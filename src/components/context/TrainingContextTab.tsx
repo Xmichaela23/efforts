@@ -123,10 +123,6 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
     High: 'Back off slightly to reduce injury and illness risk.',
   };
 
-  const verdictPermission = data.weekly_verdict
-    ? (data.weekly_verdict.label === 'high' ? 'Good to go.' : data.weekly_verdict.label === 'medium' ? 'Proceed with caution.' : 'Prioritize recovery.')
-    : null;
-
   // One-line explanations for fatigue tiers (reusable; teaches without wall of text)
   const fatigueTierCopy: Record<FatigueTier, string> = {
     Low: 'You should handle normal training well.',
@@ -171,7 +167,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
             Updated from your last 7 days
           </span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.92)' }}>
-            Current training state
+            Today
           </span>
         </div>
         <button
@@ -188,9 +184,10 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
-      {/* Context Summary: one integrated story (replaces scattered banner + plan lines) */}
+      {/* Today's context: one integrated story (summary is the hero) */}
       {data.context_summary && data.context_summary.length > 0 ? (
         <div className="instrument-card flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Today&apos;s context</p>
           <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{data.context_summary[0]}</p>
           {data.context_summary.slice(1).map((line, i) => (
             <p key={i} className="text-sm text-white/90 leading-relaxed">{line}</p>
@@ -232,11 +229,11 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
 
       <div aria-hidden="true" className="instrument-divider" />
 
-      {/* Section 1: Current Training State — state pillars + limiter */}
+      {/* Readiness factors: aerobic + structural + limiter */}
       <div className="instrument-card">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-white/50" />
-          <span className="text-sm font-medium text-white">Current Training State</span>
+          <span className="text-sm font-medium text-white">Readiness factors</span>
         </div>
         <div className="space-y-3">
           {/* Aerobic Load — helper only for Moderate/Elevated (option B) */}
@@ -321,78 +318,109 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </div>
       )}
 
-      {/* Training Guidance — title, %, tier tag, subordinate label; then action only (no re-explain when summary present) */}
-      {data.weekly_verdict ? (
-        <div className="instrument-card">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Target className="w-4 h-4 shrink-0 text-white/50" />
-              <span className="text-sm font-medium text-white">Training Guidance</span>
-            </div>
-            <div className="flex flex-col items-end shrink-0">
-              {/* Display tier only — do not use for decisions. */}
-              <div className="flex items-baseline gap-1.5">
-                <span
-                  className={`text-lg font-semibold ${
-                    data.weekly_verdict.label === 'high'
-                      ? 'text-green-400'
-                      : data.weekly_verdict.label === 'medium'
-                        ? 'text-amber-400'
-                        : 'text-white/70'
-                  }`}
-                >
-                  {data.weekly_verdict.readiness_pct}%
-                </span>
-                <span className="text-[11px] text-white/50 whitespace-nowrap">
-                  {data.weekly_verdict.readiness_pct >= 80
-                    ? 'High confidence'
-                    : data.weekly_verdict.readiness_pct >= 60
-                      ? 'Moderate confidence'
-                      : 'Low confidence'}
-                </span>
+      {/* Guidance: Recovery Day (no score) on rest; Training Readiness (index) on training with stimulus; Low-stress or Updating otherwise */}
+      {(() => {
+        // Do not infer day_type from strings; missing = show "Updating" (ship-safe).
+        const isRestDay = data.day_type === 'rest';
+        const dayTypeUnknown = data.day_type == null;
+        const hasStimulus = data.has_planned_stimulus !== false; // show score when true or undefined (legacy payload)
+
+        if (dayTypeUnknown) {
+          return (
+            <div className="instrument-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-white/50" />
+                <span className="text-sm font-medium text-white">Today</span>
               </div>
-              <p className="text-[11px] text-white/40 mt-0.5 leading-tight">Confidence to train as planned</p>
+              <p className="text-sm text-white/70">Updating today&apos;s status…</p>
+              <p className="text-xs text-white/50 mt-1">Refresh to see recovery or readiness.</p>
             </div>
-          </div>
-          {data.context_summary?.length && data.next_action ? (
-            <>
-              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
-              <p className="text-sm text-white/85 mt-0.5">{data.next_action}</p>
-            </>
-          ) : data.context_summary?.length ? (
-            <>
-              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
-              <p className="text-sm text-white/85 mt-0.5">&ldquo;{verdictPermission}&rdquo;</p>
-            </>
-          ) : (
-            <>
-              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
-              <p className="text-sm text-white/85 mt-0.5">&ldquo;{verdictPermission}&rdquo;</p>
-              <p className="text-sm text-white/80 mt-1.5">{data.weekly_verdict.message}</p>
-              {data.weekly_verdict.drivers.length > 0 && (
-                <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
+          );
+        }
+        if (isRestDay) {
+          return (
+            <div className="instrument-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-white/50" />
+                <span className="text-sm font-medium text-white">Recovery day</span>
+              </div>
+              <p className="text-sm font-medium text-white/90">What to do today:</p>
+              <p className="text-sm text-white/85 mt-0.5">{data.next_action ?? 'Rest today. Resume tomorrow.'}</p>
+              {(aerobicTier === 'Moderate' || aerobicTier === 'Elevated') && (
+                <p className="text-xs text-white/50 mt-2">Moderate fatigue is expected heading into a rest day.</p>
               )}
-            </>
-          )}
-          {data.readiness_source_date && (
-            <p className="text-xs text-white/40 mt-2">
-              {data.readiness_source_start_date
-                ? `Based on your last runs (${new Date(data.readiness_source_start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`
-                : `Based on your run on ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+            </div>
+          );
+        }
+        // Training day but low/no stimulus: no score.
+        if (data.day_type === 'training' && data.has_planned_stimulus === false) {
+          return (
+            <div className="instrument-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-white/50" />
+                <span className="text-sm font-medium text-white">Low-stress day</span>
+              </div>
+              <p className="text-sm font-medium text-white/90">What to do today:</p>
+              <p className="text-sm text-white/85 mt-0.5">{data.next_action ?? 'Follow your plan — no changes needed.'}</p>
+            </div>
+          );
+        }
+        if (data.weekly_verdict && hasStimulus) {
+          const pct = data.weekly_verdict.readiness_pct;
+          const readinessTier = pct >= 80 ? 'High' : pct >= 60 ? 'Moderate' : 'Low';
+          return (
+            <div className="instrument-card">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Target className="w-4 h-4 shrink-0 text-white/50" />
+                  <span className="text-sm font-medium text-white">Training readiness</span>
+                </div>
+                <div className="flex flex-col items-end shrink-0">
+                  <div className="flex items-baseline gap-1.5">
+                    <span
+                      className={`text-lg font-semibold ${
+                        data.weekly_verdict.label === 'high' ? 'text-green-400' : data.weekly_verdict.label === 'medium' ? 'text-amber-400' : 'text-white/70'
+                      }`}
+                    >
+                      {pct}%
+                    </span>
+                    <span className="text-[11px] text-white/50 whitespace-nowrap">{readinessTier}</span>
+                  </div>
+                  {/* Training Readiness (0–100) = scaled readiness index from aerobic tier, structural tier, adherence, load-change risk. Not a probability or % complete. */}
+                  <p
+                    className="text-[11px] text-white/40 mt-0.5 leading-tight"
+                    title="Built from aerobic fatigue, structural fatigue, adherence reliability, and rapid load increases (when present)."
+                  >
+                    A 0–100 readiness index for today&apos;s planned training.
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
+              <p className="text-sm text-white/85 mt-0.5">
+                {data.context_summary?.length && data.next_action ? data.next_action : data.weekly_verdict.label === 'high' ? 'No changes needed today.' : data.weekly_verdict.label === 'medium' ? 'Proceed with planned session; keep intensity controlled.' : 'Reduce intensity today; stay within plan.'}
+              </p>
+              {data.readiness_source_date && (
+                <p className="text-xs text-white/40 mt-2">
+                  {data.readiness_source_start_date
+                    ? `Based on your last runs (${new Date(data.readiness_source_start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`
+                    : `Based on your run on ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                </p>
+              )}
+            </div>
+          );
+        }
+        return (
+          <div className="instrument-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-4 h-4 text-white/50" />
+              <span className="text-sm font-medium text-white">Training readiness</span>
+            </div>
+            <p className="text-xs text-white/50">
+              Complete a run with HR to see your readiness for today&apos;s planned work (heart-rate drift and pace adherence).
             </p>
-          )}
-        </div>
-      ) : (
-        <div className="instrument-card">
-          <div className="flex items-center gap-2 mb-2">
-            <Target className="w-4 h-4 text-white/50" />
-            <span className="text-sm font-medium text-white">Training Guidance</span>
           </div>
-          <p className="text-xs text-white/50">
-            Complete a run with HR to see your verdict for today&apos;s work (based on heart-rate drift and pace adherence).
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Training Load Chart */}
       <TrainingLoadChart 

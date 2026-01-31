@@ -246,6 +246,10 @@ interface TrainingContextResponse {
   };
   /** Single synthesized story — one integrated Context Summary (replaces scattered banner + plan lines). */
   context_summary?: string[];
+  /** Plan day type for this date (from plan, not completed data). Gates score display on client. */
+  day_type?: 'rest' | 'training';
+  /** True when today has planned run/ride/strength/swim (not mobility-only). When false on training day, client shows Low-stress card without score. */
+  has_planned_stimulus?: boolean;
 }
 
 interface WorkoutRecord {
@@ -664,8 +668,8 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================================================
-    // CONTEXT SUMMARY (one integrated story — resolves signals, no repetition)
-    // Built from: plan phase + day type, adherence tier, limiter, projected load.
+    // CONTEXT SUMMARY (coach-grade: 4–5 lines max; no extra sentences)
+    // Structure: (1) Phase + day type, (2) On-plan + day, (3) Aerobic/Structural, (4) week intent or ACWR, (5) action.
     // ==========================================================================
     const weekIntentForSummary = planContext?.weekIntent ?? 'build';
     const pacePct = weekly_readiness?.pace_adherence_pct ?? null;
@@ -673,45 +677,36 @@ Deno.serve(async (req) => {
       pacePct == null ? null : pacePct >= 85 ? 'high' : pacePct >= 70 ? 'moderate' : 'low';
     const phaseLabel = !hasActivePlan ? 'OFF PLAN' : isRecoveryWeek ? 'RECOVERY WEEK' : isTaperWeek ? 'TAPER WEEK' : weekIntentForSummary === 'peak' ? 'PEAK WEEK' : weekIntentForSummary === 'baseline' ? 'BASELINE WEEK' : 'BUILD WEEK';
     const dayTypeLabel = todayIsRestDay ? 'REST' : 'TRAINING';
-    const aerobicWord = display_aerobic_tier === 'Low' ? 'low' : display_aerobic_tier === 'Moderate' ? 'moderate' : 'elevated';
-    const structuralWord = display_structural_tier === 'Low' ? 'fresh' : display_structural_tier === 'Moderate' ? 'moderate' : 'elevated';
+    const aerobicShort = display_aerobic_tier === 'Low' ? 'low' : display_aerobic_tier === 'Moderate' ? 'moderate' : 'elevated';
+    const structuralShort = display_structural_tier === 'Low' ? 'fresh' : display_structural_tier === 'Moderate' ? 'moderate' : 'elevated';
 
     const context_summary: string[] = [];
     context_summary.push(`${phaseLabel} — ${dayTypeLabel}`);
-    if (hasActivePlan) {
-      if (adherenceTier !== null && pacePct != null) {
-        if (adherenceTier === 'high') context_summary.push(`You're on plan and adhering well (${pacePct}%).`);
-        else if (adherenceTier === 'moderate') context_summary.push(`Moderate adherence to pace (${pacePct}%) — some variability in signals.`);
-        else context_summary.push(`Low adherence to pace (${pacePct}%) — treat readiness signals with caution.`);
+    // Line 2: on-plan + day in one line when possible (max 5 lines total).
+    if (hasActivePlan && adherenceTier !== null && pacePct != null) {
+      if (todayIsRestDay) {
+        context_summary.push(adherenceTier === 'high' ? `On plan, rest day (${pacePct}% adherence).` : adherenceTier === 'moderate' ? `On plan, rest day (${pacePct}%).` : `On plan, rest day (${pacePct}% — treat signals with caution).`);
       } else {
-        context_summary.push("You're on plan.");
-      }
-    }
-    if (todayIsRestDay && hasActivePlan) {
-      context_summary.push('This is a planned rest day.');
-      if (display_aerobic_tier === 'Moderate' || display_aerobic_tier === 'Elevated') {
-        context_summary.push('Moderate fatigue is expected heading into a rest day.');
+        context_summary.push(adherenceTier === 'high' ? `On plan (${pacePct}% adherence).` : adherenceTier === 'moderate' ? `Moderate adherence (${pacePct}%).` : `Low adherence (${pacePct}%) — treat signals with caution.`);
       }
     } else if (hasActivePlan) {
-      context_summary.push(`This is a training day in a ${phaseLabel.toLowerCase().replace(' week', '')} week.`);
+      context_summary.push(todayIsRestDay ? 'On plan, rest day.' : 'On plan.');
     } else {
-      context_summary.push(todayIsRestDay ? 'Today is a rest day.' : 'Today is a training day.');
+      context_summary.push(todayIsRestDay ? 'Rest day.' : 'Training day.');
     }
-    context_summary.push(`Your aerobic system is carrying ${aerobicWord} fatigue from recent sessions, while your structural system is ${structuralWord}.`);
-    if (hasActivePlan && projected_week_load) {
-      const label = projected_week_load.projected_label;
-      const intentSuffix =
-        isRecoveryWeek ? ' (recovery week)' : isTaperWeek ? ' (taper)' : label === 'below' && (weekIntentForSummary === 'build' || weekIntentForSummary === 'peak' || weekIntentForSummary === 'baseline') ? ' (lighter build week)' : '';
-      if (label === 'below') {
-        context_summary.push(`Planned week is lighter than your recent baseline${intentSuffix}.`);
-      } else if (label === 'in range') {
-        context_summary.push('Planned week is in line with your recent baseline.');
-      } else {
-        context_summary.push('Planned week is heavier than your recent baseline.');
-      }
-    }
+    context_summary.push(`Aerobic: ${aerobicShort} fatigue. Structural: ${structuralShort}.`);
+    // Line 4: week intent OR ACWR (one only to keep to 5 lines).
     if (acwr.ratio > 1.3 && acwr.data_days >= 7) {
       context_summary.push(acwr.ratio > 1.5 ? 'Load change risk is overreaching — avoid adding volume.' : 'Load change risk is ramping fast — avoid adding volume.');
+    } else if (hasActivePlan && projected_week_load) {
+      const label = projected_week_load.projected_label;
+      if (label === 'below') {
+        context_summary.push(isRecoveryWeek ? 'This week is intentionally lighter (recovery).' : isTaperWeek ? 'This week is intentionally lighter (taper).' : 'This week is intentionally lighter than your baseline.');
+      } else if (label === 'in range') {
+        context_summary.push('This week is in line with your baseline.');
+      } else {
+        context_summary.push('This week is heavier than your baseline.');
+      }
     }
     const next_action =
       acwr.ratio > 1.3 && acwr.data_days >= 7
@@ -752,7 +747,9 @@ Deno.serve(async (req) => {
       display_load_change_risk_helper: display_load_change_risk_helper ?? undefined,
       context_banner,
       projected_week_load,
-      context_summary
+      context_summary,
+      day_type: todayIsRestDay ? 'rest' : 'training',
+      has_planned_stimulus: todayIsRestDay ? undefined : plannedForFocusDate.some(p => ['run', 'ride', 'strength', 'swim'].includes((p.type || '').toLowerCase()))
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

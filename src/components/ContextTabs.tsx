@@ -19,7 +19,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) =
         {/* Header */}
         <div className="px-1 pt-1 pb-3 flex-shrink-0">
           <p className="text-xs text-white/40 uppercase tracking-widest mb-2">
-            Training Analysis
+            Today
           </p>
           
           {/* Tab Pills (more “mounted” like dashboard controls) */}

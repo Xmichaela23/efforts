@@ -190,6 +190,10 @@ export interface TrainingContextData {
   };
   /** Single synthesized story — one integrated Context Summary (replaces scattered banner + plan lines). */
   context_summary?: string[];
+  /** Plan day type for this date (from plan). Gates score display: no % on rest days. Do not infer from strings when missing. */
+  day_type?: 'rest' | 'training';
+  /** True when today has planned run/ride/strength/swim (not mobility-only). When false on training day, show Low-stress card without score. */
+  has_planned_stimulus?: boolean;
 }
 
 interface UseTrainingContextResult {
