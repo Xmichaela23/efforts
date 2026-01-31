@@ -205,6 +205,11 @@ interface TrainingContextResponse {
   readiness_source_date?: string | null;
   /** When verdict is from multi-run trend: start date of window (oldest run). With readiness_source_date = "Jan 15 – Jan 28". */
   readiness_source_start_date?: string | null;
+  /** Display-only: human-centric state for dumb client. Protocol: state first, constraint second. */
+  display_aerobic_tier?: 'Low' | 'Moderate' | 'Elevated';
+  display_structural_tier?: 'Low' | 'Moderate' | 'Elevated';
+  display_limiter_line?: string;
+  display_load_change_risk_label?: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching';
 }
 
 interface WorkoutRecord {
@@ -485,6 +490,42 @@ Deno.serve(async (req) => {
     const weekly_verdict = goalPrediction.weekly_verdict ?? undefined;
 
     // ==========================================================================
+    // DISPLAY-ONLY FIELDS (smart server, dumb client — no client-side derivation)
+    // ==========================================================================
+    type FatigueTier = 'Low' | 'Moderate' | 'Elevated';
+    const heartLungsStatus: 'Fresh' | 'Stable' | 'Tired' = (() => {
+      if (weekly_verdict) {
+        if (weekly_verdict.label === 'high') return 'Fresh';
+        if (weekly_verdict.label === 'medium') return 'Stable';
+        return 'Tired';
+      }
+      const trend = (weekly_readiness as { recent_form_trend?: 'improving' | 'stable' | 'worsening' } | undefined)?.recent_form_trend;
+      if (trend === 'worsening') return 'Tired';
+      if (trend === 'improving') return 'Fresh';
+      return 'Stable';
+    })();
+    const rir = avg_rir_acute ?? null;
+    const muscleJointsStatus: 'Fresh' | 'Loaded' | 'Recovering' =
+      rir == null ? 'Fresh' : rir >= 2 ? 'Fresh' : rir >= 1 ? 'Loaded' : 'Recovering';
+    const display_aerobic_tier: FatigueTier = heartLungsStatus === 'Fresh' ? 'Low' : heartLungsStatus === 'Stable' ? 'Moderate' : 'Elevated';
+    const display_structural_tier: FatigueTier = muscleJointsStatus === 'Fresh' ? 'Low' : muscleJointsStatus === 'Loaded' ? 'Moderate' : 'Elevated';
+    const tierOrder: Record<FatigueTier, number> = { Low: 0, Moderate: 1, Elevated: 2 };
+    const display_limiter_line =
+      tierOrder[display_aerobic_tier] > tierOrder[display_structural_tier]
+        ? 'Today is limited by aerobic fatigue.'
+        : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
+          ? 'Today is limited by structural fatigue.'
+          : 'No clear limiter.';
+    const display_load_change_risk_label: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching' =
+      acwr.status === 'undertrained' || acwr.status === 'recovery' || acwr.status === 'optimal_recovery'
+        ? 'Below baseline'
+        : acwr.status === 'optimal'
+          ? 'In range'
+          : acwr.status === 'elevated'
+            ? 'Ramping fast'
+            : 'Overreaching';
+
+    // ==========================================================================
     // BUILD RESPONSE
     // ==========================================================================
 
@@ -499,7 +540,11 @@ Deno.serve(async (req) => {
       weekly_verdict,
       structural_load: { acute: sportBreakdown.strength.workload, avg_rir_acute: avg_rir_acute ?? undefined },
       readiness_source_date: readiness_source_date ?? undefined,
-      readiness_source_start_date: readiness_source_start_date ?? undefined
+      readiness_source_start_date: readiness_source_start_date ?? undefined,
+      display_aerobic_tier,
+      display_structural_tier,
+      display_limiter_line,
+      display_load_change_risk_label
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

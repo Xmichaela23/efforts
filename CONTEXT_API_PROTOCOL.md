@@ -4,6 +4,13 @@
 
 **Smart server, dumb client:** All Context API logic runs on the server. The server computes ACWR, 3-run readiness, structural load, goal-predictor verdicts, and messaging; the client **only** fetches and displays the returned `weekly_verdict`, `goal_prediction`, `structural_load`, `acwr`, etc. The client does **no** readiness math, no verdict interpretation, and no goal-profile logic—display only.
 
+**Display-only fields:** To enforce dumb-client display, `generate-training-context` returns human-centric display values so the client does not derive tiers or labels from raw data. The client should prefer and render these when present; fallback derivation is only for older cached responses. Returned display fields:
+
+- **`display_aerobic_tier`** — `'Low' | 'Moderate' | 'Elevated'` (fatigue tier for Aerobic Load; from `weekly_verdict.label` or `recent_form_trend`).
+- **`display_structural_tier`** — `'Low' | 'Moderate' | 'Elevated'` (fatigue tier for Structural Load; from `avg_rir_acute`).
+- **`display_limiter_line`** — Single line: *"Today is limited by aerobic fatigue."* | *"Today is limited by structural fatigue."* | *"No clear limiter."* (deterministic: higher tier = limiter).
+- **`display_load_change_risk_label`** — `'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching'` (ACWR spec labels; see ACWR_LOAD_CHANGE_RISK_RULES.md).
+
 ---
 
 ## Purpose

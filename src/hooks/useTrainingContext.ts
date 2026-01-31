@@ -156,6 +156,11 @@ export interface TrainingContextData {
   readiness_source_date?: string | null;
   /** Start date of trend window when multi-run (oldest run); with readiness_source_date = "Jan 15 – Jan 28" */
   readiness_source_start_date?: string | null;
+  /** Server-computed display values (smart server, dumb client). Use these; fallback only for old cached responses. */
+  display_aerobic_tier?: 'Low' | 'Moderate' | 'Elevated';
+  display_structural_tier?: 'Low' | 'Moderate' | 'Elevated';
+  display_limiter_line?: string;
+  display_load_change_risk_label?: 'Below baseline' | 'In range' | 'Ramping fast' | 'Overreaching';
 }
 
 interface UseTrainingContextResult {

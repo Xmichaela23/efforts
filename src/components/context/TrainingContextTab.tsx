@@ -17,7 +17,6 @@
 import React from 'react';
 import { Loader2, RefreshCw, AlertCircle, Target, Activity, Dumbbell, TrendingUp } from 'lucide-react';
 import { useTrainingContext } from '@/hooks/useTrainingContext';
-import { ACWRGauge } from './ACWRGauge';
 import { TrainingLoadChart } from './TrainingLoadChart';
 import { SportBreakdown } from './SportBreakdown';
 import { SmartInsights } from './SmartInsights';
@@ -70,45 +69,45 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
     );
   }
 
-  // Plan-aware ACWR label: on build/baseline/peak weeks, show "Below Base" instead of "undertrained"
+  // Server-computed display values (smart server, dumb client). Fallback only for old cached responses.
+  type FatigueTier = 'Low' | 'Moderate' | 'Elevated';
+  const aerobicTier: FatigueTier = data.display_aerobic_tier ?? (() => {
+    if (data.weekly_verdict) {
+      if (data.weekly_verdict.label === 'high') return 'Low' as FatigueTier;
+      if (data.weekly_verdict.label === 'medium') return 'Moderate' as FatigueTier;
+      return 'Elevated' as FatigueTier;
+    }
+    const trend = data.weekly_readiness?.recent_form_trend;
+    if (trend === 'worsening') return 'Elevated' as FatigueTier;
+    if (trend === 'improving') return 'Low' as FatigueTier;
+    return 'Moderate' as FatigueTier;
+  })();
+  const structuralTier: FatigueTier = data.display_structural_tier ?? (() => {
+    const rir = data.structural_load?.avg_rir_acute;
+    if (rir == null || rir >= 2) return 'Low' as FatigueTier;
+    if (rir >= 1) return 'Moderate' as FatigueTier;
+    return 'Elevated' as FatigueTier;
+  })();
+  const limiterLine = data.display_limiter_line ?? (() => {
+    const o: Record<FatigueTier, number> = { Low: 0, Moderate: 1, Elevated: 2 };
+    return o[aerobicTier] > o[structuralTier] ? 'Today is limited by aerobic fatigue.'
+      : o[structuralTier] > o[aerobicTier] ? 'Today is limited by structural fatigue.'
+      : 'No clear limiter.';
+  })();
+  const loadChangeRiskLabel = data.display_load_change_risk_label ?? (
+    data.acwr.status === 'undertrained' || data.acwr.status === 'recovery' || data.acwr.status === 'optimal_recovery' ? 'Below baseline'
+    : data.acwr.status === 'optimal' ? 'In range'
+    : data.acwr.status === 'elevated' ? 'Ramping fast'
+    : 'Overreaching'
+  );
+
+  // Plan-aware ACWR label (for burnout copy only)
   const hasActivePlan = !!data.acwr.plan_context?.hasActivePlan;
   const weekIntent = data.acwr.plan_context?.weekIntent;
   const isBuildBaselinePeak = weekIntent === 'build' || weekIntent === 'baseline' || weekIntent === 'peak';
   const acwrStatusLabel = hasActivePlan && isBuildBaselinePeak && data.acwr.status === 'undertrained'
     ? 'Below Base'
     : data.acwr.status.replace('_', ' ');
-
-  // Human-centric status and coaching copy for Training Stability
-  const heartLungsStatus = (() => {
-    if (data.weekly_verdict) {
-      if (data.weekly_verdict.label === 'high') return 'Fresh';
-      if (data.weekly_verdict.label === 'medium') return 'Stable';
-      return 'Tired';
-    }
-    const trend = data.weekly_readiness?.recent_form_trend;
-    if (trend === 'worsening') return 'Tired';
-    if (trend === 'improving') return 'Fresh';
-    return 'Stable';
-  })();
-  const heartLungsCopy: Record<string, string> = {
-    Fresh: 'Your heart is working efficiently; your engine is ready for today\'s work.',
-    Stable: 'Your heart is holding steady; you can complete planned sessions with normal effort.',
-    Tired: 'Based on your last runs, your heart is working harder than usual. Keep effort easy to let your engine catch up.',
-  };
-
-  const rir = data.structural_load?.avg_rir_acute;
-  const muscleJointsStatus = rir == null
-    ? 'Fresh'
-    : rir >= 2
-      ? 'Fresh'
-      : rir >= 1
-        ? 'Loaded'
-        : 'Recovering';
-  const muscleJointsCopy: Record<string, string> = {
-    Fresh: 'Your recent lifting wasn\'t to failure; your legs are ready for impact.',
-    Loaded: 'Some fatigue from recent strength work; easy running is fine, watch intensity on key days.',
-    Recovering: 'Your recent lifting was close to failure; prioritize easy movement and let your legs recover.',
-  };
 
   const burnoutRiskStatus = (acwrStatusLabel === 'Below Base' || data.acwr.status === 'undertrained' || data.acwr.status === 'recovery' || data.acwr.status === 'optimal_recovery')
     ? 'Low'
@@ -162,10 +161,10 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
       >
         <div className="flex flex-col">
           <span className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.40)' }}>
-            Week
+            Updated from your last 7 days
           </span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.92)' }}>
-            Training Context
+            Current training state
           </span>
         </div>
         <button
@@ -189,71 +188,76 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
 
       <div aria-hidden="true" className="instrument-divider" />
 
-      {/* ACWR Gauge */}
-      <ACWRGauge acwr={data.acwr} />
-
-      {/* Training Stability (7d): human-centric labels + status-first + coaching copy */}
+      {/* Section 1: Current Training State — state pillars + limiter */}
       <div className="instrument-card">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-white/50" />
-          <span className="text-sm font-medium text-white">Training Stability (7d)</span>
+          <span className="text-sm font-medium text-white">Current Training State</span>
         </div>
         <div className="space-y-3">
-          {/* Heart & Lungs */}
+          {/* Aerobic Load */}
           <div>
             <div className="flex items-center justify-between text-sm mb-0.5">
               <div className="flex items-center gap-2 text-white/70">
                 <Activity className="w-3.5 h-3.5 text-teal-400/80" />
-                <span>Heart &amp; Lungs</span>
+                <span>Aerobic Load</span>
               </div>
-              <span className={`font-medium ${heartLungsStatus === 'Fresh' ? 'text-green-400' : heartLungsStatus === 'Tired' ? 'text-amber-400' : 'text-white/80'}`}>
-                {heartLungsStatus}
+              <span className={`font-medium ${aerobicTier === 'Low' ? 'text-green-400' : aerobicTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
+                {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
               </span>
             </div>
-            <p className="text-xs text-white/50">{heartLungsCopy[heartLungsStatus]}</p>
           </div>
-          {/* Muscle & Joints */}
+          {/* Structural Load */}
           <div>
             <div className="flex items-center justify-between text-sm mb-0.5">
               <div className="flex items-center gap-2 text-white/70">
                 <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
-                <span>Muscle &amp; Joints</span>
+                <span>Structural Load</span>
               </div>
-              <span className={`font-medium ${muscleJointsStatus === 'Fresh' ? 'text-green-400' : muscleJointsStatus === 'Recovering' ? 'text-amber-400' : 'text-white/80'}`}>
-                {muscleJointsStatus}
+              <span className={`font-medium ${structuralTier === 'Low' ? 'text-green-400' : structuralTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
+                {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
               </span>
             </div>
-            <p className="text-xs text-white/50">{muscleJointsCopy[muscleJointsStatus]}</p>
           </div>
-          {/* Burnout Risk */}
-          <div>
-            <div className="flex items-center justify-between text-sm mb-0.5">
-              <span className="flex items-center gap-2 text-white/70">
-                <TrendingUp className="w-3.5 h-3.5 text-blue-400/80" />
-                Burnout Risk
-              </span>
-              <span className={`font-medium ${burnoutRiskStatus === 'Elevated' || burnoutRiskStatus === 'High' ? 'text-amber-400' : burnoutRiskStatus === 'Good' ? 'text-green-400' : 'text-white/80'}`}>
-                {burnoutRiskStatus}
-              </span>
-            </div>
-            {acwrStatusLabel === 'Below Base' ? (
-              <p className="text-xs text-white/50">
-                On your plan, low ACWR means you’re below your planned baseline—not undertrained. Use it as a “vs baseline” signal, not a cue to add volume.
-              </p>
-            ) : (
-              <p className="text-xs text-white/50">{burnoutRiskCopy[burnoutRiskStatus]}</p>
-            )}
-          </div>
+          {/* Limiter line (deterministic: higher tier = limiter) */}
+          <p className="text-sm text-white/80 pt-1 border-t border-white/10">{limiterLine}</p>
         </div>
       </div>
 
-      {/* The Verdict: permission-based readiness for today's work */}
+      {/* Section 2: Why (compact — drivers only, no data dump) */}
+      <div className="instrument-card py-2.5 px-3">
+        <p className="text-xs text-white/50">
+          <span className="text-white/70">Aerobic Load (based on):</span> HR drift trend, pace adherence, last 3 runs.
+        </p>
+        <p className="text-xs text-white/50 mt-1">
+          <span className="text-white/70">Structural Load (based on):</span> lifting volume (7d), avg RIR (7d).
+        </p>
+      </div>
+
+      {/* Section 3: Load Change Risk — minimal row (no gauge, no "Undertrained") */}
+      {data.acwr.data_days < 7 ? (
+        <div className="text-xs text-white/50 py-2 px-3">
+          Train for {7 - data.acwr.data_days} more day{7 - data.acwr.data_days !== 1 ? 's' : ''} to unlock load change risk.
+        </div>
+      ) : (
+        <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
+          <span className="text-white/60">Load Change Risk</span>
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
+            <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
+              {loadChangeRiskLabel}
+            </span>
+          </span>
+        </div>
+      )}
+
+      {/* Section 4: Training Guidance (Verdict) */}
       {data.weekly_verdict ? (
         <div className="instrument-card">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-white/50" />
-              <span className="text-sm font-medium text-white">The Verdict</span>
+              <span className="text-sm font-medium text-white">Training Guidance</span>
             </div>
             <span
               className={`text-lg font-semibold ${
@@ -284,7 +288,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         <div className="instrument-card">
           <div className="flex items-center gap-2 mb-2">
             <Target className="w-4 h-4 text-white/50" />
-            <span className="text-sm font-medium text-white">The Verdict</span>
+            <span className="text-sm font-medium text-white">Training Guidance</span>
           </div>
           <p className="text-xs text-white/50">
             Complete a run with HR to see your verdict for today&apos;s work (based on heart-rate drift and pace adherence).
