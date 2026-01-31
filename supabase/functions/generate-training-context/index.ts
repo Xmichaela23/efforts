@@ -77,6 +77,17 @@ interface PlanContext {
   weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
   weekFocusLabel: string | null;
   planName: string | null;
+  /** Plan length (weeks). Enables "Week X of Y". */
+  duration_weeks?: number | null;
+  /** Weeks left to plan end (or to race if race_date set). Enables "Z weeks to go". */
+  weeks_remaining?: number | null;
+  /** Race/goal date (ISO). Enables "Z weeks to race". */
+  race_date?: string | null;
+  /** Target finish time (seconds). Passed to goal predictor for marathon/speed plans. */
+  target_finish_time_seconds?: number | null;
+  /** Next week's intent (from plan design). Enables "what's coming up" in general state. */
+  next_week_intent?: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown' | null;
+  next_week_focus_label?: string | null;
 }
 
 interface PlanProgress {
@@ -504,7 +515,22 @@ Deno.serve(async (req) => {
         : undefined;
     const goalPrediction = runGoalPredictor({
       weekly: weeklyInput,
-      plan: planContext?.planName ? { target_finish_time_seconds: null, race_name: planContext.planName } : null
+      plan: planContext?.planName
+        ? {
+            target_finish_time_seconds: planContext.target_finish_time_seconds ?? null,
+            race_name: planContext.planName,
+            goal_profile: null
+          }
+        : null,
+      weekly_plan_context: planContext?.hasActivePlan
+        ? {
+            week_intent: planContext.weekIntent,
+            is_recovery_week: planContext.isRecoveryWeek,
+            is_taper_week: planContext.isTaperWeek,
+            next_week_intent: planContext.next_week_intent ?? null,
+            weeks_remaining: planContext.weeks_remaining ?? null
+          }
+        : null
     });
     const weekly_verdict = goalPrediction.weekly_verdict ?? undefined;
 
@@ -554,10 +580,12 @@ Deno.serve(async (req) => {
 
     // ==========================================================================
     // CONTEXT BANNER (never lead with ACWR — plan + limiter + guidance first)
+    // Sync with plan: on rest days (no planned workout today), say so.
     // ==========================================================================
     const hasActivePlan = planContext?.hasActivePlan ?? false;
     const isRecoveryWeek = planContext?.isRecoveryWeek ?? false;
     const isTaperWeek = planContext?.isTaperWeek ?? false;
+    const todayIsRestDay = hasActivePlan && plannedForFocusDate.length === 0;
     let context_banner: TrainingContextResponse['context_banner'] | undefined;
     if (display_limiter_line) {
       const line1 =
@@ -566,14 +594,16 @@ Deno.serve(async (req) => {
           : hasActivePlan
             ? 'On plan — stay the course.'
             : 'Off plan — adjust this week.';
-      const line2 = display_limiter_line;
-      const line3 = weekly_verdict
-        ? weekly_verdict.label === 'high'
-          ? 'Proceed with planned sessions.'
-          : weekly_verdict.label === 'medium'
-            ? 'Proceed with caution.'
-            : 'Prioritize recovery.'
-        : 'Follow your planned sessions.';
+      const line2 = todayIsRestDay ? 'Today is a rest day.' : display_limiter_line;
+      const line3 = todayIsRestDay
+        ? 'No planned work — prioritize recovery.'
+        : weekly_verdict
+          ? weekly_verdict.label === 'high'
+            ? 'Proceed with planned sessions.'
+            : weekly_verdict.label === 'medium'
+              ? 'Proceed with caution.'
+              : 'Prioritize recovery.'
+          : 'Follow your planned sessions.';
       const acwr_clause =
         acwr.ratio > 1.3
           ? acwr.ratio > 1.5
@@ -876,7 +906,13 @@ async function fetchPlanContext(
     isTaperWeek: false,
     weekIntent: 'unknown',
     weekFocusLabel: null,
-    planName: null
+    planName: null,
+    duration_weeks: null,
+    weeks_remaining: null,
+    race_date: null,
+    target_finish_time_seconds: null,
+    next_week_intent: null,
+    next_week_focus_label: null
   };
 
   try {
@@ -1050,7 +1086,57 @@ async function fetchPlanContext(
       weekIntent = 'build';
     }
 
-    console.log(`📋 Plan context: week=${weekIndex}, intent=${weekIntent}, recovery=${isRecoveryWeek}, taper=${isTaperWeek}`);
+    // Next week's intent (what's coming up — plan design)
+    let next_week_intent: PlanContext['next_week_intent'] = null;
+    let next_week_focus_label: string | null = null;
+    const nextWeekIndex = weekIndex + 1;
+    if (durationWeeks == null || nextWeekIndex <= durationWeeks) {
+      const nextWeekSummary = weeklySummaries[String(nextWeekIndex)] || {};
+      next_week_focus_label = nextWeekSummary.focus || null;
+      if (next_week_focus_label) {
+        const nextLower = next_week_focus_label.toLowerCase();
+        if (nextLower.includes('recovery') || nextLower.includes('recovery week')) next_week_intent = 'recovery';
+        else if (nextLower.includes('taper') || nextLower.includes('taper week')) next_week_intent = 'taper';
+        else if (nextLower.includes('peak')) next_week_intent = 'peak';
+        else if (nextLower.includes('base')) next_week_intent = 'baseline';
+        else next_week_intent = 'build';
+      } else if (config.phases) {
+        for (const [, phaseData] of Object.entries(config.phases)) {
+          const phase = phaseData as any;
+          if (phase.weeks && phase.weeks.includes(nextWeekIndex)) {
+            const name = (phase as any).name || '';
+            if (name.toLowerCase().includes('taper')) next_week_intent = 'taper';
+            else if (name.toLowerCase().includes('peak')) next_week_intent = 'peak';
+            else if (name.toLowerCase().includes('base')) next_week_intent = 'baseline';
+            else if (phase.recovery_weeks && phase.recovery_weeks.includes(nextWeekIndex)) next_week_intent = 'recovery';
+            else next_week_intent = 'build';
+            break;
+          }
+        }
+      }
+      if (next_week_intent === null) next_week_intent = 'build';
+    }
+
+    // Plan length and goal (science of the plan)
+    const durationWeeksNum = durationWeeks > 0 ? durationWeeks : null;
+    const raceDateStr = config.race_date || config.goal_date || null;
+    const targetSeconds =
+      config.target_time != null && Number.isFinite(Number(config.target_time))
+        ? Number(config.target_time)
+        : config.marathon_target_seconds != null && Number.isFinite(Number(config.marathon_target_seconds))
+          ? Number(config.marathon_target_seconds)
+          : null;
+    let weeksRemaining: number | null = null;
+    if (raceDateStr) {
+      const raceDate = new Date(raceDateStr);
+      const now = new Date(focusDateISO);
+      const diffMs = raceDate.getTime() - now.getTime();
+      weeksRemaining = Math.max(0, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000)));
+    } else if (durationWeeksNum != null && weekIndex != null) {
+      weeksRemaining = Math.max(0, durationWeeksNum - weekIndex);
+    }
+
+    console.log(`📋 Plan context: week=${weekIndex}, intent=${weekIntent}, recovery=${isRecoveryWeek}, taper=${isTaperWeek}, duration=${durationWeeksNum}, weeks_remaining=${weeksRemaining}, race_date=${raceDateStr ? 'set' : 'none'}`);
 
     return {
       hasActivePlan: true,
@@ -1062,7 +1148,13 @@ async function fetchPlanContext(
       isTaperWeek,
       weekIntent,
       weekFocusLabel,
-      planName: plan.name
+      planName: plan.name,
+      duration_weeks: durationWeeksNum ?? undefined,
+      weeks_remaining: weeksRemaining ?? undefined,
+      race_date: raceDateStr ?? undefined,
+      target_finish_time_seconds: targetSeconds ?? undefined,
+      next_week_intent: next_week_intent ?? undefined,
+      next_week_focus_label: next_week_focus_label ?? undefined
     };
 
   } catch (error) {

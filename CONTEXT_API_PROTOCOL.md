@@ -83,6 +83,22 @@ The protocol’s math relies on **actual workload** and **ID-matching**, not lea
 - **Pace adherence logic:** "Plan pace targets" are used **only when a completed run is explicitly linked to a `planned_id`** (and that planned workout has pace/steps). Otherwise, the analyzer uses structure-based adherence (e.g. Z2 gating, workout type).
 - **Unified algorithm:** There are **not** two separate code paths for "plan mode" vs "no-plan mode." There is a **single readiness logic**; **messaging** (and ACWR insight wording) adjusts based on `goal_profile` and plan context (e.g. "on plan" vs "below base").
 
+### Plan science (length, goal, what's coming)
+
+The Context API uses the **science of the plan** so verdicts and copy align with periodization and goal:
+
+- **Plan length:** `duration_weeks` (from plan config) and current `weekIndex` enable "Week X of Y" and weeks remaining to plan end.
+- **Goal / race:** `race_date` (or `goal_date`) and `target_finish_time_seconds` (from plan config) are passed into the goal predictor. Weekly context now passes **target finish time** and **race name** to the predictor (same as Block context), so marathon/speed plans get goal-aware messaging. `weeks_remaining` is computed to race date when set, else to plan end.
+- **What's coming:** Current week intent (build/recovery/taper/peak), rest-day detection (no planned workout today), projected week load (completed + planned remaining), and **next week intent** (`next_week_intent`, `next_week_focus_label` from plan design) are used so the system understands what's ahead. UI can show "Next week: recovery" (or build/taper) when available.
+
+### General state: what's happened + what the plan was designed for + what's coming up
+
+The user's **general state** on the Context screen is derived from all three. The **primary purpose** of plan context (current week intent, next week intent, weeks to race) is for the **system to understand why** the user is where they are (HR drift, fatigue) — so the verdict **message** interprets readiness in light of the plan, not to display "Week X of Y" or "Next week: recovery" as the main goal.
+
+1. **What has happened:** Completed load (acute 7d, chronic 28d → ACWR, week comparison), last runs (HR drift, pace adherence → readiness / aerobic fatigue), strength in acute window (structural load, avg RIR → structural fatigue), and plan progress (completed vs planned to-date → on track / behind / ahead).
+2. **What the plan was designed for:** Goal (plan name, target time, race date → goal profile and goal-aware messaging), current week intent (build/recovery/taper/peak → "down-week by design," ACWR thresholds, insights), and phase (from config.phases). **Interpretation:** The goal predictor receives `weekly_plan_context` (week_intent, is_recovery_week, is_taper_week, next_week_intent, weeks_remaining) and uses it to **contextualize the verdict message** — e.g. "Expected after your build — use this week to recover," "Taper fatigue is normal; prioritize rest," "Build week — prioritize sleep and stick to the plan," "Recovery is scheduled next week," "Race is close — trust your taper." So HR drift and fatigue are explained *in light of* the plan.
+3. **What's coming up:** Remaining planned load this week (projected week load), rest day today (no planned workout), next week intent (fed into verdict interpretation), and weeks to race or to plan end. Verdict and banner copy use this so "proceed with caution" vs "rest day" vs "down-week by design" align with the plan, and the **message** explains why the user is where they are.
+
 ---
 
 ## 3. Cross-Discipline Interference

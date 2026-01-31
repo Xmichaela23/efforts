@@ -181,6 +181,24 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
+      {/* Plan science: length + what's coming (when available) */}
+      {data.acwr?.plan_context?.hasActivePlan && (data.acwr.plan_context.weekIndex != null || data.acwr.plan_context.weeks_remaining != null) && (
+        <div className="text-xs text-white/50 px-1 flex flex-wrap gap-x-2">
+          {data.acwr.plan_context.weekIndex != null && data.acwr.plan_context.duration_weeks != null && (
+            <span>Week {data.acwr.plan_context.weekIndex} of {data.acwr.plan_context.duration_weeks}</span>
+          )}
+          {data.acwr.plan_context.weekIndex != null && !data.acwr.plan_context.duration_weeks && (
+            <span>Week {data.acwr.plan_context.weekIndex}</span>
+          )}
+          {data.acwr.plan_context.weeks_remaining != null && (
+            <span>{data.acwr.plan_context.race_date ? `${data.acwr.plan_context.weeks_remaining} weeks to race` : `${data.acwr.plan_context.weeks_remaining} weeks to go`}</span>
+          )}
+          {data.acwr.plan_context.next_week_intent != null && data.acwr.plan_context.next_week_intent !== 'unknown' && (
+            <span>Next week: {data.acwr.plan_context.next_week_focus_label || data.acwr.plan_context.next_week_intent}</span>
+          )}
+        </div>
+      )}
+
       {/* Top banner: plan + limiter + guidance (never leads with ACWR) */}
       {data.context_banner && (
         <div className="instrument-card flex flex-col gap-1.5">

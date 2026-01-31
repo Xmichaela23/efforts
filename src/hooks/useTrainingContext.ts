@@ -41,6 +41,12 @@ export interface ACWRData {
     weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
     weekFocusLabel: string | null;
     planName: string | null;
+    duration_weeks?: number | null;
+    weeks_remaining?: number | null;
+    race_date?: string | null;
+    target_finish_time_seconds?: number | null;
+    next_week_intent?: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown' | null;
+    next_week_focus_label?: string | null;
   };
   projected?: {
     ratio: number;

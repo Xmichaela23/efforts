@@ -43,11 +43,22 @@ export interface GoalPredictorPlanInput {
   goal_profile?: GoalProfile | null;
 }
 
+/** Plan context for the current week — used to interpret why the user is where they are (HR drift, fatigue), not for display. */
+export interface WeeklyPlanContextInput {
+  week_intent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+  is_recovery_week: boolean;
+  is_taper_week: boolean;
+  next_week_intent?: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown' | null;
+  weeks_remaining?: number | null;
+}
+
 export interface GoalPredictorInput {
   weekly?: WeeklyReadinessInput | null;
   block?: BlockTrajectoryInput | null;
   plan?: GoalPredictorPlanInput | null;
   goal_profile?: GoalProfile | null;
+  /** Plan context for this week — used to interpret readiness/fatigue in light of the plan. */
+  weekly_plan_context?: WeeklyPlanContextInput | null;
 }
 
 export interface CurrentConfidenceResult {
@@ -172,12 +183,50 @@ const STRUCTURAL_LOAD_ACUTE_THRESHOLD = 40;
 /** Avg RIR below this = deep fatigue; trigger structural message even if volume isn't high */
 const AVG_RIR_DEEP_FATIGUE_THRESHOLD = 1.5;
 
+/**
+ * Contextualize the verdict message using plan context — so the system explains *why* the user
+ * is where they are (HR drift, fatigue) in light of what the plan was designed for and what's coming.
+ */
+function contextualizeVerdictWithPlan(
+  baseMessage: string,
+  ctx: WeeklyPlanContextInput | null | undefined,
+  label: 'high' | 'medium' | 'low'
+): string {
+  if (!ctx) return baseMessage;
+  const { week_intent, is_recovery_week, is_taper_week, next_week_intent, weeks_remaining } = ctx;
+  const parts: string[] = [];
+
+  if (is_recovery_week) {
+    if (label === 'medium' || label === 'low')
+      parts.push('Expected after your build — use this week to recover.');
+    else
+      parts.push('Recovery week by design; you\'re absorbing the load well.');
+  } else if (is_taper_week) {
+    if (label === 'medium' || label === 'low')
+      parts.push('Taper fatigue is normal; prioritize rest and sleep.');
+    else
+      parts.push('Taper week — you\'re ready.');
+  } else if (week_intent === 'build' || week_intent === 'peak' || week_intent === 'baseline') {
+    if (label === 'medium' || label === 'low')
+      parts.push('Build week — prioritize sleep and stick to the plan.');
+    if (next_week_intent === 'recovery' && (label === 'medium' || label === 'low'))
+      parts.push('Recovery is scheduled next week.');
+  }
+
+  if (weeks_remaining != null && weeks_remaining <= 2 && weeks_remaining >= 0 && (label === 'medium' || label === 'low'))
+    parts.push('Race is close — trust your taper.');
+
+  if (parts.length === 0) return baseMessage;
+  return `${baseMessage} ${parts.join(' ')}`;
+}
+
 function buildWeeklyVerdictMessage(
   profile: GoalProfile,
   cc: CurrentConfidenceResult,
   hrDriftBpm: number | null,
   structuralLoadAcute: number | null | undefined,
-  avgRirAcute: number | null | undefined
+  avgRirAcute: number | null | undefined,
+  weeklyPlanContext: WeeklyPlanContextInput | null | undefined
 ): string {
   const drift = hrDriftBpm ?? 0;
   const driftPhrase = drift <= 0 ? '0 bpm drift' : `+${drift} bpm drift`;
@@ -192,42 +241,45 @@ function buildWeeklyVerdictMessage(
         : ' Your heart is ready, but your legs need an easy day. Stick to the slow end of your pace targets to avoid mechanical injury.')
     : '';
 
+  let base: string;
   switch (profile) {
     case 'marathon':
-      return (
-        (cc.label === 'high'
+      base =
+        cc.label === 'high'
           ? `Your ${driftPhrase} suggests you've recovered. You are ready for this week's intensity.`
           : cc.label === 'medium'
             ? "You're in a good place to complete planned sessions; watch effort on key days."
-            : "Prioritize recovery and stick to the lower end of pace targets if needed.") + structuralVsCardioSuffix
-      );
+            : "Prioritize recovery and stick to the lower end of pace targets if needed.";
+      break;
     case 'strength':
-      return (
-        (cc.label === 'high'
+      base =
+        cc.label === 'high'
           ? "Your recovery signals suggest you're ready. Go hard today."
           : cc.label === 'medium'
             ? "You're in a good place for today's load; consider capping RPE on accessory work."
-            : "Prioritize recovery; consider reducing volume or intensity today.") + structuralVsCardioSuffix
-      );
+            : "Prioritize recovery; consider reducing volume or intensity today.";
+      break;
     case 'speed':
-      return (
-        (cc.label === 'high'
+      base =
+        cc.label === 'high'
           ? "Pace adherence and HR data support high-intensity readiness. Go hard today."
           : cc.label === 'medium'
             ? "You're in a good place; expect to hit targets if you nail warm-up and pacing."
-            : "Expect ~5% slower pace adherence; prioritize form over speed today.") + structuralVsCardioSuffix
-      );
+            : "Expect ~5% slower pace adherence; prioritize form over speed today.";
+      break;
     case 'power':
-      return (
-        (cc.label === 'high'
+      base =
+        cc.label === 'high'
           ? `Your ${driftPhrase} suggests you've recovered from recent power work. Go hard today.`
           : cc.label === 'medium'
             ? "You're in a good place for intervals; monitor HR drift on base work."
-            : "Aerobic stress may be elevated; consider Z2 focus or lighter intervals today.") + structuralVsCardioSuffix
-      );
+            : "Aerobic stress may be elevated; consider Z2 focus or lighter intervals today.";
+      break;
     default:
-      return cc.message + structuralVsCardioSuffix;
+      base = cc.message;
   }
+  const withStructural = base + structuralVsCardioSuffix;
+  return contextualizeVerdictWithPlan(withStructural, weeklyPlanContext, cc.label);
 }
 
 function buildBlockVerdict(
@@ -480,7 +532,7 @@ export function runGoalPredictor(input: GoalPredictorInput): GoalPredictionResul
     }
     weekly_verdict = {
       readiness_pct: current_confidence.score,
-      message: buildWeeklyVerdictMessage(goal_profile, current_confidence, input.weekly?.hr_drift_bpm ?? null, structuralLoadAcute, avgRirAcute),
+      message: buildWeeklyVerdictMessage(goal_profile, current_confidence, input.weekly?.hr_drift_bpm ?? null, structuralLoadAcute, avgRirAcute, input.weekly_plan_context ?? null),
       drivers,
       label: current_confidence.label,
     };
