@@ -78,6 +78,56 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
     ? 'Below Base'
     : data.acwr.status.replace('_', ' ');
 
+  // Human-centric status and coaching copy for Training Stability
+  const heartLungsStatus = (() => {
+    if (data.weekly_verdict) {
+      if (data.weekly_verdict.label === 'high') return 'Fresh';
+      if (data.weekly_verdict.label === 'medium') return 'Stable';
+      return 'Tired';
+    }
+    const trend = data.weekly_readiness?.recent_form_trend;
+    if (trend === 'worsening') return 'Tired';
+    if (trend === 'improving') return 'Fresh';
+    return 'Stable';
+  })();
+  const heartLungsCopy: Record<string, string> = {
+    Fresh: 'Your heart is working efficiently; your engine is ready for today\'s work.',
+    Stable: 'Your heart is holding steady; you can complete planned sessions with normal effort.',
+    Tired: 'Based on your last runs, your heart is working harder than usual. Keep effort easy to let your engine catch up.',
+  };
+
+  const rir = data.structural_load?.avg_rir_acute;
+  const muscleJointsStatus = rir == null
+    ? 'Fresh'
+    : rir >= 2
+      ? 'Fresh'
+      : rir >= 1
+        ? 'Loaded'
+        : 'Recovering';
+  const muscleJointsCopy: Record<string, string> = {
+    Fresh: 'Your recent lifting wasn\'t to failure; your legs are ready for impact.',
+    Loaded: 'Some fatigue from recent strength work; easy running is fine, watch intensity on key days.',
+    Recovering: 'Your recent lifting was close to failure; prioritize easy movement and let your legs recover.',
+  };
+
+  const burnoutRiskStatus = (acwrStatusLabel === 'Below Base' || data.acwr.status === 'undertrained' || data.acwr.status === 'recovery' || data.acwr.status === 'optimal_recovery')
+    ? 'Low'
+    : data.acwr.status === 'optimal'
+      ? 'Good'
+      : data.acwr.status === 'elevated'
+        ? 'Elevated'
+        : 'High';
+  const burnoutRiskCopy: Record<string, string> = {
+    Low: 'You aren\'t adding mileage too fast for your current base.',
+    Good: 'Your training load is in a safe progression zone.',
+    Elevated: 'Volume is building; prioritize recovery and sleep.',
+    High: 'Back off slightly to reduce injury and illness risk.',
+  };
+
+  const verdictPermission = data.weekly_verdict
+    ? (data.weekly_verdict.label === 'high' ? 'Good to go.' : data.weekly_verdict.label === 'medium' ? 'Proceed with caution.' : 'Prioritize recovery.')
+    : null;
+
   return (
     <div className="space-y-3 pb-6">
       {/* Cockpit strip (matches dashboard week strip language) */}
@@ -142,77 +192,68 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
       {/* ACWR Gauge */}
       <ACWRGauge acwr={data.acwr} />
 
-      {/* Training Stability: three pillars (7-day window) — how HR drift trend responds to ACWR and structural load */}
+      {/* Training Stability (7d): human-centric labels + status-first + coaching copy */}
       <div className="instrument-card">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-white/50" />
           <span className="text-sm font-medium text-white">Training Stability (7d)</span>
         </div>
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 text-white/70">
-              <Activity className="w-3.5 h-3.5 text-teal-400/80" />
-              <span>Aerobic form</span>
-              {data.weekly_readiness?.recent_form_trend && (
-                <span className={`text-xs capitalize ${data.weekly_readiness.recent_form_trend === 'improving' ? 'text-emerald-400' : data.weekly_readiness.recent_form_trend === 'worsening' ? 'text-amber-400' : 'text-white/50'}`}>
-                  ({data.weekly_readiness.recent_form_trend})
-                </span>
-              )}
+        <div className="space-y-3">
+          {/* Heart & Lungs */}
+          <div>
+            <div className="flex items-center justify-between text-sm mb-0.5">
+              <div className="flex items-center gap-2 text-white/70">
+                <Activity className="w-3.5 h-3.5 text-teal-400/80" />
+                <span>Heart &amp; Lungs</span>
+              </div>
+              <span className={`font-medium ${heartLungsStatus === 'Fresh' ? 'text-green-400' : heartLungsStatus === 'Tired' ? 'text-amber-400' : 'text-white/80'}`}>
+                {heartLungsStatus}
+              </span>
             </div>
-            <span className="text-white/90">
-              {data.weekly_verdict ? (
-                <span className={data.weekly_verdict.label === 'high' ? 'text-green-400' : data.weekly_verdict.label === 'medium' ? 'text-amber-400' : 'text-white/70'}>
-                  {data.weekly_verdict.label}
-                </span>
-              ) : data.weekly_readiness?.hr_drift_bpm != null || data.weekly_readiness?.pace_adherence_pct != null ? (
-                `${data.weekly_readiness?.hr_drift_bpm ?? '—'} bpm drift, ${data.weekly_readiness?.pace_adherence_pct ?? '—'}% pace`
-              ) : (
-                <span className="text-white/50">No run data</span>
-              )}
-            </span>
+            <p className="text-xs text-white/50">{heartLungsCopy[heartLungsStatus]}</p>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 text-white/70">
-              <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
-              <span>Structural load</span>
+          {/* Muscle & Joints */}
+          <div>
+            <div className="flex items-center justify-between text-sm mb-0.5">
+              <div className="flex items-center gap-2 text-white/70">
+                <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
+                <span>Muscle &amp; Joints</span>
+              </div>
+              <span className={`font-medium ${muscleJointsStatus === 'Fresh' ? 'text-green-400' : muscleJointsStatus === 'Recovering' ? 'text-amber-400' : 'text-white/80'}`}>
+                {muscleJointsStatus}
+              </span>
             </div>
-            <span className="text-white/90">
-              {data.structural_load != null ? (
-                <>
-                  <span>{data.structural_load.acute}</span>
-                  {data.structural_load.avg_rir_acute != null && (
-                    <span className="text-white/50 ml-1">(avg RIR {data.structural_load.avg_rir_acute})</span>
-                  )}
-                </>
-              ) : (
-                <span className="text-white/50">—</span>
-              )}
-            </span>
+            <p className="text-xs text-white/50">{muscleJointsCopy[muscleJointsStatus]}</p>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 text-white/70">
-              <TrendingUp className="w-3.5 h-3.5 text-blue-400/80" />
-              Systemic risk (ACWR)
-            </span>
-            <span className={`font-medium ${data.acwr.status === 'elevated' || data.acwr.status === 'high_risk' ? 'text-amber-400' : data.acwr.status === 'optimal' || data.acwr.status === 'optimal_recovery' ? 'text-green-400' : 'text-white/80'}`}>
-              {data.acwr.ratio.toFixed(2)} — {acwrStatusLabel}
-            </span>
+          {/* Burnout Risk */}
+          <div>
+            <div className="flex items-center justify-between text-sm mb-0.5">
+              <span className="flex items-center gap-2 text-white/70">
+                <TrendingUp className="w-3.5 h-3.5 text-blue-400/80" />
+                Burnout Risk
+              </span>
+              <span className={`font-medium ${burnoutRiskStatus === 'Elevated' || burnoutRiskStatus === 'High' ? 'text-amber-400' : burnoutRiskStatus === 'Good' ? 'text-green-400' : 'text-white/80'}`}>
+                {burnoutRiskStatus}
+              </span>
+            </div>
+            {acwrStatusLabel === 'Below Base' ? (
+              <p className="text-xs text-white/50">
+                On your plan, low ACWR means you’re below your planned baseline—not undertrained. Use it as a “vs baseline” signal, not a cue to add volume.
+              </p>
+            ) : (
+              <p className="text-xs text-white/50">{burnoutRiskCopy[burnoutRiskStatus]}</p>
+            )}
           </div>
-          {acwrStatusLabel === 'Below Base' && (
-            <p className="text-xs text-white/50 mt-1.5 pt-1.5 border-t border-white/10">
-              On your plan, low ACWR here means you’re below your planned baseline—not undertrained. Use it as a “vs baseline” signal, not a cue to add volume.
-            </p>
-          )}
         </div>
       </div>
 
-      {/* Readiness: server-computed weekly verdict ("Am I ready for today's specific work?") */}
+      {/* The Verdict: permission-based readiness for today's work */}
       {data.weekly_verdict ? (
         <div className="instrument-card">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Target className="w-4 h-4 text-white/50" />
-              <span className="text-sm font-medium text-white">Readiness</span>
+              <span className="text-sm font-medium text-white">The Verdict</span>
             </div>
             <span
               className={`text-lg font-semibold ${
@@ -226,6 +267,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               {data.weekly_verdict.readiness_pct}%
             </span>
           </div>
+          <p className="text-sm font-medium text-white/90 mb-1.5">&ldquo;{verdictPermission}&rdquo;</p>
           <p className="text-sm text-white/80">{data.weekly_verdict.message}</p>
           {data.weekly_verdict.drivers.length > 0 && (
             <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
@@ -242,10 +284,10 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         <div className="instrument-card">
           <div className="flex items-center gap-2 mb-2">
             <Target className="w-4 h-4 text-white/50" />
-            <span className="text-sm font-medium text-white">Readiness</span>
+            <span className="text-sm font-medium text-white">The Verdict</span>
           </div>
           <p className="text-xs text-white/50">
-            Complete a run with HR to see how ready you are for today&apos;s work (based on HR drift and pace adherence).
+            Complete a run with HR to see your verdict for today&apos;s work (based on heart-rate drift and pace adherence).
           </p>
         </div>
       )}
