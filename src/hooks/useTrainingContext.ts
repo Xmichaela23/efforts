@@ -169,7 +169,7 @@ export interface TrainingContextData {
   display_limiter_label?: string;
   /** One-line next action (mirrors summary close); use in Training Guidance card. */
   next_action?: string;
-  display_load_change_risk_label?: 'Below baseline' | 'Below baseline (planned)' | 'In range' | 'Ramping fast' | 'Overreaching';
+  display_load_change_risk_label?: string;
   display_load_change_risk_helper?: string | null;
   /** Top banner: plan + limiter + guidance (never leads with ACWR). */
   context_banner?: {
@@ -194,6 +194,18 @@ export interface TrainingContextData {
   day_type?: 'rest' | 'training';
   /** True when today has planned run/ride/strength/swim (not mobility-only). When false on training day, show Low-stress card without score. */
   has_planned_stimulus?: boolean;
+  /** Plan-native check-in: week, today/next workouts, completion %. When present, client leads with Plan Check-in card. */
+  plan_checkin?: {
+    plan_name: string;
+    plan_week_index: number;
+    plan_week_total: number;
+    plan_phase_label: string;
+    today_planned_workout: { title: string; type: string; duration?: number; intensity_tag?: string } | null;
+    next_planned_workout: { title: string; type: string; date: string; day_label: string } | null;
+    week_completion_pct: number;
+    week_adherence_tier: 'high' | 'moderate' | 'low';
+    plan_is_active: boolean;
+  };
 }
 
 interface UseTrainingContextResult {

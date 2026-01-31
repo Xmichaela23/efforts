@@ -184,10 +184,17 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
-      {/* Today's context: one integrated story (summary is the hero) */}
+      {/* Plan Check-in (when on plan) or Today's context: plan-driven narrative */}
       {data.context_summary && data.context_summary.length > 0 ? (
         <div className="instrument-card flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Today&apos;s context</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
+            {data.plan_checkin?.plan_is_active ? 'Plan Check-in' : "Today's context"}
+          </p>
+          {data.plan_checkin?.plan_is_active && (
+            <p className="text-xs uppercase tracking-wider text-white/40">
+              Week {data.plan_checkin.plan_week_index} of {data.plan_checkin.plan_week_total} — {data.plan_checkin.plan_phase_label}
+            </p>
+          )}
           <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{data.context_summary[0]}</p>
           {data.context_summary.slice(1).map((line, i) => (
             <p key={i} className="text-sm text-white/90 leading-relaxed">{line}</p>
@@ -229,11 +236,11 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
 
       <div aria-hidden="true" className="instrument-divider" />
 
-      {/* Readiness factors: aerobic + structural + limiter */}
+      {/* Today's signals: aerobic + structural + limiter (state, not prescription) */}
       <div className="instrument-card">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-white/50" />
-          <span className="text-sm font-medium text-white">Readiness factors</span>
+          <span className="text-sm font-medium text-white">Today&apos;s signals</span>
         </div>
         <div className="space-y-3">
           {/* Aerobic Load — helper only for Moderate/Elevated (option B) */}
@@ -273,18 +280,18 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </div>
       </div>
 
-      {/* Why (collapsed by default — supports summary, not duplicate) */}
+      {/* Why (collapsed; instrumentation language) */}
       <details className="instrument-card py-2 px-3" open={false}>
         <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
           <span className="text-white/60">Why</span>
-          <span className="text-white/40">— Aerobic: HR drift, pace adherence, last 3 runs. Structural: volume (7d), avg RIR (7d).</span>
+          <span className="text-white/40">Aerobic (recent run efficiency, HR drift, pace adherence). Structural (strength volume, avg RIR).</span>
         </summary>
         <div className="mt-2 pt-2 border-t border-white/10">
           <p className="text-xs text-white/50">
-            <span className="text-white/70">Aerobic Load (based on):</span> HR drift trend, pace adherence, last 3 runs.
+            <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, pace adherence.
           </p>
           <p className="text-xs text-white/50 mt-1">
-            <span className="text-white/70">Structural Load (based on):</span> lifting volume (7d), avg RIR (7d).
+            <span className="text-white/70">Structural:</span> strength volume (7d), avg RIR (7d).
           </p>
         </div>
       </details>
@@ -342,10 +349,9 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
             <div className="instrument-card">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-white/50" />
-                <span className="text-sm font-medium text-white">Recovery day</span>
+                <span className="text-sm font-medium text-white">Today</span>
               </div>
-              <p className="text-sm font-medium text-white/90">What to do today:</p>
-              <p className="text-sm text-white/85 mt-0.5">{data.next_action ?? 'Rest today. Resume tomorrow.'}</p>
+              <p className="text-sm text-white/90">Rest day. Resume tomorrow.</p>
               {(aerobicTier === 'Moderate' || aerobicTier === 'Elevated') && (
                 <p className="text-xs text-white/50 mt-2">Moderate fatigue is expected heading into a rest day.</p>
               )}
@@ -373,7 +379,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Target className="w-4 h-4 shrink-0 text-white/50" />
-                  <span className="text-sm font-medium text-white">Training readiness</span>
+                  <span className="text-sm font-medium text-white">Execution readiness</span>
                 </div>
                 <div className="flex flex-col items-end shrink-0">
                   <div className="flex items-baseline gap-1.5">
@@ -386,12 +392,8 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
                     </span>
                     <span className="text-[11px] text-white/50 whitespace-nowrap">{readinessTier}</span>
                   </div>
-                  {/* Training Readiness (0–100) = scaled readiness index from aerobic tier, structural tier, adherence, load-change risk. Not a probability or % complete. */}
-                  <p
-                    className="text-[11px] text-white/40 mt-0.5 leading-tight"
-                    title="Built from aerobic fatigue, structural fatigue, adherence reliability, and rapid load increases (when present)."
-                  >
-                    A 0–100 readiness index for today&apos;s planned training.
+                  <p className="text-[11px] text-white/40 mt-0.5 leading-tight">
+                    Likelihood you can complete today&apos;s planned session as prescribed.
                   </p>
                 </div>
               </div>
@@ -413,10 +415,10 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           <div className="instrument-card">
             <div className="flex items-center gap-2 mb-2">
               <Target className="w-4 h-4 text-white/50" />
-              <span className="text-sm font-medium text-white">Training readiness</span>
+              <span className="text-sm font-medium text-white">Execution readiness</span>
             </div>
             <p className="text-xs text-white/50">
-              Complete a run with HR to see your readiness for today&apos;s planned work (heart-rate drift and pace adherence).
+              Complete a run with HR to see execution readiness for today&apos;s planned session (heart-rate drift and pace adherence).
             </p>
           </div>
         );
