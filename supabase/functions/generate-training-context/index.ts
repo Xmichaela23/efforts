@@ -318,6 +318,10 @@ interface TrainingContextResponse {
       reason_codes: string[];
     };
     match_coverage_note?: string | null;
+    /** Workload to-date: matched completed vs planned (apples-to-apples). Use for On-plan progress % and raw numbers. */
+    planned_to_date_workload?: number;
+    completed_matched_workload?: number;
+    workload_pct_of_planned_to_date?: number | null;
     /** Dev-only: raw planned/completed dates and matched pairs for truth debugging */
     debug_week_truth?: {
       focus_date: string;
@@ -923,6 +927,15 @@ Deno.serve(async (req) => {
           ? 'Some sessions couldn\'t be matched to your plan. We\'re still learning your patterns.'
           : null;
 
+      // Workload to-date: matched completed vs planned (apples-to-apples for On-plan progress %)
+      const planned_to_date_workload = plannedToDate.reduce((s, p) => s + (Number(p.workload_planned) || 0), 0);
+      const completed_matched_workload = matched_pairs.reduce((s, pair) => {
+        const w = weekRuns.find((r: WorkoutRecord) => r.id === pair.workout_id);
+        return s + (w ? Number(w.workload_actual) || 0 : 0);
+      }, 0);
+      const workload_pct_of_planned_to_date =
+        planned_to_date_workload > 0 ? Math.round((completed_matched_workload / planned_to_date_workload) * 100) : null;
+
       // Moved: matched pair where planned_date !== completed_date (done on different day, within ±1)
       const movedExamples: Array<{ title: string; planned_date: string; done_date: string }> = [];
       let sessionsMoved = 0;
@@ -1149,6 +1162,9 @@ Deno.serve(async (req) => {
         moved_examples: movedExamples.length > 0 ? movedExamples : undefined,
         week_verdict,
         match_coverage_note: matchCoverageNote ?? undefined,
+        planned_to_date_workload: Math.round(planned_to_date_workload),
+        completed_matched_workload: Math.round(completed_matched_workload),
+        workload_pct_of_planned_to_date: workload_pct_of_planned_to_date,
         debug_week_truth: {
           focus_date: focusDateISO,
           week_start: weekStartISO!,

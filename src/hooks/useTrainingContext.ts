@@ -250,6 +250,10 @@ export interface TrainingContextData {
     moved_examples?: Array<{ title: string; planned_date: string; done_date: string }>;
     week_verdict?: { headline: string; detail?: string | null; reason_codes: string[] };
     match_coverage_note?: string | null;
+    /** Workload to-date: matched completed vs planned (apples-to-apples). Use for On-plan progress % and raw numbers. */
+    planned_to_date_workload?: number;
+    completed_matched_workload?: number;
+    workload_pct_of_planned_to_date?: number | null;
     /** Dev-only: planned_dates, completed_dates, matched_pairs for truth debugging */
     debug_week_truth?: {
       focus_date: string;
