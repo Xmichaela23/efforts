@@ -689,6 +689,9 @@ Deno.serve(async (req) => {
     }
     if (todayIsRestDay && hasActivePlan) {
       context_summary.push('This is a planned rest day.');
+      if (display_aerobic_tier === 'Moderate' || display_aerobic_tier === 'Elevated') {
+        context_summary.push('Moderate fatigue is expected heading into a rest day.');
+      }
     } else if (hasActivePlan) {
       context_summary.push(`This is a training day in a ${phaseLabel.toLowerCase().replace(' week', '')} week.`);
     } else {

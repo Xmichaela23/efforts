@@ -127,6 +127,13 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
     ? (data.weekly_verdict.label === 'high' ? 'Good to go.' : data.weekly_verdict.label === 'medium' ? 'Proceed with caution.' : 'Prioritize recovery.')
     : null;
 
+  // One-line explanations for fatigue tiers (reusable; teaches without wall of text)
+  const fatigueTierCopy: Record<FatigueTier, string> = {
+    Low: 'You should handle normal training well.',
+    Moderate: 'You can train, but intensity may feel harder than normal.',
+    Elevated: 'Prioritize recovery; quality work will underperform.',
+  };
+
   return (
     <div className="space-y-3 pb-6">
       {/* Cockpit strip (matches dashboard week strip language) */}
@@ -232,7 +239,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           <span className="text-sm font-medium text-white">Current Training State</span>
         </div>
         <div className="space-y-3">
-          {/* Aerobic Load */}
+          {/* Aerobic Load — helper only for Moderate/Elevated (option B) */}
           <div>
             <div className="flex items-center justify-between text-sm mb-0.5">
               <div className="flex items-center gap-2 text-white/70">
@@ -243,8 +250,11 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
                 {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
               </span>
             </div>
+            {aerobicTier !== 'Low' && (
+              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[aerobicTier]}</p>
+            )}
           </div>
-          {/* Structural Load */}
+          {/* Structural Load — helper only for Moderate/Elevated */}
           <div>
             <div className="flex items-center justify-between text-sm mb-0.5">
               <div className="flex items-center gap-2 text-white/70">
@@ -255,6 +265,9 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
                 {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
               </span>
             </div>
+            {structuralTier !== 'Low' && (
+              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[structuralTier]}</p>
+            )}
           </div>
           {/* Limiter as label (no repeated prose) */}
           <p className="text-sm text-white/80 pt-1 border-t border-white/10">
@@ -308,34 +321,54 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </div>
       )}
 
-      {/* Training Guidance (1–2 lines when summary present; full when not) */}
+      {/* Training Guidance — title, %, tier tag, subordinate label; then action only (no re-explain when summary present) */}
       {data.weekly_verdict ? (
         <div className="instrument-card">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-white/50" />
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Target className="w-4 h-4 shrink-0 text-white/50" />
               <span className="text-sm font-medium text-white">Training Guidance</span>
             </div>
-            <span
-              className={`text-lg font-semibold ${
-                data.weekly_verdict.label === 'high'
-                  ? 'text-green-400'
-                  : data.weekly_verdict.label === 'medium'
-                    ? 'text-amber-400'
-                    : 'text-white/70'
-              }`}
-            >
-              {data.weekly_verdict.readiness_pct}%
-            </span>
+            <div className="flex flex-col items-end shrink-0">
+              {/* Display tier only — do not use for decisions. */}
+              <div className="flex items-baseline gap-1.5">
+                <span
+                  className={`text-lg font-semibold ${
+                    data.weekly_verdict.label === 'high'
+                      ? 'text-green-400'
+                      : data.weekly_verdict.label === 'medium'
+                        ? 'text-amber-400'
+                        : 'text-white/70'
+                  }`}
+                >
+                  {data.weekly_verdict.readiness_pct}%
+                </span>
+                <span className="text-[11px] text-white/50 whitespace-nowrap">
+                  {data.weekly_verdict.readiness_pct >= 80
+                    ? 'High confidence'
+                    : data.weekly_verdict.readiness_pct >= 60
+                      ? 'Moderate confidence'
+                      : 'Low confidence'}
+                </span>
+              </div>
+              <p className="text-[11px] text-white/40 mt-0.5 leading-tight">Confidence to train as planned</p>
+            </div>
           </div>
           {data.context_summary?.length && data.next_action ? (
-            <p className="text-sm text-white/85 mt-1">{data.next_action}</p>
+            <>
+              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
+              <p className="text-sm text-white/85 mt-0.5">{data.next_action}</p>
+            </>
           ) : data.context_summary?.length ? (
-            <p className="text-sm text-white/85 mt-1">&ldquo;{verdictPermission}&rdquo;</p>
+            <>
+              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
+              <p className="text-sm text-white/85 mt-0.5">&ldquo;{verdictPermission}&rdquo;</p>
+            </>
           ) : (
             <>
-              <p className="text-sm font-medium text-white/90 mb-1.5 mt-1">&ldquo;{verdictPermission}&rdquo;</p>
-              <p className="text-sm text-white/80">{data.weekly_verdict.message}</p>
+              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
+              <p className="text-sm text-white/85 mt-0.5">&ldquo;{verdictPermission}&rdquo;</p>
+              <p className="text-sm text-white/80 mt-1.5">{data.weekly_verdict.message}</p>
               {data.weekly_verdict.drivers.length > 0 && (
                 <p className="text-xs text-white/50 mt-2">{data.weekly_verdict.drivers.join(' • ')}</p>
               )}
