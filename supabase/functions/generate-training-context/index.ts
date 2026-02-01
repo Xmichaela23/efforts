@@ -891,19 +891,34 @@ Deno.serve(async (req) => {
       const planned_dates = plannedToDate.map(p => toLocalDay(p.date));
       const completed_dates = weekRuns.map((w: WorkoutRecord) => toLocalDay(w.date));
 
-      // Day-aligned matching: a workout satisfies a planned session only if planned_id matches AND |planned_day_index - completed_day_index| <= 1
+      // Day-aligned matching: (1) planned_id match + ±1 day; (2) fallback: no planned_id — match by ±1 day so runs still count
       const matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }> = [];
       const usedWorkoutIds = new Set<string>();
       for (const p of plannedToDate) {
         const plannedDay = toLocalDay(p.date);
         const plannedIdx = dayIndex(p.date);
-        const candidate = weekRuns.find((w: WorkoutRecord) => {
+        let candidate = weekRuns.find((w: WorkoutRecord) => {
           if (!w.planned_id || String(w.planned_id) !== String(p.id)) return false;
           if (usedWorkoutIds.has(w.id)) return false;
           const completedIdx = dayIndex(w.date);
           if (Math.abs(plannedIdx - completedIdx) > 1) return false;
           return true;
         });
+        if (!candidate) {
+          // Fallback: match by date (±1 day) when planned_id missing — so completed runs still count toward plan
+          const withinRange = weekRuns.filter((w: WorkoutRecord) => {
+            if (usedWorkoutIds.has(w.id)) return false;
+            const completedIdx = dayIndex(w.date);
+            return Math.abs(plannedIdx - completedIdx) <= 1;
+          });
+          candidate = withinRange.length > 0
+            ? withinRange.reduce((best, w) => {
+                const bestDiff = Math.abs(plannedIdx - dayIndex(best.date));
+                const wDiff = Math.abs(plannedIdx - dayIndex(w.date));
+                return wDiff < bestDiff ? w : best;
+              })
+            : undefined;
+        }
         if (candidate) {
           usedWorkoutIds.add(candidate.id);
           matched_pairs.push({
@@ -1104,7 +1119,11 @@ Deno.serve(async (req) => {
       const reasonCodes: string[] = [];
       let weekVerdictHeadline: string;
       let weekVerdictDetail: string | null = null;
-      if (sessionsMissed != null && sessionsMissed > 0) {
+      if (sessionsMatchedToPlan === 0 && sessionsCompletedTotal > 0) {
+        weekVerdictHeadline = 'Sessions not matched to plan.';
+        weekVerdictDetail = 'We couldn\'t link your runs to planned sessions. Use "Link to plan" on a run to match it, or we\'ll keep learning.';
+        reasonCodes.push('NO_MATCHES');
+      } else if (sessionsMissed != null && sessionsMissed > 0) {
         weekVerdictHeadline = 'Week is behind plan.';
         weekVerdictDetail = `${sessionsMissed} session(s) missed to date.`;
         reasonCodes.push('MISSED_SESSIONS');

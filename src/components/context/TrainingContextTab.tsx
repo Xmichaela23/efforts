@@ -533,12 +533,15 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
                       ? 'behind'
                       : data.week_review.week_verdict.headline.includes('trending hot')
                         ? 'hot'
-                        : data.week_review.week_verdict.headline.includes('on track')
-                          ? 'on_track'
-                          : data.plan_progress.status)
+                        : data.week_review.week_verdict.headline.includes('not matched')
+                          ? 'not_matched'
+                          : data.week_review.week_verdict.headline.includes('on track')
+                            ? 'on_track'
+                            : data.plan_progress.status)
                   : data.plan_progress.status;
                 if (status === 'behind') return <span className="text-amber-400 font-medium">Behind</span>;
                 if (status === 'hot') return <span className="text-amber-400 font-medium">Execution hot</span>;
+                if (status === 'not_matched') return <span className="text-white/70 font-medium">Not matched</span>;
                 if (status === 'on_track') return <span className="text-green-400 font-medium">On track</span>;
                 if (status === 'ahead') return <span className="text-blue-400 font-medium">Ahead</span>;
                 return <span className="text-white/60 font-medium">Unknown</span>;
