@@ -206,12 +206,70 @@ export interface TrainingContextData {
     week_adherence_tier: 'high' | 'moderate' | 'low';
     plan_is_active: boolean;
   };
+  /** Coach dashboard: week narrative (execution + load + response + synthesis). No verdict language. */
+  week_narrative?: {
+    week_index: number;
+    week_day_index: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    phase: 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan';
+    execution: {
+      planned_to_date: number;
+      completed_linked: number;
+      completed_unlinked: number;
+      moved: number;
+      missed: number | null;
+      quality_label?: 'on_target' | 'mixed' | 'off_target' | 'unknown';
+      quality_reason?: string;
+      key_sessions_audited: number;
+      key_sessions_on_target: number;
+      key_sessions_flags: Array<{
+        planned_id: string;
+        title: string;
+        date: string;
+        status: 'on_target' | 'slightly_off' | 'too_fast' | 'too_easy' | 'incomplete' | 'unavailable';
+        delta?: { planned: string; actual: string; pct?: number };
+        one_fix?: string;
+      }>;
+    };
+    load: { acwr: number | null; load_vs_baseline: 'lighter' | 'similar' | 'heavier' | null; ramp_flag: 'stable' | 'fast' | null };
+    response: {
+      aerobic_tier: 'low' | 'moderate' | 'elevated';
+      structural_tier: 'low' | 'moderate' | 'elevated';
+      limiter: 'aerobic' | 'structural' | 'none';
+      trend: 'improving' | 'stable' | 'worsening' | 'unknown';
+    };
+    carryover?: { level: 'low' | 'moderate' | 'high'; pct_of_baseline: number | null; interpretation?: string | null } | null;
+    synthesis: { headline: string; bullets: string[]; implication: string | null };
+    plan_goal_line?: string | null;
+    week_focus_label?: string | null;
+    next_key_session?: {
+      planned_id: string | null;
+      date: string | null;
+      date_local: string | null;
+      title: string | null;
+      primary_target: string | null;
+      sport?: string | null;
+    };
+    today_role?: 'recover' | 'easy' | 'key' | 'optional' | 'rest';
+    today_role_label?: string | null;
+    body_response_line?: string | null;
+    /** Dev-only: planned IDs, unlinked completed IDs, key session audit source */
+    debug_week_narrative?: {
+      planned_to_date: Array<{ id: string; date: string; completed_workout_id: string | null }>;
+      completed_unlinked_count: number;
+      completed_unlinked_ids: string[];
+      key_session_audits_source: Array<{ planned_id: string; workout_id: string }>;
+    };
+  };
   /** Week-to-date plan review: what changed, what you did vs plan, key session audits. No fake adherence. */
   week_review?: {
     week_index: number;
     week_total: number;
     week_day_index: number;
     phase: 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan';
+    /** What this week is designed for (from plan metadata). */
+    week_focus_label?: string | null;
+    /** Holistic plan goal. E.g. "LA Marathon 2026 • 10 weeks to race". */
+    plan_goal_line?: string | null;
     planned: { sessions_total: number; sessions_to_date: number; sessions_remaining: number; quality_sessions_to_date: number };
     completed: {
       sessions_completed_total: number;

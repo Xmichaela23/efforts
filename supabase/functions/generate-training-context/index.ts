@@ -262,12 +262,82 @@ interface TrainingContextResponse {
     week_adherence_tier: 'high' | 'moderate' | 'low';
     plan_is_active: boolean;
   };
+  /** Coach dashboard: week narrative (execution + load + response + synthesis). Replaces verdict language with contextual narrative. */
+  week_narrative?: {
+    week_index: number;
+    week_day_index: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    phase: 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan';
+    execution: {
+      planned_to_date: number;
+      completed_linked: number;
+      completed_unlinked: number;
+      moved: number;
+      missed: number | null;
+      quality_label: 'on_target' | 'mixed' | 'off_target' | 'unknown';
+      quality_reason: string;
+      key_sessions_audited: number;
+      key_sessions_on_target: number;
+      key_sessions_flags: Array<{
+        planned_id: string;
+        title: string;
+        date: string;
+        status: 'on_target' | 'slightly_off' | 'too_fast' | 'too_easy' | 'incomplete' | 'unavailable';
+        delta?: { planned: string; actual: string; pct?: number };
+        one_fix?: string;
+      }>;
+    };
+    load: {
+      acwr: number | null;
+      load_vs_baseline: 'lighter' | 'similar' | 'heavier' | null;
+      ramp_flag: 'stable' | 'fast' | null;
+    };
+    response: {
+      aerobic_tier: 'low' | 'moderate' | 'elevated';
+      structural_tier: 'low' | 'moderate' | 'elevated';
+      limiter: 'aerobic' | 'structural' | 'none';
+      trend: 'improving' | 'stable' | 'worsening' | 'unknown';
+    };
+    carryover?: {
+      level: 'low' | 'moderate' | 'high';
+      pct_of_baseline: number | null;
+      interpretation: string | null;
+    } | null;
+    synthesis: {
+      headline: string;
+      bullets: string[];
+      implication: string | null;
+    };
+    /** Plan goal line and week focus for display. */
+    plan_goal_line?: string | null;
+    week_focus_label?: string | null;
+    next_key_session?: {
+      planned_id: string | null;
+      date: string | null;
+      date_local: string | null;
+      title: string | null;
+      primary_target: string | null;
+      sport?: string | null;
+    };
+    today_role?: 'recover' | 'easy' | 'key' | 'optional' | 'rest';
+    today_role_label?: string | null;
+    body_response_line?: string | null;
+    debug_week_narrative?: {
+      planned_to_date: Array<{ id: string; date: string; completed_workout_id: string | null }>;
+      completed_unlinked_count: number;
+      completed_unlinked_ids: string[];
+      key_session_audits_source: Array<{ planned_id: string; workout_id: string }>;
+    };
+  };
   /** Week-to-date plan review: what changed, what you did vs plan, what it implies. Deterministic; no fake adherence. */
   week_review?: {
     week_index: number;
     week_total: number;
     week_day_index: number;
     phase: 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan';
+    /** What this week is designed for (from plan metadata). E.g. "Recovery week", "Volume build". */
+    week_focus_label?: string | null;
+    /** Holistic plan goal for display. E.g. "LA Marathon 2026 • 10 weeks to race". */
+    plan_goal_line?: string | null;
     planned: {
       sessions_total: number;
       sessions_to_date: number;
@@ -357,6 +427,7 @@ interface PlannedWorkoutRecord {
   duration: number;
   workout_status: string;
   training_plan_id?: string | null;
+  completed_workout_id?: string | null;
 }
 
 // =============================================================================
@@ -454,9 +525,9 @@ Deno.serve(async (req) => {
 
     let plannedWeekQuery = supabase
       .from('planned_workouts')
-      .select('id, type, name, date, workload_planned, duration, workout_status, training_plan_id')
+      .select('id, type, name, date, workload_planned, duration, workout_status, training_plan_id, completed_workout_id')
       .eq('user_id', user_id)
-      .eq('workout_status', 'planned')
+      .in('workout_status', ['planned', 'in_progress', 'completed'])
       .gte('date', plannedRangeStartISO)
       .lte('date', plannedRangeEndISO);
 
@@ -870,6 +941,7 @@ Deno.serve(async (req) => {
     };
 
     let week_review: TrainingContextResponse['week_review'] | undefined;
+    let week_narrative: TrainingContextResponse['week_narrative'] | undefined;
     if (hasActivePlan && planContext?.planName && planContext.weekIndex != null && weekStartISO && weekEndISO) {
       const plannedToDate = plannedWeek.filter(p => p.date <= focusDateISO);
       const plannedRemaining = plannedWeek.filter(p => p.date > focusDateISO);
@@ -881,71 +953,55 @@ Deno.serve(async (req) => {
       const dayIndex = (dateIso: string): number =>
         Math.floor((new Date(toLocalDay(dateIso) + 'T12:00:00').getTime() - weekStartDate.getTime()) / (24 * 60 * 60 * 1000));
 
-      // Run-only: completed runs in week (to focus date)
-      const weekRuns = (workouts || []).filter((w: WorkoutRecord) => {
-        const t = (w.type || '').toLowerCase();
-        if (t !== 'run' && t !== 'running') return false;
-        return w.date >= weekStartISO! && w.date <= focusDateISO;
-      });
-      const sessionsCompletedTotal = weekRuns.length;
+      // All types: completed workouts in week (to focus date) — for plan matching and workload
+      const weekCompleted = (workouts || []).filter((w: WorkoutRecord) =>
+        w.date >= weekStartISO! && w.date <= focusDateISO
+      );
+      const sessionsCompletedTotal = weekCompleted.length;
       const planned_dates = plannedToDate.map(p => toLocalDay(p.date));
-      const completed_dates = weekRuns.map((w: WorkoutRecord) => toLocalDay(w.date));
+      const completed_dates = weekCompleted.map((w: WorkoutRecord) => toLocalDay(w.date));
 
-      // Day-aligned matching: (1) planned_id match + ±1 day; (2) fallback: no planned_id — match by ±1 day so runs still count
+      // Run-only: for key_session_audits and any run-specific copy
+      const weekRuns = weekCompleted.filter((w: WorkoutRecord) => {
+        const t = (w.type || '').toLowerCase();
+        return t === 'run' || t === 'running';
+      });
+
+      // Use the existing link: planned_workouts.completed_workout_id (all plan types: run, strength, bike, swim, etc.)
       const matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }> = [];
-      const usedWorkoutIds = new Set<string>();
       for (const p of plannedToDate) {
-        const plannedDay = toLocalDay(p.date);
-        const plannedIdx = dayIndex(p.date);
-        let candidate = weekRuns.find((w: WorkoutRecord) => {
-          if (!w.planned_id || String(w.planned_id) !== String(p.id)) return false;
-          if (usedWorkoutIds.has(w.id)) return false;
-          const completedIdx = dayIndex(w.date);
-          if (Math.abs(plannedIdx - completedIdx) > 1) return false;
-          return true;
+        const wid = (p as PlannedWorkoutRecord & { completed_workout_id?: string | null }).completed_workout_id;
+        if (!wid) continue;
+        const completedWorkout = weekCompleted.find((w: WorkoutRecord) => w.id === wid);
+        if (!completedWorkout) continue;
+        matched_pairs.push({
+          planned_date: toLocalDay(p.date),
+          completed_date: toLocalDay(completedWorkout.date),
+          planned_id: String(p.id),
+          workout_id: wid
         });
-        if (!candidate) {
-          // Fallback: match by date (±1 day) when planned_id missing — so completed runs still count toward plan
-          const withinRange = weekRuns.filter((w: WorkoutRecord) => {
-            if (usedWorkoutIds.has(w.id)) return false;
-            const completedIdx = dayIndex(w.date);
-            return Math.abs(plannedIdx - completedIdx) <= 1;
-          });
-          candidate = withinRange.length > 0
-            ? withinRange.reduce((best, w) => {
-                const bestDiff = Math.abs(plannedIdx - dayIndex(best.date));
-                const wDiff = Math.abs(plannedIdx - dayIndex(w.date));
-                return wDiff < bestDiff ? w : best;
-              })
-            : undefined;
-        }
-        if (candidate) {
-          usedWorkoutIds.add(candidate.id);
-          matched_pairs.push({
-            planned_date: plannedDay,
-            completed_date: toLocalDay(candidate.date),
-            planned_id: String(p.id),
-            workout_id: candidate.id
-          });
-        }
       }
 
       const sessionsMatchedToPlan = matched_pairs.length;
       const matchCoveragePct = sessionsCompletedTotal > 0 ? matched_pairs.length / sessionsCompletedTotal : 0;
+      const completed_unlinked_count = Math.max(0, sessionsCompletedTotal - sessionsMatchedToPlan);
       const sessionsMissedRaw = Math.max(0, sessionsToDate - sessionsMatchedToPlan);
-      const sessionsMissed = matchCoveragePct >= 1
-        ? sessionsMissedRaw
-        : null;
+      // Only show "missed" when linking is complete and math is trustworthy (spec: planned>=3, coverage>=0.8, unlinked=0)
+      const coverageToDate = sessionsToDate > 0 ? sessionsMatchedToPlan / sessionsToDate : 0;
+      const sessionsMissed =
+        sessionsToDate >= 3 && coverageToDate >= 0.8 && completed_unlinked_count === 0
+          ? sessionsMissedRaw
+          : null;
 
       const matchCoverageNote =
         matchCoveragePct < 1 && sessionsCompletedTotal > 0
           ? 'Some sessions couldn\'t be matched to your plan. We\'re still learning your patterns.'
           : null;
 
-      // Workload to-date: matched completed vs planned (apples-to-apples for On-plan progress %)
+      // Workload to-date: matched completed vs planned (apples-to-apples, all types)
       const planned_to_date_workload = plannedToDate.reduce((s, p) => s + (Number(p.workload_planned) || 0), 0);
       const completed_matched_workload = matched_pairs.reduce((s, pair) => {
-        const w = weekRuns.find((r: WorkoutRecord) => r.id === pair.workout_id);
+        const w = weekCompleted.find((r: WorkoutRecord) => r.id === pair.workout_id);
         return s + (w ? Number(w.workload_actual) || 0 : 0);
       }, 0);
       const workload_pct_of_planned_to_date =
@@ -958,10 +1014,10 @@ Deno.serve(async (req) => {
         if (pair.planned_date === pair.completed_date) continue;
         sessionsMoved += 1;
         if (movedExamples.length < 2) {
-          const r = weekRuns.find((w: WorkoutRecord) => w.id === pair.workout_id);
+          const w = weekCompleted.find((x: WorkoutRecord) => x.id === pair.workout_id);
           const p = plannedToDate.find(pp => String(pp.id) === pair.planned_id);
           movedExamples.push({
-            title: r?.name || p?.name || 'Run',
+            title: w?.name || p?.name || (p?.type || 'Session'),
             planned_date: pair.planned_date,
             done_date: pair.completed_date
           });
@@ -1145,11 +1201,16 @@ Deno.serve(async (req) => {
         reason_codes: reasonCodes
       };
 
+      const planGoalLine = planContext.planName && (planContext.race_date != null || planContext.weeks_remaining != null)
+        ? `${planContext.planName}${planContext.weeks_remaining != null ? ` • ${planContext.weeks_remaining} week${planContext.weeks_remaining !== 1 ? 's' : ''} to ${planContext.race_date ? 'race' : 'go'}` : ''}`
+        : null;
       week_review = {
         week_index: planContext.weekIndex,
         week_total: planContext.duration_weeks ?? 12,
         week_day_index: weekDayIndex,
         phase: (phaseLabel === 'OFF PLAN' ? 'off_plan' : phaseLabel === 'RECOVERY' ? 'recovery' : phaseLabel === 'TAPER' ? 'taper' : phaseLabel === 'PEAK' ? 'peak' : 'build') as 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan',
+        week_focus_label: planContext.weekFocusLabel ?? undefined,
+        plan_goal_line: planGoalLine ?? undefined,
         planned: {
           sessions_total: plannedWeek.length,
           sessions_to_date: sessionsToDate,
@@ -1191,6 +1252,254 @@ Deno.serve(async (req) => {
           planned_dates,
           completed_dates,
           matched_pairs
+        }
+      };
+
+      // -----------------------------------------------------------------------
+      // WEEK NARRATIVE (coach dashboard: execution + load + response + synthesis)
+      // -----------------------------------------------------------------------
+      const completed_unlinked = completed_unlinked_count;
+      const mapAuditStatus = (s: string): 'on_target' | 'slightly_off' | 'too_fast' | 'too_easy' | 'incomplete' | 'unavailable' => {
+        if (s === 'hit' || s === 'close') return 'on_target';
+        if (s === 'partial' || s === 'miss') return 'slightly_off';
+        if (s === 'too_hard') return 'too_fast';
+        if (s === 'too_easy') return 'too_easy';
+        if (s === 'unknown') return 'unavailable';
+        return 'incomplete';
+      };
+      const key_sessions_flags = key_session_audits.map(a => ({
+        planned_id: a.planned_id,
+        title: a.title,
+        date: a.date,
+        status: mapAuditStatus(a.status),
+        delta: a.delta ? { planned: a.delta.planned, actual: a.delta.actual, pct: a.delta.pct } : undefined,
+        one_fix: a.detail ?? undefined
+      }));
+      // Execution quality label (from key session audits only; deterministic coach judgment)
+      const key_sessions_audited = key_sessions_flags.length;
+      const key_sessions_on_target_count = key_sessions_flags.filter(s => s.status === 'on_target').length;
+      const on_target_rate = key_sessions_audited > 0 ? key_sessions_on_target_count / key_sessions_audited : 0;
+      const has_too_fast_or_too_easy = key_sessions_flags.some(s => s.status === 'too_fast' || s.status === 'too_easy');
+      let execution_quality_label: 'on_target' | 'mixed' | 'off_target' | 'unknown' = 'unknown';
+      let execution_quality_reason = 'Key session execution not available yet.';
+      if (key_sessions_audited === 0) {
+        execution_quality_label = 'unknown';
+        execution_quality_reason = 'Key session execution not available yet.';
+      } else if (has_too_fast_or_too_easy) {
+        execution_quality_label = 'off_target';
+        execution_quality_reason = key_sessions_flags.some(s => s.status === 'too_fast')
+          ? 'Key work is drifting faster than target.'
+          : 'Key work is drifting slower than target.';
+      } else if (on_target_rate >= 0.8) {
+        execution_quality_label = 'on_target';
+        execution_quality_reason = 'Key sessions are landing inside target.';
+      } else {
+        execution_quality_label = 'mixed';
+        execution_quality_reason = 'One key session hit target; one drifted.';
+      }
+      const load_vs_baseline: 'lighter' | 'similar' | 'heavier' | null =
+        acwr.status === 'undertrained' || acwr.status === 'recovery' || acwr.status === 'optimal_recovery' ? 'lighter'
+          : acwr.status === 'optimal' ? 'similar'
+          : acwr.status === 'elevated' || acwr.status === 'high_risk' ? 'heavier'
+          : null;
+      const ramp_flag: 'stable' | 'fast' | null = acwr.ratio > 1.3 ? 'fast' : 'stable';
+      const aerobicTier = display_aerobic_tier === 'Low' ? 'low' : display_aerobic_tier === 'Moderate' ? 'moderate' : 'elevated';
+      const structuralTier = display_structural_tier === 'Low' ? 'low' : display_structural_tier === 'Moderate' ? 'moderate' : 'elevated';
+      const limiter: 'aerobic' | 'structural' | 'none' =
+        display_limiter_label?.startsWith('Aerobic') ? 'aerobic' : display_limiter_label?.startsWith('Structural') ? 'structural' : 'none';
+      const trend = ((weekly_readiness as { recent_form_trend?: 'improving' | 'stable' | 'worsening' } | undefined)?.recent_form_trend) ?? 'unknown';
+
+      // Carryover: decayed load from previous week into current (physiological residue)
+      const CARRYOVER_DECAY: Record<number, number> = { 1: 0.9, 2: 0.75, 3: 0.6, 4: 0.45, 5: 0.3, 6: 0.15, 7: 0 };
+      let carryover_level: 'low' | 'moderate' | 'high' = 'low';
+      let carryover_pct_of_baseline: number | null = null;
+      if (dateRanges.previousWeekStartISO && dateRanges.previousWeekEndISO) {
+        const prevWorkouts = (workouts || []).filter((w: WorkoutRecord) =>
+          w.date >= dateRanges.previousWeekStartISO! && w.date <= dateRanges.previousWeekEndISO!
+        );
+        const loadByDay: Record<string, number> = {};
+        for (const w of prevWorkouts) {
+          const d = w.date.slice(0, 10);
+          loadByDay[d] = (loadByDay[d] || 0) + (Number(w.workload_actual) || 0);
+        }
+        const focusDate = new Date(focusDateISO + 'T12:00:00');
+        let carryoverSum = 0;
+        for (const [day, load] of Object.entries(loadByDay)) {
+          const dayDate = new Date(day + 'T12:00:00');
+          const daysAgo = Math.round((focusDate.getTime() - dayDate.getTime()) / (24 * 60 * 60 * 1000));
+          const weight = daysAgo >= 1 && daysAgo <= 7 ? CARRYOVER_DECAY[daysAgo] : 0;
+          carryoverSum += load * weight;
+        }
+        const baseline = acwr.chronic_total > 0 ? acwr.chronic_total / 4 : 0; // one week typical
+        if (baseline > 0) {
+          carryover_pct_of_baseline = Math.round(100 * carryoverSum / baseline);
+          if (carryoverSum < 0.25 * baseline) carryover_level = 'low';
+          else if (carryoverSum <= 0.55 * baseline) carryover_level = 'moderate';
+          else carryover_level = 'high';
+        }
+      }
+      // Carryover interpretation (why previous week is impacting current)
+      let carryover_interpretation: string | null = null;
+      if (carryover_level !== 'low' && (carryover_level === 'moderate' || carryover_level === 'high')) {
+        if (limiter === 'structural') carryover_interpretation = 'Carryover is likely showing up as structural fatigue.';
+        else if (limiter === 'aerobic') carryover_interpretation = 'Carryover is likely showing up as aerobic fatigue.';
+        else carryover_interpretation = 'Carryover is elevated; keep key work controlled.';
+      }
+
+      // Headline priority: 1) Linking incomplete, 2) Key session execution problem, 3) Response slipping under rising load, 4) Carryover high + fatigue elevated, 5) Clean week
+      const coverageThreshold = 0.8;
+      const linkingIncomplete = completed_unlinked > 0 && (sessionsToDate === 0 || sessionsMatchedToPlan / sessionsToDate < coverageThreshold);
+      const keySessionProblem = key_sessions_flags.some(s => s.status === 'too_fast' || s.status === 'too_easy' || s.status === 'slightly_off');
+      const responseSlipping = ramp_flag === 'fast' && trend === 'worsening';
+      const carryoverHighFatigue = (carryover_level === 'high' || carryover_level === 'moderate') && (aerobicTier === 'elevated' || structuralTier === 'elevated');
+      let headline = 'Week is tracking clean.';
+      if (linkingIncomplete) {
+        headline = 'Week review incomplete (sessions not linked to plan).';
+      } else if (keySessionProblem) {
+        if (execution_quality_label === 'off_target') headline = 'Key work is drifting off target.';
+        else headline = 'Key session execution needs attention.';
+      } else if (responseSlipping) {
+        headline = 'Load is up; response is slipping.';
+      } else if (carryoverHighFatigue) {
+        headline = 'Carryover from last week is showing; keep key work controlled.';
+      } else if (execution_quality_label === 'on_target' && trend === 'stable') {
+        headline = 'Week is tracking clean.';
+      } else if (sessionsMissed != null && sessionsMissed > 0) {
+        headline = 'Week is behind plan.';
+      } else if (sessionsMoved > 0) {
+        headline = 'Week is on track (schedule adjusted).';
+      } else if (ramp_flag === 'fast') {
+        headline = 'Ramp is running fast; keep next session controlled.';
+      } else if (load_vs_baseline === 'lighter' && (planContext.isRecoveryWeek || planContext.weekIntent === 'recovery')) {
+        headline = 'This week is intentionally lighter.';
+      }
+
+      // Bullets: max 4, premium phrasing; always include completion, execution quality, optional carryover, load/ramp if relevant, response; one action implication in implication field
+      const bullets: string[] = [];
+      // Completion line (never show "missed" unless server says missed is set)
+      if (sessionsMissed != null && sessionsMissed > 0) {
+        bullets.push(`Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned; ${sessionsMissed} missed.`);
+      } else if (completed_unlinked > 0) {
+        bullets.push('Completion tracking incomplete (some sessions not linked).');
+      } else if (sessionsToDate < 3) {
+        bullets.push('Week in progress; completion not finalized.');
+      } else {
+        bullets.push(`Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned sessions to date.`);
+      }
+      // Execution quality line (from audits)
+      if (execution_quality_label === 'off_target') {
+        const hot = key_session_audits.find(a => a.status === 'too_hard' && a.delta);
+        bullets.push(hot?.delta ? `Intervals: ${Math.abs(hot.delta.pct)}% fast vs target — tighten the cap next time.` : execution_quality_reason);
+      } else if (execution_quality_label === 'mixed') {
+        bullets.push(execution_quality_reason);
+      } else if (execution_quality_label === 'on_target' && key_sessions_audited > 0) {
+        bullets.push('Long run / intervals: on target — keep the rhythm.');
+      } else if (execution_quality_label === 'unknown' && key_sessions_audited === 0) {
+        bullets.push(execution_quality_reason);
+      }
+      // Carryover (only if moderate/high)
+      if (carryover_interpretation) bullets.push(`Carryover (last week): ${carryover_level} — ${carryover_interpretation}`);
+      // Load/ramp or response (cap total at 4; drop load first unless ramp fast, then response)
+      if (ramp_flag === 'fast') bullets.push(`Ramp: ${trend !== 'unknown' ? trend : 'elevated'} — no structural red flags yet.`);
+      else if (trend !== 'unknown') bullets.push(`Trend: ${trend} — ${trend === 'worsening' ? 'absorb before extending reps.' : trend === 'improving' ? 'response is absorbing.' : 'stable.'}`);
+      // Cap at 4 bullets: drop load line first (unless ramp fast), then response line
+      if (bullets.length > 4) {
+        if (ramp_flag !== 'fast') {
+          const rampIdx = bullets.findIndex(b => b.startsWith('Ramp:'));
+          if (rampIdx >= 0) bullets.splice(rampIdx, 1);
+        }
+        if (bullets.length > 4) {
+          const trendIdx = bullets.findIndex(b => b.startsWith('Trend:'));
+          if (trendIdx >= 0) bullets.splice(trendIdx, 1);
+        }
+        if (bullets.length > 4) bullets.splice(4);
+      }
+
+      let implication: string | null = null;
+      if (nextQualityPlanned && execution_quality_label === 'off_target') implication = 'Next key session: keep inside target band.';
+      else if (nextQualityPlanned && latestIsHot) implication = 'Protect the long run: keep the next quality day inside target.';
+      else if (trend === 'worsening') implication = 'Absorb before adding: hold targets, don\'t extend reps.';
+      else if (todayIsRestDay) implication = 'Today is for absorption. Tomorrow is the first test.';
+      else if (nextQualityPlanned) implication = 'Next key session: stay inside target band.';
+
+      // Today's role in the week (from planned workout for focus day — congruent with plan)
+      type TodayRole = 'recover' | 'easy' | 'key' | 'optional' | 'rest';
+      let today_role: TodayRole = 'rest';
+      let today_role_label: string = 'Rest day';
+      if (plannedForFocusDate.length > 0) {
+        const first = plannedForFocusDate[0];
+        const t = (first.type || '').toLowerCase();
+        if (isQualityType(first.type, first.name)) {
+          today_role = 'key';
+          today_role_label = 'Key session';
+        } else if (t === 'run' || t === 'running' || t === 'ride' || t === 'bike' || t === 'swim') {
+          today_role = planContext.isRecoveryWeek || planContext.weekIntent === 'recovery' ? 'recover' : 'easy';
+          today_role_label = today_role === 'recover' ? 'Recovery day (absorption)' : 'Easy day';
+        } else if (t === 'mobility' || t === 'strength') {
+          today_role = 'optional';
+          today_role_label = 'Optional';
+        } else {
+          today_role = 'easy';
+          today_role_label = 'Easy day';
+        }
+      }
+
+      // Unlinked completed workout IDs (for dev debug)
+      const completed_unlinked_ids = weekCompleted
+        .filter((w: WorkoutRecord) => !matched_pairs.some(p => p.workout_id === w.id))
+        .map((w: WorkoutRecord) => w.id);
+
+      week_narrative = {
+        week_index: planContext.weekIndex,
+        week_day_index: weekDayIndex as 1 | 2 | 3 | 4 | 5 | 6 | 7,
+        phase: (phaseLabel === 'OFF PLAN' ? 'off_plan' : phaseLabel === 'RECOVERY' ? 'recovery' : phaseLabel === 'TAPER' ? 'taper' : phaseLabel === 'PEAK' ? 'peak' : 'build') as 'build' | 'recovery' | 'peak' | 'taper' | 'off_plan',
+        execution: {
+          planned_to_date: sessionsToDate,
+          completed_linked: sessionsMatchedToPlan,
+          completed_unlinked,
+          moved: sessionsMoved,
+          missed: sessionsMissed,
+          quality_label: execution_quality_label,
+          quality_reason: execution_quality_reason,
+          key_sessions_audited: key_session_audits.length,
+          key_sessions_on_target: key_session_audits.filter(a => a.status === 'hit' || a.status === 'close').length,
+          key_sessions_flags
+        },
+        load: {
+          acwr: acwr.ratio,
+          load_vs_baseline,
+          ramp_flag
+        },
+        response: {
+          aerobic_tier: aerobicTier,
+          structural_tier: structuralTier,
+          limiter,
+          trend
+        },
+        carryover: dateRanges.previousWeekStartISO
+          ? { level: carryover_level, pct_of_baseline: carryover_pct_of_baseline, interpretation: carryover_interpretation }
+          : undefined,
+        synthesis: { headline, bullets, implication },
+        plan_goal_line: planGoalLine ?? undefined,
+        week_focus_label: planContext.weekFocusLabel ?? undefined,
+        next_key_session: nextQualityPlanned
+          ? { planned_id: nextQualityPlanned.id, date: nextQualityPlanned.date, date_local: dateLocal, title: nextQualityPlanned.name, primary_target: primaryTarget, sport: (nextQualityPlanned.type || 'run').toLowerCase() }
+          : undefined,
+        today_role,
+        today_role_label,
+        body_response_line: 'Body response: last 7 days ending today',
+        debug_week_narrative: {
+          planned_to_date: plannedToDate.map((p: PlannedWorkoutRecord & { completed_workout_id?: string | null }) => ({
+            id: String(p.id),
+            date: p.date,
+            completed_workout_id: p.completed_workout_id ?? null
+          })),
+          completed_unlinked_count,
+          completed_unlinked_ids,
+          key_session_audits_source: key_session_audits.map((_, i) => ({
+            planned_id: key_sessions_flags[i]?.planned_id ?? '',
+            workout_id: (qualityRunsWithAnalysis as Array<{ id: string }>)[i]?.id ?? ''
+          }))
         }
       };
     }
@@ -1278,7 +1587,8 @@ Deno.serve(async (req) => {
       day_type: todayIsRestDay ? 'rest' : 'training',
       has_planned_stimulus: todayIsRestDay ? undefined : plannedForFocusDate.some(p => ['run', 'ride', 'strength', 'swim'].includes((p.type || '').toLowerCase())),
       plan_checkin,
-      week_review
+      week_review,
+      week_narrative
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

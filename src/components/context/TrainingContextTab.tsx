@@ -184,12 +184,54 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </button>
       </div>
 
-      {/* Week Review (when on plan with week_review): verdict first, then day/counts, coverage note, moved, audits */}
-      {data.week_review ? (
+      {/* 1. Week Narrative (coach dashboard: headline + bullets + implication). When present, replaces verdict-style Week Review. */}
+      {data.week_narrative ? (
+        <div className="instrument-card flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
+            Week {data.week_narrative.week_index} • Day {data.week_narrative.week_day_index} of 7 ({data.week_narrative.phase.replace('_', ' ')})
+            {data.week_narrative.week_focus_label ? ` • ${data.week_narrative.week_focus_label}` : ''}
+          </p>
+          {data.week_narrative.body_response_line && (
+            <p className="text-xs text-white/40">{data.week_narrative.body_response_line}</p>
+          )}
+          {data.week_narrative.plan_goal_line && (
+            <p className="text-xs text-white/60">{data.week_narrative.plan_goal_line}</p>
+          )}
+          <p className="text-sm font-medium text-white/95">{data.week_narrative.synthesis.headline}</p>
+          <ul className="text-sm text-white/85 list-disc list-inside space-y-0.5">
+            {data.week_narrative.synthesis.bullets.map((b, i) => (
+              <li key={i}>{b}</li>
+            ))}
+          </ul>
+          {data.week_narrative.carryover && data.week_narrative.carryover.level !== 'low' && (
+            <p className="text-xs text-white/50">
+              Carryover (last week): {data.week_narrative.carryover.level}
+              {data.week_narrative.carryover.pct_of_baseline != null && ` — ${data.week_narrative.carryover.pct_of_baseline}% of baseline`}
+              {data.week_narrative.carryover.interpretation ? ` — ${data.week_narrative.carryover.interpretation}` : '.'}
+            </p>
+          )}
+          {data.week_narrative.synthesis.implication && (
+            <p className="text-sm text-white/80 pt-1 border-t border-white/10">
+              {data.week_narrative.synthesis.implication}
+            </p>
+          )}
+          {import.meta.env.DEV && data.week_narrative.debug_week_narrative && (
+            <details className="mt-2 pt-2 border-t border-white/10 text-xs font-mono text-white/50" open={false}>
+              <summary className="cursor-pointer text-white/40">debug_week_narrative</summary>
+              <pre className="mt-1 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                {JSON.stringify(data.week_narrative.debug_week_narrative, null, 2)}
+              </pre>
+            </details>
+          )}
+        </div>
+      ) : data.week_review ? (
         <div className="instrument-card flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
             Week {data.week_review.week_index} check-in
           </p>
+          {data.week_review.plan_goal_line && (
+            <p className="text-xs text-white/60">{data.week_review.plan_goal_line}</p>
+          )}
           {data.week_review.week_verdict && (
             <>
               <p className="text-sm font-medium text-white/95">{data.week_review.week_verdict.headline}</p>
@@ -200,11 +242,12 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           )}
           <p className="text-sm text-white/90">
             Day {data.week_review.week_day_index} of 7 • {data.week_review.phase.charAt(0).toUpperCase() + data.week_review.phase.slice(1).replace('_', ' ')}
+            {data.week_review.week_focus_label ? ` • ${data.week_review.week_focus_label}` : ''}
           </p>
           <p className="text-sm text-white/85">
             {data.week_review.completed.sessions_missed != null
-              ? `${data.week_review.completed.sessions_completed_total} run${data.week_review.completed.sessions_completed_total !== 1 ? 's' : ''} this week • ${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} planned matched • Missed: ${data.week_review.completed.sessions_missed} • Remaining: ${data.week_review.planned.sessions_remaining}`
-              : `${data.week_review.completed.sessions_completed_total} run${data.week_review.completed.sessions_completed_total !== 1 ? 's' : ''} this week • ${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} planned matched • Remaining: ${data.week_review.planned.sessions_remaining}`}
+              ? `${data.week_review.completed.sessions_completed_total} session${data.week_review.completed.sessions_completed_total !== 1 ? 's' : ''} this week • ${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} planned matched • Missed: ${data.week_review.completed.sessions_missed} • Remaining: ${data.week_review.planned.sessions_remaining}`
+              : `${data.week_review.completed.sessions_completed_total} session${data.week_review.completed.sessions_completed_total !== 1 ? 's' : ''} this week • ${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} planned matched • Remaining: ${data.week_review.planned.sessions_remaining}`}
           </p>
           {data.week_review.match_coverage_note && (
             <p className="text-xs text-white/40">{data.week_review.match_coverage_note}</p>
@@ -239,7 +282,6 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               {audit.detail && <p className="text-xs text-white/60 mt-0.5">One adjustment: {audit.detail}</p>}
             </div>
           ))}
-          {/* Dev-only: truth debug block */}
           {import.meta.env.DEV && data.week_review.debug_week_truth && (
             <details className="mt-2 pt-2 border-t border-white/10 text-xs font-mono text-white/50" open={false}>
               <summary className="cursor-pointer text-white/40">debug_week_truth</summary>
@@ -294,34 +336,41 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         </>
       )}
 
-      {/* Next key session (when week_review has next quality session); date from plan calendar (date_local) */}
-      {data.week_review?.next_key_session?.title && (
-        <div className="text-sm text-white/85 py-2 px-3 rounded-lg border border-white/10 bg-white/[0.03]">
-          <span className="text-white/60">Next key session: </span>
-          <span className="text-white/90">{data.week_review.next_key_session.title}</span>
-          {(data.week_review.next_key_session.date_local || data.week_review.next_key_session.date) && (
-            <span className="text-white/50 ml-1">
-              — {new Date((data.week_review.next_key_session.date_local || data.week_review.next_key_session.date)! + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-          )}
-          {data.week_review.next_key_session.primary_target && (
-            <p className="text-xs text-white/60 mt-0.5">Target: {data.week_review.next_key_session.primary_target}</p>
-          )}
-        </div>
-      )}
+      {/* 2. Next key session (from week_narrative or week_review) */}
+      {(() => {
+        const nextKey = data.week_narrative?.next_key_session ?? data.week_review?.next_key_session;
+        if (!nextKey?.title) return null;
+        return (
+          <div className="text-sm text-white/85 py-2 px-3 rounded-lg border border-white/10 bg-white/[0.03]">
+            <span className="text-white/60">Next key session: </span>
+            <span className="text-white/90">{nextKey.title}</span>
+            {(nextKey.date_local || nextKey.date) && (
+              <span className="text-white/50 ml-1">
+                — {new Date((nextKey.date_local || nextKey.date)! + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
+            )}
+            {nextKey.primary_target && (
+              <p className="text-xs text-white/60 mt-0.5">Target: {nextKey.primary_target}</p>
+            )}
+          </div>
+        );
+      })()}
 
-      {/* Today: single action (rest day / execution readiness / low-stress) — premium scan path #3 */}
+      {/* Today: role in the week (from plan) + one action — congruent with Week Narrative */}
       {(() => {
         const isRestDay = data.day_type === 'rest';
         const dayTypeUnknown = data.day_type == null;
         const hasStimulus = data.has_planned_stimulus !== false;
+        const todayTitle = data.week_narrative?.today_role_label
+          ? `Today: ${data.week_narrative.today_role_label}`
+          : 'Today';
 
         if (dayTypeUnknown) {
           return (
             <div className="instrument-card">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-white/50" />
-                <span className="text-sm font-medium text-white">Today</span>
+                <span className="text-sm font-medium text-white">{todayTitle}</span>
               </div>
               <p className="text-sm text-white/70">Updating today&apos;s status…</p>
               <p className="text-xs text-white/50 mt-1">Refresh to see recovery or readiness.</p>
@@ -333,9 +382,9 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
             <div className="instrument-card">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-white/50" />
-                <span className="text-sm font-medium text-white">Today</span>
+                <span className="text-sm font-medium text-white">{todayTitle}</span>
               </div>
-              <p className="text-sm text-white/90">Rest day. Resume tomorrow.</p>
+              <p className="text-sm text-white/90">{data.next_action ?? 'Rest day. Resume tomorrow.'}</p>
               {(aerobicTier === 'Moderate' || aerobicTier === 'Elevated') && (
                 <p className="text-xs text-white/50 mt-2">Moderate fatigue is expected heading into a rest day.</p>
               )}
@@ -347,10 +396,9 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
             <div className="instrument-card">
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-4 h-4 text-white/50" />
-                <span className="text-sm font-medium text-white">Low-stress day</span>
+                <span className="text-sm font-medium text-white">{todayTitle}</span>
               </div>
-              <p className="text-sm font-medium text-white/90">What to do today:</p>
-              <p className="text-sm text-white/85 mt-0.5">{data.next_action ?? 'Follow your plan — no changes needed.'}</p>
+              <p className="text-sm text-white/85">{data.next_action ?? 'Follow your plan — no changes needed.'}</p>
             </div>
           );
         }
@@ -362,29 +410,27 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Target className="w-4 h-4 shrink-0 text-white/50" />
-                  <span className="text-sm font-medium text-white">Execution readiness</span>
+                  <span className="text-sm font-medium text-white">{todayTitle}</span>
                 </div>
-                <div className="flex flex-col items-end shrink-0">
-                  <div className="flex items-baseline gap-1.5">
-                    <span
-                      className={`text-lg font-semibold ${
-                        data.weekly_verdict.label === 'high' ? 'text-green-400' : data.weekly_verdict.label === 'medium' ? 'text-amber-400' : 'text-white/70'
-                      }`}
-                    >
-                      {pct}%
-                    </span>
-                    <span className="text-[11px] text-white/50 whitespace-nowrap">{readinessTier}</span>
+                {!data.week_narrative?.today_role_label && (
+                  <div className="flex flex-col items-end shrink-0">
+                    <div className="flex items-baseline gap-1.5">
+                      <span
+                        className={`text-lg font-semibold ${
+                          data.weekly_verdict.label === 'high' ? 'text-green-400' : data.weekly_verdict.label === 'medium' ? 'text-amber-400' : 'text-white/70'
+                        }`}
+                      >
+                        {pct}%
+                      </span>
+                      <span className="text-[11px] text-white/50 whitespace-nowrap">{readinessTier}</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-white/40 mt-0.5 leading-tight">
-                    Likelihood you can complete today&apos;s planned session as prescribed.
-                  </p>
-                </div>
+                )}
               </div>
-              <p className="text-sm font-medium text-white/90 mt-2">What to do today:</p>
-              <p className="text-sm text-white/85 mt-0.5">
-                {data.context_summary?.length && data.next_action ? data.next_action : data.weekly_verdict.label === 'high' ? 'No changes needed today.' : data.weekly_verdict.label === 'medium' ? 'Proceed with planned session; keep intensity controlled.' : 'Reduce intensity today; stay within plan.'}
+              <p className="text-sm text-white/85 mt-1">
+                {data.next_action ?? (data.weekly_verdict.label === 'high' ? 'No changes needed today.' : data.weekly_verdict.label === 'medium' ? 'Proceed with planned session; keep intensity controlled.' : 'Reduce intensity today; stay within plan.')}
               </p>
-              {data.readiness_source_date && (
+              {data.readiness_source_date && !data.week_narrative?.today_role_label && (
                 <p className="text-xs text-white/40 mt-2">
                   {data.readiness_source_start_date
                     ? `Based on your last runs (${new Date(data.readiness_source_start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(data.readiness_source_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})`
@@ -398,11 +444,14 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           <div className="instrument-card">
             <div className="flex items-center gap-2 mb-2">
               <Target className="w-4 h-4 text-white/50" />
-              <span className="text-sm font-medium text-white">Execution readiness</span>
+              <span className="text-sm font-medium text-white">{todayTitle}</span>
             </div>
-            <p className="text-xs text-white/50">
-              Complete a run with HR to see execution readiness for today&apos;s planned session (heart-rate drift and pace adherence).
-            </p>
+            <p className="text-sm text-white/85">{data.next_action ?? 'Follow your plan — no changes needed.'}</p>
+            {!data.week_narrative?.today_role_label && (
+              <p className="text-xs text-white/50 mt-2">
+                Complete a run with HR to see execution readiness (heart-rate drift and on-target execution).
+              </p>
+            )}
           </div>
         );
       })()}
@@ -485,11 +534,11 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
       <details className="instrument-card py-2 px-3" open={false}>
         <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
           <span className="text-white/60">Why</span>
-          <span className="text-white/40">Aerobic (recent run efficiency, HR drift, pace adherence). Structural (strength volume, avg RIR).</span>
+          <span className="text-white/40">Aerobic (recent run efficiency, HR drift, on-target execution). Structural (strength volume, avg RIR).</span>
         </summary>
         <div className="mt-2 pt-2 border-t border-white/10">
           <p className="text-xs text-white/50">
-            <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, pace adherence.
+            <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, on-target execution.
           </p>
           <p className="text-xs text-white/50 mt-1">
             <span className="text-white/70">Structural:</span> strength volume (7d), avg RIR (7d).
