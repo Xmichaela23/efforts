@@ -480,19 +480,14 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
 
       <div aria-hidden="true" className="instrument-divider" />
 
-      {/* Details accordion: Today's signals + Why — premium scan path #5 */}
-      <details className="instrument-card" open={false}>
-        <summary className="text-sm font-medium text-white/80 cursor-pointer list-none flex items-center gap-2 py-2">
-          <TrendingUp className="w-4 h-4 text-white/50" />
-          <span>Today&apos;s signals</span>
-        </summary>
-        <div className="pt-2 mt-1 border-t border-white/10">
+      {/* Today's signals — always visible (not a dropdown) */}
+      <div className="instrument-card">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-white/50" />
           <span className="text-sm font-medium text-white">Today&apos;s signals</span>
         </div>
         <div className="space-y-3">
-          {/* Aerobic Load — helper only for Moderate/Elevated (option B) */}
+          {/* Aerobic Load */}
           <div>
             <div className="flex items-center justify-between text-sm mb-0.5">
               <div className="flex items-center gap-2 text-white/70">
@@ -507,7 +502,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[aerobicTier]}</p>
             )}
           </div>
-          {/* Structural Load — helper only for Moderate/Elevated */}
+          {/* Structural Load */}
           <div>
             <div className="flex items-center justify-between text-sm mb-0.5">
               <div className="flex items-center gap-2 text-white/70">
@@ -522,13 +517,12 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[structuralTier]}</p>
             )}
           </div>
-          {/* Limiter as label (no repeated prose) */}
+          {/* Limiter */}
           <p className="text-sm text-white/80 pt-1 border-t border-white/10">
             Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
           </p>
         </div>
-        </div>
-      </details>
+      </div>
 
       {/* Why (collapsed; instrumentation language) */}
       <details className="instrument-card py-2 px-3" open={false}>
@@ -558,13 +552,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         <SmartInsights insights={data.insights} />
       )}
 
-      {/* Training Load Chart */}
-      <TrainingLoadChart 
-        timeline={data.timeline} 
-        totalWorkload={data.sport_breakdown.total_workload} 
-      />
-
-      {/* Plan progress (only when on an active plan and data is available) */}
+      {/* On-plan progress — above 7-day training load */}
       {data.plan_progress && data.acwr?.plan_context?.hasActivePlan && (
         <div className="instrument-card">
           <div className="flex items-center justify-between">
@@ -646,6 +634,12 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           )}
         </div>
       )}
+
+      {/* 7-day Training Load Chart */}
+      <TrainingLoadChart 
+        timeline={data.timeline} 
+        totalWorkload={data.sport_breakdown.total_workload} 
+      />
 
       {/* Week Comparison */}
       {data.week_comparison && (

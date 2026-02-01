@@ -11,7 +11,12 @@ import {
   GeneratePlanResponse,
   PlanPreview,
   PhaseInfo,
-  TrainingPlan
+  TrainingPlan,
+  PlanContractV1,
+  PlanContractPhase,
+  PlanContractKeySessionType,
+  PlanContractWeekIntent,
+  PhaseStructure
 } from './types.ts';
 import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConflicts } from './validation.ts';
 import { SustainableGenerator } from './generators/sustainable.ts';
@@ -237,6 +242,9 @@ Deno.serve(async (req: Request) => {
       console.warn('Schedule conflicts detected:', conflicts);
     }
 
+    // Build plan_contract_v1 (Context handshake - single stored contract)
+    const plan_contract_v1 = buildPlanContractV1(plan, phaseStructure, request, startDate);
+
     // Save plan to database
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -289,7 +297,8 @@ Deno.serve(async (req: Request) => {
           })() : (effortScore && request.distance ? getTargetTime(effortScore, request.distance) : null),
           baselines_required: plan.baselines_required,
           units: plan.units,
-          weekly_summaries: plan.weekly_summaries
+          weekly_summaries: plan.weekly_summaries,
+          plan_contract_v1
         },
         sessions_by_week: plan.sessions_by_week,
         notes_by_week: {},
@@ -357,6 +366,123 @@ Deno.serve(async (req: Request) => {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * Build plan_contract_v1 for Context handshake.
+ * Every generator writes the same shape; Context reads only this. No inference.
+ */
+function buildPlanContractV1(
+  plan: TrainingPlan,
+  phaseStructure: PhaseStructure,
+  request: GeneratePlanRequest,
+  startDate: string
+): PlanContractV1 {
+  const duration = plan.duration_weeks;
+  const phaseByName = (weekNum: number): PlanContractPhase => {
+    if (phaseStructure.recovery_weeks.includes(weekNum)) return 'recovery';
+    for (const p of phaseStructure.phases) {
+      if (weekNum >= p.start_week && weekNum <= p.end_week) {
+        const n = p.name.toLowerCase().trim();
+        if (n === 'base') return 'base';
+        if (n === 'speed') return 'build';
+        if (n.includes('race prep')) return 'peak';
+        if (n === 'taper') return 'taper';
+        return 'build';
+      }
+    }
+    return 'build';
+  };
+
+  const phase_by_week: PlanContractPhase[] = [];
+  for (let w = 1; w <= duration; w++) phase_by_week.push(phaseByName(w));
+
+  const week_intent_by_week: PlanContractWeekIntent[] = [];
+  const summaries = plan.weekly_summaries || {};
+  const taperPhase = phaseStructure.phases.find((p: { name: string }) => p.name === 'Taper');
+  const taperMultipliers: Record<number, number> = {};
+  if (taperPhase) {
+    for (let w = taperPhase.start_week; w <= taperPhase.end_week; w++) {
+      taperMultipliers[w] = taperPhase.volume_multiplier ?? 0.6;
+    }
+  }
+
+  for (let weekIndex = 1; weekIndex <= duration; weekIndex++) {
+    const summary = summaries[String(weekIndex)];
+    const phase = phase_by_week[weekIndex - 1];
+    const focus_label = summary?.focus ?? (phase === 'recovery' ? 'Recovery Week' : 'Training week');
+    const focus_code = focusLabelToCode(focus_label, phase);
+    const sessions = plan.sessions_by_week?.[String(weekIndex)] ?? [];
+    const key_session_types = deriveKeySessionTypes(sessions);
+    const isTaper = phase === 'taper';
+    week_intent_by_week.push({
+      week_index: weekIndex,
+      focus_code,
+      focus_label,
+      disciplines: ['run'],
+      key_session_types,
+      hard_cap: 3,
+      taper_multiplier: isTaper ? (taperMultipliers[weekIndex] ?? 0.6) : undefined
+    });
+  }
+
+  const strengthEnabled = (request.strength_frequency ?? 0) > 0;
+  const workload_disciplines = strengthEnabled ? ['run', 'strength'] : ['run'];
+
+  return {
+    version: 1,
+    plan_type: 'run',
+    start_date: startDate,
+    duration_weeks: duration,
+    week_start: 'mon',
+    phase_by_week,
+    week_intent_by_week,
+    policies: {
+      max_hard_per_week: 3,
+      min_rest_gap_days: 1,
+      taper_multipliers: Object.keys(taperMultipliers).length > 0 ? taperMultipliers : undefined
+    },
+    strength: strengthEnabled
+      ? {
+          enabled: true,
+          protocol_id: request.strength_protocol ?? undefined,
+          frequency_per_week: request.strength_frequency ?? undefined,
+          intent: request.strength_tier === 'strength_power' ? 'neural' : 'durability',
+          priority: 'support'
+        }
+      : undefined,
+    goal: {
+      event_type: request.distance ?? undefined,
+      event_date: request.race_date ?? undefined,
+      target: request.race_name ?? undefined
+    },
+    workload_model: {
+      unit: 'load_points',
+      include_disciplines: workload_disciplines
+    }
+  };
+}
+
+function focusLabelToCode(label: string, phase: PlanContractPhase): string {
+  const l = label.toLowerCase();
+  if (l.includes('recovery')) return 'recovery';
+  if (l.includes('taper') || phase === 'taper') return 'taper';
+  if (l.includes('vo2') || l.includes('speed')) return 'build_vo2_speed';
+  if (l.includes('race prep') || l.includes('race-specific')) return 'peak_race_prep';
+  if (l.includes('aerobic') || l.includes('foundation')) return 'base_aerobic';
+  return phase === 'base' ? 'base_aerobic' : phase === 'peak' ? 'peak_race_prep' : 'build_vo2_speed';
+}
+
+function deriveKeySessionTypes(sessions: { tags?: string[]; type?: string }[]): PlanContractKeySessionType[] {
+  const out: PlanContractKeySessionType[] = [];
+  for (const s of sessions) {
+    const tags = s.tags ?? [];
+    if (tags.includes('long_run')) out.push('run_long');
+    if (tags.some(t => t === 'intervals' || t === 'hard_run')) out.push('run_intervals');
+    if (tags.some(t => t === 'tempo' || t === 'threshold')) out.push('run_tempo');
+    if (s.type === 'strength') out.push('strength');
+  }
+  return [...new Set(out)];
+}
 
 /**
  * Calculate plan start date

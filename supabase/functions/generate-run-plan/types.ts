@@ -138,6 +138,68 @@ export interface WeeklySummary {
 }
 
 // ============================================================================
+// PLAN CONTRACT V1 (Context handshake - single stored contract)
+// Every generator writes the same shape; Context reads only this. No inference.
+// ============================================================================
+
+export type PlanContractPhase = 'base' | 'build' | 'peak' | 'taper' | 'recovery';
+
+export type PlanContractKeySessionType =
+  | 'run_intervals' | 'run_tempo' | 'run_long'
+  | 'bike_vo2' | 'bike_threshold' | 'bike_long'
+  | 'swim_tech' | 'swim_endurance'
+  | 'strength' | 'mobility'
+  | 'rest';
+
+export interface PlanContractWeekIntent {
+  week_index: number;
+  focus_code: string;
+  focus_label: string;
+  disciplines?: string[];
+  key_session_types: PlanContractKeySessionType[];
+  hard_cap: number;
+  taper_multiplier?: number;
+}
+
+export interface PlanContractV1 {
+  version: 1;
+  plan_type: 'run' | 'bike' | 'tri' | 'hybrid';
+  start_date: string;
+  duration_weeks: number;
+  week_start: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+  phase_by_week: PlanContractPhase[];
+  week_intent_by_week: PlanContractWeekIntent[];
+  policies: {
+    max_hard_per_week: number;
+    min_rest_gap_days: number;
+    taper_multipliers?: Record<number, number>;
+  };
+  strength?: {
+    enabled: boolean;
+    protocol_id?: string;
+    frequency_per_week?: number;
+    intent?: 'neural' | 'durability' | 'upper' | 'maintenance';
+    priority?: 'primary' | 'support';
+  };
+  goal?: {
+    event_type?: string;
+    event_date?: string;
+    target?: string;
+  };
+  workload_model?: {
+    unit: string;
+    include_disciplines: string[];
+    weights?: Record<string, number>;
+  };
+  schedule_preferences?: {
+    long_run_day?: 'sat' | 'sun';
+    long_ride_day?: 'sat' | 'sun';
+    key_run_day?: 'tue' | 'wed' | 'thu';
+    key_bike_day?: 'tue' | 'wed' | 'thu';
+  };
+}
+
+// ============================================================================
 // PHASE STRUCTURE
 // ============================================================================
 

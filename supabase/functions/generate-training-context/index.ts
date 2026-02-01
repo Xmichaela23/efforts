@@ -967,17 +967,24 @@ Deno.serve(async (req) => {
         return t === 'run' || t === 'running';
       });
 
-      // Use the existing link: planned_workouts.completed_workout_id (all plan types: run, strength, bike, swim, etc.)
+      // Match by planned_workouts.completed_workout_id first; then by workouts.planned_id so links from Attach flow are recognized
       const matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }> = [];
+      const plannedIdsUsed = new Set<string>();
       for (const p of plannedToDate) {
-        const wid = (p as PlannedWorkoutRecord & { completed_workout_id?: string | null }).completed_workout_id;
-        if (!wid) continue;
+        const pId = String(p.id);
+        let wid = (p as PlannedWorkoutRecord & { completed_workout_id?: string | null }).completed_workout_id;
+        if (!wid) {
+          const fromWorkout = weekCompleted.find((w: WorkoutRecord & { planned_id?: string | null }) => String(w.planned_id || '') === pId);
+          if (fromWorkout) wid = fromWorkout.id;
+        }
+        if (!wid || plannedIdsUsed.has(pId)) continue;
         const completedWorkout = weekCompleted.find((w: WorkoutRecord) => w.id === wid);
         if (!completedWorkout) continue;
+        plannedIdsUsed.add(pId);
         matched_pairs.push({
           planned_date: toLocalDay(p.date),
           completed_date: toLocalDay(completedWorkout.date),
-          planned_id: String(p.id),
+          planned_id: pId,
           workout_id: wid
         });
       }
@@ -1346,9 +1353,10 @@ Deno.serve(async (req) => {
         else carryover_interpretation = 'Carryover is elevated; keep key work controlled.';
       }
 
-      // Headline priority: 1) Linking incomplete, 2) Key session execution problem, 3) Response slipping under rising load, 4) Carryover high + fatigue elevated, 5) Clean week
-      const coverageThreshold = 0.8;
-      const linkingIncomplete = completed_unlinked > 0 && (sessionsToDate === 0 || sessionsMatchedToPlan / sessionsToDate < coverageThreshold);
+      // Headline priority: 1) Linking poor (< half linked), 2) Key session execution problem, 3) Response slipping, 4) Carryover high + fatigue, 5) Clean / on track
+      // Only lead with "incomplete" when linking is genuinely poor; otherwise lead with execution/response so the narrative says something useful
+      const coverageToDatePct = sessionsToDate > 0 ? sessionsMatchedToPlan / sessionsToDate : 0;
+      const linkingIncomplete = completed_unlinked > 0 && (sessionsToDate === 0 || coverageToDatePct < 0.5);
       const keySessionProblem = key_sessions_flags.some(s => s.status === 'too_fast' || s.status === 'too_easy' || s.status === 'slightly_off');
       const responseSlipping = ramp_flag === 'fast' && trend === 'worsening';
       const carryoverHighFatigue = (carryover_level === 'high' || carryover_level === 'moderate') && (aerobicTier === 'elevated' || structuralTier === 'elevated');
@@ -1379,8 +1387,8 @@ Deno.serve(async (req) => {
       // Completion line (never show "missed" unless server says missed is set)
       if (sessionsMissed != null && sessionsMissed > 0) {
         bullets.push(`Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned; ${sessionsMissed} missed.`);
-      } else if (completed_unlinked > 0) {
-        bullets.push('Completion tracking incomplete (some sessions not linked).');
+      } else if (completed_unlinked > 0 && sessionsToDate >= 1) {
+        bullets.push(`${sessionsMatchedToPlan}/${sessionsToDate} sessions linked${completed_unlinked > 0 ? `; ${completed_unlinked} not yet linked` : ''}.`);
       } else if (sessionsToDate < 3) {
         bullets.push('Week in progress; completion not finalized.');
       } else {
@@ -1883,159 +1891,60 @@ async function fetchPlanContext(
       weekIndex = Math.min(weekIndex, durationWeeks);
     }
 
-    // Get weekly summaries
-    let weeklySummaries = config.weekly_summaries || {};
-    
-    // Generate from sessions_by_week if missing (same logic as get-week)
-    if (!weeklySummaries || Object.keys(weeklySummaries).length === 0) {
-      const sessionsByWeek = plan.sessions_by_week || {};
-      weeklySummaries = {};
-      const weekKeys = Object.keys(sessionsByWeek).sort((a, b) => parseInt(a) - parseInt(b));
-      
-      for (const weekKey of weekKeys) {
-        const sessions = Array.isArray(sessionsByWeek[weekKey]) ? sessionsByWeek[weekKey] : [];
-        if (sessions.length === 0) continue;
-        
-        const hasIntervals = sessions.some((s: any) => {
-          const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
-          const tags = Array.isArray(s?.tags) ? s.tags : [];
-          const desc = String(s?.description || s?.name || '').toLowerCase();
-          return tokens.some((t: string) => /interval|vo2|5kpace|tempo|threshold/.test(String(t).toLowerCase())) ||
-                 tags.some((t: string) => /interval|vo2|tempo|threshold|hard/.test(String(t).toLowerCase())) ||
-                 /interval|vo2|tempo|threshold/.test(desc);
-        });
-        
-        const hasLongRun = sessions.some((s: any) => {
-          const tokens = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
-          const tags = Array.isArray(s?.tags) ? s.tags : [];
-          const desc = String(s?.description || s?.name || '').toLowerCase();
-          return tokens.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
-                 tags.some((t: string) => /longrun|long_run/.test(String(t).toLowerCase())) ||
-                 /long run|longrun/.test(desc);
-        });
-        
-        let focus = '';
-        if (hasIntervals && hasLongRun) {
-          focus = 'Build Phase';
-        } else if (hasIntervals) {
-          focus = 'Speed Development';
-        } else if (hasLongRun) {
-          focus = 'Endurance Building';
-        } else {
-          focus = 'Training Week';
-        }
-        
-        weeklySummaries[weekKey] = { focus };
-      }
-    }
+    // Plan contract v1 only — no inference, no fallback
+    const contract = config.plan_contract_v1 as {
+      version: number;
+      phase_by_week?: string[];
+      week_intent_by_week?: Array<{ week_index: number; focus_label: string }>;
+    } | undefined;
 
-    const weekSummary = weeklySummaries[String(weekIndex)] || {};
-    const weekFocusLabel = weekSummary.focus || null;
-
-    // Determine recovery/taper status (explicit detection, ranked by trust)
+    let weekFocusLabel: string | null = null;
     let isRecoveryWeek = false;
     let isTaperWeek = false;
     let weekIntent: PlanContext['weekIntent'] = 'build';
-    let phaseKey: string | null = null;
-    let phaseName: string | null = null;
+    const phaseKey: string | null = null;
+    const phaseName: string | null = null;
 
-    // PRIORITY 1: Explicit per-week tag in weekly_summaries
-    if (weekFocusLabel) {
-      const focusLower = weekFocusLabel.toLowerCase();
-      if (focusLower.includes('recovery') || focusLower.includes('recovery week')) {
+    if (contract?.version === 1 && Array.isArray(contract.phase_by_week) && weekIndex >= 1 && weekIndex <= contract.phase_by_week.length) {
+      const phase = contract.phase_by_week[weekIndex - 1];
+      if (phase === 'recovery') {
         isRecoveryWeek = true;
         weekIntent = 'recovery';
-      } else if (focusLower.includes('taper') || focusLower.includes('taper week')) {
+      } else if (phase === 'taper') {
         isTaperWeek = true;
         weekIntent = 'taper';
-      } else if (focusLower.includes('peak')) {
+      } else if (phase === 'peak') {
         weekIntent = 'peak';
+      } else if (phase === 'base') {
+        weekIntent = 'baseline';
+      } else {
+        weekIntent = 'build';
       }
+      const weekIntentEntry = Array.isArray(contract.week_intent_by_week)
+        ? contract.week_intent_by_week.find((w: { week_index: number }) => w.week_index === weekIndex)
+        : null;
+      if (weekIntentEntry?.focus_label) weekFocusLabel = weekIntentEntry.focus_label;
     }
 
-    // PRIORITY 2: Explicit phase metadata (recovery_weeks array)
-    if (!isRecoveryWeek && !isTaperWeek && config.phases) {
-      for (const [phaseKeyName, phaseData] of Object.entries(config.phases)) {
-        const phase = phaseData as any;
-        if (phase.weeks && phase.weeks.includes(weekIndex)) {
-          phaseKey = phaseKeyName;
-          phaseName = phaseKeyName;
-          
-          // Check if phase has recovery_weeks array
-          if (phase.recovery_weeks && Array.isArray(phase.recovery_weeks) && phase.recovery_weeks.includes(weekIndex)) {
-            isRecoveryWeek = true;
-            weekIntent = 'recovery';
-          }
-          
-          // Check if it's a taper phase
-          if (phaseKeyName.toLowerCase().includes('taper')) {
-            isTaperWeek = true;
-            weekIntent = 'taper';
-          }
-          
-          // If we haven't set intent yet, infer from phase name
-          if (weekIntent === 'build') {
-            if (phaseKeyName.toLowerCase().includes('peak')) {
-              weekIntent = 'peak';
-            } else if (phaseKeyName.toLowerCase().includes('base')) {
-              weekIntent = 'baseline';
-            }
-          }
-          
-          break;
-        }
-      }
-    }
-
-    // PRIORITY 3: Pattern-based (only if explicitly declared)
-    if (!isRecoveryWeek && !isTaperWeek && config.recoveryPattern === 'every_4th') {
-      // Every 4th week is recovery (but not in taper)
-      const taperPhase = config.phases ? Object.values(config.phases).find((p: any) => 
-        p.name && p.name.toLowerCase().includes('taper')
-      ) : null;
-      
-      const isInTaper = taperPhase && (taperPhase as any).weeks && (taperPhase as any).weeks.includes(weekIndex);
-      
-      if (!isInTaper && weekIndex % 4 === 0) {
-        isRecoveryWeek = true;
-        weekIntent = 'recovery';
-      }
-    }
-
-    // If we still don't know, default to 'build' (not 'unknown' - that's for no plan)
-    if (weekIntent === 'unknown') {
-      weekIntent = 'build';
-    }
-
-    // Next week's intent (what's coming up — plan design)
+    // Next week's intent from contract only
     let next_week_intent: PlanContext['next_week_intent'] = null;
     let next_week_focus_label: string | null = null;
     const nextWeekIndex = weekIndex + 1;
-    if (durationWeeks == null || nextWeekIndex <= durationWeeks) {
-      const nextWeekSummary = weeklySummaries[String(nextWeekIndex)] || {};
-      next_week_focus_label = nextWeekSummary.focus || null;
-      if (next_week_focus_label) {
-        const nextLower = next_week_focus_label.toLowerCase();
-        if (nextLower.includes('recovery') || nextLower.includes('recovery week')) next_week_intent = 'recovery';
-        else if (nextLower.includes('taper') || nextLower.includes('taper week')) next_week_intent = 'taper';
-        else if (nextLower.includes('peak')) next_week_intent = 'peak';
-        else if (nextLower.includes('base')) next_week_intent = 'baseline';
+    if (durationWeeks != null && nextWeekIndex <= durationWeeks) {
+      if (contract?.version === 1 && Array.isArray(contract.phase_by_week) && nextWeekIndex <= contract.phase_by_week.length) {
+        const nextPhase = contract.phase_by_week[nextWeekIndex - 1];
+        if (nextPhase === 'recovery') next_week_intent = 'recovery';
+        else if (nextPhase === 'taper') next_week_intent = 'taper';
+        else if (nextPhase === 'peak') next_week_intent = 'peak';
+        else if (nextPhase === 'base') next_week_intent = 'baseline';
         else next_week_intent = 'build';
-      } else if (config.phases) {
-        for (const [, phaseData] of Object.entries(config.phases)) {
-          const phase = phaseData as any;
-          if (phase.weeks && phase.weeks.includes(nextWeekIndex)) {
-            const name = (phase as any).name || '';
-            if (name.toLowerCase().includes('taper')) next_week_intent = 'taper';
-            else if (name.toLowerCase().includes('peak')) next_week_intent = 'peak';
-            else if (name.toLowerCase().includes('base')) next_week_intent = 'baseline';
-            else if (phase.recovery_weeks && phase.recovery_weeks.includes(nextWeekIndex)) next_week_intent = 'recovery';
-            else next_week_intent = 'build';
-            break;
-          }
-        }
+        const nextIntentEntry = Array.isArray(contract.week_intent_by_week)
+          ? contract.week_intent_by_week.find((w: { week_index: number }) => w.week_index === nextWeekIndex)
+          : null;
+        if (nextIntentEntry?.focus_label) next_week_focus_label = nextIntentEntry.focus_label;
+      } else {
+        next_week_intent = 'build';
       }
-      if (next_week_intent === null) next_week_intent = 'build';
     }
 
     // Plan length and goal (science of the plan)
