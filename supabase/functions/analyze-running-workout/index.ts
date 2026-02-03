@@ -232,8 +232,9 @@ Deno.serve(async (req) => {
         if (workoutsWithDrift.length >= 1) {
           const avgDrift = workoutsWithDrift.reduce((sum, w) => sum + w.driftBpm, 0) / workoutsWithDrift.length;
           
-          // Find last week's similar workout (5-10 days ago)
-          const lastWeekSimilar = workoutsWithDrift.find(w => w.daysSince >= 5 && w.daysSince <= 10);
+          // Find last similar workout (3-21 days ago for more flexibility)
+          const lastWeekSimilar = workoutsWithDrift.find(w => w.daysSince >= 3 && w.daysSince <= 21);
+          console.log(`📊 [HISTORICAL] Looking for similar workout 3-21 days ago. Candidates: ${workoutsWithDrift.map(w => `${w.daysSince}d ago: ${w.driftBpm}bpm`).join(', ')}`);
           
           // Determine trend (compare recent 3 vs older)
           let trend: 'improving' | 'stable' | 'worsening' | undefined = undefined;
