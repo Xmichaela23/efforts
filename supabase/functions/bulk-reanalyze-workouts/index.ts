@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
     // Build query based on filter type
     let query = supabase
       .from('workouts')
-      .select('id, name, date, type, workout_analysis, planned_workout_id', { count: 'exact' })
+      .select('id, name, date, type, workout_analysis, planned_id', { count: 'exact' })
       .eq('user_id', user.id)
       .eq('workout_status', 'completed')
       .gte('date', startDateStr)
@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
             name: w.name,
             date: w.date,
             type: w.type,
-            has_planned: !!w.planned_workout_id,
+            has_planned: !!w.planned_id,
             has_analysis: !!w.workout_analysis,
             has_hr_drift: !!(
               w.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ??
