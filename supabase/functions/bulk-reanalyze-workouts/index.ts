@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     const daysBack = Number(body?.days_back ?? 90);
     const workoutTypeFilter = String(body?.workout_type ?? 'run').toLowerCase();
     const dryRun = body?.dry_run !== false; // Default to true for safety
-    const limit = Math.min(Math.max(Number(body?.limit ?? 5), 1), 10); // 1..10
+    const limit = Math.min(Math.max(Number(body?.limit ?? 10), 1), 25); // 1..25
     const offset = Math.max(Number(body?.offset ?? 0), 0);
     const filter = String(body?.filter ?? 'missing_hr_drift').toLowerCase();
 

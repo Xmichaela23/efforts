@@ -47,9 +47,9 @@ export default function WorkloadAdmin() {
 
   // Bulk reanalyze state
   const [reanalyzeLoading, setReanalyzeLoading] = useState(false);
-  const [reanalyzeDaysBack, setReanalyzeDaysBack] = useState(90);
+  const [reanalyzeDaysBack, setReanalyzeDaysBack] = useState(180);
   const [reanalyzeDryRun, setReanalyzeDryRun] = useState(true);
-  const [reanalyzeLimit, setReanalyzeLimit] = useState(5);
+  const [reanalyzeLimit, setReanalyzeLimit] = useState(10);
   const [reanalyzeOffset, setReanalyzeOffset] = useState(0);
   const [reanalyzeWorkoutType, setReanalyzeWorkoutType] = useState<string>('run');
   const [reanalyzeFilter, setReanalyzeFilter] = useState<string>('missing_hr_drift');
@@ -411,9 +411,9 @@ export default function WorkloadAdmin() {
                     id="reanalyzeDaysBack"
                     type="number"
                     value={reanalyzeDaysBack}
-                    onChange={(e) => setReanalyzeDaysBack(parseInt(e.target.value) || 90)}
+                    onChange={(e) => setReanalyzeDaysBack(parseInt(e.target.value) || 180)}
                     min="7"
-                    max="365"
+                    max="730"
                     className="h-8"
                   />
                 </div>
@@ -423,9 +423,9 @@ export default function WorkloadAdmin() {
                     id="reanalyzeLimit"
                     type="number"
                     value={reanalyzeLimit}
-                    onChange={(e) => setReanalyzeLimit(parseInt(e.target.value) || 5)}
+                    onChange={(e) => setReanalyzeLimit(parseInt(e.target.value) || 10)}
                     min="1"
-                    max="10"
+                    max="25"
                     className="h-8"
                   />
                 </div>
