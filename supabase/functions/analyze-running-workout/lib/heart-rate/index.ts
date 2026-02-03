@@ -126,7 +126,7 @@ function analyzeSteadyStateWorkout(
   console.log('💓 [HR ANALYSIS] Context check - historicalDrift:', context.historicalDrift ? 
     `${context.historicalDrift.similarWorkouts.length} workouts, lastSimilar=${context.historicalDrift.lastSimilar?.driftBpm ?? 'NONE'}` : 'NONE');
   console.log('💓 [HR ANALYSIS] Context check - weather:', context.weather ? 
-    `${context.weather.temperatureF}°F` : 'NONE');
+    `${context.weather.temperatureF}°F (${context.weather.source || 'unknown'})` : 'NONE');
   
   try {
     // Calculate drift

@@ -39,6 +39,7 @@ export interface HRAnalysisContext {
   weather?: {
     temperatureF?: number;
     humidity?: number;
+    source?: 'device' | 'openweathermap';  // Where the temp came from
   };
   
   // Planned workout (when attached to plan)

@@ -57,6 +57,7 @@ export default function WorkloadAdmin() {
   // Fix single workout state
   const [fixWorkoutId, setFixWorkoutId] = useState<string>('');
   const [fixWorkoutLoading, setFixWorkoutLoading] = useState(false);
+  const [forceWeatherRefresh, setForceWeatherRefresh] = useState(false);
 
   useEffect(() => {
     const getUser = async () => {
@@ -269,9 +270,12 @@ export default function WorkloadAdmin() {
       
       setResults({ message: 'Step 2/2: Running analyze-running-workout...' });
       
-      // Step 2: Re-analyze
+      // Step 2: Re-analyze (with optional weather refresh)
       const { data: analyzeData, error: analyzeError } = await supabase.functions.invoke('analyze-running-workout', {
-        body: { workout_id: fixWorkoutId.trim() }
+        body: { 
+          workout_id: fixWorkoutId.trim(),
+          force_weather_refresh: forceWeatherRefresh
+        }
       });
       
       if (analyzeError) {
@@ -650,6 +654,17 @@ export default function WorkloadAdmin() {
                   placeholder="e.g., ff0ae455-cca6-42d5-..."
                   className="h-8 font-mono text-xs"
                 />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="forceWeatherRefresh"
+                  checked={forceWeatherRefresh}
+                  onCheckedChange={(checked) => setForceWeatherRefresh(checked as boolean)}
+                />
+                <Label htmlFor="forceWeatherRefresh" className="text-xs cursor-pointer">
+                  Refresh weather (re-fetch from Open-Meteo)
+                </Label>
               </div>
 
               <Button

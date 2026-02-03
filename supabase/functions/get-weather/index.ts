@@ -152,66 +152,69 @@ Deno.serve(async (req) => {
 });
 
 async function fetchWeatherData(lat: number, lng: number, timestamp: string): Promise<WeatherData | null> {
-  const apiKey = Deno.env.get('OPENWEATHER_API_KEY');
-  if (!apiKey) {
-    console.error('OPENWEATHER_API_KEY not configured');
-    return null;
-  }
-
   try {
-    // Preferred: One Call 3.0 for current + daily (sunrise/sunset + highs)
-    // Use One Call v2.5 for broader key compatibility
-    const urlOneCall = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial&exclude=minutely,hourly,alerts`;
-    try {
-      const resp = await fetch(urlOneCall);
-      if (resp.ok) {
-        const data = await resp.json();
-        const current = data.current || {};
-        const daily0 = Array.isArray(data.daily) && data.daily.length ? data.daily[0] : {};
-
-        const sunriseUnix = daily0?.sunrise || current?.sunrise;
-        const sunsetUnix = daily0?.sunset || current?.sunset;
-        const sunriseIso = sunriseUnix ? new Date(sunriseUnix * 1000).toISOString() : undefined;
-        const sunsetIso = sunsetUnix ? new Date(sunsetUnix * 1000).toISOString() : undefined;
-
-        return {
-          temperature: Math.round(current?.temp ?? 0),
-          condition: (current?.weather && current.weather[0]?.main) || '—',
-          humidity: Math.round(current?.humidity ?? 0),
-          windSpeed: Math.round(current?.wind_speed ?? 0),
-          windDirection: Math.round(current?.wind_deg ?? 0),
-          precipitation: (current?.rain?.['1h'] ?? current?.snow?.['1h'] ?? 0) as number,
-          sunrise: sunriseIso,
-          sunset: sunsetIso,
-          daily_high: daily0?.temp?.max != null ? Math.round(daily0.temp.max) : undefined,
-          daily_low: daily0?.temp?.min != null ? Math.round(daily0.temp.min) : undefined,
-          timestamp: timestamp
-        };
+    // Use Open-Meteo's FREE historical weather API (no API key needed)
+    // This gives us actual weather at the workout time, not "current" weather
+    const workoutDate = new Date(timestamp);
+    const dateStr = workoutDate.toISOString().slice(0, 10); // YYYY-MM-DD
+    const workoutHour = workoutDate.getUTCHours();
+    
+    console.log(`🌡️ [WEATHER] Fetching historical weather for ${dateStr} hour ${workoutHour} at ${lat},${lng}`);
+    
+    // Open-Meteo archive API - free, no key required
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`Open-Meteo API error: ${resp.status}`);
+      return null;
+    }
+    
+    const data = await resp.json();
+    const hourly = data.hourly;
+    
+    if (!hourly || !hourly.time || !hourly.temperature_2m) {
+      console.error('Open-Meteo returned no hourly data');
+      return null;
+    }
+    
+    // Find the hour closest to workout time
+    // Open-Meteo returns times like "2026-01-25T08:00" in local timezone
+    let bestIdx = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < hourly.time.length; i++) {
+      const hourTime = new Date(hourly.time[i]);
+      const diff = Math.abs(hourTime.getTime() - workoutDate.getTime());
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = i;
       }
-    } catch (e) {
-      // fall through to simple endpoint
     }
-
-    // Fallback: current weather endpoint provides temp, condition, and sys.sunrise/sunset, main.temp_max/min
-    const urlCurrent = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial`;
-    const r2 = await fetch(urlCurrent);
-    if (!r2.ok) {
-      throw new Error(`Weather API error: ${r2.status}`);
-    }
-    const d2 = await r2.json();
-    const sr = d2?.sys?.sunrise ? new Date(d2.sys.sunrise * 1000).toISOString() : undefined;
-    const ss = d2?.sys?.sunset ? new Date(d2.sys.sunset * 1000).toISOString() : undefined;
+    
+    const temp = hourly.temperature_2m[bestIdx];
+    const humidity = hourly.relative_humidity_2m?.[bestIdx];
+    const windSpeed = hourly.wind_speed_10m?.[bestIdx];
+    const windDir = hourly.wind_direction_10m?.[bestIdx];
+    const precip = hourly.precipitation?.[bestIdx];
+    
+    // Get daily high/low from the full day's data
+    const temps = hourly.temperature_2m.filter((t: number | null) => t != null);
+    const dailyHigh = temps.length ? Math.round(Math.max(...temps)) : undefined;
+    const dailyLow = temps.length ? Math.round(Math.min(...temps)) : undefined;
+    
+    console.log(`🌡️ [WEATHER] Open-Meteo result: ${Math.round(temp)}°F at hour ${bestIdx} (high: ${dailyHigh}, low: ${dailyLow})`);
+    
     return {
-      temperature: Math.round(d2.main?.temp ?? 0),
-      condition: (d2.weather && d2.weather[0]?.main) || '—',
-      humidity: Math.round(d2.main?.humidity ?? 0),
-      windSpeed: Math.round(d2.wind?.speed ?? 0),
-      windDirection: Math.round(d2.wind?.deg ?? 0),
-      precipitation: (d2.rain?.['1h'] ?? d2.snow?.['1h'] ?? 0) as number,
-      sunrise: sr,
-      sunset: ss,
-      daily_high: d2.main?.temp_max != null ? Math.round(d2.main.temp_max) : undefined,
-      daily_low: d2.main?.temp_min != null ? Math.round(d2.main.temp_min) : undefined,
+      temperature: Math.round(temp ?? 0),
+      condition: '—', // Open-Meteo archive doesn't provide condition text
+      humidity: Math.round(humidity ?? 0),
+      windSpeed: Math.round(windSpeed ?? 0),
+      windDirection: Math.round(windDir ?? 0),
+      precipitation: precip ?? 0,
+      sunrise: undefined, // Could add with separate API call if needed
+      sunset: undefined,
+      daily_high: dailyHigh,
+      daily_low: dailyLow,
       timestamp: timestamp
     };
     

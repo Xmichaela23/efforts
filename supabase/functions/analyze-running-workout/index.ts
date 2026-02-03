@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     workout_id = body.workout_id;
+    const force_weather_refresh = body.force_weather_refresh === true;
     
     if (!workout_id) {
       return new Response(JSON.stringify({
@@ -90,6 +91,15 @@ Deno.serve(async (req) => {
     }
 
     console.log(`🏃‍♂️ Analyzing running workout: ${workout_id}`);
+    
+    // Clear cached weather if force refresh requested
+    if (force_weather_refresh) {
+      console.log('🌡️ [WEATHER] Force refresh requested, clearing cached weather...');
+      await supabase
+        .from('workouts')
+        .update({ weather_data: null })
+        .eq('id', workout_id);
+    }
     console.log('🆕 NEW VERSION: Checking time_series_data and garmin_data for pace data');
     console.log('🔍 [MAIN DEBUG] Starting analysis for workout:', workout_id);
 
@@ -124,7 +134,10 @@ Deno.serve(async (req) => {
         total_timer_time,
         distance,
         weather_data,
-        avg_temperature
+        avg_temperature,
+        start_position_lat,
+        start_position_long,
+        date
       `)
       .eq('id', workout_id)
       .single();
@@ -153,6 +166,35 @@ Deno.serve(async (req) => {
 
     if (!workout.sensor_data && !workout.computed) {
       throw new Error('No sensor data or computed data available. Workout may not have been processed yet.');
+    }
+
+    // Fetch historical weather if not cached and we have location data
+    if (!workout.weather_data && workout.start_position_lat && workout.start_position_long && workout.date) {
+      console.log('🌡️ [WEATHER] No cached weather, fetching from Open-Meteo...');
+      try {
+        const weatherResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-weather`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify({
+            lat: workout.start_position_lat,
+            lng: workout.start_position_long,
+            timestamp: workout.date,
+            workout_id: workout_id
+          })
+        });
+        if (weatherResp.ok) {
+          const weatherResult = await weatherResp.json();
+          if (weatherResult.weather) {
+            workout.weather_data = weatherResult.weather;
+            console.log(`🌡️ [WEATHER] Fetched: ${weatherResult.weather.temperature}°F`);
+          }
+        }
+      } catch (wxErr) {
+        console.warn('🌡️ [WEATHER] Failed to fetch:', wxErr);
+      }
     }
 
     // Get user baselines first (needed for both planned and unplanned workouts)
@@ -190,7 +232,8 @@ Deno.serve(async (req) => {
       
       // Fetch similar workouts - MORE LENIENT: any run 30+ minutes in last 90 days
       // (removed strict duration matching - all aerobic runs are comparable for drift trends)
-      const minDuration = 30 * 60; // 30 minutes minimum
+      // NOTE: moving_time is stored in MINUTES in the database, not seconds!
+      const minDuration = 30; // 30 minutes minimum
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
       
@@ -621,9 +664,16 @@ Deno.serve(async (req) => {
         totalElevationGainM: workout?.elevation_gain ?? workout?.metrics?.elevation_gain ?? undefined,
         samples: sensorData
       },
-      weather: workout?.weather_data ? {
-        temperatureF: workout.avg_temperature ?? workout.weather_data?.temperature,
-        humidity: workout.weather_data?.humidity
+      // Weather: prioritize device-recorded temp (from Garmin/Strava watch)
+      // Device temp is stored in Celsius, convert to Fahrenheit
+      // Fall back to OpenWeatherMap data if no device temp
+      ...(console.log(`🌡️ [WEATHER DEBUG] avg_temperature=${workout?.avg_temperature}, weather_data.temp=${workout?.weather_data?.temperature}`), {}),
+      weather: (workout?.avg_temperature != null || workout?.weather_data) ? {
+        temperatureF: workout.avg_temperature != null 
+          ? Math.round(workout.avg_temperature * 9/5 + 32)  // Celsius to Fahrenheit
+          : workout.weather_data?.temperature,
+        humidity: workout.weather_data?.humidity,
+        source: workout.avg_temperature != null ? 'device' : 'openweathermap'
       } : undefined,
       plannedWorkout: plannedWorkout ? {
         description: plannedWorkout.description || plannedWorkout.workout_description,
