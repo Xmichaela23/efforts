@@ -169,6 +169,81 @@ export default function WorkloadAdmin() {
     }
   };
 
+  // Auto-process all batches until done
+  const handleBulkReanalyzeAll = async () => {
+    if (!user?.id || reanalyzeDryRun) return;
+    setReanalyzeLoading(true);
+    
+    let currentOffset = 0;
+    let totalProcessed = 0;
+    let totalSuccess = 0;
+    let totalErrors = 0;
+    let batchCount = 0;
+    
+    try {
+      while (true) {
+        batchCount++;
+        setResults({ 
+          processing: true, 
+          batch: batchCount, 
+          offset: currentOffset,
+          total_processed: totalProcessed,
+          success: totalSuccess,
+          errors: totalErrors,
+          message: `Processing batch ${batchCount} (offset ${currentOffset})...`
+        });
+        
+        const { data, error } = await supabase.functions.invoke('bulk-reanalyze-workouts', {
+          body: {
+            days_back: reanalyzeDaysBack,
+            workout_type: reanalyzeWorkoutType,
+            dry_run: false,
+            limit: reanalyzeLimit,
+            offset: currentOffset,
+            filter: reanalyzeFilter
+          }
+        });
+
+        if (error) throw error;
+        
+        totalProcessed += data?.processed || 0;
+        totalSuccess += data?.success || 0;
+        totalErrors += data?.errors || 0;
+        
+        if (!data?.has_more) {
+          // Done!
+          setResults({
+            processing: false,
+            completed: true,
+            batches: batchCount,
+            total_processed: totalProcessed,
+            success: totalSuccess,
+            errors: totalErrors,
+            message: `✅ All done! Processed ${totalProcessed} workouts in ${batchCount} batches.`
+          });
+          setReanalyzeOffset(0);
+          break;
+        }
+        
+        currentOffset = data.next_offset;
+        
+        // Small delay between batches to avoid overwhelming the server
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } catch (e: any) {
+      console.error('Bulk reanalyze all failed:', e);
+      setResults({ 
+        error: e?.message || String(e),
+        batches_completed: batchCount - 1,
+        total_processed: totalProcessed,
+        success: totalSuccess,
+        errors: totalErrors
+      });
+    } finally {
+      setReanalyzeLoading(false);
+    }
+  };
+
   const handleSweepHistory = async () => {
     if (!user?.id) return;
     
@@ -473,7 +548,7 @@ export default function WorkloadAdmin() {
                   className="flex-1"
                 >
                   {reanalyzeLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                  {reanalyzeDryRun ? 'Preview' : 'Run'}
+                  {reanalyzeDryRun ? 'Preview' : 'Run Batch'}
                 </Button>
                 <Button
                   onClick={() => handleBulkReanalyze(reanalyzeOffset)}
@@ -484,6 +559,20 @@ export default function WorkloadAdmin() {
                   Next
                 </Button>
               </div>
+              
+              {!reanalyzeDryRun && (
+                <Button
+                  onClick={handleBulkReanalyzeAll}
+                  disabled={reanalyzeLoading}
+                  size="sm"
+                  variant="default"
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  {reanalyzeLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                  Process All (Auto)
+                </Button>
+              )}
+              
               {reanalyzeOffset > 0 && (
                 <p className="text-xs text-white/40">Offset: {reanalyzeOffset}</p>
               )}
