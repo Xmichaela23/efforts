@@ -31,13 +31,19 @@ export default function PlansAdminImport() {
         }
       />
 
-      <main className="mobile-main-content" style={{ overflow: 'auto' }}>
-        <div className="w-full max-w-3xl mx-auto px-4 py-4 pb-32 space-y-8">
+      <div 
+        className="absolute inset-0 overflow-y-auto"
+        style={{ 
+          top: 'calc(var(--header-h, 56px) + env(safe-area-inset-top, 0px))',
+          paddingBottom: '120px'
+        }}
+      >
+        <div className="w-full max-w-3xl mx-auto px-4 py-4 space-y-8">
           <WorkloadAdmin />
           <PlanJSONImport />
           <PlanGeneratorTest />
         </div>
-      </main>
+      </div>
     </div>
   );
 }
