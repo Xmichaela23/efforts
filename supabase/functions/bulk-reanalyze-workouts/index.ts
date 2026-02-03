@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       .eq('workout_status', 'completed')
       .gte('date', startDateStr)
       .in('type', allowedTypes)
-      .order('date', { ascending: false })
+      .order('date', { ascending: true }) // Process oldest first so historical comparisons work
       .range(offset, offset + limit - 1);
 
     const { data: workouts, error: queryError, count } = await query;
