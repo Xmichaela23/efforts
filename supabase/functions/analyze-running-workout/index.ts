@@ -7,7 +7,8 @@ import { calculateGarminExecutionScore, getPaceToleranceForSegment } from './lib
 import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherence, type IntervalAnalysis, type SampleTiming } from './lib/adherence/granular-pace.ts';
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
 import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
-import { calculateHeartRateDrift } from './lib/analysis/heart-rate-drift.ts';
+// Old HR drift import removed - now using consolidated HR analysis module
+import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType } from './lib/heart-rate/index.ts';
 import { generateAINarrativeInsights } from './lib/narrative/ai-generator.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from './lib/plan-context.ts';
@@ -172,6 +173,102 @@ Deno.serve(async (req) => {
     } catch (error) {
       console.log('⚠️ No user baselines found, using defaults');
       // Use default baselines for analysis
+    }
+
+    // Query similar historical workouts for HR drift comparison
+    let historicalDriftData: {
+      similarWorkouts: Array<{ date: string; driftBpm: number; durationMin: number; elevationFt?: number }>;
+      avgDriftBpm: number;
+      recentTrend?: 'improving' | 'stable' | 'worsening';
+      lastWeekSimilar?: { date: string; driftBpm: number; durationMin: number; elevationFt?: number; daysSince: number };
+    } | undefined = undefined;
+    
+    try {
+      const currentDuration = workout.moving_time || workout.duration || 0;
+      const currentDistance = workout.distance || 0;
+      
+      // Fetch similar workouts (within 30% duration, same type, last 90 days)
+      const minDuration = currentDuration * 0.7;
+      const maxDuration = currentDuration * 1.3;
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      
+      const { data: similarWorkouts } = await supabase
+        .from('workouts')
+        .select('id, start_date, moving_time, duration, elevation_gain, workout_analysis')
+        .eq('user_id', workout.user_id)
+        .eq('type', 'run')
+        .neq('id', workout_id) // Exclude current workout
+        .gte('start_date', ninetyDaysAgo.toISOString())
+        .gte('moving_time', minDuration)
+        .lte('moving_time', maxDuration)
+        .not('workout_analysis', 'is', null)
+        .order('start_date', { ascending: false })
+        .limit(10);
+      
+      if (similarWorkouts && similarWorkouts.length > 0) {
+        const workoutsWithDrift = similarWorkouts
+          .map(w => {
+            // Check multiple possible locations for HR drift (different analysis versions)
+            const hrDrift = 
+              w.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ??
+              w.workout_analysis?.heart_rate_summary?.drift_bpm ??
+              w.workout_analysis?.detailed_analysis?.workout_summary?.hr_drift ??
+              null;
+            if (hrDrift != null && Number.isFinite(hrDrift)) {
+              const daysSince = Math.round((Date.now() - new Date(w.start_date).getTime()) / (1000 * 60 * 60 * 24));
+              return {
+                date: w.start_date,
+                driftBpm: hrDrift,
+                durationMin: Math.round((w.moving_time || w.duration || 0) / 60),
+                elevationFt: w.elevation_gain ? Math.round(w.elevation_gain * 3.28084) : undefined,
+                daysSince
+              };
+            }
+            return null;
+          })
+          .filter((w): w is NonNullable<typeof w> => w !== null);
+        
+        if (workoutsWithDrift.length >= 1) {
+          const avgDrift = workoutsWithDrift.reduce((sum, w) => sum + w.driftBpm, 0) / workoutsWithDrift.length;
+          
+          // Find last week's similar workout (5-10 days ago)
+          const lastWeekSimilar = workoutsWithDrift.find(w => w.daysSince >= 5 && w.daysSince <= 10);
+          
+          // Determine trend (compare recent 3 vs older)
+          let trend: 'improving' | 'stable' | 'worsening' | undefined = undefined;
+          if (workoutsWithDrift.length >= 4) {
+            const recent = workoutsWithDrift.slice(0, Math.floor(workoutsWithDrift.length / 2));
+            const older = workoutsWithDrift.slice(Math.floor(workoutsWithDrift.length / 2));
+            const recentAvg = recent.reduce((sum, w) => sum + w.driftBpm, 0) / recent.length;
+            const olderAvg = older.reduce((sum, w) => sum + w.driftBpm, 0) / older.length;
+            
+            if (recentAvg < olderAvg - 2) trend = 'improving';
+            else if (recentAvg > olderAvg + 2) trend = 'worsening';
+            else trend = 'stable';
+          }
+          
+          historicalDriftData = {
+            similarWorkouts: workoutsWithDrift,
+            avgDriftBpm: Math.round(avgDrift),
+            recentTrend: trend,
+            lastWeekSimilar: lastWeekSimilar ? {
+              date: lastWeekSimilar.date,
+              driftBpm: lastWeekSimilar.driftBpm,
+              durationMin: lastWeekSimilar.durationMin,
+              elevationFt: lastWeekSimilar.elevationFt,
+              daysSince: lastWeekSimilar.daysSince
+            } : undefined
+          };
+          console.log(`📊 [HISTORICAL] Found ${workoutsWithDrift.length} similar workouts, avg drift: ${avgDrift.toFixed(1)} bpm, trend: ${trend || 'unknown'}, lastWeekSimilar: ${lastWeekSimilar ? lastWeekSimilar.driftBpm + ' bpm' : 'none'}`);
+        } else {
+          console.log(`📊 [HISTORICAL] Found ${similarWorkouts.length} similar workouts but none had HR drift data`);
+        }
+      } else {
+        console.log(`📊 [HISTORICAL] No similar workouts found (within 30% duration, last 90 days)`);
+      }
+    } catch (error) {
+      console.log('⚠️ Could not fetch historical drift data:', error);
       baselines = {
         fiveK_pace: 450, // 7:30/mi
         easyPace: 540,   // 9:00/mi
@@ -197,6 +294,42 @@ Deno.serve(async (req) => {
       } else {
         plannedWorkout = planned;
         intervals = await getWorkIntervals(workout, plannedWorkout, baselines);
+      }
+    }
+
+    // Fetch plan context early so it can be used in HR drift interpretation
+    let planContextForDrift: {
+      weekIndex?: number;
+      weekIntent?: string;
+      phaseName?: string;
+      isRecoveryWeek?: boolean;
+      isTaperWeek?: boolean;
+      hasActivePlan?: boolean;
+      planName?: string;
+    } | undefined = undefined;
+    
+    if (plannedWorkout?.training_plan_id) {
+      try {
+        const planContext = await fetchPlanContextForWorkout(
+          supabase,
+          workout.user_id,
+          plannedWorkout.training_plan_id,
+          workout.date || new Date().toISOString()
+        );
+        if (planContext) {
+          planContextForDrift = {
+            weekIndex: planContext.weekIndex,
+            weekIntent: planContext.weekIntent,
+            phaseName: planContext.phaseName,
+            isRecoveryWeek: planContext.isRecoveryWeek,
+            isTaperWeek: planContext.isTaperWeek,
+            hasActivePlan: planContext.hasActivePlan,
+            planName: planContext.planName ?? undefined
+          };
+          console.log('📋 [PLAN CONTEXT EARLY] Fetched for drift analysis:', planContextForDrift);
+        }
+      } catch (err) {
+        console.warn('⚠️ Could not fetch plan context early:', err);
       }
     }
 
@@ -444,9 +577,98 @@ Deno.serve(async (req) => {
     })));
     
     // Perform granular adherence analysis
+    console.log('🔴🔴🔴 INDEX.TS VERSION 2026-02-02-D: HR DRIFT FIX ACTIVE');
     console.log('🚀 [TIMING] Starting calculatePrescribedRangeAdherenceGranular...');
-    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout);
+    const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout, historicalDriftData, planContextForDrift);
     console.log('✅ [TIMING] Granular analysis completed!');
+    
+    // 💓 SINGLE SOURCE OF TRUTH: Consolidated HR Analysis
+    // All HR metrics (drift, zones, efficiency, intervals) calculated here
+    const hrAnalysisContext: HRAnalysisContext = {
+      workoutType: detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout),
+      intervals: intervalsToAnalyze.map(interval => ({
+        role: (interval.role || interval.kind || 'work') as any,
+        sampleIdxStart: interval.sample_idx_start,
+        sampleIdxEnd: interval.sample_idx_end,
+        startTimeS: interval.start_time_s || 0,
+        endTimeS: interval.end_time_s || 0,
+        paceRange: interval.pace_range || interval.target_pace,
+        executed: interval.executed ? {
+          avgPaceSPerMi: interval.executed.avg_pace_s_per_mi,
+          durationS: interval.executed.duration_s,
+          avgHr: interval.executed.avg_hr
+        } : undefined
+      })),
+      terrain: {
+        totalElevationGainM: workout?.elevation_gain ?? workout?.metrics?.elevation_gain ?? undefined,
+        samples: sensorData
+      },
+      weather: workout?.weather_data ? {
+        temperatureF: workout.avg_temperature ?? workout.weather_data?.temperature,
+        humidity: workout.weather_data?.humidity
+      } : undefined,
+      plannedWorkout: plannedWorkout ? {
+        description: plannedWorkout.description || plannedWorkout.workout_description,
+        workoutToken: plannedWorkout.workout_token,
+        paceRanges: plannedWorkout.computed?.steps?.filter((s: any) => s.pace_range).map((s: any) => s.pace_range),
+        intent: detectWorkoutIntent(plannedWorkout)
+      } : undefined,
+      planContext: planContextForDrift ? {
+        weekIndex: planContextForDrift.weekIndex,
+        weekIntent: planContextForDrift.weekIntent as any,
+        isRecoveryWeek: planContextForDrift.isRecoveryWeek,
+        isTaperWeek: planContextForDrift.isTaperWeek,
+        phaseName: planContextForDrift.phaseName,
+        planName: planContextForDrift.planName
+      } : undefined,
+      historicalDrift: historicalDriftData ? {
+        similarWorkouts: historicalDriftData.similarWorkouts || [],
+        avgDriftBpm: historicalDriftData.avgDriftBpm || 0,
+        trend: historicalDriftData.recentTrend,
+        lastSimilar: historicalDriftData.lastWeekSimilar
+      } : undefined,
+      userUnits: 'imperial'
+    };
+    
+    const hrAnalysisResult = analyzeHeartRate(sensorData, hrAnalysisContext);
+    console.log(`💓 [HR ANALYSIS] Complete: type=${hrAnalysisResult.workoutType}, drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'}, confidence=${hrAnalysisResult.confidence}`);
+    
+    // Update analysis.heart_rate_analysis with consolidated results
+    {
+      const validHRSamples = sensorData.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
+      const avgHR = validHRSamples.length > 0
+        ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
+        : 0;
+      
+      analysis.heart_rate_analysis = {
+        adherence_percentage: 100,
+        time_in_zone_s: 0,
+        time_outside_zone_s: 0,
+        total_time_s: sensorData.length,
+        samples_in_zone: validHRSamples.length,
+        samples_outside_zone: 0,
+        average_heart_rate: avgHR,
+        target_zone: null,
+        // Drift metrics from new module
+        hr_drift_bpm: hrAnalysisResult.drift?.driftBpm ?? null,
+        early_avg_hr: hrAnalysisResult.drift?.earlyAvgHr ?? null,
+        late_avg_hr: hrAnalysisResult.drift?.lateAvgHr ?? null,
+        hr_drift_interpretation: hrAnalysisResult.interpretation,
+        analysis_scope: hrAnalysisResult.drift?.analysisScope ?? null,
+        scope_description: hrAnalysisResult.drift?.scopeDescription ?? null,
+        terrain_contribution_bpm: hrAnalysisResult.drift?.terrain?.contributionBpm ?? null,
+        terrain_note: hrAnalysisResult.drift?.terrain?.profileDescription ?? null,
+        temperature_factor: hrAnalysisResult.drift?.weather?.factor ?? null,
+        temperature_note: hrAnalysisResult.drift?.weather?.note ?? null,
+        excluded_segments: hrAnalysisResult.drift?.excludedSegments ?? [],
+        confidence: hrAnalysisResult.confidence,
+        workout_type: hrAnalysisResult.workoutType,
+        // Human-readable label for UI
+        summary_label: hrAnalysisResult.summaryLabel,
+        // NEW: Full structured summary for weekly/block aggregation
+        summary: hrAnalysisResult.summary
+      };
+    }
 
     // Add data quality information to analysis
     const enhancedAnalysis = {
@@ -778,6 +1000,8 @@ Deno.serve(async (req) => {
     console.log('🔍 Sensor data length:', sensorData.length);
     console.log('🔍 Computed intervals length:', computedIntervals.length);
     console.log('🔍 Enhanced analysis keys:', Object.keys(enhancedAnalysis));
+    console.log('🔍 [HR DRIFT DEBUG] enhancedAnalysis.heart_rate_analysis?.hr_drift_bpm:', enhancedAnalysis?.heart_rate_analysis?.hr_drift_bpm);
+    console.log('🔍 [HR DRIFT DEBUG] enhancedAnalysis.heart_rate_analysis exists:', !!enhancedAnalysis?.heart_rate_analysis);
     
     let detailedAnalysis = null;
     try {
@@ -1077,7 +1301,9 @@ Deno.serve(async (req) => {
         narrative_insights: narrativeInsights,  // AI-generated human-readable insights
         score_explanation: scoreExplanation,  // Backward-compat: single verdict line
         adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact
-        mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null  // Include terrain breakdown
+        mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
+        // NEW: Structured HR summary for weekly/block context aggregation
+        heart_rate_summary: hrAnalysisResult.summary
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()
@@ -1274,7 +1500,8 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
       average_pace_adherence: workIntervals.length > 0 ? 
         workIntervals.reduce((sum, i) => sum + (i.pace_adherence || 0), 0) / workIntervals.length : 0,
       pace_variability: granularAnalysis.pacing_analysis?.pacing_variability || 0,
-      hr_drift: granularAnalysis.heart_rate_analysis?.hr_drift_bpm || 0
+      // HR drift now comes from consolidated HR analysis module (handles tempo_finish, terrain, etc.)
+      hr_drift: granularAnalysis.heart_rate_analysis?.hr_drift_bpm ?? null
     },
     mile_by_mile_terrain: mileByMileTerrain
   };
@@ -1672,6 +1899,25 @@ function generateAdherenceSummary(
   const hrDrift = ws?.hr_drift ?? granularAnalysis?.heart_rate_analysis?.hr_drift_bpm ?? null;
   const hrDriftAbs = hrDrift != null && Number.isFinite(hrDrift) ? Math.abs(hrDrift) : null;
 
+  // Planned workout context: does the plan have a faster finish? (e.g. long easy + 1 mi at M pace)
+  let hasPlannedFasterFinish = false;
+  if (workIntervals.length >= 2) {
+    const first = workIntervals[0];
+    const last = workIntervals[workIntervals.length - 1];
+    const firstMid = ((Number(first?.planned_pace_range_lower) || 0) + (Number(first?.planned_pace_range_upper) || 0)) / 2;
+    const lastMid = ((Number(last?.planned_pace_range_lower) || 0) + (Number(last?.planned_pace_range_upper) || 0)) / 2;
+    if (firstMid > 0 && lastMid > 0 && lastMid < firstMid * 0.95) {
+      hasPlannedFasterFinish = true; // last segment target is at least 5% faster
+    }
+  }
+  const driftContextNote = hasPlannedFasterFinish
+    ? ' Your plan included a faster finish; some of this rise may reflect that effort rather than fatigue.'
+    : '';
+  const driftClarify = ' (first vs last 10 min of moving time)';
+  const plannedWorkoutLeadIn = plannedWorkout
+    ? 'Considering your planned workout, '
+    : '';
+
   // Verdict: single non-repetitive sentence; upgrade when internal vs external load tells a story
   let verdict = parts[0].trim() + (parts[0].endsWith('.') ? '' : '.');
   if (fastDominant && isRecoveryContext && hrDriftAbs != null && hrDriftAbs <= 5) {
@@ -1717,23 +1963,23 @@ function generateAdherenceSummary(
     outlook = `This effort fits within your current phase (${currentPhaseName}).`;
   }
 
-  // Overall context (no plan): still give a useful outlook — pacing consequence + HR when available
+  // Overall context: Only needed if there's something NOT covered in the HR drift narrative
+  // The HR drift interpretation now tells the complete story including pace adherence
   if (!outlook && !planContext?.hasActivePlan) {
-    focus = 'Overall';
-    const hrLine = hrDrift != null && Number.isFinite(hrDrift)
-      ? hrDriftAbs != null && hrDriftAbs <= 3
-        ? ' Heart rate stayed stable — good aerobic efficiency at this pace.'
-        : hrDriftAbs != null && hrDriftAbs <= 10
-          ? ` Moderate HR drift (+${hrDrift} bpm) — pace may have felt harder toward the end.`
-          : ` Significant HR drift (+${hrDrift} bpm) — consider recovery and whether fatigue is building.`
-      : '';
-    if (fastDominant) {
-      outlook = `Intervals were faster than prescribed; sustained faster pacing can contribute to fatigue and injury risk.${hrLine}`;
-    } else if (slowDominant) {
-      outlook = `Intervals were slower than prescribed — you may have missed the intended stimulus.${hrLine}`;
-    } else {
-      outlook = `Pacing was on target or mixed relative to prescribed.${hrLine}`.trim();
+    const hasRichHRInterpretation = granularAnalysis?.heart_rate_analysis?.hr_drift_interpretation?.length > 100;
+    
+    if (!hasRichHRInterpretation) {
+      // Fallback for older analyses without rich interpretation
+      focus = 'Overall';
+      if (fastDominant) {
+        outlook = `Intervals were faster than prescribed; sustained faster pacing can contribute to fatigue and injury risk.`;
+      } else if (slowDominant) {
+        outlook = `Intervals were slower than prescribed — you may have missed the intended stimulus.`;
+      } else {
+        outlook = `Pacing was on target or mixed relative to prescribed.`;
+      }
     }
+    // If rich interpretation exists, don't set focus/outlook - let UI handle empty state
   }
 
   // Technical insights: internal vs external load + diagnostic labels (interpret, don't mirror)
@@ -1747,14 +1993,35 @@ function generateAdherenceSummary(
     });
   }
 
-  // HR drift → Aerobic Efficiency / Aerobic Stress (coaching logic)
+  // HR drift → Use the rich context-aware interpretation from granular analysis
+  // This includes terrain profile, workout plan context, and window-by-window analysis
+  const richHRInterpretation = granularAnalysis?.heart_rate_analysis?.hr_drift_interpretation;
   if (hrDrift != null && Number.isFinite(hrDrift) && hrDriftAbs !== null) {
-    if (hrDriftAbs <= 3) {
-      technical_insights.push({ label: 'Aerobic Efficiency', value: `Heart rate remained stable (${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift), suggesting this pace is within your aerobic threshold.` });
-    } else if (hrDriftAbs <= 10) {
-      technical_insights.push({ label: 'Cardiac Drift', value: `Moderate HR drift (+${hrDrift} bpm) in the second half — pace may have felt harder as the session went on.` });
+    // Use summary_label from HR analysis module (single source of truth)
+    // Falls back to derived label only if summary_label not available
+    let driftLabel = granularAnalysis?.heart_rate_analysis?.summary_label;
+    if (!driftLabel) {
+      // Fallback for older analyses: derive label from drift magnitude
+      driftLabel = 'Cardiac Drift';
+      if (hrDriftAbs <= 3) {
+        driftLabel = 'Aerobic Efficiency';
+      } else if (hrDriftAbs > 10) {
+        driftLabel = 'Aerobic Stress';
+      }
+    }
+    
+    // Use rich interpretation if available, otherwise fall back to simple text
+    if (richHRInterpretation && richHRInterpretation.length > 20) {
+      technical_insights.push({ label: driftLabel, value: richHRInterpretation });
     } else {
-      technical_insights.push({ label: 'Aerobic Stress', value: `Significant HR drift (+${hrDrift} bpm) suggests accumulated fatigue or intensity creep. Consider hydration, heat, and recovery; this may take longer to absorb.` });
+      // Fallback for older analyses without rich interpretation
+      if (hrDriftAbs <= 3) {
+        technical_insights.push({ label: driftLabel, value: `${plannedWorkoutLeadIn}Heart rate remained stable (${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift${driftClarify}), suggesting this pace is within your aerobic threshold.` });
+      } else if (hrDriftAbs <= 10) {
+        technical_insights.push({ label: driftLabel, value: `${plannedWorkoutLeadIn}Moderate HR drift (+${hrDrift} bpm${driftClarify}) in the second half — pace may have felt harder as the session went on.${driftContextNote}` });
+      } else {
+        technical_insights.push({ label: driftLabel, value: `${plannedWorkoutLeadIn}Significant HR drift (+${hrDrift} bpm${driftClarify}) suggests accumulated fatigue or intensity creep. Consider hydration, heat, and recovery; this may take longer to absorb.${driftContextNote}` });
+      }
     }
   }
 
@@ -1792,10 +2059,115 @@ function generateAdherenceSummary(
     }
   }
 
+  // If no specific plan_impact was set but we have a rich narrative, skip plan_impact
+  // The complete story is already told in the technical_insights (HR Summary / Cardiac Drift)
+  const hrSummaryLabels = ['HR Summary', 'Cardiac Drift', 'Aerobic Efficiency', 'Aerobic Stress', 'Aerobic Response', 'Elevated Drift', 'High Cardiac Stress'];
+  const hasRichNarrative = technical_insights.some(t => 
+    hrSummaryLabels.includes(t.label) && t.value.length > 100
+  );
+  
   return {
     verdict,
     technical_insights,
-    plan_impact: { focus, outlook: outlook || 'No plan context.' }
+    plan_impact: { 
+      focus: focus || '', 
+      outlook: outlook || (hasRichNarrative ? '' : 'No additional context.')
+    }
   };
 }
 
+// =============================================================================
+// HR ANALYSIS HELPERS
+// =============================================================================
+
+/**
+ * Detect workout type from intervals and planned workout info.
+ * Used to provide context to the HR analysis module.
+ */
+function detectWorkoutTypeFromIntervals(
+  intervals: any[],
+  plannedWorkout?: any
+): WorkoutType {
+  if (!intervals || intervals.length === 0) {
+    return 'steady_state';
+  }
+  
+  const workIntervals = intervals.filter(i => 
+    i.role === 'work' || i.role === 'Work' || i.kind === 'work'
+  );
+  const recoveryIntervals = intervals.filter(i => 
+    i.role === 'recovery' || i.role === 'Recovery' || i.role === 'rest' || i.kind === 'recovery'
+  );
+  
+  const desc = (plannedWorkout?.description || plannedWorkout?.workout_description || '').toLowerCase();
+  const token = (plannedWorkout?.workout_token || '').toLowerCase();
+  
+  // Hill repeats
+  if (desc.includes('hill') && (desc.includes('repeat') || desc.includes('reps'))) {
+    return 'hill_repeats';
+  }
+  
+  // Fartlek
+  if (desc.includes('fartlek') || token.includes('fartlek')) {
+    return 'fartlek';
+  }
+  
+  // Standard intervals
+  if (workIntervals.length > 1 && recoveryIntervals.length > 0) {
+    return 'intervals';
+  }
+  
+  // Tempo finish detection
+  if (workIntervals.length >= 2) {
+    const lastInterval = workIntervals[workIntervals.length - 1];
+    const firstInterval = workIntervals[0];
+    
+    const lastPace = lastInterval.executed?.avg_pace_s_per_mi || lastInterval.pace_range?.lower || 0;
+    const firstPace = firstInterval.executed?.avg_pace_s_per_mi || firstInterval.pace_range?.lower || 0;
+    const lastDuration = lastInterval.executed?.duration_s || 
+      (lastInterval.sample_idx_end && lastInterval.sample_idx_start 
+        ? lastInterval.sample_idx_end - lastInterval.sample_idx_start : 0);
+    const firstDuration = firstInterval.executed?.duration_s || 
+      (firstInterval.sample_idx_end && firstInterval.sample_idx_start 
+        ? firstInterval.sample_idx_end - firstInterval.sample_idx_start : 0);
+    
+    // Tempo finish: last interval is faster AND shorter (<25% of first)
+    if (lastPace > 0 && firstPace > 0 && lastPace < firstPace * 0.9 &&
+        lastDuration > 0 && firstDuration > 0 && lastDuration < firstDuration * 0.25) {
+      return 'tempo_finish';
+    }
+  }
+  
+  // Check description
+  if (desc.includes('progressive') || token.includes('progressive')) {
+    return 'progressive';
+  }
+  
+  if (desc.includes('tempo finish') || desc.includes('fast finish') || 
+      desc.includes('@ m pace') || desc.includes('@ tempo')) {
+    return 'tempo_finish';
+  }
+  
+  return 'steady_state';
+}
+
+/**
+ * Detect workout intent from planned workout metadata.
+ */
+function detectWorkoutIntent(plannedWorkout: any): 'easy' | 'long' | 'tempo' | 'intervals' | 'recovery' | undefined {
+  if (!plannedWorkout) return undefined;
+  
+  const token = (plannedWorkout.workout_token || '').toLowerCase();
+  const desc = (plannedWorkout.description || plannedWorkout.workout_description || '').toLowerCase();
+  const name = (plannedWorkout.name || plannedWorkout.workout_name || '').toLowerCase();
+  
+  const combined = `${token} ${desc} ${name}`;
+  
+  if (combined.includes('recovery')) return 'recovery';
+  if (combined.includes('easy') || combined.includes('aerobic') || combined.includes('base')) return 'easy';
+  if (combined.includes('long')) return 'long';
+  if (combined.includes('tempo') || combined.includes('threshold')) return 'tempo';
+  if (combined.includes('interval') || combined.includes('repeat') || combined.includes('speed')) return 'intervals';
+  
+  return undefined;
+}

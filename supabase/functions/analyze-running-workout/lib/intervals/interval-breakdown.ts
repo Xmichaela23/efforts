@@ -28,65 +28,38 @@ export function generateIntervalBreakdown(
     const plannedDuration = interval.planned?.duration_s || 0;
     const plannedPace = interval.planned?.target_pace_s_per_mi || 0;
     
-    // Extract actual values from executed object
+    // Extract actual values from executed object (elapsed from stream)
     const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
     
-    // ✅ FIX: Recalculate pace using moving time, not duration-based pace
-    // The stored avg_pace_s_per_mi might be calculated from elapsed duration, not moving time
-    // Use moving time from workout.computed.overall.duration_s_moving (same as Details tab)
-    let actualPace = interval.executed?.avg_pace_s_per_mi || 0;
-    const intervalDistanceM = interval.executed?.distance_m || 0;
-    
-    // ✅ CRITICAL: Use moving time from overall workout (same source as Details tab)
-    // For steady-state runs, the interval IS the whole workout, so use overall moving time
-    // For interval workouts, use the interval's moving time if available, otherwise calculate from sensor data
+    // ✅ Use moving time for overall row so Time and Pace match Readouts (Duration vs Moving Time difference)
     const overallMovingTimeS = rawWorkoutData?.computed?.overall?.duration_s_moving || null;
     const overallDistanceM = rawWorkoutData?.computed?.overall?.distance_m || null;
-    
-    // If this is a single-interval workout (steady-state), use overall moving time
+    let displayDurationS = actualDuration; // default: elapsed (for intervals)
+    let safeMovingTimeS: number | null = null;
+
+    let actualPace = interval.executed?.avg_pace_s_per_mi || 0;
+    const intervalDistanceM = interval.executed?.distance_m || 0;
+
+    // If this is a single-interval workout (steady-state), use overall moving time for both Time and Pace
     if (intervalsToAnalyze.length === 1 && overallMovingTimeS && overallDistanceM && overallDistanceM > 0) {
+      safeMovingTimeS = overallMovingTimeS;
+      if (overallMovingTimeS < 60 && rawWorkoutData?.moving_time) {
+        const mvMin = Number(rawWorkoutData.moving_time);
+        if (Number.isFinite(mvMin) && mvMin > 0) {
+          safeMovingTimeS = Math.round(mvMin * 60);
+          console.log(`⚠️ [PACE FIX] Detected suspicious duration_s_moving=${overallMovingTimeS}s, recalculating from moving_time=${mvMin}min → ${safeMovingTimeS}s`);
+        }
+      }
+      displayDurationS = safeMovingTimeS; // show moving time in Performance table
       const miles = overallDistanceM / 1609.34;
       if (miles > 0) {
-        // ✅ FIX: Sanity check - if overallMovingTimeS is suspiciously small (< 60), it might be in minutes
-        // Recalculate from rawWorkoutData.moving_time if available
-        let safeMovingTimeS = overallMovingTimeS;
-        if (overallMovingTimeS < 60 && rawWorkoutData?.moving_time) {
-          const mvMin = Number(rawWorkoutData.moving_time);
-          if (Number.isFinite(mvMin) && mvMin > 0) {
-            safeMovingTimeS = Math.round(mvMin * 60);
-            console.log(`⚠️ [PACE FIX] Detected suspicious duration_s_moving=${overallMovingTimeS}s, recalculating from moving_time=${mvMin}min → ${safeMovingTimeS}s`);
-          }
-        }
-        actualPace = safeMovingTimeS / miles; // seconds per mile
-        console.log(`🔍 [PACE RECALC] Steady-state: using overall moving_time=${safeMovingTimeS}s, distance=${overallDistanceM}m, pace=${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi) [was: ${interval.executed?.avg_pace_s_per_mi || 'N/A'}s/mi]`);
-      }
-    } else if (sensorData && interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined && intervalDistanceM > 0) {
-      // For interval workouts, calculate moving time from sensor samples
-      const intervalSamples = sensorData.slice(interval.sample_idx_start, interval.sample_idx_end + 1);
-      if (intervalSamples.length > 1) {
-        // Calculate moving time: count samples with valid pace (indicates movement)
-        // Each sample represents 1 second if pace is valid
-        let movingTimeSeconds = 0;
-        
-        for (const sample of intervalSamples) {
-          // Valid pace range: 180-1200 s/mi (3-20 min/mi) indicates movement
-          const pace = sample.pace_s_per_mi;
-          if (pace && pace > 0 && pace >= 180 && pace <= 1200) {
-            movingTimeSeconds += 1; // Each sample = 1 second
-          }
-        }
-        
-        // If we calculated moving time, recalculate pace using moving time and distance
-        if (movingTimeSeconds > 0 && intervalDistanceM > 0) {
-          const miles = intervalDistanceM / 1609.34;
-          if (miles > 0) {
-            actualPace = movingTimeSeconds / miles; // seconds per mile
-            console.log(`🔍 [PACE RECALC] Interval ${index + 1}: moving_time=${movingTimeSeconds}s (from ${intervalSamples.length} samples), distance=${intervalDistanceM}m, pace=${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi) [was: ${interval.executed?.avg_pace_s_per_mi || 'N/A'}s/mi]`);
-          }
-        }
+        actualPace = safeMovingTimeS / miles; // seconds per mile (moving pace)
+        console.log(`🔍 [PACE RECALC] Steady-state: moving_time=${safeMovingTimeS}s, distance=${overallDistanceM}m, pace=${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi) [was: ${interval.executed?.avg_pace_s_per_mi || 'N/A'}s/mi]`);
       }
     }
-    // Fallback: derive pace from interval's actual duration + distance when no other source (e.g. no sample indices or sensor pace)
+    // For multi-interval workouts: use executed.avg_pace_s_per_mi (elapsed from summary). Do NOT overwrite
+    // with sensor "moving time" count — that assumed 1 sample = 1s and produced wrongly fast paces (e.g. 6:31 vs 9:54).
+    // Fallback: derive pace from interval's actual duration + distance when no other source
     if (actualPace <= 0 && actualDuration > 0 && intervalDistanceM > 0) {
       const miles = intervalDistanceM / 1609.34;
       if (miles > 0) {
@@ -95,13 +68,12 @@ export function generateIntervalBreakdown(
       }
     }
     
-    // Calculate duration adherence: how close actual is to planned (not just ratio)
-    // If planned is 250s and actual is 245s, adherence = 100 - |245-250|/250 * 100 = 98%
+    // Calculate duration adherence: how close actual is to planned (use display duration = moving for overall row)
     let durationAdherence = 0;
-    if (plannedDuration > 0 && actualDuration > 0) {
-      const durationDelta = Math.abs(actualDuration - plannedDuration);
+    if (plannedDuration > 0 && displayDurationS > 0) {
+      const durationDelta = Math.abs(displayDurationS - plannedDuration);
       durationAdherence = Math.max(0, 100 - (durationDelta / plannedDuration) * 100);
-    } else if (plannedDuration > 0 && actualDuration === 0) {
+    } else if (plannedDuration > 0 && displayDurationS === 0) {
       durationAdherence = 0; // No actual duration recorded
     }
     
@@ -167,7 +139,7 @@ export function generateIntervalBreakdown(
     if (index === 0) {
       console.log(`🔍 [INTERVAL BREAKDOWN DEBUG] Interval ${index + 1}:`);
       console.log(`  Planned duration: ${plannedDuration}s (${Math.floor(plannedDuration/60)}:${String(Math.round(plannedDuration%60)).padStart(2,'0')})`);
-      console.log(`  Actual duration: ${actualDuration}s (${actualDuration > 0 ? `${Math.floor(actualDuration/60)}:${String(Math.round(actualDuration%60)).padStart(2,'0')}` : 'N/A'})`);
+      console.log(`  Display duration: ${displayDurationS}s (${displayDurationS > 0 ? `${Math.floor(displayDurationS/60)}:${String(Math.round(displayDurationS%60)).padStart(2,'0')}` : 'N/A'})${displayDurationS !== actualDuration ? ` [moving; elapsed=${actualDuration}s]` : ''}`);
       console.log(`  Planned pace: ${plannedPace}s/mi (${plannedPace > 0 ? `${Math.floor(plannedPace/60)}:${String(Math.round(plannedPace%60)).padStart(2,'0')}/mi` : 'N/A'})`);
       console.log(`  Planned pace range: ${workRangeLower}-${workRangeUpper}s/mi`);
       console.log(`  Actual pace: ${actualPace}s/mi (${actualPace > 0 ? `${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi` : 'N/A'})`);
@@ -183,7 +155,7 @@ export function generateIntervalBreakdown(
       interval_number: index + 1,
       interval_id: interval.planned_step_id || null,
       planned_duration_s: plannedDuration,
-      actual_duration_s: actualDuration,
+      actual_duration_s: displayDurationS,
       planned_distance_m: interval.planned?.distance_m || 0,
       actual_distance_m: interval.executed?.distance_m || 0,
       duration_adherence_percent: Math.round(durationAdherence),

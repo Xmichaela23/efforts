@@ -967,9 +967,19 @@ Deno.serve(async (req) => {
         return t === 'run' || t === 'running';
       });
 
-      // Match by planned_workouts.completed_workout_id first; then by workouts.planned_id so links from Attach flow are recognized
+      // Match: (1) completed_workout_id, (2) workouts.planned_id, (3) same date + same type, (4) same week + same type (moved)
       const matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }> = [];
       const plannedIdsUsed = new Set<string>();
+      const workoutIdsUsed = new Set<string>();
+      const normalizeType = (t: string): string => {
+        const s = (t || '').toLowerCase();
+        if (s.includes('run') || s === 'running') return 'run';
+        if (s.includes('ride') || s.includes('bike') || s.includes('cycl')) return 'ride';
+        if (s.includes('swim')) return 'swim';
+        if (s.includes('strength') || s.includes('weight')) return 'strength';
+        if (s.includes('mobility') || s === 'pt') return 'mobility';
+        return s || 'run';
+      };
       for (const p of plannedToDate) {
         const pId = String(p.id);
         let wid = (p as PlannedWorkoutRecord & { completed_workout_id?: string | null }).completed_workout_id;
@@ -977,10 +987,18 @@ Deno.serve(async (req) => {
           const fromWorkout = weekCompleted.find((w: WorkoutRecord & { planned_id?: string | null }) => String(w.planned_id || '') === pId);
           if (fromWorkout) wid = fromWorkout.id;
         }
+        if (!wid) {
+          const pType = normalizeType((p as any).type);
+          const sameDaySameType = weekCompleted.find((w: WorkoutRecord) =>
+            w.date === p.date && normalizeType(w.type) === pType && !workoutIdsUsed.has(w.id)
+          );
+          if (sameDaySameType) wid = sameDaySameType.id;
+        }
         if (!wid || plannedIdsUsed.has(pId)) continue;
         const completedWorkout = weekCompleted.find((w: WorkoutRecord) => w.id === wid);
         if (!completedWorkout) continue;
         plannedIdsUsed.add(pId);
+        workoutIdsUsed.add(wid);
         matched_pairs.push({
           planned_date: toLocalDay(p.date),
           completed_date: toLocalDay(completedWorkout.date),
@@ -988,15 +1006,53 @@ Deno.serve(async (req) => {
           workout_id: wid
         });
       }
+      // Same-week, same-type fallback: match unlinked completions to unmatched planned (e.g. Fri optional strength -> Sat strength)
+      const unmatchedPlanned = plannedToDate.filter(p => !plannedIdsUsed.has(String(p.id)));
+      const unlinkedCompleted = weekCompleted.filter((w: WorkoutRecord) => !workoutIdsUsed.has(w.id));
+      for (const p of unmatchedPlanned) {
+        const pId = String(p.id);
+        const pType = normalizeType((p as any).type);
+        const pDate = p.date;
+        const candidates = unlinkedCompleted
+          .filter((w: WorkoutRecord) => normalizeType(w.type) === pType)
+          .map((w: WorkoutRecord) => ({ w, dayDelta: Math.abs(new Date(w.date).getTime() - new Date(pDate).getTime()) / (24 * 60 * 60 * 1000) }))
+          .sort((a, b) => a.dayDelta - b.dayDelta);
+        const best = candidates[0];
+        if (!best) continue;
+        plannedIdsUsed.add(pId);
+        workoutIdsUsed.add(best.w.id);
+        matched_pairs.push({
+          planned_date: toLocalDay(p.date),
+          completed_date: toLocalDay(best.w.date),
+          planned_id: pId,
+          workout_id: best.w.id
+        });
+        unlinkedCompleted.splice(unlinkedCompleted.indexOf(best.w), 1);
+      }
+
+      // Persist inferred moved links so calendar shows planned session as completed (done on different day)
+      const movedPairs = matched_pairs.filter(p => p.planned_date !== p.completed_date);
+      for (const pair of movedPairs) {
+        const plannedRow = plannedToDate.find((p: any) => String(p.id) === pair.planned_id);
+        const workoutRow = weekCompleted.find((w: WorkoutRecord) => w.id === pair.workout_id) as WorkoutRecord & { planned_id?: string | null } | undefined;
+        if (!plannedRow || !workoutRow) continue;
+        const planned = plannedRow as { completed_workout_id?: string | null };
+        const alreadyLinked = planned.completed_workout_id === pair.workout_id && (workoutRow.planned_id ?? null) === pair.planned_id;
+        if (alreadyLinked) continue;
+        try {
+          await supabase.from('planned_workouts').update({ completed_workout_id: pair.workout_id }).eq('id', pair.planned_id);
+          await supabase.from('workouts').update({ planned_id: pair.planned_id }).eq('id', pair.workout_id).eq('user_id', user_id);
+        } catch (_) { /* ignore per-call errors */ }
+      }
 
       const sessionsMatchedToPlan = matched_pairs.length;
       const matchCoveragePct = sessionsCompletedTotal > 0 ? matched_pairs.length / sessionsCompletedTotal : 0;
       const completed_unlinked_count = Math.max(0, sessionsCompletedTotal - sessionsMatchedToPlan);
       const sessionsMissedRaw = Math.max(0, sessionsToDate - sessionsMatchedToPlan);
-      // Only show "missed" when linking is complete and math is trustworthy (spec: planned>=3, coverage>=0.8, unlinked=0)
+      // Only show "missed" when linking is complete and math is trustworthy (planned>=3, unlinked=0, coverage>=0.75 so 6/8 counts)
       const coverageToDate = sessionsToDate > 0 ? sessionsMatchedToPlan / sessionsToDate : 0;
       const sessionsMissed =
-        sessionsToDate >= 3 && coverageToDate >= 0.8 && completed_unlinked_count === 0
+        sessionsToDate >= 3 && completed_unlinked_count === 0 && coverageToDate >= 0.75
           ? sessionsMissedRaw
           : null;
 

@@ -5,7 +5,8 @@
 
 import { getPaceToleranceForSegment } from './garmin-execution.ts';
 import { calculatePaceRangeAdherence, getIntervalType, type IntervalType } from './pace-adherence.ts';
-import { calculateHeartRateDrift } from '../analysis/heart-rate-drift.ts';
+// NOTE: HR drift is now calculated by the consolidated HR analysis module in index.ts
+// Do NOT import or call calculateHeartRateDrift here - it creates competing calculations
 
 // -----------------------------------------------------------------------------
 // Exported types
@@ -266,14 +267,9 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
   const paceStdDev = Math.sqrt(paceValues.reduce((sum, v) => sum + Math.pow(v - avgPace, 2), 0) / paceValues.length);
   const paceVariation = avgPace > 0 ? (paceStdDev / avgPace) * 100 : 0;
 
-  const intervalStartTimestamp = samples.length > 0
-    ? (samples[0].timestamp || samples[0].elapsed_time_s || 0)
-    : undefined;
-  const intervalEndTimestamp = samples.length > 0
-    ? (samples[samples.length - 1].timestamp || samples[samples.length - 1].elapsed_time_s || 0)
-    : undefined;
-  const hrDriftResult = calculateHeartRateDrift(samples, intervalStartTimestamp, intervalEndTimestamp);
-  const hrDrift = hrDriftResult.valid ? hrDriftResult.drift_bpm : 0;
+  // Per-interval HR drift is not meaningful (drift requires sustained effort)
+  // Workout-level HR drift is now calculated by consolidated HR analysis in index.ts
+  const hrDrift = 0;
 
   const avgCadence = cadenceValues.length > 0
     ? cadenceValues.reduce((sum, v) => sum + v, 0) / cadenceValues.length
@@ -303,7 +299,27 @@ function analyzeIntervalPace(samples: any[], interval: any, plannedWorkout?: any
 // calculateIntervalPaceAdherence
 // -----------------------------------------------------------------------------
 
-function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], workout: any, plannedWorkout: any): PrescribedRangeAdherence {
+function calculateIntervalPaceAdherence(
+  sensorData: any[], 
+  intervals: any[], 
+  workout: any, 
+  plannedWorkout: any,
+  historicalDrift?: {
+    similarWorkouts: Array<{ date: string; driftBpm: number; durationMin: number; elevationFt?: number }>;
+    avgDriftBpm: number;
+    recentTrend?: 'improving' | 'stable' | 'worsening';
+    lastWeekSimilar?: { date: string; driftBpm: number; durationMin: number; elevationFt?: number; daysSince: number };
+  },
+  planContext?: {
+    weekIndex?: number;
+    weekIntent?: string;
+    phaseName?: string;
+    isRecoveryWeek?: boolean;
+    hasActivePlan?: boolean;
+  }
+): PrescribedRangeAdherence {
+  console.log('🔴🔴🔴 VERSION 2026-02-02-C-EARLY-DRIFT: calculateIntervalPaceAdherence STARTED');
+  console.log('🟢🟢🟢 IMMEDIATE-CHECK: This should appear right after version');
   console.log('🏃‍♂️ Analyzing interval workout pace adherence');
 
   const workIntervals = intervals.filter(interval => {
@@ -339,6 +355,56 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     totalTimeOutsideRange += intervalResult.timeOutsideRange;
     totalSamples += intervalResult.totalSamples;
   }
+
+  console.log(`🟡🟡🟡 AFTER-FORLOOP: workIntervals processed, totalTimeInRange=${totalTimeInRange}`);
+  console.log(`🔵🔵🔵 EARLY-DRIFT-SECTION-START: workIntervals.length=${workIntervals.length}`);
+
+  // ============================================================================
+  // BASIC HR STATS - Full drift analysis is done by consolidated module in index.ts
+  // ============================================================================
+  let heartRateAnalysis: any = null;
+  const allWorkSamplesForHR: any[] = [];
+  for (const interval of workIntervals) {
+    if (interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined) {
+      allWorkSamplesForHR.push(...sensorData.slice(interval.sample_idx_start, interval.sample_idx_end + 1));
+    }
+  }
+  console.log(`📊 [GRANULAR-PACE] Collecting basic HR stats from ${allWorkSamplesForHR.length} samples`);
+  
+  if (allWorkSamplesForHR.length > 0) {
+    const validHRSamples = allWorkSamplesForHR.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
+    const avgHR = validHRSamples.length > 0
+      ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
+      : 0;
+
+    // Calculate totalTime for HR analysis
+    const totalTimeForHR = workIntervals.reduce((sum, i) => {
+      const duration = i.executed?.duration_s || 
+        (i.sample_idx_end && i.sample_idx_start ? (i.sample_idx_end - i.sample_idx_start + 1) : 0);
+      return sum + duration;
+    }, 0);
+
+    // NOTE: hr_drift_bpm and related fields are now populated by the consolidated
+    // HR analysis module (analyzeHeartRate) in index.ts. We only capture basic stats here.
+    heartRateAnalysis = {
+      adherence_percentage: 100,
+      time_in_zone_s: totalTimeForHR,
+      time_outside_zone_s: 0,
+      total_time_s: totalTimeForHR,
+      samples_in_zone: validHRSamples.length,
+      samples_outside_zone: 0,
+      average_heart_rate: avgHR,
+      target_zone: null,
+      // Drift fields left null - populated by consolidated HR analysis in index.ts
+      hr_drift_bpm: null,
+      early_avg_hr: null,
+      late_avg_hr: null,
+      hr_drift_interpretation: null,
+      hr_consistency: null // Will be updated later with pacing variability
+    };
+    console.log(`📊 [GRANULAR-PACE] Basic HR stats: avgHR=${avgHR}, samples=${validHRSamples.length}`);
+  }
+  // ============================================================================
 
   const totalTime = totalTimeInRange + totalTimeOutsideRange;
   const timeInRangeScore = totalTime > 0 ? totalTimeInRange / totalTime : 0;
@@ -459,62 +525,19 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
     return { adherence: Math.round(segmentAdherencePct), timeInRange: segmentTimeInRange, totalTime: segmentTotalTime };
   };
 
+  console.log(`🟣 PRE-SEGMENT: warmup=${warmupIntervals.length}, work=${workIntervalsOnly.length}, recovery=${recoveryIntervals.length}, cooldown=${cooldownIntervals.length}`);
   if (warmupIntervals.length > 0) segmentAdherence.warmup = calculateSegmentAdherence(warmupIntervals);
   if (workIntervalsOnly.length > 0) segmentAdherence.work_intervals = calculateSegmentAdherence(workIntervalsOnly);
   if (recoveryIntervals.length > 0) segmentAdherence.recovery = calculateSegmentAdherence(recoveryIntervals);
   if (cooldownIntervals.length > 0) segmentAdherence.cooldown = calculateSegmentAdherence(cooldownIntervals);
+  console.log(`🟣 POST-SEGMENT: segment adherence calculated`);
 
-  const allWorkSamples: any[] = [];
-  for (const interval of workIntervals) {
-    if (interval.sample_idx_start !== undefined && interval.sample_idx_end !== undefined) {
-      allWorkSamples.push(...sensorData.slice(interval.sample_idx_start, interval.sample_idx_end + 1));
-    }
+  // Update hr_consistency now that we have pacing variability
+  if (heartRateAnalysis) {
+    heartRateAnalysis.hr_consistency = 1 - (pacingVariability.coefficient_of_variation / 100);
   }
-
-  let heartRateAnalysis = null;
-  if (allWorkSamples.length > 0) {
-    const validHRSamples = allWorkSamples.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
-    const avgHR = validHRSamples.length > 0
-      ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
-      : 0;
-    const isIntervalWorkout = recoveryIntervals.length > 0;
-    if (isIntervalWorkout) {
-      heartRateAnalysis = {
-        adherence_percentage: 100,
-        time_in_zone_s: totalTime,
-        time_outside_zone_s: 0,
-        total_time_s: totalTime,
-        samples_in_zone: validHRSamples.length,
-        samples_outside_zone: 0,
-        average_heart_rate: avgHR,
-        target_zone: null,
-        hr_drift_bpm: null,
-        early_avg_hr: null,
-        late_avg_hr: null,
-        hr_drift_interpretation: 'Not applicable for interval workouts (HR resets during recovery)',
-        hr_consistency: 1 - (pacingVariability.coefficient_of_variation / 100)
-      };
-    } else {
-      const workStartTimestamp = allWorkSamples.length > 0 ? (allWorkSamples[0].timestamp || allWorkSamples[0].elapsed_time_s || 0) : undefined;
-      const workEndTimestamp = allWorkSamples.length > 0 ? (allWorkSamples[allWorkSamples.length - 1].timestamp || allWorkSamples[allWorkSamples.length - 1].elapsed_time_s || 0) : undefined;
-      const hrDriftResult = calculateHeartRateDrift(allWorkSamples, workStartTimestamp, workEndTimestamp);
-      heartRateAnalysis = {
-        adherence_percentage: 100,
-        time_in_zone_s: totalTime,
-        time_outside_zone_s: 0,
-        total_time_s: totalTime,
-        samples_in_zone: validHRSamples.length,
-        samples_outside_zone: 0,
-        average_heart_rate: avgHR,
-        target_zone: null,
-        hr_drift_bpm: hrDriftResult.valid ? hrDriftResult.drift_bpm : null,
-        early_avg_hr: hrDriftResult.valid ? hrDriftResult.early_avg_hr : null,
-        late_avg_hr: hrDriftResult.valid ? hrDriftResult.late_avg_hr : null,
-        hr_drift_interpretation: hrDriftResult.valid ? hrDriftResult.interpretation : 'Insufficient data for drift calculation',
-        hr_consistency: 1 - (pacingVariability.coefficient_of_variation / 100)
-      };
-    }
-  }
+  
+  console.log(`🟣 RETURN: heartRateAnalysis=${heartRateAnalysis ? 'SET' : 'NULL'}, hr_drift_bpm=${heartRateAnalysis?.hr_drift_bpm ?? 'N/A'}`);
 
   return {
     overall_adherence: timeInRangeScore,
@@ -549,7 +572,25 @@ function calculateIntervalPaceAdherence(sensorData: any[], intervals: any[], wor
 // calculateSteadyStatePaceAdherence
 // -----------------------------------------------------------------------------
 
-function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], workout: any, plannedWorkout: any): PrescribedRangeAdherence {
+function calculateSteadyStatePaceAdherence(
+  sensorData: any[], 
+  intervals: any[], 
+  workout: any, 
+  plannedWorkout: any,
+  historicalDrift?: {
+    similarWorkouts: Array<{ date: string; driftBpm: number; durationMin: number; elevationFt?: number }>;
+    avgDriftBpm: number;
+    recentTrend?: 'improving' | 'stable' | 'worsening';
+    lastWeekSimilar?: { date: string; driftBpm: number; durationMin: number; elevationFt?: number; daysSince: number };
+  },
+  planContext?: {
+    weekIndex?: number;
+    weekIntent?: string;
+    phaseName?: string;
+    isRecoveryWeek?: boolean;
+    hasActivePlan?: boolean;
+  }
+): PrescribedRangeAdherence {
   console.log('🏃‍♂️ Analyzing steady-state workout pace adherence');
 
   const mainSegments = intervals.filter(interval => {
@@ -569,9 +610,8 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
     const avgHR = validHRSamples.length > 0
       ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
       : 0;
-    const workStartTimestamp = sensorData.length > 0 ? (sensorData[0].timestamp || sensorData[0].elapsed_time_s || 0) : undefined;
-    const workEndTimestamp = sensorData.length > 0 ? (sensorData[sensorData.length - 1].timestamp || sensorData[sensorData.length - 1].elapsed_time_s || 0) : undefined;
-    const hrDriftResult = calculateHeartRateDrift(sensorData, workStartTimestamp, workEndTimestamp);
+    // NOTE: Full HR drift analysis is done by consolidated module in index.ts
+    // We only capture basic stats here
     const allPaces = validPaceSamples.map(s => s.pace_s_per_mi);
     const stdDev = allPaces.length > 1 ? calculateStandardDeviation(allPaces) : 0;
     const cv = avgPace > 0 ? stdDev / avgPace : 0;
@@ -641,6 +681,7 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
       total_time_s: timeInRange + timeOutsideRange,
       samples_in_range: timeInRange,
       samples_outside_range: timeOutsideRange,
+      // NOTE: Basic HR stats only - full drift analysis done by consolidated module in index.ts
       heart_rate_analysis: avgHR > 0 ? {
         adherence_percentage: 100,
         time_in_zone_s: totalTimeSeconds,
@@ -650,10 +691,11 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
         samples_outside_zone: 0,
         average_heart_rate: avgHR,
         target_zone: null,
-        hr_drift_bpm: hrDriftResult.valid ? hrDriftResult.drift_bpm : hrDriftResult.drift_bpm,
-        early_avg_hr: hrDriftResult.valid ? hrDriftResult.early_avg_hr : null,
-        late_avg_hr: hrDriftResult.valid ? hrDriftResult.late_avg_hr : null,
-        hr_drift_interpretation: hrDriftResult.valid ? hrDriftResult.interpretation : null,
+        // Drift fields left null - populated by consolidated HR analysis in index.ts
+        hr_drift_bpm: null,
+        early_avg_hr: null,
+        late_avg_hr: null,
+        hr_drift_interpretation: null,
         hr_consistency: 1 - cv
       } : null,
       pacing_analysis: { time_in_range_score: 100, variability_score: cv, smoothness_score: 1 - cv, pacing_variability: cv * 100 },
@@ -741,28 +783,26 @@ function calculateSteadyStatePaceAdherence(sensorData: any[], intervals: any[], 
   const samplesForHR = allSegmentSamples.length > 0 ? allSegmentSamples : sensorData;
   let heartRateAnalysis = null;
   if (samplesForHR.length > 0) {
-    const workStartTimestamp = samplesForHR[0]?.timestamp || samplesForHR[0]?.elapsed_time_s || 0;
-    const workEndTimestamp = samplesForHR[samplesForHR.length - 1]?.timestamp || samplesForHR[samplesForHR.length - 1]?.elapsed_time_s || 0;
-    const hrDriftResult = calculateHeartRateDrift(samplesForHR, workStartTimestamp, workEndTimestamp);
-    if (hrDriftResult.valid) {
-      const validHRSamples = samplesForHR.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
-      const avgHR = validHRSamples.length > 0 ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length) : 0;
-      heartRateAnalysis = {
-        adherence_percentage: 100,
-        time_in_zone_s: actualDurationSeconds,
-        time_outside_zone_s: 0,
-        total_time_s: actualDurationSeconds,
-        samples_in_zone: validHRSamples.length,
-        samples_outside_zone: 0,
-        average_heart_rate: avgHR,
-        target_zone: null,
-        hr_drift_bpm: hrDriftResult.drift_bpm,
-        early_avg_hr: hrDriftResult.early_avg_hr,
-        late_avg_hr: hrDriftResult.late_avg_hr,
-        hr_drift_interpretation: hrDriftResult.interpretation,
-        hr_consistency: 1 - cv
-      };
-    }
+    // NOTE: Full HR drift analysis is done by consolidated module in index.ts
+    // We only capture basic stats here
+    const validHRSamples = samplesForHR.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
+    const avgHR = validHRSamples.length > 0 ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length) : 0;
+    heartRateAnalysis = {
+      adherence_percentage: 100,
+      time_in_zone_s: actualDurationSeconds,
+      time_outside_zone_s: 0,
+      total_time_s: actualDurationSeconds,
+      samples_in_zone: validHRSamples.length,
+      samples_outside_zone: 0,
+      average_heart_rate: avgHR,
+      target_zone: null,
+      // Drift fields left null - populated by consolidated HR analysis in index.ts
+      hr_drift_bpm: null,
+      early_avg_hr: null,
+      late_avg_hr: null,
+      hr_drift_interpretation: null,
+      hr_consistency: 1 - cv
+    };
   }
 
   return {
@@ -811,7 +851,20 @@ export function calculatePrescribedRangeAdherenceGranular(
   sensorData: any[],
   intervals: any[],
   workout: any,
-  plannedWorkout: any
+  plannedWorkout: any,
+  historicalDrift?: {
+    similarWorkouts: Array<{ date: string; driftBpm: number; durationMin: number; elevationFt?: number }>;
+    avgDriftBpm: number;
+    recentTrend?: 'improving' | 'stable' | 'worsening';
+    lastWeekSimilar?: { date: string; driftBpm: number; durationMin: number; elevationFt?: number; daysSince: number };
+  },
+  planContext?: {
+    weekIndex?: number;
+    weekIntent?: string;
+    phaseName?: string;
+    isRecoveryWeek?: boolean;
+    hasActivePlan?: boolean;
+  }
 ): PrescribedRangeAdherence {
   console.log(`📊 Starting granular prescribed range analysis for ${intervals.length} intervals`);
 
@@ -833,7 +886,7 @@ export function calculatePrescribedRangeAdherenceGranular(
   console.log(`🔍 Workout type: ${isIntervalWorkout ? 'Intervals' : 'Steady-state'} (${intervalsWithPaceTargets.length} intervals with pace targets, ${workIntervals.length} work segments)`);
 
   if (isIntervalWorkout) {
-    return calculateIntervalPaceAdherence(sensorData, intervals, workout, plannedWorkout);
+    return calculateIntervalPaceAdherence(sensorData, intervals, workout, plannedWorkout, historicalDrift, planContext);
   }
-  return calculateSteadyStatePaceAdherence(sensorData, intervals, workout, plannedWorkout);
+  return calculateSteadyStatePaceAdherence(sensorData, intervals, workout, plannedWorkout, historicalDrift, planContext);
 }

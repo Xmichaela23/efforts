@@ -45,6 +45,15 @@ export default function WorkloadAdmin() {
   const [adaptationOffset, setAdaptationOffset] = useState(0);
   const [adaptationForceRecompute, setAdaptationForceRecompute] = useState(true);
 
+  // Bulk reanalyze state
+  const [reanalyzeLoading, setReanalyzeLoading] = useState(false);
+  const [reanalyzeDaysBack, setReanalyzeDaysBack] = useState(90);
+  const [reanalyzeDryRun, setReanalyzeDryRun] = useState(true);
+  const [reanalyzeLimit, setReanalyzeLimit] = useState(5);
+  const [reanalyzeOffset, setReanalyzeOffset] = useState(0);
+  const [reanalyzeWorkoutType, setReanalyzeWorkoutType] = useState<string>('run');
+  const [reanalyzeFilter, setReanalyzeFilter] = useState<string>('missing_hr_drift');
+
   useEffect(() => {
     const getUser = async () => {
       setPlansLoading(true);
@@ -129,6 +138,34 @@ export default function WorkloadAdmin() {
       setResults({ error: e?.message || String(e) });
     } finally {
       setAdaptationLoading(false);
+    }
+  };
+
+  const handleBulkReanalyze = async (offset = 0) => {
+    if (!user?.id) return;
+    setReanalyzeLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-reanalyze-workouts', {
+        body: {
+          days_back: reanalyzeDaysBack,
+          workout_type: reanalyzeWorkoutType,
+          dry_run: reanalyzeDryRun,
+          limit: reanalyzeLimit,
+          offset,
+          filter: reanalyzeFilter
+        }
+      });
+
+      if (error) throw error;
+
+      setResults(data);
+      if (data?.next_offset != null) setReanalyzeOffset(data.next_offset);
+      else setReanalyzeOffset(0);
+    } catch (e: any) {
+      console.error('Bulk reanalyze failed:', e);
+      setResults({ error: e?.message || String(e) });
+    } finally {
+      setReanalyzeLoading(false);
     }
   };
 
@@ -584,6 +621,114 @@ export default function WorkloadAdmin() {
                 Next
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Bulk Re-analyze Workouts */}
+        <Card className="mt-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              Bulk Re-analyze Workouts
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Re-run workout analysis to populate new fields (HR drift, terrain-adjusted metrics).
+              Use after system updates to backfill historical data.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="reanalyzeDaysBack">Days Back</Label>
+                <Input
+                  id="reanalyzeDaysBack"
+                  type="number"
+                  value={reanalyzeDaysBack}
+                  onChange={(e) => setReanalyzeDaysBack(parseInt(e.target.value) || 90)}
+                  min="7"
+                  max="365"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reanalyzeLimit">Batch size</Label>
+                <Input
+                  id="reanalyzeLimit"
+                  type="number"
+                  value={reanalyzeLimit}
+                  onChange={(e) => setReanalyzeLimit(parseInt(e.target.value) || 5)}
+                  min="1"
+                  max="10"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="reanalyzeWorkoutType">Workout Type</Label>
+                <Select value={reanalyzeWorkoutType} onValueChange={setReanalyzeWorkoutType}>
+                  <SelectTrigger className="bg-white/10 border-white/20">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
+                    <SelectItem value="run" className="hover:bg-white/10">Runs</SelectItem>
+                    <SelectItem value="strength" className="hover:bg-white/10">Strength</SelectItem>
+                    <SelectItem value="cycling" className="hover:bg-white/10">Cycling</SelectItem>
+                    <SelectItem value="swim" className="hover:bg-white/10">Swimming</SelectItem>
+                    <SelectItem value="all" className="hover:bg-white/10">All Types</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reanalyzeFilter">Filter</Label>
+                <Select value={reanalyzeFilter} onValueChange={setReanalyzeFilter}>
+                  <SelectTrigger className="bg-white/10 border-white/20">
+                    <SelectValue placeholder="Select filter..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
+                    <SelectItem value="missing_hr_drift" className="hover:bg-white/10">Missing HR Drift</SelectItem>
+                    <SelectItem value="missing_analysis" className="hover:bg-white/10">Missing Analysis</SelectItem>
+                    <SelectItem value="all" className="hover:bg-white/10">All Workouts</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="reanalyzeDryRun"
+                checked={reanalyzeDryRun}
+                onCheckedChange={(checked) => setReanalyzeDryRun(checked as boolean)}
+              />
+              <Label htmlFor="reanalyzeDryRun">Dry Run (preview only)</Label>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleBulkReanalyze(0)}
+                disabled={reanalyzeLoading}
+                className="flex-1"
+              >
+                {reanalyzeLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                {reanalyzeDryRun ? 'Preview Re-analysis' : 'Run Re-analysis (Batch)'}
+              </Button>
+
+              <Button
+                onClick={() => handleBulkReanalyze(reanalyzeOffset)}
+                disabled={reanalyzeLoading || !reanalyzeOffset}
+                variant="secondary"
+              >
+                Next
+              </Button>
+            </div>
+
+            {reanalyzeOffset > 0 && (
+              <p className="text-xs text-white/40">Current offset: {reanalyzeOffset}</p>
+            )}
           </CardContent>
         </Card>
 
