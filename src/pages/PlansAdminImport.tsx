@@ -31,8 +31,8 @@ export default function PlansAdminImport() {
         }
       />
 
-      <main className="mobile-main-content">
-        <div className="w-full max-w-3xl mx-auto px-4 py-4 space-y-8">
+      <main className="mobile-main-content overflow-y-auto">
+        <div className="w-full max-w-3xl mx-auto px-4 py-4 pb-24 space-y-8">
           <WorkloadAdmin />
           <PlanJSONImport />
           <PlanGeneratorTest />
