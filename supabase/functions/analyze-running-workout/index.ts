@@ -186,27 +186,44 @@ Deno.serve(async (req) => {
     try {
       const currentDuration = workout.moving_time || workout.duration || 0;
       const currentDistance = workout.distance || 0;
+      const currentDurationMin = Math.round(currentDuration / 60);
       
-      // Fetch similar workouts (within 30% duration, same type, last 90 days)
-      const minDuration = currentDuration * 0.7;
-      const maxDuration = currentDuration * 1.3;
+      // Fetch similar workouts - MORE LENIENT: any run 30+ minutes in last 90 days
+      // (removed strict duration matching - all aerobic runs are comparable for drift trends)
+      const minDuration = 30 * 60; // 30 minutes minimum
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
       
-      const { data: similarWorkouts } = await supabase
+      console.log(`📊 [HISTORICAL QUERY] Looking for runs: user=${workout.user_id}, minDuration=30min, since=${ninetyDaysAgo.toISOString()}, excludeId=${workout_id}`);
+      
+      const { data: similarWorkouts, error: histError } = await supabase
         .from('workouts')
-        .select('id, start_date, moving_time, duration, elevation_gain, workout_analysis')
+        .select('id, name, date, moving_time, duration, elevation_gain, workout_analysis')
         .eq('user_id', workout.user_id)
         .eq('type', 'run')
         .neq('id', workout_id) // Exclude current workout
-        .gte('start_date', ninetyDaysAgo.toISOString())
+        .gte('date', ninetyDaysAgo.toISOString())
         .gte('moving_time', minDuration)
-        .lte('moving_time', maxDuration)
         .not('workout_analysis', 'is', null)
-        .order('start_date', { ascending: false })
-        .limit(10);
+        .order('date', { ascending: false })
+        .limit(15);
+      
+      if (histError) {
+        console.log(`📊 [HISTORICAL QUERY] Error: ${histError.message}`);
+      }
+      
+      console.log(`📊 [HISTORICAL QUERY] Found ${similarWorkouts?.length ?? 0} runs with analysis`);
       
       if (similarWorkouts && similarWorkouts.length > 0) {
+        // Log what we found
+        similarWorkouts.forEach((w, i) => {
+          const durMin = Math.round((w.moving_time || w.duration || 0) / 60);
+          const hasDrift1 = w.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm;
+          const hasDrift2 = w.workout_analysis?.heart_rate_summary?.drift_bpm;
+          const hasDrift3 = w.workout_analysis?.detailed_analysis?.workout_summary?.hr_drift;
+          console.log(`📊 [HISTORICAL QUERY] ${i+1}. ${w.name || 'Run'} (${durMin}min): drift1=${hasDrift1}, drift2=${hasDrift2}, drift3=${hasDrift3}`);
+        });
+        
         const workoutsWithDrift = similarWorkouts
           .map(w => {
             // Check multiple possible locations for HR drift (different analysis versions)
@@ -216,9 +233,9 @@ Deno.serve(async (req) => {
               w.workout_analysis?.detailed_analysis?.workout_summary?.hr_drift ??
               null;
             if (hrDrift != null && Number.isFinite(hrDrift)) {
-              const daysSince = Math.round((Date.now() - new Date(w.start_date).getTime()) / (1000 * 60 * 60 * 24));
+              const daysSince = Math.round((Date.now() - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24));
               return {
-                date: w.start_date,
+                date: w.date,
                 driftBpm: hrDrift,
                 durationMin: Math.round((w.moving_time || w.duration || 0) / 60),
                 elevationFt: w.elevation_gain ? Math.round(w.elevation_gain * 3.28084) : undefined,
@@ -263,10 +280,10 @@ Deno.serve(async (req) => {
           };
           console.log(`📊 [HISTORICAL] Found ${workoutsWithDrift.length} similar workouts, avg drift: ${avgDrift.toFixed(1)} bpm, trend: ${trend || 'unknown'}, lastWeekSimilar: ${lastWeekSimilar ? lastWeekSimilar.driftBpm + ' bpm' : 'none'}`);
         } else {
-          console.log(`📊 [HISTORICAL] Found ${similarWorkouts.length} similar workouts but none had HR drift data`);
+          console.log(`📊 [HISTORICAL] Found ${similarWorkouts.length} runs but none had HR drift data stored`);
         }
       } else {
-        console.log(`📊 [HISTORICAL] No similar workouts found (within 30% duration, last 90 days)`);
+        console.log(`📊 [HISTORICAL] No runs found (30+ min, last 90 days, with analysis)`);
       }
     } catch (error) {
       console.log('⚠️ Could not fetch historical drift data:', error);

@@ -54,6 +54,10 @@ export default function WorkloadAdmin() {
   const [reanalyzeWorkoutType, setReanalyzeWorkoutType] = useState<string>('run');
   const [reanalyzeFilter, setReanalyzeFilter] = useState<string>('missing_hr_drift');
 
+  // Fix single workout state
+  const [fixWorkoutId, setFixWorkoutId] = useState<string>('');
+  const [fixWorkoutLoading, setFixWorkoutLoading] = useState(false);
+
   useEffect(() => {
     const getUser = async () => {
       setPlansLoading(true);
@@ -241,6 +245,50 @@ export default function WorkloadAdmin() {
       });
     } finally {
       setReanalyzeLoading(false);
+    }
+  };
+
+  // Fix single workout - calls compute then analyze
+  const handleFixSingleWorkout = async () => {
+    if (!fixWorkoutId.trim()) {
+      setResults({ error: 'Please enter a workout ID' });
+      return;
+    }
+    setFixWorkoutLoading(true);
+    try {
+      setResults({ message: 'Step 1/2: Running compute-workout-analysis...' });
+      
+      // Step 1: Recompute intervals
+      const { data: computeData, error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
+        body: { workout_id: fixWorkoutId.trim() }
+      });
+      
+      if (computeError) {
+        throw new Error(`Compute failed: ${computeError.message}`);
+      }
+      
+      setResults({ message: 'Step 2/2: Running analyze-running-workout...' });
+      
+      // Step 2: Re-analyze
+      const { data: analyzeData, error: analyzeError } = await supabase.functions.invoke('analyze-running-workout', {
+        body: { workout_id: fixWorkoutId.trim() }
+      });
+      
+      if (analyzeError) {
+        throw new Error(`Analyze failed: ${analyzeError.message}`);
+      }
+      
+      setResults({
+        success: true,
+        message: '✅ Workout fixed! Refresh the workout page.',
+        compute: computeData,
+        analyze: analyzeData
+      });
+    } catch (e: any) {
+      console.error('Fix workout failed:', e);
+      setResults({ error: e?.message || String(e) });
+    } finally {
+      setFixWorkoutLoading(false);
     }
   };
 
@@ -576,6 +624,43 @@ export default function WorkloadAdmin() {
               {reanalyzeOffset > 0 && (
                 <p className="text-xs text-white/40">Offset: {reanalyzeOffset}</p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Fix Single Workout */}
+          <Card className="mt-3 border-orange-500/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base text-orange-400">
+                <Zap className="h-4 w-4" />
+                Fix Single Workout
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Fully recompute a workout's intervals + analysis. Use if intervals are broken.
+              </p>
+
+              <div className="space-y-1">
+                <Label htmlFor="fixWorkoutId" className="text-xs">Workout ID</Label>
+                <Input
+                  id="fixWorkoutId"
+                  type="text"
+                  value={fixWorkoutId}
+                  onChange={(e) => setFixWorkoutId(e.target.value)}
+                  placeholder="e.g., ff0ae455-cca6-42d5-..."
+                  className="h-8 font-mono text-xs"
+                />
+              </div>
+
+              <Button
+                onClick={handleFixSingleWorkout}
+                disabled={fixWorkoutLoading || !fixWorkoutId.trim()}
+                size="sm"
+                className="w-full bg-orange-600 hover:bg-orange-700"
+              >
+                {fixWorkoutLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+                Fix Workout
+              </Button>
             </CardContent>
           </Card>
 
