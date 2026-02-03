@@ -378,388 +378,386 @@ export default function WorkloadAdmin() {
     <div className="space-y-6 p-6">
       <div className="flex items-center gap-2">
         <Calculator className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Workload Administration</h1>
+        <h1 className="text-2xl font-bold">Admin Tools</h1>
       </div>
 
-      <div className="max-w-md">
-        {/* Historical Sweep */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Historical Sweep
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="batchSize">Batch Size</Label>
-              <Input
-                id="batchSize"
-                type="number"
-                value={batchSize}
-                onChange={(e) => setBatchSize(parseInt(e.target.value) || 100)}
-                min="1"
-                max="1000"
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="dryRun"
-                checked={dryRun}
-                onCheckedChange={(checked) => setDryRun(checked as boolean)}
-              />
-              <Label htmlFor="dryRun">Dry Run (don't update database)</Label>
-            </div>
+      <div className="max-w-md space-y-6">
+        
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* ANALYSIS & BACKFILL */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">
+            Analysis & Backfill
+          </h2>
 
-            <Button 
-              onClick={handleSweepHistory} 
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <History className="h-4 w-4 mr-2" />
-              )}
-              Sweep User History
-            </Button>
-          </CardContent>
-        </Card>
+          {/* Bulk Re-analyze Workouts - FIRST (most used) */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <RefreshCw className="h-4 w-4" />
+                Bulk Re-analyze Workouts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Re-run analysis to populate HR drift, terrain metrics. Use after system updates.
+              </p>
 
-        {/* Reassociate Workouts */}
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Link2 className="h-5 w-5" />
-              Re-associate Workouts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Link existing logged workouts to a new plan. Use after deleting and recreating
-              a plan to reconnect your workout history.
-            </p>
-            
-            <div className="space-y-2">
-              <Label htmlFor="planSelect">Target Plan {plansLoading && '(loading...)'}</Label>
-              <Select value={selectedPlanId} onValueChange={setSelectedPlanId} disabled={plansLoading}>
-                <SelectTrigger className="bg-white/10 border-white/20">
-                  <SelectValue placeholder={plansLoading ? "Loading plans..." : "Select a plan..."} />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
-                  {plansLoading ? (
-                    <SelectItem value="_loading" disabled>Loading...</SelectItem>
-                  ) : plans.length === 0 ? (
-                    <SelectItem value="_none" disabled>No plans found</SelectItem>
-                  ) : (
-                    plans.map((plan) => (
-                      <SelectItem key={plan.id} value={plan.id} className="hover:bg-white/10">
-                        {plan.name} {plan.status === 'active' && '(active)'}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-white/40">Found {plans.length} plans</p>
-              {selectedPlanId && plans.find(p => p.id === selectedPlanId)?.config && (
-                <p className="text-xs text-white/50">
-                  {plans.find(p => p.id === selectedPlanId)?.config?.user_selected_start_date} → {plans.find(p => p.id === selectedPlanId)?.config?.race_date}
-                </p>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="reassociateDryRun"
-                checked={reassociateDryRun}
-                onCheckedChange={(checked) => setReassociateDryRun(checked as boolean)}
-              />
-              <Label htmlFor="reassociateDryRun">Dry Run (preview only)</Label>
-            </div>
-
-            <Button 
-              onClick={handleReassociateWorkouts} 
-              disabled={reassociateLoading || !selectedPlanId}
-              className="w-full"
-            >
-              {reassociateLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Link2 className="h-4 w-4 mr-2" />
-              )}
-              {reassociateDryRun ? 'Preview Re-association' : 'Re-associate Workouts'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Power Curve Backfill */}
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
-              Power Curve Backfill
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Recalculate power curves (bikes) and best efforts (runs) for existing workouts.
-              Required for accurate Block tab performance trends.
-            </p>
-            
-            <div className="space-y-2">
-              <Label htmlFor="powerCurveDaysBack">Days Back</Label>
-              <Input
-                id="powerCurveDaysBack"
-                type="number"
-                value={powerCurveDaysBack}
-                onChange={(e) => setPowerCurveDaysBack(parseInt(e.target.value) || 60)}
-                min="7"
-                max="365"
-              />
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="powerCurveDryRun"
-                checked={powerCurveDryRun}
-                onCheckedChange={(checked) => setPowerCurveDryRun(checked as boolean)}
-              />
-              <Label htmlFor="powerCurveDryRun">Dry Run (preview only)</Label>
-            </div>
-
-            <Button 
-              onClick={() => handlePowerCurveBackfill(0)} 
-              disabled={powerCurveLoading}
-              className="w-full"
-            >
-              {powerCurveLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Zap className="h-4 w-4 mr-2" />
-              )}
-              {powerCurveDryRun ? 'Preview Backfill' : 'Run Backfill (Batch of 10)'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Adaptation Metrics Backfill */}
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Adaptation Metrics Backfill
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Populate workouts.computed.adaptation (cheap lane) for the last N days. Run in small batches to avoid timeouts.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="adaptationDaysBack">Days Back</Label>
-                <Input
-                  id="adaptationDaysBack"
-                  type="number"
-                  value={adaptationDaysBack}
-                  onChange={(e) => setAdaptationDaysBack(parseInt(e.target.value) || 183)}
-                  min="7"
-                  max="365"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="reanalyzeDaysBack" className="text-xs">Days Back</Label>
+                  <Input
+                    id="reanalyzeDaysBack"
+                    type="number"
+                    value={reanalyzeDaysBack}
+                    onChange={(e) => setReanalyzeDaysBack(parseInt(e.target.value) || 90)}
+                    min="7"
+                    max="365"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="reanalyzeLimit" className="text-xs">Batch</Label>
+                  <Input
+                    id="reanalyzeLimit"
+                    type="number"
+                    value={reanalyzeLimit}
+                    onChange={(e) => setReanalyzeLimit(parseInt(e.target.value) || 5)}
+                    min="1"
+                    max="10"
+                    className="h-8"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="adaptationLimit">Batch size</Label>
-                <Input
-                  id="adaptationLimit"
-                  type="number"
-                  value={adaptationLimit}
-                  onChange={(e) => setAdaptationLimit(parseInt(e.target.value) || 25)}
-                  min="1"
-                  max="50"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="adaptationDryRun"
-                checked={adaptationDryRun}
-                onCheckedChange={(checked) => setAdaptationDryRun(checked as boolean)}
-              />
-              <Label htmlFor="adaptationDryRun">Dry Run (preview only)</Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="adaptationForceRecompute"
-                checked={adaptationForceRecompute}
-                onCheckedChange={(checked) => setAdaptationForceRecompute(checked as boolean)}
-              />
-              <Label htmlFor="adaptationForceRecompute">Recompute existing (fix null/non-comparable)</Label>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                onClick={() => handleAdaptationBackfill(0)}
-                disabled={adaptationLoading}
-                className="flex-1"
-              >
-                {adaptationLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Activity className="h-4 w-4 mr-2" />
-                )}
-                {adaptationDryRun ? 'Preview Backfill' : 'Run Backfill (Batch)'}
-              </Button>
-
-              <Button
-                onClick={() => handleAdaptationBackfill(adaptationOffset)}
-                disabled={adaptationLoading || !adaptationOffset}
-                variant="secondary"
-              >
-                Next
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bulk Re-analyze Workouts */}
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5" />
-              Bulk Re-analyze Workouts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Re-run workout analysis to populate new fields (HR drift, terrain-adjusted metrics).
-              Use after system updates to backfill historical data.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="reanalyzeDaysBack">Days Back</Label>
-                <Input
-                  id="reanalyzeDaysBack"
-                  type="number"
-                  value={reanalyzeDaysBack}
-                  onChange={(e) => setReanalyzeDaysBack(parseInt(e.target.value) || 90)}
-                  min="7"
-                  max="365"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reanalyzeLimit">Batch size</Label>
-                <Input
-                  id="reanalyzeLimit"
-                  type="number"
-                  value={reanalyzeLimit}
-                  onChange={(e) => setReanalyzeLimit(parseInt(e.target.value) || 5)}
-                  min="1"
-                  max="10"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="reanalyzeWorkoutType">Workout Type</Label>
+              <div className="grid grid-cols-2 gap-2">
                 <Select value={reanalyzeWorkoutType} onValueChange={setReanalyzeWorkoutType}>
-                  <SelectTrigger className="bg-white/10 border-white/20">
-                    <SelectValue placeholder="Select type..." />
+                  <SelectTrigger className="bg-white/10 border-white/20 h-8 text-xs">
+                    <SelectValue placeholder="Type..." />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
-                    <SelectItem value="run" className="hover:bg-white/10">Runs</SelectItem>
-                    <SelectItem value="strength" className="hover:bg-white/10">Strength</SelectItem>
-                    <SelectItem value="cycling" className="hover:bg-white/10">Cycling</SelectItem>
-                    <SelectItem value="swim" className="hover:bg-white/10">Swimming</SelectItem>
-                    <SelectItem value="all" className="hover:bg-white/10">All Types</SelectItem>
+                    <SelectItem value="run">Runs</SelectItem>
+                    <SelectItem value="strength">Strength</SelectItem>
+                    <SelectItem value="cycling">Cycling</SelectItem>
+                    <SelectItem value="swim">Swimming</SelectItem>
+                    <SelectItem value="all">All Types</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="reanalyzeFilter">Filter</Label>
                 <Select value={reanalyzeFilter} onValueChange={setReanalyzeFilter}>
-                  <SelectTrigger className="bg-white/10 border-white/20">
-                    <SelectValue placeholder="Select filter..." />
+                  <SelectTrigger className="bg-white/10 border-white/20 h-8 text-xs">
+                    <SelectValue placeholder="Filter..." />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
-                    <SelectItem value="missing_hr_drift" className="hover:bg-white/10">Missing HR Drift</SelectItem>
-                    <SelectItem value="missing_analysis" className="hover:bg-white/10">Missing Analysis</SelectItem>
-                    <SelectItem value="all" className="hover:bg-white/10">All Workouts</SelectItem>
+                    <SelectItem value="missing_hr_drift">Missing HR Drift</SelectItem>
+                    <SelectItem value="missing_analysis">Missing Analysis</SelectItem>
+                    <SelectItem value="all">All Workouts</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="reanalyzeDryRun"
-                checked={reanalyzeDryRun}
-                onCheckedChange={(checked) => setReanalyzeDryRun(checked as boolean)}
-              />
-              <Label htmlFor="reanalyzeDryRun">Dry Run (preview only)</Label>
-            </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="reanalyzeDryRun"
+                  checked={reanalyzeDryRun}
+                  onCheckedChange={(checked) => setReanalyzeDryRun(checked as boolean)}
+                />
+                <Label htmlFor="reanalyzeDryRun" className="text-xs">Dry Run</Label>
+              </div>
 
-            <div className="flex gap-2">
-              <Button
-                onClick={() => handleBulkReanalyze(0)}
-                disabled={reanalyzeLoading}
-                className="flex-1"
-              >
-                {reanalyzeLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                {reanalyzeDryRun ? 'Preview Re-analysis' : 'Run Re-analysis (Batch)'}
-              </Button>
-
-              <Button
-                onClick={() => handleBulkReanalyze(reanalyzeOffset)}
-                disabled={reanalyzeLoading || !reanalyzeOffset}
-                variant="secondary"
-              >
-                Next
-              </Button>
-            </div>
-
-            {reanalyzeOffset > 0 && (
-              <p className="text-xs text-white/40">Current offset: {reanalyzeOffset}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Process Workouts */}
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5" />
-              Process Workouts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Process the last 10 workouts that need computed.analysis.series data.
-              This generates chart data for workouts that are missing it.
-            </p>
-
-            <Button 
-              onClick={handleProcessWorkouts} 
-              disabled={processWorkoutsLoading}
-              className="w-full"
-            >
-              {processWorkoutsLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleBulkReanalyze(0)}
+                  disabled={reanalyzeLoading}
+                  size="sm"
+                  className="flex-1"
+                >
+                  {reanalyzeLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                  {reanalyzeDryRun ? 'Preview' : 'Run'}
+                </Button>
+                <Button
+                  onClick={() => handleBulkReanalyze(reanalyzeOffset)}
+                  disabled={reanalyzeLoading || !reanalyzeOffset}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Next
+                </Button>
+              </div>
+              {reanalyzeOffset > 0 && (
+                <p className="text-xs text-white/40">Offset: {reanalyzeOffset}</p>
               )}
-              Process Last 10 Workouts
-            </Button>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Adaptation Metrics */}
+          <Card className="mt-3">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Activity className="h-4 w-4" />
+                Adaptation Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Populate workouts.computed.adaptation for performance trends.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="adaptationDaysBack" className="text-xs">Days Back</Label>
+                  <Input
+                    id="adaptationDaysBack"
+                    type="number"
+                    value={adaptationDaysBack}
+                    onChange={(e) => setAdaptationDaysBack(parseInt(e.target.value) || 183)}
+                    min="7"
+                    max="365"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="adaptationLimit" className="text-xs">Batch</Label>
+                  <Input
+                    id="adaptationLimit"
+                    type="number"
+                    value={adaptationLimit}
+                    onChange={(e) => setAdaptationLimit(parseInt(e.target.value) || 25)}
+                    min="1"
+                    max="50"
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="adaptationDryRun"
+                    checked={adaptationDryRun}
+                    onCheckedChange={(checked) => setAdaptationDryRun(checked as boolean)}
+                  />
+                  <Label htmlFor="adaptationDryRun" className="text-xs">Dry Run</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="adaptationForceRecompute"
+                    checked={adaptationForceRecompute}
+                    onCheckedChange={(checked) => setAdaptationForceRecompute(checked as boolean)}
+                  />
+                  <Label htmlFor="adaptationForceRecompute" className="text-xs">Force</Label>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleAdaptationBackfill(0)}
+                  disabled={adaptationLoading}
+                  size="sm"
+                  className="flex-1"
+                >
+                  {adaptationLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
+                  {adaptationDryRun ? 'Preview' : 'Run'}
+                </Button>
+                <Button
+                  onClick={() => handleAdaptationBackfill(adaptationOffset)}
+                  disabled={adaptationLoading || !adaptationOffset}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Next
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Power Curve */}
+          <Card className="mt-3">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Zap className="h-4 w-4" />
+                Power Curves & Best Efforts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Recalculate power curves (bikes) and best efforts (runs).
+              </p>
+
+              <div className="space-y-1">
+                <Label htmlFor="powerCurveDaysBack" className="text-xs">Days Back</Label>
+                <Input
+                  id="powerCurveDaysBack"
+                  type="number"
+                  value={powerCurveDaysBack}
+                  onChange={(e) => setPowerCurveDaysBack(parseInt(e.target.value) || 60)}
+                  min="7"
+                  max="365"
+                  className="h-8"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="powerCurveDryRun"
+                  checked={powerCurveDryRun}
+                  onCheckedChange={(checked) => setPowerCurveDryRun(checked as boolean)}
+                />
+                <Label htmlFor="powerCurveDryRun" className="text-xs">Dry Run</Label>
+              </div>
+
+              <Button
+                onClick={() => handlePowerCurveBackfill(0)}
+                disabled={powerCurveLoading}
+                size="sm"
+                className="w-full"
+              >
+                {powerCurveLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+                {powerCurveDryRun ? 'Preview' : 'Run Batch'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Process Workouts */}
+          <Card className="mt-3">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="h-4 w-4" />
+                Process Chart Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Generate chart series data for workouts missing it.
+              </p>
+              <Button
+                onClick={handleProcessWorkouts}
+                disabled={processWorkoutsLoading}
+                size="sm"
+                className="w-full"
+              >
+                {processWorkoutsLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <BarChart3 className="h-3 w-3 mr-1" />}
+                Process Last 10
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* PLAN MANAGEMENT */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">
+            Plan Management
+          </h2>
+
+          {/* Reassociate Workouts */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Link2 className="h-4 w-4" />
+                Re-associate Workouts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Link logged workouts to a plan. Use after recreating a plan.
+              </p>
+
+              <div className="space-y-1">
+                <Label htmlFor="planSelect" className="text-xs">Target Plan</Label>
+                <Select value={selectedPlanId} onValueChange={setSelectedPlanId} disabled={plansLoading}>
+                  <SelectTrigger className="bg-white/10 border-white/20 h-8 text-xs">
+                    <SelectValue placeholder={plansLoading ? "Loading..." : "Select plan..."} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border border-white/20 shadow-xl z-50">
+                    {plans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {plan.name} {plan.status === 'active' && '✓'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-white/40">{plans.length} plans</p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="reassociateDryRun"
+                  checked={reassociateDryRun}
+                  onCheckedChange={(checked) => setReassociateDryRun(checked as boolean)}
+                />
+                <Label htmlFor="reassociateDryRun" className="text-xs">Dry Run</Label>
+              </div>
+
+              <Button
+                onClick={handleReassociateWorkouts}
+                disabled={reassociateLoading || !selectedPlanId}
+                size="sm"
+                className="w-full"
+              >
+                {reassociateLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Link2 className="h-3 w-3 mr-1" />}
+                {reassociateDryRun ? 'Preview' : 'Re-associate'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* WORKLOAD */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <div>
+          <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">
+            Workload
+          </h2>
+
+          {/* Historical Sweep */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <History className="h-4 w-4" />
+                Historical Sweep
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Recalculate workload for all historical workouts.
+              </p>
+
+              <div className="space-y-1">
+                <Label htmlFor="batchSize" className="text-xs">Batch Size</Label>
+                <Input
+                  id="batchSize"
+                  type="number"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(parseInt(e.target.value) || 100)}
+                  min="1"
+                  max="1000"
+                  className="h-8"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="dryRun"
+                  checked={dryRun}
+                  onCheckedChange={(checked) => setDryRun(checked as boolean)}
+                />
+                <Label htmlFor="dryRun" className="text-xs">Dry Run</Label>
+              </div>
+
+              <Button
+                onClick={handleSweepHistory}
+                disabled={loading}
+                size="sm"
+                className="w-full"
+              >
+                {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <History className="h-3 w-3 mr-1" />}
+                Sweep History
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
       </div>
 
