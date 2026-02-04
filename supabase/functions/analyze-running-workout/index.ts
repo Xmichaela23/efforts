@@ -2062,11 +2062,16 @@ function generateAdherenceSummary(
   };
 
   // Analyze pace deviations for each work interval
+  // For recovery/easy runs, use percentage-based tolerance to avoid false positives
+  // Thresholds: ≤2% = on_target, 2-5% = slight (no warning), 5-10% = aggressive, >10% = blown
+  const RECOVERY_TOLERANCE_PCT = 0.05; // 5% threshold for recovery/easy runs to trigger warning
+  
   interface Deviation {
     interval: number;
     actual: string;
     target: string;
     delta: number;
+    deltaPct: number; // percentage deviation from target midpoint
     direction: 'fast' | 'slow' | 'ok';
   }
   
@@ -2078,22 +2083,49 @@ function generateAdherenceSummary(
     const targetUpper = interval.planned_pace_range_upper || 0;
     
     if (actualPaceSecPerMi > 0 && targetLower > 0 && targetUpper > 0) {
+      const targetMid = (targetLower + targetUpper) / 2;
+      
+      // Calculate percentage deviation from target midpoint
+      // Note: faster pace = lower seconds, so negative deltaPct = faster
+      const deltaPct = (targetMid - actualPaceSecPerMi) / targetMid;
+      const absDeltaPct = Math.abs(deltaPct);
+      
       let direction: 'fast' | 'slow' | 'ok' = 'ok';
       let delta = 0;
       
-      if (actualPaceSecPerMi < targetLower) {
-        direction = 'fast';
-        delta = targetLower - actualPaceSecPerMi;
-      } else if (actualPaceSecPerMi > targetUpper) {
-        direction = 'slow';
-        delta = actualPaceSecPerMi - targetUpper;
+      // For recovery/easy runs: use percentage threshold to avoid false positives
+      // For interval workouts: use absolute comparison (any deviation matters)
+      if (isEasyOrRecoveryRun || isRecoveryContext) {
+        // Recovery/easy: only flag if deviation >= 5% of target
+        if (deltaPct > RECOVERY_TOLERANCE_PCT) {
+          // Positive deltaPct means actual is faster than target (lower seconds)
+          direction = 'fast';
+          delta = targetLower - actualPaceSecPerMi;
+        } else if (deltaPct < -RECOVERY_TOLERANCE_PCT) {
+          // Negative deltaPct means actual is slower than target
+          direction = 'slow';
+          delta = actualPaceSecPerMi - targetUpper;
+        }
+        // Otherwise: within 5% tolerance = 'ok' (no warning)
+      } else {
+        // Interval workouts: use absolute comparison (original logic)
+        if (actualPaceSecPerMi < targetLower) {
+          direction = 'fast';
+          delta = targetLower - actualPaceSecPerMi;
+        } else if (actualPaceSecPerMi > targetUpper) {
+          direction = 'slow';
+          delta = actualPaceSecPerMi - targetUpper;
+        }
       }
+      
+      console.log(`🎯 [PACE DEVIATION] Interval ${interval.interval_number || deviations.length + 1}: actual=${fmtPace(actualPaceSecPerMi)}, target=${fmtPace(targetLower)}-${fmtPace(targetUpper)}, deltaPct=${(deltaPct * 100).toFixed(1)}%, direction=${direction}, isRecovery=${isEasyOrRecoveryRun || isRecoveryContext}`);
       
       deviations.push({
         interval: interval.interval_number || deviations.length + 1,
         actual: fmtPace(actualPaceSecPerMi),
         target: `${fmtPace(targetLower)}-${fmtPace(targetUpper)}`,
         delta,
+        deltaPct,
         direction
       });
     }
