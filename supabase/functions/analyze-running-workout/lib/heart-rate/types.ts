@@ -38,8 +38,9 @@ export interface HRAnalysisContext {
   // Weather (if available)
   weather?: {
     temperatureF?: number;
+    feelsLikeF?: number;
     humidity?: number;
-    source?: 'device' | 'openweathermap';  // Where the temp came from
+    source?: 'device' | 'openweathermap' | 'openmeteo';
   };
   
   // Planned workout (when attached to plan)
@@ -49,6 +50,9 @@ export interface HRAnalysisContext {
     paceRanges?: { lower: number; upper: number }[];
     intent?: 'easy' | 'long' | 'tempo' | 'intervals' | 'recovery';
   };
+  
+  // Execution metrics (from pace-adherence calculation)
+  paceAdherencePct?: number;  // 0-100, overall pace adherence
   
   // Plan context (when part of training plan)
   planContext?: {

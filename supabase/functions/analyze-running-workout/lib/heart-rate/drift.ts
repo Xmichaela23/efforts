@@ -444,34 +444,43 @@ interface WeatherContribution {
 
 function analyzeWeatherContribution(context: HRAnalysisContext): WeatherContribution {
   const temp = context.weather?.temperatureF;
+  const feelsLike = context.weather?.feelsLikeF;
   
   if (temp === undefined || temp === null) {
     return { factor: 'unknown', contributionBpm: 0, note: null };
   }
   
-  // Hot conditions (>82°F significant, >75°F moderate)
-  if (temp > 82) {
+  // Use feels_like for physiological impact calculation (accounts for humidity, wind)
+  const effectiveTemp = feelsLike ?? temp;
+  
+  // Format temperature string - show feels like if significantly different
+  const tempStr = (feelsLike && Math.abs(feelsLike - temp) >= 3)
+    ? `${Math.round(temp)}°F (feels like ${Math.round(feelsLike)}°F)`
+    : `${Math.round(temp)}°F`;
+  
+  // Hot conditions (>82°F significant, >75°F moderate) - use effective temp
+  if (effectiveTemp > 82) {
     return {
       factor: 'hot',
       contributionBpm: 8,
-      note: `${Math.round(temp)}°F — significant heat, elevated drift expected`
+      note: `${tempStr} — significant heat, elevated drift expected`
     };
   }
   
-  if (temp > 75) {
+  if (effectiveTemp > 75) {
     return {
       factor: 'hot',
       contributionBpm: 4,
-      note: `${Math.round(temp)}°F — warm conditions`
+      note: `${tempStr} — warm conditions`
     };
   }
   
   // Cold conditions (<50°F)
-  if (temp < 50) {
+  if (effectiveTemp < 50) {
     return {
       factor: 'cold',
       contributionBpm: -2,
-      note: `${Math.round(temp)}°F — cool conditions`
+      note: `${tempStr} — cool conditions`
     };
   }
   
@@ -479,7 +488,7 @@ function analyzeWeatherContribution(context: HRAnalysisContext): WeatherContribu
   return { 
     factor: 'normal', 
     contributionBpm: 0, 
-    note: `${Math.round(temp)}°F` 
+    note: tempStr 
   };
 }
 

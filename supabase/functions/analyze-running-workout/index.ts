@@ -91,14 +91,24 @@ Deno.serve(async (req) => {
     }
 
     console.log(`🏃‍♂️ Analyzing running workout: ${workout_id}`);
+    console.log(`🌡️ [WEATHER] force_weather_refresh param: ${force_weather_refresh}`);
+    
+    // Track if we need to force fetch weather (even if cached data exists in memory)
+    let forceWeatherFetch = false;
     
     // Clear cached weather if force refresh requested
     if (force_weather_refresh) {
-      console.log('🌡️ [WEATHER] Force refresh requested, clearing cached weather...');
-      await supabase
+      console.log('🌡️ [WEATHER] Force refresh requested, clearing cached weather in DB...');
+      const { error: clearError } = await supabase
         .from('workouts')
         .update({ weather_data: null })
         .eq('id', workout_id);
+      if (clearError) {
+        console.warn('🌡️ [WEATHER] Failed to clear cached weather:', clearError.message);
+      } else {
+        console.log('🌡️ [WEATHER] Successfully cleared cached weather from DB');
+        forceWeatherFetch = true;
+      }
     }
     console.log('🆕 NEW VERSION: Checking time_series_data and garmin_data for pace data');
     console.log('🔍 [MAIN DEBUG] Starting analysis for workout:', workout_id);
@@ -146,6 +156,13 @@ Deno.serve(async (req) => {
       throw new Error(`Workout not found: ${workoutError?.message}`);
     }
 
+    // If force refresh was requested, clear the in-memory weather data
+    // (DB was already cleared, but SELECT might have returned stale data)
+    if (forceWeatherFetch && workout.weather_data) {
+      console.log('🌡️ [WEATHER] Force refresh: clearing in-memory weather_data');
+      workout.weather_data = null;
+    }
+
     console.log('🔍 Available data sources:', {
       time_series_data: !!workout.time_series_data,
       garmin_data: !!workout.garmin_data,
@@ -168,10 +185,26 @@ Deno.serve(async (req) => {
       throw new Error('No sensor data or computed data available. Workout may not have been processed yet.');
     }
 
-    // Fetch historical weather if not cached and we have location data
-    if (!workout.weather_data && workout.start_position_lat && workout.start_position_long && workout.date) {
-      console.log('🌡️ [WEATHER] No cached weather, fetching from Open-Meteo...');
+    // Fetch historical weather if not cached (or force refresh) and we have location data
+    if ((forceWeatherFetch || !workout.weather_data) && workout.start_position_lat && workout.start_position_long && workout.date) {
+      console.log(`🌡️ [WEATHER] Fetching from Open-Meteo (forceWeatherFetch=${forceWeatherFetch}, cached=${!!workout.weather_data})...`);
       try {
+        // Get actual workout start time from sensor data (more accurate than just date)
+        let workoutTimestamp = workout.date;
+        const sensorSamples = workout.sensor_data?.samples || workout.sensor_data || [];
+        if (Array.isArray(sensorSamples) && sensorSamples.length > 0) {
+          const firstSample = sensorSamples[0];
+          // Garmin uses startTimeInSeconds (unix epoch) or timestamp (ms)
+          if (firstSample.startTimeInSeconds) {
+            workoutTimestamp = new Date(firstSample.startTimeInSeconds * 1000).toISOString();
+          } else if (firstSample.timestamp && firstSample.timestamp > 1000000000000) {
+            workoutTimestamp = new Date(firstSample.timestamp).toISOString();
+          } else if (firstSample.timestamp) {
+            workoutTimestamp = new Date(firstSample.timestamp * 1000).toISOString();
+          }
+        }
+        console.log(`🌡️ [WEATHER] Using timestamp: ${workoutTimestamp}`);
+        
         const weatherResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-weather`, {
           method: 'POST',
           headers: {
@@ -181,16 +214,19 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             lat: workout.start_position_lat,
             lng: workout.start_position_long,
-            timestamp: workout.date,
-            workout_id: workout_id
+            timestamp: workoutTimestamp,
+            workout_id: workout_id,
+            force_refresh: forceWeatherFetch  // Skip all caches when force refresh requested
           })
         });
         if (weatherResp.ok) {
           const weatherResult = await weatherResp.json();
           if (weatherResult.weather) {
             workout.weather_data = weatherResult.weather;
-            console.log(`🌡️ [WEATHER] Fetched: ${weatherResult.weather.temperature}°F`);
+            console.log(`🌡️ [WEATHER] Fetched: ${weatherResult.weather.temperature}°F (feels like ${weatherResult.weather.feels_like}°F)`);
           }
+        } else {
+          console.warn(`🌡️ [WEATHER] API returned ${weatherResp.status}`);
         }
       } catch (wxErr) {
         console.warn('🌡️ [WEATHER] Failed to fetch:', wxErr);
@@ -666,14 +702,15 @@ Deno.serve(async (req) => {
       },
       // Weather: prioritize device-recorded temp (from Garmin/Strava watch)
       // Device temp is stored in Celsius, convert to Fahrenheit
-      // Fall back to OpenWeatherMap data if no device temp
-      ...(console.log(`🌡️ [WEATHER DEBUG] avg_temperature=${workout?.avg_temperature}, weather_data.temp=${workout?.weather_data?.temperature}`), {}),
+      // Fall back to weather_data (from Open-Meteo or OpenWeatherMap)
+      ...(console.log(`🌡️ [WEATHER DEBUG] avg_temperature=${workout?.avg_temperature}, weather_data.temp=${workout?.weather_data?.temperature}, feels_like=${workout?.weather_data?.feels_like}`), {}),
       weather: (workout?.avg_temperature != null || workout?.weather_data) ? {
         temperatureF: workout.avg_temperature != null 
           ? Math.round(workout.avg_temperature * 9/5 + 32)  // Celsius to Fahrenheit
           : workout.weather_data?.temperature,
+        feelsLikeF: workout.weather_data?.feels_like,
         humidity: workout.weather_data?.humidity,
-        source: workout.avg_temperature != null ? 'device' : 'openweathermap'
+        source: workout.avg_temperature != null ? 'device' : 'openmeteo'
       } : undefined,
       plannedWorkout: plannedWorkout ? {
         description: plannedWorkout.description || plannedWorkout.workout_description,
@@ -695,7 +732,11 @@ Deno.serve(async (req) => {
         trend: historicalDriftData.recentTrend,
         lastSimilar: historicalDriftData.lastWeekSimilar
       } : undefined,
-      userUnits: 'imperial'
+      userUnits: 'imperial',
+      // Pace adherence from granular analysis (0-1 fraction → 0-100 percentage)
+      paceAdherencePct: analysis.overall_adherence != null 
+        ? Math.round(analysis.overall_adherence * 100) 
+        : undefined
     };
     
     const hrAnalysisResult = analyzeHeartRate(sensorData, hrAnalysisContext);
@@ -2128,10 +2169,10 @@ function generateAdherenceSummary(
   }
 
   // If no specific plan_impact was set but we have a rich narrative, skip plan_impact
-  // The complete story is already told in the technical_insights (HR Summary / Cardiac Drift)
-  const hrSummaryLabels = ['HR Summary', 'Cardiac Drift', 'Aerobic Efficiency', 'Aerobic Stress', 'Aerobic Response', 'Elevated Drift', 'High Cardiac Stress'];
+  // The complete story is already told in the technical_insights (Summary / Cardiac Drift)
+  const summaryLabels = ['Summary', 'Cardiac Drift', 'Aerobic Efficiency', 'Aerobic Stress', 'Aerobic Response', 'Elevated Drift', 'High Cardiac Stress', 'Interval Summary', 'Zone Summary'];
   const hasRichNarrative = technical_insights.some(t => 
-    hrSummaryLabels.includes(t.label) && t.value.length > 100
+    summaryLabels.includes(t.label) && t.value.length > 100
   );
   
   return {

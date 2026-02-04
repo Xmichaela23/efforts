@@ -188,7 +188,7 @@ function analyzeSteadyStateWorkout(
       analysisType: 'drift',
       zones,
       interpretation: 'Error during HR analysis.',
-      summaryLabel: 'HR Summary',
+      summaryLabel: 'Summary',
       confidence: 'low',
       confidenceReasons: ['Analysis error occurred'],
       summary: {
@@ -252,7 +252,7 @@ function analyzeIntervalWorkout(
     zones,
     trends,
     interpretation,
-    summaryLabel: 'Interval HR Summary',
+    summaryLabel: 'Interval Summary',
     confidence,
     confidenceReasons: reasons,
     summary
@@ -292,7 +292,7 @@ function analyzeMixedWorkout(
     analysisType: 'zones',
     zones,
     interpretation,
-    summaryLabel: 'HR Zone Summary',
+    summaryLabel: 'Zone Summary',
     confidence,
     confidenceReasons: reasons,
     summary
@@ -344,14 +344,15 @@ function createInsufficientDataResult(
 /**
  * Get human-readable summary label based on assessment.
  * Used by UI instead of deriving label from assessment.
+ * Note: Changed from "HR Summary" to "Summary" - this is a holistic workout summary, not just HR.
  */
 function getSummaryLabel(
   assessment: string | undefined,
   workoutType: WorkoutType
 ): string {
-  // For tempo finish or progressive, always show "HR Summary"
+  // For tempo finish or progressive, show generic "Summary"
   if (workoutType === 'tempo_finish' || workoutType === 'progressive') {
-    return 'HR Summary';
+    return 'Summary';
   }
   
   switch (assessment) {
@@ -360,13 +361,13 @@ function getSummaryLabel(
     case 'good':
       return 'Aerobic Response';
     case 'normal':
-      return 'HR Summary';
+      return 'Summary';
     case 'elevated':
       return 'Elevated Drift';
     case 'high':
       return 'High Cardiac Stress';
     default:
-      return 'HR Summary';
+      return 'Summary';
   }
 }
 
