@@ -1405,10 +1405,17 @@ Deno.serve(async (req) => {
           
           // Calculate avg_pace_s_per_mi for runs/walks (needed by Summary screen)
           let avgPaceSPerMi: number | null = null;
+          let paceDisplay: string = '—'; // Default to dash for missing data
           if (dist && dur && dist > 0 && dur > 0) {
             const miles = dist / 1609.34; // meters to miles
             if (miles > 0) {
               avgPaceSPerMi = dur / miles; // seconds per mile
+              // Format pace_display (e.g., "10:52/mi") - server-side, no frontend math
+              // Round total first to avoid "10:60/mi" edge case
+              const total = Math.round(avgPaceSPerMi);
+              const mins = Math.floor(total / 60);
+              const secs = total % 60;
+              paceDisplay = `${mins}:${String(secs).padStart(2, '0')}/mi`;
             }
           }
           
@@ -1417,7 +1424,8 @@ Deno.serve(async (req) => {
             distance_m: dist, 
             duration_s_moving: dur, 
             duration_s_elapsed: elapsedDur,
-            avg_pace_s_per_mi: avgPaceSPerMi ?? prevOverall?.avg_pace_s_per_mi ?? null
+            avg_pace_s_per_mi: avgPaceSPerMi ?? prevOverall?.avg_pace_s_per_mi ?? null,
+            pace_display: paceDisplay !== '—' ? paceDisplay : (prevOverall?.pace_display ?? '—')
           };
         } catch { return prevOverall || {}; }
       }

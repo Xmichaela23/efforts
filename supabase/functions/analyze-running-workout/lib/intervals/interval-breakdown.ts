@@ -32,40 +32,72 @@ export function generateIntervalBreakdown(
     const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
     
     // ✅ Use moving time for overall row so Time and Pace match Readouts (Duration vs Moving Time difference)
-    const overallMovingTimeS = rawWorkoutData?.computed?.overall?.duration_s_moving || null;
-    const overallDistanceM = rawWorkoutData?.computed?.overall?.distance_m || null;
+    // -------------------------------------------------------------------------
+    // PACE CALCULATION - Single source of truth with sanity checks
+    // -------------------------------------------------------------------------
+    // Sanity bounds: reasonable running pace is 3:00/mi to 30:00/mi (180-1800 s/mi)
+    const MIN_VALID_PACE_S = 180;  // 3:00/mi (elite sprint)
+    const MAX_VALID_PACE_S = 1800; // 30:00/mi (slow walk)
+    
+    const isValidPace = (pace: number): boolean => 
+      Number.isFinite(pace) && pace >= MIN_VALID_PACE_S && pace <= MAX_VALID_PACE_S;
+    
     let displayDurationS = actualDuration; // default: elapsed (for intervals)
-    let safeMovingTimeS: number | null = null;
-
-    let actualPace = interval.executed?.avg_pace_s_per_mi || 0;
+    let actualPace = 0; // Will be set to valid pace or remain 0
+    let paceValid = false;
     const intervalDistanceM = interval.executed?.distance_m || 0;
+    
+    // Determine if this row represents the overall workout (single-interval = overall)
+    const isOverallRow = intervalsToAnalyze.length === 1;
 
-    // If this is a single-interval workout (steady-state), use overall moving time for both Time and Pace
-    if (intervalsToAnalyze.length === 1 && overallMovingTimeS && overallDistanceM && overallDistanceM > 0) {
-      safeMovingTimeS = overallMovingTimeS;
-      if (overallMovingTimeS < 60 && rawWorkoutData?.moving_time) {
-        const mvMin = Number(rawWorkoutData.moving_time);
-        if (Number.isFinite(mvMin) && mvMin > 0) {
-          safeMovingTimeS = Math.round(mvMin * 60);
-          console.log(`⚠️ [PACE FIX] Detected suspicious duration_s_moving=${overallMovingTimeS}s, recalculating from moving_time=${mvMin}min → ${safeMovingTimeS}s`);
+    if (isOverallRow) {
+      // For overall row: use workout-level moving_time and distance (most reliable)
+      const workoutMovingTimeMin = rawWorkoutData?.moving_time;
+      const workoutDistanceKm = rawWorkoutData?.distance;
+      
+      if (workoutMovingTimeMin && workoutDistanceKm) {
+        const movingTimeS = Number(workoutMovingTimeMin) * 60;
+        const distanceM = Number(workoutDistanceKm) * 1000;
+        if (movingTimeS > 0 && distanceM > 0) {
+          displayDurationS = movingTimeS;
+          const miles = distanceM / 1609.34;
+          const calculatedPace = movingTimeS / miles;
+          if (isValidPace(calculatedPace)) {
+            actualPace = calculatedPace;
+            paceValid = true;
+            console.log(`🔍 [PACE CALC] Overall row from workout moving_time/distance: ${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi)`);
+          }
         }
       }
-      displayDurationS = safeMovingTimeS; // show moving time in Performance table
-      const miles = overallDistanceM / 1609.34;
-      if (miles > 0) {
-        actualPace = safeMovingTimeS / miles; // seconds per mile (moving pace)
-        console.log(`🔍 [PACE RECALC] Steady-state: moving_time=${safeMovingTimeS}s, distance=${overallDistanceM}m, pace=${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi) [was: ${interval.executed?.avg_pace_s_per_mi || 'N/A'}s/mi]`);
+    } else {
+      // For interval reps: compute from rep-local duration + distance only
+      // Do NOT use workout-level data - that would be wrong for individual reps
+      if (actualDuration > 0 && intervalDistanceM > 0) {
+        const miles = intervalDistanceM / 1609.34;
+        if (miles > 0) {
+          const calculatedPace = actualDuration / miles;
+          if (isValidPace(calculatedPace)) {
+            actualPace = calculatedPace;
+            paceValid = true;
+            console.log(`🔍 [PACE CALC] Interval ${index + 1} from rep duration/distance: ${actualPace.toFixed(0)}s/mi (${Math.floor(actualPace/60)}:${String(Math.round(actualPace%60)).padStart(2,'0')}/mi)`);
+          }
+        }
+      }
+      
+      // Fallback for interval reps: use executed.avg_pace_s_per_mi if rep-local calc failed
+      if (!paceValid) {
+        const executedPace = interval.executed?.avg_pace_s_per_mi || 0;
+        if (isValidPace(executedPace)) {
+          actualPace = executedPace;
+          paceValid = true;
+          console.log(`🔍 [PACE CALC] Interval ${index + 1} from executed.avg_pace_s_per_mi: ${actualPace.toFixed(0)}s/mi`);
+        }
       }
     }
-    // For multi-interval workouts: use executed.avg_pace_s_per_mi (elapsed from summary). Do NOT overwrite
-    // with sensor "moving time" count — that assumed 1 sample = 1s and produced wrongly fast paces (e.g. 6:31 vs 9:54).
-    // Fallback: derive pace from interval's actual duration + distance when no other source
-    if (actualPace <= 0 && actualDuration > 0 && intervalDistanceM > 0) {
-      const miles = intervalDistanceM / 1609.34;
-      if (miles > 0) {
-        actualPace = actualDuration / miles; // seconds per mile
-        console.log(`🔍 [PACE FALLBACK] Interval ${index + 1}: pace from duration=${actualDuration}s, distance=${intervalDistanceM}m → ${actualPace.toFixed(0)}s/mi`);
-      }
+    
+    // Log warning if pace is invalid
+    if (!paceValid) {
+      console.warn(`⚠️ [PACE INVALID] Interval ${index + 1}: No valid pace source found. pace_display will show "—"`);
     }
     
     // Calculate duration adherence: how close actual is to planned (use display duration = moving for overall row)
@@ -150,6 +182,29 @@ export function generateIntervalBreakdown(
       console.log(`  Elevation: gain=${elevationMetrics.elevation_gain_m}m, loss=${elevationMetrics.elevation_loss_m}m, grade=${elevationMetrics.avg_grade_percent}%`);
     }
     
+    // Format pace for display (returns "—" if invalid)
+    // Round total first to avoid "10:60/mi" edge case
+    const formatPaceDisplay = (paceS: number): string => {
+      if (!isValidPace(paceS)) return '—';
+      const total = Math.round(paceS);
+      const mins = Math.floor(total / 60);
+      const secs = total % 60;
+      return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+    };
+    
+    // Format pace range for display
+    // Round totals first to avoid "10:60/mi" edge case
+    const formatPaceRangeDisplay = (lower: number, upper: number): string => {
+      if (lower <= 0 || upper <= 0) return '—';
+      const lTotal = Math.round(lower);
+      const uTotal = Math.round(upper);
+      const lMins = Math.floor(lTotal / 60);
+      const lSecs = lTotal % 60;
+      const uMins = Math.floor(uTotal / 60);
+      const uSecs = uTotal % 60;
+      return `${lMins}:${String(lSecs).padStart(2, '0')}-${uMins}:${String(uSecs).padStart(2, '0')}/mi`;
+    };
+    
     return {
       interval_type: 'work',
       interval_number: index + 1,
@@ -165,7 +220,14 @@ export function generateIntervalBreakdown(
       planned_pace_min_per_mi: workRangeLower > 0 && workRangeUpper > 0 
         ? null // Use range instead
         : (plannedPace > 0 ? Math.round(plannedPace / 60 * 100) / 100 : 0),
-      actual_pace_min_per_mi: actualPace > 0 ? Math.round(actualPace / 60 * 100) / 100 : 0,
+      actual_pace_min_per_mi: paceValid ? Math.round(actualPace / 60 * 100) / 100 : 0,
+      // Canonical pace fields for frontend (no math required)
+      pace_s_per_mi: paceValid ? Math.round(actualPace) : null,
+      pace_display: paceValid ? formatPaceDisplay(actualPace) : '—',
+      pace_valid: paceValid, // For debugging in devtools
+      planned_pace_display: workRangeLower > 0 && workRangeUpper > 0
+        ? formatPaceRangeDisplay(workRangeLower, workRangeUpper)
+        : (plannedPace > 0 ? formatPaceDisplay(plannedPace) : '—'),
       pace_adherence_percent: Math.round(paceAdherence),
       performance_score: Math.round(overallScore),
       // Heart rate metrics
@@ -1060,3 +1122,60 @@ export function generateIntervalBreakdown(
   
   return result;
 }
+
+// =============================================================================
+// GOLDEN TEST: Pace formatting correctness
+// Ensures "round once then mod" pattern prevents "10:60/mi" bugs
+// =============================================================================
+
+/**
+ * Format pace for display - the canonical implementation
+ * Round total seconds first to avoid "10:60/mi" edge case
+ */
+export function formatPaceSecondsToDisplay(paceSeconds: number): string {
+  if (!Number.isFinite(paceSeconds) || paceSeconds <= 0) return '—';
+  const total = Math.round(paceSeconds);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+}
+
+/**
+ * Golden test assertions for pace formatting
+ * Run this to verify the "round once" fix is intact
+ * Throws if any assertion fails
+ */
+export function runPaceFormattingGoldenTests(): void {
+  const testCases: Array<{ input: number; expected: string; description: string }> = [
+    { input: 652.4, expected: '10:52/mi', description: '652.4s rounds down to 652' },
+    { input: 652.6, expected: '10:53/mi', description: '652.6s rounds up to 653' },
+    { input: 659.6, expected: '11:00/mi', description: '659.6s rounds to 660 = 11:00, NOT 10:60' },
+    { input: 600.0, expected: '10:00/mi', description: 'Exact minute boundary' },
+    { input: 599.5, expected: '10:00/mi', description: '599.5s rounds to 600 = 10:00' },
+    { input: 599.4, expected: '9:59/mi', description: '599.4s rounds to 599 = 9:59' },
+    { input: 0, expected: '—', description: 'Zero pace shows dash' },
+    { input: -100, expected: '—', description: 'Negative pace shows dash' },
+    { input: NaN, expected: '—', description: 'NaN pace shows dash' },
+  ];
+
+  let passed = 0;
+  let failed = 0;
+
+  for (const { input, expected, description } of testCases) {
+    const result = formatPaceSecondsToDisplay(input);
+    if (result === expected) {
+      passed++;
+    } else {
+      failed++;
+      console.error(`❌ GOLDEN TEST FAILED: ${description}`);
+      console.error(`   Input: ${input}, Expected: "${expected}", Got: "${result}"`);
+    }
+  }
+
+  if (failed > 0) {
+    throw new Error(`Pace formatting golden tests failed: ${failed}/${testCases.length}`);
+  }
+
+  console.log(`✅ Pace formatting golden tests passed: ${passed}/${testCases.length}`);
+}
+

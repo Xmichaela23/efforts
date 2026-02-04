@@ -2192,8 +2192,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   executed: {
                     distance_m: iv.actual_distance_m,
                     duration_s: iv.actual_duration_s,
-                    avg_pace_s_per_mi: iv.actual_pace_min_per_mi,
                   },
+                  // Pre-formatted display string from backend (frontend does zero math)
+                  pace_display: iv.pace_display,
                   planned_label: iv.planned_label || (iv.interval_type === 'work' ? `Work · ${iv.actual_duration_s ? `${Math.round(iv.actual_duration_s / 60)} min` : ''}` : String(iv.interval_type || '')),
                 };
               }
@@ -2265,9 +2266,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 return '—';
               }
               // For other sports, use server-computed interval data
+              // Frontend does zero math: render pace_display only; if missing show "—"
               if (!hasServerComputed || !row) return '—';
-              const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
-              return secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—';
+              return (row as any)?.pace_display ?? '—';
             })();
 
             const distCell = (() => {

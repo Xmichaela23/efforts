@@ -1223,11 +1223,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
                   {/* Show type-specific metrics */}
                   {(workout.type === 'run' || workout.type === 'running') && (
                     <>
-                      {workout.computed?.overall?.avg_pace_s_per_mi && (
-                        <div>
-                          Pace: {Math.floor(workout.computed.overall.avg_pace_s_per_mi / 60)}:{String(Math.round(workout.computed.overall.avg_pace_s_per_mi % 60)).padStart(2, '0')}/mi
-                        </div>
-                      )}
+                      <div>Pace: {workout.computed?.overall?.pace_display ?? '—'}</div>
                       {workout.avg_heart_rate && (
                         <div>HR: {workout.avg_heart_rate} bpm</div>
                       )}

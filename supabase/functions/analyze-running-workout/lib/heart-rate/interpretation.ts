@@ -28,6 +28,35 @@ interface InterpretationInput {
 }
 
 // =============================================================================
+// HEAT ALLOWANCE FOR PACE TOLERANCE
+// =============================================================================
+
+/**
+ * Get additional pace tolerance based on temperature.
+ * Hot conditions justify slower pacing without losing aerobic stimulus.
+ */
+export function getHeatAllowance(tempF: number | null | undefined): number {
+  if (tempF === null || tempF === undefined) return 0;
+  if (tempF > 85) return 0.12;  // +12%
+  if (tempF > 75) return 0.07;  // +7%
+  if (tempF > 65) return 0.03;  // +3%
+  return 0;
+}
+
+/**
+ * Base slowdown threshold for easy/long runs.
+ * Running more than 15% slower than target = under-stimulated.
+ */
+export const BASE_SLOW_THRESHOLD = 0.15;
+
+/**
+ * Calculate effective slow floor with heat adjustment.
+ */
+export function getEffectiveSlowFloor(tempF: number | null | undefined): number {
+  return BASE_SLOW_THRESHOLD + getHeatAllowance(tempF);
+}
+
+// =============================================================================
 // CONDITIONS SEVERITY HELPER
 // =============================================================================
 
@@ -159,6 +188,12 @@ interface SteadyStateNarrativeInput {
   // Pace (optional)
   paceAdherencePct?: number;
   
+  // Segment-level pace data (for long runs with fast finish)
+  baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
+  finishOnTarget?: boolean;  // Whether finish segment hit target
+  finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
+  hasFinishSegment?: boolean; // Whether workout has a distinct fast finish
+  
   // HR drift (optional)
   hrDriftBpm?: number;
   earlyAvgHr?: number;
@@ -178,13 +213,20 @@ interface SteadyStateNarrativeInput {
  * Build a synthesized narrative for steady-state workouts (easy/long/recovery).
  * Uses decision-tree logic with clear rules, not a data dump.
  * 
- * Note: Tempo finish and other workout types should have their own narrative builders.
+ * Key improvements:
+ * - Heat-adjusted pace tolerance (slower pace in heat still achieves stimulus)
+ * - HR drift as tie-breaker (if drift is normal, stimulus was achieved)
+ * - Separate base vs finish assessment for long runs with fast finish
  */
 function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   const {
     intent,
     durationMinutes,
     paceAdherencePct,
+    baseSlowdownPct,
+    finishOnTarget,
+    finishPace,
+    hasFinishSegment,
     hrDriftBpm,
     temperatureF,
     elevationGainFt,
@@ -212,6 +254,23 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   }
   
   // -------------------------------------------------------------------------
+  // HEAT-ADJUSTED TOLERANCE + HR TIE-BREAKER
+  // -------------------------------------------------------------------------
+  const effectiveSlowFloor = getEffectiveSlowFloor(temperatureF);
+  const hrSuggestsStimulus = driftBand === 'normal' || driftBand === 'elevated';
+  const isWarm = temperatureF !== null && temperatureF !== undefined && temperatureF > 65;
+  // Weather: only mention temp when severity >= moderate, always include the number
+  // Map severity to adjective: moderate → "warm", high → "hot"
+  const shouldMentionTemp = (conditionsSeverity === 'moderate' || conditionsSeverity === 'high') && temperatureF !== null && temperatureF !== undefined;
+  const tempAdjective = conditionsSeverity === 'high' ? 'hot' : 'warm';
+  const tempPhrase = shouldMentionTemp ? `${tempAdjective} conditions (${Math.round(temperatureF)}°F)` : 'warm conditions';
+  
+  // Determine if base portion was undercooked (beyond heat-adjusted tolerance)
+  const baseUndercooked = baseSlowdownPct !== undefined && baseSlowdownPct > effectiveSlowFloor && !hrSuggestsStimulus;
+  const baseSlow = baseSlowdownPct !== undefined && baseSlowdownPct > 0;
+  const baseWithinHeatTolerance = baseSlowdownPct !== undefined && baseSlowdownPct <= effectiveSlowFloor;
+  
+  // -------------------------------------------------------------------------
   // OPENING
   // -------------------------------------------------------------------------
   if (isLongestRunInPlan) {
@@ -225,25 +284,53 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   }
   
   // -------------------------------------------------------------------------
-  // PACE ASSESSMENT (only if we have pace adherence)
+  // PACE ASSESSMENT - Heat + HR aware
   // -------------------------------------------------------------------------
-  if (paceAdherencePct !== undefined && paceAdherencePct !== null) {
+  if (hasFinishSegment && baseSlowdownPct !== undefined) {
+    // Long run with fast finish: evaluate base and finish separately
+    if (baseSlow && baseWithinHeatTolerance && isWarm) {
+      // Base was slow but within heat tolerance
+      parts.push(`Pace was slower than the target range, but ${tempPhrase} increased the effort cost. HR suggests you still achieved the aerobic stimulus.`);
+    } else if (baseSlow && hrSuggestsStimulus) {
+      // Base was slow but HR indicates stimulus achieved
+      parts.push('Pace was slower than the target range, but HR response confirms the aerobic stimulus was achieved.');
+    } else if (baseUndercooked) {
+      // Base was truly undercooked
+      parts.push('The easy portion was well slower than the target range, reducing the intended aerobic stimulus.');
+    } else if (!baseSlow) {
+      // Base was on target
+      parts.push('Pace was on target.');
+    }
+    
+    // Finish assessment: if planned final segment was on target, add one sentence
+    if (finishOnTarget && finishPace) {
+      parts.push(`Last segment was on target at ${finishPace}.`);
+    } else if (finishOnTarget) {
+      parts.push('Last segment was on target.');
+    }
+  } else if (paceAdherencePct !== undefined && paceAdherencePct !== null) {
+    // Single-segment workout: use paceAdherencePct with heat/HR awareness
     if (paceAdherencePct >= 95) {
       if (conditionsSeverity === 'moderate' || conditionsSeverity === 'high') {
-        parts.push('You hit your pace targets despite conditions.');
+        parts.push(`You hit your pace targets despite ${tempPhrase}.`);
       } else {
         parts.push('Pace was on target.');
       }
     } else if (paceAdherencePct >= 85) {
-      if (conditionsSeverity === 'high') {
-        parts.push('Slightly slower than prescribed, and conditions were a factor.');
+      // Check if heat justifies the slowdown and HR confirms stimulus
+      if (isWarm && hrSuggestsStimulus) {
+        parts.push(`Pace was slower than the target range, but ${tempPhrase} increased the effort cost. HR suggests you still achieved the aerobic stimulus.`);
+      } else if (conditionsSeverity === 'high') {
+        parts.push(`Slightly slower than prescribed — ${tempPhrase} was a factor.`);
       } else {
         parts.push('Slightly slower than prescribed.');
       }
     } else {
       // < 85%
-      if (conditionsSeverity === 'high') {
-        parts.push('Well off pace, though conditions were challenging.');
+      if (isWarm && hrSuggestsStimulus) {
+        parts.push(`Pace was slower than the target range, but ${tempPhrase} increased the effort cost. HR suggests you still achieved the aerobic stimulus.`);
+      } else if (conditionsSeverity === 'high') {
+        parts.push(`Well off pace, though ${tempPhrase} made it challenging.`);
       } else {
         // conditionsSeverity is unknown, low, or moderate — don't blame conditions if unknown
         parts.push('Slower than prescribed — could be fatigue or pacing.');
@@ -393,6 +480,11 @@ function buildDriftInterpretation(
     intent,
     durationMinutes,
     paceAdherencePct: context.paceAdherencePct, // From granular analysis
+    // Segment-level data for long runs with fast finish
+    baseSlowdownPct: context.segmentData?.baseSlowdownPct,
+    finishOnTarget: context.segmentData?.finishOnTarget,
+    finishPace: context.segmentData?.finishPace,
+    hasFinishSegment: context.segmentData?.hasFinishSegment,
     hrDriftBpm,
     earlyAvgHr: drift.earlyAvgHr,
     lateAvgHr: drift.lateAvgHr,
@@ -597,112 +689,377 @@ function buildBottomLine(
 }
 
 // =============================================================================
-// INTERVAL INTERPRETATION
+// INTERVAL INTERPRETATION - Coaching-style narrative with complete pattern grammar
 // =============================================================================
 
+interface IntervalExecution {
+  repNumber: number;
+  targetMidpoint: number;  // sec/mi - midpoint of target range
+  actualPace: number;      // sec/mi
+  status: 'on_target' | 'too_fast' | 'too_slow' | 'blown';
+  deviationPct: number;    // % deviation from target midpoint (negative = faster)
+}
+
+/**
+ * Classify a rep's execution using %-based thresholds
+ * Thresholds scale with pace (5 sec at 6:00 ≠ 5 sec at 11:00)
+ * 
+ * on_target:  within ±5% of target midpoint
+ * too_fast:   >5% faster than target
+ * too_slow:   >7% slower than target  
+ * blown:      >15% slower than target
+ */
+function classifyRepExecution(
+  actualPace: number,
+  targetLower: number,
+  targetUpper: number
+): { status: IntervalExecution['status']; deviationPct: number } {
+  const targetMidpoint = (targetLower + targetUpper) / 2;
+  
+  // Calculate % deviation (negative = faster, positive = slower)
+  const deviationPct = ((actualPace - targetMidpoint) / targetMidpoint) * 100;
+  
+  // Classify based on % thresholds
+  let status: IntervalExecution['status'];
+  
+  if (deviationPct <= -5) {
+    // >5% faster than target
+    status = 'too_fast';
+  } else if (deviationPct >= 15) {
+    // >15% slower = blown
+    status = 'blown';
+  } else if (deviationPct >= 7) {
+    // >7% slower = too slow
+    status = 'too_slow';
+  } else {
+    // Within ±5-7% = on target
+    status = 'on_target';
+  }
+  
+  return { status, deviationPct: Math.round(deviationPct * 10) / 10 };
+}
+
+/**
+ * Detect execution patterns across the set
+ */
+interface ExecutionPatterns {
+  hasBlownRep: boolean;
+  firstRepTooFast: boolean;
+  lateRepsSlow: boolean;           // Last 1-2 reps slow/blown
+  progressiveFade: boolean;        // Each rep slower than previous by >3%
+  negativeSplit: boolean;          // Second half ≥3% faster than first
+  conservativeConsistent: boolean; // All slightly slow but within 3% of each other
+  aggressiveConsistent: boolean;   // All slightly fast but within 3% of each other
+  firstRepSlow: boolean;           // First rep >7% slow, rest on target
+}
+
+function detectExecutionPatterns(reps: IntervalExecution[]): ExecutionPatterns {
+  const patterns: ExecutionPatterns = {
+    hasBlownRep: false,
+    firstRepTooFast: false,
+    lateRepsSlow: false,
+    progressiveFade: false,
+    negativeSplit: false,
+    conservativeConsistent: false,
+    aggressiveConsistent: false,
+    firstRepSlow: false
+  };
+  
+  if (reps.length === 0) return patterns;
+  
+  // Basic flags
+  patterns.hasBlownRep = reps.some(r => r.status === 'blown');
+  patterns.firstRepTooFast = reps[0].status === 'too_fast';
+  
+  // First rep slow (>7% slow, but rest mostly on target)
+  if (reps.length >= 2 && reps[0].deviationPct > 7) {
+    const restOnTarget = reps.slice(1).filter(r => r.status === 'on_target').length;
+    patterns.firstRepSlow = restOnTarget >= (reps.length - 1) * 0.6;
+  }
+  
+  // Late reps slow (last 1-2 reps slow or blown)
+  if (reps.length >= 2) {
+    const lastRep = reps[reps.length - 1];
+    const secondLastRep = reps.length >= 3 ? reps[reps.length - 2] : null;
+    patterns.lateRepsSlow = 
+      (lastRep.status === 'too_slow' || lastRep.status === 'blown') ||
+      (secondLastRep && (secondLastRep.status === 'too_slow' || secondLastRep.status === 'blown'));
+  }
+  
+  // Progressive fade: each rep slower than previous by >3%
+  if (reps.length >= 3) {
+    let fadeCount = 0;
+    for (let i = 1; i < reps.length; i++) {
+      const pctSlower = ((reps[i].actualPace - reps[i-1].actualPace) / reps[i-1].actualPace) * 100;
+      if (pctSlower > 3) fadeCount++;
+    }
+    patterns.progressiveFade = fadeCount >= reps.length - 2; // Most transitions are fading
+  }
+  
+  // Negative split: second half ≥3% faster than first half
+  if (reps.length >= 4) {
+    const midpoint = Math.floor(reps.length / 2);
+    const firstHalfAvg = reps.slice(0, midpoint).reduce((sum, r) => sum + r.actualPace, 0) / midpoint;
+    const secondHalfAvg = reps.slice(midpoint).reduce((sum, r) => sum + r.actualPace, 0) / (reps.length - midpoint);
+    const pctFaster = ((firstHalfAvg - secondHalfAvg) / firstHalfAvg) * 100;
+    patterns.negativeSplit = pctFaster >= 3;
+  }
+  
+  // Conservative but consistent: all slightly slow (>5% slow) but within 3% of each other
+  const allSlightlySlow = reps.every(r => r.deviationPct > 5 && r.deviationPct < 15);
+  if (allSlightlySlow && reps.length >= 2) {
+    const deviations = reps.map(r => r.deviationPct);
+    const spread = Math.max(...deviations) - Math.min(...deviations);
+    patterns.conservativeConsistent = spread <= 3;
+  }
+  
+  // Aggressive but consistent: all slightly fast (< -3%) but within 3% of each other
+  const allSlightlyFast = reps.every(r => r.deviationPct < -3);
+  if (allSlightlyFast && reps.length >= 2) {
+    const deviations = reps.map(r => r.deviationPct);
+    const spread = Math.max(...deviations) - Math.min(...deviations);
+    patterns.aggressiveConsistent = spread <= 3;
+  }
+  
+  return patterns;
+}
+
+/**
+ * Main interval interpretation function
+ */
 function buildIntervalInterpretation(
-  intervals: IntervalHRAnalysis,
+  hrIntervals: IntervalHRAnalysis,
   zones: ZoneDistribution,
   trends: TrendAnalysis | undefined,
   context: HRAnalysisContext
 ): string {
   const parts: string[] = [];
   
-  // Overview
-  parts.push(`Your HR averaged ${intervals.workIntervalAvgHr} bpm across ${intervals.workIntervalCount} work intervals.`);
+  // Extract work intervals with pace data from context
+  const workIntervals = context.intervals.filter(i => i.role === 'work' || i.role === 'Work');
   
-  // HR Creep
-  parts.push(buildCreepStatement(intervals.hrCreep));
-  
-  // Recovery
-  parts.push(buildRecoveryStatement(intervals.recovery));
-  
-  // Consistency
-  if (intervals.workIntervalCount >= 3) {
-    parts.push(buildConsistencyStatement(intervals.consistency));
-  }
-  
-  // Plan context
-  if (context.planContext?.hasActivePlan) {
-    const weekNum = context.planContext.weekIndex ? `Week ${context.planContext.weekIndex}` : '';
-    if (context.planContext.weekIntent === 'build') {
-      parts.push(`${weekNum ? weekNum + ': ' : ''}Building fitness through quality intervals.`);
+  // Analyze each rep's execution with %-based classification
+  const repExecutions: IntervalExecution[] = [];
+  for (let i = 0; i < workIntervals.length; i++) {
+    const interval = workIntervals[i];
+    const paceRange = interval.paceRange;
+    const executed = interval.executed;
+    
+    if (paceRange && executed?.avgPaceSPerMi) {
+      const { status, deviationPct } = classifyRepExecution(
+        executed.avgPaceSPerMi,
+        paceRange.lower,
+        paceRange.upper
+      );
+      
+      repExecutions.push({
+        repNumber: i + 1,
+        targetMidpoint: (paceRange.lower + paceRange.upper) / 2,
+        actualPace: executed.avgPaceSPerMi,
+        status,
+        deviationPct
+      });
     }
   }
   
-  // Bottom line
-  parts.push(buildIntervalBottomLine(intervals));
+  // Calculate summary stats
+  const totalReps = repExecutions.length;
+  const onTargetReps = repExecutions.filter(r => r.status === 'on_target').length;
+  
+  // Detect patterns
+  const patterns = detectExecutionPatterns(repExecutions);
+  
+  // Recovery quality for physiology bridge
+  const recoveryQuality = hrIntervals.recovery.quality;
+  
+  // Format pace helper
+  const formatPace = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = Math.round(secs % 60);
+    return `${mins}:${s.toString().padStart(2, '0')}`;
+  };
+  
+  // Build narrative
+  if (totalReps > 0) {
+    // Get target range from first work interval for display
+    const firstWorkInterval = workIntervals[0];
+    const paceRange = firstWorkInterval?.paceRange;
+    
+    if (paceRange) {
+      const targetRange = `${formatPace(paceRange.lower)}-${formatPace(paceRange.upper)}/mi`;
+      parts.push(`${totalReps} work intervals at ${targetRange}.`);
+    } else {
+      parts.push(`${totalReps} work intervals.`);
+    }
+    
+    // Execution summary
+    if (onTargetReps === totalReps) {
+      parts.push(`All ${totalReps} reps on target — excellent execution.`);
+    } else if (onTargetReps === 0) {
+      parts.push(`No reps hit the target range.`);
+    } else {
+      parts.push(`You hit ${onTargetReps} of ${totalReps} reps on target.`);
+    }
+    
+    // Pattern diagnosis - PRIORITY ORDER (only one fires)
+    // 1. Blown reps present + first rep fast
+    if (patterns.hasBlownRep && patterns.firstRepTooFast) {
+      parts.push(`Started too fast and faded — pacing got away from you early.`);
+    }
+    // 2. Blown reps present (but not from fast start)
+    else if (patterns.hasBlownRep) {
+      if (patterns.lateRepsSlow) {
+        parts.push(`Couldn't hold pace through the full set.`);
+      } else {
+        parts.push(`Mid-workout breakdown — consider recovery or pacing adjustments.`);
+      }
+    }
+    // 3. First rep fast + late slow (no blown, but pacing error)
+    else if (patterns.firstRepTooFast && patterns.lateRepsSlow) {
+      parts.push(`First rep too aggressive, leading to slower finish.`);
+    }
+    // 4. Progressive fade
+    else if (patterns.progressiveFade) {
+      parts.push(`Gradual fade across the set — fatigue accumulated rep by rep.`);
+    }
+    // 5. Negative split
+    else if (patterns.negativeSplit) {
+      parts.push(`Built into the session — good patience.`);
+    }
+    // 6. Aggressive but controlled
+    else if (patterns.aggressiveConsistent) {
+      parts.push(`Aggressive execution, but well controlled across the set.`);
+    }
+    // 7. Conservative but consistent
+    else if (patterns.conservativeConsistent) {
+      parts.push(`Conservative but consistent — you protected the set at the cost of speed.`);
+    }
+    // 8. First rep slow (warm-up lag)
+    else if (patterns.firstRepSlow) {
+      parts.push(`Took a rep to find your rhythm.`);
+    }
+    // 9. First rep fast alone (no late fade)
+    else if (patterns.firstRepTooFast) {
+      parts.push(`First rep was fast — watch the start to avoid mid-set breakdown.`);
+    }
+    // 10. Default: even effort
+    else if (onTargetReps < totalReps) {
+      // Some misses but no clear pattern
+      parts.push(`Mixed execution across the set.`);
+    }
+    // All on target already handled above
+  } else {
+    // Fallback if no pace data
+    parts.push(`${hrIntervals.workIntervalCount} work intervals completed.`);
+  }
+  
+  // HR metrics as supporting evidence
+  const { creepBpm, assessment: creepAssessment } = hrIntervals.hrCreep;
+  if (creepAssessment === 'minimal' || creepAssessment === 'normal') {
+    parts.push(`HR crept ${creepBpm > 0 ? '+' : ''}${creepBpm} bpm — well controlled across the set.`);
+  } else if (creepAssessment === 'elevated') {
+    parts.push(`HR crept +${creepBpm} bpm — fatigue accumulating.`);
+  } else if (creepAssessment === 'high') {
+    parts.push(`HR crept +${creepBpm} bpm — significant fatigue or pacing issue.`);
+  }
+  
+  // Recovery quality
+  const { avgDropBpm } = hrIntervals.recovery;
+  if (recoveryQuality === 'excellent') {
+    parts.push(`Recovery was excellent (${avgDropBpm} bpm drop).`);
+  } else if (recoveryQuality === 'good') {
+    parts.push(`Recovery was solid.`);
+  } else if (recoveryQuality === 'fair') {
+    parts.push(`Recovery was adequate.`);
+  } else if (recoveryQuality === 'poor') {
+    parts.push(`Recovery was limited — consider longer rest next time.`);
+  }
+  
+  // PHYSIOLOGY BRIDGE: Connect recovery to late fade
+  if (patterns.lateRepsSlow && recoveryQuality === 'poor') {
+    parts.push(`Limited recovery likely contributed to the late fade.`);
+  }
+  
+  // Coaching bottom line
+  const bottomLine = buildIntervalCoachingBottomLine(
+    onTargetReps, totalReps, patterns, creepAssessment, recoveryQuality
+  );
+  if (bottomLine) {
+    parts.push(bottomLine);
+  }
   
   return parts.filter(p => p.length > 0).join(' ');
 }
 
-function buildCreepStatement(creep: IntervalHRAnalysis['hrCreep']): string {
-  const { creepBpm, assessment } = creep;
+/**
+ * Generate coaching bottom line based on execution and physiology
+ */
+function buildIntervalCoachingBottomLine(
+  onTarget: number,
+  total: number,
+  patterns: ExecutionPatterns,
+  hrCreep: string,
+  recovery: string
+): string {
+  const hitRate = total > 0 ? onTarget / total : 0;
+  const goodHR = hrCreep === 'minimal' || hrCreep === 'normal';
+  const goodRecovery = recovery === 'excellent' || recovery === 'good';
   
-  switch (assessment) {
-    case 'minimal':
-      return `HR creep was minimal (+${creepBpm} bpm from first to last interval) — strong fitness.`;
-    case 'normal':
-      return `HR crept +${creepBpm} bpm from first to last interval — normal fatigue accumulation.`;
-    case 'elevated':
-      return `HR crept +${creepBpm} bpm from first to last — moderate fatigue toward the end.`;
-    case 'high':
-      return `HR crept +${creepBpm} bpm across intervals — consider if recovery was adequate or intervals were too ambitious.`;
-    default:
-      return '';
-  }
-}
-
-function buildRecoveryStatement(recovery: IntervalHRAnalysis['recovery']): string {
-  const { avgDropBpm, quality, avgRecoveryTimeS } = recovery;
-  const avgTimeMin = Math.round(avgRecoveryTimeS / 60 * 10) / 10;
-  
-  switch (quality) {
-    case 'excellent':
-      return `Recovery was excellent — HR dropped ${avgDropBpm} bpm on average during ${avgTimeMin}-min rest intervals.`;
-    case 'good':
-      return `Recovery was solid — ${avgDropBpm} bpm average drop.`;
-    case 'fair':
-      return `Recovery was moderate — ${avgDropBpm} bpm average drop. Consider longer rest if doing more reps next time.`;
-    case 'poor':
-      return `Recovery was limited — only ${avgDropBpm} bpm average drop. You may need longer rest intervals.`;
-    default:
-      return '';
-  }
-}
-
-function buildConsistencyStatement(consistency: IntervalHRAnalysis['consistency']): string {
-  const { assessment, coefficientOfVariation } = consistency;
-  
-  switch (assessment) {
-    case 'very_consistent':
-      return `HR was very consistent across intervals (${coefficientOfVariation}% CV).`;
-    case 'consistent':
-      return `HR was consistent across intervals.`;
-    case 'variable':
-      return `HR varied somewhat across intervals — pacing consistency could improve.`;
-    case 'inconsistent':
-      return `HR was inconsistent across intervals — focus on even pacing.`;
-    default:
-      return '';
-  }
-}
-
-function buildIntervalBottomLine(intervals: IntervalHRAnalysis): string {
-  const creepOk = intervals.hrCreep.assessment === 'minimal' || intervals.hrCreep.assessment === 'normal';
-  const recoveryOk = intervals.recovery.quality === 'excellent' || intervals.recovery.quality === 'good';
-  
-  if (creepOk && recoveryOk) {
+  // Great execution
+  if (hitRate >= 0.75 && goodHR && !patterns.hasBlownRep) {
     return 'Strong interval execution.';
   }
-  if (creepOk) {
-    return 'Good pacing across intervals.';
+  
+  // Good fitness, pacing issue from fast start
+  if (goodHR && patterns.firstRepTooFast) {
+    return 'Strong fitness, but tighten the first rep to avoid mid-set breakdown.';
   }
-  if (recoveryOk) {
-    return 'Recovery between intervals was on point.';
+  
+  // Negative split with good HR = intentional build
+  if (patterns.negativeSplit && goodHR) {
+    return 'Well-paced session with a strong finish.';
   }
-  return 'Consider adjusting interval intensity or recovery for next session.';
+  
+  // Blown rep with otherwise decent execution
+  if (patterns.hasBlownRep && hitRate >= 0.5) {
+    return 'Solid fitness — address the blown rep to complete the full set next time.';
+  }
+  
+  // Recovery-limited fade
+  if (patterns.lateRepsSlow && !goodRecovery) {
+    return 'Recovery limited the back half — consider longer rest or fewer reps.';
+  }
+  
+  // Progressive fade with HR issues
+  if (patterns.progressiveFade && !goodHR) {
+    return 'Fatigue accumulated steadily — consider adjusting targets or recovery.';
+  }
+  
+  // Conservative execution
+  if (patterns.conservativeConsistent) {
+    return 'Room to push harder next time while maintaining consistency.';
+  }
+  
+  // Aggressive but controlled
+  if (patterns.aggressiveConsistent && goodHR) {
+    return 'Strong execution — consider this your new baseline.';
+  }
+  
+  // Low hit rate with poor recovery
+  if (hitRate < 0.5 && !goodRecovery) {
+    return 'Recovery limited execution — consider longer rest or fewer reps.';
+  }
+  
+  // General fade with HR issues
+  if (hitRate < 0.5 && !goodHR) {
+    return 'Fatigue accumulated — consider adjusting targets or recovery.';
+  }
+  
+  return '';
 }
+
+// Old helper functions removed - buildIntervalInterpretation now handles everything inline
+// with access to pace execution data for coaching-style narratives
 
 // =============================================================================
 // ZONES-ONLY INTERPRETATION (Fartlek/Mixed)

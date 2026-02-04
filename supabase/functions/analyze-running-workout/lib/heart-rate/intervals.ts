@@ -40,6 +40,23 @@ export function analyzeIntervalHR(
   console.log('🏃 [INTERVAL HR] Work intervals:', workIntervals.length);
   console.log('🏃 [INTERVAL HR] Recovery intervals:', recoveryIntervals.length);
   
+  // Debug: log first work interval details
+  if (workIntervals.length > 0) {
+    const first = workIntervals[0];
+    console.log('🏃 [INTERVAL HR] First work interval:', JSON.stringify({
+      role: first.role,
+      startTimeS: first.startTimeS,
+      endTimeS: first.endTimeS,
+      sampleIdxStart: first.sampleIdxStart,
+      sampleIdxEnd: first.sampleIdxEnd
+    }));
+  }
+  
+  // Debug: log first sensor sample timestamp format
+  if (sensorData.length > 0) {
+    console.log('🏃 [INTERVAL HR] First sensor sample timestamp:', sensorData[0].timestamp);
+  }
+  
   if (workIntervals.length === 0) {
     console.log('🏃 [INTERVAL HR] No work intervals found');
     return undefined;
@@ -101,15 +118,25 @@ function calculateIntervalHRStats(
   intervalNumber: number
 ): PerIntervalHR | null {
   // Get samples for this interval
+  // PREFER timestamp-based filtering because sample indices from raw data
+  // become invalid after extractSensorData filters out samples without valid pace
   let samples: SensorSample[];
   
-  if (interval.sampleIdxStart !== undefined && interval.sampleIdxEnd !== undefined) {
+  if (interval.startTimeS !== undefined && interval.endTimeS !== undefined && interval.startTimeS > 0) {
+    // Timestamp-based filtering (most reliable)
+    // Handle both millisecond and second timestamps
+    const startMs = interval.startTimeS > 1e10 ? interval.startTimeS : interval.startTimeS * 1000;
+    const endMs = interval.endTimeS > 1e10 ? interval.endTimeS : interval.endTimeS * 1000;
+    samples = sensorData.filter(s => {
+      if (!s.timestamp) return false;
+      const tsMs = s.timestamp > 1e10 ? s.timestamp : s.timestamp * 1000;
+      return tsMs >= startMs && tsMs <= endMs;
+    });
+  } else if (interval.sampleIdxStart !== undefined && interval.sampleIdxEnd !== undefined) {
+    // Fallback to index-based (may be misaligned after filtering)
     samples = sensorData.slice(interval.sampleIdxStart, interval.sampleIdxEnd + 1);
-  } else if (interval.startTimeS !== undefined && interval.endTimeS !== undefined) {
-    samples = sensorData.filter(s => 
-      s.timestamp && s.timestamp >= interval.startTimeS! && s.timestamp <= interval.endTimeS!
-    );
   } else {
+    console.log(`🏃 [INTERVAL HR] Interval ${intervalNumber} has no time range or sample indices`);
     return null;
   }
   
@@ -118,7 +145,10 @@ function calculateIntervalHRStats(
     s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250
   );
   
-  if (validSamples.length < 10) return null;
+  if (validSamples.length < 10) {
+    console.log(`🏃 [INTERVAL HR] Interval ${intervalNumber}: only ${validSamples.length} valid HR samples (need 10)`);
+    return null;
+  }
   
   const hrValues = validSamples.map(s => s.heart_rate!);
   
@@ -298,14 +328,19 @@ function calculateRecovery(
 function getEndHR(sensorData: SensorSample[], interval: IntervalData): number | null {
   let endSamples: SensorSample[];
   
-  if (interval.sampleIdxEnd !== undefined) {
+  // Prefer timestamp-based filtering (indices may be misaligned after extraction)
+  if (interval.endTimeS !== undefined && interval.endTimeS > 0) {
+    // Handle both millisecond and second timestamps
+    const endTimeMs = interval.endTimeS > 1e10 ? interval.endTimeS : interval.endTimeS * 1000;
+    endSamples = sensorData.filter(s => {
+      if (!s.timestamp) return false;
+      const tsMs = s.timestamp > 1e10 ? s.timestamp : s.timestamp * 1000;
+      return tsMs >= endTimeMs - 10000 && tsMs <= endTimeMs;
+    });
+  } else if (interval.sampleIdxEnd !== undefined) {
     const endIdx = interval.sampleIdxEnd;
     const startIdx = Math.max(0, endIdx - 10);
     endSamples = sensorData.slice(startIdx, endIdx + 1);
-  } else if (interval.endTimeS !== undefined) {
-    endSamples = sensorData.filter(s => 
-      s.timestamp && s.timestamp >= interval.endTimeS! - 10 && s.timestamp <= interval.endTimeS!
-    );
   } else {
     return null;
   }

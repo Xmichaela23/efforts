@@ -32,7 +32,10 @@ import { analyzeSteadyStateDrift } from './drift.ts';
 import { analyzeIntervalHR } from './intervals.ts';
 import { calculateZoneDistribution } from './zones.ts';
 import { calculateEfficiency } from './efficiency.ts';
-import { buildInterpretation } from './interpretation.ts';
+import { buildInterpretation, getHeatAllowance, getEffectiveSlowFloor, BASE_SLOW_THRESHOLD } from './interpretation.ts';
+
+// Re-export heat tolerance functions for use in adherence verdicts
+export { getHeatAllowance, getEffectiveSlowFloor, BASE_SLOW_THRESHOLD };
 
 // =============================================================================
 // MAIN ENTRY POINT

@@ -54,6 +54,14 @@ export interface HRAnalysisContext {
   // Execution metrics (from pace-adherence calculation)
   paceAdherencePct?: number;  // 0-100, overall pace adherence
   
+  // Segment-level pace data (for long runs with fast finish)
+  segmentData?: {
+    baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
+    finishOnTarget?: boolean;  // Whether finish segment hit target
+    finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
+    hasFinishSegment?: boolean; // Whether workout has a distinct fast finish
+  };
+  
   // Plan context (when part of training plan)
   planContext?: {
     weekIndex: number;

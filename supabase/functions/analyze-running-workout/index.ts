@@ -8,7 +8,7 @@ import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherenc
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
 import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 // Old HR drift import removed - now using consolidated HR analysis module
-import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType } from './lib/heart-rate/index.ts';
+import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
 import { generateAINarrativeInsights } from './lib/narrative/ai-generator.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from './lib/plan-context.ts';
@@ -681,21 +681,156 @@ Deno.serve(async (req) => {
     
     // 💓 SINGLE SOURCE OF TRUTH: Consolidated HR Analysis
     // All HR metrics (drift, zones, efficiency, intervals) calculated here
+    
+    // Compute interval timestamps from sensor data
+    // The sample indices reference the original data, but we need timestamps for reliable filtering
+    // Use first sensor sample timestamp as base, add sample index as seconds offset
+    const workoutStartTimestamp = sensorData[0]?.timestamp || 0;
+    const isMilliseconds = workoutStartTimestamp > 1e10;
+    
+    // -------------------------------------------------------------------------
+    // SEGMENT-LEVEL PACE DATA (for long runs with fast finish)
+    // Calculate before HR analysis so narrative can use it
+    // -------------------------------------------------------------------------
+    let segmentData: {
+      baseSlowdownPct?: number;
+      finishOnTarget?: boolean;
+      finishPace?: string;
+      hasFinishSegment?: boolean;
+    } | undefined = undefined;
+    
+    // Check if this is a long run with fast finish (e.g., 14 mi easy + 1 mi at M pace)
+    // Sort by true chronological key: start_time_s (actual timestamp) or planned_step_index (plan order)
+    const workIntervalsUnsorted = intervalsToAnalyze.filter((i: any) => i.role === 'work' || i.kind === 'work');
+    
+    // Check if we have a reliable chronological key
+    const hasChronoKey = workIntervalsUnsorted.every((i: any) => 
+      i.start_time_s != null || i.start_offset_s != null || i.planned_step_index != null
+    );
+    
+    // Only proceed with segment detection if we have reliable ordering
+    const workIntervalsList = hasChronoKey 
+      ? workIntervalsUnsorted.sort((a: any, b: any) => {
+          // Primary: actual start time (most reliable)
+          const aTime = a.start_time_s ?? a.start_offset_s;
+          const bTime = b.start_time_s ?? b.start_offset_s;
+          if (aTime != null && bTime != null) return aTime - bTime;
+          // Fallback: plan authoring order
+          const aIdx = a.planned_step_index ?? 0;
+          const bIdx = b.planned_step_index ?? 0;
+          return aIdx - bIdx;
+        })
+      : []; // Empty = skip segment detection if no reliable order
+    
+    if (workIntervalsList.length >= 2) {
+      const firstInterval = workIntervalsList[0];
+      const lastInterval = workIntervalsList[workIntervalsList.length - 1];
+      
+      // Calculate target midpoints from pace_range
+      // Handles both object format { lower: 621, upper: 715 } and string format "10:55-11:21/mi"
+      const parsePaceRange = (range: any): { lower: number; upper: number } | null => {
+        if (!range) return null;
+        
+        // If it's already an object with lower/upper properties (seconds)
+        if (typeof range === 'object' && range.lower != null && range.upper != null) {
+          return { lower: Number(range.lower), upper: Number(range.upper) };
+        }
+        
+        // If it's a string, parse it
+        if (typeof range === 'string') {
+          const match = range.match(/(\d+):(\d+)[\s-]+(\d+):(\d+)/);
+          if (!match) return null;
+          const lower = parseInt(match[1]) * 60 + parseInt(match[2]);
+          const upper = parseInt(match[3]) * 60 + parseInt(match[4]);
+          return { lower, upper };
+        }
+        
+        return null;
+      };
+      
+      const firstRange = parsePaceRange(firstInterval.pace_range || firstInterval.target_pace);
+      const lastRange = parsePaceRange(lastInterval.pace_range || lastInterval.target_pace);
+      
+      if (firstRange && lastRange) {
+        const firstMid = (firstRange.lower + firstRange.upper) / 2;
+        const lastMid = (lastRange.lower + lastRange.upper) / 2;
+        
+        // If last segment target is at least 5% faster, this is a fast-finish workout
+        if (lastMid < firstMid * 0.95) {
+          const hasFinishSegment = true;
+          
+          // Calculate base slowdown (compare actual to target for base portion)
+          const baseActualPace = firstInterval.executed?.avg_pace_s_per_mi;
+          let baseSlowdownPct = 0;
+          if (baseActualPace && firstMid > 0) {
+            baseSlowdownPct = Math.max(0, (baseActualPace - firstMid) / firstMid);
+          }
+          
+          // Check if finish segment was on target
+          const lastActualPace = lastInterval.executed?.avg_pace_s_per_mi;
+          const finishOnTarget = lastActualPace != null && 
+                                 lastActualPace >= lastRange.lower * 0.95 && // Allow 5% tolerance
+                                 lastActualPace <= lastRange.upper * 1.05;
+          
+          // Format finish pace for display
+          const formatPace = (secPerMi: number): string => {
+            const mins = Math.floor(secPerMi / 60);
+            const secs = Math.round(secPerMi % 60);
+            return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+          };
+          const finishPace = lastActualPace ? formatPace(lastActualPace) : undefined;
+          
+          segmentData = {
+            baseSlowdownPct,
+            finishOnTarget,
+            finishPace,
+            hasFinishSegment
+          };
+          
+          console.log(`📊 [SEGMENT DATA] Fast-finish detected: baseSlowdown=${(baseSlowdownPct*100).toFixed(1)}%, finishOnTarget=${finishOnTarget}, finishPace=${finishPace}`);
+        }
+      }
+    }
+    
     const hrAnalysisContext: HRAnalysisContext = {
       workoutType: detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout),
-      intervals: intervalsToAnalyze.map(interval => ({
-        role: (interval.role || interval.kind || 'work') as any,
-        sampleIdxStart: interval.sample_idx_start,
-        sampleIdxEnd: interval.sample_idx_end,
-        startTimeS: interval.start_time_s || 0,
-        endTimeS: interval.end_time_s || 0,
-        paceRange: interval.pace_range || interval.target_pace,
-        executed: interval.executed ? {
-          avgPaceSPerMi: interval.executed.avg_pace_s_per_mi,
-          durationS: interval.executed.duration_s,
-          avgHr: interval.executed.avg_hr
-        } : undefined
-      })),
+      intervals: intervalsToAnalyze.map(interval => {
+        // Compute timestamps from sample indices
+        // Sample indices are roughly 1 sample per second
+        const sampleIdxStart = interval.sample_idx_start ?? 0;
+        const sampleIdxEnd = interval.sample_idx_end ?? 0;
+        
+        // Compute timestamp: base + index offset (in same units as base)
+        let startTimeS = interval.start_time_s;
+        let endTimeS = interval.end_time_s;
+        
+        // If no explicit timestamps, compute from sample indices
+        if (!startTimeS || !endTimeS) {
+          if (isMilliseconds) {
+            // workoutStartTimestamp is in ms, convert to ms then back
+            startTimeS = workoutStartTimestamp + (sampleIdxStart * 1000);
+            endTimeS = workoutStartTimestamp + (sampleIdxEnd * 1000);
+          } else {
+            // Already in seconds
+            startTimeS = workoutStartTimestamp + sampleIdxStart;
+            endTimeS = workoutStartTimestamp + sampleIdxEnd;
+          }
+        }
+        
+        return {
+          role: (interval.role || interval.kind || 'work') as any,
+          sampleIdxStart,
+          sampleIdxEnd,
+          startTimeS,
+          endTimeS,
+          paceRange: interval.pace_range || interval.target_pace,
+          executed: interval.executed ? {
+            avgPaceSPerMi: interval.executed.avg_pace_s_per_mi,
+            durationS: interval.executed.duration_s,
+            avgHr: interval.executed.avg_hr
+          } : undefined
+        };
+      }),
       terrain: {
         totalElevationGainM: workout?.elevation_gain ?? workout?.metrics?.elevation_gain ?? undefined,
         samples: sensorData
@@ -736,11 +871,20 @@ Deno.serve(async (req) => {
       // Pace adherence from granular analysis (0-1 fraction → 0-100 percentage)
       paceAdherencePct: analysis.overall_adherence != null 
         ? Math.round(analysis.overall_adherence * 100) 
-        : undefined
+        : undefined,
+      // Segment-level data for long runs with fast finish
+      segmentData
     };
+    
+    // Debug: log computed interval timestamps
+    if (hrAnalysisContext.intervals.length > 0) {
+      const firstInterval = hrAnalysisContext.intervals[0];
+      console.log(`💓 [HR CONTEXT] Computed timestamps for first interval: startTimeS=${firstInterval.startTimeS}, endTimeS=${firstInterval.endTimeS}, isMs=${isMilliseconds}`);
+    }
     
     const hrAnalysisResult = analyzeHeartRate(sensorData, hrAnalysisContext);
     console.log(`💓 [HR ANALYSIS] Complete: type=${hrAnalysisResult.workoutType}, drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'}, confidence=${hrAnalysisResult.confidence}`);
+    console.log(`💓 [HR ANALYSIS] Interpretation length: ${hrAnalysisResult.interpretation?.length ?? 0}`);
     
     // Update analysis.heart_rate_analysis with consolidated results
     {
@@ -872,12 +1016,21 @@ Deno.serve(async (req) => {
           const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
           const stepKind = String(workStepsForDetection[0]?.kind || workStepsForDetection[0]?.role || '').toLowerCase();
           
-          // Expanded detection for easy/recovery runs
+          // Expanded detection for easy/recovery runs vs interval workouts
+          // Check for interval workout indicators first (prevents "jog recovery between reps" false positive)
+          const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
+          const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
+          const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
+          const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
+          const isIntervalWorkout = hasIntervalKeywordsInName || hasRepeatPattern;
+          
           const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-          const isEasyOrLongRun = easyKeywords.some(kw => 
+          const hasEasyKeywords = easyKeywords.some(kw => 
             workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
-          ) || stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic' || stepKind === 'recovery';
-          console.log(`🔍 [EASY RUN DETECTION] isEasyOrLongRun=${isEasyOrLongRun}, workoutName="${workoutName}", workoutToken="${workoutToken}", stepKind="${stepKind}"`);
+          );
+          // Only classify as easy if NOT an interval workout AND (has easy keywords OR step kind indicates easy)
+          const isEasyOrLongRun = !isIntervalWorkout && (hasEasyKeywords || stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic' || stepKind === 'recovery');
+          console.log(`🔍 [EASY RUN DETECTION] isEasyOrLongRun=${isEasyOrLongRun}, isIntervalWorkout=${isIntervalWorkout}, workoutName="${workoutName}", workoutToken="${workoutToken}", stepKind="${stepKind}"`);
           
           const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
           console.log(`🔍 [INTERVAL TYPE] Detected as '${intervalType}' - token: ${workoutToken}, name: ${workoutName}, stepKind: ${stepKind}`);
@@ -907,14 +1060,28 @@ Deno.serve(async (req) => {
         const intervalAdherences: number[] = [];
         
         // Check if this is an easy/recovery workout (overrides interval role)
+        // Note: Multi-interval workouts with 2+ work steps are almost always NOT easy/recovery runs
+        // The word "recovery" in "jog recovery between reps" refers to rest periods, not workout type
         const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
         const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
         const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
+        const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
+        
+        // Check for interval workout indicators
+        const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
+        const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
+        const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
+        // Multiple work intervals = interval workout, not easy/recovery
+        const hasMultipleWorkIntervals = workIntervalsForAdherence.length >= 2;
+        const isIntervalWorkout = hasMultipleWorkIntervals || hasIntervalKeywordsInName || hasRepeatPattern;
+        
         const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-        const isEasyOrLongRunWorkout = easyKeywords.some(kw => 
+        const hasEasyKeywords = easyKeywords.some(kw => 
           workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
         );
-        console.log(`🔍 [EASY RUN DETECTION MULTI] isEasyOrLongRunWorkout=${isEasyOrLongRunWorkout}, workoutName="${workoutName}"`);
+        // Only classify as easy if NOT an interval workout
+        const isEasyOrLongRunWorkout = !isIntervalWorkout && hasEasyKeywords;
+        console.log(`🔍 [EASY RUN DETECTION MULTI] isEasyOrLongRunWorkout=${isEasyOrLongRunWorkout}, isIntervalWorkout=${isIntervalWorkout}, workIntervals=${workIntervalsForAdherence.length}, workoutName="${workoutName}"`);
         
         for (const interval of workIntervalsForAdherence) {
           // Get the interval's actual average pace
@@ -981,13 +1148,21 @@ Deno.serve(async (req) => {
             const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
             const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
             
-            // Expanded detection for easy/recovery runs
+            // Expanded detection for easy/recovery runs vs interval workouts
+            // Note: "recovery" in "jog recovery between reps" refers to rest periods, not workout type
+            const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
+            const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
+            const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
+            const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
+            const isIntervalWorkout = hasIntervalKeywordsInName || hasRepeatPattern;
+            
             const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-            const isEasyOrLongRun = easyKeywords.some(kw => 
+            const hasEasyKeywords = easyKeywords.some(kw => 
               workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
             );
+            const isEasyOrLongRun = !isIntervalWorkout && hasEasyKeywords;
             const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
-            console.log(`🔍 [EASY RUN DETECTION FALLBACK] isEasyOrLongRun=${isEasyOrLongRun}, workoutName="${workoutName}"`);
+            console.log(`🔍 [EASY RUN DETECTION FALLBACK] isEasyOrLongRun=${isEasyOrLongRun}, isIntervalWorkout=${isIntervalWorkout}, workoutName="${workoutName}"`);
             
             granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
             console.log(`🔍 [PACE ADHERENCE] Steady-state average pace adherence (${intervalType}): ${granularPaceAdherence}%`);
@@ -1043,6 +1218,50 @@ Deno.serve(async (req) => {
     // Attach performance to enhancedAnalysis so it's available in generateIntervalBreakdown
     // This ensures single source of truth - performance.pace_adherence matches Summary view
     enhancedAnalysis.performance = performance;
+    
+    // FIX: Update HR narrative with correct pace adherence
+    // The HR analysis ran before performance was calculated, so it used time-in-range (overall_adherence)
+    // instead of average pace adherence (performance.pace_adherence). Fix the narrative to match the UI.
+    if (analysis.heart_rate_analysis?.hr_drift_interpretation && performance.pace_adherence != null) {
+      const currentNarrative = analysis.heart_rate_analysis.hr_drift_interpretation;
+      const paceAdherencePct = Math.round(performance.pace_adherence);
+      
+      // Detect and fix pace assessment conflicts
+      // The narrative might say "Slower than prescribed" when pace_adherence is actually 95%+
+      const slowPhrases = [
+        'Slower than prescribed — could be fatigue or pacing.',
+        'Well off pace, though conditions were challenging.',
+        'Slightly slower than prescribed, and conditions were a factor.',
+        'Slightly slower than prescribed.'
+      ];
+      
+      let correctedNarrative = currentNarrative;
+      
+      if (paceAdherencePct >= 95) {
+        // Should say "on target" or "hit targets despite conditions"
+        for (const phrase of slowPhrases) {
+          if (currentNarrative.includes(phrase)) {
+            correctedNarrative = currentNarrative.replace(phrase, 'Pace was on target.');
+            console.log(`🔧 [NARRATIVE FIX] Corrected pace assessment: "${phrase}" → "Pace was on target." (pace_adherence=${paceAdherencePct}%)`);
+            break;
+          }
+        }
+      } else if (paceAdherencePct >= 85 && paceAdherencePct < 95) {
+        // Should say "slightly slower"
+        const verySlowPhrases = ['Slower than prescribed — could be fatigue or pacing.', 'Well off pace, though conditions were challenging.'];
+        for (const phrase of verySlowPhrases) {
+          if (currentNarrative.includes(phrase)) {
+            correctedNarrative = currentNarrative.replace(phrase, 'Slightly slower than prescribed.');
+            console.log(`🔧 [NARRATIVE FIX] Corrected pace assessment: "${phrase}" → "Slightly slower than prescribed." (pace_adherence=${paceAdherencePct}%)`);
+            break;
+          }
+        }
+      }
+      
+      if (correctedNarrative !== currentNarrative) {
+        analysis.heart_rate_analysis.hr_drift_interpretation = correctedNarrative;
+      }
+    }
 
     // Extract planned pace info early so it can be passed to detailed analysis
     let plannedPaceInfo: {
@@ -1790,14 +2009,33 @@ function generateAdherenceSummary(
     return null;
   }
   
-  // Detect if this is an easy/recovery run (affects messaging)
+  // Detect if this is an easy/recovery run vs an interval workout (affects messaging)
   const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
   const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
   const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
+  const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
+  
+  // First check: Is this clearly an interval workout?
+  // - Multiple work intervals (2+)
+  // - Contains interval-specific keywords in token/name (not just description)
+  const hasMultipleWorkIntervals = workIntervals.length >= 2;
+  const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
+  const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
+  // Check for patterns like "4x1000m", "4×800", "6 x 400" in any text
+  const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
+  const isIntervalWorkout = hasMultipleWorkIntervals || hasIntervalKeywordsInName || hasRepeatPattern;
+  
+  // Second check: Easy/recovery keywords (only applies if NOT an interval workout)
+  // Note: "recovery" in "jog recovery between reps" means rest periods, not workout type
   const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-  const isEasyOrRecoveryRun = easyKeywords.some(kw => 
+  const hasEasyKeywords = easyKeywords.some(kw => 
     workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
   );
+  
+  // Only classify as easy/recovery if it's NOT an interval workout AND has easy keywords
+  const isEasyOrRecoveryRun = !isIntervalWorkout && hasEasyKeywords;
+  
+  console.log(`🔍 [WORKOUT TYPE DETECT] isIntervalWorkout=${isIntervalWorkout} (workIntervals=${workIntervals.length}, hasIntervalKeywords=${hasIntervalKeywordsInName}, hasRepeatPattern=${hasRepeatPattern}), hasEasyKeywords=${hasEasyKeywords}, final isEasyOrRecoveryRun=${isEasyOrRecoveryRun}`);
   
   // Plan-aware context: use plan week intent if available, otherwise fall back to workout detection
   const isRecoveryContext = planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery' || isEasyOrRecoveryRun;
@@ -2003,13 +2241,67 @@ function generateAdherenceSummary(
   if (parts.length === 0) return null;
 
   const fastDominant = fastIntervals.length > 0 && slowIntervals.length === 0;
-  const slowDominant = slowIntervals.length > 0 && fastIntervals.length === 0;
   const ws = detailedAnalysis?.workout_summary;
   const hrDrift = ws?.hr_drift ?? granularAnalysis?.heart_rate_analysis?.hr_drift_bpm ?? null;
   const hrDriftAbs = hrDrift != null && Number.isFinite(hrDrift) ? Math.abs(hrDrift) : null;
+  
+  // -------------------------------------------------------------------------
+  // HEAT-ADJUSTED TOLERANCE + HR TIE-BREAKER FOR STIMULUS DETERMINATION
+  // -------------------------------------------------------------------------
+  // Get temperature from granular analysis
+  const tempF: number | null = granularAnalysis?.weather?.temperatureF ?? 
+                               granularAnalysis?.heart_rate_analysis?.temperature_factor?.temperatureF ?? 
+                               null;
+  
+  // Calculate effective slow floor with heat adjustment
+  // Base: 15% slower = under-stimulated, but heat adds tolerance (+3% for 65-75°F, +7% for 75-85°F, +12% for >85°F)
+  const effectiveSlowFloor = getEffectiveSlowFloor(tempF);
+  const heatAllowanceApplied = getHeatAllowance(tempF);
+  
+  // Calculate actual slowdown percentage for slow intervals
+  let maxSlowdownPct = 0;
+  let avgSlowdownPct = 0;
+  if (slowIntervals.length > 0) {
+    for (const d of slowIntervals) {
+      // Find the corresponding work interval to get target midpoint
+      const wi = workIntervals.find((w: any) => w.interval_number === d.interval);
+      if (wi) {
+        const targetMid = ((wi.planned_pace_range_lower || 0) + (wi.planned_pace_range_upper || 0)) / 2;
+        const actualPace = (wi.actual_pace_min_per_mi || 0) * 60;
+        if (targetMid > 0 && actualPace > 0) {
+          const slowdownPct = (actualPace - targetMid) / targetMid;
+          if (slowdownPct > maxSlowdownPct) maxSlowdownPct = slowdownPct;
+          avgSlowdownPct += slowdownPct;
+        }
+      }
+    }
+    if (slowIntervals.length > 0) avgSlowdownPct /= slowIntervals.length;
+  }
+  
+  // Determine if HR suggests stimulus was achieved despite slow pace
+  // HR drift being "normal" or "elevated" for the duration suggests cardiovascular work was done
+  const durationMinutes = granularAnalysis?.duration_minutes ?? 0;
+  // Normal drift bands by duration (from interpretation.ts):
+  // <45 min: 0-8 bpm, 45-90: 4-12 bpm, 90-150: 6-16 bpm, 150+: 8-20 bpm
+  let hrSuggestsStimulus = false;
+  if (hrDrift != null && Number.isFinite(hrDrift)) {
+    // If drift is >= 6 bpm for longer runs (>45 min), HR response indicates work was done
+    if (durationMinutes > 90 && hrDrift >= 6) hrSuggestsStimulus = true;
+    else if (durationMinutes > 45 && hrDrift >= 4) hrSuggestsStimulus = true;
+    else if (hrDrift >= 3) hrSuggestsStimulus = true;
+  }
+  
+  // Slow dominant only if: slow AND beyond heat-adjusted tolerance AND HR doesn't save it
+  const trulySlow = avgSlowdownPct > effectiveSlowFloor && !hrSuggestsStimulus;
+  const slowDominant = slowIntervals.length > 0 && fastIntervals.length === 0 && trulySlow;
+  
+  console.log(`🔥 [HEAT+HR CONTEXT] tempF=${tempF}, heatAllowance=${(heatAllowanceApplied*100).toFixed(0)}%, effectiveSlowFloor=${(effectiveSlowFloor*100).toFixed(0)}%`);
+  console.log(`🔥 [HEAT+HR CONTEXT] avgSlowdownPct=${(avgSlowdownPct*100).toFixed(1)}%, hrDrift=${hrDrift}, hrSuggestsStimulus=${hrSuggestsStimulus}, trulySlow=${trulySlow}`);
 
   // Planned workout context: does the plan have a faster finish? (e.g. long easy + 1 mi at M pace)
   let hasPlannedFasterFinish = false;
+  let finishSegmentOnTarget = false;
+  let finishPaceDisplay = '';
   if (workIntervals.length >= 2) {
     const first = workIntervals[0];
     const last = workIntervals[workIntervals.length - 1];
@@ -2017,6 +2309,16 @@ function generateAdherenceSummary(
     const lastMid = ((Number(last?.planned_pace_range_lower) || 0) + (Number(last?.planned_pace_range_upper) || 0)) / 2;
     if (firstMid > 0 && lastMid > 0 && lastMid < firstMid * 0.95) {
       hasPlannedFasterFinish = true; // last segment target is at least 5% faster
+      
+      // Check if finish segment was on target
+      const lastDev = deviations.find(d => d.interval === (last.interval_number || workIntervals.length));
+      if (lastDev && lastDev.direction === 'ok') {
+        finishSegmentOnTarget = true;
+        finishPaceDisplay = lastDev.actual;
+      } else if (lastDev && lastDev.direction === 'fast') {
+        finishSegmentOnTarget = true; // fast is also "hit"
+        finishPaceDisplay = lastDev.actual;
+      }
     }
   }
   const driftContextNote = hasPlannedFasterFinish
@@ -2057,9 +2359,21 @@ function generateAdherenceSummary(
           ? `Strong execution in ${currentPhaseName}; this extra load may necessitate a more conservative approach to your next key session.${weekFocus ? ` Focus: ${weekFocus}.` : ''}`
           : "Strong execution; keep an eye on cumulative fatigue as the block progresses.";
       } else if (slowDominant) {
+        // Only show "missed stimulus" if heat+HR logic confirms it was truly missed
         outlook = currentPhaseName
           ? `Missed target stimulus in ${currentPhaseName} may reduce the intended training load for this block.${weekFocus ? ` Adjust ${weekFocus.toLowerCase()} as needed.` : ''}`
           : "Missed target stimulus today may reduce the intended training load for this phase.";
+      } else if (slowIntervals.length > 0 && !trulySlow) {
+        // Slow but within tolerance (heat) or HR suggests stimulus achieved
+        // Keep BUILD EXECUTION concise — details are in SUMMARY
+        if (heatAllowanceApplied > 0 && hrSuggestsStimulus) {
+          outlook = "Stimulus achieved under warm conditions.";
+        } else if (hrSuggestsStimulus) {
+          outlook = "Stimulus achieved — HR confirms the work was done.";
+        } else if (heatAllowanceApplied > 0) {
+          outlook = "Pace adjusted for conditions — within heat tolerance.";
+        }
+        // Note: finish segment info is already in SUMMARY, don't repeat here
       }
     } else if (isTaperContext) {
       focus = 'Taper Discipline';
@@ -2102,13 +2416,18 @@ function generateAdherenceSummary(
     });
   }
 
-  // HR drift → Use the rich context-aware interpretation from granular analysis
+  // HR analysis → Use the rich context-aware interpretation from granular analysis
   // This includes terrain profile, workout plan context, and window-by-window analysis
+  // For intervals, drift may be N/A but we still have interval-specific narrative
   const richHRInterpretation = granularAnalysis?.heart_rate_analysis?.hr_drift_interpretation;
+  const hrSummaryLabel = granularAnalysis?.heart_rate_analysis?.summary_label;
+  const workoutTypeFromAnalysis = granularAnalysis?.heart_rate_analysis?.workout_type;
+  
+  // CASE 1: Steady-state workouts with drift data
   if (hrDrift != null && Number.isFinite(hrDrift) && hrDriftAbs !== null) {
     // Use summary_label from HR analysis module (single source of truth)
     // Falls back to derived label only if summary_label not available
-    let driftLabel = granularAnalysis?.heart_rate_analysis?.summary_label;
+    let driftLabel = hrSummaryLabel;
     if (!driftLabel) {
       // Fallback for older analyses: derive label from drift magnitude
       driftLabel = 'Cardiac Drift';
@@ -2132,6 +2451,11 @@ function generateAdherenceSummary(
         technical_insights.push({ label: driftLabel, value: `${plannedWorkoutLeadIn}Significant HR drift (+${hrDrift} bpm${driftClarify}) suggests accumulated fatigue or intensity creep. Consider hydration, heat, and recovery; this may take longer to absorb.${driftContextNote}` });
       }
     }
+  }
+  // CASE 2: Interval workouts - no drift, but have interval-specific narrative
+  else if (workoutTypeFromAnalysis === 'intervals' && richHRInterpretation && richHRInterpretation.length > 20) {
+    const intervalLabel = hrSummaryLabel || 'Interval Summary';
+    technical_insights.push({ label: intervalLabel, value: richHRInterpretation });
   }
 
   // Pacing stability: < 5% → Pacing Mastery; otherwise diagnostic
