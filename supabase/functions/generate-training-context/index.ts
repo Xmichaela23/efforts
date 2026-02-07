@@ -1143,7 +1143,10 @@ Deno.serve(async (req) => {
         return t === 'run' || t === 'running';
       });
 
-      // Match: (1) completed_workout_id, (2) workouts.planned_id, (3) same date + same type, (4) same week + same type (moved)
+      // Match (smart, deterministic):
+      // 1) Hard links: planned_workouts.completed_workout_id or workouts.planned_id
+      // 2) High-confidence inference: score-based matching (type + day proximity + duration/workload similarity)
+      // 3) Persist high-confidence inferred links so the system improves over time (no manual linking needed)
       const matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }> = [];
       const plannedIdsUsed = new Set<string>();
       const workoutIdsUsed = new Set<string>();
@@ -1156,19 +1159,80 @@ Deno.serve(async (req) => {
         if (s.includes('mobility') || s === 'pt') return 'mobility';
         return s || 'run';
       };
+
+      const isOptionalPlanned = (p: PlannedWorkoutRecord): boolean => {
+        const n = String(p?.name || '').toLowerCase();
+        const t = String(p?.type || '').toLowerCase();
+        return n.includes('optional') || /\bopt\b/.test(t) || t.includes('opt_') || t.includes('_opt');
+      };
+
+      const daysBetween = (aISO: string, bISO: string): number => {
+        const a = new Date(toLocalDay(aISO) + 'T12:00:00').getTime();
+        const b = new Date(toLocalDay(bISO) + 'T12:00:00').getTime();
+        return Math.round(Math.abs(a - b) / (24 * 60 * 60 * 1000));
+      };
+
+      const scorePlannedToWorkout = (p: PlannedWorkoutRecord, w: WorkoutRecord): number => {
+        const pType = normalizeType((p as any).type);
+        const wType = normalizeType((w as any).type);
+        if (pType !== wType) return -Infinity;
+
+        const dayDelta = daysBetween(p.date, w.date);
+        // Keep inference tight: most plan moves are within ±1–2 days. Allow optional to float slightly more.
+        const maxDayDelta = isOptionalPlanned(p) ? 3 : 2;
+        if (dayDelta > maxDayDelta) return -Infinity;
+
+        let score = 100;
+        score -= dayDelta * 15;
+        if (dayDelta === 0) score += 15;
+
+        // Duration similarity (minutes). Use moving_time when available.
+        const plannedDur = Number((p as any).duration) || 0;
+        const doneDur = Number((w as any).moving_time) || Number((w as any).duration) || 0;
+        if (plannedDur > 0 && doneDur > 0) {
+          const pct = Math.abs(doneDur - plannedDur) / plannedDur;
+          if (pct <= 0.10) score += 20;
+          else if (pct <= 0.25) score += 10;
+          else if (pct >= 0.60) score -= 15;
+        }
+
+        // Workload similarity
+        const plannedWL = Number((p as any).workload_planned) || 0;
+        const doneWL = Number((w as any).workload_actual) || 0;
+        if (plannedWL > 0 && doneWL > 0) {
+          const pct = Math.abs(doneWL - plannedWL) / plannedWL;
+          if (pct <= 0.20) score += 20;
+          else if (pct <= 0.40) score += 10;
+        }
+
+        // Name/intent keyword overlap (small bonus)
+        const pn = String(p?.name || '').toLowerCase();
+        const wn = String((w as any)?.name || '').toLowerCase();
+        const keywords = ['easy', 'recovery', 'long', 'interval', 'tempo', 'threshold', 'vo2', 'upper', 'lower', 'maintenance'];
+        const overlap = keywords.some(k => pn.includes(k) && wn.includes(k));
+        if (overlap) score += 8;
+
+        return score;
+      };
+
+      const inferAndPersistLink = async (planned_id: string, workout_id: string): Promise<void> => {
+        try {
+          await supabase.from('planned_workouts').update({ completed_workout_id: workout_id }).eq('id', planned_id);
+          await supabase.from('workouts').update({ planned_id }).eq('id', workout_id).eq('user_id', user_id);
+        } catch (_) {
+          /* ignore per-call errors */
+        }
+      };
+
+      // -----------------------------------------------------------------------
+      // 1) Hard links (completed_workout_id or workouts.planned_id)
+      // -----------------------------------------------------------------------
       for (const p of plannedToDate) {
         const pId = String(p.id);
         let wid = (p as PlannedWorkoutRecord & { completed_workout_id?: string | null }).completed_workout_id;
         if (!wid) {
           const fromWorkout = weekCompleted.find((w: WorkoutRecord & { planned_id?: string | null }) => String(w.planned_id || '') === pId);
           if (fromWorkout) wid = fromWorkout.id;
-        }
-        if (!wid) {
-          const pType = normalizeType((p as any).type);
-          const sameDaySameType = weekCompleted.find((w: WorkoutRecord) =>
-            w.date === p.date && normalizeType(w.type) === pType && !workoutIdsUsed.has(w.id)
-          );
-          if (sameDaySameType) wid = sameDaySameType.id;
         }
         if (!wid || plannedIdsUsed.has(pId)) continue;
         const completedWorkout = weekCompleted.find((w: WorkoutRecord) => w.id === wid);
@@ -1182,43 +1246,66 @@ Deno.serve(async (req) => {
           workout_id: wid
         });
       }
-      // Same-week, same-type fallback: match unlinked completions to unmatched planned (e.g. Fri optional strength -> Sat strength)
-      const unmatchedPlanned = plannedToDate.filter(p => !plannedIdsUsed.has(String(p.id)));
-      const unlinkedCompleted = weekCompleted.filter((w: WorkoutRecord) => !workoutIdsUsed.has(w.id));
-      for (const p of unmatchedPlanned) {
-        const pId = String(p.id);
-        const pType = normalizeType((p as any).type);
-        const pDate = p.date;
-        const candidates = unlinkedCompleted
-          .filter((w: WorkoutRecord) => normalizeType(w.type) === pType)
-          .map((w: WorkoutRecord) => ({ w, dayDelta: Math.abs(new Date(w.date).getTime() - new Date(pDate).getTime()) / (24 * 60 * 60 * 1000) }))
-          .sort((a, b) => a.dayDelta - b.dayDelta);
-        const best = candidates[0];
-        if (!best) continue;
-        plannedIdsUsed.add(pId);
-        workoutIdsUsed.add(best.w.id);
-        matched_pairs.push({
-          planned_date: toLocalDay(p.date),
-          completed_date: toLocalDay(best.w.date),
-          planned_id: pId,
-          workout_id: best.w.id
-        });
-        unlinkedCompleted.splice(unlinkedCompleted.indexOf(best.w), 1);
-      }
 
-      // Persist inferred moved links so calendar shows planned session as completed (done on different day)
-      const movedPairs = matched_pairs.filter(p => p.planned_date !== p.completed_date);
-      for (const pair of movedPairs) {
-        const plannedRow = plannedToDate.find((p: any) => String(p.id) === pair.planned_id);
-        const workoutRow = weekCompleted.find((w: WorkoutRecord) => w.id === pair.workout_id) as WorkoutRecord & { planned_id?: string | null } | undefined;
-        if (!plannedRow || !workoutRow) continue;
-        const planned = plannedRow as { completed_workout_id?: string | null };
-        const alreadyLinked = planned.completed_workout_id === pair.workout_id && (workoutRow.planned_id ?? null) === pair.planned_id;
-        if (alreadyLinked) continue;
-        try {
-          await supabase.from('planned_workouts').update({ completed_workout_id: pair.workout_id }).eq('id', pair.planned_id);
-          await supabase.from('workouts').update({ planned_id: pair.planned_id }).eq('id', pair.workout_id).eq('user_id', user_id);
-        } catch (_) { /* ignore per-call errors */ }
+      // -----------------------------------------------------------------------
+      // 2) High-confidence inference (score-based matching)
+      // -----------------------------------------------------------------------
+      const remainingPlanned = plannedToDate.filter(p => !plannedIdsUsed.has(String(p.id)));
+      const remainingWorkouts = weekCompleted.filter((w: WorkoutRecord) => !workoutIdsUsed.has(w.id));
+
+      type Candidate = { workout: WorkoutRecord; score: number };
+      const plannedCandidates = remainingPlanned.map(p => {
+        const scored: Candidate[] = remainingWorkouts
+          .map(w => ({ workout: w, score: scorePlannedToWorkout(p, w) }))
+          .filter(c => Number.isFinite(c.score) && c.score > -Infinity)
+          .sort((a, b) => b.score - a.score);
+        const best = scored[0]?.score ?? -Infinity;
+        const second = scored[1]?.score ?? -Infinity;
+        return { planned: p, scored, best, margin: best - second };
+      });
+
+      // Greedy assign planned sessions with the most unambiguous best match first
+      plannedCandidates
+        .sort((a, b) => (b.margin - a.margin) || (b.best - a.best))
+        .forEach(item => {
+          const p = item.planned;
+          const pId = String(p.id);
+          if (plannedIdsUsed.has(pId)) return;
+
+          const best = item.scored.find(c => !workoutIdsUsed.has(c.workout.id));
+          if (!best) return;
+
+          // Confidence gates: require a high score and a margin over the next-best alternative
+          const MIN_SCORE = isOptionalPlanned(p) ? 70 : 78;
+          const MIN_MARGIN = 15;
+          if (best.score < MIN_SCORE) return;
+          if (item.margin < MIN_MARGIN) return;
+
+          plannedIdsUsed.add(pId);
+          workoutIdsUsed.add(best.workout.id);
+          matched_pairs.push({
+            planned_date: toLocalDay(p.date),
+            completed_date: toLocalDay(best.workout.date),
+            planned_id: pId,
+            workout_id: best.workout.id
+          });
+        });
+
+      // Persist high-confidence inferred links (including same-day) so users don't have to manually link
+      const persistedPairs = matched_pairs.filter(pair => {
+        const plannedRow = plannedToDate.find((p: any) => String(p.id) === pair.planned_id) as any;
+        const workoutRow = weekCompleted.find((w: WorkoutRecord) => w.id === pair.workout_id) as any;
+        if (!plannedRow || !workoutRow) return false;
+        // Only persist if neither side is already linked
+        const already = (plannedRow.completed_workout_id ?? null) === pair.workout_id || (workoutRow.planned_id ?? null) === pair.planned_id;
+        return !already;
+      });
+      for (const pair of persistedPairs) {
+        // Only persist when the pair was inferred (not hard-linked) AND looks unambiguous.
+        // We approximate by requiring the planned session still had no completed_workout_id.
+        const plannedRow = plannedToDate.find((p: any) => String(p.id) === pair.planned_id) as any;
+        if (!plannedRow || plannedRow.completed_workout_id) continue;
+        await inferAndPersistLink(pair.planned_id, pair.workout_id);
       }
 
       const sessionsMatchedToPlan = matched_pairs.length;
