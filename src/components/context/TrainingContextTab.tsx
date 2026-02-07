@@ -164,7 +164,7 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
       >
         <div className="flex flex-col">
           <span className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.40)' }}>
-            Updated from your last 7 days
+            {data?.acwr?.plan_context?.hasActivePlan ? 'Updated from this plan week (to date)' : 'Updated from your last 7 days'}
           </span>
           <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.92)' }}>
             Today
@@ -610,84 +610,6 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           )}
 
           {data.insights && data.insights.length > 0 && <SmartInsights insights={data.insights} />}
-
-          {/* On-plan progress (accounting) */}
-          {data.plan_progress && data.acwr?.plan_context?.hasActivePlan && (
-            <div className="instrument-card">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-white/60">On-plan progress</span>
-                <span className="text-xs text-white/40">
-                  {data.plan_progress.week_start} → {data.plan_progress.week_end}
-                </span>
-              </div>
-              <div className="mt-2 flex items-baseline justify-between gap-2">
-                <div className="text-sm text-white/80">
-                  {(() => {
-                    const status = data.week_review?.week_verdict?.headline
-                      ? (data.week_review.week_verdict.headline.includes('behind')
-                          ? 'behind'
-                          : data.week_review.week_verdict.headline.includes('trending hot')
-                            ? 'hot'
-                            : data.week_review.week_verdict.headline.includes('not matched')
-                              ? 'not_matched'
-                              : data.week_review.week_verdict.headline.includes('on track')
-                                ? 'on_track'
-                                : data.plan_progress.status)
-                      : data.plan_progress.status;
-                    if (status === 'behind') return <span className="text-amber-400 font-medium">Behind</span>;
-                    if (status === 'hot') return <span className="text-amber-400 font-medium">Execution hot</span>;
-                    if (status === 'not_matched') return <span className="text-white/70 font-medium">Not matched</span>;
-                    if (status === 'on_track') return <span className="text-green-400 font-medium">On track</span>;
-                    if (status === 'ahead') return <span className="text-blue-400 font-medium">Ahead</span>;
-                    return <span className="text-white/60 font-medium">Unknown</span>;
-                  })()}
-                  <span className="text-white/40 ml-2">
-                    {data.acwr.plan_context?.planName ? `${data.acwr.plan_context.planName}` : 'Active plan'}
-                    {data.acwr.plan_context?.weekIndex ? ` • Week ${data.acwr.plan_context.weekIndex}` : ''}
-                  </span>
-                </div>
-                {(() => {
-                  const pct = data.week_review?.workload_pct_of_planned_to_date ?? data.plan_progress.percent_of_planned_to_date;
-                  if (typeof pct !== 'number') return null;
-                  return (
-                    <div className="text-sm text-white/80">
-                      <span className="font-medium">{pct}%</span>
-                      <span className="text-white/40"> of planned workload so far (to-date)</span>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="mt-1 text-xs text-white/50 flex items-center justify-between">
-                <span>
-                  Sessions: {data.week_review
-                    ? `${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} matched (to-date)`
-                    : `${data.plan_progress.matched_planned_sessions_to_date}/${data.plan_progress.planned_sessions_to_date} matched (to-date)`}
-                </span>
-                <span>
-                  Match: {data.week_review
-                    ? `${Math.round((data.week_review.completed.match_coverage_pct || 0) * 100)}%`
-                    : `${Math.round((data.plan_progress.match_confidence || 0) * 100)}%`}
-                </span>
-              </div>
-              <div className="mt-1 text-xs text-white/50">
-                {data.week_review?.planned_to_date_workload != null && data.week_review?.completed_matched_workload != null
-                  ? <>Workload so far: {Math.round(data.week_review.completed_matched_workload)} matched / {Math.round(data.week_review.planned_to_date_workload)} planned to-date</>
-                  : <>Workload so far: {Math.round(data.plan_progress.completed_to_date_total)} completed / {Math.round(data.plan_progress.planned_to_date_total)} planned to-date</>}
-                {data.plan_progress.planned_week_total > 0 && data.plan_progress.planned_week_total !== data.plan_progress.planned_to_date_total && (
-                  <span className="text-white/40"> • {Math.round(data.plan_progress.planned_week_total)} planned (full week)</span>
-                )}
-              </div>
-              {data.week_review?.match_coverage_note ? (
-                <div className="mt-2 text-xs text-white/40 italic">
-                  {data.week_review.match_coverage_note}
-                </div>
-              ) : (data.plan_progress.match_confidence ?? 0) < 0.5 && (
-                <div className="mt-2 text-xs text-white/40 italic">
-                  Sessions not matched—your activities may be on different days than the planned sessions, or start workouts from your plan to link them.
-                </div>
-              )}
-            </div>
-          )}
 
           <TrainingLoadChart timeline={data.timeline} totalWorkload={data.sport_breakdown.total_workload} />
 

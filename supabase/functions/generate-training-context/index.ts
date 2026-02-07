@@ -1729,65 +1729,9 @@ Deno.serve(async (req) => {
         headline = 'Recovery week by design — keep it easy.';
       }
 
-      // Bullets: max 4, premium phrasing; always include completion, execution quality, optional carryover, load/ramp if relevant, response; one action implication in implication field
+      // Bullets: keep this screen physiology-focused. Calendar owns compliance/accounting.
+      // Only include bullets that help interpret training response (quality execution, trend, carryover, load).
       const bullets: string[] = [];
-      // Completion / linking line (commercial-grade: explicit + actionable; avoid ambiguous "not matched")
-      if (sessionsToDate >= 1) {
-        const isOptionalPlanned = (p: PlannedWorkoutRecord): boolean => {
-          const n = String(p?.name || '').toLowerCase();
-          const t = String(p?.type || '').toLowerCase();
-          // Heuristic: optional appears in name, or type token contains opt
-          return n.includes('optional') || /\bopt\b/.test(t) || t.includes('opt_') || t.includes('_opt');
-        };
-        const weekdayLabel = (dateISO: string): string => {
-          const d = new Date(toLocalDay(dateISO) + 'T12:00:00');
-          const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-          return names[d.getDay()] || '';
-        };
-
-        // Which planned sessions (to date) are still unconfirmed (no matched workout)
-        const plannedUnconfirmed = plannedToDate.filter(p => !plannedIdsUsed.has(String(p.id)));
-        const requiredPlanned = plannedToDate.filter(p => !isOptionalPlanned(p));
-        const optionalPlanned = plannedToDate.filter(p => isOptionalPlanned(p));
-        const requiredLinked = requiredPlanned.filter(p => plannedIdsUsed.has(String(p.id))).length;
-        const optionalLinked = optionalPlanned.filter(p => plannedIdsUsed.has(String(p.id))).length;
-
-        // Completed workouts that weren't matched to the plan (often extra/unplanned)
-        const extraCompleted = weekCompleted.filter((w: WorkoutRecord) => !matched_pairs.some(p => p.workout_id === w.id));
-
-        // Headline check-in
-        let line = `Plan check-in: ${requiredLinked}/${requiredPlanned.length} required sessions confirmed.`;
-        if (optionalPlanned.length > 0) {
-          line += ` Optional: ${optionalLinked}/${optionalPlanned.length} confirmed.`;
-        }
-
-        // Only assert "missed" when server says linking is complete enough to be trustworthy
-        if (sessionsMissed != null && sessionsMissed > 0) {
-          line += ` ${sessionsMissed} missed.`;
-        } else if (plannedUnconfirmed.length > 0) {
-          const plannedLabel = (p: PlannedWorkoutRecord): string => {
-            const label = `${weekdayLabel(p.date)} ${String(p.name || p.type || 'Session')}`.trim();
-            return isOptionalPlanned(p) ? `${label} (optional)` : label;
-          };
-          const preview = plannedUnconfirmed
-            .slice(0, 2)
-            .map(p => plannedLabel(p))
-            .join('; ');
-          line += ` Needs attention (${plannedUnconfirmed.length}): ${preview}${plannedUnconfirmed.length > 2 ? '…' : ''}.`;
-          line += ` Link a workout or mark as missed.`;
-        }
-
-        if (extraCompleted.length > 0) {
-          line += ` Extra workouts (${extraCompleted.length}) not in plan.`;
-        }
-
-        bullets.push(line);
-      } else if (sessionsCompletedTotal > 0) {
-        // No planned sessions in the window; don't talk about linking
-        bullets.push(`Completed ${sessionsCompletedTotal} workout${sessionsCompletedTotal === 1 ? '' : 's'} (no planned sessions in this window).`);
-      } else {
-        bullets.push('Week in progress; completion not finalized.');
-      }
       // Execution quality line (from audits)
       if (execution_quality_label === 'off_target') {
         const hot = key_session_audits.find(a => a.status === 'too_hard' && a.delta);
@@ -1836,23 +1780,15 @@ Deno.serve(async (req) => {
         }
       };
 
-      const missingRequired = pickUnconfirmedRequired();
-      const missingLabel = missingRequired ? String(missingRequired.name || missingRequired.type || 'a required session') : null;
-
       let implication: string | null = null;
       if (todayIsRestDay) {
-        // Don’t instruct “do the missing run today” on a rest day; instruct confirmation + restraint.
-        implication = missingLabel
-          ? `Action: Confirm ${missingLabel}. Keep today as rest; hold targets and don’t add volume.`
-          : 'Action: Keep today as rest; hold targets and don’t add volume.';
+        implication = 'Action: Keep today as rest; hold targets and don’t add volume.';
       } else if (nextQualityPlanned && execution_quality_label === 'off_target') {
         implication = 'Action: Keep the next key session inside the target band.';
       } else if (nextQualityPlanned && latestIsHot) {
         implication = 'Action: Protect the long run — keep the next quality day inside target.';
       } else if (trend === 'worsening') {
-        implication = missingLabel
-          ? `Action: Hold targets. Don’t extend reps. Skip optionals. Confirm ${missingLabel}.`
-          : 'Action: Hold targets. Don’t extend reps. Skip optionals.';
+        implication = 'Action: Hold targets. Don’t extend reps. Skip optionals.';
       } else if (nextQualityPlanned) {
         implication = 'Action: Next key session — stay inside the target band.';
       }
