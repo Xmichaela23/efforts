@@ -1471,33 +1471,44 @@ Deno.serve(async (req) => {
         else carryover_interpretation = 'Carryover is elevated; keep key work controlled.';
       }
 
-      // Headline priority: 1) Linking poor (< half linked), 2) Key session execution problem, 3) Response slipping, 4) Carryover high + fatigue, 5) Clean / on track
-      // Only lead with "incomplete" when linking is genuinely poor; otherwise lead with execution/response so the narrative says something useful
+      // Headline priority (commercial-grade): STATUS first (fatigue/response), then data integrity, then execution.
+      // Goal: the headline should reflect "state of the athlete", not compliance bookkeeping.
       const coverageToDatePct = sessionsToDate > 0 ? sessionsMatchedToPlan / sessionsToDate : 0;
       const linkingIncomplete = completed_unlinked > 0 && (sessionsToDate === 0 || coverageToDatePct < 0.5);
       const keySessionProblem = key_sessions_flags.some(s => s.status === 'too_fast' || s.status === 'too_easy' || s.status === 'slightly_off');
       const responseSlipping = ramp_flag === 'fast' && trend === 'worsening';
       const carryoverHighFatigue = (carryover_level === 'high' || carryover_level === 'moderate') && (aerobicTier === 'elevated' || structuralTier === 'elevated');
-      let headline = 'Week is tracking clean.';
-      if (linkingIncomplete) {
-        headline = 'Week review incomplete (sessions not linked to plan).';
-      } else if (keySessionProblem) {
-        if (execution_quality_label === 'off_target') headline = 'Key work is drifting off target.';
-        else headline = 'Key session execution needs attention.';
+      const fatigueBuilding =
+        trend === 'worsening' &&
+        (aerobicTier === 'elevated' || structuralTier === 'elevated' || ramp_flag === 'fast' || carryover_level === 'high' || carryover_level === 'moderate');
+      const overreached =
+        trend === 'worsening' &&
+        (aerobicTier === 'elevated' && structuralTier === 'elevated') &&
+        (execution_quality_label === 'off_target' || keySessionProblem);
+
+      let headline = 'On track — keep the rhythm.';
+      if (overreached) {
+        headline = 'Overreaching — absorb before adding.';
+      } else if (fatigueBuilding) {
+        headline = 'Fatigue building — absorb this week.';
       } else if (responseSlipping) {
         headline = 'Load is up; response is slipping.';
       } else if (carryoverHighFatigue) {
-        headline = 'Carryover from last week is showing; keep key work controlled.';
-      } else if (execution_quality_label === 'on_target' && trend === 'stable') {
-        headline = 'Week is tracking clean.';
+        headline = 'Carryover is showing — keep key work controlled.';
+      } else if (linkingIncomplete) {
+        headline = 'Week review incomplete — link sessions.';
       } else if (sessionsMissed != null && sessionsMissed > 0) {
-        headline = 'Week is behind plan.';
+        headline = 'Behind plan — protect the next key session.';
+      } else if (keySessionProblem) {
+        headline = execution_quality_label === 'off_target'
+          ? 'Key work drifting — tighten the cap.'
+          : 'Key session execution needs attention.';
       } else if (sessionsMoved > 0) {
-        headline = 'Week is on track (schedule adjusted).';
+        headline = 'On track (schedule adjusted).';
       } else if (ramp_flag === 'fast') {
-        headline = 'Ramp is running fast; keep next session controlled.';
+        headline = 'Ramp is fast — keep the next session controlled.';
       } else if (load_vs_baseline === 'lighter' && (planContext.isRecoveryWeek || planContext.weekIntent === 'recovery')) {
-        headline = 'This week is intentionally lighter.';
+        headline = 'Recovery week by design — keep it easy.';
       }
 
       // Bullets: max 4, premium phrasing; always include completion, execution quality, optional carryover, load/ramp if relevant, response; one action implication in implication field
@@ -1588,12 +1599,45 @@ Deno.serve(async (req) => {
         if (bullets.length > 4) bullets.splice(4);
       }
 
+      // One primary action (deterministic). This is what the user should do next.
+      // Keep it short. If there are unconfirmed required sessions, name the top priority.
+      const pickUnconfirmedRequired = (): PlannedWorkoutRecord | null => {
+        try {
+          const isOptionalPlanned = (p: PlannedWorkoutRecord): boolean => {
+            const n = String(p?.name || '').toLowerCase();
+            const t = String(p?.type || '').toLowerCase();
+            return n.includes('optional') || /\bopt\b/.test(t) || t.includes('opt_') || t.includes('_opt');
+          };
+          const isQuality = (p: PlannedWorkoutRecord): boolean => isQualityType(p.type, p.name);
+          const unconfirmed = plannedToDate.filter(p => !plannedIdsUsed.has(String(p.id)));
+          const required = unconfirmed.filter(p => !isOptionalPlanned(p));
+          // Prefer missing easy/non-quality first (low cost, high compliance value)
+          return required.find(p => !isQuality(p)) ?? required[0] ?? null;
+        } catch {
+          return null;
+        }
+      };
+
+      const missingRequired = pickUnconfirmedRequired();
+      const missingLabel = missingRequired ? String(missingRequired.name || missingRequired.type || 'a required session') : null;
+
       let implication: string | null = null;
-      if (nextQualityPlanned && execution_quality_label === 'off_target') implication = 'Next key session: keep inside target band.';
-      else if (nextQualityPlanned && latestIsHot) implication = 'Protect the long run: keep the next quality day inside target.';
-      else if (trend === 'worsening') implication = 'Absorb before adding: hold targets, don\'t extend reps.';
-      else if (todayIsRestDay) implication = 'Today is for absorption. Tomorrow is the first test.';
-      else if (nextQualityPlanned) implication = 'Next key session: stay inside target band.';
+      if (todayIsRestDay) {
+        // Don’t instruct “do the missing run today” on a rest day; instruct confirmation + restraint.
+        implication = missingLabel
+          ? `Action: Confirm ${missingLabel}. Keep today as rest; hold targets and don’t add volume.`
+          : 'Action: Keep today as rest; hold targets and don’t add volume.';
+      } else if (nextQualityPlanned && execution_quality_label === 'off_target') {
+        implication = 'Action: Keep the next key session inside the target band.';
+      } else if (nextQualityPlanned && latestIsHot) {
+        implication = 'Action: Protect the long run — keep the next quality day inside target.';
+      } else if (trend === 'worsening') {
+        implication = missingLabel
+          ? `Action: Hold targets. Don’t extend reps. Skip optionals. Confirm ${missingLabel}.`
+          : 'Action: Hold targets. Don’t extend reps. Skip optionals.';
+      } else if (nextQualityPlanned) {
+        implication = 'Action: Next key session — stay inside the target band.';
+      }
 
       // Today's role in the week (from planned workout for focus day — congruent with plan)
       type TodayRole = 'recover' | 'easy' | 'key' | 'optional' | 'rest';

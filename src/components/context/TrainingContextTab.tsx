@@ -197,13 +197,23 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           {data.week_narrative.plan_goal_line && (
             <p className="text-xs text-white/60">{data.week_narrative.plan_goal_line}</p>
           )}
-          {/* Decision-first (commercial-grade): one status + one action. Forensics moved to Details. */}
+          {/* Decision-first (commercial-grade): status → why → action. Forensics moved to Details. */}
           <p className="text-sm font-medium text-white/95">{data.week_narrative.synthesis.headline}</p>
-          {data.week_narrative.synthesis.implication && (
-            <p className="text-sm text-white/85">
-              {data.week_narrative.synthesis.implication}
+          {data.week_narrative.response?.trend_evidence && data.week_narrative.response.trend_evidence.length > 0 && (
+            <p className="text-sm text-white/75">
+              Why: {data.week_narrative.response.trend_evidence.slice(0, 2).map(e => `${e.label} ${e.value}`).join(' · ')}
             </p>
           )}
+          {data.week_narrative.synthesis.implication && (
+            <p className="text-sm text-white/85">{data.week_narrative.synthesis.implication}</p>
+          )}
+          {(() => {
+            const qualityLine = data.week_narrative?.synthesis?.bullets?.find(b =>
+              String(b || '').toLowerCase().startsWith('long run / intervals')
+            );
+            if (!qualityLine) return null;
+            return <p className="text-sm text-white/75">{qualityLine}</p>;
+          })()}
 
           <details className="pt-1 border-t border-white/10 text-sm text-white/80" open={false}>
             <summary className="cursor-pointer text-white/60">Details</summary>
