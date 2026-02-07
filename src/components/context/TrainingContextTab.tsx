@@ -199,11 +199,21 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           )}
           {/* Decision-first (commercial-grade): status → why → action. Forensics moved to Details. */}
           <p className="text-sm font-medium text-white/95">{data.week_narrative.synthesis.headline}</p>
-          {data.week_narrative.response?.trend_evidence && data.week_narrative.response.trend_evidence.length > 0 && (
-            <p className="text-sm text-white/75">
-              Why: {data.week_narrative.response.trend_evidence.slice(0, 2).map(e => `${e.label} ${e.value}`).join(' · ')}
-            </p>
-          )}
+          {(() => {
+            const explanation = data.week_narrative.response?.trend_explanation;
+            if (explanation) {
+              return <p className="text-sm text-white/75">Why: {explanation}</p>;
+            }
+            const ev = data.week_narrative.response?.trend_evidence;
+            if (ev && ev.length > 0) {
+              return (
+                <p className="text-sm text-white/75">
+                  Why: {ev.slice(0, 2).map(e => `${e.label} ${e.value}`).join(' · ')}
+                </p>
+              );
+            }
+            return null;
+          })()}
           {data.week_narrative.synthesis.implication && (
             <p className="text-sm text-white/85">{data.week_narrative.synthesis.implication}</p>
           )}

@@ -305,6 +305,11 @@ interface TrainingContextResponse {
         value: string;
         severity: 'info' | 'warning';
       }>;
+      /**
+       * LLM-translated explanation of the trend evidence (2-3 sentences).
+       * Must stay grounded in the provided evidence and plan context.
+       */
+      trend_explanation?: string;
     };
     carryover?: {
       level: 'low' | 'moderate' | 'high';
@@ -756,6 +761,88 @@ Deno.serve(async (req) => {
         (weekly_readiness as any).__trend_evidence = evidence;
       }
     }
+
+    // ==========================================================================
+    // TREND EXPLANATION (LLM translation only; metrics remain deterministic)
+    // ==========================================================================
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    const buildTrendExplanation = async (): Promise<string | null> => {
+      try {
+        if (!openaiKey) return null;
+        const evidence = ((weekly_readiness as any)?.__trend_evidence as any[]) ?? [];
+        if (!Array.isArray(evidence) || evidence.length === 0) return null;
+
+        const intent = planContext?.weekIntent ?? 'unknown';
+        const nextIntent = planContext?.next_week_intent ?? null;
+        const weeksRemaining = planContext?.weeks_remaining ?? null;
+        const weekFocus = planContext?.weekFocusLabel ?? null;
+        const weekIndex = planContext?.weekIndex ?? null;
+        const planName = planContext?.planName ?? null;
+
+        // Provide both absolute + delta where available to avoid confusing "0%"
+        const avgDrift = weekly_readiness?.hr_drift_bpm ?? null;
+        const avgPaceAdh = weekly_readiness?.pace_adherence_pct ?? null;
+
+        const prompt = [
+          `You are a running coach. Translate weekly training metrics into clear, human language.`,
+          `Constraints:`,
+          `- Use ONLY the facts provided. Do not invent numbers or symptoms.`,
+          `- Explain what each metric means in plain English (e.g., what does \"0% change\" imply).`,
+          `- Be concise: 2–3 sentences. No bullets.`,
+          ``,
+          `Plan context:`,
+          `- Plan: ${planName ?? 'unknown'}`,
+          `- Week: ${weekIndex ?? 'unknown'}`,
+          `- Phase: ${String(intent)}`,
+          `- Next week: ${String(nextIntent ?? 'unknown')}`,
+          `- Weeks to race/go: ${weeksRemaining ?? 'unknown'}`,
+          weekFocus ? `- Focus: ${weekFocus}` : null,
+          ``,
+          `Weekly readiness (averaged across recent runs):`,
+          `- Avg HR drift: ${avgDrift != null ? `${avgDrift} bpm` : 'unknown'}`,
+          `- Avg pace adherence: ${avgPaceAdh != null ? `${avgPaceAdh}%` : 'unknown'}`,
+          ``,
+          `Trend evidence (labels + values):`,
+          ...evidence.map(e => `- ${e.label}: ${e.value}`),
+          ``,
+          `Write a 2–3 sentence explanation of what this suggests about fatigue/adaptation, and whether it is expected for this phase.`,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            temperature: 0,
+            max_tokens: 140,
+            messages: [
+              { role: 'system', content: 'You are precise, grounded, and coach-like. No fluff.' },
+              { role: 'user', content: prompt },
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          const txt = await response.text().catch(() => '');
+          console.warn('⚠️ [TREND EXPLANATION] OpenAI non-OK:', response.status, txt?.slice?.(0, 200));
+          return null;
+        }
+
+        const json = await response.json();
+        const content = json?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string') return null;
+        const cleaned = content.trim().replace(/\s+/g, ' ');
+        return cleaned.length ? cleaned : null;
+      } catch (e) {
+        console.warn('⚠️ [TREND EXPLANATION] Failed:', e);
+        return null;
+      }
+    };
 
     // ==========================================================================
     // WEEKLY VERDICT (Goal Predictor — server-side; no client-side math)
@@ -1699,6 +1786,7 @@ Deno.serve(async (req) => {
         .filter((w: WorkoutRecord) => !matched_pairs.some(p => p.workout_id === w.id))
         .map((w: WorkoutRecord) => w.id);
 
+      const trend_explanation = await buildTrendExplanation();
       week_narrative = {
         week_index: planContext.weekIndex,
         week_day_index: weekDayIndex as 1 | 2 | 3 | 4 | 5 | 6 | 7,
@@ -1725,7 +1813,8 @@ Deno.serve(async (req) => {
           structural_tier: structuralTier,
           limiter,
           trend,
-          trend_evidence: ((weekly_readiness as any)?.__trend_evidence as any) ?? []
+          trend_evidence: ((weekly_readiness as any)?.__trend_evidence as any) ?? [],
+          trend_explanation: trend_explanation ?? undefined
         },
         carryover: dateRanges.previousWeekStartISO
           ? { level: carryover_level, pct_of_baseline: carryover_pct_of_baseline, interpretation: carryover_interpretation }

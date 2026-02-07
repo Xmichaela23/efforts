@@ -241,6 +241,7 @@ export interface TrainingContextData {
         value: string;
         severity: 'info' | 'warning';
       }>;
+      trend_explanation?: string;
     };
     carryover?: { level: 'low' | 'moderate' | 'high'; pct_of_baseline: number | null; interpretation?: string | null } | null;
     synthesis: { headline: string; bullets: string[]; implication: string | null };
