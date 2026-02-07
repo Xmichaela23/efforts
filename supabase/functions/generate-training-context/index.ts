@@ -296,6 +296,15 @@ interface TrainingContextResponse {
       structural_tier: 'low' | 'moderate' | 'elevated';
       limiter: 'aerobic' | 'structural' | 'none';
       trend: 'improving' | 'stable' | 'worsening' | 'unknown';
+      /**
+       * Evidence behind trend classification (auditable signals).
+       * This is intentionally small and specific; UI can show 1-line summary with expandable details.
+       */
+      trend_evidence?: Array<{
+        label: string;
+        value: string;
+        severity: 'info' | 'warning';
+      }>;
     };
     carryover?: {
       level: 'low' | 'moderate' | 'high';
@@ -609,6 +618,24 @@ Deno.serve(async (req) => {
       .lte('date', dateRanges.acuteEndISO)
       .order('date', { ascending: false });
     const avg_rir_acute = computeAvgRirAcute(acuteStrengthWorkouts || []);
+    // Previous-week RIR (for evidence: RIR compression = rising structural fatigue)
+    const addDaysISO = (iso: string, days: number): string => {
+      const d = new Date(iso + 'T12:00:00');
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+    const prevWeekStartISO = addDaysISO(dateRanges.acuteStartISO, -7);
+    const prevWeekEndISO = addDaysISO(dateRanges.acuteStartISO, -1);
+    const { data: prevStrengthWorkouts } = await supabase
+      .from('workouts')
+      .select('id, strength_exercises, computed')
+      .eq('user_id', user_id)
+      .eq('workout_status', 'completed')
+      .in('type', ['strength', 'strength_training'])
+      .gte('date', prevWeekStartISO)
+      .lte('date', prevWeekEndISO)
+      .order('date', { ascending: false });
+    const avg_rir_prev_week = computeAvgRirAcute(prevStrengthWorkouts || []);
 
     // ==========================================================================
     // WEEKLY READINESS (3-run window within acute 7 days = "Recent Form")
@@ -676,6 +703,41 @@ Deno.serve(async (req) => {
         readiness_source_start_date = firstDate !== lastDate ? firstDate : null;
         (weekly_readiness as any).recent_runs_count = points.length;
         (weekly_readiness as any).recent_form_trend = recent_form_trend;
+        // Add auditable evidence for the trend decision (kept small; UI can expand)
+        const evidence: Array<{ label: string; value: string; severity: 'info' | 'warning' }> = [];
+        if (points.length >= 2) {
+          const oldestFirst = [...points].reverse();
+          const first = oldestFirst[0];
+          const last = oldestFirst[oldestFirst.length - 1];
+          if (first.hr_drift_bpm != null && last.hr_drift_bpm != null) {
+            const delta = Math.round((last.hr_drift_bpm - first.hr_drift_bpm) * 10) / 10;
+            const sign = delta > 0 ? '+' : '';
+            evidence.push({
+              label: 'HR drift trend',
+              value: `${sign}${delta} bpm (oldest → latest)`,
+              severity: delta >= 2 ? 'warning' : 'info'
+            });
+          }
+          if (first.pace_adherence_pct != null && last.pace_adherence_pct != null) {
+            const delta = Math.round(last.pace_adherence_pct - first.pace_adherence_pct);
+            const sign = delta > 0 ? '+' : '';
+            evidence.push({
+              label: 'Pace adherence trend',
+              value: `${sign}${delta}% (oldest → latest)`,
+              severity: delta <= -10 ? 'warning' : 'info'
+            });
+          }
+        }
+        if (avg_rir_prev_week != null && avg_rir_acute != null) {
+          const delta = Math.round((avg_rir_acute - avg_rir_prev_week) * 10) / 10;
+          // Lower RIR = more fatigue; negative delta is a warning
+          evidence.push({
+            label: 'Strength RIR (avg)',
+            value: `${avg_rir_prev_week.toFixed(1)} → ${avg_rir_acute.toFixed(1)} (${delta > 0 ? '+' : ''}${delta.toFixed(1)})`,
+            severity: delta <= -0.8 ? 'warning' : 'info'
+          });
+        }
+        (weekly_readiness as any).__trend_evidence = evidence;
       }
     }
 
@@ -1585,7 +1647,8 @@ Deno.serve(async (req) => {
           aerobic_tier: aerobicTier,
           structural_tier: structuralTier,
           limiter,
-          trend
+          trend,
+          trend_evidence: ((weekly_readiness as any)?.__trend_evidence as any) ?? []
         },
         carryover: dateRanges.previousWeekStartISO
           ? { level: carryover_level, pct_of_baseline: carryover_pct_of_baseline, interpretation: carryover_interpretation }
