@@ -1474,9 +1474,13 @@ Deno.serve(async (req) => {
         if (sessionsMissed != null && sessionsMissed > 0) {
           line += ` ${sessionsMissed} missed.`;
         } else if (plannedUnconfirmed.length > 0) {
+          const plannedLabel = (p: PlannedWorkoutRecord): string => {
+            const label = `${weekdayLabel(p.date)} ${String(p.name || p.type || 'Session')}`.trim();
+            return isOptionalPlanned(p) ? `${label} (optional)` : label;
+          };
           const preview = plannedUnconfirmed
             .slice(0, 2)
-            .map(p => `${weekdayLabel(p.date)} ${formatSessionTitle(p)}`)
+            .map(p => plannedLabel(p))
             .join('; ');
           line += ` Needs attention (${plannedUnconfirmed.length}): ${preview}${plannedUnconfirmed.length > 2 ? '…' : ''}.`;
           line += ` Link a workout or mark as missed.`;
