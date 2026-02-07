@@ -197,38 +197,50 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
           {data.week_narrative.plan_goal_line && (
             <p className="text-xs text-white/60">{data.week_narrative.plan_goal_line}</p>
           )}
+          {/* Decision-first (commercial-grade): one status + one action. Forensics moved to Details. */}
           <p className="text-sm font-medium text-white/95">{data.week_narrative.synthesis.headline}</p>
-          <ul className="text-sm text-white/85 list-disc list-inside space-y-0.5">
-            {data.week_narrative.synthesis.bullets.map((b, i) => (
-              <li key={i}>{b}</li>
-            ))}
-          </ul>
-          {data.week_narrative.response?.trend_evidence && data.week_narrative.response.trend_evidence.length > 0 && (
-            <details className="pt-1 border-t border-white/10 text-sm text-white/80" open={false}>
-              <summary className="cursor-pointer text-white/60">
-                Why “trend: {data.week_narrative.response.trend}”
-              </summary>
-              <ul className="mt-1 text-sm text-white/80 list-disc list-inside space-y-0.5">
-                {data.week_narrative.response.trend_evidence.slice(0, 4).map((e, idx) => (
-                  <li key={idx} className={e.severity === 'warning' ? 'text-yellow-200/90' : ''}>
-                    {e.label}: {e.value}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {data.week_narrative.carryover && data.week_narrative.carryover.level !== 'low' && (
-            <p className="text-xs text-white/50">
-              Carryover (last week): {data.week_narrative.carryover.level}
-              {data.week_narrative.carryover.pct_of_baseline != null && ` — ${data.week_narrative.carryover.pct_of_baseline}% of baseline`}
-              {data.week_narrative.carryover.interpretation ? ` — ${data.week_narrative.carryover.interpretation}` : '.'}
-            </p>
-          )}
           {data.week_narrative.synthesis.implication && (
-            <p className="text-sm text-white/80 pt-1 border-t border-white/10">
+            <p className="text-sm text-white/85">
               {data.week_narrative.synthesis.implication}
             </p>
           )}
+
+          <details className="pt-1 border-t border-white/10 text-sm text-white/80" open={false}>
+            <summary className="cursor-pointer text-white/60">Details</summary>
+
+            {/* Bullets (forensics) */}
+            <ul className="mt-2 text-sm text-white/80 list-disc list-inside space-y-0.5">
+              {data.week_narrative.synthesis.bullets.map((b, i) => (
+                <li key={i}>{b}</li>
+              ))}
+            </ul>
+
+            {/* Trend evidence (auditable signals) */}
+            {data.week_narrative.response?.trend_evidence && data.week_narrative.response.trend_evidence.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs uppercase tracking-wider text-white/40">
+                  Why “trend: {data.week_narrative.response.trend}”
+                </p>
+                <ul className="mt-1 text-sm text-white/80 list-disc list-inside space-y-0.5">
+                  {data.week_narrative.response.trend_evidence.slice(0, 4).map((e, idx) => (
+                    <li key={idx} className={e.severity === 'warning' ? 'text-yellow-200/90' : ''}>
+                      {e.label}: {e.value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Carryover (only if moderate/high) */}
+            {data.week_narrative.carryover && data.week_narrative.carryover.level !== 'low' && (
+              <p className="text-xs text-white/50 mt-2">
+                Carryover (last week): {data.week_narrative.carryover.level}
+                {data.week_narrative.carryover.pct_of_baseline != null && ` — ${data.week_narrative.carryover.pct_of_baseline}% of baseline`}
+                {data.week_narrative.carryover.interpretation ? ` — ${data.week_narrative.carryover.interpretation}` : '.'}
+              </p>
+            )}
+          </details>
+
           {import.meta.env.DEV && data.week_narrative.debug_week_narrative && (
             <details className="mt-2 pt-2 border-t border-white/10 text-xs font-mono text-white/50" open={false}>
               <summary className="cursor-pointer text-white/40">debug_week_narrative</summary>
