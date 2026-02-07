@@ -719,17 +719,19 @@ Deno.serve(async (req) => {
             const sign = delta > 0 ? '+' : '';
             evidence.push({
               label: 'HR drift trend',
-              value: `${sign}${delta} bpm (oldest → latest)`,
+              value: `${first.hr_drift_bpm} → ${last.hr_drift_bpm} bpm (${sign}${delta} bpm)`,
               severity: delta >= 2 ? 'warning' : 'info'
             });
           }
           if (first.pace_adherence_pct != null && last.pace_adherence_pct != null) {
-            const delta = Math.round(last.pace_adherence_pct - first.pace_adherence_pct);
-            const sign = delta > 0 ? '+' : '';
+            const deltaPts = Math.round(last.pace_adherence_pct - first.pace_adherence_pct);
+            const sign = deltaPts > 0 ? '+' : '';
+            const suffix =
+              deltaPts === 0 ? 'held steady' : deltaPts > 0 ? 'improved' : 'down';
             evidence.push({
-              label: 'Pace adherence trend',
-              value: `${sign}${delta}% (oldest → latest)`,
-              severity: delta <= -10 ? 'warning' : 'info'
+              label: 'Pace adherence',
+              value: `${first.pace_adherence_pct}% → ${last.pace_adherence_pct}% (${sign}${deltaPts} pts, ${suffix})`,
+              severity: deltaPts <= -10 ? 'warning' : 'info'
             });
           }
         }
@@ -787,8 +789,9 @@ Deno.serve(async (req) => {
           `You are a running coach. Translate weekly training metrics into clear, human language.`,
           `Constraints:`,
           `- Use ONLY the facts provided. Do not invent numbers or symptoms.`,
-          `- Explain what each metric means in plain English (e.g., what does \"0% change\" imply).`,
-          `- Be concise: 2–3 sentences. No bullets.`,
+          `- Explain what each metric means in plain English. If a change is 0, say it held steady (not \"zero adherence\").`,
+          `- Be concise: exactly 2 sentences. No bullets.`,
+          `- Stay consistent: if pace held but HR cost rose, say \"pace held but cost increased\" (not a contradiction).`,
           ``,
           `Plan context:`,
           `- Plan: ${planName ?? 'unknown'}`,
@@ -797,6 +800,11 @@ Deno.serve(async (req) => {
           `- Next week: ${String(nextIntent ?? 'unknown')}`,
           `- Weeks to race/go: ${weeksRemaining ?? 'unknown'}`,
           weekFocus ? `- Focus: ${weekFocus}` : null,
+          ``,
+          `Metric meanings (do not contradict these):`,
+          `- HR drift: higher drift usually means more fatigue / heat / pacing cost at steady effort.`,
+          `- Pace adherence: closer to 100% means execution matched the prescribed pace ranges.`,
+          `- Strength RIR: lower RIR means less reserve (strength work feels harder).`,
           ``,
           `Weekly readiness (averaged across recent runs):`,
           `- Avg HR drift: ${avgDrift != null ? `${avgDrift} bpm` : 'unknown'}`,
@@ -819,7 +827,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             temperature: 0,
-            max_tokens: 140,
+            max_tokens: 90,
             messages: [
               { role: 'system', content: 'You are precise, grounded, and coach-like. No fluff.' },
               { role: 'user', content: prompt },
@@ -837,7 +845,10 @@ Deno.serve(async (req) => {
         const content = json?.choices?.[0]?.message?.content;
         if (typeof content !== 'string') return null;
         const cleaned = content.trim().replace(/\s+/g, ' ');
-        return cleaned.length ? cleaned : null;
+        // Enforce exactly 2 sentences in case the model ignores instructions
+        const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
+        const two = sentences.slice(0, 2).join(' ').trim();
+        return two.length ? two : null;
       } catch (e) {
         console.warn('⚠️ [TREND EXPLANATION] Failed:', e);
         return null;
