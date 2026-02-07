@@ -1440,20 +1440,52 @@ Deno.serve(async (req) => {
 
       // Bullets: max 4, premium phrasing; always include completion, execution quality, optional carryover, load/ramp if relevant, response; one action implication in implication field
       const bullets: string[] = [];
-      // Completion / linking line (avoid ambiguous "not yet linked")
+      // Completion / linking line (commercial-grade: explicit + actionable; avoid ambiguous "not matched")
       if (sessionsToDate >= 1) {
-        const plannedUnmatched = Math.max(0, sessionsToDate - sessionsMatchedToPlan);
-        let line = `Linked ${sessionsMatchedToPlan}/${sessionsToDate} planned sessions.`;
+        const isOptionalPlanned = (p: PlannedWorkoutRecord): boolean => {
+          const n = String(p?.name || '').toLowerCase();
+          const t = String(p?.type || '').toLowerCase();
+          // Heuristic: optional appears in name, or type token contains opt
+          return n.includes('optional') || /\bopt\b/.test(t) || t.includes('opt_') || t.includes('_opt');
+        };
+        const weekdayLabel = (dateISO: string): string => {
+          const d = new Date(toLocalDay(dateISO) + 'T12:00:00');
+          const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          return names[d.getDay()] || '';
+        };
+
+        // Which planned sessions (to date) are still unconfirmed (no matched workout)
+        const plannedUnconfirmed = plannedToDate.filter(p => !plannedIdsUsed.has(String(p.id)));
+        const requiredPlanned = plannedToDate.filter(p => !isOptionalPlanned(p));
+        const optionalPlanned = plannedToDate.filter(p => isOptionalPlanned(p));
+        const requiredLinked = requiredPlanned.filter(p => plannedIdsUsed.has(String(p.id))).length;
+        const optionalLinked = optionalPlanned.filter(p => plannedIdsUsed.has(String(p.id))).length;
+
+        // Completed workouts that weren't matched to the plan (often extra/unplanned)
+        const extraCompleted = weekCompleted.filter((w: WorkoutRecord) => !matched_pairs.some(p => p.workout_id === w.id));
+
+        // Headline check-in
+        let line = `Plan check-in: ${requiredLinked}/${requiredPlanned.length} required sessions confirmed.`;
+        if (optionalPlanned.length > 0) {
+          line += ` Optional: ${optionalLinked}/${optionalPlanned.length} confirmed.`;
+        }
+
         // Only assert "missed" when server says linking is complete enough to be trustworthy
         if (sessionsMissed != null && sessionsMissed > 0) {
-          line = `Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned; ${sessionsMissed} missed.`;
-        } else if (plannedUnmatched > 0) {
-          line += ` ${plannedUnmatched} planned session${plannedUnmatched === 1 ? '' : 's'} not matched yet (missed or unlinked).`;
+          line += ` ${sessionsMissed} missed.`;
+        } else if (plannedUnconfirmed.length > 0) {
+          const preview = plannedUnconfirmed
+            .slice(0, 2)
+            .map(p => `${weekdayLabel(p.date)} ${formatSessionTitle(p)}`)
+            .join('; ');
+          line += ` Needs attention (${plannedUnconfirmed.length}): ${preview}${plannedUnconfirmed.length > 2 ? '…' : ''}.`;
+          line += ` Link a workout or mark as missed.`;
         }
-        // Separately report completed workouts that weren't matched to the plan (often extra/unplanned)
-        if (completed_unlinked > 0) {
-          line += ` Also found ${completed_unlinked} completed workout${completed_unlinked === 1 ? '' : 's'} not matched to the plan.`;
+
+        if (extraCompleted.length > 0) {
+          line += ` Extra workouts (${extraCompleted.length}) not in plan.`;
         }
+
         bullets.push(line);
       } else if (sessionsCompletedTotal > 0) {
         // No planned sessions in the window; don't talk about linking
@@ -1475,8 +1507,8 @@ Deno.serve(async (req) => {
       // Carryover (only if moderate/high)
       if (carryover_interpretation) bullets.push(`Carryover (last week): ${carryover_level} — ${carryover_interpretation}`);
       // Load/ramp or response (cap total at 4; drop load first unless ramp fast, then response)
-      if (ramp_flag === 'fast') bullets.push(`Ramp: ${trend !== 'unknown' ? trend : 'elevated'} — no structural red flags yet.`);
-      else if (trend !== 'unknown') bullets.push(`Trend: ${trend} — ${trend === 'worsening' ? 'absorb before extending reps.' : trend === 'improving' ? 'response is absorbing.' : 'stable.'}`);
+      if (ramp_flag === 'fast') bullets.push(`Ramp: ${trend !== 'unknown' ? trend : 'elevated'} — load is rising quickly.`);
+      else if (trend !== 'unknown') bullets.push(`Trend: ${trend} — ${trend === 'worsening' ? 'fatigue signs rising; hold targets.' : trend === 'improving' ? 'absorbing well.' : 'stable.'}`);
       // Cap at 4 bullets: drop load line first (unless ramp fast), then response line
       if (bullets.length > 4) {
         if (ramp_flag !== 'fast') {
