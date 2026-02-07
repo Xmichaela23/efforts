@@ -502,227 +502,226 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
         );
       })()}
 
-      {/* Load Change Risk — premium scan path #4 */}
-      {data.acwr.data_days < 7 ? (
-        <div className="text-xs text-white/50 py-2 px-3">
-          Train for {7 - data.acwr.data_days} more day{7 - data.acwr.data_days !== 1 ? 's' : ''} to unlock load change risk.
-        </div>
-      ) : (
-        <div className="space-y-1">
-          <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
-            <span className="text-white/60">Load Change Risk</span>
-            <span className="flex items-center gap-2">
-              <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
-              <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
-                {loadChangeRiskLabel}
-              </span>
-            </span>
-          </div>
-          {data.display_load_change_risk_helper && (
-            <p className="text-xs text-white/50 px-3">{data.display_load_change_risk_helper}</p>
-          )}
-        </div>
-      )}
-
-      <div aria-hidden="true" className="instrument-divider" />
-
-      {/* Today's signals — always visible (not a dropdown) */}
       <div className="instrument-card">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-white/50" />
-          <span className="text-sm font-medium text-white">Today&apos;s signals</span>
-        </div>
-        <div className="space-y-3">
-          {/* Aerobic Load */}
-          <div>
-            <div className="flex items-center justify-between text-sm mb-0.5">
-              <div className="flex items-center gap-2 text-white/70">
-                <Activity className="w-3.5 h-3.5 text-teal-400/80" />
-                <span>Aerobic Load</span>
-              </div>
-              <span className={`font-medium ${aerobicTier === 'Low' ? 'text-green-400' : aerobicTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
-                {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
-              </span>
-            </div>
-            {aerobicTier !== 'Low' && (
-              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[aerobicTier]}</p>
-            )}
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-white/70">
+            <TrendingUp className="w-4 h-4 text-white/50" />
+            <span>Signals</span>
           </div>
-          {/* Structural Load */}
-          <div>
-            <div className="flex items-center justify-between text-sm mb-0.5">
-              <div className="flex items-center gap-2 text-white/70">
-                <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
-                <span>Structural Load</span>
-              </div>
-              <span className={`font-medium ${structuralTier === 'Low' ? 'text-green-400' : structuralTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
-                {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
-              </span>
-            </div>
-            {structuralTier !== 'Low' && (
-              <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[structuralTier]}</p>
-            )}
-          </div>
-          {/* Limiter */}
-          <p className="text-sm text-white/80 pt-1 border-t border-white/10">
-            Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
-          </p>
+          <span className="text-white/80">
+            Aerobic: {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} · Structural:{' '}
+            {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'}
+          </span>
         </div>
+        <p className="text-xs text-white/50 mt-1">
+          Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
+        </p>
       </div>
 
-      {/* Why (collapsed; instrumentation language) */}
+      {/* Everything else: charts + accounting + instrumentation */}
       <details className="instrument-card py-2 px-3" open={false}>
-        <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
-          <span className="text-white/60">Why</span>
-          <span className="text-white/40">Aerobic (recent run efficiency, HR drift, on-target execution). Structural (strength volume, avg RIR).</span>
-        </summary>
-        <div className="mt-2 pt-2 border-t border-white/10">
-          <p className="text-xs text-white/50">
-            <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, on-target execution.
-          </p>
-          <p className="text-xs text-white/50 mt-1">
-            <span className="text-white/70">Structural:</span> strength volume (7d), avg RIR (7d).
-          </p>
-        </div>
-      </details>
+        <summary className="text-sm text-white/70 cursor-pointer list-none">Details & charts</summary>
 
-      {/* Projected week load — only when no context_summary (summary already includes it) */}
-      {data.projected_week_load && !data.context_summary?.length && (
-        <div className="text-xs text-white/50 py-2 px-3">
-          {data.projected_week_load.message}
-        </div>
-      )}
-
-      {/* Other insights (optional) */}
-      {data.insights && data.insights.length > 0 && (
-        <SmartInsights insights={data.insights} />
-      )}
-
-      {/* On-plan progress — above 7-day training load */}
-      {data.plan_progress && data.acwr?.plan_context?.hasActivePlan && (
-        <div className="instrument-card">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-white/60">On-plan progress</span>
-            <span className="text-xs text-white/40">
-              {data.plan_progress.week_start} → {data.plan_progress.week_end}
-            </span>
-          </div>
-
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <div className="text-sm text-white/80">
-              {(() => {
-                const status = data.week_review?.week_verdict?.headline
-                  ? (data.week_review.week_verdict.headline.includes('behind')
-                      ? 'behind'
-                      : data.week_review.week_verdict.headline.includes('trending hot')
-                        ? 'hot'
-                        : data.week_review.week_verdict.headline.includes('not matched')
-                          ? 'not_matched'
-                          : data.week_review.week_verdict.headline.includes('on track')
-                            ? 'on_track'
-                            : data.plan_progress.status)
-                  : data.plan_progress.status;
-                if (status === 'behind') return <span className="text-amber-400 font-medium">Behind</span>;
-                if (status === 'hot') return <span className="text-amber-400 font-medium">Execution hot</span>;
-                if (status === 'not_matched') return <span className="text-white/70 font-medium">Not matched</span>;
-                if (status === 'on_track') return <span className="text-green-400 font-medium">On track</span>;
-                if (status === 'ahead') return <span className="text-blue-400 font-medium">Ahead</span>;
-                return <span className="text-white/60 font-medium">Unknown</span>;
-              })()}
-              <span className="text-white/40 ml-2">
-                {data.acwr.plan_context?.planName ? `${data.acwr.plan_context.planName}` : 'Active plan'}
-                {data.acwr.plan_context?.weekIndex ? ` • Week ${data.acwr.plan_context.weekIndex}` : ''}
-              </span>
+        <div className="mt-2 space-y-3">
+          {/* Load Change Risk */}
+          {data.acwr.data_days < 7 ? (
+            <div className="text-xs text-white/50 py-2 px-1">
+              Train for {7 - data.acwr.data_days} more day{7 - data.acwr.data_days !== 1 ? 's' : ''} to unlock load change risk.
             </div>
-
-            {(() => {
-              const pct = data.week_review?.workload_pct_of_planned_to_date ?? data.plan_progress.percent_of_planned_to_date;
-              if (typeof pct !== 'number') return null;
-              return (
-                <div className="text-sm text-white/80">
-                  <span className="font-medium">{pct}%</span>
-                  <span className="text-white/40"> of planned workload so far (to-date)</span>
-                </div>
-              );
-            })()}
-          </div>
-
-          <div className="mt-1 text-xs text-white/50 flex items-center justify-between">
-            <span>
-              Sessions: {data.week_review
-                ? `${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} matched (to-date)`
-                : `${data.plan_progress.matched_planned_sessions_to_date}/${data.plan_progress.planned_sessions_to_date} matched (to-date)`}
-            </span>
-            <span>
-              Match: {data.week_review
-                ? `${Math.round((data.week_review.completed.match_coverage_pct || 0) * 100)}%`
-                : `${Math.round((data.plan_progress.match_confidence || 0) * 100)}%`}
-            </span>
-          </div>
-
-          <div className="mt-1 text-xs text-white/50">
-            {data.week_review?.planned_to_date_workload != null && data.week_review?.completed_matched_workload != null
-              ? <>Workload so far: {Math.round(data.week_review.completed_matched_workload)} matched / {Math.round(data.week_review.planned_to_date_workload)} planned to-date</>
-              : <>Workload so far: {Math.round(data.plan_progress.completed_to_date_total)} completed / {Math.round(data.plan_progress.planned_to_date_total)} planned to-date</>}
-            {data.plan_progress.planned_week_total > 0 && data.plan_progress.planned_week_total !== data.plan_progress.planned_to_date_total && (
-              <span className="text-white/40"> • {Math.round(data.plan_progress.planned_week_total)} planned (full week)</span>
-            )}
-          </div>
-
-          {data.week_review?.match_coverage_note ? (
-            <div className="mt-2 text-xs text-white/40 italic">
-              {data.week_review.match_coverage_note}
-            </div>
-          ) : (data.plan_progress.match_confidence ?? 0) < 0.5 && (
-            <div className="mt-2 text-xs text-white/40 italic">
-              Sessions not matched—your activities may be on different days than the planned sessions, or start workouts from your plan to link them. The % above compares completed workload so far to planned workload for the same period (same units).
+          ) : (
+            <div className="space-y-1">
+              <div className={`flex items-center justify-between text-sm py-2 px-3 rounded-lg border border-white/10 ${data.acwr.ratio > 1.3 ? 'bg-amber-500/10 border-amber-400/30' : 'bg-white/[0.03]'}`}>
+                <span className="text-white/60">Load Change Risk</span>
+                <span className="flex items-center gap-2">
+                  <span className="font-mono text-white/80">{data.acwr.ratio.toFixed(2)}</span>
+                  <span className={`font-medium ${data.acwr.ratio > 1.5 ? 'text-red-400' : data.acwr.ratio > 1.3 ? 'text-amber-400' : 'text-white/80'}`}>
+                    {loadChangeRiskLabel}
+                  </span>
+                </span>
+              </div>
+              {data.display_load_change_risk_helper && (
+                <p className="text-xs text-white/50 px-3">{data.display_load_change_risk_helper}</p>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* 7-day Training Load Chart */}
-      <TrainingLoadChart 
-        timeline={data.timeline} 
-        totalWorkload={data.sport_breakdown.total_workload} 
-      />
-
-      {/* Week Comparison */}
-      {data.week_comparison && (
-        <div className="instrument-card">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-white/60">Week-over-Week</span>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-medium ${
-                data.week_comparison.change_direction === 'increase' 
-                  ? 'text-green-400' 
-                  : data.week_comparison.change_direction === 'decrease'
-                    ? 'text-red-400'
-                    : 'text-white/60'
-              }`}>
-                {data.week_comparison.change_direction === 'increase' && '+'}
-                {data.week_comparison.change_direction === 'decrease' && '-'}
-                {Math.abs(data.week_comparison.change_percent)}%
-              </span>
-              <span className="text-xs text-white/40">
-                ({Math.round(data.week_comparison.previous_week_total)} → {Math.round(data.week_comparison.current_week_total)})
-              </span>
+          {/* Today's signals (full) */}
+          <div className="instrument-card">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-white/50" />
+              <span className="text-sm font-medium text-white">Today&apos;s signals</span>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between text-sm mb-0.5">
+                  <div className="flex items-center gap-2 text-white/70">
+                    <Activity className="w-3.5 h-3.5 text-teal-400/80" />
+                    <span>Aerobic Load</span>
+                  </div>
+                  <span className={`font-medium ${aerobicTier === 'Low' ? 'text-green-400' : aerobicTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
+                    {aerobicTier === 'Low' ? 'Low' : aerobicTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
+                  </span>
+                </div>
+                {aerobicTier !== 'Low' && (
+                  <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[aerobicTier]}</p>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm mb-0.5">
+                  <div className="flex items-center gap-2 text-white/70">
+                    <Dumbbell className="w-3.5 h-3.5 text-orange-400/80" />
+                    <span>Structural Load</span>
+                  </div>
+                  <span className={`font-medium ${structuralTier === 'Low' ? 'text-green-400' : structuralTier === 'Elevated' ? 'text-amber-400' : 'text-white/80'}`}>
+                    {structuralTier === 'Low' ? 'Low' : structuralTier === 'Moderate' ? 'Moderate' : 'Elevated'} fatigue
+                  </span>
+                </div>
+                {structuralTier !== 'Low' && (
+                  <p className="text-xs text-white/50 mt-0.5 pl-5">{fatigueTierCopy[structuralTier]}</p>
+                )}
+              </div>
+              <p className="text-sm text-white/80 pt-1 border-t border-white/10">
+                Limiter: {data.display_limiter_label ?? (limiterLine === 'No clear limiter.' ? 'None' : limiterLine.replace('Today is limited by ', '').replace('.', ''))}
+              </p>
             </div>
           </div>
+
+          {/* Why (collapsed) */}
+          <details className="instrument-card py-2 px-3" open={false}>
+            <summary className="text-xs text-white/50 cursor-pointer list-none flex items-center gap-1">
+              <span className="text-white/60">Why</span>
+              <span className="text-white/40">Aerobic (recent run efficiency, HR drift, on-target execution). Structural (strength volume, avg RIR).</span>
+            </summary>
+            <div className="mt-2 pt-2 border-t border-white/10">
+              <p className="text-xs text-white/50">
+                <span className="text-white/70">Aerobic:</span> recent run efficiency, HR drift, on-target execution.
+              </p>
+              <p className="text-xs text-white/50 mt-1">
+                <span className="text-white/70">Structural:</span> strength volume (7d), avg RIR (7d).
+              </p>
+            </div>
+          </details>
+
+          {/* Projected week load */}
+          {data.projected_week_load && !data.context_summary?.length && (
+            <div className="text-xs text-white/50 py-2 px-1">
+              {data.projected_week_load.message}
+            </div>
+          )}
+
+          {data.insights && data.insights.length > 0 && <SmartInsights insights={data.insights} />}
+
+          {/* On-plan progress (accounting) */}
+          {data.plan_progress && data.acwr?.plan_context?.hasActivePlan && (
+            <div className="instrument-card">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-white/60">On-plan progress</span>
+                <span className="text-xs text-white/40">
+                  {data.plan_progress.week_start} → {data.plan_progress.week_end}
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between gap-2">
+                <div className="text-sm text-white/80">
+                  {(() => {
+                    const status = data.week_review?.week_verdict?.headline
+                      ? (data.week_review.week_verdict.headline.includes('behind')
+                          ? 'behind'
+                          : data.week_review.week_verdict.headline.includes('trending hot')
+                            ? 'hot'
+                            : data.week_review.week_verdict.headline.includes('not matched')
+                              ? 'not_matched'
+                              : data.week_review.week_verdict.headline.includes('on track')
+                                ? 'on_track'
+                                : data.plan_progress.status)
+                      : data.plan_progress.status;
+                    if (status === 'behind') return <span className="text-amber-400 font-medium">Behind</span>;
+                    if (status === 'hot') return <span className="text-amber-400 font-medium">Execution hot</span>;
+                    if (status === 'not_matched') return <span className="text-white/70 font-medium">Not matched</span>;
+                    if (status === 'on_track') return <span className="text-green-400 font-medium">On track</span>;
+                    if (status === 'ahead') return <span className="text-blue-400 font-medium">Ahead</span>;
+                    return <span className="text-white/60 font-medium">Unknown</span>;
+                  })()}
+                  <span className="text-white/40 ml-2">
+                    {data.acwr.plan_context?.planName ? `${data.acwr.plan_context.planName}` : 'Active plan'}
+                    {data.acwr.plan_context?.weekIndex ? ` • Week ${data.acwr.plan_context.weekIndex}` : ''}
+                  </span>
+                </div>
+                {(() => {
+                  const pct = data.week_review?.workload_pct_of_planned_to_date ?? data.plan_progress.percent_of_planned_to_date;
+                  if (typeof pct !== 'number') return null;
+                  return (
+                    <div className="text-sm text-white/80">
+                      <span className="font-medium">{pct}%</span>
+                      <span className="text-white/40"> of planned workload so far (to-date)</span>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="mt-1 text-xs text-white/50 flex items-center justify-between">
+                <span>
+                  Sessions: {data.week_review
+                    ? `${data.week_review.completed.sessions_matched_to_plan}/${data.week_review.planned.sessions_to_date} matched (to-date)`
+                    : `${data.plan_progress.matched_planned_sessions_to_date}/${data.plan_progress.planned_sessions_to_date} matched (to-date)`}
+                </span>
+                <span>
+                  Match: {data.week_review
+                    ? `${Math.round((data.week_review.completed.match_coverage_pct || 0) * 100)}%`
+                    : `${Math.round((data.plan_progress.match_confidence || 0) * 100)}%`}
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-white/50">
+                {data.week_review?.planned_to_date_workload != null && data.week_review?.completed_matched_workload != null
+                  ? <>Workload so far: {Math.round(data.week_review.completed_matched_workload)} matched / {Math.round(data.week_review.planned_to_date_workload)} planned to-date</>
+                  : <>Workload so far: {Math.round(data.plan_progress.completed_to_date_total)} completed / {Math.round(data.plan_progress.planned_to_date_total)} planned to-date</>}
+                {data.plan_progress.planned_week_total > 0 && data.plan_progress.planned_week_total !== data.plan_progress.planned_to_date_total && (
+                  <span className="text-white/40"> • {Math.round(data.plan_progress.planned_week_total)} planned (full week)</span>
+                )}
+              </div>
+              {data.week_review?.match_coverage_note ? (
+                <div className="mt-2 text-xs text-white/40 italic">
+                  {data.week_review.match_coverage_note}
+                </div>
+              ) : (data.plan_progress.match_confidence ?? 0) < 0.5 && (
+                <div className="mt-2 text-xs text-white/40 italic">
+                  Sessions not matched—your activities may be on different days than the planned sessions, or start workouts from your plan to link them.
+                </div>
+              )}
+            </div>
+          )}
+
+          <TrainingLoadChart timeline={data.timeline} totalWorkload={data.sport_breakdown.total_workload} />
+
+          {data.week_comparison && (
+            <div className="instrument-card">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-white/60">Week-over-Week</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${
+                    data.week_comparison.change_direction === 'increase'
+                      ? 'text-green-400'
+                      : data.week_comparison.change_direction === 'decrease'
+                        ? 'text-red-400'
+                        : 'text-white/60'
+                  }`}>
+                    {data.week_comparison.change_direction === 'increase' && '+'}
+                    {data.week_comparison.change_direction === 'decrease' && '-'}
+                    {Math.abs(data.week_comparison.change_percent)}%
+                  </span>
+                  <span className="text-xs text-white/40">
+                    ({Math.round(data.week_comparison.previous_week_total)} → {Math.round(data.week_comparison.current_week_total)})
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <SportBreakdown breakdown={data.sport_breakdown} />
+
+          <div aria-hidden="true" className="instrument-divider" />
+
+          <ActivityTimeline timeline={data.timeline} focusDate={focusDate} onSelectWorkout={onSelectWorkout} />
         </div>
-      )}
-
-      {/* Sport Breakdown */}
-      <SportBreakdown breakdown={data.sport_breakdown} />
-
-      <div aria-hidden="true" className="instrument-divider" />
-
-      {/* Activity Timeline */}
-      <ActivityTimeline 
-        timeline={data.timeline} 
-        focusDate={focusDate} 
-        onSelectWorkout={onSelectWorkout}
-      />
+      </details>
     </div>
   );
 };
