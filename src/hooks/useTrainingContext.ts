@@ -236,6 +236,11 @@ export interface TrainingContextData {
       structural_tier: 'low' | 'moderate' | 'elevated';
       limiter: 'aerobic' | 'structural' | 'none';
       trend: 'improving' | 'stable' | 'worsening' | 'unknown';
+      trend_evidence?: Array<{
+        label: string;
+        value: string;
+        severity: 'info' | 'warning';
+      }>;
     };
     carryover?: { level: 'low' | 'moderate' | 'high'; pct_of_baseline: number | null; interpretation?: string | null } | null;
     synthesis: { headline: string; bullets: string[]; implication: string | null };

@@ -203,6 +203,20 @@ export const TrainingContextTab: React.FC<TrainingContextTabProps> = ({ date, on
               <li key={i}>{b}</li>
             ))}
           </ul>
+          {data.week_narrative.response?.trend_evidence && data.week_narrative.response.trend_evidence.length > 0 && (
+            <details className="pt-1 border-t border-white/10 text-sm text-white/80" open={false}>
+              <summary className="cursor-pointer text-white/60">
+                Why “trend: {data.week_narrative.response.trend}”
+              </summary>
+              <ul className="mt-1 text-sm text-white/80 list-disc list-inside space-y-0.5">
+                {data.week_narrative.response.trend_evidence.slice(0, 4).map((e, idx) => (
+                  <li key={idx} className={e.severity === 'warning' ? 'text-yellow-200/90' : ''}>
+                    {e.label}: {e.value}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {data.week_narrative.carryover && data.week_narrative.carryover.level !== 'low' && (
             <p className="text-xs text-white/50">
               Carryover (last week): {data.week_narrative.carryover.level}
