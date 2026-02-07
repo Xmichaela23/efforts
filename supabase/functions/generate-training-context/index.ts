@@ -1440,15 +1440,26 @@ Deno.serve(async (req) => {
 
       // Bullets: max 4, premium phrasing; always include completion, execution quality, optional carryover, load/ramp if relevant, response; one action implication in implication field
       const bullets: string[] = [];
-      // Completion line (never show "missed" unless server says missed is set)
-      if (sessionsMissed != null && sessionsMissed > 0) {
-        bullets.push(`Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned; ${sessionsMissed} missed.`);
-      } else if (completed_unlinked > 0 && sessionsToDate >= 1) {
-        bullets.push(`${sessionsMatchedToPlan}/${sessionsToDate} sessions linked${completed_unlinked > 0 ? `; ${completed_unlinked} not yet linked` : ''}.`);
-      } else if (sessionsToDate < 3) {
-        bullets.push('Week in progress; completion not finalized.');
+      // Completion / linking line (avoid ambiguous "not yet linked")
+      if (sessionsToDate >= 1) {
+        const plannedUnmatched = Math.max(0, sessionsToDate - sessionsMatchedToPlan);
+        let line = `Linked ${sessionsMatchedToPlan}/${sessionsToDate} planned sessions.`;
+        // Only assert "missed" when server says linking is complete enough to be trustworthy
+        if (sessionsMissed != null && sessionsMissed > 0) {
+          line = `Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned; ${sessionsMissed} missed.`;
+        } else if (plannedUnmatched > 0) {
+          line += ` ${plannedUnmatched} planned session${plannedUnmatched === 1 ? '' : 's'} not matched yet (missed or unlinked).`;
+        }
+        // Separately report completed workouts that weren't matched to the plan (often extra/unplanned)
+        if (completed_unlinked > 0) {
+          line += ` Also found ${completed_unlinked} completed workout${completed_unlinked === 1 ? '' : 's'} not matched to the plan.`;
+        }
+        bullets.push(line);
+      } else if (sessionsCompletedTotal > 0) {
+        // No planned sessions in the window; don't talk about linking
+        bullets.push(`Completed ${sessionsCompletedTotal} workout${sessionsCompletedTotal === 1 ? '' : 's'} (no planned sessions in this window).`);
       } else {
-        bullets.push(`Completed ${sessionsMatchedToPlan}/${sessionsToDate} planned sessions to date.`);
+        bullets.push('Week in progress; completion not finalized.');
       }
       // Execution quality line (from audits)
       if (execution_quality_label === 'off_target') {
