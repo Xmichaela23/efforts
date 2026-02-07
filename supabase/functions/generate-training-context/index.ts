@@ -737,6 +737,22 @@ Deno.serve(async (req) => {
             severity: delta <= -0.8 ? 'warning' : 'info'
           });
         }
+        // Periodization context: make it explicit when fatigue is expected at block edges
+        try {
+          const intent = planContext?.weekIntent;
+          const nextIntent = planContext?.next_week_intent;
+          const endOfBuildBlock =
+            (intent === 'build' || intent === 'peak' || intent === 'baseline') && nextIntent === 'recovery';
+          if (endOfBuildBlock) {
+            evidence.push({
+              label: 'Block timing',
+              value: 'end of build (recovery next week)',
+              severity: 'info'
+            });
+          }
+        } catch {
+          // ignore evidence enrichment failures
+        }
         (weekly_readiness as any).__trend_evidence = evidence;
       }
     }
@@ -1478,6 +1494,14 @@ Deno.serve(async (req) => {
       const keySessionProblem = key_sessions_flags.some(s => s.status === 'too_fast' || s.status === 'too_easy' || s.status === 'slightly_off');
       const responseSlipping = ramp_flag === 'fast' && trend === 'worsening';
       const carryoverHighFatigue = (carryover_level === 'high' || carryover_level === 'moderate') && (aerobicTier === 'elevated' || structuralTier === 'elevated');
+      const intent = planContext?.weekIntent ?? 'unknown';
+      const nextIntent = planContext?.next_week_intent ?? null;
+      const endOfBuildBlock =
+        (intent === 'build' || intent === 'peak' || intent === 'baseline') && nextIntent === 'recovery';
+      const evidenceWarnings =
+        Array.isArray((weekly_readiness as any)?.__trend_evidence)
+          ? ((weekly_readiness as any).__trend_evidence as Array<{ severity?: string }>).filter(e => e?.severity === 'warning').length
+          : 0;
       const fatigueBuilding =
         trend === 'worsening' &&
         (aerobicTier === 'elevated' || structuralTier === 'elevated' || ramp_flag === 'fast' || carryover_level === 'high' || carryover_level === 'moderate');
@@ -1489,8 +1513,17 @@ Deno.serve(async (req) => {
       let headline = 'On track — keep the rhythm.';
       if (overreached) {
         headline = 'Overreaching — absorb before adding.';
+      } else if (endOfBuildBlock && trend === 'worsening') {
+        // Science: functional fatigue is expected at the end of a build block. Use consolidating language.
+        headline = evidenceWarnings > 0
+          ? 'End of build block — fatigue is showing. Consolidate this week.'
+          : 'End of build block — consolidate this week.';
       } else if (fatigueBuilding) {
-        headline = 'Fatigue building — absorb this week.';
+        // Build weeks tolerate more fatigue; recovery/taper treat it as higher priority.
+        headline =
+          intent === 'build' || intent === 'peak' || intent === 'baseline'
+            ? 'Build fatigue rising — consolidate (hold targets).'
+            : 'Fatigue building — absorb this week.';
       } else if (responseSlipping) {
         headline = 'Load is up; response is slipping.';
       } else if (carryoverHighFatigue) {
