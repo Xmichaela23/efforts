@@ -391,6 +391,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [sourcePlannedName, setSourcePlannedName] = useState<string>('');
   const [sourcePlannedId, setSourcePlannedId] = useState<string | null>(null);
   const [sourcePlannedDate, setSourcePlannedDate] = useState<string | null>(null);
+  // Performed date (calendar day the workout should be marked completed on).
+  // IMPORTANT: selecting a planned workout should set linkage (planned_id) but must NOT force the performed date.
+  const [performedDate, setPerformedDate] = useState<string>(
+    targetDate || scheduledWorkout?.date || new Date().toLocaleDateString('en-CA')
+  );
   const [lockManualPrefill, setLockManualPrefill] = useState<boolean>(false);
   type AddonStep = { move: string; time_sec: number };
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
@@ -461,6 +466,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     keypadSecondaryHandlerRef.current = opts.onSecondary;
     setKeypadOpen(true);
   };
+
+  // Keep performed date in sync with external targetDate changes (e.g., user tapped a different calendar day).
+  useEffect(() => {
+    try {
+      const next = targetDate || scheduledWorkout?.date || new Date().toLocaleDateString('en-CA');
+      if (next) setPerformedDate((prev) => (prev === next ? prev : next));
+    } catch {}
+  }, [targetDate, scheduledWorkout?.date]);
 
   const commitKeypad = (rawOverride?: string) => {
     const ctx = keypadCtxRef.current;
@@ -701,7 +714,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
   
-  // Session persistence key based on target date - use consistent date format
+  // Session persistence key based on performed date (so logging on a different day keeps the right draft)
   const getStrengthLoggerDateString = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -710,7 +723,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return `${year}-${month}-${day}`;
   };
   
-  const sessionKey = `strength_logger_session_${targetDate || getStrengthLoggerDateString()}`;
+  const sessionKey = `strength_logger_session_${performedDate || targetDate || getStrengthLoggerDateString()}`;
   
   // Save session progress to localStorage
   const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
@@ -2448,12 +2461,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     console.log('✅ Validation passed - proceeding with save');
     console.log('✅ Valid exercises:', validExercises);
 
-    // Save to selected date when provided; otherwise fall back to scheduled or today
-    const workoutDate = (targetDate || scheduledWorkout?.date || getStrengthLoggerDateString());
+    // Save to performed date (user-chosen); planned selection should not override this.
+    const workoutDate = (performedDate || targetDate || scheduledWorkout?.date || getStrengthLoggerDateString());
     
     // 🔍 DEBUG: Log the exact date being used
     console.log('🔍 DEBUG - Date details:');
     console.log('  - getStrengthLoggerDateString():', getStrengthLoggerDateString());
+    console.log('  - performedDate:', performedDate);
+    console.log('  - targetDate prop:', targetDate);
     console.log('  - scheduledWorkout?.date:', scheduledWorkout?.date);
     console.log('  - Final workoutDate:', workoutDate);
     console.log('  - Current local time:', new Date().toString());
@@ -2748,6 +2763,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             })()}
           </h1>
           <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={performedDate || ''}
+              onChange={(e) => setPerformedDate(e.target.value)}
+              className="h-8 px-2 py-1 text-xs text-white/90 bg-white/[0.08] border-2 border-white/20 rounded-full hover:bg-white/[0.12] hover:border-white/30 focus:bg-white/[0.12] focus:border-white/35 transition-all duration-300"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            />
             <div className="relative">
               <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" style={{ fontFamily: 'Inter, sans-serif' }}>Pick planned</button>
               {showPlannedMenu && (

@@ -133,7 +133,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         setSelectedWorkout(null);
         // Mutual exclusion handled by single logger state
         setLoggerScheduledWorkout(planned);
-        if (planned?.date) setSelectedDate(String(planned.date));
+        // Do NOT override selectedDate here.
+        // selectedDate represents the performed/logged day; planned.date is the scheduled day (used for linkage/prefill).
         setShowStrengthLogger(true);
       } catch {}
     };
@@ -232,7 +233,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         });
         const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
         setLoggerScheduledWorkout(plannedForStrength);
-        if (planned?.date) setSelectedDate(String(planned.date));
+        // Do NOT override selectedDate; keep performed/logged day stable.
         setShowStrengthLogger(true);
       } catch {}
     };
@@ -248,7 +249,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         setShowAllPlans(false);
         setSelectedWorkout(null);
         setLoggerScheduledWorkout(planned);
-        if (planned?.date) setSelectedDate(String(planned.date));
+        // Do NOT override selectedDate; keep performed/logged day stable.
         setShowPilatesYogaLogger(true);
       } catch {}
     };
@@ -1492,7 +1493,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setActiveTab('summary');
                   setLoggerScheduledWorkout(null);
                 }}
-                targetDate={(loggerScheduledWorkout as any)?.date || selectedDate}
+                // IMPORTANT: selected planned workout controls linkage (planned_id),
+                // but the performed date should come from the user's selected calendar date.
+                targetDate={selectedDate}
               />
             </div>
           ) : showPilatesYogaLogger ? (
@@ -1506,7 +1509,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setActiveTab('summary');
                   setLoggerScheduledWorkout(null);
                 }}
-                targetDate={(loggerScheduledWorkout as any)?.date || selectedDate}
+                // Same rule as StrengthLogger: planned selection should not override performed date.
+                targetDate={selectedDate}
               />
             </div>
           ) : showContext ? (
