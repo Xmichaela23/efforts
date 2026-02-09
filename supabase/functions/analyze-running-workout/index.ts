@@ -1232,10 +1232,31 @@ Deno.serve(async (req) => {
         'Slower than prescribed — could be fatigue or pacing.',
         'Well off pace, though conditions were challenging.',
         'Slightly slower than prescribed, and conditions were a factor.',
-        'Slightly slower than prescribed.'
+        'Slightly slower than prescribed.',
       ];
       
       let correctedNarrative = currentNarrative;
+
+      const replacePaceSentence = (narrative: string, replacement: string): string => {
+        // Replace the steady-state "slower than target range" sentence(s) without depending on exact temperature text.
+        // Examples:
+        // - "Pace was slower than the target range, but warm conditions (74°F) increased the effort cost. HR suggests you still achieved the aerobic stimulus."
+        // - "Pace was slower than the target range, but HR response confirms the aerobic stimulus was achieved."
+        const patterns: RegExp[] = [
+          /Pace was slower than the target range,[\s\S]*?aerobic stimulus\./,
+          /Pace was slower than the target range,[\s\S]*?stimulus was achieved\./,
+          /Pace was slower than the target range\.[\s\S]*?aerobic stimulus\./,
+          /Pace was slower than the target range\.[\s\S]*?stimulus was achieved\./,
+        ];
+        let out = narrative;
+        for (const re of patterns) {
+          if (re.test(out)) {
+            out = out.replace(re, replacement);
+            break;
+          }
+        }
+        return out;
+      };
       
       if (paceAdherencePct >= 95) {
         // Should say "on target" or "hit targets despite conditions"
@@ -1246,6 +1267,12 @@ Deno.serve(async (req) => {
             break;
           }
         }
+        if (correctedNarrative === currentNarrative && currentNarrative.includes('Pace was slower than the target range')) {
+          correctedNarrative = replacePaceSentence(currentNarrative, 'Pace was on target.');
+          if (correctedNarrative !== currentNarrative) {
+            console.log(`🔧 [NARRATIVE FIX] Corrected target-range pace assessment → "Pace was on target." (pace_adherence=${paceAdherencePct}%)`);
+          }
+        }
       } else if (paceAdherencePct >= 85 && paceAdherencePct < 95) {
         // Should say "slightly slower"
         const verySlowPhrases = ['Slower than prescribed — could be fatigue or pacing.', 'Well off pace, though conditions were challenging.'];
@@ -1254,6 +1281,12 @@ Deno.serve(async (req) => {
             correctedNarrative = currentNarrative.replace(phrase, 'Slightly slower than prescribed.');
             console.log(`🔧 [NARRATIVE FIX] Corrected pace assessment: "${phrase}" → "Slightly slower than prescribed." (pace_adherence=${paceAdherencePct}%)`);
             break;
+          }
+        }
+        if (correctedNarrative === currentNarrative && currentNarrative.includes('Pace was slower than the target range')) {
+          correctedNarrative = replacePaceSentence(currentNarrative, 'Slightly slower than prescribed.');
+          if (correctedNarrative !== currentNarrative) {
+            console.log(`🔧 [NARRATIVE FIX] Corrected target-range pace assessment → "Slightly slower than prescribed." (pace_adherence=${paceAdherencePct}%)`);
           }
         }
       }
@@ -1606,6 +1639,88 @@ Deno.serve(async (req) => {
     const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis);
     const scoreExplanation = adherenceSummary?.verdict ?? null;
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
+
+    // =========================================================================
+    // Standardized per-workout summary (v1)
+    // Discipline analyzers write this; coach consumes it (no re-interpretation).
+    // =========================================================================
+    const summaryV1 = (() => {
+      type SummaryV1 = {
+        version: 1;
+        title: string;
+        bullets: string[];
+        tags: string[];
+        confidence: number; // 0..1
+      };
+
+      const title =
+        (hrAnalysisResult as any)?.summaryLabel
+        || (enhancedAnalysis as any)?.heart_rate_analysis?.summary_label
+        || 'Summary';
+
+      const narrative = String((hrAnalysisResult as any)?.interpretation || '').trim();
+      const sentences = (() => {
+        if (!narrative) return [] as string[];
+        // Split on ". " followed by capital letter, keep periods.
+        const parts = narrative
+          .split(/\. (?=[A-Z])/g)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => (s.endsWith('.') ? s : `${s}.`));
+        return parts;
+      })();
+
+      const bullets: string[] = [];
+      if (typeof adherenceSummary?.verdict === 'string' && adherenceSummary.verdict.trim().length > 0) {
+        bullets.push(adherenceSummary.verdict.trim().endsWith('.') ? adherenceSummary.verdict.trim() : `${adherenceSummary.verdict.trim()}.`);
+      }
+      for (const s of sentences) {
+        if (bullets.length >= 4) break;
+        // Avoid duplicating verdict if it's already present
+        if (bullets.some((b) => b.toLowerCase() === s.toLowerCase())) continue;
+        bullets.push(s);
+      }
+
+      const tags: string[] = [];
+      // Pace adherence tags (use the same metric displayed in UI)
+      const paceAdh = Number((performance as any)?.pace_adherence);
+      if (Number.isFinite(paceAdh)) {
+        if (paceAdh >= 95) tags.push('pace_on_target');
+        else if (paceAdh >= 85) tags.push('pace_slightly_off');
+        else tags.push('pace_off_target');
+      }
+      // HR drift assessment tags
+      const driftAssess = (hrAnalysisResult as any)?.drift?.assessment;
+      if (driftAssess === 'excellent' || driftAssess === 'good' || driftAssess === 'normal') tags.push('hr_drift_normal');
+      if (driftAssess === 'elevated') tags.push('hr_drift_elevated');
+      if (driftAssess === 'high') tags.push('hr_drift_high');
+      // Conditions tags (temperature only; keep simple/portable)
+      const tempF = (hrAnalysisContext as any)?.weather?.temperatureF;
+      if (Number.isFinite(Number(tempF))) {
+        const tf = Number(tempF);
+        if (tf >= 85) tags.push('conditions_hot');
+        else if (tf >= 70) tags.push('conditions_warm');
+      }
+      // Workout type tag from HR analyzer
+      const wt = String((hrAnalysisResult as any)?.workoutType || '').trim();
+      if (wt) tags.push(`workout_type_${wt}`);
+
+      // Confidence mapping
+      const confLbl = String((hrAnalysisResult as any)?.confidence || '').toLowerCase();
+      const confidence = confLbl === 'high' ? 0.85 : confLbl === 'medium' ? 0.65 : 0.45;
+
+      const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+      const cleanedBullets = bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
+
+      const out: SummaryV1 = {
+        version: 1,
+        title: String(title),
+        bullets: cleanedBullets.length ? cleanedBullets : (scoreExplanation ? [String(scoreExplanation)] : []),
+        tags: uniq(tags),
+        confidence,
+      };
+      return out;
+    })();
     
     // Use RPC to merge computed (preserves analysis.series from compute-workout-analysis)
     // RPC is required - no fallbacks to prevent data loss
@@ -1629,6 +1744,7 @@ Deno.serve(async (req) => {
         narrative_insights: narrativeInsights,  // AI-generated human-readable insights
         score_explanation: scoreExplanation,  // Backward-compat: single verdict line
         adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact
+        summary: summaryV1, // Standardized per-workout summary (v1)
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         // NEW: Structured HR summary for weekly/block context aggregation
         heart_rate_summary: hrAnalysisResult.summary

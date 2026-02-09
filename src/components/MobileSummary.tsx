@@ -2409,16 +2409,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         {/* Run adherence summary below intervals: structured (technical + coach outlook), AI narrative, old score_explanation, or fallback */}
         {/run|walk/i.test(sportType) && (() => {
           const workoutAnalysis = (completed as any)?.workout_analysis;
+          const standardizedSummary = workoutAnalysis?.summary;
           const adherenceSummary = workoutAnalysis?.adherence_summary;
           const narrativeInsights = workoutAnalysis?.narrative_insights;
           const scoreExplanation = workoutAnalysis?.score_explanation;
+          const hasStandardized =
+            standardizedSummary &&
+            standardizedSummary.version === 1 &&
+            (typeof standardizedSummary.title === 'string' && standardizedSummary.title.length > 0) &&
+            Array.isArray(standardizedSummary.bullets) &&
+            standardizedSummary.bullets.length > 0;
           const hasStructured = adherenceSummary && (
             (Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0) ||
             (adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.')
           );
           const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
           const hasLegacyVerdict = typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
-          const hasNothing = !hasStructured && !hasNarrative && !hasLegacyVerdict;
+          const hasNothing = !hasStandardized && !hasStructured && !hasNarrative && !hasLegacyVerdict;
           if (hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
@@ -2432,6 +2439,18 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           }
           return (
             <div className="mt-4 px-3 pb-4 space-y-3">
+              {hasStandardized && (
+                <div>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                    {standardizedSummary.title || 'Summary'}
+                  </span>
+                  <div className="mt-1 space-y-1.5">
+                    {standardizedSummary.bullets.slice(0, 4).map((b: string, i: number) => (
+                      <p key={i} className="text-sm text-gray-300 leading-relaxed">{b}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
               {hasStructured && adherenceSummary && (
                 <>
                   {Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0 && (
