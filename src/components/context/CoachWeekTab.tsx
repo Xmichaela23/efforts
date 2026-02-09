@@ -55,7 +55,7 @@ export default function CoachWeekTab() {
       const n = data.reaction?.execution_sample_size || 0;
       return {
         title: 'Execution down vs baseline',
-        subtitle: d != null ? `Execution is ${d}% vs your 28d norm (n=${n}).` : `Execution is below your 28d norm (n=${n}).`,
+        subtitle: d != null ? `Planned-session execution is ${d}% vs your 28d norm (n=${n}).` : `Planned-session execution is below your 28d norm (n=${n}).`,
       };
     }
     if (drivers.includes('aerobic_drift_up')) {

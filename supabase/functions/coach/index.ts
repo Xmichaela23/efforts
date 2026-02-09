@@ -385,6 +385,30 @@ Deno.serve(async (req) => {
       try { return typeof v === 'string' ? JSON.parse(v) : (v || null); } catch { return null; }
     };
 
+    const executionScoreFromWorkout = (wAny: any): number | null => {
+      try {
+        // Prefer canonical computed score when present
+        const c = parseJson((wAny as any)?.computed);
+        const s1 = safeNum(c?.overall?.execution_score);
+        if (s1 != null) return Math.max(0, Math.min(100, s1));
+
+        const wa = parseJson((wAny as any)?.workout_analysis) || {};
+        const s2 =
+          safeNum(wa?.execution_summary?.overall_execution) ??
+          safeNum(wa?.performance?.execution_adherence) ??
+          safeNum(wa?.performance?.pace_adherence) ??
+          safeNum(wa?.performance?.overall_adherence) ??
+          null;
+        if (s2 == null) return null;
+
+        // Normalize 0..1 fractions to 0..100
+        const normalized = s2 > 0 && s2 <= 1 ? s2 * 100 : s2;
+        return Math.max(0, Math.min(100, Math.round(normalized)));
+      } catch {
+        return null;
+      }
+    };
+
     const hrWorkoutTypeFromWorkout = (wAny: any): string | null => {
       try {
         const wa = parseJson((wAny as any)?.workout_analysis) || {};
@@ -453,8 +477,7 @@ Deno.serve(async (req) => {
       if (String(w?.workout_status || '').toLowerCase() !== 'completed') continue;
       const pid = w?.planned_id != null ? String(w.planned_id) : '';
       if (pid && plannedIds.has(pid)) {
-        const c = parseJson((w as any).computed);
-        const s = safeNum(c?.overall?.execution_score);
+        const s = executionScoreFromWorkout(w as any);
         if (s != null) executionScores.push(s);
         // Aerobic response: HR drift for steady aerobic runs only (avoid intervals/fartlek noise)
         if (String((w as any)?.type || '').toLowerCase() === 'run') {
@@ -467,8 +490,8 @@ Deno.serve(async (req) => {
       }
       // Fallback: if workout_analysis has a numeric execution adherence, use it.
       const wa = parseJson((w as any).workout_analysis);
-      const s2 = safeNum(wa?.performance?.execution_adherence ?? wa?.performance?.pace_adherence);
-      if (s2 != null) executionScores.push(s2);
+      // We intentionally do NOT include unplanned workouts in execution here
+      // because "execution" is meant to reflect compliance to planned intent.
       if (String((w as any)?.type || '').toLowerCase() === 'run') {
         if (hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
           const d = driftBpmFromWorkout(w as any);
@@ -648,9 +671,11 @@ Deno.serve(async (req) => {
       if (String((w as any)?.workout_status || '').toLowerCase() !== 'completed') continue;
 
       // execution score
-      const c = parseJson((w as any).computed);
-      const ex = safeNum(c?.overall?.execution_score);
-      if (ex != null) normExecution.push(ex);
+      // Baseline execution should match the planned-execution definition.
+      if ((w as any)?.planned_id != null) {
+        const ex = executionScoreFromWorkout(w as any);
+        if (ex != null) normExecution.push(ex);
+      }
 
       // HR drift: steady aerobic runs only (TrainingPeaks-style)
       if (String((w as any)?.type || '').toLowerCase() === 'run' && hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
