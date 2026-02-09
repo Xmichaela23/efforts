@@ -116,6 +116,13 @@ export type CoachWeekContextV1 = {
     confidence: number;
     baseline_days: number;
     load_ramp_acwr: number | null;
+    load_ramp: {
+      acute7_total_load: number | null;
+      chronic28_total_load: number | null;
+      acute7_by_type: Array<{ type: string; sessions: number; total_load: number }>;
+      chronic28_by_type: Array<{ type: string; sessions: number; total_load: number }>;
+      top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number }>;
+    };
   };
   verdict: {
     code: string;

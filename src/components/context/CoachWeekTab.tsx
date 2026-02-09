@@ -44,6 +44,18 @@ export default function CoachWeekTab() {
   const keyPct = data.reaction?.key_sessions_completion_ratio != null ? Math.round(data.reaction.key_sessions_completion_ratio * 100) : null;
   const ts = data.training_state;
   const acwrLine = ts?.load_ramp_acwr != null ? `Load ramp: ${Number(ts.load_ramp_acwr.toFixed(2))}×` : null;
+  const loadDriversLine = (() => {
+    const rows = Array.isArray(ts?.load_ramp?.acute7_by_type) ? ts!.load_ramp.acute7_by_type : [];
+    if (!rows.length) return null;
+    const top = rows.slice(0, 3).map((r) => `${r.type} ${Math.round(r.total_load)}pts (${r.sessions})`);
+    return top.length ? `Top load drivers (7d): ${top.join(' • ')}` : null;
+  })();
+  const topSessionsLine = (() => {
+    const rows = Array.isArray(ts?.load_ramp?.top_sessions_acute7) ? ts!.load_ramp.top_sessions_acute7 : [];
+    if (!rows.length) return null;
+    const top = rows.slice(0, 2).map((r) => `${r.date} ${r.type}${r.name ? ` (${r.name})` : ''} ${Math.round(r.workload_actual)}pts`);
+    return top.length ? `Biggest sessions (7d): ${top.join(' • ')}` : null;
+  })();
 
   const formatDelta = (v: number | null, unit: string) => {
     if (v == null) return '—';
@@ -97,6 +109,12 @@ export default function CoachWeekTab() {
               {acwrLine ? <span> • {acwrLine}</span> : null}
               <span> • Baseline: last {ts?.baseline_days || 28} days</span>
             </div>
+            {loadDriversLine ? (
+              <div className="text-2xs text-white/40 mt-1">{loadDriversLine}</div>
+            ) : null}
+            {topSessionsLine ? (
+              <div className="text-2xs text-white/35 mt-0.5">{topSessionsLine}</div>
+            ) : null}
             {data.plan.week_focus_label ? (
               <div className="text-xs text-white/50 mt-1">{data.plan.week_focus_label}</div>
             ) : null}

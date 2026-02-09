@@ -175,6 +175,14 @@ export type CoachWeekContextResponseV1 = {
     confidence: number; // 0..1
     baseline_days: number; // typically 28
     load_ramp_acwr: number | null; // optional context (acute/chronic ratio)
+    load_ramp: {
+      // Explain "what was higher" using completed workouts only.
+      acute7_total_load: number | null;
+      chronic28_total_load: number | null;
+      acute7_by_type: Array<{ type: string; sessions: number; total_load: number }>;
+      chronic28_by_type: Array<{ type: string; sessions: number; total_load: number }>;
+      top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number }>;
+    };
   };
   verdict: {
     code: WeekVerdictCode;

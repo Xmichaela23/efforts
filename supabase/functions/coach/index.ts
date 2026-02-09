@@ -808,17 +808,52 @@ Deno.serve(async (req) => {
 
     const { data: rolling, error: rErr } = await supabase
       .from('workouts')
-      .select('workload_actual,date,workout_status')
+      .select('id,workload_actual,date,workout_status,type,name')
       .eq('user_id', userId)
       .gte('date', chronicStart)
       .lte('date', asOfDate);
     if (rErr) throw rErr;
 
     const completedRolling = (rolling || []).filter((r: any) => String(r?.workout_status || '').toLowerCase() === 'completed');
-    const acute7Load = completedRolling
-      .filter((r: any) => String(r?.date) >= acuteStart)
-      .reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
+    const acute7Rows = completedRolling.filter((r: any) => String(r?.date) >= acuteStart);
+    const acute7Load = acute7Rows.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
     const chronic28Load = completedRolling.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
+
+    const normalizeType = (t: any): string => {
+      const s = String(t || '').toLowerCase();
+      if (!s) return 'other';
+      if (s.includes('run')) return 'run';
+      if (s.includes('bike') || s.includes('ride') || s.includes('cycl')) return 'bike';
+      if (s.includes('swim')) return 'swim';
+      if (s.includes('strength')) return 'strength';
+      if (s.includes('mobility') || s === 'pt') return 'mobility';
+      return s;
+    };
+
+    const byType = (rows: any[]): Array<{ type: string; sessions: number; total_load: number }> => {
+      const m = new Map<string, { sessions: number; total: number }>();
+      for (const r of rows) {
+        const typ = normalizeType(r?.type);
+        const wl = safeNum(r?.workload_actual) || 0;
+        const cur = m.get(typ) || { sessions: 0, total: 0 };
+        cur.sessions += 1;
+        cur.total += wl;
+        m.set(typ, cur);
+      }
+      return Array.from(m.entries())
+        .map(([type, v]) => ({ type, sessions: v.sessions, total_load: Math.round(v.total) }))
+        .sort((a, b) => b.total_load - a.total_load);
+    };
+
+    const topSessionsAcute7 = acute7Rows
+      .map((r: any) => ({
+        date: String(r?.date || '').slice(0, 10),
+        type: normalizeType(r?.type),
+        name: r?.name != null ? String(r.name) : null,
+        workload_actual: safeNum(r?.workload_actual) || 0,
+      }))
+      .sort((a: any, b: any) => (b.workload_actual || 0) - (a.workload_actual || 0))
+      .slice(0, 3);
 
     const acwr = chronic28Load > 0 ? (acute7Load / 7) / (chronic28Load / 28) : null;
 
@@ -874,6 +909,13 @@ Deno.serve(async (req) => {
       const conf = responseInterp.overall.confidence || 0;
       const baseline_days = 28;
       const load_ramp_acwr = metrics.acwr;
+      const load_ramp = {
+        acute7_total_load: completedRolling.length ? Math.round(acute7Load) : null,
+        chronic28_total_load: completedRolling.length ? Math.round(chronic28Load) : null,
+        acute7_by_type: byType(acute7Rows),
+        chronic28_by_type: byType(completedRolling),
+        top_sessions_acute7: topSessionsAcute7,
+      };
       if (responseInterp.overall.label === 'need_more_data') {
         return {
           code: 'need_more_data',
@@ -883,6 +925,7 @@ Deno.serve(async (req) => {
           confidence: conf,
           baseline_days,
           load_ramp_acwr,
+          load_ramp,
         };
       }
       if (v.code === 'recover_overreaching' || (responseInterp.overall.drivers.length >= 2 && responseInterp.overall.label === 'fatigue_signs')) {
@@ -894,6 +937,7 @@ Deno.serve(async (req) => {
           confidence: conf,
           baseline_days,
           load_ramp_acwr,
+          load_ramp,
         };
       }
       if (v.code === 'caution_ramping_fast' || responseInterp.overall.drivers.length === 1) {
@@ -905,6 +949,7 @@ Deno.serve(async (req) => {
           confidence: conf,
           baseline_days,
           load_ramp_acwr,
+          load_ramp,
         };
       }
       const okTitle = (weekIntent === 'recovery' || weekIntent === 'taper') ? 'Recovery looks right' : 'Strain looks right';
@@ -916,6 +961,7 @@ Deno.serve(async (req) => {
         confidence: conf,
         baseline_days,
         load_ramp_acwr,
+        load_ramp,
       };
     })();
 
