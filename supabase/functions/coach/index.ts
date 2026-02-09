@@ -833,6 +833,92 @@ Deno.serve(async (req) => {
 
     const v = buildVerdict(metrics, methodologyId, methodologyCtx, reaction);
 
+    // =========================================================================
+    // Deterministic training state (plan-aware topline for dumb clients)
+    // =========================================================================
+    const intentLabel =
+      weekIntent === 'build' ? 'Build week'
+      : weekIntent === 'peak' ? 'Peak week'
+      : weekIntent === 'taper' ? 'Taper week'
+      : weekIntent === 'recovery' ? 'Recovery week'
+      : weekIntent === 'baseline' ? 'Baseline week'
+      : 'Plan';
+
+    const primaryDeltaLine = (() => {
+      const d = responseInterp.overall.drivers || [];
+      if (d.includes('absorption_exec_down')) {
+        const delta = responseInterp.absorption.execution_delta;
+        const n = reaction.execution_sample_size || 0;
+        return delta != null ? `Execution: ${delta}% vs baseline (n=${n})` : `Execution: below baseline (n=${n})`;
+      }
+      if (d.includes('aerobic_drift_up')) {
+        const delta = responseInterp.aerobic.drift_delta_bpm;
+        const n = reaction.hr_drift_sample_size || 0;
+        return delta != null ? `Aerobic strain: +${Math.abs(delta)} bpm drift vs baseline (n=${n})` : `Aerobic strain: elevated drift vs baseline (n=${n})`;
+      }
+      if (d.includes('structural_rir_down')) {
+        const delta = responseInterp.structural.rir_delta;
+        const n = reaction.rir_sample_size_7d || 0;
+        return delta != null ? `Strength fatigue: ${delta} RIR vs baseline (n=${n})` : `Strength fatigue: lower RIR vs baseline (n=${n})`;
+      }
+      if (d.includes('subjective_rpe_up')) {
+        const delta = responseInterp.subjective.rpe_delta;
+        const n = reaction.rpe_sample_size_7d || 0;
+        return delta != null ? `Perceived strain: +${Math.abs(delta)} RPE vs baseline (n=${n})` : `Perceived strain: higher RPE vs baseline (n=${n})`;
+      }
+      return null;
+    })();
+
+    const training_state: CoachWeekContextResponseV1['training_state'] = (() => {
+      const kicker = `${intentLabel} • Response vs baseline`;
+      const conf = responseInterp.overall.confidence || 0;
+      const baseline_days = 28;
+      const load_ramp_acwr = metrics.acwr;
+      if (responseInterp.overall.label === 'need_more_data') {
+        return {
+          code: 'need_more_data',
+          kicker,
+          title: 'Not enough data',
+          subtitle: 'We need a few more logged sessions to compare against your baseline.',
+          confidence: conf,
+          baseline_days,
+          load_ramp_acwr,
+        };
+      }
+      if (v.code === 'recover_overreaching' || (responseInterp.overall.drivers.length >= 2 && responseInterp.overall.label === 'fatigue_signs')) {
+        return {
+          code: 'overstrained',
+          kicker,
+          title: 'Overstrained',
+          subtitle: primaryDeltaLine || 'Multiple response markers are worse than your normal.',
+          confidence: conf,
+          baseline_days,
+          load_ramp_acwr,
+        };
+      }
+      if (v.code === 'caution_ramping_fast' || responseInterp.overall.drivers.length === 1) {
+        return {
+          code: 'strained',
+          kicker,
+          title: 'Strained',
+          subtitle: primaryDeltaLine || 'One response marker is worse than your normal.',
+          confidence: conf,
+          baseline_days,
+          load_ramp_acwr,
+        };
+      }
+      const okTitle = (weekIntent === 'recovery' || weekIntent === 'taper') ? 'Recovery looks right' : 'Strain looks right';
+      return {
+        code: 'strain_ok',
+        kicker,
+        title: okTitle,
+        subtitle: 'Your response markers are within your normal range for this point in the week.',
+        confidence: conf,
+        baseline_days,
+        load_ramp_acwr,
+      };
+    })();
+
     const evidence: EvidenceItem[] = [
       { code: 'week_window', label: 'Week window', value: `${weekStartDate} → ${weekEndDate}` },
       { code: 'wtd_load', label: 'Week-to-date load', value: Math.round(actualWtdLoad), unit: 'pts' },
@@ -865,6 +951,7 @@ Deno.serve(async (req) => {
       reaction,
       baselines,
       response: responseInterp,
+      training_state,
       verdict: {
         code: v.code,
         label: v.label,

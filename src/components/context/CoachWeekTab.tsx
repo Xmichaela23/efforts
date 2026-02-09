@@ -42,87 +42,8 @@ export default function CoachWeekTab() {
     ? Math.round(((data.week.planned_remaining_load || 0) / data.week.planned_total_load) * 100)
     : null;
   const keyPct = data.reaction?.key_sessions_completion_ratio != null ? Math.round(data.reaction.key_sessions_completion_ratio * 100) : null;
-
-  const overall = data.response?.overall;
-  const drivers = Array.isArray(overall?.drivers) ? overall!.drivers : [];
-  const hasData = String(overall?.label || '') !== 'need_more_data';
-
-  const intent = String(data.plan?.week_intent || 'unknown');
-  const intentLabel =
-    intent === 'build' ? 'Build week'
-    : intent === 'peak' ? 'Peak week'
-    : intent === 'taper' ? 'Taper week'
-    : intent === 'recovery' ? 'Recovery week'
-    : intent === 'baseline' ? 'Baseline week'
-    : 'Plan';
-
-  const acwr = data.metrics?.acwr;
-  const acwrLine = acwr != null ? `Load ramp: ${Number(acwr.toFixed(2))}×` : null;
-
-  const primaryDeltaLine = (() => {
-    // Keep it non-prescriptive; just state what's moving.
-    if (drivers.includes('absorption_exec_down')) {
-      const d = data.response?.absorption?.execution_delta;
-      const n = data.reaction?.execution_sample_size || 0;
-      if (d != null) return `Execution: ${d}% vs baseline (n=${n})`;
-      return `Execution: below baseline (n=${n})`;
-    }
-    if (drivers.includes('aerobic_drift_up')) {
-      const d = data.response?.aerobic?.drift_delta_bpm;
-      const n = data.reaction?.hr_drift_sample_size || 0;
-      if (d != null) return `Aerobic strain: +${Math.abs(d)} bpm drift vs baseline (n=${n})`;
-      return `Aerobic strain: elevated drift vs baseline (n=${n})`;
-    }
-    if (drivers.includes('structural_rir_down')) {
-      const d = data.response?.structural?.rir_delta;
-      const n = data.reaction?.rir_sample_size_7d || 0;
-      if (d != null) return `Strength fatigue: ${d} RIR vs baseline (n=${n})`;
-      return `Strength fatigue: lower RIR vs baseline (n=${n})`;
-    }
-    if (drivers.includes('subjective_rpe_up')) {
-      const d = data.response?.subjective?.rpe_delta;
-      const n = data.reaction?.rpe_sample_size_7d || 0;
-      if (d != null) return `Perceived strain: +${Math.abs(d)} RPE vs baseline (n=${n})`;
-      return `Perceived strain: higher RPE vs baseline (n=${n})`;
-    }
-    return null;
-  })();
-
-  const snapshot = (() => {
-    // Training-state language, aligned with plan intent.
-    if (!hasData) {
-      return {
-        kicker: `${intentLabel} • Response vs baseline`,
-        title: 'Not enough data',
-        subtitle: 'We need a few more logged sessions to compare against your baseline.',
-      };
-    }
-
-    const verdictCode = String(data.verdict?.code || '');
-    if (verdictCode === 'recover_overreaching' || (drivers.length >= 2 && String(overall?.label) === 'fatigue_signs')) {
-      return {
-        kicker: `${intentLabel} • Response vs baseline`,
-        title: 'Overstrained',
-        subtitle: primaryDeltaLine || 'Multiple response markers are worse than your normal.',
-      };
-    }
-
-    if (verdictCode === 'caution_ramping_fast' || drivers.length === 1) {
-      return {
-        kicker: `${intentLabel} • Response vs baseline`,
-        title: 'Strained',
-        subtitle: primaryDeltaLine || 'One response marker is worse than your normal.',
-      };
-    }
-
-    // Default: response looks normal for the current week intent.
-    const normalTitle = intent === 'recovery' || intent === 'taper' ? 'Recovery looks right' : 'Strain looks right';
-    return {
-      kicker: `${intentLabel} • Response vs baseline`,
-      title: normalTitle,
-      subtitle: 'Your response markers are within your normal range for this point in the week.',
-    };
-  })();
+  const ts = data.training_state;
+  const acwrLine = ts?.load_ramp_acwr != null ? `Load ramp: ${Number(ts.load_ramp_acwr.toFixed(2))}×` : null;
 
   const formatDelta = (v: number | null, unit: string) => {
     if (v == null) return '—';
@@ -166,17 +87,15 @@ export default function CoachWeekTab() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm text-white/60">Training state</div>
-            {'kicker' in snapshot ? (
-              <div className="text-2xs text-white/40 mt-0.5">{(snapshot as any).kicker}</div>
-            ) : null}
-            <div className="text-xl font-medium text-white">{snapshot.title}</div>
+            <div className="text-2xs text-white/40 mt-0.5">{ts?.kicker || ''}</div>
+            <div className="text-xl font-medium text-white">{ts?.title || '—'}</div>
             <div className="text-xs text-white/45 mt-1">
-              {snapshot.subtitle}
+              {ts?.subtitle || '—'}
             </div>
             <div className="text-2xs text-white/35 mt-1">
-              Confidence: {Math.round((data.response?.overall?.confidence || 0) * 100)}%
+              Confidence: {Math.round(((ts?.confidence || 0) * 100))}
               {acwrLine ? <span> • {acwrLine}</span> : null}
-              <span> • Baseline: last 28 days</span>
+              <span> • Baseline: last {ts?.baseline_days || 28} days</span>
             </div>
             {data.plan.week_focus_label ? (
               <div className="text-xs text-white/50 mt-1">{data.plan.week_focus_label}</div>

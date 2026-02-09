@@ -166,6 +166,16 @@ export type CoachWeekContextResponseV1 = {
       avg_decoupling_pct: number | null;
     }>;
   };
+  training_state: {
+    // Deterministic, plan-aware topline (frontend should render this verbatim)
+    code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';
+    kicker: string; // e.g. "Build week • Response vs baseline"
+    title: string; // e.g. "Strain looks right" | "Strained" | "Overstrained"
+    subtitle: string; // one-line explanation, non-prescriptive
+    confidence: number; // 0..1
+    baseline_days: number; // typically 28
+    load_ramp_acwr: number | null; // optional context (acute/chronic ratio)
+  };
   verdict: {
     code: WeekVerdictCode;
     label: string;

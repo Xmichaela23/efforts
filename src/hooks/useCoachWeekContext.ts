@@ -108,6 +108,15 @@ export type CoachWeekContextV1 = {
       avg_decoupling_pct: number | null;
     }>;
   };
+  training_state: {
+    code: string;
+    kicker: string;
+    title: string;
+    subtitle: string;
+    confidence: number;
+    baseline_days: number;
+    load_ramp_acwr: number | null;
+  };
   verdict: {
     code: string;
     label: string;
