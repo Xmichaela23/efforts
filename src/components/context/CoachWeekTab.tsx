@@ -145,6 +145,18 @@ export default function CoachWeekTab() {
   const { data, loading, error, refresh } = useCoachWeekContext();
   const [linkOpen, setLinkOpen] = useState(false);
 
+  // Hooks must be called unconditionally (even while loading/error).
+  // Keep derived memoized slices above any early returns.
+  const ts = data?.training_state;
+  const loadDriverRows = useMemo(() => {
+    const rows = (ts && Array.isArray(ts?.load_ramp?.acute7_by_type)) ? ts.load_ramp.acute7_by_type : [];
+    return rows.slice(0, 3);
+  }, [ts?.load_ramp?.acute7_by_type]);
+  const topSessionsRows = useMemo(() => {
+    const rows = (ts && Array.isArray(ts?.load_ramp?.top_sessions_acute7)) ? ts.load_ramp.top_sessions_acute7 : [];
+    return rows.slice(0, 2);
+  }, [ts?.load_ramp?.top_sessions_acute7]);
+
   if (loading && !data) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-white/60">
@@ -182,16 +194,7 @@ export default function CoachWeekTab() {
     ? Math.round(((data.week.planned_remaining_load || 0) / data.week.planned_total_load) * 100)
     : null;
   const keyPct = data.reaction?.key_sessions_completion_ratio != null ? Math.round(data.reaction.key_sessions_completion_ratio * 100) : null;
-  const ts = data.training_state;
   const acwrLine = ts?.load_ramp_acwr != null ? `Load ramp: ${Number(ts.load_ramp_acwr.toFixed(2))}×` : null;
-  const loadDriverRows = useMemo(() => {
-    const rows = Array.isArray(ts?.load_ramp?.acute7_by_type) ? ts!.load_ramp.acute7_by_type : [];
-    return rows.slice(0, 3);
-  }, [ts?.load_ramp?.acute7_by_type]);
-  const topSessionsRows = useMemo(() => {
-    const rows = Array.isArray(ts?.load_ramp?.top_sessions_acute7) ? ts!.load_ramp.top_sessions_acute7 : [];
-    return rows.slice(0, 2);
-  }, [ts?.load_ramp?.top_sessions_acute7]);
 
   const trainingConfidenceLabel = (() => {
     const c = ts?.confidence ?? 0;
