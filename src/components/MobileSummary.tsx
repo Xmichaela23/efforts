@@ -343,10 +343,44 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
   // Completed data used for computations (assumed present in development/clean data)
   const [hydratedCompleted, setHydratedCompleted] = useState<any>(completed);
+  const [recomputing, setRecomputing] = useState(false);
+  const [recomputeError, setRecomputeError] = useState<string | null>(null);
 
   useEffect(() => {
     setHydratedCompleted(completed);
+    setRecomputeError(null);
+    setRecomputing(false);
   }, [completed]);
+
+  const recomputeRunAnalysis = async () => {
+    const src = hydratedCompleted || completed;
+    const workoutId = String((src as any)?.id || '');
+    if (!workoutId) return;
+    try {
+      setRecomputing(true);
+      setRecomputeError(null);
+
+      const { error: fnErr } = await supabase.functions.invoke('analyze-running-workout', {
+        body: { workout_id: workoutId },
+      });
+      if (fnErr) throw fnErr;
+
+      const { data: refreshed, error: wErr } = await supabase
+        .from('workouts')
+        .select('id,workout_analysis,analysis_status,analyzed_at')
+        .eq('id', workoutId)
+        .maybeSingle();
+      if (wErr) throw wErr;
+      if (refreshed) {
+        setHydratedCompleted((prev: any) => ({ ...(prev || {}), ...(refreshed as any) }));
+      }
+      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+    } catch (e: any) {
+      setRecomputeError(e?.message || String(e));
+    } finally {
+      setRecomputing(false);
+    }
+  };
 
   // No interactive hydration path; assume data present during development
 
@@ -2408,7 +2442,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         </table>
         {/* Run adherence summary below intervals: structured (technical + coach outlook), AI narrative, old score_explanation, or fallback */}
         {/run|walk/i.test(sportType) && (() => {
-          const workoutAnalysis = (completed as any)?.workout_analysis;
+          const completedSrc: any = hydratedCompleted || completed;
+          const workoutAnalysis = completedSrc?.workout_analysis;
           const standardizedSummary = workoutAnalysis?.summary;
           const adherenceSummary = workoutAnalysis?.adherence_summary;
           const narrativeInsights = workoutAnalysis?.narrative_insights;
@@ -2439,6 +2474,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           }
           return (
             <div className="mt-4 px-3 pb-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-gray-500">
+                  {recomputeError ? (
+                    <span className="text-red-300">{recomputeError}</span>
+                  ) : null}
+                </div>
+                <button
+                  onClick={recomputeRunAnalysis}
+                  disabled={recomputing || !completedSrc?.id}
+                  className="text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
+                  title="Re-run analysis for this workout"
+                >
+                  {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+                </button>
+              </div>
               {hasStandardized && (
                 <div>
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
