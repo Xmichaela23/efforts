@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import TrainingContextTab from './context/TrainingContextTab';
+import CoachWeekTab from './context/CoachWeekTab';
 import BlockSummaryTab from './context/BlockSummaryTab';
 
 interface ContextTabsProps {
@@ -59,7 +59,7 @@ const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) =
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 overflow-y-auto min-h-0 px-1 pb-1">
             <TabsContent value="context" className="mt-0">
-              <TrainingContextTab onSelectWorkout={onSelectWorkout} />
+              <CoachWeekTab />
             </TabsContent>
             
             <TabsContent value="block" className="mt-0">
