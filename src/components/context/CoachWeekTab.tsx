@@ -47,42 +47,81 @@ export default function CoachWeekTab() {
   const drivers = Array.isArray(overall?.drivers) ? overall!.drivers : [];
   const hasData = String(overall?.label || '') !== 'need_more_data';
 
-  const snapshot = (() => {
-    if (!hasData) return { title: 'Not enough data', subtitle: 'We need a few more logged sessions to compare against your baseline.' };
-    if (drivers.length >= 2) return { title: 'Multiple fatigue signals', subtitle: 'More than one marker is elevated vs your normal.' };
+  const intent = String(data.plan?.week_intent || 'unknown');
+  const intentLabel =
+    intent === 'build' ? 'Build week'
+    : intent === 'peak' ? 'Peak week'
+    : intent === 'taper' ? 'Taper week'
+    : intent === 'recovery' ? 'Recovery week'
+    : intent === 'baseline' ? 'Baseline week'
+    : 'Plan';
+
+  const acwr = data.metrics?.acwr;
+  const acwrLine = acwr != null ? `Load ramp: ${Number(acwr.toFixed(2))}×` : null;
+
+  const primaryDeltaLine = (() => {
+    // Keep it non-prescriptive; just state what's moving.
     if (drivers.includes('absorption_exec_down')) {
       const d = data.response?.absorption?.execution_delta;
       const n = data.reaction?.execution_sample_size || 0;
-      return {
-        title: 'Execution down vs baseline',
-        subtitle: d != null ? `Planned-session execution is ${d}% vs your 28d norm (n=${n}).` : `Planned-session execution is below your 28d norm (n=${n}).`,
-      };
+      if (d != null) return `Execution: ${d}% vs baseline (n=${n})`;
+      return `Execution: below baseline (n=${n})`;
     }
     if (drivers.includes('aerobic_drift_up')) {
       const d = data.response?.aerobic?.drift_delta_bpm;
       const n = data.reaction?.hr_drift_sample_size || 0;
-      return {
-        title: 'Aerobic strain up vs baseline',
-        subtitle: d != null ? `HR drift is +${Math.abs(d)} bpm vs your 28d norm (n=${n}).` : `HR drift is elevated vs your 28d norm (n=${n}).`,
-      };
+      if (d != null) return `Aerobic strain: +${Math.abs(d)} bpm drift vs baseline (n=${n})`;
+      return `Aerobic strain: elevated drift vs baseline (n=${n})`;
     }
     if (drivers.includes('structural_rir_down')) {
       const d = data.response?.structural?.rir_delta;
       const n = data.reaction?.rir_sample_size_7d || 0;
-      return {
-        title: 'Strength fatigue up vs baseline',
-        subtitle: d != null ? `Strength RIR is ${d} vs your 28d norm (n=${n}).` : `Strength RIR is lower than your 28d norm (n=${n}).`,
-      };
+      if (d != null) return `Strength fatigue: ${d} RIR vs baseline (n=${n})`;
+      return `Strength fatigue: lower RIR vs baseline (n=${n})`;
     }
     if (drivers.includes('subjective_rpe_up')) {
       const d = data.response?.subjective?.rpe_delta;
       const n = data.reaction?.rpe_sample_size_7d || 0;
+      if (d != null) return `Perceived strain: +${Math.abs(d)} RPE vs baseline (n=${n})`;
+      return `Perceived strain: higher RPE vs baseline (n=${n})`;
+    }
+    return null;
+  })();
+
+  const snapshot = (() => {
+    // Training-state language, aligned with plan intent.
+    if (!hasData) {
       return {
-        title: 'Perceived strain up vs baseline',
-        subtitle: d != null ? `Session RPE is +${Math.abs(d)} vs your 28d norm (n=${n}).` : `Session RPE is higher than your 28d norm (n=${n}).`,
+        kicker: `${intentLabel} • Response vs baseline`,
+        title: 'Not enough data',
+        subtitle: 'We need a few more logged sessions to compare against your baseline.',
       };
     }
-    return { title: 'Within your normal range', subtitle: 'Your response markers look normal vs your 28d baseline.' };
+
+    const verdictCode = String(data.verdict?.code || '');
+    if (verdictCode === 'recover_overreaching' || (drivers.length >= 2 && String(overall?.label) === 'fatigue_signs')) {
+      return {
+        kicker: `${intentLabel} • Response vs baseline`,
+        title: 'Overstrained',
+        subtitle: primaryDeltaLine || 'Multiple response markers are worse than your normal.',
+      };
+    }
+
+    if (verdictCode === 'caution_ramping_fast' || drivers.length === 1) {
+      return {
+        kicker: `${intentLabel} • Response vs baseline`,
+        title: 'Strained',
+        subtitle: primaryDeltaLine || 'One response marker is worse than your normal.',
+      };
+    }
+
+    // Default: response looks normal for the current week intent.
+    const normalTitle = intent === 'recovery' || intent === 'taper' ? 'Recovery looks right' : 'Strain looks right';
+    return {
+      kicker: `${intentLabel} • Response vs baseline`,
+      title: normalTitle,
+      subtitle: 'Your response markers are within your normal range for this point in the week.',
+    };
   })();
 
   const formatDelta = (v: number | null, unit: string) => {
@@ -126,13 +165,18 @@ export default function CoachWeekTab() {
       <div className={`rounded-xl border p-3 ${verdictTone}`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm text-white/60">Response snapshot</div>
+            <div className="text-sm text-white/60">Training state</div>
+            {'kicker' in snapshot ? (
+              <div className="text-2xs text-white/40 mt-0.5">{(snapshot as any).kicker}</div>
+            ) : null}
             <div className="text-xl font-medium text-white">{snapshot.title}</div>
             <div className="text-xs text-white/45 mt-1">
               {snapshot.subtitle}
             </div>
             <div className="text-2xs text-white/35 mt-1">
-              Confidence: {Math.round((data.response?.overall?.confidence || 0) * 100)}% • Baseline: last 28 days
+              Confidence: {Math.round((data.response?.overall?.confidence || 0) * 100)}%
+              {acwrLine ? <span> • {acwrLine}</span> : null}
+              <span> • Baseline: last 28 days</span>
             </div>
             {data.plan.week_focus_label ? (
               <div className="text-xs text-white/50 mt-1">{data.plan.week_focus_label}</div>
