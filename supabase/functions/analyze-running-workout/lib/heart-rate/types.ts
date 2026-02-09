@@ -59,6 +59,7 @@ export interface HRAnalysisContext {
     baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
     finishOnTarget?: boolean;  // Whether finish segment hit target
     finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
+    finishTargetPace?: string; // Display target pace for finish (e.g., "9:52/mi")
     hasFinishSegment?: boolean; // Whether workout has a distinct fast finish
   };
   

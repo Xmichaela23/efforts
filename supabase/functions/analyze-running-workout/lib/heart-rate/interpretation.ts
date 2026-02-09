@@ -192,6 +192,7 @@ interface SteadyStateNarrativeInput {
   baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
   finishOnTarget?: boolean;  // Whether finish segment hit target
   finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
+  finishTargetPace?: string; // Display target pace for finish (e.g., "9:52/mi")
   hasFinishSegment?: boolean; // Whether workout has a distinct fast finish
   
   // HR drift (optional)
@@ -226,6 +227,7 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
     baseSlowdownPct,
     finishOnTarget,
     finishPace,
+    finishTargetPace,
     hasFinishSegment,
     hrDriftBpm,
     temperatureF,
@@ -267,7 +269,10 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   
   // Determine if base portion was undercooked (beyond heat-adjusted tolerance)
   const baseUndercooked = baseSlowdownPct !== undefined && baseSlowdownPct > effectiveSlowFloor && !hrSuggestsStimulus;
-  const baseSlow = baseSlowdownPct !== undefined && baseSlowdownPct > 0;
+  // Treat tiny differences as "on target" (rounding/GPS noise)
+  const NEAR_TARGET_EPS = 0.02; // 2%
+  const baseSlow = baseSlowdownPct !== undefined && baseSlowdownPct > NEAR_TARGET_EPS;
+  const baseNearTarget = baseSlowdownPct !== undefined && baseSlowdownPct <= NEAR_TARGET_EPS;
   const baseWithinHeatTolerance = baseSlowdownPct !== undefined && baseSlowdownPct <= effectiveSlowFloor;
   
   // -------------------------------------------------------------------------
@@ -288,7 +293,9 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   // -------------------------------------------------------------------------
   if (hasFinishSegment && baseSlowdownPct !== undefined) {
     // Long run with fast finish: evaluate base and finish separately
-    if (baseSlow && baseWithinHeatTolerance && isWarm) {
+    if (baseNearTarget) {
+      parts.push('Easy portion was on target.');
+    } else if (baseSlow && baseWithinHeatTolerance && isWarm) {
       // Base was slow but within heat tolerance
       parts.push(`Pace was slower than the target range, but ${tempPhrase} increased the effort cost. HR suggests you still achieved the aerobic stimulus.`);
     } else if (baseSlow && hrSuggestsStimulus) {
@@ -307,6 +314,15 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
       parts.push(`Last segment was on target at ${finishPace}.`);
     } else if (finishOnTarget) {
       parts.push('Last segment was on target.');
+    } else {
+      // Finish missed target
+      if (finishPace && finishTargetPace) {
+        parts.push(`Last segment was slower than target (${finishPace} vs ${finishTargetPace}).`);
+      } else if (finishPace) {
+        parts.push(`Last segment was slower than target (${finishPace}).`);
+      } else {
+        parts.push('Last segment was slower than target.');
+      }
     }
   } else if (paceAdherencePct !== undefined && paceAdherencePct !== null) {
     // Single-segment workout: use paceAdherencePct with heat/HR awareness

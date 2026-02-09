@@ -696,6 +696,7 @@ Deno.serve(async (req) => {
       baseSlowdownPct?: number;
       finishOnTarget?: boolean;
       finishPace?: string;
+      finishTargetPace?: string;
       hasFinishSegment?: boolean;
     } | undefined = undefined;
     
@@ -779,15 +780,17 @@ Deno.serve(async (req) => {
             return `${mins}:${String(secs).padStart(2, '0')}/mi`;
           };
           const finishPace = lastActualPace ? formatPace(lastActualPace) : undefined;
+          const finishTargetPace = lastMid > 0 ? formatPace(lastMid) : undefined;
           
           segmentData = {
             baseSlowdownPct,
             finishOnTarget,
             finishPace,
+            finishTargetPace,
             hasFinishSegment
           };
           
-          console.log(`📊 [SEGMENT DATA] Fast-finish detected: baseSlowdown=${(baseSlowdownPct*100).toFixed(1)}%, finishOnTarget=${finishOnTarget}, finishPace=${finishPace}`);
+          console.log(`📊 [SEGMENT DATA] Fast-finish detected: baseSlowdown=${(baseSlowdownPct*100).toFixed(1)}%, finishOnTarget=${finishOnTarget}, finishPace=${finishPace}, finishTarget=${finishTargetPace}`);
         }
       }
     }
