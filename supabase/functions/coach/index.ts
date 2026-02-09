@@ -5,7 +5,7 @@
 // - Metrics are computed from stored workload_* fields (source of truth).
 // - No AI here; AI language should be layered on top of these facts.
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type {
   CoachWeekContextRequestV1,
   CoachWeekContextResponseV1,
@@ -726,7 +726,7 @@ Deno.serve(async (req) => {
         label: structuralLabel,
         strength_rir_7d: reaction.avg_strength_rir_7d,
         strength_rir_norm_28d: norms28d.strength_rir_avg,
-        rir_delta,
+        rir_delta: rirDelta,
         sample_size: reaction.rir_sample_size_7d,
       },
       subjective: {
