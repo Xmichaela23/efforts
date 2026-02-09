@@ -42,6 +42,63 @@ export default function CoachWeekTab() {
     ? Math.round(((data.week.planned_remaining_load || 0) / data.week.planned_total_load) * 100)
     : null;
   const keyPct = data.reaction?.key_sessions_completion_ratio != null ? Math.round(data.reaction.key_sessions_completion_ratio * 100) : null;
+
+  const overall = data.response?.overall;
+  const drivers = Array.isArray(overall?.drivers) ? overall!.drivers : [];
+  const hasData = String(overall?.label || '') !== 'need_more_data';
+
+  const snapshot = (() => {
+    if (!hasData) return { title: 'Not enough data', subtitle: 'We need a few more logged sessions to compare against your baseline.' };
+    if (drivers.length >= 2) return { title: 'Multiple fatigue signals', subtitle: 'More than one marker is elevated vs your normal.' };
+    if (drivers.includes('absorption_exec_down')) {
+      const d = data.response?.absorption?.execution_delta;
+      const n = data.reaction?.execution_sample_size || 0;
+      return {
+        title: 'Execution down vs baseline',
+        subtitle: d != null ? `Execution is ${d}% vs your 28d norm (n=${n}).` : `Execution is below your 28d norm (n=${n}).`,
+      };
+    }
+    if (drivers.includes('aerobic_drift_up')) {
+      const d = data.response?.aerobic?.drift_delta_bpm;
+      const n = data.reaction?.hr_drift_sample_size || 0;
+      return {
+        title: 'Aerobic strain up vs baseline',
+        subtitle: d != null ? `HR drift is +${Math.abs(d)} bpm vs your 28d norm (n=${n}).` : `HR drift is elevated vs your 28d norm (n=${n}).`,
+      };
+    }
+    if (drivers.includes('structural_rir_down')) {
+      const d = data.response?.structural?.rir_delta;
+      const n = data.reaction?.rir_sample_size_7d || 0;
+      return {
+        title: 'Strength fatigue up vs baseline',
+        subtitle: d != null ? `Strength RIR is ${d} vs your 28d norm (n=${n}).` : `Strength RIR is lower than your 28d norm (n=${n}).`,
+      };
+    }
+    if (drivers.includes('subjective_rpe_up')) {
+      const d = data.response?.subjective?.rpe_delta;
+      const n = data.reaction?.rpe_sample_size_7d || 0;
+      return {
+        title: 'Perceived strain up vs baseline',
+        subtitle: d != null ? `Session RPE is +${Math.abs(d)} vs your 28d norm (n=${n}).` : `Session RPE is higher than your 28d norm (n=${n}).`,
+      };
+    }
+    return { title: 'Within your normal range', subtitle: 'Your response markers look normal vs your 28d baseline.' };
+  })();
+
+  const formatDelta = (v: number | null, unit: string) => {
+    if (v == null) return '—';
+    const sign = v > 0 ? '+' : '';
+    return `${sign}${v}${unit}`;
+  };
+
+  const labelPhrase = (lbl: string | undefined | null) => {
+    const s = String(lbl || '');
+    if (s === 'efficient' || s === 'good' || s === 'fresh') return 'better';
+    if (s === 'stable') return 'normal';
+    if (s === 'stressed' || s === 'strained' || s === 'fatigued' || s === 'slipping') return 'worse';
+    return 'unknown';
+  };
+
   const verdictTone =
     data.verdict.code === 'recover_overreaching' ? 'border-red-500/30 bg-red-500/10'
     : data.verdict.code === 'caution_ramping_fast' ? 'border-amber-500/30 bg-amber-500/10'
@@ -70,17 +127,12 @@ export default function CoachWeekTab() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm text-white/60">Response snapshot</div>
-            <div className="text-xl font-medium text-white">
-              {(() => {
-                const lbl = String(data.response?.overall?.label || '');
-                if (lbl === 'absorbing_well') return 'Absorbing well';
-                if (lbl === 'fatigue_signs') return 'Fatigue signs';
-                if (lbl === 'mixed_signals') return 'Mixed signals';
-                return 'Need more data';
-              })()}
-            </div>
+            <div className="text-xl font-medium text-white">{snapshot.title}</div>
             <div className="text-xs text-white/45 mt-1">
-              Confidence: {Math.round((data.response?.overall?.confidence || 0) * 100)}%
+              {snapshot.subtitle}
+            </div>
+            <div className="text-2xs text-white/35 mt-1">
+              Confidence: {Math.round((data.response?.overall?.confidence || 0) * 100)}% • Baseline: last 28 days
             </div>
             {data.plan.week_focus_label ? (
               <div className="text-xs text-white/50 mt-1">{data.plan.week_focus_label}</div>
@@ -98,7 +150,7 @@ export default function CoachWeekTab() {
         <div className="text-sm text-white/70">How you’re responding</div>
         <div className="mt-2 space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Key sessions completed</div>
+            <div className="text-xs text-white/55">Key sessions (WTD)</div>
             <div className="text-xs text-white/85">
               {data.reaction.key_sessions_completed}/{data.reaction.key_sessions_planned}
               {keyPct != null ? <span className="text-white/45 ml-2">({keyPct}%)</span> : null}
@@ -144,34 +196,34 @@ export default function CoachWeekTab() {
       </div>
 
       <div className="rounded-xl border border-white/15 bg-white/[0.06] p-3">
-        <div className="text-sm text-white/70">Baseline-relative signals (vs 28d norm)</div>
+        <div className="text-sm text-white/70">What changed vs your baseline (28d)</div>
         <div className="mt-2 space-y-2">
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Aerobic (HR drift)</div>
             <div className="text-xs text-white/85 text-right">
-              {data.response?.aerobic?.drift_delta_bpm != null ? `${data.response.aerobic.drift_delta_bpm > 0 ? '+' : ''}${data.response.aerobic.drift_delta_bpm} bpm` : '—'}
-              <div className="text-2xs text-white/45">{data.response?.aerobic?.label || 'unknown'}</div>
+              {formatDelta(data.response?.aerobic?.drift_delta_bpm ?? null, ' bpm')}
+              <div className="text-2xs text-white/45">{labelPhrase(data.response?.aerobic?.label)}</div>
             </div>
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Structural (Strength RIR)</div>
             <div className="text-xs text-white/85 text-right">
-              {data.response?.structural?.rir_delta != null ? `${data.response.structural.rir_delta > 0 ? '+' : ''}${data.response.structural.rir_delta}` : '—'}
-              <div className="text-2xs text-white/45">{data.response?.structural?.label || 'unknown'}</div>
+              {formatDelta(data.response?.structural?.rir_delta ?? null, '')}
+              <div className="text-2xs text-white/45">{labelPhrase(data.response?.structural?.label)}</div>
             </div>
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Subjective (RPE)</div>
             <div className="text-xs text-white/85 text-right">
-              {data.response?.subjective?.rpe_delta != null ? `${data.response.subjective.rpe_delta > 0 ? '+' : ''}${data.response.subjective.rpe_delta}` : '—'}
-              <div className="text-2xs text-white/45">{data.response?.subjective?.label || 'unknown'}</div>
+              {formatDelta(data.response?.subjective?.rpe_delta ?? null, '')}
+              <div className="text-2xs text-white/45">{labelPhrase(data.response?.subjective?.label)}</div>
             </div>
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Absorption (Execution)</div>
             <div className="text-xs text-white/85 text-right">
-              {data.response?.absorption?.execution_delta != null ? `${data.response.absorption.execution_delta > 0 ? '+' : ''}${data.response.absorption.execution_delta}%` : '—'}
-              <div className="text-2xs text-white/45">{data.response?.absorption?.label || 'unknown'}</div>
+              {formatDelta(data.response?.absorption?.execution_delta ?? null, '%')}
+              <div className="text-2xs text-white/45">{labelPhrase(data.response?.absorption?.label)}</div>
             </div>
           </div>
         </div>
@@ -196,7 +248,7 @@ export default function CoachWeekTab() {
               const metric =
                 s.type === 'intervals' || s.type === 'hills'
                   ? (s.avg_interval_hr_creep_bpm != null ? `HR creep ${s.avg_interval_hr_creep_bpm} bpm` : (s.avg_execution_score != null ? `Exec ${s.avg_execution_score}%` : '—'))
-                  : (s.avg_hr_drift_bpm != null ? `Drift ${s.avg_hr_drift_bpm} bpm` : (s.avg_z2_percent != null ? `Z2 ${s.avg_z2_percent}%` : '—'));
+                  : (s.avg_decoupling_pct != null ? `Decoupling ${s.avg_decoupling_pct}%` : (s.avg_hr_drift_bpm != null ? `Drift ${s.avg_hr_drift_bpm} bpm` : (s.avg_z2_percent != null ? `Z2 ${s.avg_z2_percent}%` : '—')));
 
               return (
                 <div key={`${s.type}-${metric}`} className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2">

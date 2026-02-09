@@ -385,6 +385,19 @@ Deno.serve(async (req) => {
       try { return typeof v === 'string' ? JSON.parse(v) : (v || null); } catch { return null; }
     };
 
+    const hrWorkoutTypeFromWorkout = (wAny: any): string | null => {
+      try {
+        const wa = parseJson((wAny as any)?.workout_analysis) || {};
+        const hr = wa?.granular_analysis?.heart_rate_analysis || {};
+        const wt = hr?.workout_type;
+        if (wt == null) return null;
+        const s = String(wt).toLowerCase();
+        return s || null;
+      } catch {
+        return null;
+      }
+    };
+
     const driftBpmFromWorkout = (wAny: any): number | null => {
       try {
         const wa = parseJson(wAny?.workout_analysis) || {};
@@ -443,10 +456,12 @@ Deno.serve(async (req) => {
         const c = parseJson((w as any).computed);
         const s = safeNum(c?.overall?.execution_score);
         if (s != null) executionScores.push(s);
-        // Aerobic response: HR drift for runs
+        // Aerobic response: HR drift for steady aerobic runs only (avoid intervals/fartlek noise)
         if (String((w as any)?.type || '').toLowerCase() === 'run') {
-          const d = driftBpmFromWorkout(w as any);
-          if (d != null) driftBpms.push(d);
+          if (hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
+            const d = driftBpmFromWorkout(w as any);
+            if (d != null) driftBpms.push(d);
+          }
         }
         continue;
       }
@@ -455,8 +470,10 @@ Deno.serve(async (req) => {
       const s2 = safeNum(wa?.performance?.execution_adherence ?? wa?.performance?.pace_adherence);
       if (s2 != null) executionScores.push(s2);
       if (String((w as any)?.type || '').toLowerCase() === 'run') {
-        const d = driftBpmFromWorkout(w as any);
-        if (d != null) driftBpms.push(d);
+        if (hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
+          const d = driftBpmFromWorkout(w as any);
+          if (d != null) driftBpms.push(d);
+        }
       }
     }
     const avgExecutionScore =
@@ -539,8 +556,12 @@ Deno.serve(async (req) => {
       const ex = safeNum(c?.overall?.execution_score);
       if (ex != null) runAgg[rt].exec.push(ex);
 
-      const d = driftBpmFromWorkout(w as any);
-      if (d != null) runAgg[rt].drift.push(d);
+      // Drift is only meaningful for steady/progressive/tempo finish types; don't show it for intervals/fartlek.
+      const hrType = hrWorkoutTypeFromWorkout(w as any);
+      if (hrType === 'steady_state' || hrType === 'progressive' || hrType === 'tempo_finish') {
+        const d = driftBpmFromWorkout(w as any);
+        if (d != null) runAgg[rt].drift.push(d);
+      }
 
       try {
         const wa = parseJson((w as any)?.workout_analysis) || {};
@@ -631,8 +652,8 @@ Deno.serve(async (req) => {
       const ex = safeNum(c?.overall?.execution_score);
       if (ex != null) normExecution.push(ex);
 
-      // HR drift (steady-state runs only when stored)
-      if (String((w as any)?.type || '').toLowerCase() === 'run') {
+      // HR drift: steady aerobic runs only (TrainingPeaks-style)
+      if (String((w as any)?.type || '').toLowerCase() === 'run' && hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
         const d = driftBpmFromWorkout(w as any);
         if (d != null) normDrift.push(d);
       }
