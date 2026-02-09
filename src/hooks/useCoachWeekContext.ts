@@ -39,6 +39,29 @@ export type CoachWeekContextV1 = {
     key_sessions_planned: number;
     key_sessions_completed: number;
     key_sessions_completion_ratio: number | null;
+    key_sessions_linked: number;
+    key_sessions_gaps: number;
+    extra_sessions: number;
+    key_session_gaps_details: Array<{
+      planned_id: string;
+      date: string;
+      type: string;
+      name: string | null;
+      category: string;
+      workload_planned: number | null;
+    }>;
+    extra_sessions_details: Array<{
+      workout_id: string;
+      date: string;
+      type: string;
+      name: string | null;
+      workload_actual: number | null;
+    }>;
+    linking_confidence: {
+      label: 'low' | 'medium' | 'high';
+      score: number;
+      explain: string;
+    };
     avg_execution_score: number | null;
     execution_sample_size: number;
     hr_drift_avg_bpm: number | null;
@@ -119,9 +142,25 @@ export type CoachWeekContextV1 = {
     load_ramp: {
       acute7_total_load: number | null;
       chronic28_total_load: number | null;
-      acute7_by_type: Array<{ type: string; sessions: number; total_load: number }>;
-      chronic28_by_type: Array<{ type: string; sessions: number; total_load: number }>;
-      top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number }>;
+      acute7_by_type: Array<{
+        type: string;
+        total_sessions: number;
+        total_load: number;
+        linked_sessions: number;
+        linked_load: number;
+        extra_sessions: number;
+        extra_load: number;
+      }>;
+      chronic28_by_type: Array<{
+        type: string;
+        total_sessions: number;
+        total_load: number;
+        linked_sessions: number;
+        linked_load: number;
+        extra_sessions: number;
+        extra_load: number;
+      }>;
+      top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number; linked: boolean }>;
     };
   };
   verdict: {

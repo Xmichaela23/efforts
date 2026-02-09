@@ -88,6 +88,32 @@ export type CoachWeekContextResponseV1 = {
     key_sessions_planned: number;
     key_sessions_completed: number;
     key_sessions_completion_ratio: number | null; // 0..1
+    // Linking breakdown (WTD)
+    key_sessions_linked: number; // planned key sessions that have a completed workout linked
+    key_sessions_gaps: number; // planned key sessions without a linked completion
+    extra_sessions: number; // completed sessions not linked to any planned workout
+    // Details for manual repair flows (IDs needed for explicit linking)
+    key_session_gaps_details: Array<{
+      planned_id: string;
+      date: string; // YYYY-MM-DD
+      type: string;
+      name: string | null;
+      category: KeySessionCategory;
+      workload_planned: number | null;
+    }>;
+    extra_sessions_details: Array<{
+      workout_id: string;
+      date: string; // YYYY-MM-DD
+      type: string;
+      name: string | null;
+      workload_actual: number | null;
+    }>;
+    // A lightweight explanation for UI tooltips
+    linking_confidence: {
+      label: 'low' | 'medium' | 'high';
+      score: number; // 0..1
+      explain: string;
+    };
     avg_execution_score: number | null; // 0..100 (from computed.overall.execution_score where available)
     execution_sample_size: number; // count of sessions contributing to avg_execution_score
     // Aerobic response (primarily running): cardiac drift and internal load markers
@@ -179,9 +205,25 @@ export type CoachWeekContextResponseV1 = {
       // Explain "what was higher" using completed workouts only.
       acute7_total_load: number | null;
       chronic28_total_load: number | null;
-      acute7_by_type: Array<{ type: string; sessions: number; total_load: number }>;
-      chronic28_by_type: Array<{ type: string; sessions: number; total_load: number }>;
-      top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number }>;
+      acute7_by_type: Array<{
+        type: string;
+        total_sessions: number;
+        total_load: number;
+        linked_sessions: number;
+        linked_load: number;
+        extra_sessions: number;
+        extra_load: number;
+      }>;
+      chronic28_by_type: Array<{
+        type: string;
+        total_sessions: number;
+        total_load: number;
+        linked_sessions: number;
+        linked_load: number;
+        extra_sessions: number;
+        extra_load: number;
+      }>;
+      top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number; linked: boolean }>;
     };
   };
   verdict: {

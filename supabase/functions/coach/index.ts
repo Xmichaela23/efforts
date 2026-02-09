@@ -308,8 +308,10 @@ Deno.serve(async (req) => {
     const weekStartDate = weekStartOf(asOfDate, weekStartDow);
     const weekEndDate = addDaysISO(weekStartDate, 6);
     const weekIndex = activePlan ? computeWeekIndex(planConfig, asOfDate, weekStartDow, activePlan.duration_weeks || null) : null;
-    const { intent: weekIntent, focus_label: weekFocusLabel } = activePlan ? weekIntentFromContract(planConfig, weekIndex) : { intent: 'unknown', focus_label: null };
-    const methodologyCtx: MethodologyContext = { week_intent: weekIntent, week_start_dow: weekStartDow };
+    const weekIntentInfo = activePlan ? weekIntentFromContract(planConfig, weekIndex) : { intent: 'unknown', focus_label: null };
+    const weekIntent = weekIntentInfo.intent as CoachWeekContextResponseV1['plan']['week_intent'];
+    const weekFocusLabel = weekIntentInfo.focus_label as string | null;
+    const methodologyCtx: MethodologyContext = { week_intent: weekIntent as any, week_start_dow: weekStartDow };
 
     // Planned rows within the week window (used for totals + remaining + WTD)
     const { data: plannedWeek, error: pErr } = await supabase
@@ -366,20 +368,74 @@ Deno.serve(async (req) => {
     const keySessionsPlanned = plannedWtdArr
       .map((r: any) => ({ r, cat: keyCategoryForPlanned(r, methodologyCtx, methodologyId) }))
       .filter((x: any) => x.cat !== 'other');
-    const keySessionsCompleted = keySessionsPlanned.filter((x: any) =>
-      String(x?.r?.workout_status || '').toLowerCase() === 'completed' || x?.r?.completed_workout_id != null
-    );
-    const keySessionsCompletionRatio = keySessionsPlanned.length > 0 ? keySessionsCompleted.length / keySessionsPlanned.length : null;
 
     // Pull completed workouts in-week for execution_score sampling (linked workouts usually have planned_id)
     const plannedIds = new Set<string>(plannedWeekArr.map((p: any) => String(p?.id || '')).filter(Boolean));
     const { data: weekWorkouts, error: wwErr } = await supabase
       .from('workouts')
-      .select('id,date,type,workout_status,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,strength_exercises')
+      .select('id,date,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,strength_exercises')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', asOfDate);
     if (wwErr) throw wwErr;
+
+    const completedPlannedIdsFromWorkouts = new Set<string>(
+      (Array.isArray(weekWorkouts) ? weekWorkouts : [])
+        .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+        .map((w: any) => (w?.planned_id != null ? String(w.planned_id) : ''))
+        .filter((s: string) => Boolean(s))
+    );
+
+    const isPlannedCompleted = (r: any): boolean => {
+      const statusDone = String(r?.workout_status || '').toLowerCase() === 'completed';
+      const hardLinked = r?.completed_workout_id != null;
+      const viaWorkoutRef = r?.id != null && completedPlannedIdsFromWorkouts.has(String(r.id));
+      return Boolean(statusDone || hardLinked || viaWorkoutRef);
+    };
+
+    const keySessionsCompleted = keySessionsPlanned.filter((x: any) => isPlannedCompleted(x?.r));
+    const keySessionsCompletionRatio = keySessionsPlanned.length > 0 ? keySessionsCompleted.length / keySessionsPlanned.length : null;
+
+    // Linking breakdown (WTD): linked vs gaps vs extras
+    const keySessionGapsDetails = keySessionsPlanned
+      .filter((x: any) => !isPlannedCompleted(x?.r))
+      .map((x: any) => ({
+        planned_id: String(x?.r?.id || ''),
+        date: String(x?.r?.date || '').slice(0, 10),
+        type: String(x?.r?.type || ''),
+        name: x?.r?.name != null ? String(x.r.name) : null,
+        category: x?.cat,
+        workload_planned: safeNum(x?.r?.workload_planned),
+      }))
+      .filter((x: any) => Boolean(x.planned_id));
+
+    const extraSessionsDetails = (Array.isArray(weekWorkouts) ? weekWorkouts : [])
+      .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+      .filter((w: any) => w?.planned_id == null || String(w?.planned_id || '') === '')
+      .map((w: any) => ({
+        workout_id: String(w?.id || ''),
+        date: String(w?.date || '').slice(0, 10),
+        type: String(w?.type || ''),
+        name: w?.name != null ? String(w.name) : null,
+        workload_actual: safeNum((w as any)?.workload_actual),
+      }))
+      .filter((x: any) => Boolean(x.workout_id));
+
+    const keySessionsLinked = keySessionsPlanned.length - keySessionGapsDetails.length;
+    const keySessionsGaps = keySessionGapsDetails.length;
+    const extraSessions = extraSessionsDetails.length;
+
+    const daysInWindow = Math.max(
+      1,
+      Math.round((new Date(asOfDate).getTime() - new Date(weekStartDate).getTime()) / (24 * 3600 * 1000)) + 1
+    );
+    const daysWithActivity = new Set<string>(
+      (Array.isArray(weekWorkouts) ? weekWorkouts : [])
+        .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+        .map((w: any) => String(w?.date || '').slice(0, 10))
+        .filter(Boolean)
+    ).size;
+    const coverageRatio = Math.max(0, Math.min(1, daysWithActivity / daysInWindow));
 
     const parseJson = (v: any) => {
       try { return typeof v === 'string' ? JSON.parse(v) : (v || null); } catch { return null; }
@@ -624,10 +680,28 @@ Deno.serve(async (req) => {
       }))
       .sort((a, b) => b.sample_size - a.sample_size);
 
+    const linkingConfidence: CoachWeekContextResponseV1['reaction']['linking_confidence'] = (() => {
+      const base =
+        0.25 +
+        0.35 * Math.min(1, coverageRatio / 0.75) +
+        0.25 * Math.min(1, keySessionsPlanned.length / 3) +
+        0.15 * Math.min(1, executionScores.length / 4);
+      const score = Math.max(0.15, Math.min(0.98, base));
+      const label = score >= 0.8 ? 'high' : score >= 0.55 ? 'medium' : 'low';
+      const explain = `Based on ${daysWithActivity}/${daysInWindow} days with activity and ${executionScores.length} plan-linked execution samples.`;
+      return { label, score: Number(score.toFixed(2)), explain };
+    })();
+
     const reaction: CoachWeekContextResponseV1['reaction'] = {
       key_sessions_planned: keySessionsPlanned.length,
       key_sessions_completed: keySessionsCompleted.length,
       key_sessions_completion_ratio: keySessionsCompletionRatio,
+      key_sessions_linked: keySessionsLinked,
+      key_sessions_gaps: keySessionsGaps,
+      extra_sessions: extraSessions,
+      key_session_gaps_details: keySessionGapsDetails.slice(0, 10),
+      extra_sessions_details: extraSessionsDetails.slice(0, 10),
+      linking_confidence: linkingConfidence,
       avg_execution_score: avgExecutionScore,
       execution_sample_size: executionScores.length,
       hr_drift_avg_bpm: hrDriftAvg,
@@ -808,7 +882,7 @@ Deno.serve(async (req) => {
 
     const { data: rolling, error: rErr } = await supabase
       .from('workouts')
-      .select('id,workload_actual,date,workout_status,type,name')
+      .select('id,workload_actual,date,workout_status,type,name,planned_id')
       .eq('user_id', userId)
       .gte('date', chronicStart)
       .lte('date', asOfDate);
@@ -830,18 +904,37 @@ Deno.serve(async (req) => {
       return s;
     };
 
-    const byType = (rows: any[]): Array<{ type: string; sessions: number; total_load: number }> => {
-      const m = new Map<string, { sessions: number; total: number }>();
+    const byType = (rows: any[]): Array<{
+      type: string;
+      total_sessions: number;
+      total_load: number;
+      linked_sessions: number;
+      linked_load: number;
+      extra_sessions: number;
+      extra_load: number;
+    }> => {
+      const m = new Map<string, { total_sessions: number; total: number; linked_sessions: number; linked: number; extra_sessions: number; extra: number }>();
       for (const r of rows) {
         const typ = normalizeType(r?.type);
         const wl = safeNum(r?.workload_actual) || 0;
-        const cur = m.get(typ) || { sessions: 0, total: 0 };
-        cur.sessions += 1;
+        const isLinked = r?.planned_id != null && String(r.planned_id) !== '';
+        const cur = m.get(typ) || { total_sessions: 0, total: 0, linked_sessions: 0, linked: 0, extra_sessions: 0, extra: 0 };
+        cur.total_sessions += 1;
         cur.total += wl;
+        if (isLinked) { cur.linked_sessions += 1; cur.linked += wl; }
+        else { cur.extra_sessions += 1; cur.extra += wl; }
         m.set(typ, cur);
       }
       return Array.from(m.entries())
-        .map(([type, v]) => ({ type, sessions: v.sessions, total_load: Math.round(v.total) }))
+        .map(([type, v]) => ({
+          type,
+          total_sessions: v.total_sessions,
+          total_load: Math.round(v.total),
+          linked_sessions: v.linked_sessions,
+          linked_load: Math.round(v.linked),
+          extra_sessions: v.extra_sessions,
+          extra_load: Math.round(v.extra),
+        }))
         .sort((a, b) => b.total_load - a.total_load);
     };
 
@@ -851,6 +944,7 @@ Deno.serve(async (req) => {
         type: normalizeType(r?.type),
         name: r?.name != null ? String(r.name) : null,
         workload_actual: safeNum(r?.workload_actual) || 0,
+        linked: r?.planned_id != null && String(r.planned_id) !== '',
       }))
       .sort((a: any, b: any) => (b.workload_actual || 0) - (a.workload_actual || 0))
       .slice(0, 3);
@@ -932,7 +1026,7 @@ Deno.serve(async (req) => {
         return {
           code: 'overstrained',
           kicker,
-          title: 'Overstrained',
+          title: 'High fatigue',
           subtitle: primaryDeltaLine || 'Multiple response markers are worse than your normal.',
           confidence: conf,
           baseline_days,
@@ -944,7 +1038,7 @@ Deno.serve(async (req) => {
         return {
           code: 'strained',
           kicker,
-          title: 'Strained',
+          title: 'Elevated fatigue',
           subtitle: primaryDeltaLine || 'One response marker is worse than your normal.',
           confidence: conf,
           baseline_days,
@@ -952,12 +1046,14 @@ Deno.serve(async (req) => {
           load_ramp,
         };
       }
-      const okTitle = (weekIntent === 'recovery' || weekIntent === 'taper') ? 'Recovery looks right' : 'Strain looks right';
+      const okTitle = (weekIntent === 'recovery' || weekIntent === 'taper') ? 'Recovery' : 'Normal';
       return {
         code: 'strain_ok',
         kicker,
         title: okTitle,
-        subtitle: 'Your response markers are within your normal range for this point in the week.',
+        subtitle: (weekIntent === 'recovery' || weekIntent === 'taper')
+          ? 'Your response markers look appropriate for a down week vs your baseline.'
+          : 'Your response markers are within your normal range vs your baseline.',
         confidence: conf,
         baseline_days,
         load_ramp_acwr,
