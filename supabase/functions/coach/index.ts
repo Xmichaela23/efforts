@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
     // Planned rows within the week window (used for totals + remaining + WTD)
     const { data: plannedWeek, error: pErr } = await supabase
       .from('planned_workouts')
-      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned')
+      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
@@ -344,6 +344,8 @@ Deno.serve(async (req) => {
 
     const wtdCompletionRatio = plannedWtdLoad > 0 ? Math.max(0, Math.min(1, actualWtdLoad / plannedWtdLoad)) : null;
 
+    const plannedWtdArr = plannedWeekArr.filter((r: any) => String(r?.date || '') <= asOfDate);
+
     const keySessionsRemaining: KeySessionItem[] = plannedWeekArr
       .filter((r: any) => String(r?.date || '') >= asOfDate && String(r?.workout_status || '').toLowerCase() !== 'completed')
       .map((r: any) => {
@@ -360,10 +362,13 @@ Deno.serve(async (req) => {
       .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
 
     // Key session completion + execution quality
-    const keySessionsPlanned = plannedWeekArr
+    // IMPORTANT: this is week-to-date (<= asOfDate), otherwise mid-week counts look wrong.
+    const keySessionsPlanned = plannedWtdArr
       .map((r: any) => ({ r, cat: keyCategoryForPlanned(r, methodologyCtx, methodologyId) }))
       .filter((x: any) => x.cat !== 'other');
-    const keySessionsCompleted = keySessionsPlanned.filter((x: any) => String(x?.r?.workout_status || '').toLowerCase() === 'completed');
+    const keySessionsCompleted = keySessionsPlanned.filter((x: any) =>
+      String(x?.r?.workout_status || '').toLowerCase() === 'completed' || x?.r?.completed_workout_id != null
+    );
     const keySessionsCompletionRatio = keySessionsPlanned.length > 0 ? keySessionsCompleted.length / keySessionsPlanned.length : null;
 
     // Pull completed workouts in-week for execution_score sampling (linked workouts usually have planned_id)
