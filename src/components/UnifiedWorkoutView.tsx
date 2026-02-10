@@ -891,8 +891,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     if (!pid || !wid) return;
                     suppressRelinkUntil.current = Date.now() + 15000;
                     try {
-                      await supabase.from('workouts').update({ planned_id: null } as any).eq('id', wid);
-                      await supabase.from('planned_workouts').update({ workout_status: 'planned' } as any).eq('id', pid);
+                      await supabase.functions.invoke('detach-planned', { body: { workout_id: wid, planned_id: pid } as any });
                     } catch {}
                     setCurrentPlannedId(null);
                     setLinkedPlanned(null);

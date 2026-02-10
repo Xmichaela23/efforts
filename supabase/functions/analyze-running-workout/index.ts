@@ -702,9 +702,19 @@ Deno.serve(async (req) => {
       hasFinishSegment?: boolean;
     } | undefined = undefined;
     
-    // Check if this is a long run with fast finish (e.g., 14 mi easy + 1 mi at M pace)
-    // Sort by true chronological key: start_time_s (actual timestamp) or planned_step_index (plan order)
-    const workIntervalsUnsorted = intervalsToAnalyze.filter((i: any) => i.role === 'work' || i.kind === 'work');
+    // Check if this is a long run with fast finish (e.g., easy/base + fast finish).
+    // IMPORTANT: these segments are not always tagged as "work" (they may be "easy"/"steady"),
+    // so we include any non-recovery segment with an executed pace target.
+    // Sort by true chronological key: start_time_s (actual timestamp) or planned_step_index (plan order).
+    const workIntervalsUnsorted = intervalsToAnalyze.filter((i: any) => {
+      const role = String(i?.role || i?.kind || '').toLowerCase();
+      if (!i?.executed) return false;
+      if (!i?.pace_range && !i?.target_pace) return false;
+      // Exclude true recovery/rest segments (jog recoveries, rests)
+      if (role.includes('recovery') || role.includes('rest')) return false;
+      // Include "work", "easy", "steady", "base", etc.
+      return true;
+    });
     
     // Check if we have a reliable chronological key
     const hasChronoKey = workIntervalsUnsorted.every((i: any) => 
@@ -2233,11 +2243,18 @@ function generateAdherenceSummary(
         }
         // Otherwise: within 5% tolerance = 'ok' (no warning)
       } else {
-        // Interval workouts: use absolute comparison (original logic)
-        if (actualPaceSecPerMi < targetLower) {
+        // Interval workouts: still use absolute comparison, but apply a small tolerance
+        // for ultra-tight targets (e.g. 11:08-11:08) to avoid false "off target"
+        // from rounding/GPS noise.
+        const rangeWidth = Math.abs(targetUpper - targetLower);
+        const epsSec = rangeWidth <= 3 ? 5 : 0; // only widen point targets
+        const lo = targetLower - epsSec;
+        const hi = targetUpper + epsSec;
+
+        if (actualPaceSecPerMi < lo) {
           direction = 'fast';
           delta = targetLower - actualPaceSecPerMi;
-        } else if (actualPaceSecPerMi > targetUpper) {
+        } else if (actualPaceSecPerMi > hi) {
           direction = 'slow';
           delta = actualPaceSecPerMi - targetUpper;
         }

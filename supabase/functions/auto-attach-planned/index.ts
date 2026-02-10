@@ -1,7 +1,7 @@
 // @ts-nocheck
 // Function: auto-attach-planned
 // Behavior: Attach completed workouts to planned by exact YYYY-MM-DD date + type
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -220,6 +220,23 @@ Deno.serve(async (req) => {
           throw new Error(`Failed to link workout: ${workoutUpdateErr.message}`);
         }
         console.log('[auto-attach-planned] Workout linked successfully');
+
+        // Clear computed mapping so UI doesn't show stale planned snapshot.
+        // Preserve computed.analysis.series produced by compute-workout-analysis.
+        try {
+          const { error: rpcError } = await supabase.rpc('merge_computed', {
+            p_workout_id: w.id,
+            p_partial_computed: {
+              intervals: [],
+              planned_steps_light: null,
+            },
+          });
+          if (rpcError) {
+            console.error('[auto-attach-planned] Failed to merge computed (explicit):', rpcError);
+          }
+        } catch (e) {
+          console.error('[auto-attach-planned] merge_computed error (explicit):', e);
+        }
         
         // Trigger run analysis when user attaches (pace + summary); fire-and-forget
         if (finalSport === 'run') {
@@ -237,10 +254,43 @@ Deno.serve(async (req) => {
     }
 
     // ===== AUTO-ATTACH PATH (heuristic matching) =====
-    // Already linked → return early (no function triggers)
+    // Already linked → ensure planned_workouts side is synced (INSERT with planned_id does not fire UPDATE trigger).
     if (currentPlannedId) {
-      console.log('[auto-attach-planned] Workout already linked to planned_id:', currentPlannedId);
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'already_linked' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      console.log('[auto-attach-planned] Workout already has planned_id:', currentPlannedId, '— syncing planned_workouts linkage/status');
+      try {
+        const pid = String(currentPlannedId);
+        const { data: plannedRow, error: pErr } = await supabase
+          .from('planned_workouts')
+          .select('id,user_id,completed_workout_id,workout_status')
+          .eq('id', pid)
+          .maybeSingle();
+        if (!plannedRow || String(plannedRow.user_id) !== String(w.user_id)) {
+          return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_not_found_or_wrong_user', details: pErr }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+
+        // If planned row points at a different workout, clear that old workout's planned_id first.
+        const oldCompletedId = (plannedRow as any)?.completed_workout_id as string | null | undefined;
+        if (oldCompletedId && oldCompletedId !== w.id) {
+          try {
+            await supabase.from('workouts').update({ planned_id: null }).eq('id', oldCompletedId).eq('user_id', w.user_id);
+          } catch {}
+        }
+
+        const { error: upErr } = await supabase
+          .from('planned_workouts')
+          .update({ workout_status: 'completed', completed_workout_id: w.id })
+          .eq('id', pid)
+          .eq('user_id', w.user_id);
+        if (upErr) {
+          console.error('[auto-attach-planned] Sync update planned_workouts error:', upErr);
+          return new Response(JSON.stringify({ success: false, attached: false, reason: 'sync_failed', details: upErr }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+
+        return new Response(JSON.stringify({ success: true, attached: true, mode: 'sync_existing_link', planned_id: pid }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      } catch (e:any) {
+        console.error('[auto-attach-planned] Sync existing link error:', e);
+        return new Response(JSON.stringify({ success: false, attached: false, reason: 'sync_failed', error: String(e) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
     }
 
     // Fetch planned candidates of same sport on the exact YYYY-MM-DD only (timezone-agnostic)
@@ -277,7 +327,18 @@ Deno.serve(async (req) => {
       if (candidates.length === 0) {
         return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       }
-      // If multiple candidates, pick the first one (could enhance with exercise matching later)
+      // Safety: if multiple candidates exist, do NOT guess (this is a common source of wrong attachments).
+      if (candidates.length > 1) {
+        return new Response(JSON.stringify({
+          success: true,
+          attached: false,
+          reason: 'ambiguous_candidates',
+          mode: 'date_type_match',
+          candidates: candidates.map((p:any)=>({ id: p.id, date: p.date, name: p.name, type: p.type, workout_status: p.workout_status })),
+        }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+
+      // Single candidate → safe attach.
       const best = candidates[0];
       console.log('[auto-attach-planned] Selected candidate:', best.id, 'from', candidates.length, 'candidates');
       
@@ -348,13 +409,18 @@ Deno.serve(async (req) => {
     console.log('[auto-attach-planned] Run/ride/swim workout - matching by date + type + duration');
     console.log('[auto-attach-planned] Workout moving_time (minutes):', w.moving_time, 'converted to seconds:', wSec);
 
-    // High-confidence selection rule: same day+type AND duration within 85%–115%
-    // Compute planned seconds for each candidate and pick closest by percent diff
-    let best: any = null; let bestPct: number = Number.POSITIVE_INFINITY; let bestSec: number | null = null;
-    const ensureSeconds = async (p:any) => {
-      const totals = sumPlanned(p);
+    // High-confidence selection: choose closest by a combined score (duration + distance when available),
+    // and skip auto-attach when candidates are ambiguous.
+    let best: any = null;
+    let bestScore: number = Number.POSITIVE_INFINITY;
+    let bestTotals: { seconds: number | null; meters: number | null } = { seconds: null, meters: null };
+    let secondBestScore: number = Number.POSITIVE_INFINITY;
+
+    const ensureTotals = async (p:any): Promise<{ seconds: number | null; meters: number | null }> => {
+      let totals = sumPlanned(p);
       let pSec = Number(totals.seconds);
-      if (!(Number.isFinite(pSec) && pSec>0)) {
+      let pMeters = Number(totals.meters);
+      if (!((Number.isFinite(pSec) && pSec>0) || (Number.isFinite(pMeters) && pMeters>0))) {
         try {
           const baseUrl = Deno.env.get('SUPABASE_URL');
           const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
@@ -369,11 +435,15 @@ Deno.serve(async (req) => {
             .eq('id', p.id)
             .maybeSingle();
           if (pRow) Object.assign(p, pRow);
-          const totals2 = sumPlanned(p);
-          pSec = Number(totals2.seconds);
+          totals = sumPlanned(p);
+          pSec = Number(totals.seconds);
+          pMeters = Number(totals.meters);
         } catch {}
       }
-      return Number.isFinite(pSec) && pSec>0 ? pSec : null;
+      return {
+        seconds: (Number.isFinite(pSec) && pSec>0) ? pSec : null,
+        meters: (Number.isFinite(pMeters) && pMeters>0) ? pMeters : null,
+      };
     };
 
     for (const p of candidates) {
@@ -384,22 +454,58 @@ Deno.serve(async (req) => {
         console.log('[auto-attach-planned] Skipping candidate - date or type mismatch');
         continue;
       }
-      const pSec = await ensureSeconds(p);
-      console.log('[auto-attach-planned] Planned seconds:', pSec, 'Workout seconds:', wSec);
-      if (!Number.isFinite(pSec) || pSec <= 0 || !Number.isFinite(wSec) || wSec <= 0) {
-        console.log('[auto-attach-planned] Skipping candidate - invalid duration (planned:', pSec, 'workout:', wSec, ')');
-        continue;
+      const totals = await ensureTotals(p);
+      const pSec = totals.seconds;
+      const pMeters = totals.meters;
+      console.log('[auto-attach-planned] Planned totals:', { seconds: pSec, meters: pMeters }, 'Workout:', { seconds: wSec, meters: wMeters });
+
+      const secPct = (Number.isFinite(wSec) && wSec > 0 && Number.isFinite(pSec as any) && (pSec as any) > 0)
+        ? (Math.abs(wSec - (pSec as number)) / Math.max(1, (pSec as number)))
+        : Number.POSITIVE_INFINITY;
+      const distPct = (Number.isFinite(wMeters) && wMeters > 0 && Number.isFinite(pMeters as any) && (pMeters as any) > 0)
+        ? (Math.abs(wMeters - (pMeters as number)) / Math.max(1, (pMeters as number)))
+        : Number.POSITIVE_INFINITY;
+
+      // Combined score: duration is primary, distance is secondary when available.
+      const score = (secPct !== Number.POSITIVE_INFINITY ? Math.min(secPct, 1) : 1)
+        + (distPct !== Number.POSITIVE_INFINITY ? 0.5 * Math.min(distPct, 1) : 0);
+
+      console.log('[auto-attach-planned] Candidate score:', score, { secPct, distPct }, 'best so far:', bestScore);
+
+      if (score < bestScore) {
+        secondBestScore = bestScore;
+        bestScore = score;
+        best = p;
+        bestTotals = totals;
+      } else if (score < secondBestScore) {
+        secondBestScore = score;
       }
-      const pct = Math.abs(wSec - pSec) / Math.max(1, pSec);
-      console.log('[auto-attach-planned] Duration difference:', pct, 'best so far:', bestPct);
-      if (pct < bestPct) { bestPct = pct; best = p; bestSec = pSec; }
     }
     if (!best) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
-    const ratio = (bestSec && wSec>0) ? (wSec / bestSec) : null;
+    const ratio = (bestTotals.seconds && wSec>0) ? (wSec / (bestTotals.seconds as number)) : null;
     if (!(ratio!=null && ratio >= 0.85 && ratio <= 1.15)) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // Ambiguity gate: if there's more than one plausible match, do not guess.
+    // This avoids the "attaches the wrong planned workout" failure mode.
+    if (candidates.length > 1 && Number.isFinite(secondBestScore) && secondBestScore < Number.POSITIVE_INFINITY) {
+      const delta = secondBestScore - bestScore;
+      // If second-best is close, require manual attach.
+      if (delta < 0.06) {
+        return new Response(JSON.stringify({
+          success: true,
+          attached: false,
+          reason: 'ambiguous_candidates',
+          mode: 'heuristic',
+          best_candidate_id: best?.id,
+          best_score: bestScore,
+          second_best_score: secondBestScore,
+          candidates: candidates.map((p:any)=>({ id: p.id, date: p.date, name: p.name, type: p.type, workout_status: p.workout_status })),
+        }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
     }
 
     // Link (allow re-attach if previously completed to a deleted/old workout)

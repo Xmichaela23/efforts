@@ -1,0 +1,3 @@
+[functions.detach-planned]
+verify_jwt = false
+
