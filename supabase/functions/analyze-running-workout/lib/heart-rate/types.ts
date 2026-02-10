@@ -56,6 +56,8 @@ export interface HRAnalysisContext {
   
   // Segment-level pace data (for long runs with fast finish)
   segmentData?: {
+    basePace?: string;        // Display pace for base portion (e.g., "11:10/mi")
+    baseTargetPace?: string;  // Display target pace for base portion (e.g., "11:08/mi")
     baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
     finishOnTarget?: boolean;  // Whether finish segment hit target
     finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")

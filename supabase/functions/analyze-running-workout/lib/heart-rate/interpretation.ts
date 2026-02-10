@@ -189,6 +189,8 @@ interface SteadyStateNarrativeInput {
   paceAdherencePct?: number;
   
   // Segment-level pace data (for long runs with fast finish)
+  basePace?: string;        // Display pace for base portion (e.g., "11:10/mi")
+  baseTargetPace?: string;  // Display target pace for base portion (e.g., "11:08/mi")
   baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
   finishOnTarget?: boolean;  // Whether finish segment hit target
   finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
@@ -224,6 +226,8 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
     intent,
     durationMinutes,
     paceAdherencePct,
+    basePace,
+    baseTargetPace,
     baseSlowdownPct,
     finishOnTarget,
     finishPace,
@@ -294,7 +298,8 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   if (hasFinishSegment && baseSlowdownPct !== undefined) {
     // Long run with fast finish: evaluate base and finish separately
     if (baseNearTarget) {
-      parts.push('Easy portion was on target.');
+      if (basePace && baseTargetPace) parts.push(`Easy portion was on target (${basePace} vs ${baseTargetPace}).`);
+      else parts.push('Easy portion was on target.');
     } else if (baseSlow && baseWithinHeatTolerance && isWarm) {
       // Base was slow but within heat tolerance
       parts.push(`Pace was slower than the target range, but ${tempPhrase} increased the effort cost. HR suggests you still achieved the aerobic stimulus.`);
@@ -306,7 +311,8 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
       parts.push('The easy portion was well slower than the target range, reducing the intended aerobic stimulus.');
     } else if (!baseSlow) {
       // Base was on target
-      parts.push('Pace was on target.');
+      if (basePace && baseTargetPace) parts.push(`Easy portion was on target (${basePace} vs ${baseTargetPace}).`);
+      else parts.push('Pace was on target.');
     }
     
     // Finish assessment: if planned final segment was on target, add one sentence
@@ -497,9 +503,12 @@ function buildDriftInterpretation(
     durationMinutes,
     paceAdherencePct: context.paceAdherencePct, // From granular analysis
     // Segment-level data for long runs with fast finish
+    basePace: context.segmentData?.basePace,
+    baseTargetPace: context.segmentData?.baseTargetPace,
     baseSlowdownPct: context.segmentData?.baseSlowdownPct,
     finishOnTarget: context.segmentData?.finishOnTarget,
     finishPace: context.segmentData?.finishPace,
+    finishTargetPace: context.segmentData?.finishTargetPace,
     hasFinishSegment: context.segmentData?.hasFinishSegment,
     hrDriftBpm,
     earlyAvgHr: drift.earlyAvgHr,

@@ -693,6 +693,8 @@ Deno.serve(async (req) => {
     // Calculate before HR analysis so narrative can use it
     // -------------------------------------------------------------------------
     let segmentData: {
+      basePace?: string;
+      baseTargetPace?: string;
       baseSlowdownPct?: number;
       finishOnTarget?: boolean;
       finishPace?: string;
@@ -781,8 +783,12 @@ Deno.serve(async (req) => {
           };
           const finishPace = lastActualPace ? formatPace(lastActualPace) : undefined;
           const finishTargetPace = lastMid > 0 ? formatPace(lastMid) : undefined;
+          const basePace = baseActualPace ? formatPace(baseActualPace) : undefined;
+          const baseTargetPace = firstMid > 0 ? formatPace(firstMid) : undefined;
           
           segmentData = {
+            basePace,
+            baseTargetPace,
             baseSlowdownPct,
             finishOnTarget,
             finishPace,
@@ -790,7 +796,7 @@ Deno.serve(async (req) => {
             hasFinishSegment
           };
           
-          console.log(`📊 [SEGMENT DATA] Fast-finish detected: baseSlowdown=${(baseSlowdownPct*100).toFixed(1)}%, finishOnTarget=${finishOnTarget}, finishPace=${finishPace}, finishTarget=${finishTargetPace}`);
+          console.log(`📊 [SEGMENT DATA] Fast-finish detected: base=${basePace} vs ${baseTargetPace} (slowdown=${(baseSlowdownPct*100).toFixed(1)}%), finishOnTarget=${finishOnTarget}, finish=${finishPace} vs ${finishTargetPace}`);
         }
       }
     }
