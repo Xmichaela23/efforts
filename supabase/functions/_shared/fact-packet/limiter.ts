@@ -14,6 +14,8 @@ export type LimiterInput = {
   training_load: { cumulative_fatigue?: 'low' | 'moderate' | 'high'; acwr_ratio?: number | null; week_load_pct?: number | null; previous_day_workload?: number } | null;
   vs_similar: { hr_delta_bpm?: number | null };
   trend: { direction?: string };
+  workout_intent?: string | null; // "recovery" | "easy" | ...
+  week_intent?: string | null; // "recovery" | ...
 };
 
 function workSegmentsWithTargets(segments: WorkoutSegmentV1[]): WorkoutSegmentV1[] {
@@ -51,6 +53,20 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
   if (paceOnTarget) {
     return { primary: { limiter: null, evidence: ['Performance met or exceeded targets'], confidence: 1.0 }, contributors: [] };
   }
+
+  // CHECK 1A: RECOVERY INTEGRITY (too fast for easy/recovery)
+  // If the plan intent is recovery/easy and the athlete ran materially faster than target,
+  // call it a pacing error (not heat/fatigue/fitness).
+  try {
+    const intent = String(input.workout_intent || '').toLowerCase();
+    const weekIntent = String(input.week_intent || '').toLowerCase();
+    const isRecoveryIntent =
+      intent === 'recovery' || intent === 'easy' || weekIntent === 'recovery';
+    if (isRecoveryIntent && avgDev < -20) {
+      const evidence = [`Recovery intent, but executed ~${Math.round(Math.abs(avgDev))}s/mi faster than the prescribed range.`];
+      return { primary: { limiter: 'pacing_error', evidence, confidence: 0.85 }, contributors };
+    }
+  } catch {}
 
   // CHECK 1: HEAT (only if moderate/severe)
   try {

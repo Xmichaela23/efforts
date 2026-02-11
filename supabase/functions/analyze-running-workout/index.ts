@@ -1951,8 +1951,10 @@ Deno.serve(async (req) => {
       } catch {}
 
       for (const s of sentences) {
+        // When the fact packet exists, avoid re-introducing legacy narrative sentences
+        // (it tends to restate the interval table rather than coach).
+        if (fact_packet_v1) break;
         if (bullets.length >= 4) break;
-        // Avoid duplicating verdict if it's already present
         if (bullets.some((b) => b.toLowerCase() === s.toLowerCase())) continue;
         bullets.push(s);
       }

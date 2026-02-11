@@ -129,7 +129,7 @@ export async function buildWorkoutFactPacketV1(args: {
   supabase: SupabaseLike;
   workout: any;
   plannedWorkout: any | null;
-  planContext: { planName?: string | null; phaseName?: string | null; weekIndex?: number | null } | null;
+  planContext: { planName?: string | null; phaseName?: string | null; weekIndex?: number | null; weekIntent?: string | null; isRecoveryWeek?: boolean | null } | null;
   workoutIntent: string | null;
   learnedFitness: any | null; // from user_baselines.learned_fitness
 }): Promise<{ factPacket: FactPacketV1; flags: FlagV1[] }> {
@@ -220,6 +220,8 @@ export async function buildWorkoutFactPacketV1(args: {
       phase: (planContext?.phaseName ? String(planContext.phaseName) : (plannedWorkout?.phase ? String(plannedWorkout.phase) : null)),
       workout_purpose: (plannedWorkout?.focus ? String(plannedWorkout.focus) : (plannedWorkout?.description ? String(plannedWorkout.description) : null)),
       days_until_race: null,
+      week_intent: planContext?.weekIntent ? String(planContext.weekIntent) : null,
+      is_recovery_week: typeof planContext?.isRecoveryWeek === 'boolean' ? planContext.isRecoveryWeek : null,
     };
   })();
 
@@ -281,6 +283,8 @@ export async function buildWorkoutFactPacketV1(args: {
     training_load: trainingLoad,
     vs_similar: { hr_delta_bpm: (vsSimilar as any)?.hr_delta_bpm ?? null },
     trend,
+    workout_intent: String(workoutIntent || '').toLowerCase() || null,
+    week_intent: factsPlan?.week_intent ? String(factsPlan.week_intent).toLowerCase() : null,
   });
 
   const inputs_present: string[] = [];

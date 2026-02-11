@@ -53,6 +53,9 @@ export type PlanV1 = {
   phase: string | null; // "base" | "build" | ...
   workout_purpose: string | null;
   days_until_race: number | null;
+  // Optional plan-week context (drives recovery integrity flags/limiter).
+  week_intent?: string | null; // e.g. "recovery" | "build"
+  is_recovery_week?: boolean | null;
 };
 
 export type TrainingLoadV1 = {

@@ -16,6 +16,29 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
   // For v1, emit plan pacing alignment/miss.
   try {
     if (work.length) {
+      const avgDev = (() => {
+        const xs = work
+          .map((s) => coerceNumber(s.pace_deviation_sec))
+          .filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
+        if (!xs.length) return null;
+        return xs.reduce((a, b) => a + b, 0) / xs.length;
+      })();
+
+      // Recovery integrity: materially faster than prescribed on easy/recovery intent
+      try {
+        const intent = String((packet as any)?.facts?.plan?.week_intent || '').toLowerCase();
+        const workoutType = String(packet.facts.workout_type || '').toLowerCase();
+        const isRecovery = intent === 'recovery' || workoutType.includes('recovery') || workoutType.includes('easy');
+        if (isRecovery && avgDev != null && avgDev < -20) {
+          push(flags, {
+            type: 'concern',
+            category: 'pacing',
+            message: `Too fast for recovery: ~${Math.round(Math.abs(avgDev))}s/mi faster than the prescribed range.`,
+            priority: 1,
+          });
+        }
+      } catch {}
+
       const maxMiss = Math.max(...work.map((s) => Math.abs(coerceNumber(s.pace_deviation_sec) || 0)));
       if (maxMiss <= 15) {
         push(flags, { type: 'positive', category: 'pacing', message: 'Work segments were on target (±15s/mi).', priority: 3 });
