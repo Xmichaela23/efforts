@@ -99,6 +99,16 @@ function inferWorkoutTypeKey(row: any): string | null {
   return t || null;
 }
 
+/** For comparison queries: group similar workout types so we have enough history (e.g. recovery + easy + run). */
+function getComparableTypeKeys(key: string | null): string[] {
+  if (!key) return [];
+  const k = safeLower(key);
+  const easyLike = ['recovery', 'easy', 'easy_run', 'steady_state', 'run'];
+  if (easyLike.includes(k)) return easyLike;
+  if (['long_run', 'long_run_fast_finish'].includes(k)) return ['long_run', 'long_run_fast_finish'];
+  return [k];
+}
+
 async function fetchRecentWorkouts(
   supabase: SupabaseLike,
   userId: string,
@@ -140,12 +150,14 @@ export async function getSimilarWorkoutComparisons(
     const bandLo = Math.max(5, durationMin - 10);
     const bandHi = durationMin + 10;
 
+    const comparableKeys = getComparableTypeKeys(workoutTypeKey);
     const filtered = rows
       .filter((r) => String(r.id) !== String(currentWorkoutId))
       .filter((r) => String(r.workout_status || '').toLowerCase() === 'completed')
       .filter((r) => {
         if (!workoutTypeKey) return true;
-        return inferWorkoutTypeKey(r) === workoutTypeKey;
+        const inferred = inferWorkoutTypeKey(r);
+        return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
       })
       .filter((r) => {
         const d = getOverallDurationMin(r);

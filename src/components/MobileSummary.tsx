@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthCompareTable from './StrengthCompareTable';
@@ -345,6 +346,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const [hydratedCompleted, setHydratedCompleted] = useState<any>(completed);
   const [recomputing, setRecomputing] = useState(false);
   const [recomputeError, setRecomputeError] = useState<string | null>(null);
+  const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(false);
 
   useEffect(() => {
     setHydratedCompleted(completed);
@@ -2532,9 +2534,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               )}
               {hasFactPacketV1 && (
                 <div className="space-y-2">
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                    Coach signals
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAnalysisDetailsOpen((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide hover:text-gray-300"
+                  >
+                    {analysisDetailsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    Analysis Details
+                  </button>
+                  {analysisDetailsOpen && (
                   <div className="space-y-1.5">
                     {(() => {
                       const rows: Array<{ label: string; value: string }> = [];
@@ -2565,12 +2573,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
                       try {
                         const vs = factPacketV1?.derived?.comparisons?.vs_similar;
-                        if (vs && typeof vs.sample_size === 'number' && vs.sample_size > 0) {
+                        if (vs && typeof vs.sample_size === 'number' && vs.sample_size > 0 && vs.assessment !== 'insufficient_data') {
                           const map: Record<string, string> = {
                             better_than_usual: 'Better than usual',
                             typical: 'Typical',
                             worse_than_usual: 'Worse than usual',
-                            insufficient_data: 'Not enough data',
                           };
                           rows.push({
                             label: 'Similar workouts',
@@ -2581,7 +2588,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
                       try {
                         const tr = factPacketV1?.derived?.comparisons?.trend;
-                        if (tr && typeof tr.data_points === 'number' && tr.data_points > 0) {
+                        if (tr && typeof tr.data_points === 'number' && tr.data_points > 0 && tr.direction !== 'insufficient_data') {
                           rows.push({
                             label: 'Trend',
                             value: `${String(tr.direction)}${tr.magnitude ? ` — ${tr.magnitude}` : ''}`.trim(),
@@ -2591,7 +2598,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
                       try {
                         const wx = factPacketV1?.facts?.weather;
-                        if (wx && typeof wx.dew_point_f === 'number') {
+                        if (wx && typeof wx.dew_point_f === 'number' && wx.heat_stress_level && wx.heat_stress_level !== 'none') {
                           rows.push({
                             label: 'Conditions',
                             value: `Dew point ${Math.round(wx.dew_point_f)}°F (${wx.heat_stress_level})`,
@@ -2602,10 +2609,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       try {
                         const tl = factPacketV1?.derived?.training_load;
                         if (tl && typeof tl.cumulative_fatigue === 'string') {
-                          const wk = typeof tl.week_load_pct === 'number' ? `, week ${Math.round(tl.week_load_pct)}%` : '';
+                          const evidence = Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
+                            ? tl.fatigue_evidence.join(' — ')
+                            : tl.cumulative_fatigue.charAt(0).toUpperCase() + tl.cumulative_fatigue.slice(1).toLowerCase() + ' fatigue';
                           rows.push({
                             label: 'Fatigue',
-                            value: `${tl.cumulative_fatigue}${wk}`.trim(),
+                            value: evidence.trim(),
                           });
                         }
                       } catch {}
@@ -2638,6 +2647,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       ));
                     })()}
                   </div>
+                  )}
                 </div>
               )}
               {hasStructuredForRender && adherenceSummary && (

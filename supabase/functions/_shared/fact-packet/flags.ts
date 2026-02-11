@@ -95,15 +95,7 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     }
   } catch {}
 
-  // Stimulus achieved
-  try {
-    const st = packet.derived.stimulus;
-    if (st?.achieved) {
-      push(flags, { type: 'positive', category: 'execution', message: `Training stimulus achieved — ${st.evidence?.[0] || 'HR/structure confirms the work was done'}.`, priority: 1 });
-    } else {
-      push(flags, { type: 'concern', category: 'execution', message: `Stimulus may have been missed — ${st?.partial_credit || 'targets/physiology did not align'}.`, priority: 1 });
-    }
-  } catch {}
+  // Stimulus: not emitted as a flag — stimulus has its own coach signals row and summary bullet; flag was redundant.
 
   // Limiter
   try {
