@@ -2161,7 +2161,8 @@ const MIN_SEGMENT_DURATION_S = 120;
 /**
  * Merge consecutive micro-segments (e.g. 0.06 mi, 0.13 mi) into single segments so a steady
  * easy run shows one row instead of a dozen. Segments under minDistanceMi or minDurationS
- * that share the same planned_step_id (or role) are merged.
+ * that share the same role (work/recovery) are merged — use role so all small work segments
+ * combine even when planned_step_id differs (e.g. 4×100m strides).
  */
 function mergeMicroSegments(intervalList: any[], minDistanceMi: number = MIN_SEGMENT_DISTANCE_MI, minDurationS: number = MIN_SEGMENT_DURATION_S): any[] {
   if (!intervalList?.length) return intervalList;
@@ -2171,7 +2172,7 @@ function mergeMicroSegments(intervalList: any[], minDistanceMi: number = MIN_SEG
     const dur = i?.executed?.duration_s ?? i?.duration_s ?? 0;
     return (dist > 0 && dist < minDistanceM) || (dur > 0 && dur < minDurationS);
   };
-  const key = (i: any): string => String(i?.planned_step_id ?? i?.role ?? i?.label ?? '');
+  const key = (i: any): string => String(i?.role ?? i?.planned_step_id ?? i?.label ?? '');
 
   const out: any[] = [];
   let run: any[] = [];

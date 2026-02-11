@@ -167,9 +167,14 @@ export async function buildWorkoutFactPacketV1(args: {
   const maxHr = hrFromComputedMax != null ? Math.round(hrFromComputedMax) : hrSensor.max;
 
   const elevationGainFt = (() => {
-    const m = coerceNumber(workout?.elevation_gain ?? workout?.total_elevation_gain ?? overall?.elevation_gain_m ?? overall?.elevation_gain ?? overall?.total_elevation_gain_m);
+    let m = coerceNumber(workout?.elevation_gain ?? workout?.total_elevation_gain ?? overall?.elevation_gain_m ?? overall?.elevation_gain ?? overall?.total_elevation_gain_m);
+    if (m == null && overallDistMi > 0) {
+      const breakdown = workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
+      const intervals = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
+      const sum = intervals.reduce((acc: number, inv: any) => acc + (coerceNumber(inv?.elevation_gain_m) ?? 0), 0);
+      if (sum > 0) m = sum;
+    }
     if (m == null) return null;
-    // workouts.elevation_gain is typically meters in this repo
     return Math.round(m * 3.28084);
   })();
 
@@ -233,9 +238,15 @@ export async function buildWorkoutFactPacketV1(args: {
     };
   })();
 
-  // Historical queries: use classified workout_type (from plan) for comparisons so recovery/easy match past runs
+  // Historical queries: use classified workout_type (from plan) for comparisons so recovery/easy match past runs.
+  // When plan is recovery week but analyzer labeled "intervals" (e.g. strides), compare to easy/recovery runs.
   const workoutTypeKey = deriveWorkoutTypeKey(workout);
-  const comparisonTypeKey = (workout_type !== 'unknown' ? workout_type : workoutTypeKey) || workoutTypeKey;
+  let comparisonTypeKey = (workout_type !== 'unknown' ? workout_type : workoutTypeKey) || workoutTypeKey;
+  const weekIntent = planContext?.weekIntent ?? null;
+  const isRecoveryWeek = planContext?.isRecoveryWeek === true;
+  if ((weekIntent === 'recovery' || isRecoveryWeek) && (comparisonTypeKey === 'intervals' || comparisonTypeKey === 'interval_run')) {
+    comparisonTypeKey = 'recovery';
+  }
   const hrDriftCurrent = coerceNumber(workout?.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm) ?? null;
 
   const [vsSimilar, trend, achievements, trainingLoad] = await Promise.all([
