@@ -2454,13 +2454,34 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             (typeof standardizedSummary.title === 'string' && standardizedSummary.title.length > 0) &&
             Array.isArray(standardizedSummary.bullets) &&
             standardizedSummary.bullets.length > 0;
-          const hasStructured = adherenceSummary && (
-            (Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0) ||
-            (adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.')
-          );
+          // If we have standardized v1 summary, don't also render "Summary"/HR narrative from structured insights
+          // (it reads like a duplicate "SUMMARY" block).
+          const SUMMARY_LABELS = new Set([
+            'Summary',
+            'Cardiac Drift',
+            'Aerobic Efficiency',
+            'Aerobic Stress',
+            'Aerobic Response',
+            'Elevated Drift',
+            'High Cardiac Stress',
+            'Interval Summary',
+            'Zone Summary',
+          ]);
+
+          const technicalInsightsAll = Array.isArray(adherenceSummary?.technical_insights)
+            ? adherenceSummary.technical_insights
+            : [];
+          const technicalInsightsForRender = hasStandardized
+            ? technicalInsightsAll.filter((t: { label: string }) => !SUMMARY_LABELS.has(String(t?.label || '').trim()))
+            : technicalInsightsAll;
+
+          const hasPlanImpactForRender =
+            !!(adherenceSummary?.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.');
+          const hasTechnicalForRender = technicalInsightsForRender.length > 0;
+          const hasStructuredForRender = !!adherenceSummary && (hasTechnicalForRender || hasPlanImpactForRender);
           const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
           const hasLegacyVerdict = typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
-          const hasNothing = !hasStandardized && !hasStructured && !hasNarrative && !hasLegacyVerdict;
+          const hasNothing = !hasStandardized && !hasStructuredForRender && !hasNarrative && !hasLegacyVerdict;
           if (hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
@@ -2501,11 +2522,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   </div>
                 </div>
               )}
-              {hasStructured && adherenceSummary && (
+              {hasStructuredForRender && adherenceSummary && (
                 <>
-                  {Array.isArray(adherenceSummary.technical_insights) && adherenceSummary.technical_insights.length > 0 && (
+                  {technicalInsightsForRender.length > 0 && (
                     <div className="space-y-2">
-                      {adherenceSummary.technical_insights.map((t: { label: string; value: string }, i: number) => (
+                      {technicalInsightsForRender.map((t: { label: string; value: string }, i: number) => (
                         <div key={i}>
                           <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{t.label}</span>
                           <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{t.value}</p>
@@ -2521,14 +2542,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   )}
                 </>
               )}
-              {!hasStructured && hasNarrative && (
+              {!hasStructuredForRender && hasNarrative && (
                 <div className="space-y-2">
                   {narrativeInsights.map((insight: string, i: number) => (
                     <p key={i} className="text-sm text-gray-300 leading-relaxed">{insight}</p>
                   ))}
                 </div>
               )}
-              {!hasStructured && !hasNarrative && hasLegacyVerdict && (
+              {!hasStructuredForRender && !hasNarrative && hasLegacyVerdict && (
                 <p className="text-sm text-gray-300 leading-relaxed">{scoreExplanation}</p>
               )}
             </div>

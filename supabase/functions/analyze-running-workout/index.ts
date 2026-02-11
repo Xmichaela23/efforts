@@ -12,6 +12,7 @@ import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type W
 import { generateAINarrativeInsights } from './lib/narrative/ai-generator.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from './lib/plan-context.ts';
+import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -234,12 +235,14 @@ Deno.serve(async (req) => {
     }
 
     // Get user baselines first (needed for both planned and unplanned workouts)
-    let baselines = {};
+    let baselines: any = {};
+    let effortPaces: any = null;
+    let learnedFitness: any = null;
     let userUnits = 'imperial'; // default
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, units')
+        .select('performance_numbers, units, effort_paces, learned_fitness')
         .eq('user_id', workout.user_id)
         .single();
       
@@ -247,11 +250,55 @@ Deno.serve(async (req) => {
         userUnits = userBaselines.units;
       }
       baselines = userBaselines?.performance_numbers || {};
+      effortPaces = (userBaselines as any)?.effort_paces || null;
+      learnedFitness = (userBaselines as any)?.learned_fitness || null;
       console.log('📊 User baselines found:', baselines);
     } catch (error) {
       console.log('⚠️ No user baselines found, using defaults');
       // Use default baselines for analysis
     }
+
+    // Baseline paces for coach-grade comparisons (seconds per mile).
+    // Prefer effort_paces (explicit training paces), then performance_numbers.easyPace, then learned_fitness.
+    const parsePaceSecPerMi = (val: any): number | null => {
+      try {
+        if (val == null) return null;
+        if (typeof val === 'number' && Number.isFinite(val) && val > 0) return val;
+        const s = String(val).trim();
+        if (!s) return null;
+        // allow "11:08/mi" or "11:08"
+        const m = s.match(/(\d+)\s*:\s*(\d{1,2})/);
+        if (!m) return null;
+        const mm = Number(m[1]);
+        const ss = Number(m[2]);
+        if (!Number.isFinite(mm) || !Number.isFinite(ss)) return null;
+        return (mm * 60) + ss;
+      } catch {
+        return null;
+      }
+    };
+
+    const learnedEasySecPerMi = (() => {
+      try {
+        const lf = learnedFitness || {};
+        const metric = (lf as any)?.run_easy_pace_sec_per_km ?? (lf as any)?.runEasyPaceSecPerKm ?? null;
+        const v = (metric && typeof metric === 'object') ? Number((metric as any)?.value) : Number(metric);
+        if (!Number.isFinite(v) || !(v > 0)) return null;
+        // sec/km -> sec/mi
+        return v * 1.60934;
+      } catch {
+        return null;
+      }
+    })();
+
+    const baselinePacesSecPerMi = {
+      base: Number.isFinite(Number(effortPaces?.base)) ? Number(effortPaces.base)
+        : (parsePaceSecPerMi(baselines?.easyPace) ?? parsePaceSecPerMi(baselines?.easy_pace) ?? (learnedEasySecPerMi ?? null)),
+      steady: Number.isFinite(Number(effortPaces?.steady)) ? Number(effortPaces.steady) : null,
+      power: Number.isFinite(Number(effortPaces?.power)) ? Number(effortPaces.power) : null,
+      speed: Number.isFinite(Number(effortPaces?.speed)) ? Number(effortPaces.speed) : null,
+      race: Number.isFinite(Number(effortPaces?.race)) ? Number(effortPaces.race) : null,
+    } as const;
 
     // Query similar historical workouts for HR drift comparison
     let historicalDriftData: {
@@ -695,10 +742,16 @@ Deno.serve(async (req) => {
     let segmentData: {
       basePace?: string;
       baseTargetPace?: string;
+      baseActualSecPerMi?: number;
+      baseTargetSecPerMi?: number;
+      baseDeltaSecPerMi?: number;
       baseSlowdownPct?: number;
       finishOnTarget?: boolean;
       finishPace?: string;
       finishTargetPace?: string;
+      finishActualSecPerMi?: number;
+      finishTargetSecPerMi?: number;
+      finishDeltaSecPerMi?: number;
       hasFinishSegment?: boolean;
     } | undefined = undefined;
     
@@ -716,18 +769,27 @@ Deno.serve(async (req) => {
       return true;
     });
     
-    // Check if we have a reliable chronological key
-    const hasChronoKey = workIntervalsUnsorted.every((i: any) => 
-      i.start_time_s != null || i.start_offset_s != null || i.planned_step_index != null
+    // Check if we have a reliable chronological key.
+    // NOTE: computed.intervals from compute-workout-summary always include sample_idx_start, which is a
+    // stable proxy for chronological order (1 sample ~ 1 second).
+    const hasChronoKey = workIntervalsUnsorted.every((i: any) =>
+      i.start_time_s != null ||
+      i.start_offset_s != null ||
+      i.sample_idx_start != null ||
+      i.planned_step_index != null
     );
     
     // Only proceed with segment detection if we have reliable ordering
-    const workIntervalsList = hasChronoKey 
+    const workIntervalsList = hasChronoKey
       ? workIntervalsUnsorted.sort((a: any, b: any) => {
           // Primary: actual start time (most reliable)
           const aTime = a.start_time_s ?? a.start_offset_s;
           const bTime = b.start_time_s ?? b.start_offset_s;
           if (aTime != null && bTime != null) return aTime - bTime;
+          // Next: sample index start (proxy for time)
+          const aS = a.sample_idx_start ?? null;
+          const bS = b.sample_idx_start ?? null;
+          if (aS != null && bS != null) return aS - bS;
           // Fallback: plan authoring order
           const aIdx = a.planned_step_index ?? 0;
           const bIdx = b.planned_step_index ?? 0;
@@ -764,6 +826,34 @@ Deno.serve(async (req) => {
       const firstRange = parsePaceRange(firstInterval.pace_range || firstInterval.target_pace);
       const lastRange = parsePaceRange(lastInterval.pace_range || lastInterval.target_pace);
       
+      const normalizeRange = (r: { lower: number; upper: number } | null): { fast: number; slow: number } | null => {
+        if (!r) return null;
+        const a = Number(r.lower);
+        const b = Number(r.upper);
+        if (!Number.isFinite(a) || !Number.isFinite(b) || !(a > 0) || !(b > 0)) return null;
+        // For pace (sec/mi), "fast" is the smaller number.
+        return { fast: Math.min(a, b), slow: Math.max(a, b) };
+      };
+
+      const isPaceOnTarget = (actualSecPerMi: number | null | undefined, r: { lower: number; upper: number } | null): boolean => {
+        const a = Number(actualSecPerMi);
+        if (!Number.isFinite(a) || !(a > 0)) return false;
+        const nr = normalizeRange(r);
+        if (!nr) return false;
+        const { fast, slow } = nr;
+
+        // Point target: use tight absolute tolerance (seconds) to avoid false positives.
+        // This matches the UI expectation for targets like "9:52/mi".
+        const POINT_EPS_SEC = 5;
+        if (Math.abs(slow - fast) <= 0.5) {
+          return Math.abs(a - fast) <= POINT_EPS_SEC;
+        }
+
+        // Range target: allow a tiny buffer (1%) for GPS/rounding noise.
+        const RANGE_EPS_PCT = 0.01;
+        return a >= fast * (1 - RANGE_EPS_PCT) && a <= slow * (1 + RANGE_EPS_PCT);
+      };
+
       if (firstRange && lastRange) {
         const firstMid = (firstRange.lower + firstRange.upper) / 2;
         const lastMid = (lastRange.lower + lastRange.upper) / 2;
@@ -779,11 +869,11 @@ Deno.serve(async (req) => {
             baseSlowdownPct = Math.max(0, (baseActualPace - firstMid) / firstMid);
           }
           
-          // Check if finish segment was on target
+          // Check if finish segment was on target.
+          // NOTE: pace ranges are in sec/mi where lower can mean "faster" (smaller number),
+          // and some sources may invert lower/upper. Normalize first.
           const lastActualPace = lastInterval.executed?.avg_pace_s_per_mi;
-          const finishOnTarget = lastActualPace != null && 
-                                 lastActualPace >= lastRange.lower * 0.95 && // Allow 5% tolerance
-                                 lastActualPace <= lastRange.upper * 1.05;
+          const finishOnTarget = isPaceOnTarget(lastActualPace, lastRange);
           
           // Format finish pace for display
           const formatPace = (secPerMi: number): string => {
@@ -799,10 +889,18 @@ Deno.serve(async (req) => {
           segmentData = {
             basePace,
             baseTargetPace,
+            baseActualSecPerMi: Number.isFinite(Number(baseActualPace)) ? Number(baseActualPace) : undefined,
+            baseTargetSecPerMi: Number.isFinite(Number(firstMid)) ? Number(firstMid) : undefined,
+            baseDeltaSecPerMi:
+              Number.isFinite(Number(baseActualPace)) && Number.isFinite(Number(firstMid)) ? (Number(baseActualPace) - Number(firstMid)) : undefined,
             baseSlowdownPct,
             finishOnTarget,
             finishPace,
             finishTargetPace,
+            finishActualSecPerMi: Number.isFinite(Number(lastActualPace)) ? Number(lastActualPace) : undefined,
+            finishTargetSecPerMi: Number.isFinite(Number(lastMid)) ? Number(lastMid) : undefined,
+            finishDeltaSecPerMi:
+              Number.isFinite(Number(lastActualPace)) && Number.isFinite(Number(lastMid)) ? (Number(lastActualPace) - Number(lastMid)) : undefined,
             hasFinishSegment
           };
           
@@ -1690,9 +1788,96 @@ Deno.serve(async (req) => {
       })();
 
       const bullets: string[] = [];
-      if (typeof adherenceSummary?.verdict === 'string' && adherenceSummary.verdict.trim().length > 0) {
-        bullets.push(adherenceSummary.verdict.trim().endsWith('.') ? adherenceSummary.verdict.trim() : `${adherenceSummary.verdict.trim()}.`);
+      const verdictRaw = (typeof adherenceSummary?.verdict === 'string' ? adherenceSummary.verdict.trim() : '');
+      const verdictIsLowSignal = /\b\d+\s+of\s+\d+\s+intervals?\s+on\s+target\b/i.test(verdictRaw);
+      if (verdictRaw && !verdictIsLowSignal) {
+        bullets.push(verdictRaw.endsWith('.') ? verdictRaw : `${verdictRaw}.`);
       }
+
+      // Add 1-2 deterministic “coach-grade” insight bullets before the narrative,
+      // using plan expectations + conditions + your historical norms (when available).
+      try {
+        const seg = (hrAnalysisContext as any)?.segmentData || null;
+        const histAvg = Number((hrAnalysisContext as any)?.historicalDrift?.avgDriftBpm);
+        const driftBpm = Number((hrAnalysisResult as any)?.drift?.driftBpm);
+        const tempF = Number((hrAnalysisContext as any)?.weather?.temperatureF);
+        const humidity = Number((hrAnalysisContext as any)?.weather?.humidity);
+
+        const fmtDelta = (sec: number): string => {
+          const s = Math.round(Math.abs(sec));
+          const m = Math.floor(s / 60);
+          const r = s % 60;
+          return `${m}:${String(r).padStart(2, '0')}`;
+        };
+        const fmtPace = (secPerMi: number): string => {
+          const s = Math.round(Math.max(0, secPerMi));
+          const m = Math.floor(s / 60);
+          const r = s % 60;
+          return `${m}:${String(r).padStart(2, '0')}/mi`;
+        };
+
+        // Baseline easy/base comparison (what this means *for you*, not just the plan).
+        const baseActual = Number(seg?.baseActualSecPerMi);
+        const baseBaseline = Number(baselinePacesSecPerMi.base);
+        if (seg?.hasFinishSegment && Number.isFinite(baseActual) && baseActual > 0 && Number.isFinite(baseBaseline) && baseBaseline > 0) {
+          const d = baseActual - baseBaseline;
+          const abs = Math.abs(d);
+          if (abs <= 10) {
+            bullets.push(`Easy portion aligned with your baseline base pace (~${fmtPace(baseBaseline)}).`);
+          } else {
+            const dir = d > 0 ? 'slower' : 'faster';
+            bullets.push(`Easy portion was ${fmtDelta(d)}/mi ${dir} than your baseline base pace (~${fmtPace(baseBaseline)}).`);
+          }
+        }
+
+        // Segment delta (fast-finish magnitude)
+        const finishDelta = Number(seg?.finishDeltaSecPerMi);
+        if (seg?.hasFinishSegment && Number.isFinite(finishDelta) && Math.abs(finishDelta) >= 10) {
+          const dir = finishDelta > 0 ? 'slower' : 'faster';
+          bullets.push(`Fast-finish segment was ${fmtDelta(finishDelta)}/mi ${dir} than target.`);
+        }
+
+        // Historical drift baseline
+        if (Number.isFinite(histAvg) && histAvg > 0 && Number.isFinite(driftBpm) && driftBpm > 0) {
+          bullets.push(`HR drift ${Math.round(driftBpm)} bpm vs your typical ~${Math.round(histAvg)} bpm for similar runs.`);
+        }
+
+        // Conditions / terrain / pacing fluctuations (only when we have real signal).
+        // Keep this to a single concise bullet so it stays high-signal.
+        try {
+          const parts: string[] = [];
+
+          if (Number.isFinite(tempF)) {
+            const tf = Math.round(tempF);
+            if (tf >= 70) {
+              const hum = Number.isFinite(humidity) ? `, ${Math.round(humidity)}% humidity` : '';
+              parts.push(`${tf}°F${hum}`);
+            }
+          }
+
+          // Pacing fluctuations: prefer CV% from granular pacing analysis; fallback to interval speed fluctuations
+          const cv = Number((enhancedAnalysis as any)?.pacing_analysis?.pacing_variability?.coefficient_of_variation);
+          const varPct = Number((detailedAnalysis as any)?.speed_fluctuations?.pace_variability_percent);
+          const paceVar = Number.isFinite(cv) ? cv : (Number.isFinite(varPct) ? varPct : null);
+          if (paceVar != null) {
+            const pv = Math.round(paceVar);
+            if (pv >= 6) parts.push(`pace variability ~${pv}%`);
+          }
+
+          // Terrain: use mile-by-mile splits to detect "rolling" / non-flat terrain
+          const terrain = (detailedAnalysis as any)?.mile_by_mile_terrain;
+          const splits = Array.isArray(terrain?.splits) ? terrain.splits : [];
+          if (splits.length >= 3) {
+            const nonFlat = splits.filter((s: any) => String(s?.terrain_type || '').toLowerCase() !== 'flat').length;
+            if (nonFlat / splits.length >= 0.4) parts.push('rolling terrain');
+          }
+
+          if (parts.length) {
+            bullets.push(`Context: ${parts.slice(0, 3).join(' • ')}.`);
+          }
+        } catch {}
+      } catch {}
+
       for (const s of sentences) {
         if (bullets.length >= 4) break;
         // Avoid duplicating verdict if it's already present
@@ -1741,6 +1926,42 @@ Deno.serve(async (req) => {
       return out;
     })();
     
+    // =========================================================================
+    // Deterministic fact packet (v1) — single source of truth for coaching.
+    // Built from computed + workout_analysis + plan + baselines + historical queries.
+    // =========================================================================
+    let fact_packet_v1: any = null;
+    let flags_v1: any = null;
+    try {
+      const workoutForFact = {
+        ...workout,
+        // Provide the same analysis object we're about to write to DB
+        workout_analysis: {
+          granular_analysis: enhancedAnalysis,
+          performance,
+          detailed_analysis: detailedAnalysis,
+        },
+      };
+
+      const intent = plannedWorkout ? (detectWorkoutIntent(plannedWorkout) as any) : null;
+      const { factPacket, flags } = await buildWorkoutFactPacketV1({
+        supabase,
+        workout: workoutForFact,
+        plannedWorkout: plannedWorkout || null,
+        planContext: planContextForDrift
+          ? { planName: (planContextForDrift as any).planName, phaseName: (planContextForDrift as any).phaseName, weekIndex: (planContextForDrift as any).weekIndex }
+          : null,
+        workoutIntent: (intent as any) || null,
+        learnedFitness: learnedFitness || null,
+      });
+      fact_packet_v1 = factPacket;
+      flags_v1 = flags;
+    } catch (e) {
+      console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);
+      fact_packet_v1 = null;
+      flags_v1 = null;
+    }
+
     // Use RPC to merge computed (preserves analysis.series from compute-workout-analysis)
     // RPC is required - no fallbacks to prevent data loss
     const { error: rpcError } = await supabase.rpc('merge_computed', {
@@ -1764,6 +1985,8 @@ Deno.serve(async (req) => {
         score_explanation: scoreExplanation,  // Backward-compat: single verdict line
         adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact
         summary: summaryV1, // Standardized per-workout summary (v1)
+        fact_packet_v1: fact_packet_v1,
+        flags_v1: flags_v1,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         // NEW: Structured HR summary for weekly/block context aggregation
         heart_rate_summary: hrAnalysisResult.summary

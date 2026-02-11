@@ -597,7 +597,9 @@ Deno.serve(async (req) => {
     }
 
     // sport from workouts.type (fallback 'run' for walk/undefined)
-    const sport: Sport = String((w as any)?.type || 'run').toLowerCase() as Sport;
+    // Treat mobility like strength for compute purposes (no interval alignment/tolerances).
+    const sportRaw = String((w as any)?.type || 'run').toLowerCase();
+    const sport: Sport = (sportRaw === 'mobility' ? 'strength' : sportRaw) as Sport;
 
     let planned: any = null;
     if (w.planned_id) {

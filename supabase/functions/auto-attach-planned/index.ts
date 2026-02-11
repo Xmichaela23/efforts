@@ -136,6 +136,30 @@ Deno.serve(async (req) => {
         if (!plannedRow || String(plannedRow.user_id) !== String(w.user_id)) {
           return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_not_found_or_wrong_user', details: plannedErr }), { headers: { ...cors, 'Content-Type': 'application/json' } });
         }
+
+        // HARDENING: Clear any stale reverse-links pointing to this workout.
+        // This handles the legacy/old-client "Unattach" behavior where planned_workouts.completed_workout_id
+        // was left behind, causing triggers to re-sticky attach to the wrong planned row.
+        try {
+          const { data: stale } = await supabase
+            .from('planned_workouts')
+            .select('id')
+            .eq('user_id', w.user_id)
+            .eq('completed_workout_id', w.id);
+          const staleIds = (Array.isArray(stale) ? stale : [])
+            .map((r:any)=>String(r?.id||''))
+            .filter((id:string)=> id && id !== String(plannedRow.id));
+          if (staleIds.length) {
+            console.log('[auto-attach-planned] Clearing stale planned.completed_workout_id rows:', staleIds);
+            await supabase
+              .from('planned_workouts')
+              .update({ workout_status: 'planned', completed_workout_id: null })
+              .in('id', staleIds)
+              .eq('user_id', w.user_id);
+          }
+        } catch (e) {
+          console.error('[auto-attach-planned] Failed clearing stale reverse-links:', e);
+        }
         
         // Materialize steps if missing
         try {
@@ -237,14 +261,30 @@ Deno.serve(async (req) => {
         } catch (e) {
           console.error('[auto-attach-planned] merge_computed error (explicit):', e);
         }
-        
-        // Trigger run analysis when user attaches (pace + summary); fire-and-forget
+
+        // Trigger summary+analysis in deterministic order; fire-and-forget.
+        // compute-workout-summary writes computed.intervals + computed.planned_steps_light used by Performance UI.
+        const baseUrl = Deno.env.get('SUPABASE_URL');
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key };
+        const triggerSummary = fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ workout_id: w.id }),
+        });
+
         if (finalSport === 'run') {
-          const baseUrl = Deno.env.get('SUPABASE_URL');
-          const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-          fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) })
-            .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) }))
-            .catch(e => console.error('[auto-attach-planned] Run analysis trigger error:', e));
+          triggerSummary
+            .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+            .catch((e) => {
+              // Don't block run analysis on compute-workout-analysis; it's additive.
+              console.error('[auto-attach-planned] compute-workout-analysis trigger error:', e);
+              return null;
+            })
+            .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+            .catch((e) => console.error('[auto-attach-planned] Run analysis trigger error:', e));
+        } else {
+          triggerSummary.catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error:', e));
         }
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'explicit', planned_id: String(plannedRow.id) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       } catch (explicitError: any) {
@@ -284,6 +324,49 @@ Deno.serve(async (req) => {
         if (upErr) {
           console.error('[auto-attach-planned] Sync update planned_workouts error:', upErr);
           return new Response(JSON.stringify({ success: false, attached: false, reason: 'sync_failed', details: upErr }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+
+        // Also clear computed mapping so UI doesn't show a stale planned snapshot.
+        // Preserve computed.analysis.series produced by compute-workout-analysis.
+        try {
+          const { error: rpcError } = await supabase.rpc('merge_computed', {
+            p_workout_id: w.id,
+            p_partial_computed: {
+              intervals: [],
+              planned_steps_light: null,
+            },
+          });
+          if (rpcError) {
+            console.error('[auto-attach-planned] Failed to merge computed (sync_existing_link):', rpcError);
+          }
+        } catch (e) {
+          console.error('[auto-attach-planned] merge_computed error (sync_existing_link):', e);
+        }
+
+        // Trigger summary rebuild (and run analysis when applicable) so UI doesn't show stale planned rows.
+        try {
+          const baseUrl = Deno.env.get('SUPABASE_URL');
+          const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+          const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key };
+          const triggerSummary = fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ workout_id: w.id }),
+          });
+          if (finalSport === 'run') {
+            triggerSummary
+              .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+              .catch((e) => {
+                console.error('[auto-attach-planned] compute-workout-analysis trigger error (sync_existing_link):', e);
+                return null;
+              })
+              .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+              .catch((e) => console.error('[auto-attach-planned] Run analysis trigger error (sync_existing_link):', e));
+          } else {
+            triggerSummary.catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error (sync_existing_link):', e));
+          }
+        } catch (e) {
+          console.error('[auto-attach-planned] Trigger error (sync_existing_link):', e);
         }
 
         return new Response(JSON.stringify({ success: true, attached: true, mode: 'sync_existing_link', planned_id: pid }), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -396,8 +479,20 @@ Deno.serve(async (req) => {
 
       console.log('[auto-attach-planned] strength/mobility: Workout linked successfully');
       
-      // FIX: No function triggers - ingest-activity handles orchestration
-      // This ensures deterministic ordering (planned_id exists before analysis runs)
+      // Trigger computed summary rebuild so UI picks up the new planned_id mapping.
+      // (For mobility we treat it like strength inside compute-workout-summary.)
+      try {
+        const baseUrl = Deno.env.get('SUPABASE_URL');
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+          body: JSON.stringify({ workout_id: w.id }),
+        }).catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error (strength/mobility):', e));
+      } catch (e) {
+        console.error('[auto-attach-planned] compute-workout-summary trigger error (strength/mobility):', e);
+      }
+
       return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, mode: 'date_type_match' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
@@ -587,14 +682,34 @@ Deno.serve(async (req) => {
 
     console.log('[auto-attach-planned] heuristic: Workout linked successfully');
     
-    // Trigger run analysis when attach matches a run (pace + summary); fire-and-forget
-    if (finalSport === 'run') {
+    // Trigger summary+analysis after heuristic attach; fire-and-forget.
+    // compute-workout-summary writes computed.intervals + computed.planned_steps_light used by Performance UI.
+    try {
       const baseUrl = Deno.env.get('SUPABASE_URL');
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-      fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) })
-        .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) }))
-        .catch(e => console.error('[auto-attach-planned] Run analysis trigger error:', e));
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key };
+      const triggerSummary = fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ workout_id: w.id }),
+      });
+
+      if (finalSport === 'run') {
+        triggerSummary
+          .then(() => fetch(`${baseUrl}/functions/v1/compute-workout-analysis`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+          .catch((e) => {
+            console.error('[auto-attach-planned] compute-workout-analysis trigger error (heuristic):', e);
+            return null;
+          })
+          .then(() => fetch(`${baseUrl}/functions/v1/analyze-running-workout`, { method: 'POST', headers, body: JSON.stringify({ workout_id: w.id }) }))
+          .catch((e) => console.error('[auto-attach-planned] Run analysis trigger error (heuristic):', e));
+      } else {
+        triggerSummary.catch((e) => console.error('[auto-attach-planned] compute-workout-summary trigger error (heuristic):', e));
+      }
+    } catch (e) {
+      console.error('[auto-attach-planned] trigger error (heuristic):', e);
     }
+
     return new Response(JSON.stringify({ success: true, attached: true, planned_id: best.id, ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error('[auto-attach-planned] Error:', e);

@@ -58,10 +58,16 @@ export interface HRAnalysisContext {
   segmentData?: {
     basePace?: string;        // Display pace for base portion (e.g., "11:10/mi")
     baseTargetPace?: string;  // Display target pace for base portion (e.g., "11:08/mi")
+    baseActualSecPerMi?: number; // Numeric actual pace (sec/mi)
+    baseTargetSecPerMi?: number; // Numeric target pace (sec/mi)
+    baseDeltaSecPerMi?: number;  // actual - target (sec/mi), + = slower
     baseSlowdownPct?: number;  // How much slower base portion was vs target (0.12 = 12% slow)
     finishOnTarget?: boolean;  // Whether finish segment hit target
     finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
     finishTargetPace?: string; // Display target pace for finish (e.g., "9:52/mi")
+    finishActualSecPerMi?: number; // Numeric actual pace (sec/mi)
+    finishTargetSecPerMi?: number; // Numeric target pace (sec/mi)
+    finishDeltaSecPerMi?: number;  // actual - target (sec/mi), + = slower
     hasFinishSegment?: boolean; // Whether workout has a distinct fast finish
   };
   

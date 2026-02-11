@@ -195,12 +195,14 @@ interface SteadyStateNarrativeInput {
   finishOnTarget?: boolean;  // Whether finish segment hit target
   finishPace?: string;       // Display pace for finish (e.g., "9:56/mi")
   finishTargetPace?: string; // Display target pace for finish (e.g., "9:52/mi")
+  finishDeltaSecPerMi?: number; // actual - target (sec/mi), + = slower
   hasFinishSegment?: boolean; // Whether workout has a distinct fast finish
   
   // HR drift (optional)
   hrDriftBpm?: number;
   earlyAvgHr?: number;
   lateAvgHr?: number;
+  historicalAvgDriftBpm?: number; // user's typical drift for similar runs (bpm)
   
   // Conditions
   temperatureF?: number | null;
@@ -232,8 +234,10 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
     finishOnTarget,
     finishPace,
     finishTargetPace,
+    finishDeltaSecPerMi,
     hasFinishSegment,
     hrDriftBpm,
+    historicalAvgDriftBpm,
     temperatureF,
     elevationGainFt,
     terrainProfile,
@@ -242,6 +246,13 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   } = input;
   
   const parts: string[] = [];
+
+  const fmtDeltaSecPerMi = (deltaSec: number): string => {
+    const s = Math.round(Math.abs(deltaSec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  };
   
   // Compute conditions severity
   const { severity: conditionsSeverity } = calculateConditionsSeverity(
@@ -282,7 +293,10 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
   // -------------------------------------------------------------------------
   // OPENING
   // -------------------------------------------------------------------------
-  if (isLongestRunInPlan) {
+  // If we detect a distinct fast-finish segment, label it explicitly (regardless of duration).
+  if (hasFinishSegment) {
+    parts.push('Long run with fast finish.');
+  } else if (isLongestRunInPlan) {
     parts.push('Longest run so far in your plan.');
   } else if (durationMinutes > 120) {
     parts.push(`${durationMinutes}-minute long run.`);
@@ -329,6 +343,11 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
       } else {
         parts.push('Last segment was slower than target.');
       }
+    }
+
+    // Add magnitude when finish missed meaningfully (helps interpret “how far off”).
+    if (!finishOnTarget && typeof finishDeltaSecPerMi === 'number' && Number.isFinite(finishDeltaSecPerMi) && finishDeltaSecPerMi > 10) {
+      parts.push(`Fast-finish segment missed target by +${fmtDeltaSecPerMi(finishDeltaSecPerMi)}/mi.`);
     }
   } else if (paceAdherencePct !== undefined && paceAdherencePct !== null) {
     // Single-segment workout: use paceAdherencePct with heat/HR awareness
@@ -387,6 +406,15 @@ function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): string {
       case 'high':
         parts.push(`HR drifted ${driftDisplay} bpm — high for this duration.`);
         break;
+    }
+  }
+
+  // Personal baseline (historical drift) — only when available.
+  if (historicalAvgDriftBpm !== undefined && historicalAvgDriftBpm !== null) {
+    const typical = Math.round(Number(historicalAvgDriftBpm));
+    const today = Math.round(Number(hrDriftBpm));
+    if (Number.isFinite(typical) && typical > 0 && Number.isFinite(today) && today > 0) {
+      parts.push(`Compared to your similar runs, typical drift is ~${typical} bpm (today ${today} bpm).`);
     }
   }
   
@@ -509,10 +537,12 @@ function buildDriftInterpretation(
     finishOnTarget: context.segmentData?.finishOnTarget,
     finishPace: context.segmentData?.finishPace,
     finishTargetPace: context.segmentData?.finishTargetPace,
+    finishDeltaSecPerMi: context.segmentData?.finishDeltaSecPerMi,
     hasFinishSegment: context.segmentData?.hasFinishSegment,
     hrDriftBpm,
     earlyAvgHr: drift.earlyAvgHr,
     lateAvgHr: drift.lateAvgHr,
+    historicalAvgDriftBpm: context.historicalDrift?.avgDriftBpm,
     temperatureF: context.weather?.temperatureF,
     elevationGainFt: drift.terrain.totalElevationFt,
     terrainProfile,
