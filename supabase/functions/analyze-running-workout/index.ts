@@ -1781,7 +1781,13 @@ Deno.serve(async (req) => {
         workout: workoutForFact,
         plannedWorkout: plannedWorkout || null,
         planContext: planContextForDrift
-          ? { planName: (planContextForDrift as any).planName, phaseName: (planContextForDrift as any).phaseName, weekIndex: (planContextForDrift as any).weekIndex }
+          ? {
+              planName: (planContextForDrift as any).planName,
+              phaseName: (planContextForDrift as any).phaseName,
+              weekIndex: (planContextForDrift as any).weekIndex,
+              weekIntent: (planContextForDrift as any).weekIntent ?? null,
+              isRecoveryWeek: (planContextForDrift as any).isRecoveryWeek ?? null,
+            }
           : null,
         workoutIntent: (intent as any) || null,
         learnedFitness: learnedFitness || null,
@@ -2088,7 +2094,8 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Running analysis complete for workout ${workout_id}`);
     console.log(`📊 Overall adherence: ${(analysis.overall_adherence * 100).toFixed(1)}%`);
-    console.log(`🎯 Performance: ${analysis.performance_assessment}`);
+    // Stored on workout_analysis.performance (object), not performance_assessment
+    console.log(`🎯 Performance: ${JSON.stringify(performance)}`);
 
     return new Response(JSON.stringify({
       success: true,

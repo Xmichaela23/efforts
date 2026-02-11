@@ -172,7 +172,10 @@ export async function buildWorkoutFactPacketV1(args: {
       const breakdown = workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
       const intervals = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
       const sum = intervals.reduce((acc: number, inv: any) => acc + (coerceNumber(inv?.elevation_gain_m) ?? 0), 0);
-      if (sum > 0) m = sum;
+      if (sum > 0) {
+        m = sum;
+        if (workout?.id) console.log(`[fact-packet] elevation from interval_breakdown: ${sum}m for workout ${workout.id}`);
+      }
     }
     if (m == null) return null;
     return Math.round(m * 3.28084);
