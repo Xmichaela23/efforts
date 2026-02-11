@@ -2445,6 +2445,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const completedSrc: any = hydratedCompleted || completed;
           const workoutAnalysis = completedSrc?.workout_analysis;
           const standardizedSummary = workoutAnalysis?.summary;
+          const factPacketV1 = workoutAnalysis?.fact_packet_v1;
+          const flagsV1 = workoutAnalysis?.flags_v1;
           const adherenceSummary = workoutAnalysis?.adherence_summary;
           const narrativeInsights = workoutAnalysis?.narrative_insights;
           const scoreExplanation = workoutAnalysis?.score_explanation;
@@ -2454,6 +2456,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             (typeof standardizedSummary.title === 'string' && standardizedSummary.title.length > 0) &&
             Array.isArray(standardizedSummary.bullets) &&
             standardizedSummary.bullets.length > 0;
+          const hasFactPacketV1 =
+            factPacketV1 &&
+            factPacketV1.version === 1 &&
+            typeof factPacketV1.generated_at === 'string' &&
+            !!factPacketV1.facts &&
+            !!factPacketV1.derived;
           // If we have standardized v1 summary, don't also render "Summary"/HR narrative from structured insights
           // (it reads like a duplicate "SUMMARY" block).
           const SUMMARY_LABELS = new Set([
@@ -2519,6 +2527,116 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     {standardizedSummary.bullets.slice(0, 4).map((b: string, i: number) => (
                       <p key={i} className="text-sm text-gray-300 leading-relaxed">{b}</p>
                     ))}
+                  </div>
+                </div>
+              )}
+              {hasFactPacketV1 && (
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                    Coach signals
+                  </span>
+                  <div className="space-y-1.5">
+                    {(() => {
+                      const rows: Array<{ label: string; value: string }> = [];
+
+                      try {
+                        const stim = factPacketV1?.derived?.stimulus;
+                        if (stim && typeof stim.achieved === 'boolean') {
+                          rows.push({
+                            label: 'Stimulus',
+                            value: stim.achieved
+                              ? `Achieved (${stim.confidence}). ${Array.isArray(stim.evidence) && stim.evidence[0] ? stim.evidence[0] : ''}`.trim()
+                              : `Possibly missed (${stim.confidence}). ${stim.partial_credit || ''}`.trim(),
+                          });
+                        }
+                      } catch {}
+
+                      try {
+                        const lim = factPacketV1?.derived?.primary_limiter;
+                        if (lim?.limiter) {
+                          const conf = typeof lim.confidence === 'number' ? Math.round(lim.confidence * 100) : null;
+                          const ev0 = Array.isArray(lim.evidence) && lim.evidence[0] ? String(lim.evidence[0]) : '';
+                          rows.push({
+                            label: 'Limiter',
+                            value: `${String(lim.limiter)}${conf != null ? ` (${conf}%)` : ''}${ev0 ? ` — ${ev0}` : ''}`.trim(),
+                          });
+                        }
+                      } catch {}
+
+                      try {
+                        const vs = factPacketV1?.derived?.comparisons?.vs_similar;
+                        if (vs && typeof vs.sample_size === 'number' && vs.sample_size > 0) {
+                          const map: Record<string, string> = {
+                            better_than_usual: 'Better than usual',
+                            typical: 'Typical',
+                            worse_than_usual: 'Worse than usual',
+                            insufficient_data: 'Not enough data',
+                          };
+                          rows.push({
+                            label: 'Similar workouts',
+                            value: `${map[String(vs.assessment)] || String(vs.assessment)} (n=${vs.sample_size})`,
+                          });
+                        }
+                      } catch {}
+
+                      try {
+                        const tr = factPacketV1?.derived?.comparisons?.trend;
+                        if (tr && typeof tr.data_points === 'number' && tr.data_points > 0) {
+                          rows.push({
+                            label: 'Trend',
+                            value: `${String(tr.direction)}${tr.magnitude ? ` — ${tr.magnitude}` : ''}`.trim(),
+                          });
+                        }
+                      } catch {}
+
+                      try {
+                        const wx = factPacketV1?.facts?.weather;
+                        if (wx && typeof wx.dew_point_f === 'number') {
+                          rows.push({
+                            label: 'Conditions',
+                            value: `Dew point ${Math.round(wx.dew_point_f)}°F (${wx.heat_stress_level})`,
+                          });
+                        }
+                      } catch {}
+
+                      try {
+                        const tl = factPacketV1?.derived?.training_load;
+                        if (tl && typeof tl.cumulative_fatigue === 'string') {
+                          const wk = typeof tl.week_load_pct === 'number' ? `, week ${Math.round(tl.week_load_pct)}%` : '';
+                          rows.push({
+                            label: 'Fatigue',
+                            value: `${tl.cumulative_fatigue}${wk}`.trim(),
+                          });
+                        }
+                      } catch {}
+
+                      // Prefer flags as the canonical "what matters"; show top 3.
+                      try {
+                        const flags = Array.isArray(flagsV1) ? flagsV1 : [];
+                        const top = flags
+                          .filter((f: any) => f && typeof f.message === 'string' && f.message.length > 0)
+                          .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
+                          .slice(0, 3);
+                        for (const f of top) {
+                          rows.push({ label: 'Flag', value: String(f.message) });
+                        }
+                      } catch {}
+
+                      const dedup = new Set<string>();
+                      const out = rows.filter((r) => {
+                        const k = `${r.label}::${r.value}`;
+                        if (dedup.has(k)) return false;
+                        dedup.add(k);
+                        return true;
+                      }).slice(0, 8);
+
+                      return out.map((r, i) => (
+                        <div key={i}>
+                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{r.label}</span>
+                          <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{r.value}</p>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 </div>
               )}

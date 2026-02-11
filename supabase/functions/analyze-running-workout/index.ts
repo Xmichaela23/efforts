@@ -1758,6 +1758,43 @@ Deno.serve(async (req) => {
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
 
     // =========================================================================
+    // Deterministic fact packet (v1) — single source of truth for coaching.
+    // Built from computed + workout_analysis + plan + baselines + historical queries.
+    // NOTE: Must run BEFORE summaryV1 so summary can consume it.
+    // =========================================================================
+    let fact_packet_v1: any = null;
+    let flags_v1: any = null;
+    try {
+      const workoutForFact = {
+        ...workout,
+        // Provide the same analysis object we're about to write to DB
+        workout_analysis: {
+          granular_analysis: enhancedAnalysis,
+          performance,
+          detailed_analysis: detailedAnalysis,
+        },
+      };
+
+      const intent = plannedWorkout ? (detectWorkoutIntent(plannedWorkout) as any) : null;
+      const { factPacket, flags } = await buildWorkoutFactPacketV1({
+        supabase,
+        workout: workoutForFact,
+        plannedWorkout: plannedWorkout || null,
+        planContext: planContextForDrift
+          ? { planName: (planContextForDrift as any).planName, phaseName: (planContextForDrift as any).phaseName, weekIndex: (planContextForDrift as any).weekIndex }
+          : null,
+        workoutIntent: (intent as any) || null,
+        learnedFitness: learnedFitness || null,
+      });
+      fact_packet_v1 = factPacket;
+      flags_v1 = flags;
+    } catch (e) {
+      console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);
+      fact_packet_v1 = null;
+      flags_v1 = null;
+    }
+
+    // =========================================================================
     // Standardized per-workout summary (v1)
     // Discipline analyzers write this; coach consumes it (no re-interpretation).
     // =========================================================================
@@ -1797,6 +1834,41 @@ Deno.serve(async (req) => {
       // Add 1-2 deterministic “coach-grade” insight bullets before the narrative,
       // using plan expectations + conditions + your historical norms (when available).
       try {
+        // Prefer canonical fact packet signals when available (limiter/stimulus/comparisons).
+        try {
+          const st = fact_packet_v1?.derived?.stimulus;
+          if (st && typeof st.achieved === 'boolean') {
+            if (st.achieved) {
+              const ev = Array.isArray(st.evidence) && st.evidence.length ? String(st.evidence[0]) : 'HR/structure confirms the work was done';
+              bullets.push(`Stimulus achieved — ${ev.endsWith('.') ? ev : `${ev}.`}`);
+            } else {
+              const note = st.partial_credit ? String(st.partial_credit) : 'targets/physiology did not align';
+              bullets.push(`Stimulus may have been missed — ${note.endsWith('.') ? note : `${note}.`}`);
+            }
+          }
+
+          const lim = fact_packet_v1?.derived?.primary_limiter;
+          if (lim?.limiter) {
+            const conf = Number(lim.confidence);
+            const ev0 = Array.isArray(lim.evidence) && lim.evidence.length ? String(lim.evidence[0]) : '';
+            const confPct = Number.isFinite(conf) ? Math.round(conf * 100) : null;
+            bullets.push(
+              `Primary limiter: ${String(lim.limiter)}${confPct != null ? ` (${confPct}%)` : ''}${ev0 ? ` — ${ev0.replace(/\.$/, '')}.` : '.'}`
+            );
+          }
+
+          const vs = fact_packet_v1?.derived?.comparisons?.vs_similar;
+          if (vs && typeof vs.sample_size === 'number' && vs.sample_size >= 3 && typeof vs.assessment === 'string') {
+            const map: Record<string, string> = {
+              better_than_usual: 'Better than usual vs similar workouts.',
+              typical: 'Typical vs similar workouts.',
+              worse_than_usual: 'Worse than usual vs similar workouts.',
+            };
+            const msg = map[String(vs.assessment)] || null;
+            if (msg) bullets.push(msg);
+          }
+        } catch {}
+
         const seg = (hrAnalysisContext as any)?.segmentData || null;
         const histAvg = Number((hrAnalysisContext as any)?.historicalDrift?.avgDriftBpm);
         const driftBpm = Number((hrAnalysisResult as any)?.drift?.driftBpm);
@@ -1925,42 +1997,6 @@ Deno.serve(async (req) => {
       };
       return out;
     })();
-    
-    // =========================================================================
-    // Deterministic fact packet (v1) — single source of truth for coaching.
-    // Built from computed + workout_analysis + plan + baselines + historical queries.
-    // =========================================================================
-    let fact_packet_v1: any = null;
-    let flags_v1: any = null;
-    try {
-      const workoutForFact = {
-        ...workout,
-        // Provide the same analysis object we're about to write to DB
-        workout_analysis: {
-          granular_analysis: enhancedAnalysis,
-          performance,
-          detailed_analysis: detailedAnalysis,
-        },
-      };
-
-      const intent = plannedWorkout ? (detectWorkoutIntent(plannedWorkout) as any) : null;
-      const { factPacket, flags } = await buildWorkoutFactPacketV1({
-        supabase,
-        workout: workoutForFact,
-        plannedWorkout: plannedWorkout || null,
-        planContext: planContextForDrift
-          ? { planName: (planContextForDrift as any).planName, phaseName: (planContextForDrift as any).phaseName, weekIndex: (planContextForDrift as any).weekIndex }
-          : null,
-        workoutIntent: (intent as any) || null,
-        learnedFitness: learnedFitness || null,
-      });
-      fact_packet_v1 = factPacket;
-      flags_v1 = flags;
-    } catch (e) {
-      console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);
-      fact_packet_v1 = null;
-      flags_v1 = null;
-    }
 
     // Use RPC to merge computed (preserves analysis.series from compute-workout-analysis)
     // RPC is required - no fallbacks to prevent data loss
