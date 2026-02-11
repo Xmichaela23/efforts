@@ -530,7 +530,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // Endurance (run/ride/swim)
   // Read intervals from computed.intervals (single source of truth)
   // These intervals include both executed data AND granular_metrics from analyze-{discipline}-workout
-  const completedComputed = (hydratedCompleted as any)?.computed || (completed as any)?.computed;
+  const completedSrc: any = hydratedCompleted || completed;
+  const completedComputed = (completedSrc as any)?.computed;
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
     ? completedComputed.intervals 
     : [];
@@ -544,7 +545,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     : [];
   // Derive compact pace-only rows from the same source the Planned tab renders
   // For unplanned runs: use interval_breakdown from workout_analysis (one row = analysis)
-  const intervalBreakdownForUnplanned = (completed as any)?.workout_analysis?.detailed_analysis?.interval_breakdown;
+  const intervalBreakdownForUnplanned = (completedSrc as any)?.workout_analysis?.detailed_analysis?.interval_breakdown;
   const unplannedIntervals = intervalBreakdownForUnplanned?.available && Array.isArray(intervalBreakdownForUnplanned?.intervals)
     ? intervalBreakdownForUnplanned.intervals
     : [];
@@ -576,8 +577,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const stepsDisplay = useMemo(() => (hasServerComputed ? steps : [steps[0]]), [hasServerComputed, steps]);
 
   // Build accumulated rows once for completed and advance a cursor across steps
-  const comp = hydratedCompleted || completed;
-  const rows = comp ? accumulate(comp) : [];
+  const rows = completedSrc ? accumulate(completedSrc) : [];
   // Warm-up normalization: skip tiny initial sample blips (< 5s or < 10m)
   let cursorIdx = 0;
   let cursorCum = rows.length ? rows[0].cumMeters || 0 : 0;
@@ -1574,14 +1574,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })();
 
           // Use unified data source from workout_analysis
-          const workoutAnalysis = (completed as any)?.workout_analysis;
+          const workoutAnalysis = completedSrc?.workout_analysis;
           const granularAnalysis = workoutAnalysis?.granular_analysis;
           
           console.log('🔍 [DATA STRUCTURE DEBUG] workoutAnalysis:', workoutAnalysis);
           console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
           
           // 🎯 TEMPORARY FIX: Read from both old and new locations
-          const performance = (completed as any)?.workout_analysis?.performance;
+          const performance = completedSrc?.workout_analysis?.performance;
           console.log('🎯 [FRONTEND] Reading performance:', performance);
           
           // Try new Garmin metrics first, fallback to old calculation
@@ -1665,7 +1665,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           };
 
           // Adherence chips only; summary (technical_insights + plan_impact) is rendered below the intervals table
-          const adherenceSummary = (completed as any)?.workout_analysis?.adherence_summary;
+          const adherenceSummary = completedSrc?.workout_analysis?.adherence_summary;
 
           return (
             <div className="w-full pt-1 pb-2">
@@ -1682,10 +1682,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               </div>
               
               {/* View in Context link — above table */}
-              {onNavigateToContext && completed?.id && (
+              {onNavigateToContext && completedSrc?.id && (
                 <div className="text-center mb-2">
                   <button
-                    onClick={() => onNavigateToContext(completed.id)}
+                    onClick={() => onNavigateToContext(completedSrc.id)}
                     className="text-sm text-gray-200 hover:text-white transition-colors underline underline-offset-2"
                   >
                     View context
