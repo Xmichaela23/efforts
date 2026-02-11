@@ -30,6 +30,15 @@ function safeLower(s: any): string {
   try { return String(s || '').toLowerCase(); } catch { return ''; }
 }
 
+/** Normalize to YYYY-MM-DD for date comparison (avoids UTC/PT mismatch with full ISO strings). */
+function toDateOnly(val: any): string | null {
+  if (val == null) return null;
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const iso = s.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
+
 function getComputedOverall(row: any): any {
   const c = row?.computed;
   if (!c) return null;
@@ -172,6 +181,7 @@ export async function getSimilarWorkoutComparisons(
       .filter((x) => x.pace != null && x.hr != null);
 
     const sample_size = filtered.length;
+    console.log(`[fact-packet] similar workouts: workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}], durationBand=[${bandLo}-${bandHi}]min, matched=${sample_size} of ${rows.length} recent`);
     if (sample_size < 3) {
       return {
         sample_size,
@@ -404,22 +414,28 @@ export async function getTrainingLoadContext(
 
     const completed = rows
       .filter((r) => String(r.workout_status || '').toLowerCase() === 'completed')
-      .filter((r) => !!r.date)
-      .sort((a, b) => String(a.date).localeCompare(String(b.date))); // ascending
+      .filter((r) => toDateOnly(r.date) != null)
+      .sort((a, b) => (toDateOnly(a.date) || '').localeCompare(toDateOnly(b.date) || '')); // ascending
 
-    // Previous day
+    // Previous day (date-only comparison)
     const prevDate = isoDateAddDays(workoutDateIso, -1);
-    const prev = completed.filter((r) => String(r.date) === prevDate).sort((a, b) => (coerceNumber(b.workload_actual) || 0) - (coerceNumber(a.workload_actual) || 0))[0] || null;
+    const prev = completed.filter((r) => toDateOnly(r.date) === prevDate).sort((a, b) => (coerceNumber(b.workload_actual) || 0) - (coerceNumber(a.workload_actual) || 0))[0] || null;
     const previous_day_workload = Math.round(coerceNumber(prev?.workload_actual) || 0);
     const previous_day_type = prev ? (safeLower(prev.type) || null) : null;
 
-    // Consecutive training days leading up to workout date (excluding workout day)
+    // Consecutive training days leading up to workout date (excluding workout day). Use date-only to avoid UTC/tz mismatch.
     let consecutive_training_days = 0;
+    const completedDates = new Set(completed.map((r) => toDateOnly(r.date)).filter(Boolean) as string[]);
     for (let i = 1; i <= 14; i += 1) {
       const d = isoDateAddDays(workoutDateIso, -i);
-      const has = completed.some((r) => String(r.date) === d);
+      const has = completedDates.has(d);
       if (has) consecutive_training_days += 1;
       else break;
+    }
+    // Debug: log dates and count so we can verify (can remove after confirming)
+    if (consecutive_training_days > 0) {
+      const datesChecked = Array.from({ length: consecutive_training_days }, (_, i) => isoDateAddDays(workoutDateIso, -(i + 1)));
+      console.log(`[fact-packet] consecutive_training_days=${consecutive_training_days} for workout ${workoutDateIso}; dates_with_workouts: ${datesChecked.join(', ')}`);
     }
 
     // Week load pct (Mon-Sun, week containing workoutDateIso)
@@ -448,10 +464,10 @@ export async function getTrainingLoadContext(
       ? Math.round((week_workload_actual / week_workload_planned) * 100)
       : null;
 
-    // ACWR from 7d vs 28d workloads (completed workouts only)
+    // ACWR from 7d vs 28d workloads (completed workouts only); use date-only keys
     const dateToWorkload = new Map<string, number>();
     for (const r of completed) {
-      const d = String(r.date);
+      const d = toDateOnly(r.date);
       const wl = coerceNumber(r.workload_actual);
       if (!d) continue;
       if (wl != null) dateToWorkload.set(d, (dateToWorkload.get(d) || 0) + wl);

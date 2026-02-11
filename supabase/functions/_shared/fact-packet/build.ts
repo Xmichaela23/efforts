@@ -76,12 +76,17 @@ function computeTargetAndDeviation(actual: number | null, paceRange: any): { tar
 function deriveWeather(workout: any): WeatherV1 | null {
   const avgTempC = coerceNumber(workout?.avg_temperature);
   const weatherData = parseJson(workout?.weather_data) || null;
-  const tempF = avgTempC != null ? Math.round(avgTempC * 9 / 5 + 32) : coerceNumber(weatherData?.temperature);
-  const humidity = coerceNumber(weatherData?.humidity);
-  const wind = coerceNumber(weatherData?.windSpeed);
-  const condition = typeof weatherData?.condition === 'string' ? weatherData.condition : null;
+  const tempF = avgTempC != null ? Math.round(avgTempC * 9 / 5 + 32) : coerceNumber(weatherData?.temperature ?? weatherData?.temp ?? weatherData?.temperature_f);
+  const humidity = coerceNumber(weatherData?.humidity ?? weatherData?.relative_humidity);
+  const wind = coerceNumber(weatherData?.windSpeed ?? weatherData?.wind_speed);
+  const condition = typeof weatherData?.condition === 'string' ? weatherData.condition : (typeof weatherData?.weather_description === 'string' ? weatherData.weather_description : null);
 
-  if (tempF == null || humidity == null) return null;
+  if (tempF == null || humidity == null) {
+    if (workout?.id && (avgTempC != null || weatherData != null)) {
+      console.log(`[fact-packet] weather null for workout ${workout.id}: tempF=${tempF}, humidity=${humidity}, avg_temperature=${avgTempC}, weather_data keys=${weatherData ? Object.keys(weatherData).join(',') : 'none'}`);
+    }
+    return null;
+  }
   const dew = deriveDewPointF(tempF, humidity);
   return {
     temperature_f: tempF,
@@ -162,13 +167,16 @@ export async function buildWorkoutFactPacketV1(args: {
   const maxHr = hrFromComputedMax != null ? Math.round(hrFromComputedMax) : hrSensor.max;
 
   const elevationGainFt = (() => {
-    const m = coerceNumber(workout?.elevation_gain ?? overall?.elevation_gain_m ?? overall?.elevation_gain);
+    const m = coerceNumber(workout?.elevation_gain ?? workout?.total_elevation_gain ?? overall?.elevation_gain_m ?? overall?.elevation_gain ?? overall?.total_elevation_gain_m);
     if (m == null) return null;
-    // workouts.elevation_gain appears to be meters in this repo
+    // workouts.elevation_gain is typically meters in this repo
     return Math.round(m * 3.28084);
   })();
 
   const terrain_type = classifyTerrain(elevationGainFt, overallDistMi);
+  if (workout?.id && overallDistMi > 0.2 && elevationGainFt == null) {
+    console.log(`[fact-packet] terrain: elevation_gain missing for workout ${workout.id}, workout.elevation_gain=${workout?.elevation_gain}, overall.elevation_gain_m=${overall?.elevation_gain_m}`);
+  }
   const weather = deriveWeather(workout);
 
   const zones = buildZonesFromLearnedFitness(learnedFitness) || null;
@@ -225,15 +233,16 @@ export async function buildWorkoutFactPacketV1(args: {
     };
   })();
 
-  // Historical queries
+  // Historical queries: use classified workout_type (from plan) for comparisons so recovery/easy match past runs
   const workoutTypeKey = deriveWorkoutTypeKey(workout);
+  const comparisonTypeKey = (workout_type !== 'unknown' ? workout_type : workoutTypeKey) || workoutTypeKey;
   const hrDriftCurrent = coerceNumber(workout?.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm) ?? null;
 
   const [vsSimilar, trend, achievements, trainingLoad] = await Promise.all([
     getSimilarWorkoutComparisons(supabase, {
       userId: String(workout.user_id),
       currentWorkoutId: String(workout.id),
-      workoutTypeKey,
+      workoutTypeKey: comparisonTypeKey,
       durationMin: overallDurMin || 0,
       currentAvgPaceSecPerMi: overallPace != null ? overallPace : null,
       currentAvgHr: avgHr,

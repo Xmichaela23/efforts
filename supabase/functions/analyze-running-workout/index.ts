@@ -2155,6 +2155,92 @@ Deno.serve(async (req) => {
  * - All helper functions only used by dead code
  */
 
+const MIN_SEGMENT_DISTANCE_MI = 0.25;
+const MIN_SEGMENT_DURATION_S = 120;
+
+/**
+ * Merge consecutive micro-segments (e.g. 0.06 mi, 0.13 mi) into single segments so a steady
+ * easy run shows one row instead of a dozen. Segments under minDistanceMi or minDurationS
+ * that share the same planned_step_id (or role) are merged.
+ */
+function mergeMicroSegments(intervalList: any[], minDistanceMi: number = MIN_SEGMENT_DISTANCE_MI, minDurationS: number = MIN_SEGMENT_DURATION_S): any[] {
+  if (!intervalList?.length) return intervalList;
+  const minDistanceM = minDistanceMi * 1609.34;
+  const isSmall = (i: any): boolean => {
+    const dist = i?.executed?.distance_m ?? i?.distance_m ?? 0;
+    const dur = i?.executed?.duration_s ?? i?.duration_s ?? 0;
+    return (dist > 0 && dist < minDistanceM) || (dur > 0 && dur < minDurationS);
+  };
+  const key = (i: any): string => String(i?.planned_step_id ?? i?.role ?? i?.label ?? '');
+
+  const out: any[] = [];
+  let run: any[] = [];
+  const flushRun = () => {
+    if (run.length === 0) return;
+    if (run.length === 1) {
+      out.push(run[0]);
+      run = [];
+      return;
+    }
+    const first = run[0];
+    let totalDist = 0;
+    let totalDur = 0;
+    let paceWeighted = 0;
+    let hrWeighted = 0;
+    let paceWeight = 0;
+    let hrWeight = 0;
+    for (const i of run) {
+      const exec = i?.executed ?? {};
+      const d = exec.distance_m ?? i?.distance_m ?? 0;
+      const t = exec.duration_s ?? i?.duration_s ?? 0;
+      totalDist += d;
+      totalDur += t;
+      const p = exec.avg_pace_s_per_mi ?? exec.avg_pace_sec_per_mi ?? i?.avg_pace_s_per_mi;
+      const h = exec.avg_hr ?? exec.avgHr ?? i?.avg_hr;
+      if (p != null && p > 0 && t > 0) {
+        paceWeighted += p * t;
+        paceWeight += t;
+      }
+      if (h != null && h > 0 && t > 0) {
+        hrWeighted += h * t;
+        hrWeight += t;
+      }
+    }
+    const merged = {
+      ...first,
+      executed: {
+        ...(first?.executed ?? {}),
+        distance_m: totalDist,
+        duration_s: totalDur,
+        avg_pace_s_per_mi: paceWeight > 0 ? Math.round(paceWeighted / paceWeight) : (first?.executed?.avg_pace_s_per_mi ?? null),
+        avg_hr: hrWeight > 0 ? Math.round(hrWeighted / hrWeight) : (first?.executed?.avg_hr ?? null),
+        max_hr: Math.max(...run.map((r) => r?.executed?.max_hr ?? r?.max_hr ?? 0).filter(Number)),
+      },
+      label: first?.label ?? first?.name ?? 'Merged',
+    };
+    out.push(merged);
+    run = [];
+  };
+
+  for (const i of intervalList) {
+    if (!isSmall(i)) {
+      flushRun();
+      out.push(i);
+      continue;
+    }
+    const k = key(i);
+    if (run.length > 0 && key(run[0]) !== k) {
+      flushRun();
+    }
+    run.push(i);
+  }
+  flushRun();
+  if (out.length < intervalList.length) {
+    console.log(`[interval-breakdown] merged ${intervalList.length} micro-segments into ${out.length} (min ${minDistanceMi} mi / ${minDurationS}s)`);
+  }
+  return out;
+}
+
 /**
  * Generate detailed, chart-like analysis with specific metrics
  * Provides actionable insights similar to Garmin Connect analysis
@@ -2178,11 +2264,10 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
     ? Math.round(performance.pace_adherence)
     : undefined;
   
-  // Interval-by-interval breakdown
-  // For steady-state runs with no work intervals, use all intervals (warmup/work/recovery/cooldown)
-  // Otherwise use only work intervals
+  // Interval-by-interval breakdown: merge micro-segments (<0.25 mi or <2 min) so steady runs show one row
   const intervalsForBreakdown = workIntervals.length > 0 ? workIntervals : intervals.filter(i => i.executed);
-  const intervalBreakdown = generateIntervalBreakdown(intervalsForBreakdown, intervals, paceAdherenceForBreakdown, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
+  const mergedForBreakdown = mergeMicroSegments(intervalsForBreakdown, MIN_SEGMENT_DISTANCE_MI, MIN_SEGMENT_DURATION_S);
+  const intervalBreakdown = generateIntervalBreakdown(mergedForBreakdown, intervals, paceAdherenceForBreakdown, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
   
   // Pacing consistency analysis
   // Pacing consistency analysis (stub - function was removed during refactor)
