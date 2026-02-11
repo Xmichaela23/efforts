@@ -1765,6 +1765,19 @@ Deno.serve(async (req) => {
     let fact_packet_v1: any = null;
     let flags_v1: any = null;
     try {
+      // Prefer early plan context (for drift), but fallback to the later fetch
+      const planContextForFact = (planContextForDrift as any) || planContext || null;
+      if (planContextForFact) {
+        console.log('📦 [FACT PACKET] planContext:', {
+          weekIndex: (planContextForFact as any)?.weekIndex,
+          weekIntent: (planContextForFact as any)?.weekIntent,
+          isRecoveryWeek: (planContextForFact as any)?.isRecoveryWeek,
+          phaseName: (planContextForFact as any)?.phaseName,
+        });
+      } else {
+        console.log('📦 [FACT PACKET] planContext: null');
+      }
+
       const workoutForFact = {
         ...workout,
         // Provide the same analysis object we're about to write to DB
@@ -1780,13 +1793,13 @@ Deno.serve(async (req) => {
         supabase,
         workout: workoutForFact,
         plannedWorkout: plannedWorkout || null,
-        planContext: planContextForDrift
+        planContext: planContextForFact
           ? {
-              planName: (planContextForDrift as any).planName,
-              phaseName: (planContextForDrift as any).phaseName,
-              weekIndex: (planContextForDrift as any).weekIndex,
-              weekIntent: (planContextForDrift as any).weekIntent ?? null,
-              isRecoveryWeek: (planContextForDrift as any).isRecoveryWeek ?? null,
+              planName: (planContextForFact as any).planName ?? null,
+              phaseName: (planContextForFact as any).phaseName ?? null,
+              weekIndex: (planContextForFact as any).weekIndex ?? null,
+              weekIntent: (planContextForFact as any).weekIntent ?? null,
+              isRecoveryWeek: (planContextForFact as any).isRecoveryWeek ?? null,
             }
           : null,
         workoutIntent: (intent as any) || null,
