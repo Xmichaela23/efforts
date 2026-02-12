@@ -472,6 +472,29 @@ export async function getTrainingLoadContext(
       else break;
     }
     const consecutive_training_days = streakDates.length;
+
+    const streakModalities = (() => {
+      const normalize = (t: string): string => {
+        const s = safeLower(t);
+        if (!s) return 'unknown';
+        if (/(run|walk)/i.test(s)) return 'run';
+        if (/(ride|bike|cycle)/i.test(s)) return 'ride';
+        if (/strength/i.test(s)) return 'strength';
+        if (/swim/i.test(s)) return 'swim';
+        if (/(mobility|yoga|stretch)/i.test(s)) return 'mobility';
+        return s;
+      };
+      const mods = new Set<string>();
+      for (const d of streakDates) {
+        const a = dayAgg.get(d);
+        if (!a) continue;
+        for (const t of Array.from(a.types || [])) mods.add(normalize(t));
+      }
+      mods.delete('unknown');
+      // Hide mobility if mixed with other modalities; keep if it's the only modality.
+      if (mods.size > 1) mods.delete('mobility');
+      return Array.from(mods).sort();
+    })();
     // Debug: log the streak and the last N unique workout dates seen.
     try {
       const uniqSorted = Array.from(dayAgg.keys()).sort(); // ascending
@@ -545,8 +568,11 @@ export async function getTrainingLoadContext(
     const flagsHigh: boolean[] = [];
     const flagsMod: boolean[] = [];
 
-    if (consecutive_training_days >= 5) { flagsHigh.push(true); fatigue_evidence.push(`${consecutive_training_days} consecutive training days`); }
-    else if (consecutive_training_days >= 3) { flagsMod.push(true); fatigue_evidence.push(`${consecutive_training_days} consecutive training days`); }
+    const streakLabel = consecutive_training_days > 0
+      ? `${consecutive_training_days} consecutive training days${streakModalities.length ? ` (${streakModalities.join('/')})` : ''}`
+      : null;
+    if (consecutive_training_days >= 5) { flagsHigh.push(true); if (streakLabel) fatigue_evidence.push(streakLabel); }
+    else if (consecutive_training_days >= 3) { flagsMod.push(true); if (streakLabel) fatigue_evidence.push(streakLabel); }
 
     if (previous_day_workload > 80) { flagsHigh.push(true); fatigue_evidence.push(`Yesterday workload ${previous_day_workload}`); }
     else if (previous_day_workload > 50) { flagsMod.push(true); fatigue_evidence.push(`Yesterday workload ${previous_day_workload}`); }
