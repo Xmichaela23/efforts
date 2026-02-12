@@ -2459,6 +2459,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const adherenceSummary = workoutAnalysis?.adherence_summary;
           const narrativeInsights = workoutAnalysis?.narrative_insights;
           const scoreExplanation = workoutAnalysis?.score_explanation;
+          const aiSummary = typeof workoutAnalysis?.ai_summary === 'string' ? workoutAnalysis.ai_summary.trim() : '';
+          const hasAISummary = aiSummary.length > 0;
           const hasStandardized =
             standardizedSummary &&
             standardizedSummary.version === 1 &&
@@ -2498,7 +2500,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const hasStructuredForRender = !!adherenceSummary && (hasTechnicalForRender || hasPlanImpactForRender);
           const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
           const hasLegacyVerdict = typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
-          const hasNothing = !hasStandardized && !hasStructuredForRender && !hasNarrative && !hasLegacyVerdict;
+          const hasNothing = !hasAISummary && !hasStandardized && !hasStructuredForRender && !hasNarrative && !hasLegacyVerdict;
           if (hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
@@ -2527,7 +2529,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   {recomputing ? 'Recomputing…' : 'Recompute analysis'}
                 </button>
               </div>
-              {hasStandardized && (
+              {hasAISummary && (
+                <div>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                    Coach
+                  </span>
+                  <p className="text-sm text-gray-300 leading-relaxed mt-1">{aiSummary}</p>
+                </div>
+              )}
+              {!hasAISummary && hasStandardized && (
                 <div>
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
                     {standardizedSummary.title || 'Summary'}
@@ -2657,7 +2667,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   )}
                 </div>
               )}
-              {hasStructuredForRender && adherenceSummary && (
+              {!hasAISummary && hasStructuredForRender && adherenceSummary && (
                 <>
                   {technicalInsightsForRender.length > 0 && (
                     <div className="space-y-2">
@@ -2677,14 +2687,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   )}
                 </>
               )}
-              {!hasStructuredForRender && hasNarrative && (
+              {!hasAISummary && !hasStructuredForRender && hasNarrative && (
                 <div className="space-y-2">
                   {narrativeInsights.map((insight: string, i: number) => (
                     <p key={i} className="text-sm text-gray-300 leading-relaxed">{insight}</p>
                   ))}
                 </div>
               )}
-              {!hasStructuredForRender && !hasNarrative && hasLegacyVerdict && (
+              {!hasAISummary && !hasStructuredForRender && !hasNarrative && hasLegacyVerdict && (
                 <p className="text-sm text-gray-300 leading-relaxed">{scoreExplanation}</p>
               )}
             </div>

@@ -9,10 +9,10 @@ import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
 import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 // Old HR drift import removed - now using consolidated HR analysis module
 import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
-import { generateAINarrativeInsights } from './lib/narrative/ai-generator.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from './lib/plan-context.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
+import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -1646,34 +1646,12 @@ Deno.serve(async (req) => {
         }
         }
 
-    }    // 🤖 GENERATE AI NARRATIVE INSIGHTS
-    let narrativeInsights = null;
-    try {
-      console.log('🤖 [CRITICAL] Starting AI narrative generation...');
-      console.log('🤖 [CRITICAL] Checking for OPENAI_API_KEY...');
-      const hasKey = !!Deno.env.get('OPENAI_API_KEY');
-      console.log('🤖 [CRITICAL] OPENAI_API_KEY present:', hasKey);
-      console.log('🤖 [CRITICAL] User units preference:', userUnits);
-      
-      narrativeInsights = await generateAINarrativeInsights(
-        sensorData,
-        workout,
-        plannedWorkout,
-        enhancedAnalysis,
-        performance,
-        detailedAnalysis,
-        userUnits,
-        supabase
-      );
-      console.log('✅ [CRITICAL] AI narrative generated:', JSON.stringify(narrativeInsights));
-      console.log('✅ [CRITICAL] AI narrative is array:', Array.isArray(narrativeInsights));
-      console.log('✅ [CRITICAL] AI narrative length:', narrativeInsights?.length);
-    } catch (error) {
-      console.error('❌ [CRITICAL] AI narrative generation failed:', error);
-      console.error('❌ [CRITICAL] Error message:', error.message);
-      console.error('❌ [CRITICAL] Error stack:', error.stack);
-      narrativeInsights = null; // Continue without narrative if AI fails
     }
+
+    // 🤖 Legacy AI narrative insights (deprecated)
+    // Contract: AI summary must translate ONLY the deterministic fact packet (no sensor math).
+    // Keep this field for backward compatibility but stop generating it here.
+    const narrativeInsights = null;
 
     // Store enhanced intervals back to computed.intervals (single source of truth)
     // Store summary analysis in workout_analysis
@@ -1811,6 +1789,23 @@ Deno.serve(async (req) => {
       console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);
       fact_packet_v1 = null;
       flags_v1 = null;
+    }
+
+    // =========================================================================
+    // AI coaching paragraph (v1)
+    // Contract: AI receives ONLY the deterministic fact packet + flags.
+    // =========================================================================
+    let ai_summary: string | null = null;
+    let ai_summary_generated_at: string | null = null;
+    try {
+      if (fact_packet_v1 && flags_v1) {
+        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1);
+        if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+      }
+    } catch (e) {
+      console.warn('[analyze-running-workout] ai_summary generation failed:', e);
+      ai_summary = null;
+      ai_summary_generated_at = null;
     }
 
     // =========================================================================
@@ -2030,19 +2025,33 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to merge computed data: ${rpcError.message}. RPC function merge_computed is required.`);
     }
     
+    // Contract: merge into existing workout_analysis (do not replace).
+    const { data: existingRowForMerge, error: existingRowErr } = await supabase
+      .from('workouts')
+      .select('workout_analysis')
+      .eq('id', workout_id)
+      .single();
+    if (existingRowErr) {
+      console.warn('[analyze-running-workout] failed to read existing workout_analysis for merge:', existingRowErr.message);
+    }
+    const existingAnalysis = existingRowForMerge?.workout_analysis || {};
+
     // Update workout_analysis separately (doesn't conflict with computed)
     const updatePayload = {
       workout_analysis: {
-        // DON'T spread existingAnalysis - replace entirely with new structure
+        // Merge: preserve existing fields, overwrite with latest analysis outputs
+        ...(existingAnalysis || {}),
         granular_analysis: enhancedAnalysis,
         performance: performance,
         detailed_analysis: detailedAnalysis,
-        narrative_insights: narrativeInsights,  // AI-generated human-readable insights
+        narrative_insights: narrativeInsights,  // deprecated (kept for backward compat)
         score_explanation: scoreExplanation,  // Backward-compat: single verdict line
         adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact
         summary: summaryV1, // Standardized per-workout summary (v1)
         fact_packet_v1: fact_packet_v1,
         flags_v1: flags_v1,
+        ai_summary: ai_summary,
+        ai_summary_generated_at: ai_summary_generated_at,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         // NEW: Structured HR summary for weekly/block context aggregation
         heart_rate_summary: hrAnalysisResult.summary
