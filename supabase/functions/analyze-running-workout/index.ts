@@ -1857,10 +1857,9 @@ Deno.serve(async (req) => {
         try {
           const st = fact_packet_v1?.derived?.stimulus;
           if (st && typeof st.achieved === 'boolean') {
-            if (st.achieved) {
-              const ev = Array.isArray(st.evidence) && st.evidence.length ? String(st.evidence[0]) : 'HR/structure confirms the work was done';
-              bullets.push(`Stimulus achieved — ${ev.endsWith('.') ? ev : `${ev}.`}`);
-            } else {
+            // Avoid repeating the Stimulus line in the summary when it's already shown in Analysis Details.
+            // Keep the "missed" case since it's actionable.
+            if (!st.achieved) {
               const note = st.partial_credit ? String(st.partial_credit) : 'targets/physiology did not align';
               bullets.push(`Stimulus may have been missed — ${note.endsWith('.') ? note : `${note}.`}`);
             }
