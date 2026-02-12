@@ -347,6 +347,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const [recomputing, setRecomputing] = useState(false);
   const [recomputeError, setRecomputeError] = useState<string | null>(null);
   const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(false);
+  const [showFullIntervalBreakdown, setShowFullIntervalBreakdown] = useState(false);
 
   useEffect(() => {
     setHydratedCompleted(completed);
@@ -585,6 +586,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
   // Collapse micro-steps (e.g. 4×100m strides) for easy/recovery runs so the table doesn't become noise.
   const stepsDisplay = useMemo(() => {
+    if (showFullIntervalBreakdown) return stepsDisplayBase;
     const fp = completedSrc?.workout_analysis?.fact_packet_v1;
     const workoutType = String(fp?.facts?.workout_type || '').toLowerCase();
     const weekIntent = String(fp?.facts?.plan?.week_intent || '').toLowerCase();
@@ -636,7 +638,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       return best ? [best] : stepsDisplayBase;
     }
     return stepsDisplayBase;
-  }, [stepsDisplayBase, completedSrc]);
+  }, [stepsDisplayBase, completedSrc, showFullIntervalBreakdown]);
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const rows = completedSrc ? accumulate(completedSrc) : [];
@@ -2181,7 +2183,35 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           </colgroup>
           <thead>
             <tr className="border-b border-white/10">
-              <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Planned</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">
+                <div className="flex items-center gap-2">
+                  <span>Planned</span>
+                  {(() => {
+                    const fp = completedSrc?.workout_analysis?.fact_packet_v1;
+                    const workoutType = String(fp?.facts?.workout_type || '').toLowerCase();
+                    const weekIntent = String(fp?.facts?.plan?.week_intent || '').toLowerCase();
+                    const isRecoveryWeek = fp?.facts?.plan?.is_recovery_week === true;
+                    const easyLike =
+                      weekIntent === 'recovery' ||
+                      isRecoveryWeek ||
+                      workoutType.includes('recovery') ||
+                      workoutType === 'easy' ||
+                      workoutType === 'easy_run';
+                    if (!easyLike) return null;
+                    if (!Array.isArray(stepsDisplayBase) || stepsDisplayBase.length <= 2) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setShowFullIntervalBreakdown((v) => !v)}
+                        className="text-[11px] px-1.5 py-0.5 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15"
+                        title={showFullIntervalBreakdown ? 'Hide strides/micro-steps' : 'Show strides/micro-steps'}
+                      >
+                        {showFullIntervalBreakdown ? 'Hide details' : 'Show details'}
+                      </button>
+                    );
+                  })()}
+                </div>
+              </th>
               <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">{isRideSport ? 'Watts' : (isSwimSport ? '/100 (pref)' : 'Pace')}</th>
               <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Dist</th>
               <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Time</th>

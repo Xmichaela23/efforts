@@ -7,6 +7,71 @@ type OpenAIChatResponse = {
   }>;
 };
 
+function normalizeParagraph(text: string): string {
+  return String(text || '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
+function extractNumericTokens(text: string): string[] {
+  const s = String(text || '');
+  const out = new Set<string>();
+  // Pace tokens like 10:16/mi
+  for (const m of s.matchAll(/\b\d{1,2}:\d{2}\/mi\b/g)) out.add(m[0]);
+  // Percent tokens
+  for (const m of s.matchAll(/\b\d+(?:\.\d+)?%\b/g)) out.add(m[0]);
+  // Plain numbers (integers/decimals). We keep them as they appear.
+  for (const m of s.matchAll(/\b\d+(?:\.\d+)?\b/g)) out.add(m[0]);
+  return Array.from(out);
+}
+
+function validateNoNewNumbers(summary: string, displayPacket: any): { ok: boolean; bad: string[] } {
+  const displayStr = JSON.stringify(displayPacket, null, 2);
+  const tokens = extractNumericTokens(summary);
+  const bad: string[] = [];
+  for (const t of tokens) {
+    // Ignore tokens that are trivially common and non-meaningful.
+    if (t === '1') continue; // version numbers etc
+    if (!displayStr.includes(t)) bad.push(t);
+  }
+  return { ok: bad.length === 0, bad };
+}
+
+async function callOpenAIParagraph(openaiKey: string, prompt: string, temperature: number): Promise<string | null> {
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are an expert endurance coach. Output must be a single paragraph (3-5 sentences). No bullets. No headers.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature,
+      max_tokens: 260,
+    }),
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`OpenAI API error: ${resp.status} - ${txt}`);
+  }
+  const data = (await resp.json()) as OpenAIChatResponse;
+  const content = String(data?.choices?.[0]?.message?.content || '').trim();
+  const normalized = normalizeParagraph(content);
+  return normalized || null;
+}
+
 function pickTopFlags(flags: FlagV1[]): FlagV1[] {
   const arr = Array.isArray(flags) ? flags : [];
   return [...arr]
@@ -192,44 +257,18 @@ ${JSON.stringify(displayPacket, null, 2)}
 Write the summary now.`;
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are an expert endurance coach. Output must be a single paragraph (3-5 sentences). No bullets. No headers.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 260,
-      }),
-    });
+    // Attempt 1: normal generation
+    const s1 = await callOpenAIParagraph(openaiKey, prompt, 0.2);
+    if (!s1) return null;
+    const v1 = validateNoNewNumbers(s1, displayPacket);
+    if (v1.ok) return s1;
 
-    if (!resp.ok) {
-      const txt = await resp.text();
-      throw new Error(`OpenAI API error: ${resp.status} - ${txt}`);
-    }
-
-    const data = (await resp.json()) as OpenAIChatResponse;
-    const content = String(data?.choices?.[0]?.message?.content || '').trim();
-    if (!content) return null;
-
-    // Ensure single paragraph output (remove extra blank lines).
-    const normalized = content
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join(' ');
-
-    return normalized || null;
+    // Attempt 2: corrective retry with explicit violations + temp=0
+    const corrective = `${prompt}\n\nYou violated the numeric grounding rule by introducing these tokens not present in DISPLAY PACKET: ${v1.bad.join(', ')}.\nRewrite the paragraph and REMOVE any token not present verbatim in DISPLAY PACKET.`;
+    const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
+    if (!s2) return null;
+    const v2 = validateNoNewNumbers(s2, displayPacket);
+    return v2.ok ? s2 : null;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;
