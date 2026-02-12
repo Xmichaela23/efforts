@@ -438,19 +438,51 @@ export async function getTrainingLoadContext(
     const previous_day_type = prev ? (safeLower(prev.type) || null) : null;
 
     // Consecutive training days leading up to workout date (excluding workout day). Use date-only to avoid UTC/tz mismatch.
-    const completedDates = new Set(completed.map((r) => toDateOnly(r.date)).filter(Boolean) as string[]);
+    // Define "training day" as a day with non-trivial load/duration (avoids counting trivial/misc entries).
+    // This is intentionally conservative to prevent inflated streaks.
+    const dayAgg = new Map<string, { workload: number; durationMin: number; types: Set<string> }>();
+    for (const r of completed) {
+      const d = toDateOnly(r.date);
+      if (!d) continue;
+      const wl = coerceNumber(r.workload_actual) || 0;
+      const dur = getOverallDurationMin(r) || 0;
+      const t = safeLower(r.type) || 'unknown';
+      const cur = dayAgg.get(d) || { workload: 0, durationMin: 0, types: new Set<string>() };
+      cur.workload += wl;
+      cur.durationMin += dur;
+      cur.types.add(t);
+      dayAgg.set(d, cur);
+    }
+
+    const isTrainingDay = (d: string): boolean => {
+      const a = dayAgg.get(d);
+      if (!a) return false;
+      // Thresholds tuned to avoid counting mobility/short walks/etc.
+      return a.workload >= 10 || a.durationMin >= 20;
+    };
+
+    const trainingDates = new Set<string>(Array.from(dayAgg.keys()).filter(isTrainingDay));
     const streakDates: string[] = [];
     for (let i = 1; i <= 14; i += 1) {
       const d = isoDateAddDays(workoutDate, -i);
-      if (completedDates.has(d)) streakDates.push(d);
+      if (trainingDates.has(d)) streakDates.push(d);
       else break;
     }
     const consecutive_training_days = streakDates.length;
     // Debug: log the streak and the last N unique workout dates seen.
     try {
-      const uniqSorted = Array.from(completedDates).sort(); // ascending
+      const uniqSorted = Array.from(dayAgg.keys()).sort(); // ascending
+      const last14 = Array.from({ length: 14 }, (_, i) => isoDateAddDays(workoutDate, -(i + 1)));
+      const breakdown = last14
+        .map((d) => {
+          const a = dayAgg.get(d);
+          if (!a) return `${d}:none`;
+          const counted = isTrainingDay(d) ? 'Y' : 'n';
+          return `${d}:${counted}(wl=${Math.round(a.workload)},dur=${Math.round(a.durationMin)}m,types=${Array.from(a.types).slice(0, 3).join('+')})`;
+        })
+        .join(' | ');
       console.log(
-        `[fact-packet] consecutive_training_days=${consecutive_training_days} for workoutDate=${workoutDate}; streakDates=[${streakDates.join(', ')}]; completedDates(last<=25)=[${uniqSorted.slice(-25).join(', ')}]`
+        `[fact-packet] consecutive_training_days=${consecutive_training_days} for workoutDate=${workoutDate}; streakDates=[${streakDates.join(', ')}]; dayAggDates(last<=25)=[${uniqSorted.slice(-25).join(', ')}]; last14_breakdown=${breakdown}`
       );
     } catch {}
 
