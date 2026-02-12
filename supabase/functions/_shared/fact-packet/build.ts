@@ -143,8 +143,13 @@ export async function buildWorkoutFactPacketV1(args: {
   const computed = parseJson(workout?.computed) || {};
   const overall = computed?.overall || {};
   const overallDistMi = (() => {
-    const m = coerceNumber(overall?.distance_m);
+    const m =
+      coerceNumber(overall?.distance_m) ??
+      coerceNumber(overall?.distance_meters) ??
+      coerceNumber(overall?.distanceMeters);
     if (m != null && m > 0) return m / 1609.34;
+    const kmOverall = coerceNumber(overall?.distance_km ?? overall?.distanceKm);
+    if (kmOverall != null && kmOverall > 0) return kmOverall * 0.621371;
     const km = coerceNumber(workout?.distance);
     return km != null && km > 0 ? km * 0.621371 : 0;
   })();

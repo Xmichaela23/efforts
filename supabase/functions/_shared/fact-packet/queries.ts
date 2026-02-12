@@ -457,8 +457,11 @@ export async function getTrainingLoadContext(
     const isTrainingDay = (d: string): boolean => {
       const a = dayAgg.get(d);
       if (!a) return false;
-      // Thresholds tuned to avoid counting mobility/short walks/etc.
-      return a.workload >= 10 || a.durationMin >= 20;
+      const types = Array.from(a.types || []);
+      const hasNonTrivialType = types.some((t) => !/(mobility|yoga|stretch)/i.test(t));
+      // Thresholds tuned to avoid counting mobility/yoga/stretch as "training days".
+      // A day can count via workload alone, or via meaningful duration only if it isn't just mobility-type work.
+      return a.workload >= 10 || (a.durationMin >= 20 && hasNonTrivialType);
     };
 
     const trainingDates = new Set<string>(Array.from(dayAgg.keys()).filter(isTrainingDay));

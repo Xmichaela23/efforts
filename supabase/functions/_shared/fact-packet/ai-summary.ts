@@ -84,9 +84,9 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       elevation_gain: (coerceNumber(facts?.elevation_gain_ft) != null) ? `${Math.round(Number(facts.elevation_gain_ft))} ft` : null,
       terrain: typeof facts?.terrain_type === 'string' ? facts.terrain_type : null,
     },
+    // Plan: exclude plan name/race identifiers to prevent the LLM from inventing race-specific context.
     plan: facts?.plan
       ? {
-          name: String(facts.plan?.name || ''),
           week_number: typeof facts.plan?.week_number === 'number' ? facts.plan.week_number : null,
           phase: typeof facts.plan?.phase === 'string' ? facts.plan.phase : null,
           workout_purpose: typeof facts.plan?.workout_purpose === 'string' ? facts.plan.workout_purpose : null,
@@ -94,17 +94,20 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
           is_recovery_week: typeof facts.plan?.is_recovery_week === 'boolean' ? facts.plan.is_recovery_week : null,
         }
       : null,
-    conditions: facts?.weather
-      ? {
-          temperature: `${Math.round(Number(facts.weather.temperature_f))}°F`,
-          humidity: `${Math.round(Number(facts.weather.humidity_pct))}%`,
-          dew_point: `${Math.round(Number(facts.weather.dew_point_f))}°F`,
-          heat_stress_level: facts.weather.heat_stress_level,
-          wind: facts.weather.wind_mph != null ? `${Math.round(Number(facts.weather.wind_mph))} mph` : null,
-          conditions: facts.weather.conditions ?? null,
-          source: facts.weather.source ?? null,
-        }
-      : null,
+    // Conditions: only include when heat stress is a factor (spec: hide weather when "nothing to report").
+    conditions: (() => {
+      const wx = facts?.weather;
+      const level = String(wx?.heat_stress_level || '');
+      if (!wx) return null;
+      if (level !== 'moderate' && level !== 'severe') return null;
+      return {
+        dew_point: `${Math.round(Number(wx.dew_point_f))}°F`,
+        heat_stress_level: wx.heat_stress_level,
+        temperature: `${Math.round(Number(wx.temperature_f))}°F`,
+        humidity: `${Math.round(Number(wx.humidity_pct))}%`,
+        wind: wx.wind_mph != null ? `${Math.round(Number(wx.wind_mph))} mph` : null,
+      };
+    })(),
     signals: {
       hr_drift: (coerceNumber(derived?.hr_drift_bpm) != null) ? `${Math.round(Number(derived.hr_drift_bpm))} bpm` : null,
       hr_drift_typical: (coerceNumber(derived?.hr_drift_typical) != null) ? `${Math.round(Number(derived.hr_drift_typical))} bpm` : null,
@@ -176,6 +179,8 @@ RULES:
 - Never say "I".
 - Never calculate.
 - CRITICAL: NEVER output pace as raw seconds. Use the provided display strings like "10:16/mi". If a pace is missing, omit it.
+- CRITICAL: Do not introduce ANY proper nouns (races, cities, events) unless they appear verbatim in DISPLAY PACKET.
+- CRITICAL: Do not introduce ANY numbers or percentages that are not present verbatim in DISPLAY PACKET.
 - Never show raw field names (no snake_case).
 
 TOP FLAGS (lead with these):
