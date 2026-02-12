@@ -241,11 +241,14 @@ RULES:
 - Lead with the most important insight (see TOP FLAGS).
 - Be specific and grounded: reference 2-4 concrete details (pace, HR, drift/decoupling, conditions, fatigue, plan intent) ONLY when they explain the outcome.
 - No filler. Avoid generic phrases like "indicating", "effective endurance training", "attention should be paid", "ensure", "focus on", "in future workouts".
+- FORBIDDEN phrasing: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing confidence", "effective management", "overall", "aligns well".
 - Never say "I".
 - Never calculate.
 - CRITICAL: NEVER output pace as raw seconds. Use the provided display strings like "10:16/mi". If a pace is missing, omit it.
 - CRITICAL: Do not introduce ANY proper nouns (races, cities, events) unless they appear verbatim in DISPLAY PACKET.
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present verbatim in DISPLAY PACKET.
+- If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost (don’t call it “achieved recovery”).
+- Do not call it an "interval session" unless DISPLAY PACKET workout.type explicitly indicates intervals/tempo/track repeats.
 - Never show raw field names (no snake_case).
 
 TOP FLAGS (lead with these):

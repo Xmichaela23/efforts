@@ -10,6 +10,7 @@ import {
   isoDateAddDays,
   isoWeekStartMonday,
   mapHrToZone,
+  paceStringToSecondsPerMi,
 } from './utils.ts';
 import { getNotableAchievements, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext } from './queries.ts';
 import { assessStimulus } from './stimulus.ts';
@@ -49,8 +50,15 @@ function deriveAvgMaxHrFromSensor(sensor_data: any): { avg: number | null; max: 
 }
 
 function normalizePaceRange(range: any): { fast: number; slow: number } | null {
-  const lo = coerceNumber(range?.lower ?? range?.min ?? range?.fast ?? range?.from);
-  const hi = coerceNumber(range?.upper ?? range?.max ?? range?.slow ?? range?.to);
+  const coercePace = (v: any): number | null => {
+    const n = coerceNumber(v);
+    if (n != null && n > 0) return n;
+    // Accept strings like "10:55/mi" or "10:55"
+    const parsed = paceStringToSecondsPerMi(v);
+    return parsed != null && parsed > 0 ? parsed : null;
+  };
+  const lo = coercePace(range?.lower ?? range?.min ?? range?.fast ?? range?.from);
+  const hi = coercePace(range?.upper ?? range?.max ?? range?.slow ?? range?.to);
   if (lo == null && hi == null) return null;
   if (lo != null && hi != null) {
     return { fast: Math.min(lo, hi), slow: Math.max(lo, hi) };
@@ -239,7 +247,7 @@ export async function buildWorkoutFactPacketV1(args: {
     const plannedType = plannedWorkout?.workout_type || plannedWorkout?.type || null;
     const analyzerType = deriveWorkoutTypeKey(workout);
     // Prefer plan type when linked; fallback to analyzer.
-    return String(plannedType || analyzerType || 'unknown');
+    return String(plannedType || workoutIntent || analyzerType || 'unknown');
   })();
 
   const factsPlan = (() => {
