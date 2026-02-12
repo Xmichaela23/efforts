@@ -408,8 +408,11 @@ export async function getTrainingLoadContext(
 ): Promise<TrainingLoadV1 | null> {
   const { userId, workoutDateIso } = params;
   try {
-    const end = isoDateAddDays(workoutDateIso, -1);
-    const start28 = isoDateAddDays(workoutDateIso, -28);
+    const workoutDate = toDateOnly(workoutDateIso);
+    if (!workoutDate) return null;
+
+    const end = isoDateAddDays(workoutDate, -1);
+    const start28 = isoDateAddDays(workoutDate, -28);
     const rows = await fetchRecentWorkouts(supabase, userId, start28, end, 220);
 
     const completed = rows
@@ -417,29 +420,42 @@ export async function getTrainingLoadContext(
       .filter((r) => toDateOnly(r.date) != null)
       .sort((a, b) => (toDateOnly(a.date) || '').localeCompare(toDateOnly(b.date) || '')); // ascending
 
+    // Debug: log the raw dates/types we got back (date-only).
+    try {
+      const sample = completed
+        .slice(-40)
+        .map((r) => `${toDateOnly(r.date)}:${safeLower(r.type) || 'unknown'}`)
+        .filter(Boolean);
+      console.log(
+        `[fact-packet] training_load query: workoutDateIso=${String(workoutDateIso)} normalized=${workoutDate} window=[${start28}..${end}] rows=${rows.length} completed=${completed.length} sample(last<=40)=[${sample.join(', ')}]`
+      );
+    } catch {}
+
     // Previous day (date-only comparison)
-    const prevDate = isoDateAddDays(workoutDateIso, -1);
+    const prevDate = isoDateAddDays(workoutDate, -1);
     const prev = completed.filter((r) => toDateOnly(r.date) === prevDate).sort((a, b) => (coerceNumber(b.workload_actual) || 0) - (coerceNumber(a.workload_actual) || 0))[0] || null;
     const previous_day_workload = Math.round(coerceNumber(prev?.workload_actual) || 0);
     const previous_day_type = prev ? (safeLower(prev.type) || null) : null;
 
     // Consecutive training days leading up to workout date (excluding workout day). Use date-only to avoid UTC/tz mismatch.
-    let consecutive_training_days = 0;
     const completedDates = new Set(completed.map((r) => toDateOnly(r.date)).filter(Boolean) as string[]);
+    const streakDates: string[] = [];
     for (let i = 1; i <= 14; i += 1) {
-      const d = isoDateAddDays(workoutDateIso, -i);
-      const has = completedDates.has(d);
-      if (has) consecutive_training_days += 1;
+      const d = isoDateAddDays(workoutDate, -i);
+      if (completedDates.has(d)) streakDates.push(d);
       else break;
     }
-    // Debug: log dates and count so we can verify (can remove after confirming)
-    if (consecutive_training_days > 0) {
-      const datesChecked = Array.from({ length: consecutive_training_days }, (_, i) => isoDateAddDays(workoutDateIso, -(i + 1)));
-      console.log(`[fact-packet] consecutive_training_days=${consecutive_training_days} for workout ${workoutDateIso}; dates_with_workouts: ${datesChecked.join(', ')}`);
-    }
+    const consecutive_training_days = streakDates.length;
+    // Debug: log the streak and the last N unique workout dates seen.
+    try {
+      const uniqSorted = Array.from(completedDates).sort(); // ascending
+      console.log(
+        `[fact-packet] consecutive_training_days=${consecutive_training_days} for workoutDate=${workoutDate}; streakDates=[${streakDates.join(', ')}]; completedDates(last<=25)=[${uniqSorted.slice(-25).join(', ')}]`
+      );
+    } catch {}
 
     // Week load pct (Mon-Sun, week containing workoutDateIso)
-    const weekStart = isoWeekStartMonday(workoutDateIso);
+    const weekStart = isoWeekStartMonday(workoutDate);
     const weekEnd = isoDateAddDays(weekStart, 6);
     const weekActualRows = await fetchRecentWorkouts(supabase, userId, weekStart, weekEnd, 80);
     const week_workload_actual = weekActualRows
@@ -475,7 +491,7 @@ export async function getTrainingLoadContext(
     const sumDays = (days: number): number => {
       let sum = 0;
       for (let i = 1; i <= days; i += 1) {
-        const d = isoDateAddDays(workoutDateIso, -i);
+        const d = isoDateAddDays(workoutDate, -i);
         sum += dateToWorkload.get(d) || 0;
       }
       return sum;
