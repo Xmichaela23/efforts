@@ -581,7 +581,62 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
   }
   // If executed mapping isn't ready, collapse to a single row to avoid showing planned-only dashes
-  const stepsDisplay = useMemo(() => (hasServerComputed ? steps : [steps[0]]), [hasServerComputed, steps]);
+  const stepsDisplayBase = useMemo(() => (hasServerComputed ? steps : [steps[0]]), [hasServerComputed, steps]);
+
+  // Collapse micro-steps (e.g. 4×100m strides) for easy/recovery runs so the table doesn't become noise.
+  const stepsDisplay = useMemo(() => {
+    const fp = completedSrc?.workout_analysis?.fact_packet_v1;
+    const workoutType = String(fp?.facts?.workout_type || '').toLowerCase();
+    const weekIntent = String(fp?.facts?.plan?.week_intent || '').toLowerCase();
+    const isRecoveryWeek = fp?.facts?.plan?.is_recovery_week === true;
+    const easyLike =
+      weekIntent === 'recovery' ||
+      isRecoveryWeek ||
+      workoutType.includes('recovery') ||
+      workoutType === 'easy' ||
+      workoutType === 'easy_run';
+
+    if (!easyLike) return stepsDisplayBase;
+    if (!Array.isArray(stepsDisplayBase) || stepsDisplayBase.length <= 2) return stepsDisplayBase;
+
+    const stepMi = (st: any): number | null => {
+      const m = Number(st?.distanceMeters);
+      if (Number.isFinite(m) && m > 0) return m / 1609.34;
+      return null;
+    };
+    const stepS = (st: any): number | null => {
+      const s = Number(st?.seconds ?? st?.duration_s ?? st?.duration);
+      return Number.isFinite(s) && s > 0 ? s : null;
+    };
+
+    const MICRO_MI = 0.25;
+    const MICRO_S = 120;
+    const BIG_MI = 2.0;
+    const BIG_S = 900; // 15 min
+
+    const scored = stepsDisplayBase.map((st: any) => {
+      const mi = stepMi(st);
+      const s = stepS(st);
+      const micro = (mi != null && mi > 0 && mi < MICRO_MI) || (s != null && s > 0 && s < MICRO_S);
+      const big = (mi != null && mi >= BIG_MI) || (s != null && s >= BIG_S);
+      const size = (mi != null ? mi : (s != null ? s / 60 : 0));
+      return { st, mi, s, micro, big, size };
+    });
+
+    const bigSteps = scored.filter((x) => x.big).map((x) => x.st);
+    const nonBig = scored.filter((x) => !x.big);
+    const allNonBigAreMicro = nonBig.length > 0 && nonBig.every((x) => x.micro);
+
+    // If we have a dominant easy segment and the rest are micro-steps, show only the dominant segment.
+    if (bigSteps.length >= 1 && allNonBigAreMicro) {
+      // Pick the largest big step to represent the session.
+      const best = scored
+        .filter((x) => x.big)
+        .sort((a, b) => (b.size - a.size))[0]?.st;
+      return best ? [best] : stepsDisplayBase;
+    }
+    return stepsDisplayBase;
+  }, [stepsDisplayBase, completedSrc]);
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const rows = completedSrc ? accumulate(completedSrc) : [];
