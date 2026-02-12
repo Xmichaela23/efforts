@@ -167,14 +167,23 @@ export async function buildWorkoutFactPacketV1(args: {
   const maxHr = hrFromComputedMax != null ? Math.round(hrFromComputedMax) : hrSensor.max;
 
   const elevationGainFt = (() => {
-    let m = coerceNumber(workout?.elevation_gain ?? workout?.total_elevation_gain ?? overall?.elevation_gain_m ?? overall?.elevation_gain ?? overall?.total_elevation_gain_m);
+    let m = coerceNumber(
+      workout?.elevation_gain ??
+      workout?.metrics?.elevation_gain ??
+      workout?.total_elevation_gain ??
+      overall?.elevation_gain_m ??
+      overall?.elevation_gain ??
+      overall?.total_elevation_gain_m
+    );
     if (m == null && overallDistMi > 0) {
       const breakdown = workout?.workout_analysis?.detailed_analysis?.interval_breakdown;
       const intervals = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
       const sum = intervals.reduce((acc: number, inv: any) => acc + (coerceNumber(inv?.elevation_gain_m) ?? 0), 0);
       if (sum > 0) {
+        // Note: interval_breakdown elevation is GPS-estimated and may overcount vs barometric total.
+        // Only use it as a last resort when workout-level elevation is missing.
         m = sum;
-        if (workout?.id) console.log(`[fact-packet] elevation from interval_breakdown: ${sum}m for workout ${workout.id}`);
+        if (workout?.id) console.log(`[fact-packet] elevation fallback from interval_breakdown: ${sum}m for workout ${workout.id}`);
       }
     }
     if (m == null) return null;
@@ -183,7 +192,7 @@ export async function buildWorkoutFactPacketV1(args: {
 
   const terrain_type = classifyTerrain(elevationGainFt, overallDistMi);
   if (workout?.id && overallDistMi > 0.2 && elevationGainFt == null) {
-    console.log(`[fact-packet] terrain: elevation_gain missing for workout ${workout.id}, workout.elevation_gain=${workout?.elevation_gain}, overall.elevation_gain_m=${overall?.elevation_gain_m}`);
+    console.log(`[fact-packet] terrain: elevation_gain missing for workout ${workout.id}, workout.elevation_gain=${workout?.elevation_gain}, workout.metrics.elevation_gain=${workout?.metrics?.elevation_gain}, overall.elevation_gain_m=${overall?.elevation_gain_m}`);
   }
   const weather = deriveWeather(workout);
 
