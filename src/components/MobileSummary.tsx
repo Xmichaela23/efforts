@@ -374,7 +374,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         .maybeSingle();
       if (wErr) throw wErr;
       if (refreshed) {
-        setHydratedCompleted((prev: any) => ({ ...(prev || {}), ...(refreshed as any) }));
+        // JSONB may arrive as string depending on transport; normalize for rendering
+        const normalized: any = { ...(refreshed as any) };
+        try {
+          if (typeof normalized.workout_analysis === 'string') {
+            normalized.workout_analysis = JSON.parse(normalized.workout_analysis);
+          }
+        } catch {}
+        setHydratedCompleted((prev: any) => ({ ...(prev || {}), ...(normalized as any) }));
       }
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
     } catch (e: any) {
@@ -1783,10 +1790,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const fmtDeltaPer100 = (s:number) => { const faster = s>0; const v = Math.abs(s); const m=Math.floor(v/60); const ss=Math.round(v%60); return `${m?`${m}m `:''}${ss}s/${swimUnit==='yd'?'100yd':'100m'} ${faster? 'faster' : 'slower'}`.trim(); };
 
             // Use server-computed metrics from workout_analysis.performance (new unified source)
-            const performance = (completed as any)?.workout_analysis?.performance;
+            const performance = completedSrc?.workout_analysis?.performance;
             const executionScore = Number.isFinite(performance?.execution_adherence) 
               ? Math.round(performance.execution_adherence)
-              : ((completed as any)?.computed?.overall?.execution_score || null);
+              : ((completedSrc as any)?.computed?.overall?.execution_score || null);
             // ✅ FIX: Only use server-side granular analysis, no fallback to client calculations
             const paceAdherence = Number.isFinite(performance?.pace_adherence)
               ? Math.round(performance.pace_adherence)
@@ -1823,10 +1830,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 </div>
                 
                 {/* View in Context link */}
-                {onNavigateToContext && completed?.id && (
+                {onNavigateToContext && completedSrc?.id && (
                   <div className="text-center">
                     <button
-                      onClick={() => onNavigateToContext(completed.id)}
+                      onClick={() => onNavigateToContext(completedSrc.id)}
                     className="text-sm text-black hover:text-gray-600 transition-colors"
                     style={{
                       fontFamily: 'Inter, sans-serif',
@@ -1850,7 +1857,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           // ------------ BIKE/RIDE (smart server, dumb client - same as running) ------------
           if (isRide) {
             // ✅ SMART SERVER, DUMB CLIENT: Read all adherence values from workout_analysis.performance
-            const performance = (completed as any)?.workout_analysis?.performance;
+            const performance = completedSrc?.workout_analysis?.performance;
             console.log('🚴 [CYCLING DEBUG] Reading from workout_analysis.performance:', performance);
             
             // Use server-computed values (same pattern as running)
@@ -1926,10 +1933,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 </div>
                 
                 {/* View in Context link */}
-                {onNavigateToContext && completed?.id && (
+                {onNavigateToContext && completedSrc?.id && (
                   <div className="text-center">
                     <button
-                      onClick={() => onNavigateToContext(completed.id)}
+                      onClick={() => onNavigateToContext(completedSrc.id)}
                     className="text-sm text-black hover:text-gray-600 transition-colors"
                     style={{
                       fontFamily: 'Inter, sans-serif',
@@ -2238,7 +2245,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             // Use enhanced analysis adherence percentage if available (works for both running and cycling)
             const getEnhancedAdherence = () => {
               // Check for enhanced analysis from analyze-running-workout or analyze-cycling-workout
-              const workoutAnalysis = (completed as any)?.workout_analysis;
+              const workoutAnalysis = completedSrc?.workout_analysis;
               if (workoutAnalysis?.granular_analysis?.interval_breakdown) {
                 const intervalBreakdown = workoutAnalysis.granular_analysis.interval_breakdown;
                 // Find matching interval by planned step ID or index
@@ -2311,7 +2318,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               if (!hasServerComputed || !row) {
                 if (idx !== 0) return '—';
                 // ONLY use server-computed distance - NO fallbacks
-                const overall = (completed as any)?.computed?.overall || {};
+                const overall = (completedSrc as any)?.computed?.overall || {};
                 const distM = Number(overall?.distance_m);
                 if (Number.isFinite(distM) && distM > 0) {
                   if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
@@ -2372,10 +2379,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 
                 // For overall row, show overall workout HR
                 if (isOverallRow) {
-                  const overall = (completed as any)?.computed?.overall || {};
+                  const overall = (completedSrc as any)?.computed?.overall || {};
                   const hr = Number(overall?.avg_hr);
                   if (Number.isFinite(hr) && hr > 0) return Math.round(hr);
-                  const fromMetrics = Number((completed as any)?.avg_heart_rate ?? (completed as any)?.metrics?.avg_heart_rate);
+                  const fromMetrics = Number((completedSrc as any)?.avg_heart_rate ?? (completedSrc as any)?.metrics?.avg_heart_rate);
                   if (Number.isFinite(fromMetrics) && fromMetrics > 0) return Math.round(fromMetrics);
                 }
                 return null;
@@ -2394,7 +2401,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
                           {/* Enhanced analysis indicator */}
                           {(() => {
-                            const workoutAnalysis = (completed as any)?.workout_analysis;
+                            const workoutAnalysis = completedSrc?.workout_analysis;
                             if (workoutAnalysis?.analysis?.pacing_analysis) {
                               const pacingAnalysis = workoutAnalysis.analysis.pacing_analysis;
                               const variability = pacingAnalysis.pacing_variability;
