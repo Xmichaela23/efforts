@@ -146,7 +146,6 @@ Deno.serve(async (req) => {
         total_timer_time,
         distance,
         elevation_gain,
-        total_elevation_gain,
         weather_data,
         avg_temperature,
         start_position_lat,
