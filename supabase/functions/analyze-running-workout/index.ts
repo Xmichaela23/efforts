@@ -1873,10 +1873,36 @@ Deno.serve(async (req) => {
       const bullets: string[] = [];
       // Prefer deterministic flags as the canonical "what matters" when available.
       if (fact_packet_v1 && Array.isArray(flags_v1) && flags_v1.length) {
+        // Always lead with a single overall sentence so the summary isn't just one flag.
+        try {
+          const fp = fact_packet_v1 as any;
+          const dist = Number(fp?.facts?.total_distance_mi);
+          const dur = Number(fp?.facts?.total_duration_min);
+          const pace = Number(fp?.facts?.avg_pace_sec_per_mi);
+          const hr = Number(fp?.facts?.avg_hr);
+          const terrain = String(fp?.facts?.terrain_type || '');
+          const fmtMi = (m: number) => `${m.toFixed(m < 1 ? 2 : 1)} mi`;
+          const fmtMin = (m: number) => `${Math.round(m)} min`;
+          const fmtPace = (secPerMi: number): string => {
+            const s = Math.round(Math.max(0, secPerMi));
+            const mm = Math.floor(s / 60);
+            const ss = s % 60;
+            return `${mm}:${String(ss).padStart(2, '0')}/mi`;
+          };
+          if (Number.isFinite(dist) && dist > 0 && Number.isFinite(dur) && dur > 0) {
+            const bits: string[] = [];
+            bits.push(`${fmtMi(dist)} in ${fmtMin(dur)}`);
+            if (Number.isFinite(pace) && pace > 0) bits.push(`${fmtPace(pace)} avg pace`);
+            if (Number.isFinite(hr) && hr > 0) bits.push(`${Math.round(hr)} bpm avg HR`);
+            if (terrain) bits.push(`${terrain} terrain`);
+            bullets.push(bits.join(' • ') + '.');
+          }
+        } catch {}
+
         const top = (flags_v1 as any[])
           .filter((f) => f && typeof f.message === 'string' && f.message.trim())
           .sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99))
-          .slice(0, 3);
+          .slice(0, 2);
         for (const f of top) bullets.push(String(f.message).trim().replace(/\.$/, '') + '.');
       } else {
         const verdictRaw = (typeof adherenceSummary?.verdict === 'string' ? adherenceSummary.verdict.trim() : '');

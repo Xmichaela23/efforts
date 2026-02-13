@@ -11,6 +11,7 @@ import {
   isoWeekStartMonday,
   mapHrToZone,
   paceStringToSecondsPerMi,
+  secondsToPaceString,
 } from './utils.ts';
 import { getNotableAchievements, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext } from './queries.ts';
 import { assessStimulus } from './stimulus.ts';
@@ -319,6 +320,44 @@ export async function buildWorkoutFactPacketV1(args: {
   const fade = calculatePaceFadePct(segments);
   const driftSeg = calculateOverallHrDriftBpm(segments);
 
+  const pacing_pattern = (() => {
+    try {
+      const splits = workout?.workout_analysis?.detailed_analysis?.mile_by_mile_terrain?.splits;
+      if (!Array.isArray(splits) || splits.length < 2) return { speedups_note: null };
+      const overallPace = overallPace != null ? overallPace : null;
+      if (overallPace == null) return { speedups_note: null };
+
+      const downhill = splits
+        .map((s: any) => ({
+          mile: coerceNumber(s?.mile),
+          pace: coerceNumber(s?.pace_s_per_mi),
+          grade: coerceNumber(s?.grade_percent),
+          type: String(s?.terrain_type || '').toLowerCase(),
+        }))
+        .filter((s: any) => s.mile != null && s.pace != null)
+        .filter((s: any) => s.type === 'downhill' || (s.grade != null && s.grade <= -0.5));
+
+      const notable = downhill
+        .filter((s: any) => (s.pace as number) <= (overallPace - 5)) // at least 5s/mi faster than overall
+        .sort((a: any, b: any) => (a.pace as number) - (b.pace as number))
+        .slice(0, 2);
+
+      if (!notable.length) return { speedups_note: null };
+
+      const parts = notable.map((s: any) => {
+        const paceStr = secondsToPaceString(s.pace as number) || '';
+        const gradeStr = s.grade != null ? `${Math.round((s.grade as number) * 10) / 10}%` : null;
+        return `M${Math.round(s.mile as number)} ${paceStr}${gradeStr ? ` (${gradeStr} grade)` : ''}`;
+      });
+
+      return {
+        speedups_note: `Faster splits lined up with downhill miles (${parts.join(', ')}) — speed is likely terrain-driven rather than effort-driven.`,
+      };
+    } catch {
+      return { speedups_note: null };
+    }
+  })();
+
   const stimulus = assessStimulus(
     String(workoutIntent || workout_type || workoutTypeKey || 'unknown'),
     segments,
@@ -376,6 +415,7 @@ export async function buildWorkoutFactPacketV1(args: {
       hr_drift_typical,
       cardiac_decoupling_pct: dec,
       pace_fade_pct: fade,
+      pacing_pattern,
       training_load: trainingLoad,
       comparisons: {
         vs_similar: {

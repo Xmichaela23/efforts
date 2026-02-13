@@ -2753,6 +2753,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       } catch {}
 
                       try {
+                        const note = factPacketV1?.derived?.pacing_pattern?.speedups_note;
+                        if (note && typeof note === 'string' && note.trim().length > 0) {
+                          rows.push({
+                            label: 'Speed',
+                            value: note.trim(),
+                          });
+                        }
+                      } catch {}
+
+                      try {
                         const wx = factPacketV1?.facts?.weather;
                         if (wx && typeof wx.dew_point_f === 'number' && wx.heat_stress_level && wx.heat_stress_level !== 'none') {
                           rows.push({

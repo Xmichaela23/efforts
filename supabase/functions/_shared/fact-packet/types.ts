@@ -136,6 +136,10 @@ export type FactPacketV1 = {
     hr_drift_typical: number | null;
     cardiac_decoupling_pct: number | null;
     pace_fade_pct: number | null;
+    pacing_pattern?: {
+      // Deterministic explanation for why pace may be faster/slower (e.g. downhill miles).
+      speedups_note: string | null;
+    };
     training_load: TrainingLoadV1 | null;
     comparisons: {
       vs_similar: VsSimilarV1;
