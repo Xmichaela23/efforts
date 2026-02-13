@@ -53,11 +53,23 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     const drift = coerceNumber(packet.derived.hr_drift_bpm);
     const typ = coerceNumber(packet.derived.hr_drift_typical);
     if (drift != null && typ != null && typ > 0) {
+      const terrain = String(packet.facts.terrain_type || '').toLowerCase();
       const delta = drift - typ;
       if (delta <= -3) {
         push(flags, { type: 'positive', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm — better than usual.`, priority: 2 });
       } else if (delta >= 5) {
-        push(flags, { type: 'concern', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm — elevated.`, priority: 1 });
+        // If terrain is hilly, elevated drift can be terrain-driven (climbs raise HR even at controlled effort).
+        // Prefer an explanatory neutral flag over a concern in this case.
+        if (terrain === 'hilly' && drift >= 8 && drift <= 20) {
+          push(flags, {
+            type: 'neutral',
+            category: 'hr',
+            message: `HR drift ${Math.round(drift)} bpm is consistent with hilly terrain — not necessarily a fatigue signal.`,
+            priority: 2,
+          });
+        } else {
+          push(flags, { type: 'concern', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm — elevated.`, priority: 1 });
+        }
       } else {
         push(flags, { type: 'neutral', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm.`, priority: 3 });
       }
