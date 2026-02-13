@@ -911,6 +911,21 @@ Deno.serve(async (req) => {
       }
     }
     
+    // Provide user-specific HR zones when we have a learned threshold HR baseline.
+    const hrZonesFromBaseline = (() => {
+      try {
+        const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
+        if (!Number.isFinite(thr) || thr <= 0) return undefined;
+        const z1Max = Math.round(thr * 0.75);
+        const z2Max = Math.round(thr * 0.85);
+        const z3Max = Math.round(thr * 0.92);
+        const z4Max = Math.round(thr * 0.98);
+        return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
+      } catch {
+        return undefined;
+      }
+    })();
+
     const hrAnalysisContext: HRAnalysisContext = {
       workoutType: detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout),
       intervals: intervalsToAnalyze.map(interval => {
@@ -987,6 +1002,7 @@ Deno.serve(async (req) => {
         lastSimilar: historicalDriftData.lastWeekSimilar
       } : undefined,
       userUnits: 'imperial',
+      hrZones: hrZonesFromBaseline,
       // Pace adherence from granular analysis (0-1 fraction → 0-100 percentage)
       paceAdherencePct: analysis.overall_adherence != null 
         ? Math.round(analysis.overall_adherence * 100) 
@@ -1733,7 +1749,17 @@ Deno.serve(async (req) => {
     }
 
     // Structured adherence summary (verdict + technical insights + plan impact)
-    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis);
+    const aerobicCeilingBpm = (() => {
+      try {
+        const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
+        if (!Number.isFinite(thr) || thr <= 0) return null;
+        return Math.round(thr * 0.85); // match fact-packet Z2 ceiling
+      } catch {
+        return null;
+      }
+    })();
+
+    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis, aerobicCeilingBpm);
     const scoreExplanation = adherenceSummary?.verdict ?? null;
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
 
@@ -2536,7 +2562,8 @@ function generateAdherenceSummary(
     weekFocusLabel: string | null;
     planName: string | null;
   } | null,
-  granularAnalysis?: any
+  granularAnalysis?: any,
+  aerobicCeilingBpm?: number | null
 ): WorkoutAdherenceSummary | null {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
@@ -2586,6 +2613,12 @@ function generateAdherenceSummary(
   const isBuildContext = planContext?.weekIntent === 'build' || planContext?.weekIntent === 'peak';
   const weekNumber = planContext?.weekIndex;
   const currentPhaseName = planContext?.phaseName ?? null;
+
+  // HR gate for recovery integrity: faster-than-range is only a concern when HR confirms intensity drifted above aerobic (Z2 ceiling).
+  const avgHR = Number(granularAnalysis?.heart_rate_analysis?.average_heart_rate);
+  const hrIsAerobic = (aerobicCeilingBpm != null && Number.isFinite(avgHR) && avgHR > 0)
+    ? avgHR <= (aerobicCeilingBpm as number)
+    : null;
   
   console.log(`🔍 [EXPLANATION CONTEXT] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, planContext=${planContext ? JSON.stringify({ weekIntent: planContext.weekIntent, isRecoveryWeek: planContext.isRecoveryWeek, weekIndex: planContext.weekIndex }) : 'none'}`);
 
@@ -2746,11 +2779,23 @@ function generateAdherenceSummary(
       if (isRecoveryContext) {
         // Recovery/easy run that was too fast
         if (planContext?.isRecoveryWeek) {
-          parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than target — too hard for recovery, limits adaptation and supercompensation`);
+          if (hrIsAerobic === true) {
+            parts.push(`Recovery week: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but HR stayed aerobic — controlled recovery effort (terrain/fitness can explain the speed)`);
+          } else {
+            parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than target — too hard for recovery, limits adaptation and supercompensation`);
+          }
         } else if (planContext?.hasActivePlan) {
-          parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+          if (hrIsAerobic === true) {
+            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but HR stayed aerobic — effort was controlled`);
+          } else {
+            parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+          }
         } else {
-          parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+          if (hrIsAerobic === true) {
+            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but HR stayed aerobic — effort was controlled`);
+          } else {
+            parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
+          }
         }
       } else {
         parts.push(`Completed intervals ${fmtDelta(avgFastDelta)}/mi faster than prescribed (${targetRange}/mi)`);
@@ -2804,9 +2849,17 @@ function generateAdherenceSummary(
       if (isRecoveryContext) {
         // Recovery/easy run that was too fast
         if (planContext?.isRecoveryWeek) {
-          parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard, compromises recovery and adaptation`);
+          if (hrIsAerobic === true) {
+            parts.push(`Recovery week: Pace was ${fmtDelta(avgFastDelta)}/mi faster than prescribed, but HR stayed aerobic — recovery intent preserved`);
+          } else {
+            parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard, compromises recovery and adaptation`);
+          }
         } else {
-          parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard for recovery day`);
+          if (hrIsAerobic === true) {
+            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than prescribed, but HR stayed aerobic — recovery intent preserved`);
+          } else {
+            parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard for recovery day`);
+          }
         }
       } else {
         // Work intervals that were too fast
@@ -2913,7 +2966,7 @@ function generateAdherenceSummary(
 
   // Verdict: single non-repetitive sentence; upgrade when internal vs external load tells a story
   let verdict = parts[0].trim() + (parts[0].endsWith('.') ? '' : '.');
-  if (fastDominant && isRecoveryContext && hrDriftAbs != null && hrDriftAbs <= 5) {
+  if (fastDominant && isRecoveryContext && hrDriftAbs != null && hrDriftAbs <= 5 && hrIsAerobic !== true) {
     verdict = "Physiologically efficient, but tactically over-paced for a recovery day.";
   }
 
@@ -2926,9 +2979,13 @@ function generateAdherenceSummary(
     if (isRecoveryContext) {
       focus = 'Recovery Integrity';
       if (fastDominant) {
-        outlook = currentPhaseName
-          ? `This extra effort in the ${currentPhaseName} phase may dampen the supercompensation intended for this rest block.${weekFocus ? ` Consider a more conservative approach to ${weekFocus.toLowerCase()}.` : ''}`
-          : "By exceeding the pace today, you turned a recovery session into a moderate-intensity run. This may dampen the supercompensation effect intended for this rest block.";
+        if (hrIsAerobic === true) {
+          outlook = `Pace came in faster than the prescribed range, but HR stayed aerobic — terrain and fitness likely explain the speed, and the recovery intent was preserved.`;
+        } else {
+          outlook = currentPhaseName
+            ? `This extra effort in the ${currentPhaseName} phase may dampen the supercompensation intended for this rest block.${weekFocus ? ` Consider a more conservative approach to ${weekFocus.toLowerCase()}.` : ''}`
+            : "By exceeding the pace today, you turned a recovery session into a moderate-intensity run. This may dampen the supercompensation effect intended for this rest block.";
+        }
       } else if (slowDominant) {
         outlook = currentPhaseName
           ? `Slower-than-target pacing in ${currentPhaseName} supports adaptation and sets you up well for the next build.`
