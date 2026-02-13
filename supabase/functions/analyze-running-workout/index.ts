@@ -1823,10 +1823,14 @@ Deno.serve(async (req) => {
         confidence: number; // 0..1
       };
 
+      // When a deterministic fact packet exists, avoid "HIGH CARDIAC STRESS" style titles that can
+      // contradict plan intent and flags. Use a neutral title; the flags/coach paragraph carry the meaning.
       const title =
-        (hrAnalysisResult as any)?.summaryLabel
-        || (enhancedAnalysis as any)?.heart_rate_analysis?.summary_label
-        || 'Summary';
+        (fact_packet_v1 ? 'Summary' : (
+          (hrAnalysisResult as any)?.summaryLabel
+          || (enhancedAnalysis as any)?.heart_rate_analysis?.summary_label
+          || 'Summary'
+        ));
 
       const narrative = String((hrAnalysisResult as any)?.interpretation || '').trim();
       const sentences = (() => {
@@ -1841,10 +1845,19 @@ Deno.serve(async (req) => {
       })();
 
       const bullets: string[] = [];
-      const verdictRaw = (typeof adherenceSummary?.verdict === 'string' ? adherenceSummary.verdict.trim() : '');
-      const verdictIsLowSignal = /\b\d+\s+of\s+\d+\s+intervals?\s+on\s+target\b/i.test(verdictRaw);
-      if (verdictRaw && !verdictIsLowSignal) {
-        bullets.push(verdictRaw.endsWith('.') ? verdictRaw : `${verdictRaw}.`);
+      // Prefer deterministic flags as the canonical "what matters" when available.
+      if (fact_packet_v1 && Array.isArray(flags_v1) && flags_v1.length) {
+        const top = (flags_v1 as any[])
+          .filter((f) => f && typeof f.message === 'string' && f.message.trim())
+          .sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99))
+          .slice(0, 3);
+        for (const f of top) bullets.push(String(f.message).trim().replace(/\.$/, '') + '.');
+      } else {
+        const verdictRaw = (typeof adherenceSummary?.verdict === 'string' ? adherenceSummary.verdict.trim() : '');
+        const verdictIsLowSignal = /\b\d+\s+of\s+\d+\s+intervals?\s+on\s+target\b/i.test(verdictRaw);
+        if (verdictRaw && !verdictIsLowSignal) {
+          bullets.push(verdictRaw.endsWith('.') ? verdictRaw : `${verdictRaw}.`);
+        }
       }
 
       // Add 1-2 deterministic “coach-grade” insight bullets before the narrative,

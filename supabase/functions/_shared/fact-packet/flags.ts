@@ -12,6 +12,8 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
   const segs = packet.facts.segments || [];
   const work = segs.filter((s) => s.target_pace_sec_per_mi != null && !/warm|cool/i.test(String(s.name || '')));
 
+  const terrain = String(packet.facts.terrain_type || '').toLowerCase();
+
   // Pacing: easy portion aligned with baseline (if present as a bullet already) isn't in packet yet.
   // For v1, emit plan pacing alignment/miss.
   try {
@@ -30,12 +32,25 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
         const workoutType = String(packet.facts.workout_type || '').toLowerCase();
         const isRecovery = intent === 'recovery' || workoutType.includes('recovery') || workoutType.includes('easy');
         if (isRecovery && avgDev != null && avgDev < -20) {
-          push(flags, {
-            type: 'concern',
-            category: 'pacing',
-            message: `Too fast for recovery: ~${Math.round(Math.abs(avgDev))}s/mi faster than the prescribed range.`,
-            priority: 1,
-          });
+          // Only treat "too fast for recovery" as a concern when HR indicates intensity drifted above aerobic.
+          // If HR stayed aerobic, faster-than-range can be terrain/fitness-driven rather than "too hard".
+          const zones = work.map((s) => String(s.hr_zone || '')).filter(Boolean);
+          const hasHighZone = zones.some((z) => /^z[3-5]$/i.test(z));
+          if (hasHighZone) {
+            push(flags, {
+              type: 'concern',
+              category: 'pacing',
+              message: `Too fast for recovery: ~${Math.round(Math.abs(avgDev))}s/mi faster than the prescribed range with HR above aerobic.`,
+              priority: 1,
+            });
+          } else {
+            push(flags, {
+              type: 'neutral',
+              category: 'pacing',
+              message: `Faster than the recovery range (~${Math.round(Math.abs(avgDev))}s/mi), but HR stayed aerobic — effort was controlled${terrain ? ` on ${terrain} terrain` : ''}.`,
+              priority: 2,
+            });
+          }
         }
       } catch {}
 
@@ -48,12 +63,30 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     }
   } catch {}
 
+  // Terrain-driven drift context (even when vs-typical delta is small).
+  try {
+    const drift = coerceNumber(packet.derived.hr_drift_bpm);
+    const dec = coerceNumber(packet.derived.cardiac_decoupling_pct);
+    const fade = coerceNumber(packet.derived.pace_fade_pct);
+    if (terrain === 'hilly' && drift != null && drift >= 8 && drift <= 20) {
+      const already = flags.some((f) => /hilly terrain/i.test(String(f.message || '')) && /drift/i.test(String(f.message || '')));
+      const steady = (dec == null || dec <= 5) && (fade == null || fade <= 5);
+      if (!already && steady) {
+        push(flags, {
+          type: 'neutral',
+          category: 'hr',
+          message: `HR drift ${Math.round(drift)} bpm is consistent with hilly terrain — treat it as terrain-driven, not fatigue-driven.`,
+          priority: 2,
+        });
+      }
+    }
+  } catch {}
+
   // HR drift vs typical
   try {
     const drift = coerceNumber(packet.derived.hr_drift_bpm);
     const typ = coerceNumber(packet.derived.hr_drift_typical);
     if (drift != null && typ != null && typ > 0) {
-      const terrain = String(packet.facts.terrain_type || '').toLowerCase();
       const delta = drift - typ;
       if (delta <= -3) {
         push(flags, { type: 'positive', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm — better than usual.`, priority: 2 });
