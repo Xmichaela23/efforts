@@ -40,6 +40,23 @@ function validateNoNewNumbers(summary: string, displayPacket: any): { ok: boolea
   return { ok: bad.length === 0, bad };
 }
 
+function validateNoZoneTimeClaims(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const s = String(summary || '').toLowerCase();
+  // We do not currently provide time-in-zone / % in zone in the display packet.
+  // Reject any language that implies it.
+  const mentionsZoneTime =
+    /time spent/.test(s) ||
+    /percent of the time/.test(s) ||
+    /% of the time/.test(s) ||
+    /target (aerobic )?heart rate range/.test(s) ||
+    /target hr zone/.test(s) ||
+    /time in (the )?target/.test(s);
+  if (!mentionsZoneTime) return { ok: true, why: null };
+  const displayStr = JSON.stringify(displayPacket, null, 2).toLowerCase();
+  const hasAnyZoneTimeMetric = displayStr.includes('time_in_zone') || displayStr.includes('time in zone');
+  return { ok: hasAnyZoneTimeMetric, why: hasAnyZoneTimeMetric ? null : 'time-in-zone claim not supported by display packet' };
+}
+
 async function callOpenAIParagraph(openaiKey: string, prompt: string, temperature: number): Promise<string | null> {
   const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -264,14 +281,16 @@ Write the summary now.`;
     const s1 = await callOpenAIParagraph(openaiKey, prompt, 0.2);
     if (!s1) return null;
     const v1 = validateNoNewNumbers(s1, displayPacket);
-    if (v1.ok) return s1;
+    const z1 = validateNoZoneTimeClaims(s1, displayPacket);
+    if (v1.ok && z1.ok) return s1;
 
     // Attempt 2: corrective retry with explicit violations + temp=0
-    const corrective = `${prompt}\n\nYou violated the numeric grounding rule by introducing these tokens not present in DISPLAY PACKET: ${v1.bad.join(', ')}.\nRewrite the paragraph and REMOVE any token not present verbatim in DISPLAY PACKET.`;
+    const corrective = `${prompt}\n\nYou violated grounding constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided.`;
     const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
     if (!s2) return null;
     const v2 = validateNoNewNumbers(s2, displayPacket);
-    return v2.ok ? s2 : null;
+    const z2 = validateNoZoneTimeClaims(s2, displayPacket);
+    return (v2.ok && z2.ok) ? s2 : null;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;

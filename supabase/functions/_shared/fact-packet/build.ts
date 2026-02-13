@@ -50,6 +50,20 @@ function deriveAvgMaxHrFromSensor(sensor_data: any): { avg: number | null; max: 
 }
 
 function normalizePaceRange(range: any): { fast: number; slow: number } | null {
+  // Accept string ranges like "10:55-11:21/mi"
+  try {
+    if (typeof range === 'string') {
+      const s = range.trim();
+      const m = s.match(/(\d+\s*:\s*\d{1,2})\s*[–-]\s*(\d+\s*:\s*\d{1,2})/);
+      if (m) {
+        const a = paceStringToSecondsPerMi(m[1]);
+        const b = paceStringToSecondsPerMi(m[2]);
+        if (a != null && b != null) {
+          return { fast: Math.min(a, b), slow: Math.max(a, b) };
+        }
+      }
+    }
+  } catch {}
   const coercePace = (v: any): number | null => {
     const n = coerceNumber(v);
     if (n != null && n > 0) return n;

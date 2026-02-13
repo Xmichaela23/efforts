@@ -581,11 +581,41 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   if (!steps.length) {
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
   }
+
+  // When the plan is a single steady segment but the executed workout contains extra micro segments
+  // (e.g. strides), allow a "Show details" view sourced from computed.intervals so those segments appear.
+  const computedDetailSteps = useMemo(() => {
+    if (!hasServerComputed) return [] as any[];
+    const list = Array.isArray(computedIntervals) ? computedIntervals : [];
+    return list
+      .filter((it) => it && (it.executed || it.duration_s || it.distance_m))
+      .map((it: any, idx: number) => {
+        const exec = it.executed || it;
+        const distM = Number(exec?.distance_m ?? exec?.distanceMeters ?? exec?.distance_meters);
+        const durS = Number(exec?.duration_s ?? exec?.durationS ?? it?.duration_s);
+        return {
+          id: String(it?.planned_step_id || it?.id || `exec_${idx}`),
+          kind: String(it?.role || it?.kind || it?.interval_type || it?.type || 'segment'),
+          label: String(it?.label || it?.name || it?.role || it?.kind || `Segment ${idx + 1}`),
+          planned_index: Number.isFinite(Number(it?.planned_index)) ? Number(it.planned_index) : idx,
+          seconds: Number.isFinite(durS) ? durS : undefined,
+          duration_s: Number.isFinite(durS) ? durS : undefined,
+          distanceMeters: Number.isFinite(distM) ? distM : undefined,
+          pace_range: it?.pace_range || it?.planned?.pace_range || it?.paceRange || null,
+        };
+      });
+  }, [hasServerComputed, computedIntervals]);
+
+  const planLooksSingleSteady = plannedStepsFull.length <= 1 && plannedStepsLight.length <= 1;
   // If executed mapping isn't ready, collapse to a single row to avoid showing planned-only dashes
   const stepsDisplayBase = useMemo(() => (hasServerComputed ? steps : [steps[0]]), [hasServerComputed, steps]);
 
   // Collapse micro-steps (e.g. 4×100m strides) for easy/recovery runs so the table doesn't become noise.
   const stepsDisplay = useMemo(() => {
+    // "Show details": for single-steady planned workouts, show executed segments from computed.intervals (strides, etc.)
+    if (showFullIntervalBreakdown && planLooksSingleSteady && computedDetailSteps.length > 1) {
+      return computedDetailSteps;
+    }
     if (showFullIntervalBreakdown) return stepsDisplayBase;
     const fp = completedSrc?.workout_analysis?.fact_packet_v1;
     const workoutType = String(fp?.facts?.workout_type || '').toLowerCase();
@@ -638,7 +668,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       return best ? [best] : stepsDisplayBase;
     }
     return stepsDisplayBase;
-  }, [stepsDisplayBase, completedSrc, showFullIntervalBreakdown]);
+  }, [stepsDisplayBase, completedSrc, showFullIntervalBreakdown, computedDetailSteps, planLooksSingleSteady]);
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const rows = completedSrc ? accumulate(completedSrc) : [];
