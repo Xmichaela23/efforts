@@ -925,7 +925,31 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         return Math.round(paceMinPerMi * 60); // Convert minutes to seconds per mile
       }
     }
-    
+
+    // Fallback (for "Show details" micro-segments): use server-provided executed pace when available,
+    // otherwise derive from executed distance + duration. This keeps recovery/rest rows readable.
+    try {
+      const exec = interval?.executed || interval || null;
+      const direct = Number(
+        exec?.avg_pace_s_per_mi ??
+        exec?.avgPaceSPerMi ??
+        exec?.avg_pace_sec_per_mi ??
+        interval?.avg_pace_s_per_mi ??
+        interval?.avg_pace_sec_per_mi
+      );
+      if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
+
+      const distM = Number(exec?.distance_m ?? exec?.distanceMeters ?? exec?.distance_meters);
+      const durS = Number(exec?.duration_s ?? exec?.durationS ?? interval?.duration_s ?? interval?.seconds);
+      if (Number.isFinite(distM) && distM > 50 && Number.isFinite(durS) && durS > 5) {
+        const miles = distM / 1609.34;
+        if (miles > 0) {
+          const secPerMi = durS / miles;
+          if (Number.isFinite(secPerMi) && secPerMi > 0) return Math.round(secPerMi);
+        }
+      }
+    } catch {}
+
     return null;
   };
 
@@ -2234,9 +2258,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                         type="button"
                         onClick={() => setShowFullIntervalBreakdown((v) => !v)}
                         className="text-[11px] px-1.5 py-0.5 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15"
-                        title={showFullIntervalBreakdown ? 'Hide strides/micro-steps' : 'Show strides/micro-steps'}
+                        title={showFullIntervalBreakdown ? 'Hide strides and recovery jogs' : 'Show strides and recovery jogs'}
                       >
-                        {showFullIntervalBreakdown ? 'Hide details' : 'Show details'}
+                        {showFullIntervalBreakdown ? 'Hide strides' : 'Show strides'}
                       </button>
                     );
                   })()}
