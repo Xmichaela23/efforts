@@ -1860,6 +1860,24 @@ Deno.serve(async (req) => {
         }
       }
 
+      // If we are already summarizing via deterministic flags, do not add additional bullets
+      // (it causes redundancies like repeating drift/terrain in "Context:" and again as a flag).
+      const usedFlagBullets = !!(fact_packet_v1 && Array.isArray(flags_v1) && flags_v1.length);
+      if (usedFlagBullets) {
+        const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+        const cleanedBullets = bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
+        const tags: string[] = [];
+        const confLbl = String((hrAnalysisResult as any)?.confidence || '').toLowerCase();
+        const confidence = confLbl === 'high' ? 0.85 : confLbl === 'medium' ? 0.65 : 0.45;
+        return {
+          version: 1,
+          title: String(title),
+          bullets: cleanedBullets.length ? cleanedBullets : [],
+          tags: uniq(tags),
+          confidence,
+        } as any;
+      }
+
       // Add 1-2 deterministic “coach-grade” insight bullets before the narrative,
       // using plan expectations + conditions + your historical norms (when available).
       try {

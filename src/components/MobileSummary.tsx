@@ -2775,17 +2775,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                         }
                       } catch {}
 
-                      // Prefer flags as the canonical "what matters"; show top 3.
-                      try {
-                        const flags = Array.isArray(flagsV1) ? flagsV1 : [];
-                        const top = flags
-                          .filter((f: any) => f && typeof f.message === 'string' && f.message.length > 0)
-                          .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
-                          .slice(0, 3);
-                        for (const f of top) {
-                          rows.push({ label: 'Flag', value: String(f.message) });
-                        }
-                      } catch {}
+                      // Avoid redundancy: if the standardized Summary is present, it already renders top flags.
+                      // Only show "Flag" rows in Analysis Details when the Summary isn't shown (e.g. ai_summary mode).
+                      if (!hasStandardized) {
+                        try {
+                          const flags = Array.isArray(flagsV1) ? flagsV1 : [];
+                          const top = flags
+                            .filter((f: any) => f && typeof f.message === 'string' && f.message.length > 0)
+                            .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
+                            .slice(0, 3);
+                          for (const f of top) {
+                            rows.push({ label: 'Flag', value: String(f.message) });
+                          }
+                        } catch {}
+                      }
 
                       const dedup = new Set<string>();
                       const out = rows.filter((r) => {
