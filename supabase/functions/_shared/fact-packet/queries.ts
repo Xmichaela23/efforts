@@ -97,6 +97,8 @@ function getHrDriftBpmFromAnalysis(row: any): number | null {
 function inferWorkoutTypeKey(row: any): string | null {
   // Prefer analyzer output if available
   const wa = row?.workout_analysis;
+  const classified = String(wa?.classified_type || '').trim();
+  if (classified) return safeLower(classified);
   const wt = String(wa?.granular_analysis?.heart_rate_analysis?.workout_type || wa?.granular_analysis?.heart_rate_analysis?.workoutType || '').trim();
   if (wt) return wt; // "steady_state" | "intervals" | "tempo_finish" etc.
   // Fallback: basic type
@@ -114,7 +116,13 @@ function getComparableTypeKeys(key: string | null): string[] {
   const k = safeLower(key);
   const easyLike = ['recovery', 'easy', 'easy_run', 'steady_state', 'run'];
   if (easyLike.includes(k)) return easyLike;
-  if (['long_run', 'long_run_fast_finish'].includes(k)) return ['long_run', 'long_run_fast_finish'];
+  // Long runs are often stored historically as generic steady-state/run types.
+  // We rely on duration bands elsewhere to keep the comparison set appropriate.
+  const longLike = ['long', 'long_run', 'long_run_fast_finish'];
+  if (longLike.includes(k)) {
+    const uniq = (xs: string[]) => Array.from(new Set(xs.filter(Boolean)));
+    return uniq(['long_run', 'long_run_fast_finish', ...easyLike]);
+  }
   return [k];
 }
 
@@ -275,12 +283,14 @@ export async function getPaceTrend(
     const end = new Date().toISOString().slice(0, 10);
     const start = isoDateAddDays(end, -180);
     const rows = await fetchRecentWorkouts(supabase, userId, start, end, Math.max(12, count + 6));
+    const comparableKeys = getComparableTypeKeys(workoutTypeKey);
 
     const filtered = rows
       .filter((r) => String(r.workout_status || '').toLowerCase() === 'completed')
       .filter((r) => {
         if (!workoutTypeKey) return true;
-        return inferWorkoutTypeKey(r) === workoutTypeKey;
+        const inferred = inferWorkoutTypeKey(r);
+        return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
       })
       .map((r) => ({
         date: String(r.date || ''),
@@ -307,12 +317,18 @@ export async function getPaceTrend(
       slope > 3 ? 'declining' :
       'stable';
 
-    const weeksSpan = Math.max(1, Math.round(Math.max(...xsWeeks) - Math.min(...xsWeeks)));
+    const spanWeeksRaw = Math.max(...xsWeeks) - Math.min(...xsWeeks);
+    // Guardrail: even with 5 data points, <~3 weeks is just comparing a couple close-together workouts.
+    if (!(spanWeeksRaw >= 3)) {
+      return { data_points: filtered.length, direction: 'insufficient_data', magnitude: null };
+    }
+
+    const weeksSpan = Math.max(1, Math.round(spanWeeksRaw));
     const totalDelta = slope * weeksSpan; // sec/mi across span
     const magnitude =
       direction === 'stable'
         ? null
-        : `~${Math.round(Math.abs(totalDelta))} sec/mi ${direction === 'improving' ? 'faster' : 'slower'} over ~${weeksSpan} weeks`;
+        : `~${Math.round(Math.abs(totalDelta))} sec/mi ${direction === 'improving' ? 'faster' : 'slower'} over ~${weeksSpan} week${weeksSpan === 1 ? '' : 's'}`;
 
     return { data_points: filtered.length, direction, magnitude };
   } catch {
@@ -329,12 +345,14 @@ export async function getNotableAchievements(
     const end = new Date().toISOString().slice(0, 10);
     const start = isoDateAddDays(end, -lookbackDays);
     const rows = await fetchRecentWorkouts(supabase, userId, start, end, 120);
+    const comparableKeys = getComparableTypeKeys(workoutTypeKey);
     const completed = rows
       .filter((r) => String(r.workout_status || '').toLowerCase() === 'completed')
       .filter((r) => String(r.id) !== String(currentWorkoutId))
       .filter((r) => {
         if (!workoutTypeKey) return true;
-        return inferWorkoutTypeKey(r) === workoutTypeKey;
+        const inferred = inferWorkoutTypeKey(r);
+        return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
       });
 
     // Need current workout info too; fetch it quickly.
@@ -353,9 +371,23 @@ export async function getNotableAchievements(
       const maxDist = Math.max(...completed.map((r) => getOverallDistanceMi(r) || 0), 0);
       if (curDist > maxDist + 0.05) {
         const margin = curDist - maxDist;
+        const typeLabel = (() => {
+          const k = String(workoutTypeKey || 'workout').toLowerCase();
+          if (!k || k === 'unknown') return 'workout';
+          if (k.includes('recovery')) return 'recovery run';
+          if (k.includes('easy')) return 'easy run';
+          if (k.includes('long')) return 'long run';
+          if (k.includes('tempo')) return 'tempo run';
+          if (k.includes('interval')) return 'interval workout';
+          if (k === 'run') return 'run';
+          return k.replace(/_/g, ' ');
+        })();
         achievements.push({
           type: 'longest_distance',
-          description: `Longest distance in ${lookbackDays}d (${curDist.toFixed(1)} mi vs previous ${maxDist.toFixed(1)} mi).`,
+          description:
+            maxDist <= 0.05
+              ? `First ${typeLabel} in ${lookbackDays}d (${curDist.toFixed(1)} mi).`
+              : `Longest distance in ${lookbackDays}d (${curDist.toFixed(1)} mi vs previous ${maxDist.toFixed(1)} mi).`,
           significance: margin >= 2 ? 'major' : margin >= 0.7 ? 'moderate' : 'minor',
         });
       }

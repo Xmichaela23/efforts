@@ -45,7 +45,7 @@ export function assessStimulus(
   segments: WorkoutSegmentV1[],
   zones: HrZone[] | null,
   planned: { planned_duration_min?: number | null; interval_count?: number | null } | null
-): StimulusAssessmentV1 {
+): StimulusAssessmentV1 | null {
   const intent = String(workoutIntent || 'unknown').toLowerCase();
   const evidence: string[] = [];
 
@@ -57,6 +57,11 @@ export function assessStimulus(
 
   const zs = Array.isArray(zones) ? zones : null;
 
+  // Recovery is not a "stimulus achieved" concept. Recovery integrity is assessed elsewhere.
+  if (intent === 'recovery') {
+    return null;
+  }
+
   // Helper: compute pct time in a combined zone range (min..max)
   const pctInHrRange = (minBpm: number, maxBpm: number): number | null => {
     if (!totalDurS) return null;
@@ -65,7 +70,7 @@ export function assessStimulus(
   };
 
   // EASY/LONG/RECOVERY: duration + mostly low aerobic HR.
-  if (intent === 'easy' || intent === 'long_run' || intent === 'recovery') {
+  if (intent === 'easy' || intent === 'long_run') {
     if (durationHit && totalDurMin != null) evidence.push(`Duration ${Math.round(totalDurMin)}min${durationTarget ? ` (~${Math.round((totalDurMin / durationTarget) * 100)}% of target)` : ''}`);
 
     if (zs && zs.length) {

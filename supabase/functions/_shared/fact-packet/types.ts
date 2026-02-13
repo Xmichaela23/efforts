@@ -146,7 +146,7 @@ export type FactPacketV1 = {
       trend: TrendV1;
       achievements: AchievementV1[];
     };
-    stimulus: StimulusAssessmentV1;
+    stimulus: StimulusAssessmentV1 | null;
     primary_limiter: LimiterAssessmentV1;
     contributing_limiters: ContributorV1[];
   };

@@ -2683,49 +2683,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   </span>
                   <div className="mt-1 space-y-1.5">
                     {(() => {
-                      const fmtPace = (sec: number): string => {
-                        if (!Number.isFinite(sec) || sec <= 0) return '';
-                        const m = Math.floor(sec / 60);
-                        const s = Math.round(sec % 60);
-                        return `${m}:${String(s).padStart(2, '0')}/mi`;
-                      };
-
                       const bulletsIn = Array.isArray(standardizedSummary?.bullets) ? standardizedSummary.bullets : [];
                       const bullets: string[] = bulletsIn
                         .filter((b: any) => typeof b === 'string' && b.trim().length > 0)
                         .map((b: string) => b.trim());
-
-                      // Add a deterministic overall one-liner when fact packet is present.
-                      try {
-                        if (hasFactPacketV1) {
-                          const dist = Number((factPacketV1 as any)?.facts?.total_distance_mi);
-                          const durMin = Number((factPacketV1 as any)?.facts?.total_duration_min);
-                          const paceSec = Number((factPacketV1 as any)?.facts?.avg_pace_sec_per_mi);
-                          const avgHr = Number((factPacketV1 as any)?.facts?.avg_hr);
-                          const terrain = String((factPacketV1 as any)?.facts?.terrain_type || '').trim();
-                          const weekIntent = String((factPacketV1 as any)?.facts?.plan?.week_intent || '').toLowerCase();
-                          const isRecovery = weekIntent === 'recovery';
-
-                          const distStr = Number.isFinite(dist) && dist > 0 ? `${dist.toFixed(dist < 10 ? 1 : 0)} mi` : '';
-                          const durStr = Number.isFinite(durMin) && durMin > 0 ? `${Math.round(durMin)} min` : '';
-                          const paceStr = fmtPace(paceSec);
-                          const hrStr = Number.isFinite(avgHr) && avgHr > 0 ? `${Math.round(avgHr)} bpm avg HR` : '';
-                          const terrainStr = terrain ? `${terrain} terrain` : '';
-
-                          const core = [distStr, durStr].filter(Boolean).join(' in ');
-                          const extras = [paceStr, hrStr, terrainStr].filter(Boolean).join(', ');
-                          const overview = (core || extras)
-                            ? `${isRecovery ? 'Recovery run' : 'Run'}: ${[core, extras].filter(Boolean).join(' — ')}.`
-                            : '';
-
-                          if (overview) {
-                            const alreadyHasOverview = bullets.some((b) =>
-                              b.toLowerCase().startsWith('recovery run:') || b.toLowerCase().startsWith('run:')
-                            );
-                            if (!alreadyHasOverview) bullets.unshift(overview);
-                          }
-                        }
-                      } catch {}
 
                       const seen = new Set<string>();
                       const out = bullets.filter((b) => {

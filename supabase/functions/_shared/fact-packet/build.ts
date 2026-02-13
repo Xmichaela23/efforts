@@ -146,7 +146,12 @@ function buildZonesFromLearnedFitness(learnedFitness: any): HrZone[] | null {
 
 function deriveWorkoutTypeKey(workout: any): string {
   const wa = workout?.workout_analysis;
-  const wt = String(wa?.granular_analysis?.heart_rate_analysis?.workout_type || wa?.granular_analysis?.heart_rate_analysis?.workoutType || '').trim();
+  const wt = String(
+    wa?.classified_type ||
+    wa?.granular_analysis?.heart_rate_analysis?.workout_type ||
+    wa?.granular_analysis?.heart_rate_analysis?.workoutType ||
+    ''
+  ).trim();
   if (wt) return wt;
   const t = String(workout?.type || '').toLowerCase();
   if (t.includes('run') || t.includes('walk')) return 'run';
@@ -159,9 +164,10 @@ export async function buildWorkoutFactPacketV1(args: {
   plannedWorkout: any | null;
   planContext: { planName?: string | null; phaseName?: string | null; weekIndex?: number | null; weekIntent?: string | null; isRecoveryWeek?: boolean | null } | null;
   workoutIntent: string | null;
+  classifiedTypeOverride?: string | null;
   learnedFitness: any | null; // from user_baselines.learned_fitness
 }): Promise<{ factPacket: FactPacketV1; flags: FlagV1[] }> {
-  const { supabase, workout, plannedWorkout, planContext, workoutIntent, learnedFitness } = args;
+  const { supabase, workout, plannedWorkout, planContext, workoutIntent, classifiedTypeOverride, learnedFitness } = args;
 
   const computed = parseJson(workout?.computed) || {};
   const overall = computed?.overall || {};
@@ -262,7 +268,7 @@ export async function buildWorkoutFactPacketV1(args: {
     const plannedType = plannedWorkout?.workout_type || plannedWorkout?.type || null;
     const analyzerType = deriveWorkoutTypeKey(workout);
     // Prefer plan type when linked; fallback to analyzer.
-    return String(plannedType || workoutIntent || analyzerType || 'unknown');
+    return String(plannedType || classifiedTypeOverride || workoutIntent || analyzerType || 'unknown');
   })();
 
   const factsPlan = (() => {
@@ -359,7 +365,9 @@ export async function buildWorkoutFactPacketV1(args: {
   })();
 
   const stimulus = assessStimulus(
-    String(workoutIntent || workout_type || workoutTypeKey || 'unknown'),
+    // Plan/type should drive stimulus criteria; do not let raw workoutIntent strings (e.g. "long")
+    // override normalized types like "long_run".
+    String(workout_type || workoutIntent || workoutTypeKey || 'unknown'),
     segments,
     zones,
     {

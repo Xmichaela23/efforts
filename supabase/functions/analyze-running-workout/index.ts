@@ -926,8 +926,20 @@ Deno.serve(async (req) => {
       }
     })();
 
+    // SINGLE SOURCE OF TRUTH: workout type key for interpretation.
+    // Contract:
+    // - Plan intent (when present) wins.
+    // - Otherwise, fall back to deterministic detection (today: interval-structure heuristic).
+    // - HR analyzer may observe interval-like patterns, but must not override plan intent.
+    const planClassifiedTypeKey = resolveClassifiedTypeKey(plannedWorkout, planContextForDrift);
+    const classifiedTypeKey =
+      planClassifiedTypeKey ||
+      String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').trim() ||
+      'steady_state';
+    const classifiedHrWorkoutType: WorkoutType = mapClassifiedTypeToHrWorkoutType(classifiedTypeKey);
+
     const hrAnalysisContext: HRAnalysisContext = {
-      workoutType: detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout),
+      workoutType: classifiedHrWorkoutType,
       intervals: intervalsToAnalyze.map(interval => {
         // Compute timestamps from sample indices
         // Sample indices are roughly 1 sample per second
@@ -1759,7 +1771,7 @@ Deno.serve(async (req) => {
       }
     })();
 
-    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis, aerobicCeilingBpm);
+    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis, aerobicCeilingBpm, classifiedTypeKey);
     const scoreExplanation = adherenceSummary?.verdict ?? null;
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
 
@@ -1791,6 +1803,7 @@ Deno.serve(async (req) => {
           granular_analysis: enhancedAnalysis,
           performance,
           detailed_analysis: detailedAnalysis,
+          classified_type: classifiedTypeKey,
         },
       };
 
@@ -1809,6 +1822,7 @@ Deno.serve(async (req) => {
             }
           : null,
         workoutIntent: (intent as any) || null,
+        classifiedTypeOverride: classifiedTypeKey,
         learnedFitness: learnedFitness || null,
       });
       fact_packet_v1 = factPacket;
@@ -1881,6 +1895,8 @@ Deno.serve(async (req) => {
           const pace = Number(fp?.facts?.avg_pace_sec_per_mi);
           const hr = Number(fp?.facts?.avg_hr);
           const terrain = String(fp?.facts?.terrain_type || '');
+          const weekIntent = String(fp?.facts?.plan?.week_intent || '').toLowerCase();
+          const wt = String(fp?.facts?.workout_type || '').toLowerCase();
           const fmtMi = (m: number) => `${m.toFixed(m < 1 ? 2 : 1)} mi`;
           const fmtMin = (m: number) => `${Math.round(m)} min`;
           const fmtPace = (secPerMi: number): string => {
@@ -1890,12 +1906,16 @@ Deno.serve(async (req) => {
             return `${mm}:${String(ss).padStart(2, '0')}/mi`;
           };
           if (Number.isFinite(dist) && dist > 0 && Number.isFinite(dur) && dur > 0) {
-            const bits: string[] = [];
-            bits.push(`${fmtMi(dist)} in ${fmtMin(dur)}`);
-            if (Number.isFinite(pace) && pace > 0) bits.push(`${fmtPace(pace)} avg pace`);
-            if (Number.isFinite(hr) && hr > 0) bits.push(`${Math.round(hr)} bpm avg HR`);
-            if (terrain) bits.push(`${terrain} terrain`);
-            bullets.push(bits.join(' • ') + '.');
+            const isRecovery = weekIntent === 'recovery' || wt.includes('recovery');
+            const prefix = isRecovery ? 'Recovery run' : 'Run';
+
+            const core = `${fmtMi(dist)} in ${fmtMin(dur)}`;
+            const extras: string[] = [];
+            if (Number.isFinite(pace) && pace > 0) extras.push(`${fmtPace(pace)}`);
+            if (Number.isFinite(hr) && hr > 0) extras.push(`${Math.round(hr)} bpm avg HR`);
+            if (terrain) extras.push(`${terrain} terrain`);
+
+            bullets.push(`${prefix}: ${core}${extras.length ? ` — ${extras.join(', ')}` : ''}.`);
           }
         } catch {}
 
@@ -2126,6 +2146,7 @@ Deno.serve(async (req) => {
       workout_analysis: {
         // Merge: preserve existing fields, overwrite with latest analysis outputs
         ...(existingAnalysis || {}),
+        classified_type: classifiedTypeKey,
         granular_analysis: enhancedAnalysis,
         performance: performance,
         detailed_analysis: detailedAnalysis,
@@ -2589,7 +2610,8 @@ function generateAdherenceSummary(
     planName: string | null;
   } | null,
   granularAnalysis?: any,
-  aerobicCeilingBpm?: number | null
+  aerobicCeilingBpm?: number | null,
+  classifiedTypeKey?: string | null
 ): WorkoutAdherenceSummary | null {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
@@ -2630,11 +2652,29 @@ function generateAdherenceSummary(
   
   // Only classify as easy/recovery if it's NOT an interval workout AND has easy keywords
   const isEasyOrRecoveryRun = !isIntervalWorkout && hasEasyKeywords;
+
+  // Single source of truth override: if the pipeline has already classified this workout,
+  // use that classification for messaging (prevents strides/short reps from flipping to "intervals").
+  const forced = String(classifiedTypeKey || '').toLowerCase().trim();
+  const forcedIsInterval =
+    forced === 'intervals' || forced === 'interval_run' || forced.includes('interval');
+  const forcedIsEasyOrRecovery =
+    forced === 'recovery' ||
+    forced === 'easy' ||
+    forced === 'easy_run' ||
+    forced === 'long' ||
+    forced === 'long_run' ||
+    forced === 'steady_state' ||
+    forced === 'tempo_finish' ||
+    forced === 'progressive' ||
+    forced === 'run';
+  const finalIsIntervalWorkout = forced ? forcedIsInterval : isIntervalWorkout;
+  const finalIsEasyOrRecoveryRun = forced ? (!forcedIsInterval && forcedIsEasyOrRecovery) : isEasyOrRecoveryRun;
   
-  console.log(`🔍 [WORKOUT TYPE DETECT] isIntervalWorkout=${isIntervalWorkout} (workIntervals=${workIntervals.length}, hasIntervalKeywords=${hasIntervalKeywordsInName}, hasRepeatPattern=${hasRepeatPattern}), hasEasyKeywords=${hasEasyKeywords}, final isEasyOrRecoveryRun=${isEasyOrRecoveryRun}`);
+  console.log(`🔍 [WORKOUT TYPE DETECT] classifiedTypeKey=${forced || 'none'}, isIntervalWorkout=${finalIsIntervalWorkout} (workIntervals=${workIntervals.length}, hasIntervalKeywords=${hasIntervalKeywordsInName}, hasRepeatPattern=${hasRepeatPattern}), hasEasyKeywords=${hasEasyKeywords}, final isEasyOrRecoveryRun=${finalIsEasyOrRecoveryRun}`);
   
   // Plan-aware context: use plan week intent if available, otherwise fall back to workout detection
-  const isRecoveryContext = planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery' || isEasyOrRecoveryRun;
+  const isRecoveryContext = planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery' || finalIsEasyOrRecoveryRun;
   const isTaperContext = planContext?.isTaperWeek || planContext?.weekIntent === 'taper';
   const isBuildContext = planContext?.weekIntent === 'build' || planContext?.weekIntent === 'peak';
   const weekNumber = planContext?.weekIndex;
@@ -2656,7 +2696,7 @@ function generateAdherenceSummary(
     }
   })();
   
-  console.log(`🔍 [EXPLANATION CONTEXT] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, planContext=${planContext ? JSON.stringify({ weekIntent: planContext.weekIntent, isRecoveryWeek: planContext.isRecoveryWeek, weekIndex: planContext.weekIndex }) : 'none'}`);
+  console.log(`🔍 [EXPLANATION CONTEXT] isEasyOrRecoveryRun=${finalIsEasyOrRecoveryRun}, planContext=${planContext ? JSON.stringify({ weekIntent: planContext.weekIntent, isRecoveryWeek: planContext.isRecoveryWeek, weekIndex: planContext.weekIndex }) : 'none'}`);
 
   // Format pace from seconds to MM:SS
   const fmtPace = (secPerMi: number): string => {
@@ -2707,7 +2747,7 @@ function generateAdherenceSummary(
       
       // For recovery/easy runs: use percentage threshold to avoid false positives
       // For interval workouts: use absolute comparison (any deviation matters)
-      if (isEasyOrRecoveryRun || isRecoveryContext) {
+      if (finalIsEasyOrRecoveryRun || isRecoveryContext) {
         // Recovery/easy: only flag if deviation >= 5% of target
         if (deltaPct > RECOVERY_TOLERANCE_PCT) {
           // Positive deltaPct means actual is faster than target (lower seconds)
@@ -2737,7 +2777,7 @@ function generateAdherenceSummary(
         }
       }
       
-      console.log(`🎯 [PACE DEVIATION] Interval ${interval.interval_number || deviations.length + 1}: actual=${fmtPace(actualPaceSecPerMi)}, target=${fmtPace(targetLower)}-${fmtPace(targetUpper)}, deltaPct=${(deltaPct * 100).toFixed(1)}%, direction=${direction}, isRecovery=${isEasyOrRecoveryRun || isRecoveryContext}`);
+      console.log(`🎯 [PACE DEVIATION] Interval ${interval.interval_number || deviations.length + 1}: actual=${fmtPace(actualPaceSecPerMi)}, target=${fmtPace(targetLower)}-${fmtPace(targetUpper)}, deltaPct=${(deltaPct * 100).toFixed(1)}%, direction=${direction}, isRecovery=${finalIsEasyOrRecoveryRun || isRecoveryContext}`);
       
       deviations.push({
         interval: interval.interval_number || deviations.length + 1,
@@ -2796,7 +2836,7 @@ function generateAdherenceSummary(
         // Recovery week: emphasize that slower is intentional and beneficial
         const weekInfo = weekNumber ? `Week ${weekNumber}` : '';
         parts.push(`Recovery week ${weekInfo}: Completed ${fmtDelta(avgSlowDelta)}/mi slower than target — perfect for adaptation and supercompensation`);
-      } else if (planContext?.hasActivePlan && isEasyOrRecoveryRun) {
+      } else if (planContext?.hasActivePlan && finalIsEasyOrRecoveryRun) {
         // Easy run during build week: still good, but note it's for recovery
         parts.push(`Easy run completed ${fmtDelta(avgSlowDelta)}/mi slower than target — good recovery effort, maintaining aerobic base`);
       } else {
@@ -3272,10 +3312,77 @@ function detectWorkoutIntent(plannedWorkout: any): 'easy' | 'long' | 'tempo' | '
   const combined = `${token} ${desc} ${name}`;
   
   if (combined.includes('recovery')) return 'recovery';
+  // Strides are commonly appended to easy/recovery runs; do not treat them as interval intent by default.
+  if (combined.includes('stride')) {
+    const hard = combined.includes('tempo') || combined.includes('threshold') || combined.includes('interval');
+    if (!hard) return 'easy';
+  }
   if (combined.includes('easy') || combined.includes('aerobic') || combined.includes('base')) return 'easy';
   if (combined.includes('long')) return 'long';
   if (combined.includes('tempo') || combined.includes('threshold')) return 'tempo';
   if (combined.includes('interval') || combined.includes('repeat') || combined.includes('speed')) return 'intervals';
   
   return undefined;
+}
+
+/**
+ * Resolve the canonical workout type key for the analysis pipeline.
+ *
+ * Contract:
+ * 1) Plan intent wins when present
+ * 2) Deterministic fallback (never let HR analyzer flip easy/recovery to intervals because of strides)
+ */
+function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any): string | null {
+  if (!plannedWorkout) {
+    // No plan-linked workout: only force a type when plan context clearly indicates recovery intent.
+    if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
+    return null;
+  }
+
+  // Contract: planned_workouts.workout_type wins when present.
+  const plannedTypeRaw = String(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? '').toLowerCase().trim();
+  const normalizePlannedType = (t: string): string | null => {
+    const k = String(t || '').toLowerCase().trim();
+    if (!k) return null;
+    if (k === 'long') return 'long_run';
+    if (k === 'easy_run') return 'easy';
+    if (k === 'interval_run') return 'intervals';
+    return k;
+  };
+  const plannedType = normalizePlannedType(plannedTypeRaw);
+
+  if (plannedType) {
+    if (plannedType === 'recovery') return 'recovery';
+    if (plannedType === 'easy') {
+      // Upgrade easy -> recovery when the plan week intent is explicitly recovery.
+      if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
+      return 'easy';
+    }
+    if (plannedType === 'long_run' || plannedType === 'long') return 'long_run';
+    if (plannedType === 'tempo') return 'tempo';
+    if (plannedType === 'intervals') return 'intervals';
+    return plannedType;
+  }
+
+  // Fallback to keyword-based intent detection when planned_workouts.workout_type is missing.
+  const intent = detectWorkoutIntent(plannedWorkout);
+  if (intent === 'recovery') return 'recovery';
+  if (intent === 'easy') {
+    // Upgrade easy -> recovery when the plan week intent is explicitly recovery.
+    if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
+    return 'easy';
+  }
+  if (intent === 'long') return 'long_run';
+  if (intent === 'tempo') return 'tempo';
+  if (intent === 'intervals') return 'intervals';
+
+  // Default for plan-linked workouts: treat as steady-state so we don't over-trigger interval logic.
+  return 'easy';
+}
+
+function mapClassifiedTypeToHrWorkoutType(classifiedTypeKey: string): WorkoutType {
+  const k = String(classifiedTypeKey || '').toLowerCase().trim();
+  if (k === 'intervals' || k === 'interval_run' || k.includes('interval')) return 'intervals';
+  if (k.includes('hill')) return 'hill_repeats';
+  return 'steady_state';
 }
