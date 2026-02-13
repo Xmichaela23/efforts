@@ -2682,9 +2682,63 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     {standardizedSummary.title || 'Summary'}
                   </span>
                   <div className="mt-1 space-y-1.5">
-                    {standardizedSummary.bullets.slice(0, 4).map((b: string, i: number) => (
-                      <p key={i} className="text-sm text-gray-300 leading-relaxed">{b}</p>
-                    ))}
+                    {(() => {
+                      const fmtPace = (sec: number): string => {
+                        if (!Number.isFinite(sec) || sec <= 0) return '';
+                        const m = Math.floor(sec / 60);
+                        const s = Math.round(sec % 60);
+                        return `${m}:${String(s).padStart(2, '0')}/mi`;
+                      };
+
+                      const bulletsIn = Array.isArray(standardizedSummary?.bullets) ? standardizedSummary.bullets : [];
+                      const bullets: string[] = bulletsIn
+                        .filter((b: any) => typeof b === 'string' && b.trim().length > 0)
+                        .map((b: string) => b.trim());
+
+                      // Add a deterministic overall one-liner when fact packet is present.
+                      try {
+                        if (hasFactPacketV1) {
+                          const dist = Number((factPacketV1 as any)?.facts?.total_distance_mi);
+                          const durMin = Number((factPacketV1 as any)?.facts?.total_duration_min);
+                          const paceSec = Number((factPacketV1 as any)?.facts?.avg_pace_sec_per_mi);
+                          const avgHr = Number((factPacketV1 as any)?.facts?.avg_hr);
+                          const terrain = String((factPacketV1 as any)?.facts?.terrain_type || '').trim();
+                          const weekIntent = String((factPacketV1 as any)?.facts?.plan?.week_intent || '').toLowerCase();
+                          const isRecovery = weekIntent === 'recovery';
+
+                          const distStr = Number.isFinite(dist) && dist > 0 ? `${dist.toFixed(dist < 10 ? 1 : 0)} mi` : '';
+                          const durStr = Number.isFinite(durMin) && durMin > 0 ? `${Math.round(durMin)} min` : '';
+                          const paceStr = fmtPace(paceSec);
+                          const hrStr = Number.isFinite(avgHr) && avgHr > 0 ? `${Math.round(avgHr)} bpm avg HR` : '';
+                          const terrainStr = terrain ? `${terrain} terrain` : '';
+
+                          const core = [distStr, durStr].filter(Boolean).join(' in ');
+                          const extras = [paceStr, hrStr, terrainStr].filter(Boolean).join(', ');
+                          const overview = (core || extras)
+                            ? `${isRecovery ? 'Recovery run' : 'Run'}: ${[core, extras].filter(Boolean).join(' — ')}.`
+                            : '';
+
+                          if (overview) {
+                            const alreadyHasOverview = bullets.some((b) =>
+                              b.toLowerCase().startsWith('recovery run:') || b.toLowerCase().startsWith('run:')
+                            );
+                            if (!alreadyHasOverview) bullets.unshift(overview);
+                          }
+                        }
+                      } catch {}
+
+                      const seen = new Set<string>();
+                      const out = bullets.filter((b) => {
+                        const k = b.trim();
+                        if (seen.has(k)) return false;
+                        seen.add(k);
+                        return true;
+                      });
+
+                      return out.slice(0, 4).map((b: string, i: number) => (
+                        <p key={i} className="text-sm text-gray-300 leading-relaxed">{b}</p>
+                      ));
+                    })()}
                   </div>
                 </div>
               )}
@@ -2753,12 +2807,50 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       } catch {}
 
                       try {
-                        const note = factPacketV1?.derived?.pacing_pattern?.speedups_note;
-                        if (note && typeof note === 'string' && note.trim().length > 0) {
-                          rows.push({
-                            label: 'Speed',
-                            value: note.trim(),
-                          });
+                        const mbt =
+                          (completedSrc as any)?.workout_analysis?.mile_by_mile_terrain ||
+                          (completedSrc as any)?.workout_analysis?.detailed_analysis?.mile_by_mile_terrain;
+
+                        const splitsRaw = Array.isArray((mbt as any)?.splits) ? (mbt as any).splits : [];
+                        const fmtPace = (sec: number): string => {
+                          if (!Number.isFinite(sec) || sec <= 0) return '';
+                          const m = Math.floor(sec / 60);
+                          const s = Math.round(sec % 60);
+                          return `${m}:${String(s).padStart(2, '0')}/mi`;
+                        };
+
+                        const splits = splitsRaw
+                          .map((s: any) => ({
+                            mile: Number(s?.mile),
+                            pace: Number(s?.pace_s_per_mi ?? s?.pace_sec_per_mi ?? s?.pace_sec_per_mile),
+                            terrain: String(s?.terrain_type || '').trim(),
+                          }))
+                          .filter((s: any) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
+
+                        const noteFallback = (factPacketV1 as any)?.derived?.pacing_pattern?.speedups_note;
+
+                        if (splits.length >= 2) {
+                          let best: { mile: number; pickupSec: number; pace: number; terrain?: string } | null = null;
+                          for (let i = 1; i < splits.length; i++) {
+                            const prev = splits[i - 1];
+                            const cur = splits[i];
+                            const pickupSec = prev.pace - cur.pace; // + means faster
+                            if (pickupSec > (best?.pickupSec ?? 0)) {
+                              best = { mile: cur.mile, pickupSec, pace: cur.pace, terrain: cur.terrain };
+                            }
+                          }
+
+                          if (best && Number.isFinite(best.pickupSec) && best.pickupSec >= 10) {
+                            const terr = best.terrain ? ` (${best.terrain})` : '';
+                            rows.push({
+                              label: 'Speed',
+                              value: `Biggest pickup: Mile ${best.mile}${terr} at ${fmtPace(best.pace)} (~${Math.round(best.pickupSec)}s/mi faster than prior mile)`,
+                            });
+                          } else if (noteFallback && typeof noteFallback === 'string' && noteFallback.trim().length > 0) {
+                            rows.push({ label: 'Speed', value: noteFallback.trim() });
+                          }
+                        } else if (noteFallback && typeof noteFallback === 'string' && noteFallback.trim().length > 0) {
+                          rows.push({ label: 'Speed', value: noteFallback.trim() });
                         }
                       } catch {}
 

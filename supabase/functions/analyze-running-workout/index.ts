@@ -2645,6 +2645,16 @@ function generateAdherenceSummary(
   const hrIsAerobic = (aerobicCeilingBpm != null && Number.isFinite(avgHR) && avgHR > 0)
     ? avgHR <= (aerobicCeilingBpm as number)
     : null;
+
+  const hrEvidence = (() => {
+    try {
+      if (hrIsAerobic !== true) return null;
+      if (!(aerobicCeilingBpm != null && Number.isFinite(avgHR) && avgHR > 0)) return 'HR confirms aerobic effort';
+      return `HR confirms aerobic effort (${Math.round(avgHR)} bpm avg ≤ ${Math.round(aerobicCeilingBpm)} bpm)`;
+    } catch {
+      return null;
+    }
+  })();
   
   console.log(`🔍 [EXPLANATION CONTEXT] isEasyOrRecoveryRun=${isEasyOrRecoveryRun}, planContext=${planContext ? JSON.stringify({ weekIntent: planContext.weekIntent, isRecoveryWeek: planContext.isRecoveryWeek, weekIndex: planContext.weekIndex }) : 'none'}`);
 
@@ -2806,19 +2816,19 @@ function generateAdherenceSummary(
         // Recovery/easy run that was too fast
         if (planContext?.isRecoveryWeek) {
           if (hrIsAerobic === true) {
-            parts.push(`Recovery week: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but HR stayed aerobic — controlled recovery effort (terrain/fitness can explain the speed)`);
+            parts.push(`Recovery week: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but ${hrEvidence || 'HR stayed aerobic'} — terrain and fitness explain the speed, and recovery intent was preserved`);
           } else {
             parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than target — too hard for recovery, limits adaptation and supercompensation`);
           }
         } else if (planContext?.hasActivePlan) {
           if (hrIsAerobic === true) {
-            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but HR stayed aerobic — effort was controlled`);
+            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but ${hrEvidence || 'HR stayed aerobic'} — effort was controlled`);
           } else {
             parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
           }
         } else {
           if (hrIsAerobic === true) {
-            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but HR stayed aerobic — effort was controlled`);
+            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than the range, but ${hrEvidence || 'HR stayed aerobic'} — effort was controlled`);
           } else {
             parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than target — running too hard on recovery days limits adaptation`);
           }
@@ -2876,13 +2886,13 @@ function generateAdherenceSummary(
         // Recovery/easy run that was too fast
         if (planContext?.isRecoveryWeek) {
           if (hrIsAerobic === true) {
-            parts.push(`Recovery week: Pace was ${fmtDelta(avgFastDelta)}/mi faster than prescribed, but HR stayed aerobic — recovery intent preserved`);
+            parts.push(`Recovery week: Pace was ${fmtDelta(avgFastDelta)}/mi faster than prescribed, but ${hrEvidence || 'HR stayed aerobic'} — recovery intent preserved`);
           } else {
             parts.push(`Recovery week: Ran ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard, compromises recovery and adaptation`);
           }
         } else {
           if (hrIsAerobic === true) {
-            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than prescribed, but HR stayed aerobic — recovery intent preserved`);
+            parts.push(`Easy run: Pace was ${fmtDelta(avgFastDelta)}/mi faster than prescribed, but ${hrEvidence || 'HR stayed aerobic'} — recovery intent preserved`);
           } else {
             parts.push(`Easy run was ${fmtDelta(avgFastDelta)}/mi faster than prescribed — too hard for recovery day`);
           }
@@ -3006,7 +3016,7 @@ function generateAdherenceSummary(
       focus = 'Recovery Integrity';
       if (fastDominant) {
         if (hrIsAerobic === true) {
-          outlook = `Pace came in faster than the prescribed range, but HR stayed aerobic — terrain and fitness likely explain the speed, and the recovery intent was preserved.`;
+          outlook = `Pace came in faster than the prescribed range, but ${hrEvidence || 'HR stayed aerobic'} — terrain and fitness explain the speed, and the recovery intent was preserved.`;
         } else {
           outlook = currentPhaseName
             ? `This extra effort in the ${currentPhaseName} phase may dampen the supercompensation intended for this rest block.${weekFocus ? ` Consider a more conservative approach to ${weekFocus.toLowerCase()}.` : ''}`

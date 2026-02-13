@@ -351,7 +351,7 @@ export async function buildWorkoutFactPacketV1(args: {
       });
 
       return {
-        speedups_note: `Faster splits lined up with downhill miles (${parts.join(', ')}) — speed is likely terrain-driven rather than effort-driven.`,
+        speedups_note: `Faster splits lined up with downhill miles (${parts.join(', ')}) — speed is consistent with terrain effects rather than added effort.`,
       };
     } catch {
       return { speedups_note: null };
