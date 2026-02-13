@@ -57,6 +57,59 @@ function validateNoZoneTimeClaims(summary: string, displayPacket: any): { ok: bo
   return { ok: hasAnyZoneTimeMetric, why: hasAnyZoneTimeMetric ? null : 'time-in-zone claim not supported by display packet' };
 }
 
+function countSentences(text: string): number {
+  const s = normalizeParagraph(text);
+  if (!s) return 0;
+  // naive sentence split; good enough for enforcing caps
+  const parts = s.split(/[.!?]+/).map((p) => p.trim()).filter(Boolean);
+  return parts.length;
+}
+
+function countWords(text: string): number {
+  const s = normalizeParagraph(text);
+  if (!s) return 0;
+  return s.split(/\s+/).filter(Boolean).length;
+}
+
+function getTopFlags(displayPacket: any): Array<{ type: string; message: string; priority: number }> {
+  const arr = Array.isArray(displayPacket?.top_flags) ? displayPacket.top_flags : [];
+  return arr
+    .filter((f: any) => f && typeof f.message === 'string')
+    .map((f: any) => ({ type: String(f.type || ''), message: String(f.message || ''), priority: Number(f.priority || 99) }));
+}
+
+function validateAdaptiveLength(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const top = getTopFlags(displayPacket);
+  const hasConcern = top.some((f) => f.type === 'concern' && f.priority <= 2);
+  const sentences = countSentences(summary);
+  const words = countWords(summary);
+  // If nothing concerning at top priority, keep it short and sharp.
+  if (!hasConcern) {
+    if (sentences > 3) return { ok: false, why: `too many sentences (${sentences}) for low-signal workout` };
+    if (words > 55) return { ok: false, why: `too many words (${words}) for low-signal workout` };
+  }
+  return { ok: true, why: null };
+}
+
+function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const top = getTopFlags(displayPacket);
+  const hasTerrainDriftFlag = top.some((f) => /drift/i.test(f.message) && /hilly terrain/i.test(f.message));
+  if (!hasTerrainDriftFlag) return { ok: true, why: null };
+
+  const s = normalizeParagraph(summary).toLowerCase();
+  const mentionsDrift = /\bdrift\b/.test(s);
+  if (!mentionsDrift) return { ok: false, why: 'terrain-drift flag present but summary did not mention drift' };
+
+  const connects = /terrain-driven|driven by the (hills|terrain)|consistent with (the )?hills|consistent with (the )?terrain|hill-driven/.test(s);
+  if (!connects) return { ok: false, why: 'drift mentioned without explicitly attributing it to terrain' };
+
+  // Disallow framing drift as a negative signal when the terrain-explains flag exists.
+  const negativePhrases = /despite.*drift|drift.*suggests|drift.*increase in effort|elevated drift/.test(s);
+  if (negativePhrases) return { ok: false, why: 'drift framed as effort/fatigue signal despite terrain-drift flag' };
+
+  return { ok: true, why: null };
+}
+
 async function callOpenAIParagraph(openaiKey: string, prompt: string, temperature: number): Promise<string | null> {
   const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -254,11 +307,13 @@ export async function generateAISummaryV1(
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
 
 RULES:
-- Output ONE paragraph, 3-5 sentences. No bullets. No headers.
+- Output ONE paragraph. Sentence count must match signal:
+  - If TOP FLAGS contain no priority≤2 concerns: 2–3 sentences max.
+  - If there is a priority≤2 concern: 3–5 sentences max.
 - Lead with the most important insight (see TOP FLAGS).
 - Be specific and grounded: reference 2-4 concrete details (pace, HR, drift/decoupling, conditions, fatigue, plan intent) ONLY when they explain the outcome.
 - No filler. Avoid generic phrases like "indicating", "effective endurance training", "attention should be paid", "ensure", "focus on", "in future workouts".
-- FORBIDDEN phrasing: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing confidence", "effective management", "overall", "aligns well".
+- FORBIDDEN phrasing: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing confidence", "effective management", "overall", "aligns well", "recovery-integrity cost".
 - Never say "I".
 - Never calculate.
 - CRITICAL: NEVER output pace as raw seconds. Use the provided display strings like "10:16/mi". If a pace is missing, omit it.
@@ -266,6 +321,7 @@ RULES:
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present verbatim in DISPLAY PACKET.
 - If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost (don’t call it “achieved recovery”).
 - Do not call it an "interval session" unless DISPLAY PACKET workout.type explicitly indicates intervals/tempo/track repeats.
+- If TOP FLAGS include a message that HR drift is consistent with hilly terrain, explicitly connect drift→terrain in ONE sentence and do not treat drift as a fatigue/effort signal.
 - Never show raw field names (no snake_case).
 
 TOP FLAGS (lead with these):
@@ -282,15 +338,19 @@ Write the summary now.`;
     if (!s1) return null;
     const v1 = validateNoNewNumbers(s1, displayPacket);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
-    if (v1.ok && z1.ok) return s1;
+    const len1 = validateAdaptiveLength(s1, displayPacket);
+    const td1 = validateTerrainExplainsDrift(s1, displayPacket);
+    if (v1.ok && z1.ok && len1.ok && td1.ok) return s1;
 
     // Attempt 2: corrective retry with explicit violations + temp=0
-    const corrective = `${prompt}\n\nYou violated grounding constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided.`;
+    const corrective = `${prompt}\n\nYou violated constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\n- Length violation: ${len1.why || '(none)'}\n- Terrain/drift connection violation: ${td1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided. Keep it short when there is nothing concerning.`;
     const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
     if (!s2) return null;
     const v2 = validateNoNewNumbers(s2, displayPacket);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);
-    return (v2.ok && z2.ok) ? s2 : null;
+    const len2 = validateAdaptiveLength(s2, displayPacket);
+    const td2 = validateTerrainExplainsDrift(s2, displayPacket);
+    return (v2.ok && z2.ok && len2.ok && td2.ok) ? s2 : null;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;
