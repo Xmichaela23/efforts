@@ -229,48 +229,31 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
   if (typeof plannedStep.distanceMeters === 'number' && plannedStep.distanceMeters > 0) {
     const mi = plannedStep.distanceMeters / 1609.34;
     if (isRunOrWalk) {
-      const secPerKm = completed.avg_pace || completed.metrics?.avg_pace; // seconds per km
-      const secPerMi = typeof secPerKm === 'number' ? secPerKm * 1.60934 : undefined;
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${fmtPace(secPerMi)}` , hr: getAvgHR(completed) };
+      // STRICT: dumb client — do not compute/derive pace from other fields.
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi`, hr: getAvgHR(completed) };
     }
     if (isRide) {
-      const kph = completed.avg_speed || completed.metrics?.avg_speed; // km/h
-      const mph = typeof kph === 'number' ? kph * 0.621371 : undefined;
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
+      // STRICT: dumb client — do not compute/derive speed from other fields.
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
-      // Prefer unified moving seconds via resolver for consistency
-      const durS = resolveMovingSeconds(completed);
-      const distKm = typeof completed?.distance === 'number' ? completed.distance : undefined;
-      const distM = distKm && distKm > 0 ? distKm * 1000 : undefined;
-      const per100 = (Number.isFinite(durS as any) && (durS as number) > 0 && Number.isFinite(distM as any) && (distM as number) > 0)
-        ? ((durS as number) / ((isYardPoolCompleted(completed) === true ? ((distM as number)/0.9144) : (distM as number)) / 100))
-        : computeOverallSwimPer100Sec(completed);
-      const yardPool = isYardPoolCompleted(completed) === true;
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${per100 ? `${fmtTime(per100)} ${yardPool ? '/100yd' : '/100m'}` : '—'}`, hr: getAvgHR(completed) };
+      // STRICT: dumb client — do not compute per-100 pace. Show distance only.
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi`, hr: getAvgHR(completed) };
     }
   }
 
   if (typeof plannedStep.duration === 'number' && plannedStep.duration > 0) {
     if (isRunOrWalk) {
-      const secPerKm = completed.avg_pace || completed.metrics?.avg_pace;
-      const secPerMi = typeof secPerKm === 'number' ? secPerKm * 1.60934 : undefined;
-      return { text: `${fmtTime(plannedStep.duration)} @ ${fmtPace(secPerMi)}`, hr: getAvgHR(completed) };
+      // STRICT: dumb client — do not compute pace. Show duration only.
+      return { text: `${fmtTime(plannedStep.duration)}`, hr: getAvgHR(completed) };
     }
     if (isRide) {
-      const kph = completed.avg_speed || completed.metrics?.avg_speed;
-      const mph = typeof kph === 'number' ? kph * 0.621371 : undefined;
-      return { text: `${fmtTime(plannedStep.duration)} @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
+      // STRICT: dumb client — do not compute speed. Show duration only.
+      return { text: `${fmtTime(plannedStep.duration)}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
-      const durS = resolveMovingSeconds(completed);
-      const distKm = typeof completed?.distance === 'number' ? completed.distance : undefined;
-      const distM = distKm && distKm > 0 ? distKm * 1000 : undefined;
-      const per100 = (Number.isFinite(durS as any) && (durS as number) > 0 && Number.isFinite(distM as any) && (distM as number) > 0)
-        ? ((durS as number) / ((isYardPoolCompleted(completed) === true ? ((distM as number)/0.9144) : (distM as number)) / 100))
-        : computeOverallSwimPer100Sec(completed);
-      const yardPool = isYardPoolCompleted(completed) === true;
-      return { text: `${fmtTime(plannedStep.duration)} @ ${per100 ? `${fmtTime(per100)} ${yardPool ? '/100yd' : '/100m'}` : '—'}`, hr: getAvgHR(completed) };
+      // STRICT: dumb client — do not compute per-100 pace. Show duration only.
+      return { text: `${fmtTime(plannedStep.duration)}`, hr: getAvgHR(completed) };
     }
   }
 
@@ -1666,10 +1649,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const arr = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
             let m = 0; for (const st of arr) { const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0); if (Number.isFinite(dm) && dm>0) m += dm; }
             if (m > 0) return m;
-            if (plannedSecondsTotal && plannedPaceSecPerMi) {
-              // derive from duration and target pace
-              const miles = plannedSecondsTotal / plannedPaceSecPerMi; return Math.round(miles * 1609.34);
-            }
             return null;
           })();
 
@@ -1683,20 +1662,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const executedMeters = (() => {
             const m = Number(compOverall?.distance_m);
             if (Number.isFinite(m) && m>0) return m;
-            const km = Number((hydratedCompleted || completed)?.distance);
-            return Number.isFinite(km) && km>0 ? Math.round(km * 1000) : null;
+            return null;
           })();
-          // Calculate pace from distance/time (same as Details screen) for consistency
+          // STRICT: use server-computed pace only (no client derivation)
           const executedSecPerMi = (() => {
-            const distM = Number(compOverall?.distance_m);
-            const durS = Number(compOverall?.duration_s_moving);
-            if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
-              const miles = distM / 1609.34;
-              if (miles > 0) {
-                return durS / miles; // Calculate from distance/time
-              }
-            }
-            // Fallback to stored value only if calculation not possible
             const v = Number(compOverall?.avg_pace_s_per_mi);
             return Number.isFinite(v) && v > 0 ? v : null;
           })();
