@@ -288,10 +288,18 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // Prefer server snapshot from completed.computed when available
   const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
   const hasServerPlanned = serverPlannedLight.length > 0;
-  // For strength, allow completed-only render when no planned is available
-  if (!planned && !hasServerPlanned) {
+  // When there is no planned session attached, still allow an "analysis-only" view for supported disciplines.
+  // This is required for unplanned rides/runs: we should still be able to generate and display analysis.
+  const noPlannedCompare = !planned && !hasServerPlanned;
+  if (noPlannedCompare) {
     const typeMaybe = String((completed as any)?.type || '').toLowerCase();
-    if (typeMaybe !== 'strength') {
+    const allowCompletedOnly = (
+      typeMaybe === 'strength' ||
+      typeMaybe === 'run' || typeMaybe === 'running' ||
+      typeMaybe === 'ride' || typeMaybe === 'cycling' || typeMaybe === 'bike' ||
+      typeMaybe === 'swim' || typeMaybe === 'swimming'
+    );
+    if (!allowCompletedOnly) {
       return (<div className="text-sm text-gray-600">No planned session to compare.</div>);
     }
   }
@@ -2652,6 +2660,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           if (hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
+                {noPlannedCompare && (
+                  <div className="text-xs text-gray-500 italic mb-2">
+                    No planned session to compare.
+                  </div>
+                )}
                 <div className="flex items-center justify-end">
                   <button
                     onClick={recomputeAnalysis}
@@ -2672,6 +2685,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           }
           return (
             <div className="mt-4 px-3 pb-4 space-y-3">
+              {noPlannedCompare && (
+                <div className="text-xs text-gray-500 italic">
+                  No planned session to compare.
+                </div>
+              )}
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs text-gray-500">
                   {recomputeError ? (
