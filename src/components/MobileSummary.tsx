@@ -2609,8 +2609,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })}
           </tbody>
         </table>
-        {/* Run adherence summary below intervals: structured (technical + coach outlook), AI narrative, old score_explanation, or fallback */}
-        {/run|walk/i.test(sportType) && (() => {
+        {/* Summary below intervals: coach paragraph, structured, legacy, or fallback (all disciplines) */}
+        {(() => {
           const completedSrc: any = hydratedCompleted || completed;
           const workoutAnalysis = completedSrc?.workout_analysis;
           const standardizedSummary = workoutAnalysis?.summary;
