@@ -2621,6 +2621,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const scoreExplanation = workoutAnalysis?.score_explanation;
           const aiSummary = typeof workoutAnalysis?.ai_summary === 'string' ? workoutAnalysis.ai_summary.trim() : '';
           const hasAISummary = aiSummary.length > 0;
+          const isRideSportForSummary = /ride|bike|cycling/i.test(String(type || ''));
           const hasStandardized =
             standardizedSummary &&
             standardizedSummary.version === 1 &&
@@ -2658,8 +2659,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             !!(adherenceSummary?.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.');
           const hasTechnicalForRender = technicalInsightsForRender.length > 0;
           const hasStructuredForRender = !!adherenceSummary && (hasTechnicalForRender || hasPlanImpactForRender);
-          const hasNarrative = Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
-          const hasLegacyVerdict = typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
+          // For cycling, we intentionally do NOT render legacy narrative_insights/verdict; we want the packet→flags→ai_summary pipeline only.
+          const hasNarrative = !isRideSportForSummary && Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
+          const hasLegacyVerdict = !isRideSportForSummary && typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
           const hasNothing = !hasAISummary && !hasStandardized && !hasStructuredForRender && !hasNarrative && !hasLegacyVerdict;
           if (hasNothing) {
             return (
