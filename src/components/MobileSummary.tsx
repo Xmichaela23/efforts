@@ -13,8 +13,11 @@ type MobileSummaryProps = {
 
 const fmtTime = (sec?: number) => {
   if (!sec || sec <= 0) return '—';
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
+  const s0 = Math.round(sec);
+  const h = Math.floor(s0 / 3600);
+  const m = Math.floor((s0 % 3600) / 60);
+  const s = s0 % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
 };
 
@@ -943,8 +946,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       }
     }
 
-    // Fallback (for "Show details" micro-segments): use server-provided executed pace when available,
-    // otherwise derive from executed distance + duration. This keeps recovery/rest rows readable.
+    // Fallback (for "Show details" micro-segments): use server-provided executed pace when available.
+    // STRICT: do not derive pace from distance+duration on the client.
     try {
       const exec = interval?.executed || interval || null;
       const direct = Number(
@@ -955,16 +958,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         interval?.avg_pace_sec_per_mi
       );
       if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
-
-      const distM = Number(exec?.distance_m ?? exec?.distanceMeters ?? exec?.distance_meters);
-      const durS = Number(exec?.duration_s ?? exec?.durationS ?? interval?.duration_s ?? interval?.seconds);
-      if (Number.isFinite(distM) && distM > 50 && Number.isFinite(durS) && durS > 5) {
-        const miles = distM / 1609.34;
-        if (miles > 0) {
-          const secPerMi = durS / miles;
-          if (Number.isFinite(secPerMi) && secPerMi > 0) return Math.round(secPerMi);
-        }
-      }
     } catch {}
 
     return null;

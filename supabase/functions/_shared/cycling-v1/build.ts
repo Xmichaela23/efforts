@@ -98,12 +98,20 @@ export function buildCyclingFactPacketV1(args: {
   if (ftpW != null) inputs_present.push('ftp');
 
   const durMin = (() => {
+    // Prefer server-computed moving duration (seconds) from computed.overall.
+    const overall = workout?.computed?.overall || {};
+    const s = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
+    if (s != null && s > 0) return s / 60;
     const v = coerceNumber(workout?.moving_time ?? workout?.duration);
     if (v == null) return null;
-    // In this codebase, duration/moving_time are often minutes.
+    // Fallback: duration/moving_time are often minutes.
     return v > 0 && v < 1000 ? v : (v / 60);
   })();
   const distMi = (() => {
+    // Prefer server-computed distance meters from computed.overall.
+    const overall = workout?.computed?.overall || {};
+    const m = coerceNumber(overall?.distance_m ?? overall?.distance_meters ?? overall?.distanceMeters);
+    if (m != null && m > 0) return m / 1609.34;
     const km = coerceNumber(workout?.distance);
     if (km == null) return null;
     return km > 0 ? (km * 0.621371) : null;
