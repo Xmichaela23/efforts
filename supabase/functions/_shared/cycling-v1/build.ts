@@ -101,11 +101,28 @@ export function buildCyclingFactPacketV1(args: {
     // Prefer server-computed moving duration (seconds) from computed.overall.
     const overall = workout?.computed?.overall || {};
     const s = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
-    if (s != null && s > 0) return s / 60;
+
     const v = coerceNumber(workout?.moving_time ?? workout?.duration);
-    if (v == null) return null;
-    // Fallback: duration/moving_time are often minutes.
-    return v > 0 && v < 1000 ? v : (v / 60);
+    const vMin = (() => {
+      if (v == null) return null;
+      // Fallback: duration/moving_time are often minutes, but some legacy rows are seconds.
+      return v > 0 && v < 1000 ? v : (v / 60);
+    })();
+
+    // Guardrail: Some workouts have a legacy 60x units bug in computed.overall.duration_s_moving.
+    // If computed duration disagrees wildly with the workout field duration, prefer the workout field.
+    if (s != null && s > 0) {
+      if (vMin != null && vMin > 0) {
+        const vSec = vMin * 60;
+        const ratio = vSec > 0 ? (s / vSec) : null;
+        if (ratio != null && (ratio >= 6 || ratio <= (1 / 6))) {
+          return vMin;
+        }
+      }
+      return s / 60;
+    }
+
+    return vMin;
   })();
   const distMi = (() => {
     // Prefer server-computed distance meters from computed.overall.

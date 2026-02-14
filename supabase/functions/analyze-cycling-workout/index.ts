@@ -983,6 +983,38 @@ function extractSensorData(data: any): any[] {
   return [];
 }
 
+function inferSecondsFromMaybeMinutes(args: {
+  value: number | null;
+  workout: any;
+}): number | null {
+  const { value, workout } = args;
+  if (value == null) return null;
+  if (!Number.isFinite(value) || value <= 0) return null;
+
+  const asSeconds = value;
+  const asMinutesSeconds = value * 60;
+
+  // If one option is clearly impossible (> 36h), prefer the other.
+  const tooBig = (s: number) => s > 36 * 3600;
+  if (tooBig(asMinutesSeconds) && !tooBig(asSeconds)) return asSeconds;
+  if (tooBig(asSeconds) && !tooBig(asMinutesSeconds)) return asMinutesSeconds;
+
+  // If we have distance + avg_speed, choose the candidate closer to expected clock time.
+  const distKm = Number(workout?.distance);
+  const avgSpeedKph = Number(workout?.avg_speed);
+  if (Number.isFinite(distKm) && distKm > 0 && Number.isFinite(avgSpeedKph) && avgSpeedKph > 2) {
+    const expectedSeconds = (distKm / avgSpeedKph) * 3600;
+    if (Number.isFinite(expectedSeconds) && expectedSeconds > 60 && expectedSeconds < 36 * 3600) {
+      const d1 = Math.abs(asSeconds - expectedSeconds);
+      const d2 = Math.abs(asMinutesSeconds - expectedSeconds);
+      return d1 <= d2 ? asSeconds : asMinutesSeconds;
+    }
+  }
+
+  // Default: schema typically stores minutes.
+  return asMinutesSeconds;
+}
+
 /**
  * Generate AI narrative insights for cycling workouts
  */
@@ -1005,8 +1037,9 @@ async function generateAINarrativeInsights(
 
   // Calculate metrics
   const movingTimeSeconds = workout.computed?.overall?.duration_s_moving 
-    || (workout.moving_time ? workout.moving_time * 60 : null)
-    || (workout.duration ? workout.duration * 60 : 0);
+    || inferSecondsFromMaybeMinutes({ value: workout.moving_time ?? null, workout })
+    || inferSecondsFromMaybeMinutes({ value: workout.duration ?? null, workout })
+    || 0;
   const totalDurationMinutes = movingTimeSeconds / 60;
   const totalDistanceKm = workout.distance || 0;
   const distanceValue = userUnits === 'metric' ? totalDistanceKm : totalDistanceKm * 0.621371;
@@ -1511,14 +1544,28 @@ Deno.serve(async (req) => {
     // Legacy AI insights are deprecated. Cycling V1 uses a deterministic fact packet + single coaching paragraph.
     const insights: any = null;
 
-    // Extract power samples for summary
+    // Extract power samples (include zeros; exclude null/NaN)
     const powerSamples = sensorData
-      .map(s => s.power || s.watts)
-      .filter(p => p && p > 0);
-    const avgPower = powerSamples.length > 0
-      ? Math.round(powerSamples.reduce((sum, p) => sum + p, 0) / powerSamples.length)
-      : 0;
-    const normalizedPower = calculateNormalizedPower(powerSamples);
+      .map((s: any) => {
+        const v = (s?.power ?? s?.watts ?? s?.power_w ?? s?.powerWatts);
+        const n = Number(v);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      })
+      .filter((n: number | null): n is number => n != null);
+
+    // Prefer workout summary power metrics when available (they already include coasting/zeros correctly).
+    const avgPower = (() => {
+      const v = Number((workout as any)?.avg_power ?? (workout as any)?.metrics?.avg_power);
+      if (Number.isFinite(v) && v >= 0) return Math.round(v);
+      return powerSamples.length > 0
+        ? Math.round(powerSamples.reduce((sum, p) => sum + p, 0) / powerSamples.length)
+        : 0;
+    })();
+    const normalizedPower = (() => {
+      const v = Number((workout as any)?.normalized_power ?? (workout as any)?.metrics?.normalized_power);
+      if (Number.isFinite(v) && v >= 0) return Math.round(v);
+      return calculateNormalizedPower(powerSamples);
+    })();
 
     let trainingLoadContext: any | null = null;
     try {
@@ -1557,6 +1604,35 @@ Deno.serve(async (req) => {
       console.log('⚠️ Cycling ai_summary generation failed:', e);
       ai_summary = null;
       ai_summary_generated_at = null;
+    }
+
+    // Repair legacy 60x duration units bug in computed.overall.duration_s_moving when detected.
+    try {
+      const overall = (workout as any)?.computed?.overall;
+      const cur = Number(overall?.duration_s_moving);
+      const inferred = inferSecondsFromMaybeMinutes({ value: (workout as any)?.moving_time ?? (workout as any)?.duration ?? null, workout });
+      if (
+        Number.isFinite(cur) &&
+        cur > 0 &&
+        inferred != null &&
+        inferred > 0 &&
+        (cur / inferred >= 10 || inferred / cur >= 10)
+      ) {
+        const nextComputed = {
+          ...(workout as any).computed,
+          overall: {
+            ...(overall || {}),
+            duration_s_moving: Math.round(inferred),
+          },
+        };
+        await supabase
+          .from('workouts')
+          .update({ computed: nextComputed })
+          .eq('id', workout_id);
+        console.log('🛠️ Repaired computed.overall.duration_s_moving (unit mismatch).', { cur, inferred });
+      }
+    } catch (e) {
+      console.log('⚠️ Failed to repair computed duration units:', e);
     }
 
     // Build granular analysis (matches running structure for client compatibility)
