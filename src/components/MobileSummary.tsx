@@ -355,7 +355,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     setRecomputing(false);
   }, [completed]);
 
-  const recomputeRunAnalysis = async () => {
+  const recomputeAnalysis = async () => {
     const src = hydratedCompleted || completed;
     const workoutId = String((src as any)?.id || '');
     if (!workoutId) return;
@@ -363,7 +363,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       setRecomputing(true);
       setRecomputeError(null);
 
-      const { error: fnErr } = await supabase.functions.invoke('analyze-running-workout', {
+      const fnName = (() => {
+        const t = String(type || '').toLowerCase();
+        if (t === 'run' || t === 'running') return 'analyze-running-workout';
+        if (t === 'ride' || t === 'cycling' || t === 'bike') return 'analyze-cycling-workout';
+        if (t === 'strength' || t === 'strength_training') return 'analyze-strength-workout';
+        if (t === 'swim' || t === 'swimming') return 'analyze-swim-workout';
+        return 'analyze-running-workout';
+      })();
+
+      const { error: fnErr } = await supabase.functions.invoke(fnName, {
         body: { workout_id: workoutId },
       });
       if (fnErr) throw fnErr;
@@ -2643,10 +2652,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           if (hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
+                <div className="flex items-center justify-end">
+                  <button
+                    onClick={recomputeAnalysis}
+                    disabled={recomputing || !completedSrc?.id}
+                    className="text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
+                    title="Generate analysis for this workout"
+                  >
+                    {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+                  </button>
+                </div>
                 <p className="text-sm text-gray-500 italic">
                   {planned
                     ? 'No summary for this workout. Re-attach to a planned workout and open the Performance tab to generate execution insights.'
-                    : 'No analysis for this workout yet. Analysis runs automatically for new runs; refresh or re-open to see results.'}
+                    : 'No analysis for this workout yet. Click “Recompute analysis” to generate it.'}
                 </p>
               </div>
             );
@@ -2660,7 +2679,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   ) : null}
                 </div>
                 <button
-                  onClick={recomputeRunAnalysis}
+                  onClick={recomputeAnalysis}
                   disabled={recomputing || !completedSrc?.id}
                   className="text-xs px-2 py-1 rounded-md bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15 disabled:opacity-50"
                   title="Re-run analysis for this workout"

@@ -1,4 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
+import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
+import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
+import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1231,7 +1235,7 @@ Deno.serve(async (req) => {
       .from('workouts')
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
-        planned_id, user_id, moving_time, duration, distance
+        planned_id, user_id, date, moving_time, duration, distance, workout_status, workload_actual, workload_planned
       `)
       .eq('id', workout_id)
       .single();
@@ -1266,6 +1270,15 @@ Deno.serve(async (req) => {
       console.log('⚠️ No user baselines found');
     }
 
+    const ftpW = (() => {
+      try {
+        const v = Number((baselines as any)?.ftp ?? (baselines as any)?.functional_threshold_power);
+        return Number.isFinite(v) && v > 0 ? v : null;
+      } catch {
+        return null;
+      }
+    })();
+
     // Get planned workout
     let plannedWorkout = null;
     let intervals = [];
@@ -1273,7 +1286,7 @@ Deno.serve(async (req) => {
     if (workout.planned_id) {
       const { data: planned } = await supabase
         .from('planned_workouts')
-        .select('id, intervals, steps_preset, computed, description, tags, training_plan_id, user_id')
+        .select('id, workout_type, intervals, steps_preset, computed, description, tags, training_plan_id, user_id, name, workout_name')
         .eq('id', workout.planned_id)
         .eq('user_id', workout.user_id)
         .single();
@@ -1495,17 +1508,8 @@ Deno.serve(async (req) => {
     console.log(`  - Duration adherence: ${durationAdherenceValue}%`);
     console.log(`  - Execution adherence: ${executionAdherence}% = (${powerAdherence}% × 0.7) + (${durationAdherenceValue}% × 0.3)`);
 
-    // Generate AI insights
-    const insights = await generateAINarrativeInsights(
-      sensorData,
-      workout,
-      plannedWorkout,
-      enhancedAnalysis,
-      performance,
-      { interval_breakdown: intervalBreakdown, hr_analysis: hrAnalysis },
-      userUnits,
-      supabase
-    );
+    // Legacy AI insights are deprecated. Cycling V1 uses a deterministic fact packet + single coaching paragraph.
+    const insights: any = null;
 
     // Extract power samples for summary
     const powerSamples = sensorData
@@ -1515,6 +1519,45 @@ Deno.serve(async (req) => {
       ? Math.round(powerSamples.reduce((sum, p) => sum + p, 0) / powerSamples.length)
       : 0;
     const normalizedPower = calculateNormalizedPower(powerSamples);
+
+    let trainingLoadContext: any | null = null;
+    try {
+      if ((workout as any)?.date) {
+        trainingLoadContext = await getTrainingLoadContext(supabase as any, {
+          userId: String((workout as any).user_id),
+          workoutDateIso: String((workout as any).date),
+        });
+      }
+    } catch (e) {
+      console.log('⚠️ Failed to fetch training load context for cycling:', e);
+      trainingLoadContext = null;
+    }
+
+    // Canonical, deterministic cycling fact packet + flags + coaching paragraph
+    const cyclingFactPacketV1 = buildCyclingFactPacketV1({
+      workout,
+      plannedWorkout,
+      powerSamplesW: powerSamples as number[],
+      avgPowerW: avgPower || null,
+      normalizedPowerW: normalizedPower || null,
+      avgHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.average_hr ?? (hrAnalysis as any)?.average_heart_rate) : null,
+      maxHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.max_hr ?? (hrAnalysis as any)?.max_heart_rate) : null,
+      ftpW,
+      trainingLoad: trainingLoadContext,
+      userUnits: (userUnits === 'metric' || userUnits === 'imperial') ? (userUnits as any) : null,
+    });
+    const cyclingFlagsV1 = generateCyclingFlagsV1(cyclingFactPacketV1, trainingLoadContext);
+
+    let ai_summary: string | null = null;
+    let ai_summary_generated_at: string | null = null;
+    try {
+      ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1);
+      if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+    } catch (e) {
+      console.log('⚠️ Cycling ai_summary generation failed:', e);
+      ai_summary = null;
+      ai_summary_generated_at = null;
+    }
 
     // Build granular analysis (matches running structure for client compatibility)
     const granularAnalysis = {
@@ -1552,8 +1595,8 @@ Deno.serve(async (req) => {
       granular_analysis: granularAnalysis,  // Same path as running for client compatibility
       performance: performance,
       detailed_analysis: detailedAnalysis,
-      narrative_insights: insights,
-      insights: insights, // Backward compatibility
+      narrative_insights: null, // deprecated
+      insights: null, // deprecated
       adherence_analysis: {
         power_adherence: powerAdherence,
         duration_adherence: durationAdherenceValue,
@@ -1565,10 +1608,29 @@ Deno.serve(async (req) => {
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
     console.log(`  - granular_analysis.interval_breakdown: ${intervalBreakdown.length} intervals`);
 
+    // Contract: merge into existing workout_analysis (do not replace).
+    const { data: existingRowForMerge, error: existingRowErr } = await supabase
+      .from('workouts')
+      .select('workout_analysis')
+      .eq('id', workout_id)
+      .single();
+    if (existingRowErr) {
+      console.log('⚠️ Failed to read existing workout_analysis for cycling merge:', existingRowErr.message);
+    }
+    const existingAnalysis = (existingRowForMerge as any)?.workout_analysis || {};
+
     const { error: updateError } = await supabase
       .from('workouts')
       .update({
-        workout_analysis: analysisPayload,
+        workout_analysis: {
+          ...(existingAnalysis || {}),
+          ...(analysisPayload || {}),
+          classified_type: cyclingFactPacketV1?.facts?.classified_type || null,
+          fact_packet_v1: cyclingFactPacketV1,
+          flags_v1: cyclingFlagsV1,
+          ai_summary,
+          ai_summary_generated_at,
+        },
         analysis_status: 'complete',
         analyzed_at: new Date().toISOString()
       })
