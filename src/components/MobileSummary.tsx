@@ -1765,6 +1765,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                         (finalDistPct != null) || 
                         (finalExecutionScore != null && finalExecutionScore >= 0);
           console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
+          // Adherence requires a planned target (or server-planned snapshot). Without a comparator it's misleading.
+          if (noPlannedCompare) return null;
           if (!anyVal || hideTopAdherence) return null;
 
           // Determine workout intent for rule-based coloring
@@ -1833,6 +1835,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
           // ------------ SWIM (session-average per-100 pace + duration) - OPEN WATER ONLY ------------
           if (isSwim && !isPoolSwim) {
+            if (noPlannedCompare) return null;
             // Planned totals
             const plannedSecondsTotal = (() => {
               const t = Number((planned as any)?.computed?.total_duration_seconds);
@@ -1984,6 +1987,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
           // ------------ BIKE/RIDE (smart server, dumb client - same as running) ------------
           if (isRide) {
+            if (noPlannedCompare) return null;
             // ✅ SMART SERVER, DUMB CLIENT: Read all adherence values from workout_analysis.performance
             const performance = completedSrc?.workout_analysis?.performance;
             console.log('🚴 [CYCLING DEBUG] Reading from workout_analysis.performance:', performance);
