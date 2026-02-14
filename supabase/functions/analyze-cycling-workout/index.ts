@@ -1553,16 +1553,28 @@ Deno.serve(async (req) => {
       })
       .filter((n: number | null): n is number => n != null);
 
-    // Prefer workout summary power metrics when available (they already include coasting/zeros correctly).
+    // Prefer server-computed overall power metrics when available (matches UI readouts).
     const avgPower = (() => {
-      const v = Number((workout as any)?.avg_power ?? (workout as any)?.metrics?.avg_power);
+      const v = Number(
+        (workout as any)?.computed?.overall?.avg_power_w ??
+        (workout as any)?.computed?.overall?.avg_power ??
+        (workout as any)?.avg_power ??
+        (workout as any)?.metrics?.avg_power ??
+        (workout as any)?.average_watts
+      );
       if (Number.isFinite(v) && v >= 0) return Math.round(v);
       return powerSamples.length > 0
         ? Math.round(powerSamples.reduce((sum, p) => sum + p, 0) / powerSamples.length)
         : 0;
     })();
     const normalizedPower = (() => {
-      const v = Number((workout as any)?.normalized_power ?? (workout as any)?.metrics?.normalized_power);
+      const v = Number(
+        (workout as any)?.computed?.overall?.normalized_power_w ??
+        (workout as any)?.computed?.overall?.normalized_power ??
+        (workout as any)?.normalized_power ??
+        (workout as any)?.metrics?.normalized_power ??
+        (workout as any)?.weighted_average_watts
+      );
       if (Number.isFinite(v) && v >= 0) return Math.round(v);
       return calculateNormalizedPower(powerSamples);
     })();

@@ -28,6 +28,23 @@ function validateNoNewNumbers(summary: string, displayPacket: string): { ok: boo
 function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
   const f = fp.facts;
   const d = fp.derived;
+  const tl = (d as any)?.training_load || null;
+  const planContext = (() => {
+    if (!tl || typeof tl !== 'object') return null;
+    const weekPct = (tl as any).week_load_pct;
+    const acwr = (tl as any).acwr_ratio;
+    const streak = (tl as any).consecutive_training_days;
+    return {
+      // Treat "week_load_pct present" as a signal that a plan exists for the week.
+      plan_week_detected: weekPct != null ? true : false,
+      week_load_pct: (typeof weekPct === 'number' && Number.isFinite(weekPct)) ? `${Math.round(weekPct)}%` : null,
+      acwr_ratio: (typeof acwr === 'number' && Number.isFinite(acwr)) ? `${Math.round(acwr * 100) / 100}` : null,
+      acwr_status: (typeof (tl as any).acwr_status === 'string') ? String((tl as any).acwr_status) : null,
+      consecutive_training_days: (typeof streak === 'number' && Number.isFinite(streak)) ? `${Math.round(streak)} days` : null,
+      cumulative_fatigue: (typeof (tl as any).cumulative_fatigue === 'string') ? String((tl as any).cumulative_fatigue) : null,
+      fatigue_evidence: Array.isArray((tl as any).fatigue_evidence) ? (tl as any).fatigue_evidence.slice(0, 3) : null,
+    };
+  })();
   return {
     discipline: 'ride',
     classified_type: f.classified_type,
@@ -49,6 +66,7 @@ function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
     executed_intensity: d.executed_intensity,
     confidence: d.confidence,
     ftp_quality: d.ftp_quality,
+    plan_context: planContext,
     top_flags: (Array.isArray(flags) ? flags : [])
       .slice()
       .sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99))
@@ -76,6 +94,7 @@ RULES:
 - CRITICAL: Do not introduce any numbers, percentages, or time-in-zone claims that are not present verbatim in the packet.
 - If there is no planned intent, do not pretend there was a prescription; describe what the ride was physiologically.
 - Prefer the TOP FLAGS as the framing.
+- If plan_context.plan_week_detected is true AND plan_intent is null, include one sentence on impact (week load / fatigue) and a concrete adjustment suggestion for the next day or two, using ONLY what’s in the packet (and do not add any new numbers).
 
 PACKET (authoritative; do not compute outside it):
 ${packetStr}
