@@ -96,6 +96,48 @@ function computeTargetAndDeviation(actual: number | null, paceRange: any): { tar
   return { target, deviation };
 }
 
+function derivePlannedDistanceMi(plannedWorkout: any): number | null {
+  try {
+    if (!plannedWorkout) return null;
+    const comp = parseJson(plannedWorkout?.computed) || {};
+
+    // Prefer explicit distances from computed steps.
+    const steps = Array.isArray(comp?.steps) ? comp.steps : [];
+    if (steps.length) {
+      let meters = 0;
+      for (const st of steps) {
+        const dm = coerceNumber(st?.distanceMeters ?? st?.distance_m ?? st?.m ?? st?.meters);
+        if (dm != null && dm > 0) meters += dm;
+      }
+      if (meters > 0) return meters / 1609.34;
+    }
+
+    // Fallback: derive from planned duration + target pace midpoint when available.
+    const plannedDurS =
+      coerceNumber(plannedWorkout?.total_duration_seconds) ??
+      coerceNumber(comp?.total_duration_seconds) ??
+      coerceNumber(comp?.totalDurationSeconds) ??
+      null;
+    if (plannedDurS == null || !(plannedDurS > 0)) return null;
+
+    const pr =
+      plannedWorkout?.pace_range ??
+      plannedWorkout?.paceRange ??
+      comp?.pace_range ??
+      comp?.paceRange ??
+      null;
+    const r = normalizePaceRange(pr);
+    if (!r) return null;
+    const target = (r.fast + r.slow) / 2;
+    if (!(target > 0)) return null;
+
+    const miles = plannedDurS / target;
+    return miles > 0 ? miles : null;
+  } catch {
+    return null;
+  }
+}
+
 function deriveWeather(workout: any): WeatherV1 | null {
   const avgTempC = coerceNumber(workout?.avg_temperature);
   const weatherData = parseJson(workout?.weather_data) || null;
@@ -364,6 +406,28 @@ export async function buildWorkoutFactPacketV1(args: {
     }
   })();
 
+  const plannedDistMi = plannedWorkout ? derivePlannedDistanceMi(plannedWorkout) : null;
+  const execution = (() => {
+    const planned = plannedDistMi != null && plannedDistMi > 0 ? plannedDistMi : null;
+    const actual = overallDistMi != null && overallDistMi > 0 ? overallDistMi : null;
+    const deviationPct =
+      planned != null && actual != null
+        ? Math.round(((actual - planned) / planned) * 100)
+        : null;
+    const intentional = deviationPct != null ? Math.abs(deviationPct) >= 30 : false;
+    const assessed_against: 'plan' | 'actual' = intentional ? 'actual' : 'plan';
+    const note =
+      intentional && planned != null && actual != null
+        ? `Plan modified: ${Math.round(actual * 10) / 10} mi vs ${Math.round(planned * 10) / 10} mi`
+        : null;
+    return {
+      distance_deviation_pct: deviationPct,
+      intentional_deviation: intentional,
+      assessed_against,
+      note,
+    };
+  })();
+
   const stimulus = assessStimulus(
     // Plan/type should drive stimulus criteria; do not let raw workoutIntent strings (e.g. "long")
     // override normalized types like "long_run".
@@ -371,7 +435,10 @@ export async function buildWorkoutFactPacketV1(args: {
     segments,
     zones,
     {
-      planned_duration_min: coerceNumber(plannedWorkout?.duration) ?? coerceNumber(plannedWorkout?.planned_duration_min) ?? null,
+      planned_duration_min:
+        execution.assessed_against === 'actual'
+          ? (overallDurMin != null ? Math.round(overallDurMin) : null)
+          : (coerceNumber(plannedWorkout?.duration) ?? coerceNumber(plannedWorkout?.planned_duration_min) ?? null),
       interval_count: coerceNumber((plannedWorkout as any)?.interval_count) ?? null,
     }
   );
@@ -419,6 +486,7 @@ export async function buildWorkoutFactPacketV1(args: {
       plan: factsPlan,
     },
     derived: {
+      execution,
       hr_drift_bpm: hr_drift_bpm ?? driftSeg,
       hr_drift_typical,
       cardiac_decoupling_pct: dec,

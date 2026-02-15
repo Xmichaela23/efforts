@@ -1729,6 +1729,21 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
           // Adherence requires a planned target (or server-planned snapshot). Without a comparator it's misleading.
           if (noPlannedCompare) return null;
+
+          // If the athlete intentionally modified the session volume (e.g., +30% distance),
+          // showing 0% "execution" is misleading. In that case, pivot to assessing the actual workout
+          // and suppress adherence chips.
+          const planModified = (() => {
+            try {
+              const wa = completedSrc?.workout_analysis;
+              const raw = (wa as any)?.fact_packet_v1 ?? (wa as any)?.factPacketV1 ?? null;
+              const fp = typeof raw === 'string' ? JSON.parse(raw) : raw;
+              const against = String(fp?.derived?.execution?.assessed_against || '').toLowerCase();
+              return against === 'actual';
+            } catch { return false; }
+          })();
+          if (planModified) return null;
+
           if (!anyVal || hideTopAdherence) return null;
 
           // Determine workout intent for rule-based coloring

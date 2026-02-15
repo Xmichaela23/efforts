@@ -132,6 +132,16 @@ export type FactPacketV1 = {
     plan: PlanV1 | null;
   };
   derived: {
+    execution?: {
+      /** (actual - planned) / planned * 100; null when no planned distance. */
+      distance_deviation_pct: number | null;
+      /** True when abs(distance_deviation_pct) >= 30. */
+      intentional_deviation: boolean;
+      /** Whether we should assess strain vs plan-following. */
+      assessed_against: 'plan' | 'actual';
+      /** Optional short note for UI/LLM (no new computations required). */
+      note?: string | null;
+    };
     hr_drift_bpm: number | null;
     hr_drift_typical: number | null;
     cardiac_decoupling_pct: number | null;

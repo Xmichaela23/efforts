@@ -40,6 +40,26 @@ function validateNoNewNumbers(summary: string, displayPacket: any): { ok: boolea
   return { ok: bad.length === 0, bad };
 }
 
+function validateNoGenericFiller(summary: string): { ok: boolean; why?: string } {
+  const s = String(summary || '').toLowerCase();
+  if (!s) return { ok: true };
+  const banned = [
+    'indicating',
+    'should be monitored',
+    'monitor closely',
+    'manage fatigue effectively',
+    'facilitate recovery',
+    'overall,',
+    'overall ',
+    'consistent pacing strategy',
+    'likely accumulation of fatigue',
+    'consider adjusting upcoming sessions',
+    'attention should be paid',
+  ];
+  const hit = banned.find((p) => s.includes(p));
+  return hit ? { ok: false, why: `Generic filler phrase: "${hit}"` } : { ok: true };
+}
+
 function validateNoZoneTimeClaims(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
   const s = String(summary || '').toLowerCase();
   // We do not currently provide time-in-zone / % in zone in the display packet.
@@ -244,6 +264,16 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       };
     })(),
     signals: {
+      execution: derived?.execution
+        ? {
+            distance_deviation: (coerceNumber(derived.execution.distance_deviation_pct) != null)
+              ? `${Math.round(Number(derived.execution.distance_deviation_pct))}%`
+              : null,
+            intentional_deviation: !!derived.execution.intentional_deviation,
+            assessed_against: (derived.execution.assessed_against === 'actual') ? 'actual' : 'plan',
+            note: typeof derived.execution.note === 'string' ? derived.execution.note : null,
+          }
+        : null,
       hr_drift: (coerceNumber(derived?.hr_drift_bpm) != null) ? `${Math.round(Number(derived.hr_drift_bpm))} bpm` : null,
       hr_drift_typical: (coerceNumber(derived?.hr_drift_typical) != null) ? `${Math.round(Number(derived.hr_drift_typical))} bpm` : null,
       cardiac_decoupling: (coerceNumber(derived?.cardiac_decoupling_pct) != null) ? `${Math.round(Number(derived.cardiac_decoupling_pct))}%` : null,
@@ -319,6 +349,7 @@ RULES:
 - CRITICAL: NEVER output pace as raw seconds. Use the provided display strings like "10:16/mi". If a pace is missing, omit it.
 - CRITICAL: Do not introduce ANY proper nouns (races, cities, events) unless they appear verbatim in DISPLAY PACKET.
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present verbatim in DISPLAY PACKET.
+- If DISPLAY PACKET signals.execution.assessed_against is "actual", do NOT frame this as adherence failure. Acknowledge the plan modification briefly, then evaluate how the body handled the actual session using pace fade, drift/decoupling, terrain/conditions, and training load. Note downstream impact in one sentence (e.g., recovery priority elevated) without moralizing.
 - If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost (don’t call it “achieved recovery”).
 - Do not call it an "interval session" unless DISPLAY PACKET workout.type explicitly indicates intervals/tempo/track repeats.
 - If TOP FLAGS include a message that HR drift is consistent with hilly terrain, explicitly connect drift→terrain in ONE sentence and do not treat drift as a fatigue/effort signal.
@@ -340,17 +371,19 @@ Write the summary now.`;
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
     const len1 = validateAdaptiveLength(s1, displayPacket);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
-    if (v1.ok && z1.ok && len1.ok && td1.ok) return s1;
+    const g1 = validateNoGenericFiller(s1);
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok) return s1;
 
     // Attempt 2: corrective retry with explicit violations + temp=0
-    const corrective = `${prompt}\n\nYou violated constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\n- Length violation: ${len1.why || '(none)'}\n- Terrain/drift connection violation: ${td1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided. Keep it short when there is nothing concerning.`;
+    const corrective = `${prompt}\n\nYou violated constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\n- Length violation: ${len1.why || '(none)'}\n- Terrain/drift connection violation: ${td1.why || '(none)'}\n- Coach voice violation: ${g1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided. Keep it short when there is nothing concerning.`;
     const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
     if (!s2) return null;
     const v2 = validateNoNewNumbers(s2, displayPacket);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);
     const len2 = validateAdaptiveLength(s2, displayPacket);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
-    return (v2.ok && z2.ok && len2.ok && td2.ok) ? s2 : null;
+    const g2 = validateNoGenericFiller(s2);
+    return (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) ? s2 : null;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;
