@@ -620,7 +620,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       return computedDetailSteps;
     }
     if (showFullIntervalBreakdown) return stepsDisplayBase;
-    const fp = completedSrc?.workout_analysis?.fact_packet_v1;
+    const fpRaw = completedSrc?.workout_analysis?.fact_packet_v1;
+    const fp = (() => {
+      try { return typeof fpRaw === 'string' ? JSON.parse(fpRaw) : fpRaw; } catch { return fpRaw; }
+    })();
     const workoutType = String(fp?.facts?.workout_type || '').toLowerCase();
     const weekIntent = String(fp?.facts?.plan?.week_intent || '').toLowerCase();
     const isRecoveryWeek = fp?.facts?.plan?.is_recovery_week === true;
@@ -629,7 +632,59 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       isRecoveryWeek ||
       workoutType.includes('recovery') ||
       workoutType === 'easy' ||
-      workoutType === 'easy_run';
+      workoutType === 'easy_run' ||
+      workoutType === 'long_run' ||
+      workoutType === 'steady_state' ||
+      workoutType === 'run';
+
+    // Some plans/materializations represent steady long runs as many identical ~1km "work" steps.
+    // That renders as a misleading interval table ("Work · 7 min" rows). Detect and collapse to a single overall row.
+    const looksLikeAutoSplitSteady = (() => {
+      try {
+        if (!plannedStepsFull || plannedStepsFull.length < 8) return false;
+        const kinds = plannedStepsFull.map((s: any) => String(s?.kind || s?.type || '').toLowerCase());
+        const allWorkish = kinds.every((k: string) => k === 'work' || k === 'interval' || k === 'steady' || k === '');
+        if (!allWorkish) return false;
+
+        const dm = plannedStepsFull
+          .map((s: any) => Number(s?.distanceMeters ?? s?.distance_m ?? s?.m ?? 0))
+          .filter((n: number) => Number.isFinite(n) && n > 0);
+        if (dm.length < Math.floor(plannedStepsFull.length * 0.7)) return false;
+        const nearKm = dm.filter((m: number) => m >= 900 && m <= 1100);
+        if (nearKm.length < Math.floor(dm.length * 0.7)) return false;
+
+        const pr = plannedStepsFull
+          .map((s: any) => (s as any)?.pace_range)
+          .filter((x: any) => x && typeof x === 'object' && Number.isFinite(Number(x.lower)) && Number.isFinite(Number(x.upper)))
+          .map((x: any) => `${Math.round(Number(x.lower))}-${Math.round(Number(x.upper))}`);
+        const uniq = Array.from(new Set(pr));
+        if (uniq.length > 1) return false;
+
+        return true;
+      } catch { return false; }
+    })();
+
+    if (looksLikeAutoSplitSteady && easyLike && !showFullIntervalBreakdown) {
+      const totalS = (() => {
+        const v = Number((planned as any)?.computed?.total_duration_seconds);
+        if (Number.isFinite(v) && v > 0) return Math.round(v);
+        // Fallback: sum step seconds if present
+        const sum = plannedStepsFull.reduce((acc: number, s: any) => {
+          const sec = Number(s?.seconds ?? s?.duration ?? s?.duration_s ?? 0);
+          return (Number.isFinite(sec) && sec > 0) ? acc + Math.round(sec) : acc;
+        }, 0);
+        return sum > 0 ? sum : null;
+      })();
+      const pr0 = (plannedStepsFull[0] as any)?.pace_range ?? null;
+      return [{
+        id: 'overall',
+        kind: 'overall',
+        type: 'overall',
+        planned_index: 0,
+        seconds: totalS ?? undefined,
+        pace_range: pr0 || undefined,
+      }];
+    }
 
     if (!easyLike) return stepsDisplayBase;
     if (!Array.isArray(stepsDisplayBase) || stepsDisplayBase.length <= 2) return stepsDisplayBase;
