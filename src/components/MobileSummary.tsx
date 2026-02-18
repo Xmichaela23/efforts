@@ -366,6 +366,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         return 'analyze-running-workout';
       })();
 
+      // Step 1: Recompute computed.overall (duration, pace, distance) so downstream analysis uses fresh values
+      const { error: computeErr } = await supabase.functions.invoke('compute-workout-analysis', {
+        body: { workout_id: workoutId },
+      });
+      if (computeErr) console.warn('[recompute] compute-workout-analysis warning:', computeErr);
+
+      // Step 2: Run the discipline-specific analysis (builds fact packet, narrative, etc.)
       const { error: fnErr } = await supabase.functions.invoke(fnName, {
         body: { workout_id: workoutId },
       });
@@ -373,7 +380,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
       const { data: refreshed, error: wErr } = await supabase
         .from('workouts')
-        .select('id,workout_analysis,analysis_status,analyzed_at')
+        .select('id,computed,workout_analysis,analysis_status,analyzed_at')
         .eq('id', workoutId)
         .maybeSingle();
       if (wErr) throw wErr;
