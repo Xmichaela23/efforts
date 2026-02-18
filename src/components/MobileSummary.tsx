@@ -560,6 +560,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const unplannedIntervals = intervalBreakdownForUnplanned?.available && Array.isArray(intervalBreakdownForUnplanned?.intervals)
     ? intervalBreakdownForUnplanned.intervals
     : [];
+  const hasStructuredWorkoutSteps =
+    !planned &&
+    unplannedIntervals.length > 0 &&
+    unplannedIntervals.some((iv: any) => {
+      const dur = Number(iv?.planned_duration_s);
+      const hasDur = Number.isFinite(dur) && dur > 0;
+      const lo = iv?.planned_pace_range_lower;
+      const hi = iv?.planned_pace_range_upper;
+      const hasPaceRange = lo != null && hi != null && Number.isFinite(Number(lo)) && Number.isFinite(Number(hi));
+      return hasDur || hasPaceRange;
+    });
+  const planLinkNote = !planned
+    ? (hasStructuredWorkoutSteps
+        ? 'No plan session linked. Showing steps from this structured workout.'
+        : 'No plan session linked.')
+    : null;
+  const leftColHeader = planned ? 'Planned' : (hasStructuredWorkoutSteps ? 'Workout steps' : 'Segments');
   const stepsFromUnplanned = unplannedIntervals.length > 0 && !planned
     ? unplannedIntervals.map((iv: any, idx: number) => ({
         id: iv.interval_id || 'unplanned_interval',
@@ -2292,7 +2309,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             <tr className="border-b border-white/10">
               <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">
                 <div className="flex items-center gap-2">
-                  <span>Planned</span>
+                  <span>{leftColHeader}</span>
                   {(() => {
                     const fp = completedSrc?.workout_analysis?.fact_packet_v1;
                     const workoutType = String(fp?.facts?.workout_type || '').toLowerCase();
@@ -2700,7 +2717,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               <div className="mt-4 px-3 pb-4">
                 {noPlannedCompare && (
                   <div className="text-xs text-gray-500 italic mb-2">
-                    No planned session to compare.
+                    {planLinkNote ?? 'No planned session to compare.'}
                   </div>
                 )}
                 <div className="flex items-center justify-end">
@@ -2725,7 +2742,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             <div className="mt-4 px-3 pb-4 space-y-3">
               {noPlannedCompare && (
                 <div className="text-xs text-gray-500 italic">
-                  No planned session to compare.
+                  {planLinkNote ?? 'No planned session to compare.'}
                 </div>
               )}
               <div className="flex items-center justify-between gap-3">

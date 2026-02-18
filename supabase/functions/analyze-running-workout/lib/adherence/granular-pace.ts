@@ -600,7 +600,7 @@ function calculateSteadyStatePaceAdherence(
 
   if (mainSegments.length === 0) {
     const totalTimeSeconds = workout?.computed?.overall?.duration_s_moving ||
-      (workout.moving_time ? workout.moving_time * 60 : null) ||
+      (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null) ||
       (sensorData.length > 0 ? sensorData.length : 0);
     const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
     const avgPace = validPaceSamples.length > 0

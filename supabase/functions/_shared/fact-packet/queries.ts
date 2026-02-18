@@ -56,9 +56,18 @@ function getOverallDurationMin(row: any): number | null {
   const durS = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
   if (durS != null && durS > 0) return durS / 60;
   const mvMin = coerceNumber(row?.moving_time);
-  if (mvMin != null && mvMin > 0) return mvMin;
+  if (mvMin != null && mvMin > 0) {
+    // Guardrail: some legacy rows accidentally store seconds in moving_time.
+    // If it's implausibly large in minutes (> 16h), treat it as seconds.
+    if (mvMin > 1000) return mvMin / 60;
+    return mvMin;
+  }
   const durMin = coerceNumber(row?.duration);
-  return durMin != null && durMin > 0 ? durMin : null;
+  if (durMin != null && durMin > 0) {
+    if (durMin > 1000) return durMin / 60;
+    return durMin;
+  }
+  return null;
 }
 
 function getOverallAvgHr(row: any): number | null {

@@ -1342,14 +1342,14 @@ Deno.serve(async (req) => {
               } catch {}
             }
             
-            // Last resort fallback from workouts table fields (already in minutes, convert to seconds)
+            // Last resort fallback from workouts table fields (convention: minutes, but some legacy rows store seconds)
             if (!dur) {
-              const moveMin = Number((w as any)?.moving_time);
-              if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
+              const mv = Number((w as any)?.moving_time);
+              if (Number.isFinite(mv) && mv > 0) dur = Math.round(mv < 1000 ? mv * 60 : mv);
             }
             if (!elapsedDur) {
-              const elapsedMin = Number((w as any)?.elapsed_time);
-              if (Number.isFinite(elapsedMin) && elapsedMin > 0) elapsedDur = Math.round(elapsedMin * 60);
+              const el = Number((w as any)?.elapsed_time);
+              if (Number.isFinite(el) && el > 0) elapsedDur = Math.round(el < 1000 ? el * 60 : el);
             }
             // ✅ FIX: Sanity check for duration_s_moving - if prevOverall value is suspiciously small (< 60 seconds),
             // it might be in minutes, so prefer the recalculated dur value
@@ -1386,10 +1386,10 @@ Deno.serve(async (req) => {
             } catch {}
           }
           
-          // Second: use stored moving_time field (reliable fallback)
+          // Second: use stored moving_time field (convention: minutes, but some legacy rows store seconds)
           if (!dur) {
-            const moveMin = Number((w as any)?.moving_time);
-            if (Number.isFinite(moveMin) && moveMin > 0) dur = Math.round(moveMin * 60);
+            const mv = Number((w as any)?.moving_time);
+            if (Number.isFinite(mv) && mv > 0) dur = Math.round(mv < 1000 ? mv * 60 : mv);
           }
           
           // Third: use timeSeries ONLY if we don't have moving time (might be elapsed time)

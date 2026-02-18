@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
     // Calculate average pace per 100m/yd
     let avgPacePer100 = 0;
     if (totalDistanceMeters > 0 && workout.moving_time) {
-      const totalSeconds = workout.moving_time * 60;
+      const totalSeconds = workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time;
       const paceSeconds = (totalSeconds / totalDistanceMeters) * 100;
       avgPacePer100 = paceSeconds;
     }

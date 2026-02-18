@@ -664,7 +664,7 @@ Deno.serve(async (req) => {
       try {
         const sport0 = String((wAny as any)?.type || '').toLowerCase();
         const km = Number((wAny as any)?.distance); if (Number.isFinite(km) && km > 0) meters = Math.round(km * 1000);
-        const mv = Number((wAny as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv * 60);
+        const mv = Number((wAny as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv < 1000 ? mv * 60 : mv);
         if (sport0 === 'swim') {
           if (!(meters > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0)); } catch {} }
           if (!(secs > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.duration_s)||0), 0)); } catch {} }
@@ -733,7 +733,7 @@ Deno.serve(async (req) => {
         const sport0 = String((wAny as any)?.type || '').toLowerCase();
         // Prefer authoritative scalars
         const km = Number((wAny as any)?.distance); if (Number.isFinite(km) && km > 0) meters = Math.round(km * 1000);
-        const mv = Number((wAny as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv * 60);
+        const mv = Number((wAny as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv < 1000 ? mv * 60 : mv);
         // Swim-specific secondary sources
         if (sport0 === 'swim') {
           if (!(meters > 0)) { try { const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data; const lens = Array.isArray(swim?.lengths) ? swim.lengths : []; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s + (Number(l?.distance_m)||0), 0)); } catch {} }
@@ -753,9 +753,9 @@ Deno.serve(async (req) => {
           const tmr = Number(m?.total_timer_time_seconds);
           if (Number.isFinite(tmr) && tmr > 0) return Math.round(tmr);
         } catch {}
-        // 1) Prefer table scalar minutes
+        // 1) Prefer table scalar (convention: minutes; legacy rows may be seconds)
         const mvMin = Number((wAny as any)?.moving_time);
-        if (Number.isFinite(mvMin) && mvMin > 0) return Math.round(mvMin * 60);
+        if (Number.isFinite(mvMin) && mvMin > 0) return Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
         // 2) Sum lengths durations when present
         try {
           const swim = typeof (wAny as any)?.swim_data === 'string' ? JSON.parse((wAny as any).swim_data) : (wAny as any)?.swim_data;
@@ -876,7 +876,7 @@ Deno.serve(async (req) => {
           }
         } else {
           const km = Number((w as any)?.distance); if (Number.isFinite(km) && km > 0) overallMeters = Math.round(km * 1000);
-          const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) overallSec = Math.round(mv * 60);
+          const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) overallSec = Math.round(mv < 1000 ? mv * 60 : mv);
         }
       } catch {}
 
@@ -1188,7 +1188,7 @@ Deno.serve(async (req) => {
         // Priority 2: Use moving_time field (in minutes, convert to seconds)
         if (!(overallSec > 0)) {
           const mvMin = Number((w as any)?.moving_time);
-          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
         }
         // Priority 3: Last resort - timestamp difference (elapsed time, not ideal)
         if (!(overallSec > 0)) {
@@ -1239,7 +1239,7 @@ Deno.serve(async (req) => {
           } catch {}
           if (!(overallSec > 0)) {
             const mvMin = Number((w as any)?.moving_time);
-            if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+            if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
             // Heuristic as last resort for pool swims
             if (!(overallSec > 0)) {
               const derived = deriveSwimMovingSecondsFromContext(w, rows);
@@ -1377,7 +1377,7 @@ Deno.serve(async (req) => {
         // Priority 2: Use moving_time field (in minutes, convert to seconds)
         if (!(overallSec > 0)) {
           const mvMin = Number((w as any)?.moving_time);
-          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
         }
         // Priority 3: Last resort - timestamp difference (elapsed time, not ideal)
         if (!(overallSec > 0)) {
@@ -1424,7 +1424,7 @@ Deno.serve(async (req) => {
             } catch {}
             if (!(overallSec > 0)) {
               const mvMin = Number((w as any)?.moving_time);
-              if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+              if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
               if (!(overallSec > 0)) {
                 const derived = deriveSwimMovingSecondsFromContext(w, rows);
                 if (Number.isFinite(derived as any) && (derived as number) > 0) overallSec = Number(derived);
@@ -1832,7 +1832,7 @@ Deno.serve(async (req) => {
       // Priority 2: Use moving_time field (in minutes, convert to seconds)
       if (!(overallSec > 0)) {
         const mvMin = Number((w as any)?.moving_time);
-        if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+        if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
       }
       // Priority 3: For swims only, use timestamp difference (swims don't have stops)
       if (sportForOverall === 'swim' && !(overallSec > 0)) {
@@ -1884,7 +1884,7 @@ Deno.serve(async (req) => {
           } catch {}
           if (!(overallSec > 0)) {
             const mvMin = Number((w as any)?.moving_time);
-            if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin * 60);
+            if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
             if (!(overallSec > 0)) {
               const derived = deriveSwimMovingSecondsFromContext(w, rows);
               if (Number.isFinite(derived as any) && (derived as number) > 0) overallSec = Number(derived);
@@ -2016,7 +2016,7 @@ Deno.serve(async (req) => {
         let meters = 0, secs = 0;
         const type0 = String((w as any)?.type || '').toLowerCase();
         const km = Number((w as any)?.distance); if (Number.isFinite(km) && km > 0) meters = Math.round(km * 1000);
-        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv * 60);
+        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) secs = Math.round(mv < 1000 ? mv * 60 : mv);
         if (type0 === 'swim') {
           if (!(meters>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.distance_m)||0),0)); } catch {} }
           if (!(secs>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.duration_s)||0),0)); } catch {} }
@@ -2044,13 +2044,13 @@ Deno.serve(async (req) => {
       const type = String((w as any)?.type||'').toLowerCase();
       if (type === 'swim') {
         const km = Number((w as any)?.distance); if (Number.isFinite(km) && km>0) meters = Math.round(km*1000);
-        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv*60);
+        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv < 1000 ? mv*60 : mv);
         if (!(meters>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) meters = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.distance_m)||0),0)); } catch {} }
         if (!(secs>0)) { try { const swim = typeof (w as any)?.swim_data==='string'? JSON.parse((w as any).swim_data):(w as any)?.swim_data; const lens = Array.isArray(swim?.lengths)?swim.lengths:[]; if (lens.length) secs = Math.round(lens.reduce((s:number,l:any)=> s+(Number(l?.duration_s)||0),0)); } catch {} }
         if (!(meters>0)) { const n = Number((w as any)?.number_of_active_lengths); const L = Number((w as any)?.pool_length); if (Number.isFinite(n)&&n>0&&Number.isFinite(L)&&L>0) meters = Math.round(n*L); }
       } else {
         const km = Number((w as any)?.distance); if (Number.isFinite(km) && km>0) meters = Math.round(km*1000);
-        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv*60);
+        const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv>0) secs = Math.round(mv < 1000 ? mv*60 : mv);
       }
       const computed = { version: COMPUTED_VERSION, intervals: [], overall: { duration_s_moving: secs>0?secs:null, distance_m: meters>0?meters:0, avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(meters, secs), gap_pace_s_per_mi: null } } as any;
       await writeComputed(computed);

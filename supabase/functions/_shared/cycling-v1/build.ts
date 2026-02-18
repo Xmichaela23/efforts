@@ -75,6 +75,7 @@ export function buildCyclingFactPacketV1(args: {
   maxHr: number | null;
   ftpW: number | null;
   trainingLoad?: any | null;
+  planContext?: any | null;
   userUnits?: 'metric' | 'imperial' | null;
 }): CyclingFactPacketV1 {
   const {
@@ -87,6 +88,7 @@ export function buildCyclingFactPacketV1(args: {
     maxHr,
     ftpW,
     trainingLoad,
+    planContext,
   } = args;
 
   const inputs_present: string[] = [];
@@ -179,6 +181,15 @@ export function buildCyclingFactPacketV1(args: {
       ftp_quality,
       ftp_bins: ftpBins,
       training_load: trainingLoad ?? null,
+      plan_context: planContext ? {
+        plan_name: typeof planContext?.planName === 'string' ? planContext.planName : null,
+        week_number: typeof planContext?.weekIndex === 'number' && Number.isFinite(planContext.weekIndex) ? Math.round(planContext.weekIndex) : null,
+        week_intent: typeof planContext?.weekIntent === 'string' ? String(planContext.weekIntent) : null,
+        phase: typeof planContext?.phaseName === 'string' ? planContext.phaseName : null,
+        week_focus: typeof planContext?.weekFocusLabel === 'string' ? planContext.weekFocusLabel : null,
+        is_recovery_week: typeof planContext?.isRecoveryWeek === 'boolean' ? planContext.isRecoveryWeek : null,
+        is_taper_week: typeof planContext?.isTaperWeek === 'boolean' ? planContext.isTaperWeek : null,
+      } : null,
       notes: {
         ftp_quality_note: ftp_quality === 'missing' ? 'FTP missing; intensity inferred conservatively from power distribution' : null,
       },

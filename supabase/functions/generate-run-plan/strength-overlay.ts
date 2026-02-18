@@ -121,7 +121,10 @@ export function overlayStrength(
   modifiedPlan.baselines_required = {
     ...modifiedPlan.baselines_required,
     strength: tier === 'barbell' 
-      ? ['bench1RM', 'row1RM', 'hipThrust1RM', 'rdl1RM']
+      // Use the canonical keys stored in user_baselines.performance_numbers.
+      // materialize-plan reads these directly (bench/squat/deadlift/overheadPress1RM),
+      // and the baseline prompt UI writes overheadPress1RM (not overhead1RM).
+      ? ['squat', 'deadlift', 'bench', 'overheadPress1RM']
       : [] // Bodyweight tier doesn't need 1RM baselines
   };
 

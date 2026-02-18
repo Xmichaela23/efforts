@@ -821,12 +821,12 @@ Deno.serve(async (req)=>{
         if (overall.distance_m == null) overall.distance_m = undefined; // do not guess units
         if (overall.duration_s_moving == null && overall.duration_s == null) {
           // ✅ FIX: moving_time and elapsed_time are stored in MINUTES, convert to SECONDS
-          const movingMin = num(w?.moving_time);
-          const elapsedMin = num(w?.elapsed_time);
-          if (movingMin != null && movingMin > 0) {
-            overall.duration_s_moving = Math.round(movingMin * 60);
-          } else if (elapsedMin != null && elapsedMin > 0) {
-            overall.duration_s_moving = Math.round(elapsedMin * 60);
+          const movingRaw = num(w?.moving_time);
+          const elapsedRaw = num(w?.elapsed_time);
+          if (movingRaw != null && movingRaw > 0) {
+            overall.duration_s_moving = Math.round(movingRaw < 1000 ? movingRaw * 60 : movingRaw);
+          } else if (elapsedRaw != null && elapsedRaw > 0) {
+            overall.duration_s_moving = Math.round(elapsedRaw < 1000 ? elapsedRaw * 60 : elapsedRaw);
           }
         }
         // Accept canonical m/s if provided by importer

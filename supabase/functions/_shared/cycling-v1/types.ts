@@ -63,6 +63,15 @@ export type CyclingFactPacketV1 = {
     ftp_bins: CyclingFtpBinsV1 | null;
     // Reuse cross-discipline training load context shape from the running packet (opaque here).
     training_load?: any | null;
+    plan_context?: {
+      plan_name: string | null;
+      week_number: number | null;
+      week_intent: string | null;
+      phase: string | null;
+      week_focus: string | null;
+      is_recovery_week: boolean | null;
+      is_taper_week: boolean | null;
+    } | null;
     notes?: {
       ftp_quality_note?: string | null;
     };

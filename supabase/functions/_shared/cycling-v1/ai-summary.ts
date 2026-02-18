@@ -29,14 +29,13 @@ function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
   const f = fp.facts;
   const d = fp.derived;
   const tl = (d as any)?.training_load || null;
-  const planContext = (() => {
+  const plan = (d as any)?.plan_context || null;
+  const trainingLoad = (() => {
     if (!tl || typeof tl !== 'object') return null;
     const weekPct = (tl as any).week_load_pct;
     const acwr = (tl as any).acwr_ratio;
     const streak = (tl as any).consecutive_training_days;
     return {
-      // Treat "week_load_pct present" as a signal that a plan exists for the week.
-      plan_week_detected: weekPct != null ? true : false,
       week_load_pct: (typeof weekPct === 'number' && Number.isFinite(weekPct)) ? `${Math.round(weekPct)}%` : null,
       acwr_ratio: (typeof acwr === 'number' && Number.isFinite(acwr)) ? `${Math.round(acwr * 100) / 100}` : null,
       acwr_status: (typeof (tl as any).acwr_status === 'string') ? String((tl as any).acwr_status) : null,
@@ -66,7 +65,8 @@ function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
     executed_intensity: d.executed_intensity,
     confidence: d.confidence,
     ftp_quality: d.ftp_quality,
-    plan_context: planContext,
+    plan,
+    training_load: trainingLoad,
     top_flags: (Array.isArray(flags) ? flags : [])
       .slice()
       .sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99))
@@ -94,7 +94,8 @@ RULES:
 - CRITICAL: Do not introduce any numbers, percentages, or time-in-zone claims that are not present verbatim in the packet.
 - If there is no planned intent, do not pretend there was a prescription; describe what the ride was physiologically.
 - Prefer the TOP FLAGS as the framing.
-- If plan_context.plan_week_detected is true AND plan_intent is null, include one sentence on impact (week load / fatigue) and a concrete adjustment suggestion for the next day or two, using ONLY what’s in the packet (and do not add any new numbers).
+- If plan.week_number is present, explicitly anchor where the athlete is in the plan (week number, phase/week_intent) before giving advice.
+- If plan_intent is null but plan.week_number is present, treat this as an unplanned session during a plan: include one sentence on impact using training_load, and suggest a concrete adjustment for upcoming training without adding new numbers.
 
 PACKET (authoritative; do not compute outside it):
 ${packetStr}

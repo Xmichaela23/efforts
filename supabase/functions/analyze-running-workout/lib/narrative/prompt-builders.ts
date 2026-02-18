@@ -17,8 +17,8 @@ export function buildWorkoutContext(
   // ✅ FIX: Use moving time (not elapsed time) for pace calculations
   // Priority: computed.overall.duration_s_moving (seconds) > moving_time (minutes) > duration (minutes, elapsed)
   const movingTimeSeconds = workout.computed?.overall?.duration_s_moving 
-    || (workout.moving_time ? workout.moving_time * 60 : null)
-    || (workout.duration ? workout.duration * 60 : 0); // Last resort (elapsed time)
+    || (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
+    || (workout.duration ? (workout.duration < 1000 ? workout.duration * 60 : workout.duration) : 0);
   const totalDurationMinutes = movingTimeSeconds / 60;
   const totalDistanceKm = workout.distance || 0;
   

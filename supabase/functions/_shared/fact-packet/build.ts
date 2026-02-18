@@ -228,10 +228,13 @@ export async function buildWorkoutFactPacketV1(args: {
   const overallDurMin = (() => {
     const s = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
     if (s != null && s > 0) return s / 60;
+    // DB convention: moving_time/duration in minutes. Some legacy rows store seconds.
+    // Heuristic (matches cycling-v1/build): values >= 1000 are almost certainly seconds.
+    const toMin = (v: number) => (v < 1000 ? v : v / 60);
     const mv = coerceNumber(workout?.moving_time);
-    if (mv != null && mv > 0) return mv;
+    if (mv != null && mv > 0) return toMin(mv);
     const d = coerceNumber(workout?.duration);
-    return d != null && d > 0 ? d : 0;
+    return d != null && d > 0 ? toMin(d) : 0;
   })();
 
   const overallPace = coerceNumber(overall?.avg_pace_s_per_mi);

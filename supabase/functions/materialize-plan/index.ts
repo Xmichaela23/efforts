@@ -423,6 +423,39 @@ function extractPercentageFromWeight(weight: any): number | undefined {
   return undefined;
 }
 
+// Some strength prescriptions are qualitative (e.g., "Light") rather than %1RM.
+// In those cases we should display the text and NOT mark baselines as missing.
+function isQualitativeStrengthWeight(weight: any): boolean {
+  try {
+    const s = String(weight || '').trim().toLowerCase();
+    if (!s) return false;
+    // If it has numbers or % it's not qualitative.
+    if (/\d/.test(s) || s.includes('%')) return false;
+    // Common coaching-style prescriptions we want to preserve.
+    if (s === 'light' || s === 'moderate' || s === 'heavy' || s === 'standard') return true;
+    if (s.includes('add weight')) return true; // "Add weight if able"
+    if (s.includes('activation')) return true;
+    if (s.includes('mobility')) return true;
+    if (s.includes('technique')) return true;
+    if (s.includes('light cable')) return true;
+    if (s.includes('bodyweight')) return true;
+    if (s.includes('band')) return true;
+  } catch {}
+  return false;
+}
+
+function qualitativeWeightDisplay(weight: any): string | undefined {
+  try {
+    const raw = String(weight || '').trim();
+    if (!raw) return undefined;
+    if (/bodyweight/i.test(raw)) return 'Bodyweight';
+    if (/band/i.test(raw)) return 'Band';
+    return raw;
+  } catch {
+    return undefined;
+  }
+}
+
 // Map percentage intensity to band resistance level
 function getBandResistanceFromPercentage(originalPercent: number): string {
   if (originalPercent <= 35) return "Light Band";
@@ -949,7 +982,14 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           let baselineMissing = false;
           let requiredBaseline: string | undefined = undefined;
           
-          if (!isBandExercise && exerciseConfig) {
+          // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
+          if (isQualitativeStrengthWeight((ex as any)?.weight)) {
+            weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
+            baselineMissing = false;
+            requiredBaseline = undefined;
+            percent_1rm = undefined;
+            resolved_from = undefined;
+          } else if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
             const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70; // Default 70%
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps);
@@ -1068,7 +1108,14 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           let baselineMissing = false;
           let requiredBaseline: string | undefined = undefined;
           
-          if (!isBandExercise && exerciseConfig) {
+          // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
+          if (isQualitativeStrengthWeight((ex as any)?.weight)) {
+            weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
+            baselineMissing = false;
+            requiredBaseline = undefined;
+            percent_1rm = undefined;
+            resolved_from = undefined;
+          } else if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
             const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70;
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined);

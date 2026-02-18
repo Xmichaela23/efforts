@@ -307,7 +307,8 @@ function createUpperStrengthSession(
         { name: 'Bench Press', sets: 2, reps: 5, weight: '65% 1RM' },
         { name: 'Barbell Rows', sets: 2, reps: 5, weight: '65% 1RM' },
         { name: 'Pull-ups', sets: 2, reps: '6-8', weight: 'Bodyweight' },
-        { name: 'Overhead Press', sets: 2, reps: 5, weight: 'Light', notes: 'Activation - Mobility focus' }
+        // Keep OHP qualitative in race prep to avoid fatigue; users choose a very easy load.
+        { name: 'Overhead Press', sets: 2, reps: 5, weight: 'Light', notes: 'Activation + posture. Very easy load: move fast, no grind (RPE 4–5 / leave ~5+ reps in the tank).' }
       );
       duration = 20;
       description = `Week ${displayWeek} Race Prep - Minimal upper body work. Maintain strength, no fatigue. OHP for activation.`;

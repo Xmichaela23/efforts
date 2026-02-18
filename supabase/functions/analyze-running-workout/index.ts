@@ -10,7 +10,7 @@ import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 // Old HR drift import removed - now using consolidated HR analysis module
 import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
-import { fetchPlanContextForWorkout, type PlanContext } from './lib/plan-context.ts';
+import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 
@@ -345,7 +345,8 @@ Deno.serve(async (req) => {
       if (similarWorkouts && similarWorkouts.length > 0) {
         // Log what we found
         similarWorkouts.forEach((w, i) => {
-          const durMin = Math.round((w.moving_time || w.duration || 0) / 60);
+          const mtRaw = w.moving_time || w.duration || 0;
+          const durMin = Math.round(mtRaw < 1000 ? mtRaw : mtRaw / 60);
           const hasDrift1 = w.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm;
           const hasDrift2 = w.workout_analysis?.heart_rate_summary?.drift_bpm;
           const hasDrift3 = w.workout_analysis?.detailed_analysis?.workout_summary?.hr_drift;
@@ -365,7 +366,7 @@ Deno.serve(async (req) => {
               return {
                 date: w.date,
                 driftBpm: hrDrift,
-                durationMin: Math.round((w.moving_time || w.duration || 0) / 60),
+                durationMin: Math.round((w.moving_time || w.duration || 0) < 1000 ? (w.moving_time || w.duration || 0) : (w.moving_time || w.duration || 0) / 60),
                 elevationFt: w.elevation_gain ? Math.round(w.elevation_gain * 3.28084) : undefined,
                 daysSince
               };
@@ -1144,7 +1145,7 @@ Deno.serve(async (req) => {
         });
         
         const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
-          || (workout.moving_time ? workout.moving_time * 60 : null)
+          || (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
           || null;
         const distanceKmForPace = workout.distance || 0;
         const distanceMiForPace = distanceKmForPace * 0.621371;
@@ -1258,7 +1259,7 @@ Deno.serve(async (req) => {
           
           // Calculate overall average pace
           const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
-            || (workout.moving_time ? workout.moving_time * 60 : null)
+            || (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
             || null;
           const distanceKmForPace = workout.distance || 0;
           const distanceMiForPace = distanceKmForPace * 0.621371;
@@ -2411,8 +2412,8 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   // Calculate workout-level average pace (from moving_time/distance) to pass to mile breakdown
   // This ensures consistency between AI narrative and pattern analysis
   const workoutMovingTimeSeconds = workout?.computed?.overall?.duration_s_moving 
-    || (workout?.moving_time ? workout.moving_time * 60 : null)
-    || (workout?.duration ? workout.duration * 60 : 0);
+    || (workout?.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
+    || (workout?.duration ? (workout.duration < 1000 ? workout.duration * 60 : workout.duration) : 0);
   const workoutDistanceKm = workout?.distance || 0;
   const workoutDistanceMi = workoutDistanceKm * 0.621371;
   const workoutAvgPaceSeconds = (workoutMovingTimeSeconds > 0 && workoutDistanceMi > 0) 
@@ -2586,7 +2587,7 @@ function analyzeHeartRateRecovery(sensorData: any[], workIntervals: any[], recov
 
 
 // AI Narrative generation moved to lib/narrative/ai-generator.ts
-// Plan context moved to lib/plan-context.ts
+// Plan context moved to _shared/plan-context.ts
 
 /** Structured adherence summary: verdict + technical insights + plan impact (interpret, don't mirror). */
 export interface WorkoutAdherenceSummary {

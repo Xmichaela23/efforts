@@ -497,12 +497,13 @@ Deno.serve(async (req) => {
     }
 
     // ===== RUNS/RIDES/SWIMS: Match by date + type + duration (85-115% match) =====
-    // moving_time is stored in MINUTES, convert to seconds
-    const wSec = Number(w.moving_time && typeof w.moving_time==='number' ? w.moving_time * 60 : 0);
+    // moving_time convention: minutes, but some legacy rows store seconds (heuristic: >= 1000 → seconds)
+    const mvRaw = Number(w.moving_time && typeof w.moving_time==='number' ? w.moving_time : 0);
+    const wSec = mvRaw > 0 ? Math.round(mvRaw < 1000 ? mvRaw * 60 : mvRaw) : 0;
     const wMeters = Number(w.distance ? w.distance*1000 : 0);
 
     console.log('[auto-attach-planned] Run/ride/swim workout - matching by date + type + duration');
-    console.log('[auto-attach-planned] Workout moving_time (minutes):', w.moving_time, 'converted to seconds:', wSec);
+    console.log('[auto-attach-planned] Workout moving_time:', w.moving_time, 'converted to seconds:', wSec);
 
     // High-confidence selection: choose closest by a combined score (duration + distance when available),
     // and skip auto-attach when candidates are ambiguous.

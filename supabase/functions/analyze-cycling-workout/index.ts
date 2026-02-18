@@ -3,6 +3,7 @@ import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
+import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1015,6 +1016,72 @@ function inferSecondsFromMaybeMinutes(args: {
   return asMinutesSeconds;
 }
 
+function toDateOnly(val: any): string | null {
+  if (val == null) return null;
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const iso = s.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
+
+function isoWeekStartMonday(isoDate: string): string {
+  const d = new Date(isoDate);
+  // Force local midnight
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  return monday.toLocaleDateString('en-CA');
+}
+
+function isoDateAddDays(isoDate: string, days: number): string {
+  const d = new Date(isoDate);
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString('en-CA');
+}
+
+async function inferPlanIdForDate(
+  supabase: any,
+  userId: string,
+  workoutDateIso: string
+): Promise<string | null> {
+  const d0 = toDateOnly(workoutDateIso);
+  if (!d0) return null;
+  const weekStart = isoWeekStartMonday(d0);
+  const weekEnd = isoDateAddDays(weekStart, 6);
+
+  // Prefer plan ids that actually have planned_workouts in this week.
+  try {
+    const { data: plannedRows, error } = await supabase
+      .from('planned_workouts')
+      .select('training_plan_id,date,workout_status')
+      .eq('user_id', userId)
+      .gte('date', weekStart)
+      .lte('date', weekEnd);
+    if (!error && Array.isArray(plannedRows)) {
+      const ids = plannedRows
+        .map((r: any) => String(r?.training_plan_id || '').trim())
+        .filter(Boolean);
+      if (ids.length) return ids[0];
+    }
+  } catch {}
+
+  // Fallback: any active plan.
+  try {
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('id,config')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (plan?.id) return String(plan.id);
+  } catch {}
+
+  return null;
+}
+
 /**
  * Generate AI narrative insights for cycling workouts
  */
@@ -1592,6 +1659,26 @@ Deno.serve(async (req) => {
       trainingLoadContext = null;
     }
 
+    // Plan context: even for unplanned workouts, infer active plan for this week.
+    let planContext: any | null = null;
+    try {
+      const workoutDateIso = String((workout as any)?.date || '');
+      const userId = String((workout as any)?.user_id || '');
+      const plannedPlanId = String((plannedWorkout as any)?.training_plan_id || '').trim();
+      const inferredPlanId = plannedPlanId || (await inferPlanIdForDate(supabase as any, userId, workoutDateIso));
+      if (inferredPlanId && userId && workoutDateIso) {
+        planContext = await fetchPlanContextForWorkout(
+          supabase as any,
+          userId,
+          inferredPlanId,
+          workoutDateIso
+        );
+      }
+    } catch (e) {
+      console.log('⚠️ Failed to fetch plan context for cycling:', e);
+      planContext = null;
+    }
+
     // Canonical, deterministic cycling fact packet + flags + coaching paragraph
     const cyclingFactPacketV1 = buildCyclingFactPacketV1({
       workout,
@@ -1603,6 +1690,7 @@ Deno.serve(async (req) => {
       maxHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.max_hr ?? (hrAnalysis as any)?.max_heart_rate) : null,
       ftpW,
       trainingLoad: trainingLoadContext,
+      planContext,
       userUnits: (userUnits === 'metric' || userUnits === 'imperial') ? (userUnits as any) : null,
     });
     const cyclingFlagsV1 = generateCyclingFlagsV1(cyclingFactPacketV1, trainingLoadContext);
