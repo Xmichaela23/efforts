@@ -367,16 +367,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       })();
 
       // Step 1: Recompute computed.overall (duration, pace, distance) so downstream analysis uses fresh values
-      const { error: computeErr } = await supabase.functions.invoke('compute-workout-analysis', {
+      console.log('[recompute] Step 1: compute-workout-analysis for', workoutId);
+      const computeRes = await supabase.functions.invoke('compute-workout-analysis', {
         body: { workout_id: workoutId },
       });
-      if (computeErr) console.warn('[recompute] compute-workout-analysis warning:', computeErr);
+      if (computeRes.error) console.warn('[recompute] compute-workout-analysis error:', computeRes.error);
+      else console.log('[recompute] compute-workout-analysis ok');
 
       // Step 2: Run the discipline-specific analysis (builds fact packet, narrative, etc.)
-      const { error: fnErr } = await supabase.functions.invoke(fnName, {
+      console.log('[recompute] Step 2:', fnName, 'for', workoutId);
+      const analyzeRes = await supabase.functions.invoke(fnName, {
         body: { workout_id: workoutId },
       });
-      if (fnErr) throw fnErr;
+      if (analyzeRes.error) {
+        console.error('[recompute]', fnName, 'error:', analyzeRes.error);
+        throw analyzeRes.error;
+      }
+      console.log('[recompute]', fnName, 'ok, data:', typeof analyzeRes.data === 'object' ? JSON.stringify(analyzeRes.data).slice(0, 200) : analyzeRes.data);
 
       const { data: refreshed, error: wErr } = await supabase
         .from('workouts')
@@ -2737,6 +2744,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     {recomputing ? 'Recomputing…' : 'Recompute analysis'}
                   </button>
                 </div>
+                {recomputeError && (
+                  <p className="text-sm text-red-400 mb-1">{recomputeError}</p>
+                )}
                 <p className="text-sm text-gray-500 italic">
                   {planned
                     ? 'No summary for this workout. Re-attach to a planned workout and open the Performance tab to generate execution insights.'
