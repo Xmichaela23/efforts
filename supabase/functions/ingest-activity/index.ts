@@ -1384,18 +1384,6 @@ Deno.serve(async (req)=>{
           })
         }).catch(err => console.error('[ingest-activity] compute-workout-analysis failed:', err));
 
-        const metricsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workout-metrics`;
-        fetch(metricsUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${key}`,
-            'apikey': key
-          },
-          body: JSON.stringify({
-            workout_id: wid
-          })
-        }).catch(err => console.error('[ingest-activity] calculate-workout-metrics failed:', err));
         // Calculate workload for completed workouts (Garmin/Strava imports)
         try {
           const workloadUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/calculate-workload`;

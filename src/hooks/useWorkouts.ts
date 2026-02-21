@@ -1525,12 +1525,6 @@ export const useWorkouts = () => {
           .catch(() => {});
       } catch {}
       
-      // Calculate comprehensive metrics (fire-and-forget) for smart server architecture
-      try {
-        (supabase.functions.invoke as any)?.('calculate-workout-metrics', { body: { workout_id: data.id } } as any)
-          .catch(() => {});
-      } catch {}
-      
       // Calculate workload for completed workouts (fire-and-forget)
       try {
         if (newWorkout.workout_status === 'completed') {
