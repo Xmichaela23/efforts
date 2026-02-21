@@ -29,151 +29,60 @@ function isISO(dateStr) {
 }
 
 // ============================================================================
-// INLINE WORKLOAD CALCULATION (self-healing - calculates if missing)
+// SHARED WORKLOAD CALCULATION (single source of truth from _shared/workload.ts)
 // ============================================================================
-const INTENSITY_FACTORS = {
-  run: {
-    easypace: 0.65, warmup_run_easy: 0.65, cooldown_easy: 0.65, longrun_easypace: 0.70,
-    '5kpace': 0.95, '10kpace': 0.90, marathon_pace: 0.82, speed: 1.10, strides: 1.05,
-    interval: 0.95, tempo: 0.88, cruise: 0.88
-  },
-  ride: {
-    Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70, warmup_bike: 0.60, cooldown_bike: 0.60,
-    tempo: 0.80, ss: 0.90, thr: 1.00, vo2: 1.15, anaerobic: 1.20, neuro: 1.10
-  },
-  bike: {
-    Z1: 0.55, recovery: 0.55, Z2: 0.70, endurance: 0.70, warmup_bike: 0.60, cooldown_bike: 0.60,
-    tempo: 0.80, ss: 0.90, thr: 1.00, vo2: 1.15, anaerobic: 1.20, neuro: 1.10
-  },
-  swim: {
-    warmup: 0.60, cooldown: 0.60, drill: 0.50, easy: 0.65, aerobic: 0.75,
-    pull: 0.70, kick: 0.75, threshold: 0.95, interval: 1.00
-  }
-};
+import {
+  getStepsIntensity,
+  calculateStrengthWorkload,
+  calculateMobilityWorkload,
+  calculatePilatesYogaWorkload,
+  calculateDurationWorkload,
+} from '../_shared/workload.ts';
 
-function getDefaultIntensity(type) {
-  const defaults = { run: 0.75, ride: 0.70, bike: 0.70, swim: 0.75, strength: 0.75, mobility: 0.60, pilates_yoga: 0.75, walk: 0.40 };
-  return defaults[type] || 0.75;
-}
-
-function getStepsIntensity(steps, type) {
-  const factors = INTENSITY_FACTORS[type];
-  if (!factors || !Array.isArray(steps) || steps.length === 0) return getDefaultIntensity(type);
-  const intensities = [];
-  for (const token of steps) {
-    const tokenLower = String(token).toLowerCase();
-    for (const [key, value] of Object.entries(factors)) {
-      if (tokenLower.includes(key.toLowerCase())) {
-        intensities.push(value);
-        break;
-      }
-    }
-  }
-  return intensities.length > 0 ? Math.max(...intensities) : getDefaultIntensity(type);
-}
-
-function calculateStrengthWorkload(exercises) {
-  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
-  let totalVolume = 0;
-  for (const ex of exercises) {
-    if (Array.isArray(ex.sets)) {
-      for (const set of ex.sets) {
-        if (set.completed !== false) {
-          const weight = Number(set.weight) || 0;
-          const reps = Number(set.reps) || 0;
-          totalVolume += weight * reps;
-        }
-      }
-    }
-  }
-  // Volume factor: 10,000 lbs = 1.0
-  const volumeFactor = Math.max(totalVolume / 10000, 0.1);
-  const intensity = 0.80; // Default strength intensity
-  return Math.round(volumeFactor * Math.pow(intensity, 2) * 100);
-}
-
-function calculateMobilityWorkloadForItem(item) {
-  const isCompleted = String(item?.status || '').toLowerCase() === 'completed';
-  const exercises = isCompleted
-    ? (item?.executed?.mobility_exercises || [])
-    : (item?.planned?.mobility_exercises || []);
-  
-  // No evidence: return 0 (no made-up values)
-  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
-  
-  const total = exercises.length;
-  const completed = exercises.filter(e => e.completed).length;
-  
-  // No evidence: return 0 if nothing was completed
-  if (completed === 0) return 0;
-  
-  const completionRatio = total > 0 ? completed / total : 0;
-  
-  // Get intensity (0.60-0.70 range based on completion)
-  const baseIntensity = 0.60;
-  const intensity = baseIntensity + (completionRatio * 0.1);
-  const clampedIntensity = Math.max(0.50, Math.min(0.80, intensity));
-  
-  // Base dose: ~1 point per exercise at full completion
-  const basePerExercise = 1.0;
-  const raw = total * basePerExercise * completionRatio;
-  
-  // Gentle multiplier, bounded (0.85–1.00 in the normal band)
-  const intensityMultiplier = Math.max(0.75, Math.min(1.10,
-    0.85 + (clampedIntensity - 0.60) * 1.5
-  ));
-  
-  const workload = Math.round(raw * intensityMultiplier);
-  
-  // Only enforce a minimum if they did a non-trivial amount
-  const minIfMeaningful = completed >= 3 ? 3 : 0;
-  
-  return Math.max(minIfMeaningful, Math.min(workload, 30));
-}
-
-function calculateWorkloadForItem(item) {
+function calculateWorkloadForItem(item: any): number {
   try {
     const type = String(item?.type || '').toLowerCase();
     const status = String(item?.status || '').toLowerCase();
     const isCompleted = status === 'completed';
-    
-    // For strength workouts, use volume-based calculation
+
     if (type === 'strength') {
-      const exercises = isCompleted 
+      const exercises = isCompleted
         ? (item?.executed?.strength_exercises || [])
         : (item?.planned?.strength_exercises || []);
-      return calculateStrengthWorkload(exercises);
+      const sessionRPE = item?.executed?.workout_metadata?.session_rpe
+        || item?.planned?.workout_metadata?.session_rpe;
+      return calculateStrengthWorkload(exercises, sessionRPE);
     }
-    
-    // For mobility, use exercise-based calculation (no made-up values)
+
     if (type === 'mobility') {
-      return calculateMobilityWorkloadForItem(item);
+      const exercises = isCompleted
+        ? (item?.executed?.mobility_exercises || [])
+        : (item?.planned?.mobility_exercises || []);
+      return calculateMobilityWorkload(exercises);
     }
-    
-    // For pilates_yoga, use duration × 0.75² × 100
+
     if (type === 'pilates_yoga') {
-      const durationSec = item?.planned?.total_duration_seconds || item?.executed?.overall?.duration_s_moving || 0;
-      const durationHours = durationSec / 3600;
-      return Math.round(durationHours * Math.pow(0.75, 2) * 100);
+      const durationSec = item?.planned?.total_duration_seconds
+        || item?.executed?.overall?.duration_s_moving || 0;
+      const durationMin = durationSec / 60;
+      const sessionRPE = item?.executed?.workout_metadata?.session_rpe
+        || item?.planned?.workout_metadata?.session_rpe;
+      return calculatePilatesYogaWorkload(durationMin, sessionRPE);
     }
-    
-    // For run/ride/swim, use duration × intensity² × 100
+
     let durationSec = 0;
     if (isCompleted && item?.executed?.overall) {
       durationSec = item.executed.overall.duration_s_moving || item.executed.overall.duration_s || 0;
     } else if (item?.planned?.total_duration_seconds) {
       durationSec = item.planned.total_duration_seconds;
     }
-    
     if (durationSec <= 0) return 0;
-    
-    const durationHours = durationSec / 3600;
+
+    const durationMin = durationSec / 60;
     const stepsPreset = item?.planned?.steps_preset || [];
     const intensity = getStepsIntensity(stepsPreset, type);
-    
-    return Math.round(durationHours * Math.pow(intensity, 2) * 100);
-  } catch (e) {
-    console.error('[get-week] Error calculating workload:', e);
+    return calculateDurationWorkload(durationMin, intensity);
+  } catch {
     return 0;
   }
 }
