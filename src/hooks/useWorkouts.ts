@@ -1532,6 +1532,12 @@ export const useWorkouts = () => {
             .catch(() => {});
         }
       } catch {}
+
+      // Compute deterministic facts (fire-and-forget)
+      try {
+        (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: data.id } } as any)
+          .catch(() => {});
+      } catch {}
       
       return newWorkout;
     } catch (err) {
@@ -1794,6 +1800,13 @@ export const useWorkouts = () => {
           })
           .catch(() => {});
       } catch {}
+
+      // Recompute deterministic facts on update (fire-and-forget)
+      try {
+        (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: id } } as any)
+          .catch(() => {});
+      } catch {}
+
       return updated;
     } catch (err) {
       throw err;

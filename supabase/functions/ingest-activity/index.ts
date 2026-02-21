@@ -1430,6 +1430,20 @@ Deno.serve(async (req)=>{
           console.error('[ingest-activity] compute-adaptation-metrics failed:', adaptErr);
         }
 
+        // Compute deterministic facts (Phase 1 – deterministic layer). Never fail ingestion.
+        try {
+          const factsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-facts`;
+          fetch(factsUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${key}`,
+              'apikey': key
+            },
+            body: JSON.stringify({ workout_id: wid })
+          }).catch(() => {});
+        } catch {}
+
         // Invalidate server-side block cache (24h TTL, safe to delete all for user)
         try {
           await supabase
