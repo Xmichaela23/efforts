@@ -1,3 +1,16 @@
+export interface SessionTemplate {
+  day: string;
+  discipline: 'swim' | 'bike' | 'run' | 'strength' | 'brick';
+  type: 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max' | 'anaerobic';
+  duration: number;
+  intensity: string;
+  description: string;
+  zones: number[];
+  strengthType?: 'power' | 'stability' | 'traditional' | 'traditional_lower' | 'traditional_upper' | 'cowboy_endurance' | 'cowboy_endurance_upper' | 'cowboy_endurance_walks';
+  detailedWorkout?: string;
+  intervals?: any[];
+}
+
 export type Discipline = 'run'|'ride'|'swim'|'strength'|'mobility'|'other';
 export type Hardness = 'easy'|'moderate'|'hard';
 

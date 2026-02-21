@@ -1,4 +1,4 @@
-import type { SessionTemplate } from '../Seventy3Template';
+import type { SessionTemplate } from './types';
 import type { SkeletonWeek } from './types';
 
 export interface UniversalPlanData {
