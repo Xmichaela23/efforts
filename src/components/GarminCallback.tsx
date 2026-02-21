@@ -7,13 +7,8 @@ const GarminCallback: React.FC = () => {
   useEffect(() => {
     const handleGarminCallback = async () => {
       try {
-        // Debug logging
-        console.log('Full callback URL:', window.location.href);
-        console.log('URL params:', window.location.search);
-        
         // Only process if we have URL parameters (meaning we came from OAuth)
         if (!window.location.search) {
-          console.log('No URL parameters found - not processing OAuth callback');
           setStatus('error');
           setMessage('No OAuth parameters found');
           return;
@@ -23,9 +18,6 @@ const GarminCallback: React.FC = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
-        
-        console.log('Extracted code:', code);
-        console.log('Extracted error:', error);
 
         if (error) {
           throw new Error(`Garmin authorization denied: ${error}`);
@@ -60,7 +52,6 @@ const GarminCallback: React.FC = () => {
         }
 
       } catch (error) {
-        console.error('Garmin callback error:', error);
         setStatus('error');
         setMessage(error instanceof Error ? error.message : 'Unknown error occurred');
 

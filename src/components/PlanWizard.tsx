@@ -359,7 +359,6 @@ function getAvailableDays(approach: Approach | null): DaysPerWeek[] {
   if (!approach) return ['3-4', '4-5', '5-6', '6-7'];
   // Defensive guard: if approach is not in METHODOLOGIES, return default
   if (!METHODOLOGIES[approach]) {
-    console.warn('[PlanWizard] Invalid approach:', approach, 'using default available days');
     return ['3-4', '4-5', '5-6', '6-7'];
   }
   return METHODOLOGIES[approach].supported_days;
@@ -459,8 +458,6 @@ export default function PlanWizard() {
           .eq('user_id', user.id)
           .maybeSingle();
         
-        console.log('[PlanWizard] Loaded baselines:', data);
-        
         if (data) {
           const pn = data.performance_numbers || {};
           const ep = data.effort_paces || {};
@@ -506,13 +503,6 @@ export default function PlanWizard() {
           // Set if we have ANY meaningful data
           const hasData = effortPaces || effortScore || easyPace || fiveKTime || equipment?.length;
           if (hasData) {
-            console.log('[PlanWizard] Setting saved baselines (raw data):', { 
-              easyPace, 
-              fiveKTime, 
-              effortScore, 
-              effortPaces, 
-              equipment 
-            });
             setSavedBaselines({
               easyPace: easyPace || (typeof ep.base === 'number' ? ep.base : undefined),
               fiveKTime: fiveKTime,
@@ -536,7 +526,6 @@ export default function PlanWizard() {
           }
         }
       } catch (e) {
-        console.error('Failed to load baselines:', e);
       }
     })();
   }, []);
@@ -758,7 +747,6 @@ export default function PlanWizard() {
             onConflict: 'user_id',
             ignoreDuplicates: false 
           });
-        console.log('[PlanWizard] Saved equipment preference:', equipmentToSave);
       }
 
       // Build request body
@@ -801,7 +789,6 @@ export default function PlanWizard() {
           requestBody.effort_source_distance = 5000; // 5K in meters
           requestBody.effort_source_time = savedBaselines.fiveKTime; // seconds
           requestBody.effort_score_status = 'verified';
-          console.log('[PlanWizard] Sending raw 5K time for server calculation:', savedBaselines.fiveKTime);
         }
         // If user entered a race time, send that raw data
         else if (state.effortScoreStatus === 'verified' && state.effortRaceDistance && state.effortRaceTime) {
@@ -810,7 +797,6 @@ export default function PlanWizard() {
             requestBody.effort_source_distance = raceDistanceToMeters(state.effortRaceDistance);
             requestBody.effort_source_time = timeSeconds;
             requestBody.effort_score_status = 'verified';
-            console.log('[PlanWizard] Sending raw race data for server calculation');
           }
         }
         // Fallback: send calculated values (for "unknown" or manual pace entry)
@@ -820,7 +806,6 @@ export default function PlanWizard() {
           requestBody.effort_score_status = state.effortScoreStatus || 'estimated';
           requestBody.effort_paces = state.effortPaces;
           requestBody.effort_paces_source = state.effortPacesSource;
-          console.log('[PlanWizard] Sending pre-calculated effort score (fallback)');
         }
       }
 
@@ -863,7 +848,6 @@ export default function PlanWizard() {
 
     } catch (err) {
       clearInterval(progressInterval);
-      console.error('Generation error:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate plan');
     } finally {
       setIsGenerating(false);
@@ -901,7 +885,6 @@ export default function PlanWizard() {
         navigate('/', { state: { openPlans: true, focusPlanId: generatedPlan.plan_id } });
       }, 500);
     }).catch(err => {
-      console.error('Activation error:', err);
       toast({
         title: "Activation issue", 
         description: "Plan saved. Try refreshing the app.",
@@ -1316,10 +1299,8 @@ export default function PlanWizard() {
                         const paceResult = calculatePacesFromKnownPaces(savedBaselines.easyPace, fiveKPaceSeconds);
                         score = paceResult.score;
                         paces = paceResult.paces;
-                        console.log('[PlanWizard] Recalculated from performance_numbers (5K + easy pace)');
                       } else {
                         paces = result.paces;
-                        console.log('[PlanWizard] Recalculated from performance_numbers (5K time only)');
                       }
                     }
                     // If we have score but no paces, calculate paces
@@ -1328,7 +1309,6 @@ export default function PlanWizard() {
                     }
                     // Otherwise use stored effort_paces/effort_score (fallback)
                     else if (paces || score) {
-                      console.log('[PlanWizard] Using stored effort_paces/effort_score (no 5K time in profile)');
                     }
                     
                   setState(prev => ({
@@ -2618,7 +2598,6 @@ export default function PlanWizard() {
 
       default:
         // Fallback: if we get an unknown step, show an error and allow navigation back
-        console.error('[PlanWizard] Unknown logical step:', logicalStep, 'at physical step:', step, 'needsEffortScore:', needsEffortScore);
         return (
           <StepContainer title="Navigation Error">
             <div className="space-y-4">

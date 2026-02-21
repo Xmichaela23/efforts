@@ -71,7 +71,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated, planPath, in
         setIsLoading(false);
         setLoadError(null);
       } catch (error) {
-        console.error('Failed to load plan data:', error);
         setLoadError('Failed to load training plan data. Please refresh and try again.');
         setIsLoading(false);
       }
@@ -158,8 +157,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated, planPath, in
             baselines
           });
           
-          console.log(`Week ${w} composed:`, composed.length, 'sessions');
-          
           // Map SessionTemplate to our local Session type
           const mapped: Session[] = composed.map(s => ({
             day: s.day,
@@ -172,7 +169,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated, planPath, in
           
           newSessions.set(w, mapped);
         } catch (error) {
-          console.error('Error composing week:', w, error);
           newSessions.set(w, []);
         }
       }
@@ -239,17 +235,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated, planPath, in
     const m = mins % 60;
     return `${h}h ${m}m`;
   };
-  
-  // Debug: Check what's being displayed (only in development)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🎯 Display Debug:', {
-      currentWeek,
-      weekSessions: weekSessions.length,
-      sortedSessions: sortedSessions.length,
-      totalMinutes,
-      sessionsByWeekSize: sessionsByWeek.size
-    });
-  }
 
   const handleAcceptPlan = async () => {
     if (isLoading || !!loadError) return;
@@ -290,7 +275,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated, planPath, in
       setShowSuccess(true);
       
     } catch (error) {
-      console.error('Error saving plan:', error);
       alert('Error saving plan. Please try again.');
     } finally {
       setIsSaving(false);

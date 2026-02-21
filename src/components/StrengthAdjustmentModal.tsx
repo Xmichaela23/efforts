@@ -93,7 +93,6 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       });
 
       if (insertError) {
-        console.error('Failed to save adjustment:', insertError);
         setError('Failed to save adjustment');
         setStatus('idle');
         return;
@@ -107,7 +106,6 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
             body: { plan_id: planId }
           });
         } catch (materializeErr) {
-          console.error('Failed to re-materialize plan:', materializeErr);
           // Don't block - adjustment is saved, views will update on next materialization
         }
       }
@@ -119,7 +117,6 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
         onClose();
       }, 600);
     } catch (err: any) {
-      console.error('Error saving adjustment:', err);
       setError(err.message || 'Failed to save');
       setStatus('idle');
     } finally {

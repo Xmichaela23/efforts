@@ -90,8 +90,6 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
 
   // Initialize component
   useEffect(() => {
-    console.log('🔄 PilatesYogaLogger initializing...');
-    
     // Initialize date - use targetDate, scheduledWorkout date, or today
     const initialDate = targetDate || scheduledWorkout?.date || getDateString();
     setSelectedDate(initialDate);
@@ -110,7 +108,6 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
 
       if (todaysPilatesYogaWorkouts.length > 0) {
         workoutToLoad = todaysPilatesYogaWorkouts[0];
-        console.log('✅ Using planned pilates_yoga workout:', workoutToLoad.name);
       }
     }
 
@@ -261,19 +258,14 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       planned_id: sourcePlannedId || undefined
     };
 
-    console.log('🔍 Saving completed pilates_yoga workout:', completedWorkout);
-
     // Save: update in place when editing an existing workout id; otherwise create new
     let saved: any = null;
     try {
       if (isEditingCompleted) {
-        console.log('🔧 Updating existing pilates_yoga workout:', scheduledWorkout?.id);
         saved = await updateWorkout(String(scheduledWorkout.id), completedWorkout as any);
       } else {
-        console.log('🆕 Creating new completed pilates_yoga workout');
         saved = await addWorkout(completedWorkout);
       }
-      console.log('✅ Save successful, returned:', saved);
 
       // Calculate workload for completed workout
       try {
@@ -288,34 +280,19 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
             }
           }
         });
-        console.log('✅ Workload calculated for completed pilates_yoga workout');
       } catch (workloadError) {
-        console.error('❌ Failed to calculate workload:', workloadError);
       }
 
       // Auto-attach to planned workout if possible
       try {
         const workoutId = saved?.id || completedWorkout.id;
-        console.log('🔗 Attempting auto-attachment for completed pilates_yoga workout:', workoutId);
         
-        const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+        await supabase.functions.invoke('auto-attach-planned', {
           body: { workout_id: workoutId }
         });
-        
-        console.log('🔗 Auto-attach response:', { data, error });
-        
-        if (error) {
-          console.error('❌ Auto-attach failed for pilates_yoga workout:', workoutId, error);
-        } else if (data?.attached) {
-          console.log('✅ Auto-attached pilates_yoga workout:', workoutId, data);
-        } else {
-          console.log('ℹ️ No planned workout found to attach:', workoutId, data?.reason || 'unknown');
-        }
       } catch (attachError) {
-        console.error('❌ Auto-attach error for pilates_yoga workout:', saved?.id || completedWorkout.id, attachError);
       }
     } catch (e: any) {
-      console.error('❌ Save failed with error:', e);
       // Only update state if component is still mounted
       if (isMountedRef.current) {
         setIsSaving(false);

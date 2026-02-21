@@ -181,8 +181,7 @@ export const useWorkouts = () => {
       } else {
         return null;
       }
-    } catch (error) {
-      console.error("❌ Auth error:", error);
+    } catch {
       return null;
     }
   };
@@ -493,9 +492,7 @@ export const useWorkouts = () => {
             });
           }
         }
-      } catch (garminError) {
-        console.log("⚠️ Error fetching Garmin activities (continuing with manual workouts):", garminError);
-      }
+      } catch {}
 
       // Step 2b: Fetch Strava activities saved by webhook/importer (if connected)
       let stravaWorkouts: any[] = [];
@@ -601,9 +598,7 @@ export const useWorkouts = () => {
             };
           });
         }
-      } catch (e) {
-        console.log('⚠️ Error fetching Strava activities (continuing):', e);
-      }
+      } catch {}
 
       // Step 3: Merge all sources and remove duplicates (keep simple for now)
       // Do not merge raw Strava provider rows to avoid duplicates.
@@ -661,16 +656,6 @@ export const useWorkouts = () => {
         strength_exercises: (() => {
           // For strength workouts, read from strength_exercises field first, then fall back to description
           if (w.type === 'strength') {
-            if (import.meta.env?.DEV) {
-              console.log(`🔍 DEBUG - Strength workout found: "${w.name}"`, {
-                type: w.type,
-                description: w.description,
-                hasDescription: !!w.description,
-                strength_exercises: w.strength_exercises,
-                hasStrengthExercises: !!w.strength_exercises
-              });
-            }
-            
             // First, try to read from the actual strength_exercises field
             if (w.strength_exercises) {
               try {
@@ -679,8 +664,6 @@ export const useWorkouts = () => {
                   : w.strength_exercises;
                 
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                  if (import.meta.env?.DEV) console.log(`🔍 Found strength_exercises data for "${w.name}":`, parsed);
-                  
                   // Transform the logged exercise data to match our interface
                   return parsed.map((exercise: any, index) => ({
                     id: exercise.id || `temp-${index}`,
@@ -700,11 +683,7 @@ export const useWorkouts = () => {
                     weightMode: exercise.weightMode || 'same' as const
                   }));
                 }
-              } catch (error) {
-                if (import.meta?.env?.DEV) {
-                  console.debug(`strength_exercises parse failed for "${w.name}"`, error);
-                }
-              }
+              } catch {}
             }
             
             // Remove description-based fallback and noisy console; rely on server-computed or explicit strength_exercises only
@@ -842,8 +821,7 @@ export const useWorkouts = () => {
 
       // Quiet logs
       setWorkouts(mapped);
-    } catch (error) {
-      console.error("❌ Error in fetchWorkouts:", error);
+    } catch {
       setWorkouts([]);
     } finally {
       setLoading(false);
@@ -863,9 +841,7 @@ export const useWorkouts = () => {
       } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-    } catch (e) {
-      console.log('Auto attach (server) error:', e);
-    }
+    } catch {}
   };
 
   // 🔄 Initialize auth state and listen for changes
@@ -926,9 +902,7 @@ export const useWorkouts = () => {
       try {
         await backfillRecentAttachments(14);
         try { window.localStorage.setItem(KEY, String(Date.now())); } catch {}
-      } catch (e) {
-        console.log('Backfill skipped:', e);
-      }
+      } catch {}
     })();
   }, [authReady]);
 
@@ -955,9 +929,7 @@ export const useWorkouts = () => {
           body: { userId: user.id, accessToken, refreshToken, importType: 'recent' }
         });
         if (!cancelled) await fetchWorkouts();
-      } catch (e) {
-        console.log('ℹ️ Background Strava backfill skipped:', e);
-      }
+      } catch {}
     })();
     return () => { cancelled = true; };
   }, [authReady]);
@@ -1015,8 +987,6 @@ export const useWorkouts = () => {
         throw new Error("User must be authenticated to import Garmin activities");
       }
 
-      console.log("🔍 Importing Garmin activities for user:", user.id);
-
       // Step 1: Get user's Garmin connection to find their garmin_user_id
       // Device connections then legacy fallback
       let garminUserId: string | null = null;
@@ -1040,15 +1010,8 @@ export const useWorkouts = () => {
       }
 
       if (!garminUserId) {
-        console.log("🚫 No Garmin connection found for user");
         return { imported: 0, skipped: 0 };
       }
-      if (!garminUserId) {
-        console.log("🚫 No Garmin user_id in connection data");
-        return { imported: 0, skipped: 0 };
-      }
-
-      console.log("🔗 Found Garmin user_id:", garminUserId);
 
       // Step 2: Query garmin_activities by garmin_user_id instead of app user_id
       const { data: garminActivities, error } = await supabase
@@ -1058,16 +1021,12 @@ export const useWorkouts = () => {
         .order("start_time", { ascending: false });
 
       if (error) {
-        console.error("❌ Error fetching garmin activities:", error);
         throw error;
       }
 
       if (!garminActivities || garminActivities.length === 0) {
-        console.log("📭 No Garmin activities found to import");
         return { imported: 0, skipped: 0 };
       }
-
-      console.log(`🔍 Found ${garminActivities.length} Garmin activities to process`);
 
       let imported = 0;
       let skipped = 0;
@@ -1081,7 +1040,6 @@ export const useWorkouts = () => {
           );
 
           if (existingWorkout) {
-            console.log(`⏭️ Skipping already imported activity: ${activity.garmin_activity_id}`);
             skipped++;
             continue;
           }
@@ -1226,50 +1184,29 @@ export const useWorkouts = () => {
           
           // Auto-attach to planned workout if possible
           try {
-            console.log('🔗 Attempting auto-attachment for Garmin workout:', savedWorkout?.id);
-            console.log('🔗 Workout details:', {
-              id: savedWorkout?.id,
-              type: workoutData.type,
-              date: workoutData.date,
-              duration: workoutData.duration
-            });
-            
             const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
               body: { workout_id: savedWorkout?.id }
             });
-            
-            console.log('🔗 Auto-attach response:', { data, error });
-            
             if (error) {
-              console.error('❌ Auto-attach failed for Garmin workout:', savedWorkout?.id, error);
-            } else if (data?.attached) {
-              console.log('✅ Auto-attached Garmin workout:', savedWorkout?.id, data);
               // Realtime subscription will automatically refresh via database triggers
-            } else {
-              console.log('ℹ️ No planned workout found to attach:', savedWorkout?.id, data?.reason || 'unknown');
+            } else if (data?.attached) {
+              // Realtime subscription will automatically refresh via database triggers
             }
-          } catch (attachError) {
-            console.error('❌ Auto-attach error for Garmin workout:', savedWorkout?.id, attachError);
-          }
-          
-          console.log(`✅ Imported Garmin activity: ${activity.garmin_activity_id} - ${workoutData.name}`);
+          } catch {}
+
           imported++;
 
-        } catch (activityError) {
-          console.error(`❌ Error importing activity ${activity.garmin_activity_id}:`, activityError);
+        } catch {
           skipped++;
         }
       }
 
-      console.log(`🎉 Garmin import complete: ${imported} imported, ${skipped} skipped`);
-      
       // Refresh workouts list to show newly imported activities
       await fetchWorkouts();
       
       return { imported, skipped };
 
     } catch (err) {
-      console.error("❌ Error in importGarminActivities:", err);
       throw err;
     }
   };
@@ -1307,20 +1244,6 @@ export const useWorkouts = () => {
       if (!user) {
         throw new Error("User must be authenticated to save workouts");
       }
-
-      console.log("Using user for save:", user.id);
-
-      // 🔍 DEBUG: Log the exact workout data being saved
-      console.log("🔍 DEBUG - Workout data to save:", {
-        name: workoutData.name,
-        type: workoutData.type,
-        date: workoutData.date,
-        dateType: typeof workoutData.date,
-        strength_exercises: workoutData.strength_exercises,
-        strength_exercisesType: typeof workoutData.strength_exercises,
-        strength_exercisesLength: workoutData.strength_exercises ? (Array.isArray(workoutData.strength_exercises) ? workoutData.strength_exercises.length : 'not array') : 'null/undefined',
-        workout_status: workoutData.workout_status
-      });
 
       const toSave = {
         name: workoutData.name,
@@ -1400,8 +1323,6 @@ export const useWorkouts = () => {
         planned_id: (workoutData as any).planned_id ?? null,
       };
 
-      console.log("Saving workout with ALL FIT data:", toSave);
-
       const { data, error } = await supabase
         .from("workouts")
         .insert([toSave])
@@ -1409,21 +1330,8 @@ export const useWorkouts = () => {
         .single();
 
       if (error) {
-        console.error("Error saving workout:", error);
         throw error;
       }
-
-      // 🔍 DEBUG: Log what the database returned
-      console.log("🔍 DEBUG - Database returned:", {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        date: data.date,
-        dateType: typeof data.date,
-        strength_exercises: data.strength_exercises,
-        strength_exercisesType: typeof data.strength_exercises,
-        workout_status: data.workout_status
-      });
 
       const newWorkout: Workout = {
         id: data.id,
@@ -1589,28 +1497,16 @@ export const useWorkouts = () => {
       try {
         // Only for completed sessions
         if ((newWorkout.workout_status === 'completed') && newWorkout.date && newWorkout.type) {
-          autoAttachPlannedSession(newWorkout)
-            .then(() => console.log('✅ Auto-attach completed for workout:', newWorkout.id))
-            .catch((e) => console.log('ℹ️ Auto-attach skipped:', e));
+          autoAttachPlannedSession(newWorkout).catch(() => {});
         }
-      } catch (e) {
-        console.log('ℹ️ Auto-attach skipped:', e);
-      }
+      } catch {}
 
       // Generate context for completed workouts using routing service (fire-and-forget background processing)
       try {
         if (newWorkout.workout_status === 'completed') {
-          analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type)
-            .then(() => console.log('✅ Context generated for workout:', newWorkout.id))
-            .catch((contextError) => {
-              console.error('❌ Failed to generate context:', contextError);
-              // Don't throw - context generation is not critical
-            });
+          analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type).catch(() => {});
         }
-      } catch (contextError) {
-        console.error('❌ Failed to trigger context generation:', contextError);
-        // Don't throw - context generation is not critical
-      }
+      } catch {}
 
       // Compute analysis (fire-and-forget) so computed.overall is available to unified/Today
       try {
@@ -1645,7 +1541,6 @@ export const useWorkouts = () => {
       
       return newWorkout;
     } catch (err) {
-      console.error("Error in addWorkout:", err);
       throw err;
     }
   };
@@ -1656,8 +1551,6 @@ export const useWorkouts = () => {
       if (!user) {
         throw new Error("User must be authenticated to update workouts");
       }
-
-      console.log("Using user for update:", user.id);
 
       const updateObject: any = {};
 
@@ -1909,7 +1802,6 @@ export const useWorkouts = () => {
       } catch {}
       return updated;
     } catch (err) {
-      console.error("Error in updateWorkout:", err);
       throw err;
     }
   };
@@ -1921,7 +1813,6 @@ export const useWorkouts = () => {
         throw new Error("User must be authenticated to delete workouts");
       }
 
-      console.log("Using user for delete:", user.id);
       // Capture the workout we are about to delete so we can repair any attached planned row
       const prior = workouts.find((w) => w.id === id);
 
@@ -1999,11 +1890,8 @@ export const useWorkouts = () => {
 
           try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
         }
-      } catch (repairErr) {
-        console.log('Planned row repair skipped:', repairErr);
-      }
+      } catch {}
     } catch (err) {
-      console.error("Error in deleteWorkout:", err);
       throw err;
     }
   };
@@ -2026,12 +1914,10 @@ export const useWorkouts = () => {
         .eq("type", "strength");
 
       if (error || !workouts || workouts.length === 0) {
-        console.log("No workout found to fix");
         return;
       }
 
       const workout = workouts[0];
-      console.log("Found workout to fix:", workout);
 
       // Update the date to today (2025-08-09)
       const { error: updateError } = await supabase
@@ -2039,16 +1925,10 @@ export const useWorkouts = () => {
         .update({ date: "2025-08-09" })
         .eq("id", workout.id);
 
-      if (updateError) {
-        console.error("Error fixing workout date:", updateError);
-      } else {
-        console.log("✅ Fixed workout date from 2025-08-10 to 2025-08-09");
-        // Refresh workouts
+      if (!updateError) {
         fetchWorkouts();
       }
-    } catch (error) {
-      console.error("Error in fixExistingWorkoutDate:", error);
-    }
+    } catch {}
   };
 
   // 🔧 TEMPORARY: Call this function once to fix the existing workout
@@ -2061,7 +1941,6 @@ export const useWorkouts = () => {
       );
       
       if (hasWorkoutToFix) {
-        console.log("🔧 Found workout with wrong date, fixing...");
         fixExistingWorkoutDate();
       }
     }

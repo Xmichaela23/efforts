@@ -221,7 +221,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // DEBUG: Log every render and track selectedPlanDetail changes
   const renderCountRef = useRef(0);
   renderCountRef.current++;
-  console.log('[RENDER]', renderCountRef.current, 'selectedPlanDetail:', selectedPlanDetail?.id, 'status:', selectedPlanDetail?.status);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [planStatus, setPlanStatus] = useState<string>('active');
@@ -535,13 +534,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         // Calculate week number (1-based)
         const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
         
-        console.log('📅 Current week calculation:', {
-          startDate: anchor.date,
-          today: today.toISOString().split('T')[0],
-          diffDays,
-          calculatedWeek: weekNumber
-        });
-        
         return weekNumber;
       }
       
@@ -560,25 +552,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
         
-        console.log('📅 Current week calculation (from config):', {
-          startDate: planRow.config.user_selected_start_date,
-          today: today.toISOString().split('T')[0],
-          diffDays,
-          calculatedWeek: weekNumber
-        });
-        
         return weekNumber;
       }
-    } catch (error) {
-      console.error('Error calculating current week:', error);
-    }
+    } catch {}
     
     // Default to week 1 if calculation fails
     return 1;
   };
 
   const handlePlanClick = async (planId: string) => {
-    console.log('[handlePlanClick] Opening plan:', planId, 'current selectedPlanDetail:', selectedPlanDetail?.id);
     // Guard: if we already have this plan open in detail view, skip expensive re-load
     if (selectedPlanDetail?.id === planId && currentView === 'detail') {
       return;
@@ -591,9 +573,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       if (typeof planDetail.weeks === 'string') {
         try {
           planDetail.weeks = JSON.parse(planDetail.weeks);
-        } catch (error) {
-          console.error('Error parsing weeks JSON:', error);
-        }
+        } catch {}
       }
       // Ensure weekly_summaries is an object even if stored as text
       if (planDetail.weekly_summaries && typeof planDetail.weekly_summaries === 'string') {
@@ -964,9 +944,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           // compute totals for header
           const totalWorkouts = weeksOut.reduce((sum, wk) => sum + (wk.workouts?.length || 0), 0);
           pd.totalWorkouts = totalWorkouts;
-        } catch (err) {
-          console.error('Error normalizing plan detail:', err);
-        }
+        } catch {}
       }
 
       // Calculate and set the current week based on plan start date
@@ -978,11 +956,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       setSelectedPlanDetail(pd);
       setSelectedWeek(calculatedCurrentWeek);
       
-      console.log('[handlePlanClick] Setting status from plan data:', pd.status || 'active');
       setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
     } else {
-      console.warn('[handlePlanClick] Plan not found in detailedPlans:', planId);
       setCurrentView('list');
     }
   };
@@ -1235,12 +1211,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Prevent ANY updates from resetting the plan status when we've manually changed it
   const lastManualStatusRef = useRef<{planId: string, status: string} | null>(null);
   useEffect(() => {
-    console.log('[useEffect-statusGuard] Checking status. selectedPlanDetail:', selectedPlanDetail?.status, 'lastManualStatus:', lastManualStatusRef.current?.status);
     if (selectedPlanDetail && lastManualStatusRef.current && 
         lastManualStatusRef.current.planId === selectedPlanDetail.id &&
         selectedPlanDetail.status !== lastManualStatusRef.current.status) {
-      // Plan status in selectedPlanDetail doesn't match our manual change
-      console.log('[useEffect-statusGuard] ⚠️ DETECTED STATUS RESET! From', selectedPlanDetail.status, 'back to', lastManualStatusRef.current.status);
       setPlanStatus(lastManualStatusRef.current.status);
       setSelectedPlanDetail((prev: any) => ({
         ...prev,
@@ -1372,23 +1345,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     try {
       await onDeletePlan(selectedPlanDetail.id);
       handleBack();
-    } catch (error) {
-      console.error('Error deleting plan:', error);
-    }
+    } catch {}
   };
 
   const handleEndPlan = async () => {
     if (!selectedPlanDetail || !endPlan) return;
     try {
       const result = await endPlan(selectedPlanDetail.id);
-      console.log('Plan ended:', result);
       // Update local state to reflect ended status
       setPlanStatus('ended');
       setSelectedPlanDetail({ ...selectedPlanDetail, status: 'ended' });
       // Optionally go back to list view
       // handleBack();
     } catch (error) {
-      console.error('Error ending plan:', error);
       alert('Failed to end plan. Please try again.');
     }
   };
@@ -1396,26 +1365,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const handlePausePlan = async () => {
     if (!selectedPlanDetail || !pausePlan) return;
     try {
-      console.log('[handlePausePlan] Starting pause for plan:', selectedPlanDetail.id);
       const result = await pausePlan(selectedPlanDetail.id);
-      console.log('[handlePausePlan] Pause result:', result);
       
-      // Update local state
-      console.log('[handlePausePlan] Setting planStatus to paused');
       setPlanStatus('paused');
-      setSelectedPlanDetail((prev: any) => {
-        console.log('[handlePausePlan] Updating selectedPlanDetail, prev status:', prev.status);
-        return {
-          ...prev, 
-          status: 'paused', 
-          paused_at: result.paused_at 
-        };
-      });
-      // Track manual status change to prevent prop updates from overriding
+      setSelectedPlanDetail((prev: any) => ({
+        ...prev, 
+        status: 'paused', 
+        paused_at: result.paused_at 
+      }));
       lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'paused' };
-      console.log('[handlePausePlan] State updates complete');
     } catch (error) {
-      console.error('Error pausing plan:', error);
       alert('Failed to pause plan. Please try again.');
     }
   };
@@ -1456,8 +1415,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       // Track manual status change to prevent prop updates from overriding
       lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'active' };
       
-      // CRITICAL: Trigger calendar to reload so get-week can materialize workouts
-      console.log('[handleResumePlan] Invalidating queries to trigger rematerialization');
       try {
         // Use React Query's built-in invalidation - it automatically deduplicates concurrent requests
         queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
@@ -1472,7 +1429,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       setSelectedWeek(0);
       setTimeout(() => setSelectedWeek(currentWeek), 0);
     } catch (error) {
-      console.error('Error resuming plan:', error);
       alert('Failed to resume plan. Please try again.');
     }
   };
@@ -1797,7 +1753,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           
           <div className="flex items-center gap-1.5 sm:gap-2">
             {(() => {
-              console.log('[Button Render] planStatus:', planStatus, 'selectedPlanDetail.status:', selectedPlanDetail?.status);
               if (planStatus === 'active') {
                 return (
                   <button onClick={handlePausePlan} className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">

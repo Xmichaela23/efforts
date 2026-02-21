@@ -24,7 +24,6 @@ export interface WorkoutAnalysisResult {
 export async function analyzeWorkout(workoutId: string, workoutType: string): Promise<WorkoutAnalysisResult> {
   try {
     const functionName = getAnalysisFunction(workoutType);
-    console.log(`🎯 DUMB CLIENT: Calling ${functionName} for workout ${workoutId} (type: ${workoutType})`);
     
     // Call discipline-specific function directly
     const { data, error } = await supabase.functions.invoke(functionName, {
@@ -32,16 +31,6 @@ export async function analyzeWorkout(workoutId: string, workoutType: string): Pr
     });
     
     if (error) {
-      console.error('❌ Edge function invoke error:', {
-        functionName,
-        workoutId,
-        error: error.message,
-        errorDetails: error,
-        errorContext: error.context,
-        errorStatus: error.status,
-        responseData: data // Check if error response body is in data
-      });
-      
       // Try to extract error message from response body if available
       let errorMessage = error.message || 'Failed to send a request to the Edge Function';
       
@@ -86,7 +75,6 @@ export async function analyzeWorkout(workoutId: string, workoutType: string): Pr
     };
     
   } catch (error) {
-    console.error('Workout analysis failed:', error);
     throw error;
   }
 }
@@ -127,21 +115,17 @@ export async function analyzeWorkoutWithRetry(
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🔄 Analysis attempt ${attempt}/${maxRetries} for workout ${workoutId} (type: ${workoutType})`);
       return await analyzeWorkout(workoutId, workoutType);
     } catch (error) {
       lastError = error as Error;
-      console.warn(`⚠️ Analysis attempt ${attempt} failed:`, error);
       
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s
-        console.log(`⏳ Waiting ${delay}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
-  console.error(`❌ All ${maxRetries} analysis attempts failed for workout ${workoutId}`);
   throw lastError || new Error('Analysis failed after all retries');
 }
 

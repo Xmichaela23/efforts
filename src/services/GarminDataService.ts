@@ -101,8 +101,6 @@ static async testConnection(): Promise<boolean> {
   }
 
   try {
-    console.log('🔍 GARMIN DEBUG: Testing connection with user permissions endpoint');
-    
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       'https://yyriamwvtvzlkumqrvpm.supabase.co',
@@ -119,19 +117,14 @@ static async testConnection(): Promise<boolean> {
       }
     });
 
-    console.log('🔍 GARMIN DEBUG: Permissions response status:', response.status);
-    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('🔍 GARMIN DEBUG: Permissions error:', errorText);
       throw new Error(`Garmin API permissions error: ${response.status} ${response.statusText}`);
     }
 
-    const permissions = await response.json();
-    console.log('🔍 GARMIN DEBUG: User permissions:', permissions);
+    await response.json();
     return true;
   } catch (error) {
-    console.error('Error testing Garmin connection:', error);
     throw error;
   }
 }
@@ -139,8 +132,6 @@ static async testConnection(): Promise<boolean> {
 // UPDATED: Now queries Supabase database for webhook-delivered activities
 static async fetchRecentActivities(): Promise<GarminActivity[]> {
   try {
-    console.log('🔍 GARMIN DEBUG: Querying database for webhook activities');
-
     // Import Supabase client (you'll need to add this import at the top of your file)
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
@@ -151,7 +142,6 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.log('🔍 GARMIN DEBUG: No authenticated user');
       return [];
     }
 
@@ -164,14 +154,10 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
       .limit(200);
 
     if (error) {
-      console.error('🔍 GARMIN DEBUG: Database error:', error);
       throw new Error(`Database query failed: ${error.message}`);
     }
 
-    console.log('🔍 GARMIN DEBUG: Found activities in database:', data?.length || 0);
-
     if (!data || data.length === 0) {
-      console.log('🔍 GARMIN DEBUG: No activities found in database');
       return [];
     }
 
@@ -238,21 +224,8 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
       elapsedTime: activity.elapsed_time || activity.elapsed_duration
     }));
 
-    const runningActivities = formattedActivities.filter(a =>
-      this.isRunningActivity(a.activityType?.typeKey || '')
-    );
-    
-    console.log('🏃 GARMIN DEBUG: Running activities found:', runningActivities.length);
-    console.log('🏃 GARMIN DEBUG: Activities sample:', formattedActivities.slice(0, 3).map(a => ({
-      name: a.activityName,
-      distance: a.distance,
-      duration: a.duration,
-      startTime: a.startTimeLocal
-    })));
-
     return formattedActivities;
   } catch (error) {
-    console.error('Error fetching Garmin activities from database:', error);
     throw error;
   }
 }
@@ -287,7 +260,6 @@ static async fetchActivityDetails(activityId: number): Promise<any> {
     const details = await response.json();
     return details;
   } catch (error) {
-    console.warn(`Error fetching detailed activity ${activityId}:`, error);
     return null;
   }
 }
@@ -341,8 +313,6 @@ static async analyzeActivitiesForBaselines(
     activities: any[],
     currentBaselines: any
   ): Promise<AnalyzedGarminData> {
-    console.log('🔍 GARMIN DEBUG: Analyzing activities from database', activities.length);
-
     // Convert database activities to GarminActivity format
     const garminActivities: GarminActivity[] = activities.map(activity => ({
       activityId: activity.garmin_activity_id,
@@ -434,8 +404,6 @@ static async analyzeActivitiesForBaselines(
     const endDate = Math.floor(Date.now() / 1000);
     const startDate = endDate - (180 * 24 * 60 * 60); // 6 months = 180 days
 
-    console.log('🔍 DETAILED ANALYSIS: Fetching 6 months of detailed activity data');
-
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(
       'https://yyriamwvtvzlkumqrvpm.supabase.co',
@@ -461,7 +429,6 @@ static async analyzeActivitiesForBaselines(
     }
 
     const activityData = await response.json();
-    console.log('🔍 DETAILED ANALYSIS: Received activity data for', activityData.length, 'activities');
 
     // Convert API response to our GarminActivity format
     const activities = this.convertDetailedDataToActivities(activityData);
@@ -505,7 +472,6 @@ static async analyzeActivitiesForBaselines(
     };
 
   } catch (error) {
-    console.error('Error in detailed analysis:', error);
     throw error;
   }
 }
@@ -687,14 +653,10 @@ private static async analyzeRunningData(
 }
 
 private static async findFastest5K(activities: GarminActivity[]): Promise<{time: number, source: string} | null> {
-  console.log('🔍 5K EXTRACTION: Looking for 5K+ runs from past 3 months across', activities.length, 'activities');
-
   // Get running activities 5K+ only
   const runningActivities = activities.filter(activity => {
     return activity.distance >= 5000 && activity.movingDuration > 0;
   });
-
-  console.log(`Found ${runningActivities.length} running activities 5K+ to analyze`);
 
   // Filter by recency (within 3 months)
   const recent5KPlus = runningActivities.filter(activity => {
@@ -704,11 +666,8 @@ private static async findFastest5K(activities: GarminActivity[]): Promise<{time:
   });
 
   if (recent5KPlus.length === 0) {
-    console.log('📝 No 5K+ activities found from past 3 months');
     return null;
   }
-
-  console.log(`Found ${recent5KPlus.length} runs 5K+ from past 3 months`);
 
   // Calculate first 5K pace for each run and find fastest
   const calculated5Ks = recent5KPlus.map(activity => {
@@ -722,8 +681,6 @@ private static async findFastest5K(activities: GarminActivity[]): Promise<{time:
   // Sort by fastest calculated 5K time
   const fastest5K = calculated5Ks.sort((a, b) => a.time - b.time)[0];
   const activityDate = new Date(fastest5K.activity.startTimeLocal);
-
-  console.log(`🎯 Best calculated 5K found: ${this.formatPace(fastest5K.time)} from "${fastest5K.activity.activityName}"`);
 
   return {
     time: fastest5K.time,

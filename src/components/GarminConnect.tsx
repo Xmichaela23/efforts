@@ -49,7 +49,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         setGarminData(data.connection_data);
       }
     } catch (error) {
-      console.log('No existing Garmin connection found');
     }
   };
 
@@ -106,7 +105,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       
     } catch (error) {
       setConnectionStatus('error');
-      console.error('Garmin auth error:', error);
     }
   };
 
@@ -200,7 +198,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       
     } catch (error) {
       setConnectionStatus('error');
-      console.error('OAuth success handler error:', error);
       sessionStorage.removeItem('garmin_code_verifier');
     }
   };
@@ -218,9 +215,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         throw new Error('User must be authenticated to save connection');
       }
 
-      console.log('🔐 [GarminConnect] Saving tokens for user_id:', session.user.id);
-      console.log('🔐 [GarminConnect] Token preview - access_token starts with:', tokenData.access_token?.substring(0, 20));
-
       // Check if connection already exists for this user
       const { data: existing, error: selectError } = await supabaseClient
         .from('user_connections')
@@ -228,11 +222,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         .eq('user_id', session.user.id)
         .eq('provider', 'garmin')
         .maybeSingle();
-
-      if (selectError) {
-        console.error('❌ [GarminConnect] Error checking existing connection:', selectError);
-      }
-      console.log('🔐 [GarminConnect] Existing connection:', existing ? `Found id=${existing.id}, user_id=${existing.user_id}, existing token starts with: ${existing.access_token?.substring(0, 20)}` : 'Not found');
 
       const connectionData = {
         user_id: session.user.id,
@@ -249,7 +238,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       
       if (existing) {
         // Update existing connection
-        console.log('🔐 [GarminConnect] Updating existing connection id=', existing.id, 'for user_id=', session.user.id);
         const { error: updateError } = await supabaseClient
           .from('user_connections')
           .update(connectionData)
@@ -257,43 +245,35 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
           .eq('user_id', session.user.id);
         
         if (updateError) {
-          console.error('❌ [GarminConnect] Update error:', updateError);
           throw updateError;
         }
-        console.log('✅ [GarminConnect] Successfully updated connection');
         
         // Verify the update worked
-        const { data: verify } = await supabaseClient
+        await supabaseClient
           .from('user_connections')
           .select('id, user_id, access_token')
           .eq('id', existing.id)
           .maybeSingle();
-        console.log('🔍 [GarminConnect] Verification - saved token starts with:', verify?.access_token?.substring(0, 20), 'for user_id:', verify?.user_id);
       } else {
         // Insert new connection
-        console.log('🔐 [GarminConnect] Inserting new connection for user_id=', session.user.id);
         const { error: insertError } = await supabaseClient
           .from('user_connections')
           .insert(connectionData);
         
         if (insertError) {
-          console.error('❌ [GarminConnect] Insert error:', insertError);
           throw insertError;
         }
-        console.log('✅ [GarminConnect] Successfully inserted new connection');
         
         // Verify the insert worked
-        const { data: verify } = await supabaseClient
+        await supabaseClient
           .from('user_connections')
           .select('id, user_id, access_token')
           .eq('user_id', session.user.id)
           .eq('provider', 'garmin')
           .maybeSingle();
-        console.log('🔍 [GarminConnect] Verification - saved token starts with:', verify?.access_token?.substring(0, 20), 'for user_id:', verify?.user_id);
       }
         
     } catch (error) {
-      console.error('Error saving connection:', error);
     }
   };
 
@@ -375,7 +355,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       
     } catch (error) {
       setSyncStatus('error');
-      console.error('Sync error:', error);
       setTimeout(() => setSyncStatus('idle'), 3000);
     }
   };
@@ -391,7 +370,6 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       setLastSync(null);
       setGarminData(null);
     } catch (error) {
-      console.error('Disconnect error:', error);
     }
   };
 

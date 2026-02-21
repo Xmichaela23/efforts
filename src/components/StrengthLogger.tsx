@@ -707,7 +707,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       // Dispatch event to notify TrainingBaselines to reload
       window.dispatchEvent(new CustomEvent('baseline:saved'));
     } catch (error: any) {
-      console.error('Error saving baselines:', error);
       alert('Failed to save baselines: ' + (error.message || 'Unknown error'));
     } finally {
       setSavingBaseline(false);
@@ -739,15 +738,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         sourcePlannedDate
       };
       localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-      console.log('💾 Session progress saved with key:', sessionKey, 'data:', sessionData);
     } catch (error) {
-      console.error('❌ Failed to save session progress:', error);
-      // Try to clear potentially corrupted data
       try {
         localStorage.removeItem(sessionKey);
-        console.log('🗑️ Cleared potentially corrupted session data');
-      } catch (clearError) {
-        console.error('❌ Failed to clear corrupted session data:', clearError);
+      } catch {
       }
     }
   };
@@ -755,31 +749,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Restore session progress from localStorage
   const restoreSessionProgress = (): { exercises: LoggedExercise[]; addons: AttachedAddon[]; notes: string; rpe: number | ''; sourcePlannedName: string; sourcePlannedId: string | null; sourcePlannedDate: string | null } | null => {
     try {
-      console.log('🔍 Checking for saved session with key:', sessionKey);
       const saved = localStorage.getItem(sessionKey);
-      console.log('🔍 Raw saved data:', saved ? 'found' : 'not found');
       if (saved) {
         const sessionData = JSON.parse(saved);
-        // Check if session is recent (within last 24 hours) - more lenient validation
         const now = new Date();
         const sessionTimestamp = new Date(sessionData.timestamp);
         const hoursDiff = Math.abs(now.getTime() - sessionTimestamp.getTime()) / (1000 * 60 * 60);
-        
-        console.log('🔍 Session age check - hours since session:', hoursDiff.toFixed(2));
-        
+
         if (hoursDiff < 24) {
-          console.log('🔄 Session progress restored:', sessionData);
           return sessionData;
         } else {
-          // Clear stale session data (older than 24 hours)
           localStorage.removeItem(sessionKey);
-          console.log('🗑️ Cleared stale session data (older than 24 hours)');
         }
-      } else {
-        console.log('🔍 No saved session found');
       }
-    } catch (error) {
-      console.error('❌ Failed to restore session progress:', error);
+    } catch {
     }
     return null;
   };
@@ -788,9 +771,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const clearSessionProgress = () => {
     try {
       localStorage.removeItem(sessionKey);
-      console.log('🗑️ Session progress cleared');
-    } catch (error) {
-      console.error('❌ Failed to clear session progress:', error);
+    } catch {
     }
   };
   
@@ -1350,13 +1331,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-    console.log('🔄 StrengthLogger initializing...');
-    
+
     // Try to restore session progress first
     const modeAtOpen = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
     const savedSession = restoreSessionProgress();
     if (savedSession && modeAtOpen !== 'mobility') {
-      console.log('🔄 Restoring saved session progress...');
       setExercises(savedSession.exercises);
       setAttachedAddons(savedSession.addons);
       setNotesText(savedSession.notes);
@@ -1386,7 +1365,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     // Set sourcePlannedId from scheduledWorkout if it's a planned workout
     if (scheduledWorkout?.id && String((scheduledWorkout as any)?.workout_status || 'planned').toLowerCase() !== 'completed') {
-      console.log('🔗 Setting sourcePlannedId from scheduledWorkout:', scheduledWorkout.id);
       setSourcePlannedId(String(scheduledWorkout.id));
       setSourcePlannedName(scheduledWorkout.name || 'Workout');
       setSourcePlannedDate(scheduledWorkout.date || null);
@@ -1394,7 +1372,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     // If no scheduled workout provided, do a FRESH check for selected date's planned workout
     if (!workoutToLoad) {
-      console.log('🔍 No scheduled workout, checking for selected date\'s planned workout...');
       const selectedDate = targetDate || getStrengthLoggerDateString();
       
       // Prefer planned_workouts table
@@ -1422,20 +1399,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         );
       }
 
-      console.log('📊 Found planned workouts for today:', todaysStrengthWorkouts);
-
       if (todaysStrengthWorkouts.length > 0) {
         workoutToLoad = todaysStrengthWorkouts[0];
-        console.log('✅ Using planned workout:', workoutToLoad.name);
-        // Set sourcePlannedId for auto-discovered planned workout
         if (workoutToLoad?.id) {
-          console.log('🔗 Setting sourcePlannedId from discovered workout:', workoutToLoad.id);
           setSourcePlannedId(String(workoutToLoad.id));
           setSourcePlannedName(workoutToLoad.name || 'Workout');
           setSourcePlannedDate(workoutToLoad.date || null);
         }
-      } else {
-        console.log('ℹ️ No planned strength workout found for today');
       }
     }
 
@@ -1477,7 +1447,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     // Check if this is a baseline test workout
     if (isBaselineTestWorkout(workoutToLoad)) {
-      console.log('📝 Baseline test workout detected');
       const testType = getBaselineTestType(workoutToLoad);
       let testExercises: string[] = [];
       
@@ -1496,8 +1465,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
 
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
-      console.log('📝 Pre-populating with planned workout exercises');
-      console.log('📝 Raw strength_exercises:', JSON.stringify(workoutToLoad.strength_exercises, null, 2));
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => {
         // Extract notes separately - ensure they don't end up in the name
@@ -1505,7 +1472,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Notes can come from notes, description, or weight (if weight is a string like "Planks, dead bugs, bird dogs")
         const weightAsNotes = typeof exercise.weight === 'string' && isNaN(parseFloat(exercise.weight)) ? exercise.weight : '';
         const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
-        console.log(`📝 Exercise ${index}: name="${rawName}", notes="${rawNotes}", duration_seconds=${exercise.duration_seconds}, sets=${exercise.sets}, reps=${exercise.reps}, full_exercise:`, exercise);
         // Clean name - remove any notes that might have been concatenated
         const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
         const result = {
@@ -1548,11 +1514,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             return baseSet;
           })
         };
-        console.log(`📝 Created exercise:`, result);
         return result;
       });
-      
-      console.log('📝 Final prePopulatedExercises:', JSON.stringify(prePopulatedExercises, null, 2));
+
       setExercises(prePopulatedExercises);
       exercisesLoadedFromWorkout = true;
       // Initialize rest timers for pre-populated exercises
@@ -1575,7 +1539,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const parsed = viaTokens.length>0 ? viaTokens : parseStrengthDescription(src);
       const orOpts = extractOrOptions(src);
       if (parsed.length > 0) {
-        console.log('📝 Parsed exercises from description');
         setExercises(parsed);
         exercisesLoadedFromWorkout = true;
         // Initialize rest timers for parsed exercises
@@ -1592,13 +1555,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         }, 100);
         if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
       } else {
-        console.log('🆕 Starting with empty exercise for manual logging');
         setExercises([createEmptyExercise()]);
         if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
       }
     } else {
-      console.log('🆕 Starting with empty exercise for manual logging');
-      // Start with empty exercise for manual logging
       setExercises([createEmptyExercise()]);
     }
     
@@ -2027,8 +1987,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         setSelectedWarmupVariant(firstVariant);
         setShowWarmupChooser(true);
         return; // Wait for user choice
-      } catch (e) {
-        console.warn('Warm‑up catalog load failed; falling back to default. Error:', e);
+      } catch {
       }
     }
 
@@ -2264,10 +2223,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const addSet = (exerciseId: string) => {
-    console.log('🔄 Adding set to exercise:', exerciseId);
     setExercises(exercises.map(exercise => {
       if (exercise.id === exerciseId) {
-        console.log('✅ Found exercise, current sets:', exercise.sets.length);
         const lastSet = exercise.sets[exercise.sets.length - 1];
         const exerciseType = getExerciseType(exercise.name);
         const newSet: LoggedSet = {
@@ -2287,8 +2244,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const restTimerKey = `${exerciseId}-${updatedExercise.sets.length - 1}`;
           setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
         }
-        
-        console.log('✅ New exercise with sets:', updatedExercise.sets.length);
+
         return updatedExercise;
       }
       return exercise;
@@ -2438,41 +2394,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }))
       .filter(ex => ex.sets.length > 0);
 
-    console.log('🔍 Exercise validation:');
-    console.log('  - Total exercises:', exercises.length);
-    console.log('  - Valid exercises:', validExercises.length);
-    console.log('  - Exercise details:', exercises.map(ex => ({
-      name: ex.name,
-      nameTrimmed: ex.name.trim(),
-      setsCount: ex.sets.length,
-      setsWithReps: ex.sets.filter(s => s.reps && s.reps > 0).length,
-      setsWithDuration: ex.sets.filter(s => s.duration_seconds && s.duration_seconds > 0).length,
-      setsData: ex.sets.map(s => ({ reps: s.reps, duration_seconds: s.duration_seconds, weight: s.weight, completed: s.completed })),
-      isValid: ex.name.trim() && ex.sets.filter(s => (s.reps && s.reps > 0) || (s.duration_seconds && s.duration_seconds > 0)).length > 0
-    })));
-
     if (validExercises.length === 0) {
-      console.log('❌ Validation failed - no valid exercises found');
-      console.log('❌ All exercises:', exercises);
       alert('Please add at least one exercise with a name to save the workout.');
       return;
     }
 
-    console.log('✅ Validation passed - proceeding with save');
-    console.log('✅ Valid exercises:', validExercises);
-
     // Save to performed date (user-chosen); planned selection should not override this.
     const workoutDate = (performedDate || targetDate || scheduledWorkout?.date || getStrengthLoggerDateString());
-    
-    // 🔍 DEBUG: Log the exact date being used
-    console.log('🔍 DEBUG - Date details:');
-    console.log('  - getStrengthLoggerDateString():', getStrengthLoggerDateString());
-    console.log('  - performedDate:', performedDate);
-    console.log('  - targetDate prop:', targetDate);
-    console.log('  - scheduledWorkout?.date:', scheduledWorkout?.date);
-    console.log('  - Final workoutDate:', workoutDate);
-    console.log('  - Current local time:', new Date().toString());
-    console.log('  - Current PST time:', new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
 
     // Prepare the workout data (mobility-mode saves as mobility for classification)
     const modeSave = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
@@ -2528,28 +2456,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       planned_id: sourcePlannedId || undefined
     };
 
-    console.log('🔍 Saving completed workout:', completedWorkout);
-
     // Save: update in place when editing an existing workout id; otherwise create new
     let saved: any = null;
     try {
       const editingExisting = Boolean(scheduledWorkout?.id) && String((scheduledWorkout as any)?.workout_status||'').toLowerCase()==='completed';
       if (editingExisting) {
-        console.log('🔧 Updating existing workout:', scheduledWorkout?.id);
         saved = await updateWorkout(String(scheduledWorkout?.id), completedWorkout as any);
       } else {
-        console.log('🆕 Creating new completed workout');
         saved = await addWorkout(completedWorkout as any);
       }
-      console.log('✅ Save successful, returned:', saved);
 
       // Calculate workload for completed workout
       try {
         const workoutId = saved?.id || completedWorkout.id;
-        console.log('💪 Calling calculate-workload for strength workout:', workoutId);
-        console.log('💪 Strength exercises count:', completedWorkout.strength_exercises?.length || 0);
-        
-        const result = await supabase.functions.invoke('calculate-workload', {
+
+        await supabase.functions.invoke('calculate-workload', {
           body: {
             workout_id: workoutId,
             workout_data: {
@@ -2562,54 +2483,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             }
           }
         });
-        
-        console.log('✅ Workload calculated for completed workout:', result);
-        if (result?.data) {
-          console.log('✅ Workload result:', {
-            workload_actual: result.data.workload_actual,
-            workload_method: result.data.workload_method
-          });
-        }
-      } catch (workloadError) {
-        console.error('❌ Failed to calculate workload:', workloadError);
-        console.error('❌ Workload error details:', JSON.stringify(workloadError, null, 2));
+      } catch {
       }
 
       // Auto-attach to planned workout if possible
       try {
         const workoutId = saved?.id || completedWorkout.id;
-        console.log('🔗 Attempting auto-attachment for completed workout:', workoutId);
-        console.log('🔗 Workout details:', {
-          id: workoutId,
-          type: completedWorkout.type,
-          date: completedWorkout.date,
-          duration: completedWorkout.duration
-        });
-        
-        const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
+
+        await supabase.functions.invoke('auto-attach-planned', {
           body: { workout_id: workoutId }
         });
-        
-        console.log('🔗 Auto-attach response:', { data, error });
-        
-        if (error) {
-          console.error('❌ Auto-attach failed for workout:', workoutId, error);
-        } else if (data?.attached) {
-          console.log('✅ Auto-attached workout:', workoutId, data);
-          // Realtime subscription will automatically refresh via database triggers
-        } else {
-          console.log('ℹ️ No planned workout found to attach:', workoutId, data?.reason || 'unknown');
-        }
-      } catch (attachError) {
-        console.error('❌ Auto-attach error for workout:', saved?.id || completedWorkout.id, attachError);
+      } catch {
       }
     } catch (e) {
-      console.error('❌ Save failed with error:', e);
-      console.error('❌ Error details:', {
-        message: e.message,
-        stack: e.stack,
-        name: e.name
-      });
       // Only update state if component is still mounted
       if (isMountedRef.current) {
         setIsSaving(false);

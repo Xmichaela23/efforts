@@ -79,7 +79,6 @@ export function useOverallContext(weeksBack: number = 4) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
-      console.error('Overall context fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -101,7 +100,6 @@ export function useOverallContext(weeksBack: number = 4) {
 
       return cacheData.data;
     } catch (error) {
-      console.error('Cache read error:', error);
       localStorage.removeItem(CACHE_KEY);
       return null;
     }
@@ -115,7 +113,6 @@ export function useOverallContext(weeksBack: number = 4) {
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
     } catch (error) {
-      console.error('Cache write error:', error);
     }
   };
 

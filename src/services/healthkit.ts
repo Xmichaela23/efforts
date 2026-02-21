@@ -78,17 +78,13 @@ const HealthKit = registerPlugin<HealthKitPlugin>('HealthKit');
  */
 export async function isHealthKitAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
-    console.log('[HealthKit] Not native iOS');
     return false;
   }
   
   try {
-    console.log('[HealthKit] Calling isAvailable...');
     const result = await HealthKit.isAvailable();
-    console.log('[HealthKit] isAvailable result:', result);
     return result.available;
   } catch (error: any) {
-    console.error('[HealthKit] isAvailable error:', error?.message || error);
     return false;
   }
 }
@@ -105,7 +101,6 @@ export async function requestHealthKitAuthorization(): Promise<boolean> {
     const result = await HealthKit.requestAuthorization();
     return result.authorized;
   } catch (error) {
-    console.error('HealthKit authorization error:', error);
     return false;
   }
 }
@@ -115,19 +110,16 @@ export async function requestHealthKitAuthorization(): Promise<boolean> {
  */
 export async function saveWorkoutToHealthKit(options: SaveWorkoutOptions): Promise<string | null> {
   if (!await isHealthKitAvailable()) {
-    console.log('HealthKit not available, skipping save');
     return null;
   }
   
   try {
     const result = await HealthKit.saveWorkout(options);
     if (result.success) {
-      console.log('Workout saved to HealthKit:', result.workoutId);
       return result.workoutId;
     }
     return null;
   } catch (error) {
-    console.error('Error saving workout to HealthKit:', error);
     return null;
   }
 }
@@ -144,7 +136,6 @@ export async function readWorkoutsFromHealthKit(options?: ReadWorkoutsOptions): 
     const result = await HealthKit.readWorkouts(options || {});
     return result.workouts;
   } catch (error) {
-    console.error('Error reading workouts from HealthKit:', error);
     return [];
   }
 }

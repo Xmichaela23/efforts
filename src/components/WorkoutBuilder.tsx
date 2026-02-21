@@ -11,7 +11,7 @@ import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
 import StrengthExerciseBuilder, { StrengthExercise } from './StrengthExerciseBuilder';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { PlannedWorkout } from '@/components/PlannedWorkoutView';
+import { PlannedWorkout } from '@/types/planned-workout';
 
 interface WorkoutBuilderProps {
   onClose: () => void;

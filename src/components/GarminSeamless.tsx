@@ -40,7 +40,6 @@ const GarminSeamless: React.FC<GarminSeamlessProps> = ({ onAutoSyncChange }) => 
         setStatus(settings.webhook_enabled ? 'active' : 'idle');
       }
     } catch (error) {
-      console.log('No seamless settings found');
     }
   };
 
@@ -65,7 +64,6 @@ const GarminSeamless: React.FC<GarminSeamlessProps> = ({ onAutoSyncChange }) => 
         await saveSeamlessSettings();
       }
     } catch (error) {
-      console.error('Webhook setup failed:', error);
       setStatus('idle');
     }
   };
@@ -88,7 +86,6 @@ const GarminSeamless: React.FC<GarminSeamlessProps> = ({ onAutoSyncChange }) => 
         })
         .eq('provider', 'garmin');
     } catch (error) {
-      console.error('Failed to save settings:', error);
     }
   };
 

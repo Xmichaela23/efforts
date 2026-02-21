@@ -103,7 +103,6 @@ export function useWeeklySummary(weekStartDate: string) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
-      console.error('Weekly summary fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -119,7 +118,6 @@ export function useWeeklySummary(weekStartDate: string) {
         }
       }
     } catch (error) {
-      console.error('Error reading weekly summary cache:', error);
     }
     return null;
   };
@@ -132,7 +130,6 @@ export function useWeeklySummary(weekStartDate: string) {
       };
       localStorage.setItem(`${CACHE_KEY_PREFIX}${weekStartDate}`, JSON.stringify(cacheData));
     } catch (error) {
-      console.error('Error caching weekly summary:', error);
     }
   };
 

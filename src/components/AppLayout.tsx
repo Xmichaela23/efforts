@@ -294,7 +294,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       });
 
       if (error) {
-        console.error('Error checking for feedback needed:', error);
         return;
       }
 
@@ -316,11 +315,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           .single();
 
         if (checkError || !workoutCheck) {
-          console.error('❌ [Feedback Check] Workout not found:', workoutId, checkError);
           return;
         }
 
-        console.log('🎯 Server says workout needs feedback:', workoutId);
         feedbackShownIdsRef.current.add(workoutId);
         setFeedbackWorkout({
           id: workoutId,
@@ -330,9 +327,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           existingRpe: workout.existing_rpe || null,
         });
       }
-    } catch (e) {
-      console.error('Error in checkForFeedbackNeeded:', e);
-    } finally {
+    } catch {}
+    finally {
       checkingFeedbackRef.current = false;
     }
   };
@@ -363,15 +359,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     
     const workoutStatus = String(selectedWorkout.workout_status || '').toLowerCase();
     const workoutType = selectedWorkout.type;
-    
-    console.log('🔍 [Feedback Check] selectedWorkout changed:', {
-      id: selectedWorkout.id,
-      status: workoutStatus,
-      type: workoutType,
-      localRpe: selectedWorkout.rpe,
-      hasFeedbackWorkout: !!feedbackWorkout,
-      willCheck: workoutStatus === 'completed' && (workoutType === 'run' || workoutType === 'ride') && !feedbackWorkout
-    });
 
     // Only check completed run/ride workouts (don't check RPE locally - check DB)
     if (workoutStatus === 'completed' &&
@@ -388,11 +375,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) {
-            console.log('⏭️ [Feedback Check] No user');
             return;
           }
-
-          console.log('🔍 [Feedback Check] Querying database for workout:', workoutId);
 
           // Check if this specific workout is dismissed or has RPE (authoritative DB state)
           // Check both rpe column and workout_metadata.session_rpe (normalized field)
@@ -404,12 +388,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             .single();
 
           if (error) {
-            console.error('❌ [Feedback Check] Database error:', error);
             return;
           }
           
           if (!workout) {
-            console.log('⏭️ [Feedback Check] Workout not found');
             return;
           }
 
@@ -419,27 +401,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             : (workout.workout_metadata || {});
           const hasRpe = workout.rpe != null || workoutMetadata.session_rpe != null;
 
-          console.log('🔍 [Feedback Check] Workout from DB:', {
-            id: workout.id,
-            type: workout.type,
-            rpe: workout.rpe,
-            workout_metadata_session_rpe: workoutMetadata.session_rpe,
-            hasRpe,
-            feedback_dismissed_at: workout.feedback_dismissed_at,
-            feedback_dismissed_at_raw: workout.feedback_dismissed_at,
-            date: workout.date
-          });
-
           // Only show if: no RPE, not dismissed, and within last 7 days
           const workoutDate = new Date(workout.date);
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
           const isWithin7Days = workoutDate >= sevenDaysAgo;
-
-          console.log('🔍 [Feedback Check] Date check:', {
-            workoutDate: workoutDate.toISOString(),
-            sevenDaysAgo: sevenDaysAgo.toISOString(),
-            isWithin7Days
-          });
 
           if (!hasRpe && 
               !workout.feedback_dismissed_at && 
@@ -452,11 +417,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               .single();
 
             if (verifyError || !workoutVerify) {
-              console.error('❌ [Feedback Check] Workout not found when trying to show popup:', workoutId, verifyError);
               return;
             }
 
-            console.log('✅ [Feedback Check] Showing popup for selected workout:', workoutId);
             // Don't add to feedbackShownIdsRef for selected workouts - we always check server state
             // feedbackShownIdsRef is only for general checkForFeedbackNeeded to prevent duplicate popups
             setFeedbackWorkout({
@@ -466,40 +429,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               existingGearId: workout.gear_id || null,
               existingRpe: workout.rpe || null,
             });
-          } else {
-            console.log('⏭️ [Feedback Check] Not showing popup - conditions not met:', {
-              hasRpe,
-              rpeColumn: workout.rpe,
-              metadataRpe: workoutMetadata.session_rpe,
-              isDismissed: !!workout.feedback_dismissed_at,
-              isWithin7Days
-            });
           }
-        } catch (e) {
-          console.error('❌ [Feedback Check] Error:', e);
-        }
+        } catch {}
       };
 
       checkSpecificWorkout();
-    } else {
-      console.log('⏭️ [Feedback Check] Initial conditions not met:', {
-        isCompleted: workoutStatus === 'completed',
-        isRunOrRide: workoutType === 'run' || workoutType === 'ride',
-        noFeedbackWorkout: !feedbackWorkout
-      });
     }
     // Depend on selectedWorkout ID and feedbackWorkout state
     // When feedbackWorkout is cleared (null), we should check the selected workout again
   }, [selectedWorkout?.id, feedbackWorkout === null ? 'cleared' : 'set']);
-
-  // Debug: Log when feedbackWorkout state changes
-  useEffect(() => {
-    if (feedbackWorkout) {
-      console.log('🎯 [Feedback State] feedbackWorkout SET:', feedbackWorkout);
-    } else {
-      console.log('🎯 [Feedback State] feedbackWorkout CLEARED');
-    }
-  }, [feedbackWorkout]);
 
   // Realtime subscription (fast-path optimization, not source of truth)
   useEffect(() => {
@@ -533,7 +471,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 !feedbackShownIdsRef.current.has(workoutId) &&
                 !newWorkout.rpe && // Only check RPE, not gear_id
                 !newWorkout.feedback_dismissed_at) { // Server tracks dismissals
-              console.log('🎯 Realtime: New completed run/ride detected, showing feedback popup:', workoutId);
               feedbackShownIdsRef.current.add(workoutId);
               setFeedbackWorkout({
                 id: workoutId,
@@ -571,7 +508,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 !feedbackShownIdsRef.current.has(workoutId) &&
                 !updatedWorkout.rpe &&
                 !updatedWorkout.feedback_dismissed_at) { // Server tracks dismissals
-              console.log('🎯 Realtime: Workout completed/updated, showing feedback popup:', workoutId);
               feedbackShownIdsRef.current.add(workoutId);
               setFeedbackWorkout({
                 id: workoutId,
@@ -670,13 +606,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }, [selectedWorkout?.id, selectedWorkout?.workout_status]);
 
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
-    console.log('🔄 handleUpdateWorkout called with:', { workoutId, updates });
-    
     // Update the selected workout data with the new analysis
     if (selectedWorkout && selectedWorkout.id === workoutId) {
       const updatedWorkout = { ...selectedWorkout, ...updates };
       setSelectedWorkout(updatedWorkout);
-      console.log('✅ Updated selectedWorkout with new analysis data');
     }
     
     // Also refresh the workouts list to ensure consistency
@@ -689,11 +622,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       
       if (refreshedWorkout) {
         setSelectedWorkout(refreshedWorkout);
-        console.log('✅ Refreshed workout data from database');
       }
-    } catch (error) {
-      console.error('❌ Error refreshing workout data:', error);
-    }
+    } catch {}
   };
 
   const handleOpenPlanBuilder = () => {
@@ -907,31 +837,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         
         // Auto-attach to planned workout if possible
         try {
-          console.log('🔗 Attempting auto-attachment for imported workout:', savedWorkout?.id);
-          console.log('🔗 Workout details:', {
-            id: savedWorkout?.id,
-            type: workoutToSave.type,
-            date: workoutToSave.date,
-            duration: workoutToSave.duration
-          });
-          
           const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
             body: { workout_id: savedWorkout?.id }
           });
           
-          console.log('🔗 Auto-attach response:', { data, error });
-          
-          if (error) {
-            console.error('❌ Auto-attach failed for imported workout:', savedWorkout?.id, error);
-          } else if (data?.attached) {
-            console.log('✅ Auto-attached imported workout:', savedWorkout?.id, data);
+          if (!error && data?.attached) {
             // Realtime subscription will automatically refresh via database triggers
-          } else {
-            console.log('ℹ️ No planned workout found to attach:', savedWorkout?.id, data?.reason || 'unknown');
           }
-        } catch (attachError) {
-          console.error('❌ Auto-attach error for imported workout:', savedWorkout?.id, attachError);
-        }
+        } catch {}
 
         // Calculate workload for completed workout
         try {
@@ -948,10 +861,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               }
             }
           });
-          console.log('✅ Workload calculated for imported workout');
-        } catch (workloadError) {
-          console.error('❌ Failed to calculate workload for imported workout:', workloadError);
-        }
+        } catch {}
         
         // Show post-workout feedback popup for runs and rides
         if ((workoutToSave.type === 'run' || workoutToSave.type === 'ride') && savedWorkout?.id) {
@@ -961,9 +871,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             name: workoutToSave.name || `${workoutToSave.type} workout`,
           });
         }
-      } catch (error) {
-        console.error('❌ Error importing workout:', error);
-      }
+      } catch {}
     });
     setShowImportPage(false);
   };
@@ -1111,8 +1019,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       // Ensure we leave the Unified view and return to dashboard
       setSelectedWorkout(null);
       setActiveTab('summary');
-    } catch (error) {
-      console.error('Error deleting workout:', error);
+    } catch {
       alert('Error deleting workout. Please try again.');
     }
   };
@@ -1172,16 +1079,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const parsed = raw.map((m: any) => {
               const name = String(m?.name || '').trim() || 'Mobility';
               const notes = String(m?.description || m?.notes || '').trim();
-              console.log('📝 AppLayout parsing exercise:', { name, notes, description: m?.description, m_notes: m?.notes, duration_seconds: m?.duration_seconds, sets: m?.sets, duration: m?.duration, full_m: m });
               
               // Check if this is a duration-based exercise (has duration_seconds explicitly stored)
               if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
                 const sets = m.sets || 1;
                 const w = typeof m?.weight === 'number' && Number.isFinite(m.weight) ? m.weight : 
                          (typeof m?.weight === 'string' ? (parseFloat(m.weight) || 0) : 0);
-                const result = { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
-                console.log('📝 AppLayout parsed result (duration-based):', result);
-                return result;
+                return { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
               }
               
               // Otherwise, parse as rep-based exercise
@@ -1197,9 +1101,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 const pw = parseFloat(m.weight);
                 if (Number.isFinite(pw)) w = pw;
               }
-              const result = { name, sets, reps, weight: w, notes };
-              console.log('📝 AppLayout parsed result (rep-based):', result);
-              return result;
+              return { name, sets, reps, weight: w, notes };
             });
             setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
           } else {
@@ -1349,8 +1251,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       await addPlan(newPlan);
       setShowPlanBuilder(false);
       setShowAllPlans(true);
-    } catch (error) {
-      console.error('Error saving plan:', error);
+    } catch {
       alert('Error saving plan. Please try again.');
     }
   };
@@ -1370,16 +1271,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       for (const workout of planWorkouts) {
         try {
           await deleteWorkout(workout.id);
-        } catch (error) {
-          console.error('Error deleting workout:', workout.id, error);
-        }
+        } catch {}
       }
 
       await deletePlan(planId);
       setShowAllPlans(true);
 
-    } catch (error) {
-      console.error('Error deleting plan:', error);
+    } catch {
       alert('Error deleting plan. Please try again.');
     }
   };
@@ -1743,9 +1641,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       )}
       
       {/* Post-Workout Feedback Popup */}
-      {feedbackWorkout && (() => {
-        console.log('🎯 [Render] Rendering PostWorkoutFeedback for:', feedbackWorkout.id, feedbackWorkout);
-        return (
+      {feedbackWorkout && (
           <PostWorkoutFeedback
             workoutId={feedbackWorkout.id}
             workoutType={feedbackWorkout.type}
@@ -1766,9 +1662,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 await supabase.functions.invoke('dismiss-feedback', {
                   body: { workout_id: feedbackWorkout.id }
                 });
-              } catch (e) {
-                console.error('Error dismissing feedback:', e);
-              }
+              } catch {}
             }
             setFeedbackWorkout(null);
           }}
@@ -1779,9 +1673,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 await supabase.functions.invoke('dismiss-feedback', {
                   body: { workout_id: feedbackWorkout.id }
                 });
-              } catch (e) {
-                console.error('Error dismissing feedback:', e);
-              }
+              } catch {}
             }
             setFeedbackWorkout(null);
           }}

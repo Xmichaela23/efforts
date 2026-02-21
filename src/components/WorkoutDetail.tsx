@@ -91,10 +91,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🗑️ Delete button clicked for workout:', workout.id);
-    
     if (isDeleting) {
-      console.log('🗑️ Already deleting, ignoring click');
       return;
     }
     
@@ -106,20 +103,14 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     try {
       setIsDeleting(true);
       setShowConfirmDialog(false);
-      console.log('🗑️ Starting delete process for workout:', workout.id);
       
       await deleteWorkout(workout.id);
-      console.log('🗑️ Workout deleted successfully');
       
       // Close the detail view after successful deletion
       if (onClose) {
-        console.log('🗑️ Calling onClose to return to dashboard');
         onClose();
-      } else {
-        console.log('🗑️ No onClose function provided');
       }
     } catch (error) {
-      console.error('🗑️ Error deleting workout:', error);
       alert('Error deleting workout. Please try again.');
       setIsDeleting(false);
     }
@@ -269,9 +260,6 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
           {activeTab === 'completed' && (
             <div className="space-y-0">
-              {/* 🔧 DEBUG: Log what's happening */}
-              {console.log('🔍 WorkoutDetail - activeTab:', activeTab, 'workout.type:', workout.type)}
-              
               {/* 🔧 FIXED: Support all endurance workout types (ride, run, swim) for CompletedTab */}
               {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim') ? (
                 <CompletedTab 
@@ -281,7 +269,6 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               ) : workout.type === 'strength' ? (
                 // 🔧 FIXED: Pass the workout data directly without overwriting strength_exercises
                 <div>
-                  {console.log('🔍 About to render StrengthCompletedView')}
                   <StrengthCompletedView 
                     workoutData={workout}
                   />

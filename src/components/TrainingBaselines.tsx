@@ -93,7 +93,6 @@ const checkScheduledFtpTest = async () => {
       setScheduledFtpTest(null);
     }
   } catch (error) {
-    console.error('Error checking FTP test:', error);
   } finally {
     setCheckingFtpTest(false);
   }
@@ -128,7 +127,6 @@ const scheduleFtpTest = async () => {
     const displayDate = new Date(ftpTestDate + 'T12:00:00').toLocaleDateString();
     alert(`FTP Test scheduled for ${displayDate}. Rest up - no hard training before then!`);
   } catch (error) {
-    console.error('Error scheduling FTP test:', error);
     alert('Error scheduling FTP test. Please try again.');
   }
 };
@@ -143,7 +141,6 @@ const deleteFtpTest = async () => {
     
     setScheduledFtpTest(null);
   } catch (error) {
-    console.error('Error deleting FTP test:', error);
     alert('Error deleting FTP test. Please try again.');
   }
 };
@@ -297,7 +294,6 @@ const loadBaselines = async () => {
     }
     setLoading(false);
   } catch (error) {
-    console.error('Error loading baselines:', error);
     setLoading(false);
   }
 };
@@ -308,7 +304,6 @@ const refreshLearnedProfile = async () => {
     setLearningProfile(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error('User not authenticated');
       return;
     }
 
@@ -317,14 +312,11 @@ const refreshLearnedProfile = async () => {
     });
 
     if (error) {
-      console.error('Error learning profile:', error);
       return;
     }
 
     setLearnedFitness(result);
-    console.log('Learned fitness profile:', result);
   } catch (error) {
-    console.error('Error refreshing learned profile:', error);
   } finally {
     setLearningProfile(false);
   }
@@ -415,7 +407,6 @@ const handleSave = async () => {
     setLastUpdated(new Date().toISOString());
     setTimeout(() => setSaveMessage(''), 2000);
   } catch (error) {
-    console.error('Error saving baselines:', error);
     setSaveMessage('Error saving. Please try again.');
   } finally {
     setSaving(false);
@@ -497,7 +488,6 @@ const handleGarminOAuthSuccess = async (code: string) => {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-        console.error('Garmin token exchange failed:', errorText);
       throw new Error(`Token exchange failed: ${tokenResponse.status}`);
     }
 
@@ -508,7 +498,6 @@ const handleGarminOAuthSuccess = async (code: string) => {
     setGarminMessage('Successfully connected to Garmin!');
     sessionStorage.removeItem('garmin_code_verifier');
   } catch (error) {
-      console.error('Garmin OAuth error:', error);
     setGarminMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     sessionStorage.removeItem('garmin_code_verifier');
   }

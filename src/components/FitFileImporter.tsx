@@ -126,7 +126,6 @@ const mapFitSportToAppType = (sport: string): string => {
   } else if (sportLower.includes('strength') || sportLower.includes('training') || sportLower.includes('fitness')) {
     return 'strength';
   } else {
-    console.log(`Unknown sport "${sport}", defaulting to 'ride'`);
     return 'ride';
   }
 };
@@ -143,10 +142,8 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
     loadFitParser()
       .then(() => {
         setParserLoaded(true);
-        console.log('FIT parser loaded successfully');
       })
-      .catch(error => {
-        console.error('Failed to load FIT parser:', error);
+      .catch(() => {
         setErrors(['Failed to load FIT file parser. Please refresh the page and try again.']);
       });
   }, []);
@@ -176,46 +173,14 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
 
           fitParser.parse(arrayBuffer, (error: any, data: any) => {
             if (error) {
-              console.error('FIT parsing error:', error);
               reject(new Error(`Failed to parse FIT file: ${error.message || error}`));
               return;
             }
 
             try {
-              console.log('🔍 FULL RAW FIT DATA:', data);
-              
-              // 🔧 DEBUG: Check what data structure we actually get
-              console.log('DEBUG - data.sessions exists?', !!data.sessions);
-              console.log('DEBUG - data.sessions type:', typeof data.sessions);  
-              console.log('DEBUG - data.sessions length:', data.sessions?.length);
-              console.log('DEBUG - ALL DATA KEYS:', Object.keys(data));
-              
-              // 🆕 NEW: Debug ALL possible data structures
-              console.log('🔍 ZONES DEBUG - data.zones_target:', data.zones_target);
-              console.log('🔍 ZONES DEBUG - data.zones:', data.zones);
-              console.log('🔍 ZONES DEBUG - data.zone_target:', data.zone_target);
-              console.log('🔍 USER DEBUG - data.user_profile:', data.user_profile);
-              console.log('🔍 USER DEBUG - data.user:', data.user);
-              console.log('🔍 DEVICE DEBUG - data.device_info:', data.device_info);
-              console.log('🔍 DEVICE DEBUG - data.device:', data.device);
-              console.log('🔍 FILE DEBUG - data.file_id:', data.file_id);
-              console.log('🔍 FILE DEBUG - data.file_creator:', data.file_creator);
-              
-              // 🔍 DEBUG: Log the session object completely
-              if (data.sessions && data.sessions[0]) {
-                console.log('🔍 FULL SESSION OBJECT:', data.sessions[0]);
-                console.log('🔍 SESSION KEYS:', Object.keys(data.sessions[0]));
-              }
-              
               // 🔧 FIXED: Extract date from the correct location - prioritize local_timestamp
               let workoutDate = new Date().toISOString().split('T')[0]; // fallback to today
               let workoutTimestamp = null;
-              
-              console.log('🔧 DEBUG: Available timestamps:', {
-                local_timestamp: data.local_timestamp,
-                timestamp: data.timestamp,
-                sessions_start_time: data.sessions?.[0]?.start_time
-              });
               
               if (data.local_timestamp) {
                 const dateObj = new Date(data.local_timestamp);
@@ -223,44 +188,31 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                   String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                   String(dateObj.getDate()).padStart(2, '0');
                 workoutTimestamp = data.local_timestamp;
-                console.log('✅ Using local_timestamp for date:', workoutDate);
               } else if (data.timestamp) {
                 const dateObj = new Date(data.timestamp);
                 workoutDate = dateObj.getFullYear() + '-' + 
                   String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                   String(dateObj.getDate()).padStart(2, '0');
                 workoutTimestamp = data.timestamp;
-                console.log('✅ Using timestamp for date:', workoutDate);
               } else if (data.sessions && data.sessions[0] && data.sessions[0].start_time) {
                 const dateObj = new Date(data.sessions[0].start_time);
                 workoutDate = dateObj.getFullYear() + '-' + 
                   String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                   String(dateObj.getDate()).padStart(2, '0');
                 workoutTimestamp = data.sessions[0].start_time;
-                console.log('✅ Using sessions[0].start_time for date:', workoutDate);
-              } else {
-                console.log('⚠️ No timestamp found, using today:', workoutDate);
               }
 
               // 🔧 FIXED: Extract session data from the correct location
               let session = null;
               if (data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
                 session = data.sessions[0];
-                console.log('✅ Found sessions[0]:', session);
               } else {
-                console.log('❌ No sessions array found, trying alternatives');
-                console.log('DEBUG - Looking for alternative session data...');
-                
-                // Try alternative paths based on different parser modes
                 if (data.activity) {
                   session = data.activity;
-                  console.log('✅ Using data.activity as session:', session);
                 } else if (data.session) {
                   session = data.session;
-                  console.log('✅ Using data.session as session:', session);
                 } else {
-                  console.log('❌ No session data found in any location');
-                  session = {}; // Create empty session to prevent crash
+                  session = {};
                 }
               }
 
@@ -268,33 +220,25 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
               let sport = 'cycling'; // default
               if (data.sports && Array.isArray(data.sports) && data.sports[0] && data.sports[0].sport) {
                 sport = data.sports[0].sport;
-                console.log('✅ Found sport in sports array:', sport);
               } else if (session.sport) {
                 sport = session.sport;
-                console.log('✅ Found sport in session:', sport);
-              } else {
-                console.log('⚠️ No sport found, using default:', sport);
               }
               
               const workoutType = mapFitSportToAppType(sport);
-              console.log('✅ Mapped sport to app type:', sport, '→', workoutType);
 
               // 🔧 FIXED: Extract duration from session and ensure it's a valid number
               const duration = session.total_elapsed_time ? Math.round(Number(session.total_elapsed_time)) : 
                               session.total_timer_time ? Math.round(Number(session.total_timer_time)) : 
                               0;
-              console.log('✅ Extracted duration:', duration, 'seconds');
 
               // 🔧 FIXED: Extract distance from session and ensure it's a valid number or null
               const distance = session.total_distance ? 
                 Math.round(Number(session.total_distance) * 100) / 100 : 
                 null;
-              console.log('✅ Extracted distance:', distance, 'km');
 
               // 🆕 NEW: Extract location data for title generation
               const startPositionLat = session.start_position_lat ? Number(session.start_position_lat) : null;
               const startPositionLong = session.start_position_long ? Number(session.start_position_long) : null;
-              console.log('✅ Extracted location:', { lat: startPositionLat, lng: startPositionLong });
 
               // 🆕 NEW: Extract device friendly name (from user_profile)
               const friendlyName = data.user_profile?.friendly_name || 
@@ -302,52 +246,34 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                                  data.file_creator?.friendly_name || 
                                  data.file_id?.friendly_name ||
                                  null;
-              console.log('✅ Extracted friendly_name:', friendlyName);
 
               // 🔧 CRITICAL FIX: Check multiple possible elevation field names
               let elevationGain = null;
               let elevationLoss = null;
-              console.log('🔧 DEBUG: Checking all elevation fields in session:');
-              console.log('  session.total_ascent:', session.total_ascent);
-              console.log('  session.elevation_gain:', session.elevation_gain);
-              console.log('  session.ascent:', session.ascent);
-              console.log('  session.total_elevation_gain:', session.total_elevation_gain);
-              console.log('  session.enhanced_ascent:', session.enhanced_ascent);
-              console.log('  session.total_descent:', session.total_descent);
               
               if (session.total_ascent) {
                 // 🔧 CRITICAL FIX: total_ascent is in kilometers, convert to meters
                 elevationGain = Math.round(Number(session.total_ascent) * 1000);
-                console.log('✅ Using total_ascent for elevation:', elevationGain, 'meters (converted from', session.total_ascent, 'km)');
               } else if (session.elevation_gain) {
                 elevationGain = Math.round(Number(session.elevation_gain));
-                console.log('✅ Using elevation_gain for elevation:', elevationGain);
               } else if (session.ascent) {
                 elevationGain = Math.round(Number(session.ascent));
-                console.log('✅ Using ascent for elevation:', elevationGain);
               } else if (session.total_elevation_gain) {
                 elevationGain = Math.round(Number(session.total_elevation_gain));
-                console.log('✅ Using total_elevation_gain for elevation:', elevationGain);
               } else if (session.enhanced_ascent) {
                 elevationGain = Math.round(Number(session.enhanced_ascent));
-                console.log('✅ Using enhanced_ascent for elevation:', elevationGain);
-              } else {
-                console.log('❌ No elevation gain field found in session');
               }
 
               // 🆕 NEW: Extract elevation loss/descent
               if (session.total_descent) {
                 elevationLoss = Math.round(Number(session.total_descent));
-                console.log('✅ Extracted elevation loss:', elevationLoss, 'meters');
               }
 
               // 🆕 NEW: Extract zones data
               const zonesData = data.zones_target || {};
-              console.log('🆕 DEBUG: Zones data:', zonesData);
 
               // 🆕 NEW: Extract user profile data
               const userProfile = data.user_profile || {};
-              console.log('🆕 DEBUG: User profile data:', userProfile);
 
               // 🔧 FIXED: Extract all metrics directly from session object and sanitize for database
               const metrics = {
@@ -426,22 +352,6 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 total_cycles: session.total_cycles ? Number(session.total_cycles) : null,
               };
 
-              console.log('✅ Extracted metrics from session:', metrics);
-              console.log('🔧 DEBUG - Individual metric values:');
-              console.log('  avg_heart_rate:', typeof metrics.avg_heart_rate, metrics.avg_heart_rate);
-              console.log('  avg_power:', typeof metrics.avg_power, metrics.avg_power);
-              console.log('  elevation_gain:', typeof metrics.elevation_gain, metrics.elevation_gain, 'meters');
-              console.log('  intensity_factor:', typeof metrics.intensity_factor, metrics.intensity_factor, '(converted from decimal to percentage)');
-              console.log('  duration:', typeof duration, duration);
-              console.log('  distance:', typeof distance, distance);
-              console.log('🆕 NEW FIELDS:');
-              console.log('  total_work:', metrics.total_work);
-              console.log('  avg_vam:', metrics.avg_vam);
-              console.log('  total_timer_time:', metrics.total_timer_time);
-              console.log('  start_position_lat:', startPositionLat);
-              console.log('  start_position_long:', startPositionLong);
-              console.log('  friendly_name:', friendlyName);
-
               // Create the workout object with proper data types for database
               const workout: ImportedWorkout = {
                 id: `fit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -512,26 +422,14 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 }
               };
 
-              console.log('✅ Created workout from FIT data:', workout);
-              console.log('📊 Final extracted metrics:', workout.metrics);
-              console.log('🆕 NEW FIELDS Summary:', {
-                timestamp: workout.timestamp,
-                location: { lat: workout.start_position_lat, lng: workout.start_position_long },
-                friendly_name: workout.friendly_name,
-                total_work: workout.metrics.total_work,
-                avg_vam: workout.metrics.avg_vam,
-                total_timer_time: workout.metrics.total_timer_time
-              });
               resolve(workout);
               
             } catch (processingError) {
-              console.error('Error processing FIT data:', processingError);
               reject(new Error(`Error processing workout data: ${processingError.message}`));
             }
           });
           
         } catch (parseError) {
-          console.error('Error reading FIT file:', parseError);
           reject(new Error(`Error reading file: ${parseError.message}`));
         }
       };
@@ -570,12 +468,9 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
     
     for (const file of fitFiles) {
       try {
-        console.log(`Processing FIT file: ${file.name}`);
         const workout = await parseFitFile(file);
         processedWorkouts.push(workout);
-        console.log(`Successfully processed: ${file.name}`);
       } catch (error) {
-        console.error(`Error processing ${file.name}:`, error);
         processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
@@ -622,12 +517,9 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
     
     for (const file of fitFiles) {
       try {
-        console.log(`Processing FIT file: ${file.name}`);
         const workout = await parseFitFile(file);
         processedWorkouts.push(workout);
-        console.log(`Successfully processed: ${file.name}`);
       } catch (error) {
-        console.error(`Error processing ${file.name}:`, error);
         processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }

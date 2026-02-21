@@ -117,12 +117,9 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
       // Native iOS platform - use our custom plugin
       if (isNativePlatform() && Capacitor.getPlatform() === 'ios') {
         try {
-          console.log('[BLE] Native iOS detected, checking availability...');
           const available = await isNativeBluetoothAvailable();
-          console.log('[BLE] Bluetooth available:', available);
           setState(s => ({ ...s, isAvailable: available }));
         } catch (err) {
-          console.error('[BLE] Error checking availability:', err);
           setState(s => ({ ...s, isAvailable: false }));
         }
         return;
@@ -171,7 +168,6 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
         onHeartRateUpdateRef.current?.(bpm);
       }
     } catch (err) {
-      console.error('Error parsing heart rate:', err);
     }
   }, []);
   
@@ -185,7 +181,6 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
     
     try {
       // Scan for devices
-      console.log('[BLE] Scanning for HR devices...');
       const devices = await scanForHRDevices(10);
       
       if (devices.length === 0) {
@@ -195,7 +190,6 @@ export function useBluetoothHR(options: UseBluetoothHROptions = {}) {
       // For now, connect to the first device found
       // TODO: Show a picker if multiple devices
       const device = devices[0];
-      console.log('[BLE] Found device:', device.name);
       
       nativeDeviceIdRef.current = device.deviceId;
       
