@@ -1695,8 +1695,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             }
           }}
           />
-        );
-      })()}
+      )}
     </div>
   );
 };

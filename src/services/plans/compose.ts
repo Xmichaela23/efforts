@@ -3,7 +3,7 @@ import { poolsById, selectTemplateId } from './pools';
 import { runTemplates } from './templates/run';
 import { strengthTemplates } from './templates/strength';
 import { mobilityTemplates } from './templates/mobility';
-import type { SessionTemplate } from '../Seventy3Template';
+import type { SessionTemplate } from './types';
 
 const templateIndex: Record<string, { name: string; discipline: 'run'|'ride'|'swim'|'strength'; hardness: 'easy'|'moderate'|'hard'; baseDurationMin?: number }> = {};
 const templateFullIndex: Record<string, Template> = {};

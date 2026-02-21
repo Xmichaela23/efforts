@@ -12,14 +12,12 @@ import Privacy from "./pages/Privacy";
 import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
-import PlannedWorkoutDemo from "./components/PlannedWorkoutDemo";
 import PlanSelect from "./pages/PlanSelect";
 import PlansAdminImport from "./pages/PlansAdminImport";
 import PlansCatalogPage from "./pages/PlansCatalog.tsx";
 import MobilityPlanBuilderPage from "./pages/PTPlanBuilderPage";
 import PlansBuild from "./pages/PlansBuild";
 import PlanWizard from "./components/PlanWizard";
-import EffortsButtonDemo from "./components/EffortsButtonDemo";
 
 const queryClient = new QueryClient();
 
@@ -37,14 +35,12 @@ const App = () => (
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
 <Route path="/connections" element={<Connections />} />
-<Route path="/demo" element={<PlannedWorkoutDemo />} />
 <Route path="/plans/select" element={<PlanSelect />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
 <Route path="/plans/catalog" element={<PlansCatalogPage />} />
 <Route path="/plans/build" element={<PlansBuild />} />
 <Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
 <Route path="/plans/generate" element={<PlanWizard />} />
-<Route path="/button-demo" element={<EffortsButtonDemo />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>
