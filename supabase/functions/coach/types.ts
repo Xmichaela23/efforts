@@ -238,5 +238,6 @@ export type CoachWeekContextResponseV1 = {
     details: string;
   };
   evidence: EvidenceItem[];
+  week_narrative: string | null;
 };
 

@@ -270,13 +270,15 @@ export default function CoachWeekTab() {
         </button>
       </div>
 
-      {/* ── Training State ── */}
+      {/* ── Coach Narrative ── */}
       <div className={`rounded-xl border p-4 ${verdictTone}`}>
-        <div className={`text-xl font-semibold ${titleGlow}`}
+        <div className={`text-lg font-semibold ${titleGlow}`}
           style={{ textShadow: `0 0 12px currentColor` }}
         >{ts?.title || '—'}</div>
 
-        {ts?.subtitle ? (
+        {data.week_narrative ? (
+          <div className="text-sm text-white/75 mt-2 leading-relaxed">{data.week_narrative}</div>
+        ) : ts?.subtitle ? (
           <div className="text-sm text-white/55 mt-1">{ts.subtitle}</div>
         ) : null}
 
@@ -285,13 +287,16 @@ export default function CoachWeekTab() {
             <TrainingStateBar acwr={ts.load_ramp_acwr} />
           </div>
         )}
+      </div>
 
-        {loadDriverRows.length ? (() => {
-          const maxLoad = Math.max(...loadDriverRows.map(r => r.total_load), 1);
-          return (
-            <div className="mt-4 space-y-2">
-              <div className="text-xs text-white/50 font-medium">Training load this week</div>
-              {loadDriverRows.map((r: any) => (
+      {/* ── Training Load ── */}
+      {loadDriverRows.length ? (
+        <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
+          <div className="text-sm text-white/80 mb-2">Training load</div>
+          <div className="space-y-2">
+            {(() => {
+              const maxLoad = Math.max(...loadDriverRows.map(r => r.total_load), 1);
+              return loadDriverRows.map((r: any) => (
                 <div key={r.type}>
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-xs text-white/70 capitalize">{r.type}</span>
@@ -307,21 +312,21 @@ export default function CoachWeekTab() {
                     showLabels={false}
                   />
                 </div>
-              ))}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-[10px]">
-                  <div className="w-2 h-2 rounded-[2px]" style={{ background: '#34d399' }} />
-                  <span className="text-emerald-400/70">Planned</span>
-                </div>
-                <div className="flex items-center gap-1 text-[10px]">
-                  <div className="w-2 h-2 rounded-[2px]" style={{ background: '#38bdf8' }} />
-                  <span className="text-sky-400/70">Extra</span>
-                </div>
+              ));
+            })()}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 text-[10px]">
+                <div className="w-2 h-2 rounded-[2px]" style={{ background: '#34d399' }} />
+                <span className="text-emerald-400/70">Planned</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px]">
+                <div className="w-2 h-2 rounded-[2px]" style={{ background: '#38bdf8' }} />
+                <span className="text-sky-400/70">Extra</span>
               </div>
             </div>
-          );
-        })() : null}
-      </div>
+          </div>
+        </div>
+      ) : null}
 
 
       {/* ── Key Sessions ── */}

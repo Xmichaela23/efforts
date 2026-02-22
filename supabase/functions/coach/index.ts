@@ -1061,6 +1061,89 @@ Deno.serve(async (req) => {
       };
     })();
 
+    // =========================================================================
+    // AI week narrative — coach paragraph from structured facts
+    // =========================================================================
+    let week_narrative: string | null = null;
+    try {
+      const openaiKey = Deno.env.get('OPENAI_API_KEY');
+      if (openaiKey) {
+        const narrativeFacts: string[] = [];
+
+        // Plan context
+        if (weekIntent && weekIntent !== 'unknown') {
+          narrativeFacts.push(`This is a ${weekIntent} week (week ${weekIndex ?? '?'} of the plan).`);
+        }
+
+        // Session completion
+        narrativeFacts.push(`Planned key sessions: ${reaction.key_sessions_planned}. Completed and linked: ${reaction.key_sessions_linked}. Missed: ${reaction.key_sessions_gaps}. Extra unplanned sessions: ${reaction.extra_sessions}.`);
+
+        // Load by discipline
+        const loadLines = training_state.load_ramp.acute7_by_type.map((r: any) => {
+          const plannedPct = r.total_load > 0 ? Math.round((r.linked_load / r.total_load) * 100) : 0;
+          const extraPct = 100 - plannedPct;
+          return `${r.type}: ${Math.round(r.total_load)} pts total (${plannedPct}% planned, ${extraPct}% extra/unplanned)`;
+        });
+        if (loadLines.length) narrativeFacts.push(`Training load by discipline this week: ${loadLines.join('; ')}.`);
+
+        // ACWR
+        if (metrics.acwr != null) {
+          const acwrLabel = metrics.acwr < 0.8 ? 'under-reached' : metrics.acwr > 1.3 ? 'overreaching' : 'in the optimal zone';
+          narrativeFacts.push(`Acute:Chronic workload ratio is ${metrics.acwr.toFixed(2)} (${acwrLabel}).`);
+        }
+
+        // Body response vs baseline
+        if (reaction.avg_execution_score != null) narrativeFacts.push(`Average execution score: ${reaction.avg_execution_score}% (baseline: ${baselines.norms_28d.execution_score_avg ?? '?'}%).`);
+        if (reaction.avg_session_rpe_7d != null) narrativeFacts.push(`Average RPE: ${reaction.avg_session_rpe_7d}/10 (baseline: ${baselines.norms_28d.session_rpe_avg ?? '?'}/10).`);
+        if (reaction.avg_strength_rir_7d != null) narrativeFacts.push(`Average strength RIR: ${reaction.avg_strength_rir_7d} reps in reserve (baseline: ${baselines.norms_28d.strength_rir_avg ?? '?'}).`);
+        if (reaction.hr_drift_avg_bpm != null) narrativeFacts.push(`Average HR drift: ${reaction.hr_drift_avg_bpm} bpm (baseline: ${baselines.norms_28d.hr_drift_avg_bpm ?? '?'} bpm).`);
+
+        // 4-week deltas
+        const deltas: string[] = [];
+        if (responseInterp.aerobic.drift_delta_bpm != null) deltas.push(`aerobic HR drift ${responseInterp.aerobic.drift_delta_bpm > 0 ? '+' : ''}${responseInterp.aerobic.drift_delta_bpm} bpm (${responseInterp.aerobic.drift_delta_bpm < 0 ? 'improving' : 'worsening'})`);
+        if (responseInterp.structural.rir_delta != null) deltas.push(`strength RIR ${responseInterp.structural.rir_delta > 0 ? '+' : ''}${responseInterp.structural.rir_delta} (${responseInterp.structural.rir_delta > 0 ? 'improving' : 'more fatigued'})`);
+        if (responseInterp.subjective.rpe_delta != null) deltas.push(`perceived effort ${responseInterp.subjective.rpe_delta > 0 ? '+' : ''}${responseInterp.subjective.rpe_delta} RPE (${responseInterp.subjective.rpe_delta > 0 ? 'harder' : 'easier'})`);
+        if (responseInterp.absorption.execution_delta != null) deltas.push(`execution ${responseInterp.absorption.execution_delta > 0 ? '+' : ''}${responseInterp.absorption.execution_delta}% (${responseInterp.absorption.execution_delta > 0 ? 'improving' : 'declining'})`);
+        if (deltas.length) narrativeFacts.push(`4-week trends vs baseline: ${deltas.join(', ')}.`);
+
+        // Top sessions
+        const topSessions = training_state.load_ramp.top_sessions_acute7.slice(0, 3);
+        if (topSessions.length) {
+          const topLines = topSessions.map((s: any) => `${s.date} ${s.type}${s.name ? ` (${s.name})` : ''} — ${Math.round(s.workload_actual)} pts, ${s.linked ? 'planned' : 'unplanned extra'}`);
+          narrativeFacts.push(`Biggest sessions: ${topLines.join('; ')}.`);
+        }
+
+        // Deterministic verdict
+        narrativeFacts.push(`System verdict: ${training_state.title}. ${training_state.subtitle}`);
+
+        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. You have the following facts about their training week. Write 3-5 sentences in second person ("you"). Be specific and direct. Connect the dots — explain WHY things are happening, not just WHAT the numbers say. If they deviated from the plan, mention it and explain the consequence. If something is going well, say so. End with one concrete suggestion for the rest of the week. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach.
+
+FACTS:
+${narrativeFacts.join('\n')}`;
+
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are an expert endurance and strength coach. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable.' },
+              { role: 'user', content: narrativePrompt },
+            ],
+            temperature: 0.6,
+            max_tokens: 300,
+          }),
+        });
+        if (resp.ok) {
+          const aiData = await resp.json();
+          const raw = String(aiData?.choices?.[0]?.message?.content || '').trim();
+          week_narrative = raw || null;
+        }
+      }
+    } catch (narErr: any) {
+      console.warn('[coach] week narrative generation failed (non-fatal):', narErr?.message || narErr);
+    }
+
     const evidence: EvidenceItem[] = [
       { code: 'week_window', label: 'Week window', value: `${weekStartDate} → ${weekEndDate}` },
       { code: 'wtd_load', label: 'Week-to-date load', value: Math.round(actualWtdLoad), unit: 'pts' },
@@ -1102,6 +1185,7 @@ Deno.serve(async (req) => {
       },
       next_action: v.next,
       evidence,
+      week_narrative,
     };
 
     return new Response(JSON.stringify(response), {

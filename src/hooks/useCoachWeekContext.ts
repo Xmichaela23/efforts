@@ -175,6 +175,7 @@ export type CoachWeekContextV1 = {
     details: string;
   };
   evidence: Array<{ code: string; label: string; value: number | string; unit?: string }>;
+  week_narrative: string | null;
 };
 
 export function useCoachWeekContext(date?: string) {
