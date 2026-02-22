@@ -13,6 +13,7 @@ import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-
 import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
+import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -1836,13 +1837,26 @@ Deno.serve(async (req) => {
 
     // =========================================================================
     // AI coaching paragraph (v1)
-    // Contract: AI receives ONLY the deterministic fact packet + flags.
+    // Fact packet + flags + holistic training context (deterministic layer).
     // =========================================================================
     let ai_summary: string | null = null;
     let ai_summary_generated_at: string | null = null;
     try {
       if (fact_packet_v1 && flags_v1) {
-        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1);
+        let coachingCtxText: string | null = null;
+        try {
+          const ctx = await buildCoachingContext(
+            supabase,
+            workout.user_id,
+            workout.date || new Date().toISOString(),
+            plannedWorkout?.training_plan_id ?? null,
+            planContextForDrift?.weekIndex ?? null,
+          );
+          coachingCtxText = ctx.text;
+        } catch (e) {
+          console.warn('[analyze-running-workout] coaching context failed (non-fatal):', e);
+        }
+        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1, coachingCtxText);
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }
     } catch (e) {

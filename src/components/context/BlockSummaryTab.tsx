@@ -31,6 +31,7 @@ import {
 import { useOverallContext } from '@/hooks/useOverallContext';
 import { useExerciseLog, type LiftTrend } from '@/hooks/useExerciseLog';
 import { useAthleteSnapshot } from '@/hooks/useAthleteSnapshot';
+import { ProgressRing, Sparkline } from '@/components/ui/charts';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 import type { BlockAdaptation } from '@/types/fitness';
 
@@ -94,25 +95,33 @@ const StrengthProgressionSection: React.FC<{
     overhead_press: 'OHP',
   };
 
-  const renderLift = (lift: LiftTrend) => {
+  const renderLift = (lift: LiftTrend, showSparkline = true) => {
     const first = lift.entries[0];
     const last = lift.entries[lift.entries.length - 1];
     const trendColor = lift.trend == null ? 'text-white/50'
       : lift.trend > 0 ? 'text-emerald-400'
       : lift.trend < 0 ? 'text-amber-400'
       : 'text-white/50';
+    const sparkColor = lift.trend == null ? '#94a3b8'
+      : lift.trend > 0 ? '#34d399'
+      : lift.trend < 0 ? '#fbbf24'
+      : '#94a3b8';
     const trendIcon = lift.trend == null ? '' : lift.trend > 0 ? '↑' : lift.trend < 0 ? '↓' : '→';
     const name = DISPLAY_NAMES[lift.canonical] ?? lift.displayName;
+    const sparkData = lift.entries.map(e => e.estimated_1rm);
 
     return (
-      <div key={lift.canonical} className="flex items-center justify-between text-sm py-1">
-        <div className="text-white/85 min-w-[100px]">{name}</div>
-        <div className="flex items-center gap-3 text-white/60">
-          <span>{Math.round(first.estimated_1rm)} → <span className="text-white/90">{Math.round(last.estimated_1rm)}</span></span>
-          <span className={`text-xs ${trendColor} min-w-[52px] text-right`}>
+      <div key={lift.canonical} className="flex items-center justify-between text-sm py-1 gap-2">
+        <div className="text-white/85 min-w-[80px] flex-shrink-0">{name}</div>
+        {showSparkline && sparkData.length >= 2 && (
+          <Sparkline data={sparkData} width={56} height={18} color={sparkColor} showDots className="flex-shrink-0 opacity-80" />
+        )}
+        <div className="flex items-center gap-2 text-white/60 flex-shrink-0">
+          <span className="text-xs">{Math.round(first.estimated_1rm)} → <span className="text-white/90">{Math.round(last.estimated_1rm)}</span></span>
+          <span className={`text-xs ${trendColor} min-w-[48px] text-right`}>
             {trendIcon} {lift.trend != null ? `${lift.trend > 0 ? '+' : ''}${lift.trend}%` : '—'}
           </span>
-          <span className="text-xs text-white/30">{lift.entries.length}×</span>
+          <span className="text-[10px] text-white/25">{lift.entries.length}×</span>
         </div>
       </div>
     );
@@ -137,7 +146,7 @@ const StrengthProgressionSection: React.FC<{
 
       {mainLifts.length > 0 && (
         <div className="space-y-0.5 mb-3">
-          {mainLifts.map(renderLift)}
+          {mainLifts.map(l => renderLift(l, true))}
         </div>
       )}
 
@@ -152,7 +161,7 @@ const StrengthProgressionSection: React.FC<{
           </button>
           {expanded && (
             <div className="space-y-0.5 border-t border-white/10 pt-2">
-              {accessoryLifts.map(renderLift)}
+              {accessoryLifts.map(l => renderLift(l, false))}
             </div>
           )}
         </>
@@ -360,17 +369,28 @@ const GoalPredictorBlockSection: React.FC<{ goalPrediction?: GoalPredictionResul
         )}
       </div>
       <div className="space-y-3">
-        {/* Block verdict: "Am I on track for my ultimate target?" (Goal Probability %) */}
         {blockVerdict && (
-          <div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-lg font-semibold text-white/90">{blockVerdict.goal_probability_pct}%</span>
-              <span className="text-xs text-white/50">Goal Probability</span>
+          <div className="flex items-start gap-4">
+            <ProgressRing
+              percent={blockVerdict.goal_probability_pct}
+              size={68}
+              strokeWidth={5}
+              color={
+                blockVerdict.goal_probability_pct >= 70 ? '#34d399'
+                : blockVerdict.goal_probability_pct >= 40 ? '#fbbf24'
+                : '#f87171'
+              }
+              className="flex-shrink-0"
+            >
+              <span className="text-sm font-semibold text-white/90">{blockVerdict.goal_probability_pct}%</span>
+            </ProgressRing>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-white/50 mb-0.5">Goal Probability</div>
+              <p className="text-sm text-white/70">{blockVerdict.message}</p>
+              {blockVerdict.drivers.length > 0 && (
+                <p className="text-xs text-white/50 mt-1">{blockVerdict.drivers.join(' • ')}</p>
+              )}
             </div>
-            <p className="text-sm text-white/70">{blockVerdict.message}</p>
-            {blockVerdict.drivers.length > 0 && (
-              <p className="text-xs text-white/50 mt-1">{blockVerdict.drivers.join(' • ')}</p>
-            )}
           </div>
         )}
         {/* Marathon-specific: projected finish time */}

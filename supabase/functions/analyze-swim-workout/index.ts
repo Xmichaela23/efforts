@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -428,6 +429,22 @@ ${intervalAnalysis.slice(0, 10).map((i: any) =>
   `- Interval ${i.interval_number}: ${i.distance}${poolUnit} @ ${i.pace_per_100 > 0 ? formatPace(i.pace_per_100) : 'N/A'} per 100${poolUnit}${i.adherence !== null ? ` (${Math.round(i.adherence)}% adherence)` : ''}`
 ).join('\n')}
 `;
+        }
+
+        // Holistic training context from deterministic layer
+        try {
+          const weekTag = plannedWorkout?.tags?.find((t: string) => t.startsWith('week:'));
+          const weekNum = weekTag ? parseInt(weekTag.split(':')[1].split('_of_')[0]) : null;
+          const ctx = await buildCoachingContext(
+            supabase,
+            workout.user_id,
+            workout.date || new Date().toISOString(),
+            plannedWorkout?.training_plan_id ?? null,
+            weekNum,
+          );
+          if (ctx.text) prompt += `\n\n${ctx.text}`;
+        } catch (e) {
+          console.warn('[analyze-swim-workout] coaching context failed (non-fatal):', e);
         }
 
         prompt += `

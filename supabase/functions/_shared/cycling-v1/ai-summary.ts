@@ -77,7 +77,8 @@ function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
 
 export async function generateCyclingAISummaryV1(
   factPacket: CyclingFactPacketV1,
-  flags: CyclingFlagV1[]
+  flags: CyclingFlagV1[],
+  coachingContext?: string | null,
 ): Promise<string | null> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) return null;
@@ -86,7 +87,7 @@ export async function generateCyclingAISummaryV1(
   const packetStr = JSON.stringify(display, null, 2);
 
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
-
+${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
 - Output ONE paragraph.
 - Be specific and grounded: reference 2-4 concrete details from the packet ONLY when they explain the outcome.

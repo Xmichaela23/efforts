@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AlertCircle, HelpCircle, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase } from '@/lib/supabase';
+import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
 
 type LinkExtrasDialogProps = {
   open: boolean;
@@ -211,25 +212,17 @@ export default function CoachWeekTab() {
     return `Training state confidence is based on ${signals}/4 response markers with data (exec n=${execN}, drift n=${driftN}, rpe n=${rpeN}, rir n=${rirN}).`;
   })();
 
-  const formatDelta = (v: number | null, unit: string) => {
-    if (v == null) return '—';
-    const sign = v > 0 ? '+' : '';
-    return `${sign}${v}${unit}`;
-  };
-
-  const labelPhrase = (lbl: string | undefined | null) => {
-    const s = String(lbl || '');
-    if (s === 'efficient' || s === 'good' || s === 'fresh') return 'better';
-    if (s === 'stable') return 'normal';
-    if (s === 'stressed' || s === 'strained' || s === 'fatigued' || s === 'slipping') return 'worse';
-    return 'unknown';
-  };
-
   const verdictTone =
-    data.verdict.code === 'recover_overreaching' ? 'border-red-500/30 bg-red-500/10'
-    : data.verdict.code === 'caution_ramping_fast' ? 'border-amber-500/30 bg-amber-500/10'
-    : data.verdict.code === 'undertraining' ? 'border-sky-500/30 bg-sky-500/10'
+    data.verdict.code === 'recover_overreaching' ? 'border-red-500/40 bg-gradient-to-br from-red-500/15 to-red-900/10'
+    : data.verdict.code === 'caution_ramping_fast' ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 to-amber-900/10'
+    : data.verdict.code === 'undertraining' ? 'border-sky-500/40 bg-gradient-to-br from-sky-500/12 to-sky-900/8'
     : 'border-white/15 bg-white/[0.06]';
+
+  const titleGlow =
+    data.verdict.code === 'recover_overreaching' ? 'text-red-300'
+    : data.verdict.code === 'caution_ramping_fast' ? 'text-amber-300'
+    : data.verdict.code === 'undertraining' ? 'text-sky-300'
+    : 'text-white';
 
   return (
     <div className="space-y-3 pb-6">
@@ -262,7 +255,9 @@ export default function CoachWeekTab() {
           <div>
             <div className="text-sm text-white/60">Training state</div>
             <div className="text-2xs text-white/40 mt-0.5">{ts?.kicker || ''}</div>
-            <div className="text-xl font-medium text-white">{ts?.title || '—'}</div>
+            <div className={`text-xl font-semibold ${titleGlow}`}
+              style={data.verdict.code !== 'on_track' ? { textShadow: `0 0 12px currentColor` } : undefined}
+            >{ts?.title || '—'}</div>
             <div className="text-xs text-white/45 mt-1">
               {ts?.subtitle || '—'}
             </div>
@@ -276,23 +271,41 @@ export default function CoachWeekTab() {
               {acwrLine ? <span> • {acwrLine}</span> : null}
               <span> • Baseline: last {ts?.baseline_days || 28} days</span>
             </div>
-            {loadDriverRows.length ? (
-              <div className="mt-2 space-y-1">
-                <div className="text-2xs text-white/45">Top load drivers (7d)</div>
-                {loadDriverRows.map((r) => (
-                  <div key={r.type} className="flex items-center justify-between gap-2 text-2xs">
-                    <div className="text-white/65">{r.type}</div>
-                    <div className="text-white/55 text-right">
-                      <span className="text-white/75">{Math.round(r.total_load)}pts</span>
-                      <span className="ml-2">
-                        <span className="text-emerald-300/80">planned {Math.round(r.linked_load)} </span>
-                        <span className="text-sky-300/80">extra {Math.round(r.extra_load)}</span>
-                      </span>
+            {loadDriverRows.length ? (() => {
+              const maxLoad = Math.max(...loadDriverRows.map(r => r.total_load), 1);
+              return (
+                <div className="mt-3 space-y-2">
+                  <div className="text-2xs text-white/45 uppercase tracking-wider">Load drivers (7d)</div>
+                  {loadDriverRows.map((r: any) => (
+                    <div key={r.type}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-2xs text-white/65 capitalize">{r.type}</span>
+                        <span className="text-2xs text-white/50">{Math.round(r.total_load)}pts</span>
+                      </div>
+                      <StackedHBar
+                        segments={[
+                          { value: r.linked_load, color: '#34d399', label: 'planned' },
+                          { value: r.extra_load, color: '#38bdf8', label: 'extra' },
+                        ]}
+                        maxValue={maxLoad}
+                        height={10}
+                        showLabels={false}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-3 mt-1">
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <div className="w-2 h-2 rounded-[2px]" style={{ background: '#34d399' }} />
+                      <span className="text-emerald-400/70">Planned</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <div className="w-2 h-2 rounded-[2px]" style={{ background: '#38bdf8' }} />
+                      <span className="text-sky-400/70">Extra</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : null}
+                </div>
+              );
+            })() : null}
             {topSessionsRows.length ? (
               <div className="mt-2">
                 <div className="text-2xs text-white/45">Biggest sessions (7d)</div>
@@ -310,6 +323,11 @@ export default function CoachWeekTab() {
                 </div>
               </div>
             ) : null}
+            {ts?.load_ramp_acwr != null && (
+              <div className="mt-3">
+                <TrainingStateBar acwr={ts.load_ramp_acwr} />
+              </div>
+            )}
             {data.plan.week_focus_label ? (
               <div className="text-xs text-white/50 mt-1">{data.plan.week_focus_label}</div>
             ) : null}
@@ -417,31 +435,37 @@ export default function CoachWeekTab() {
         <div className="mt-2 space-y-2">
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Aerobic (HR drift)</div>
-            <div className="text-xs text-white/85 text-right">
-              {formatDelta(data.response?.aerobic?.drift_delta_bpm ?? null, ' bpm')}
-              <div className="text-2xs text-white/45">{labelPhrase(data.response?.aerobic?.label)}</div>
-            </div>
+            <DeltaIndicator
+              value={data.response?.aerobic?.drift_delta_bpm ?? null}
+              unit=" bpm"
+              invertPositive={true}
+              size="sm"
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Structural (Strength RIR)</div>
-            <div className="text-xs text-white/85 text-right">
-              {formatDelta(data.response?.structural?.rir_delta ?? null, '')}
-              <div className="text-2xs text-white/45">{labelPhrase(data.response?.structural?.label)}</div>
-            </div>
+            <DeltaIndicator
+              value={data.response?.structural?.rir_delta ?? null}
+              invertPositive={false}
+              size="sm"
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Subjective (RPE)</div>
-            <div className="text-xs text-white/85 text-right">
-              {formatDelta(data.response?.subjective?.rpe_delta ?? null, '')}
-              <div className="text-2xs text-white/45">{labelPhrase(data.response?.subjective?.label)}</div>
-            </div>
+            <DeltaIndicator
+              value={data.response?.subjective?.rpe_delta ?? null}
+              invertPositive={true}
+              size="sm"
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-white/55">Absorption (Execution)</div>
-            <div className="text-xs text-white/85 text-right">
-              {formatDelta(data.response?.absorption?.execution_delta ?? null, '%')}
-              <div className="text-2xs text-white/45">{labelPhrase(data.response?.absorption?.label)}</div>
-            </div>
+            <DeltaIndicator
+              value={data.response?.absorption?.execution_delta ?? null}
+              unit="%"
+              invertPositive={false}
+              size="sm"
+            />
           </div>
         </div>
       </div>

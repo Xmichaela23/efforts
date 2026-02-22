@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
 
 /**
  * =============================================================================
@@ -1540,6 +1541,21 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   console.log(`📊 SESSION RPE: ${sessionRPEData ? 'Available' : 'Not provided'}`);
   console.log(`📊 READINESS: ${readinessData ? 'Available' : 'Not provided'}`);
   
+  // Build holistic coaching context from deterministic layer
+  let coachingCtxText: string | null = null;
+  try {
+    const ctx = await buildCoachingContext(
+      supabase,
+      workout.user_id,
+      workout.date || new Date().toISOString(),
+      plannedWorkout?.training_plan_id ?? null,
+      weekNumber ?? null,
+    );
+    coachingCtxText = ctx.text;
+  } catch (e) {
+    console.warn('[analyze-strength-workout] coaching context failed (non-fatal):', e);
+  }
+
   // Generate enhanced insights using GPT-4
   const insights = await generateEnhancedStrengthInsights(
     workout, 
@@ -1554,7 +1570,8 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     exerciseBreakdown,
     rirProgression,
     volumeAnalysis,
-    dataQuality
+    dataQuality,
+    coachingCtxText
   );
   
   return {
@@ -1590,7 +1607,8 @@ async function generateEnhancedStrengthInsights(
   exerciseBreakdown: any[],
   rirProgression: any,
   volumeAnalysis: any,
-  dataQuality: any
+  dataQuality: any,
+  coachingContextText?: string | null,
 ): Promise<string[]> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
@@ -2186,6 +2204,10 @@ DATA QUALITY FLAGS
 COACHING INSIGHT
 ───────────────────────────────────────────────────────────────
 [Actionable recommendations: Load increases, progression protocol, data quality fixes, next session targets]`;
+
+  if (coachingContextText) {
+    context += `\n\n${coachingContextText}`;
+  }
 
   // Add timeout protection for OpenAI API call (60 seconds)
   const controller = new AbortController();

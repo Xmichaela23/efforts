@@ -327,7 +327,8 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
 
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,
-  flags: FlagV1[]
+  flags: FlagV1[],
+  coachingContext?: string | null,
 ): Promise<string | null> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) return null;
@@ -335,7 +336,7 @@ export async function generateAISummaryV1(
   const displayPacket = toDisplayFormatV1(factPacket, flags);
 
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
-
+${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
 - Output ONE paragraph. Sentence count must match signal:
   - If TOP FLAGS contain no priority≤2 concerns: 2–3 sentences max.
