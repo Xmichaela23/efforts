@@ -1070,6 +1070,26 @@ Deno.serve(async (req) => {
       if (openaiKey) {
         const narrativeFacts: string[] = [];
 
+        // ── Pull workout-level + exercise-level detail from deterministic layer ──
+        const [wfRes, elRes] = await Promise.all([
+          supabase
+            .from('workout_facts')
+            .select('workout_id, date, discipline, duration_minutes, workload, session_rpe, adherence, run_facts, strength_facts, ride_facts, swim_facts')
+            .eq('user_id', userId)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate)
+            .order('date', { ascending: true }),
+          supabase
+            .from('exercise_log')
+            .select('workout_id, date, exercise_name, canonical_name, sets_completed, best_weight, best_reps, total_volume, avg_rir, estimated_1rm')
+            .eq('user_id', userId)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate)
+            .order('date', { ascending: true }),
+        ]);
+        const weekFacts: any[] = wfRes.data || [];
+        const weekExercises: any[] = elRes.data || [];
+
         // Plan context
         if (weekIntent && weekIntent !== 'unknown') {
           narrativeFacts.push(`This is a ${weekIntent} week (week ${weekIndex ?? '?'} of the plan).`);
@@ -1077,6 +1097,71 @@ Deno.serve(async (req) => {
 
         // Session completion
         narrativeFacts.push(`Planned key sessions: ${reaction.key_sessions_planned}. Completed and linked: ${reaction.key_sessions_linked}. Missed: ${reaction.key_sessions_gaps}. Extra unplanned sessions: ${reaction.extra_sessions}.`);
+
+        // ── Per-workout detail with plan deviations ──
+        for (const wf of weekFacts) {
+          const adh = wf.adherence || {};
+          const parts = [`${wf.date} ${wf.discipline}`];
+          if (wf.duration_minutes) parts.push(`${Math.round(wf.duration_minutes)} min`);
+          if (wf.workload) parts.push(`${Math.round(wf.workload)} pts load`);
+          if (wf.session_rpe) parts.push(`RPE ${wf.session_rpe}/10`);
+
+          if (adh.execution_score != null) parts.push(`execution ${adh.execution_score}%`);
+          if (adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
+            parts.push(adh.workload_pct > 100
+              ? `DID ${adh.workload_pct - 100}% MORE LOAD than planned`
+              : `did ${100 - adh.workload_pct}% less load than planned`);
+          }
+
+          // Strength-specific: per-exercise planned vs actual
+          if (wf.discipline === 'strength' && wf.strength_facts?.exercises) {
+            const deviations: string[] = [];
+            for (const ex of wf.strength_facts.exercises) {
+              if (ex.planned_weight && ex.best_weight) {
+                const plannedW = parseFloat(ex.planned_weight) || 0;
+                if (plannedW > 0 && ex.best_weight > plannedW * 1.05) {
+                  deviations.push(`${ex.name}: lifted ${ex.best_weight}kg but plan said ${ex.planned_weight}kg (+${Math.round(((ex.best_weight / plannedW) - 1) * 100)}% heavier)`);
+                } else if (plannedW > 0 && ex.best_weight < plannedW * 0.9) {
+                  deviations.push(`${ex.name}: lifted ${ex.best_weight}kg vs planned ${ex.planned_weight}kg (lighter than plan)`);
+                }
+              }
+              if (ex.planned_sets && ex.sets_completed && ex.sets_completed !== ex.planned_sets) {
+                deviations.push(`${ex.name}: did ${ex.sets_completed} sets vs ${ex.planned_sets} planned`);
+              }
+            }
+            if (deviations.length) parts.push(`DEVIATIONS: ${deviations.join('; ')}`);
+          }
+
+          // Run-specific: pacing adherence
+          if (wf.discipline === 'run' && wf.run_facts) {
+            if (wf.run_facts.z2_pct != null) parts.push(`zone 2 time: ${wf.run_facts.z2_pct}%`);
+            if (wf.run_facts.decoupling_pct != null) parts.push(`cardiac decoupling: ${wf.run_facts.decoupling_pct}%`);
+            if (wf.run_facts.intervals_hit != null && wf.run_facts.intervals_total != null) {
+              parts.push(`intervals: ${wf.run_facts.intervals_hit}/${wf.run_facts.intervals_total} on target`);
+            }
+          }
+
+          narrativeFacts.push(`SESSION: ${parts.join(' | ')}`);
+        }
+
+        // ── Strength exercise summary with context ──
+        if (weekExercises.length > 0) {
+          const byExercise = new Map<string, any[]>();
+          for (const e of weekExercises) {
+            const arr = byExercise.get(e.canonical_name) || [];
+            arr.push(e);
+            byExercise.set(e.canonical_name, arr);
+          }
+          const exLines: string[] = [];
+          for (const [canon, entries] of byExercise) {
+            const bestW = Math.max(...entries.map((e: any) => e.best_weight || 0));
+            const bestReps = entries.find((e: any) => e.best_weight === bestW)?.best_reps || 0;
+            const best1rm = Math.max(...entries.map((e: any) => e.estimated_1rm || 0));
+            const avgRir = entries.filter((e: any) => e.avg_rir != null).reduce((s: number, e: any) => s + e.avg_rir, 0) / (entries.filter((e: any) => e.avg_rir != null).length || 1);
+            exLines.push(`${canon}: best ${bestW}kg × ${bestReps}, est 1RM ${Math.round(best1rm)}kg, avg ${avgRir.toFixed(1)} reps in reserve`);
+          }
+          narrativeFacts.push(`STRENGTH EXERCISES THIS WEEK: ${exLines.join('; ')}.`);
+        }
 
         // Load by discipline
         const loadLines = training_state.load_ramp.acute7_by_type.map((r: any) => {
@@ -1089,34 +1174,41 @@ Deno.serve(async (req) => {
         // ACWR
         if (metrics.acwr != null) {
           const acwrLabel = metrics.acwr < 0.8 ? 'under-reached' : metrics.acwr > 1.3 ? 'overreaching' : 'in the optimal zone';
-          narrativeFacts.push(`Acute:Chronic workload ratio is ${metrics.acwr.toFixed(2)} (${acwrLabel}).`);
+          narrativeFacts.push(`Training volume ratio (this week vs last 4 weeks): ${metrics.acwr.toFixed(2)} — ${acwrLabel}.`);
         }
 
         // Body response vs baseline
         if (reaction.avg_execution_score != null) narrativeFacts.push(`Average execution score: ${reaction.avg_execution_score}% (baseline: ${baselines.norms_28d.execution_score_avg ?? '?'}%).`);
-        if (reaction.avg_session_rpe_7d != null) narrativeFacts.push(`Average RPE: ${reaction.avg_session_rpe_7d}/10 (baseline: ${baselines.norms_28d.session_rpe_avg ?? '?'}/10).`);
-        if (reaction.avg_strength_rir_7d != null) narrativeFacts.push(`Average strength RIR: ${reaction.avg_strength_rir_7d} reps in reserve (baseline: ${baselines.norms_28d.strength_rir_avg ?? '?'}).`);
-        if (reaction.hr_drift_avg_bpm != null) narrativeFacts.push(`Average HR drift: ${reaction.hr_drift_avg_bpm} bpm (baseline: ${baselines.norms_28d.hr_drift_avg_bpm ?? '?'} bpm).`);
+        if (reaction.avg_session_rpe_7d != null) narrativeFacts.push(`Average perceived effort: ${reaction.avg_session_rpe_7d}/10 (baseline: ${baselines.norms_28d.session_rpe_avg ?? '?'}/10).`);
+        if (reaction.avg_strength_rir_7d != null) narrativeFacts.push(`Average strength reps in reserve: ${reaction.avg_strength_rir_7d} (baseline: ${baselines.norms_28d.strength_rir_avg ?? '?'}).`);
+        if (reaction.hr_drift_avg_bpm != null) narrativeFacts.push(`Average cardiac drift: ${reaction.hr_drift_avg_bpm} bpm (baseline: ${baselines.norms_28d.hr_drift_avg_bpm ?? '?'} bpm).`);
+
+        // Per-discipline execution breakdown
+        const execByDiscipline: Record<string, number[]> = {};
+        for (const wf of weekFacts) {
+          const score = wf.adherence?.execution_score;
+          if (score != null) {
+            (execByDiscipline[wf.discipline] = execByDiscipline[wf.discipline] || []).push(score);
+          }
+        }
+        const execLines = Object.entries(execByDiscipline).map(([d, scores]) => {
+          const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+          return `${d}: ${avg}%`;
+        });
+        if (execLines.length > 1) narrativeFacts.push(`Execution by discipline: ${execLines.join(', ')}.`);
 
         // 4-week deltas
         const deltas: string[] = [];
-        if (responseInterp.aerobic.drift_delta_bpm != null) deltas.push(`aerobic HR drift ${responseInterp.aerobic.drift_delta_bpm > 0 ? '+' : ''}${responseInterp.aerobic.drift_delta_bpm} bpm (${responseInterp.aerobic.drift_delta_bpm < 0 ? 'improving' : 'worsening'})`);
-        if (responseInterp.structural.rir_delta != null) deltas.push(`strength RIR ${responseInterp.structural.rir_delta > 0 ? '+' : ''}${responseInterp.structural.rir_delta} (${responseInterp.structural.rir_delta > 0 ? 'improving' : 'more fatigued'})`);
-        if (responseInterp.subjective.rpe_delta != null) deltas.push(`perceived effort ${responseInterp.subjective.rpe_delta > 0 ? '+' : ''}${responseInterp.subjective.rpe_delta} RPE (${responseInterp.subjective.rpe_delta > 0 ? 'harder' : 'easier'})`);
-        if (responseInterp.absorption.execution_delta != null) deltas.push(`execution ${responseInterp.absorption.execution_delta > 0 ? '+' : ''}${responseInterp.absorption.execution_delta}% (${responseInterp.absorption.execution_delta > 0 ? 'improving' : 'declining'})`);
-        if (deltas.length) narrativeFacts.push(`4-week trends vs baseline: ${deltas.join(', ')}.`);
-
-        // Top sessions
-        const topSessions = training_state.load_ramp.top_sessions_acute7.slice(0, 3);
-        if (topSessions.length) {
-          const topLines = topSessions.map((s: any) => `${s.date} ${s.type}${s.name ? ` (${s.name})` : ''} — ${Math.round(s.workload_actual)} pts, ${s.linked ? 'planned' : 'unplanned extra'}`);
-          narrativeFacts.push(`Biggest sessions: ${topLines.join('; ')}.`);
-        }
+        if (responseInterp.aerobic.drift_delta_bpm != null) deltas.push(`aerobic efficiency ${responseInterp.aerobic.drift_delta_bpm < 0 ? 'improving' : 'worsening'} (${responseInterp.aerobic.drift_delta_bpm > 0 ? '+' : ''}${responseInterp.aerobic.drift_delta_bpm} bpm drift)`);
+        if (responseInterp.structural.rir_delta != null) deltas.push(`strength fatigue ${responseInterp.structural.rir_delta < 0 ? 'increasing' : 'decreasing'} (${responseInterp.structural.rir_delta > 0 ? '+' : ''}${responseInterp.structural.rir_delta} reps in reserve)`);
+        if (responseInterp.subjective.rpe_delta != null) deltas.push(`perceived effort ${responseInterp.subjective.rpe_delta > 0 ? 'increasing' : 'decreasing'} (${responseInterp.subjective.rpe_delta > 0 ? '+' : ''}${responseInterp.subjective.rpe_delta})`);
+        if (responseInterp.absorption.execution_delta != null) deltas.push(`execution quality ${responseInterp.absorption.execution_delta > 0 ? 'improving' : 'declining'} (${responseInterp.absorption.execution_delta > 0 ? '+' : ''}${responseInterp.absorption.execution_delta}%)`);
+        if (deltas.length) narrativeFacts.push(`4-week trends: ${deltas.join(', ')}.`);
 
         // Deterministic verdict
-        narrativeFacts.push(`System verdict: ${training_state.title}. ${training_state.subtitle}`);
+        narrativeFacts.push(`Overall status: ${training_state.title}.`);
 
-        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. You have the following facts about their training week. Write 3-5 sentences in second person ("you"). Be specific and direct. Connect the dots — explain WHY things are happening, not just WHAT the numbers say. If they deviated from the plan, mention it and explain the consequence. If something is going well, say so. End with one concrete suggestion for the rest of the week. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach.
+        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan. Connect the dots: if they lifted heavier than planned, explain how that connects to their fatigue. If their running efficiency improved, say so. End with one concrete suggestion. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
 
 FACTS:
 ${narrativeFacts.join('\n')}`;
