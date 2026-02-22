@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, HelpCircle, Link2, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase } from '@/lib/supabase';
 import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
@@ -153,10 +153,6 @@ export default function CoachWeekTab() {
     const rows = (ts && Array.isArray(ts?.load_ramp?.acute7_by_type)) ? ts.load_ramp.acute7_by_type : [];
     return rows.slice(0, 3);
   }, [ts?.load_ramp?.acute7_by_type]);
-  const topSessionsRows = useMemo(() => {
-    const rows = (ts && Array.isArray(ts?.load_ramp?.top_sessions_acute7)) ? ts.load_ramp.top_sessions_acute7 : [];
-    return rows.slice(0, 2);
-  }, [ts?.load_ramp?.top_sessions_acute7]);
 
   if (loading && !data) {
     return (
@@ -190,39 +186,65 @@ export default function CoachWeekTab() {
     );
   }
 
-  const pct = data.metrics.wtd_completion_ratio != null ? Math.round(data.metrics.wtd_completion_ratio * 100) : null;
-  const remainingPct = data.week?.planned_total_load && data.week.planned_total_load > 0
-    ? Math.round(((data.week.planned_remaining_load || 0) / data.week.planned_total_load) * 100)
-    : null;
-  const keyPct = data.reaction?.key_sessions_completion_ratio != null ? Math.round(data.reaction.key_sessions_completion_ratio * 100) : null;
-  const acwrLine = ts?.load_ramp_acwr != null ? `Load ramp: ${Number(ts.load_ramp_acwr.toFixed(2))}×` : null;
 
-  const trainingConfidenceLabel = (() => {
-    const c = ts?.confidence ?? 0;
-    if (c >= 0.8) return 'High';
-    if (c >= 0.6) return 'Medium';
-    return 'Low';
-  })();
-  const trainingConfidenceExplain = (() => {
-    const execN = data.reaction?.execution_sample_size || 0;
-    const driftN = data.reaction?.hr_drift_sample_size || 0;
-    const rpeN = data.reaction?.rpe_sample_size_7d || 0;
-    const rirN = data.reaction?.rir_sample_size_7d || 0;
-    const signals = (driftN > 0 ? 1 : 0) + (rpeN > 0 ? 1 : 0) + (rirN > 0 ? 1 : 0) + (execN > 0 ? 1 : 0);
-    return `Training state confidence is based on ${signals}/4 response markers with data (exec n=${execN}, drift n=${driftN}, rpe n=${rpeN}, rir n=${rirN}).`;
-  })();
 
   const verdictTone =
     data.verdict.code === 'recover_overreaching' ? 'border-red-500/40 bg-gradient-to-br from-red-500/15 to-red-900/10'
     : data.verdict.code === 'caution_ramping_fast' ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 to-amber-900/10'
     : data.verdict.code === 'undertraining' ? 'border-sky-500/40 bg-gradient-to-br from-sky-500/12 to-sky-900/8'
-    : 'border-white/15 bg-white/[0.06]';
+    : 'border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-emerald-900/5';
 
   const titleGlow =
     data.verdict.code === 'recover_overreaching' ? 'text-red-300'
     : data.verdict.code === 'caution_ramping_fast' ? 'text-amber-300'
     : data.verdict.code === 'undertraining' ? 'text-sky-300'
-    : 'text-white';
+    : 'text-emerald-300';
+
+  const weekLabel = (() => {
+    const parts: string[] = [];
+    if (data.plan.has_active_plan && data.plan.week_index != null) parts.push(`Week ${data.plan.week_index}`);
+    if (data.plan.week_intent) {
+      const intent = String(data.plan.week_intent).toLowerCase();
+      if (intent === 'peak') parts.push('Peak phase');
+      else if (intent === 'recovery') parts.push('Recovery week');
+      else if (intent === 'taper') parts.push('Taper');
+      else if (intent === 'build') parts.push('Build phase');
+      else if (intent === 'base') parts.push('Base phase');
+    }
+    return parts.join(' · ');
+  })();
+
+  const rpeLabel = (rpe: number | null) => {
+    if (rpe == null) return null;
+    if (rpe <= 3) return 'Light';
+    if (rpe <= 5) return 'Moderate';
+    if (rpe <= 7) return 'Hard';
+    return 'Very hard';
+  };
+
+  const rirLabel = (rir: number | null) => {
+    if (rir == null) return null;
+    if (rir >= 4) return 'Very fresh';
+    if (rir >= 3) return 'Fresh';
+    if (rir >= 2) return 'Moderate';
+    if (rir >= 1) return 'Pushing limits';
+    return 'At failure';
+  };
+
+  const efficiencyLabel = (decouple: number | null) => {
+    if (decouple == null) return null;
+    if (decouple <= 3) return 'Excellent';
+    if (decouple <= 5) return 'Good';
+    if (decouple <= 8) return 'Moderate';
+    return 'Fatigued';
+  };
+
+  const efficiencyColor = (decouple: number | null) => {
+    if (decouple == null) return 'text-white/50';
+    if (decouple <= 5) return 'text-emerald-400';
+    if (decouple <= 8) return 'text-amber-400';
+    return 'text-red-400';
+  };
 
   return (
     <div className="space-y-3 pb-6">
@@ -237,9 +259,7 @@ export default function CoachWeekTab() {
       <div className="flex items-center justify-between">
         <div className="text-xs text-white/50">
           {data.week_start_date} → {data.week_end_date}
-          {data.plan.has_active_plan && data.plan.week_index != null ? (
-            <span className="ml-2 text-white/40">Week {data.plan.week_index}</span>
-          ) : null}
+          {weekLabel ? <span className="ml-2 text-white/60">{weekLabel}</span> : null}
         </div>
         <button
           onClick={refresh}
@@ -250,254 +270,198 @@ export default function CoachWeekTab() {
         </button>
       </div>
 
-      <div className={`rounded-xl border p-3 ${verdictTone}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm text-white/60">Training state</div>
-            <div className="text-2xs text-white/40 mt-0.5">{ts?.kicker || ''}</div>
-            <div className={`text-xl font-semibold ${titleGlow}`}
-              style={data.verdict.code !== 'on_track' ? { textShadow: `0 0 12px currentColor` } : undefined}
-            >{ts?.title || '—'}</div>
-            <div className="text-xs text-white/45 mt-1">
-              {ts?.subtitle || '—'}
-            </div>
-            <div className="text-2xs text-white/35 mt-1">
-              <span className="inline-flex items-center gap-1">
-                Confidence: {trainingConfidenceLabel}
-                <span title={trainingConfidenceExplain} className="inline-flex items-center">
-                  <HelpCircle className="w-3.5 h-3.5 text-white/35" />
-                </span>
-              </span>
-              {acwrLine ? <span> • {acwrLine}</span> : null}
-              <span> • Baseline: last {ts?.baseline_days || 28} days</span>
-            </div>
-            {loadDriverRows.length ? (() => {
-              const maxLoad = Math.max(...loadDriverRows.map(r => r.total_load), 1);
-              return (
-                <div className="mt-3 space-y-2">
-                  <div className="text-2xs text-white/45 uppercase tracking-wider">Load drivers (7d)</div>
-                  {loadDriverRows.map((r: any) => (
-                    <div key={r.type}>
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-2xs text-white/65 capitalize">{r.type}</span>
-                        <span className="text-2xs text-white/50">{Math.round(r.total_load)}pts</span>
-                      </div>
-                      <StackedHBar
-                        segments={[
-                          { value: r.linked_load, color: '#34d399', label: 'planned' },
-                          { value: r.extra_load, color: '#38bdf8', label: 'extra' },
-                        ]}
-                        maxValue={maxLoad}
-                        height={10}
-                        showLabels={false}
-                      />
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-3 mt-1">
-                    <div className="flex items-center gap-1 text-[10px]">
-                      <div className="w-2 h-2 rounded-[2px]" style={{ background: '#34d399' }} />
-                      <span className="text-emerald-400/70">Planned</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[10px]">
-                      <div className="w-2 h-2 rounded-[2px]" style={{ background: '#38bdf8' }} />
-                      <span className="text-sky-400/70">Extra</span>
-                    </div>
+      {/* ── Training State ── */}
+      <div className={`rounded-xl border p-4 ${verdictTone}`}>
+        <div className={`text-xl font-semibold ${titleGlow}`}
+          style={{ textShadow: `0 0 12px currentColor` }}
+        >{ts?.title || '—'}</div>
+
+        {ts?.subtitle ? (
+          <div className="text-sm text-white/55 mt-1">{ts.subtitle}</div>
+        ) : null}
+
+        {ts?.load_ramp_acwr != null && (
+          <div className="mt-3">
+            <TrainingStateBar acwr={ts.load_ramp_acwr} />
+          </div>
+        )}
+
+        {loadDriverRows.length ? (() => {
+          const maxLoad = Math.max(...loadDriverRows.map(r => r.total_load), 1);
+          return (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs text-white/50 font-medium">Training load this week</div>
+              {loadDriverRows.map((r: any) => (
+                <div key={r.type}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs text-white/70 capitalize">{r.type}</span>
+                    <span className="text-xs text-white/50">{Math.round(r.total_load)} pts</span>
                   </div>
-                </div>
-              );
-            })() : null}
-            {topSessionsRows.length ? (
-              <div className="mt-2">
-                <div className="text-2xs text-white/45">Biggest sessions (7d)</div>
-                <div className="mt-1 space-y-0.5">
-                  {topSessionsRows.map((r) => (
-                    <div key={`${r.date}-${r.type}-${r.workload_actual}`} className="text-2xs text-white/50">
-                      <span className="text-white/65">{r.date} {r.type}</span>
-                      {r.name ? <span className="text-white/45"> ({r.name})</span> : null}
-                      <span className="text-white/35"> • </span>
-                      <span className={r.linked ? 'text-emerald-300/80' : 'text-sky-300/80'}>{r.linked ? 'planned' : 'extra'}</span>
-                      <span className="text-white/35"> • </span>
-                      <span className="text-white/70">{Math.round(r.workload_actual)}pts</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {ts?.load_ramp_acwr != null && (
-              <div className="mt-3">
-                <TrainingStateBar acwr={ts.load_ramp_acwr} />
-              </div>
-            )}
-            {data.plan.week_focus_label ? (
-              <div className="text-xs text-white/50 mt-1">{data.plan.week_focus_label}</div>
-            ) : null}
-          </div>
-          <div className="text-right text-xs text-white/45">
-            <div>{data.methodology_id}</div>
-            {data.plan.week_intent ? <div className="mt-1">Intent: {data.plan.week_intent}</div> : null}
-            {data.baselines?.learning_status ? <div className="mt-1">Baselines: {data.baselines.learning_status}</div> : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-white/15 bg-white/[0.06] p-3">
-        <div className="text-sm text-white/70">How you’re responding</div>
-        <div className="mt-2 space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Key sessions (WTD)</div>
-            <div className="text-xs text-white/85">
-              {data.reaction.key_sessions_linked}/{data.reaction.key_sessions_planned}
-              {keyPct != null ? <span className="text-white/45 ml-2">({keyPct}%)</span> : null}
-            </div>
-          </div>
-          {data.reaction.key_sessions_planned > 0 ? (
-            <div className="mt-1">
-              <div className="h-2.5 w-full rounded-full bg-white/10 overflow-hidden border border-white/10">
-                <div className="h-full flex">
-                  <div
-                    className="h-full bg-emerald-400/70"
-                    style={{ width: `${Math.round((data.reaction.key_sessions_linked / data.reaction.key_sessions_planned) * 100)}%` }}
-                  />
-                  <div
-                    className="h-full bg-amber-400/70"
-                    style={{ width: `${Math.round((data.reaction.key_sessions_gaps / data.reaction.key_sessions_planned) * 100)}%` }}
+                  <StackedHBar
+                    segments={[
+                      { value: r.linked_load, color: '#34d399', label: 'planned' },
+                      { value: r.extra_load, color: '#38bdf8', label: 'extra' },
+                    ]}
+                    maxValue={maxLoad}
+                    height={10}
+                    showLabels={false}
                   />
                 </div>
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-3 text-2xs text-white/45">
-                <div>
-                  <span className="text-emerald-300/80">Linked {data.reaction.key_sessions_linked}</span>
-                  <span className="text-white/30"> • </span>
-                  <span className="text-amber-300/80">Gaps {data.reaction.key_sessions_gaps}</span>
-                  <span className="text-white/30"> • </span>
-                  <span className="text-sky-300/80">Extras +{data.reaction.extra_sessions}</span>
+              ))}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 text-[10px]">
+                  <div className="w-2 h-2 rounded-[2px]" style={{ background: '#34d399' }} />
+                  <span className="text-emerald-400/70">Planned</span>
                 </div>
-                <div className="inline-flex items-center gap-2">
-                  <span title={data.reaction.linking_confidence?.explain || ''} className="inline-flex items-center gap-1">
-                    Linking confidence: {String(data.reaction.linking_confidence?.label || '').toUpperCase()}
-                    <HelpCircle className="w-3.5 h-3.5 text-white/35" />
-                  </span>
-                  {data.reaction.extra_sessions > 0 && data.reaction.key_sessions_gaps > 0 ? (
-                    <button
-                      onClick={() => setLinkOpen(true)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/[0.10]"
-                      title="Link extras to gaps"
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                      Link
-                    </button>
-                  ) : null}
+                <div className="flex items-center gap-1 text-[10px]">
+                  <div className="w-2 h-2 rounded-[2px]" style={{ background: '#38bdf8' }} />
+                  <span className="text-sky-400/70">Extra</span>
                 </div>
               </div>
             </div>
-          ) : null}
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Execution score (avg)</div>
-            <div className="text-xs text-white/85">
-              {data.reaction.avg_execution_score != null ? `${data.reaction.avg_execution_score}%` : '—'}
-              {data.reaction.execution_sample_size ? (
-                <span className="text-white/45 ml-2">n={data.reaction.execution_sample_size}</span>
-              ) : null}
+          );
+        })() : null}
+      </div>
+
+
+      {/* ── Key Sessions ── */}
+      {data.reaction.key_sessions_planned > 0 && (
+        <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-white/80">Key sessions</div>
+            <div className="text-sm text-white/90 font-medium">
+              {data.reaction.key_sessions_linked}/{data.reaction.key_sessions_planned} done
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">HR drift (avg)</div>
-            <div className="text-xs text-white/85">
-              {data.reaction.hr_drift_avg_bpm != null ? `${data.reaction.hr_drift_avg_bpm} bpm` : '—'}
-              {data.reaction.hr_drift_sample_size ? (
-                <span className="text-white/45 ml-2">n={data.reaction.hr_drift_sample_size}</span>
-              ) : null}
+          <div className="h-2.5 w-full rounded-full bg-white/10 overflow-hidden border border-white/10">
+            <div className="h-full flex">
+              <div
+                className="h-full bg-emerald-400/70"
+                style={{ width: `${Math.round((data.reaction.key_sessions_linked / data.reaction.key_sessions_planned) * 100)}%` }}
+              />
             </div>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Session RPE (7d avg)</div>
-            <div className="text-xs text-white/85">
-              {data.reaction.avg_session_rpe_7d != null ? `${data.reaction.avg_session_rpe_7d}` : '—'}
-              {data.reaction.rpe_sample_size_7d ? (
-                <span className="text-white/45 ml-2">n={data.reaction.rpe_sample_size_7d}</span>
-              ) : null}
+          {(data.reaction.extra_sessions > 0 || data.reaction.key_sessions_gaps > 0) && (
+            <div className="mt-2 flex items-center justify-between text-xs text-white/45">
+              <div>
+                {data.reaction.key_sessions_gaps > 0 && (
+                  <span className="text-amber-300/80">{data.reaction.key_sessions_gaps} missed</span>
+                )}
+                {data.reaction.extra_sessions > 0 && (
+                  <span className={data.reaction.key_sessions_gaps > 0 ? 'ml-2 text-sky-300/80' : 'text-sky-300/80'}>+{data.reaction.extra_sessions} extra</span>
+                )}
+              </div>
+              {data.reaction.extra_sessions > 0 && data.reaction.key_sessions_gaps > 0 && (
+                <button
+                  onClick={() => setLinkOpen(true)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/[0.10]"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  Link
+                </button>
+              )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Body Response ── */}
+      <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
+        <div className="text-sm text-white/80 mb-3">Body response</div>
+        <div className="space-y-3">
+          {data.reaction.avg_execution_score != null && (
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/60">Plan execution</div>
+              <div className="text-sm text-white/90 font-medium">{data.reaction.avg_execution_score}%</div>
+            </div>
+          )}
+          {data.reaction.avg_session_rpe_7d != null && (
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/60">Effort level</div>
+              <div className="text-sm text-white/90">
+                <span className="font-medium">{rpeLabel(data.reaction.avg_session_rpe_7d)}</span>
+                <span className="text-xs text-white/40 ml-1.5">{data.reaction.avg_session_rpe_7d}/10</span>
+              </div>
+            </div>
+          )}
+          {data.reaction.avg_strength_rir_7d != null && (
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/60">Strength reserve</div>
+              <div className="text-sm text-white/90">
+                <span className="font-medium">{rirLabel(data.reaction.avg_strength_rir_7d)}</span>
+                <span className="text-xs text-white/40 ml-1.5">{data.reaction.avg_strength_rir_7d} reps in tank</span>
+              </div>
+            </div>
+          )}
+          {data.reaction.hr_drift_avg_bpm != null && (
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-white/60">Cardiac drift</div>
+              <div className="text-sm text-white/90">
+                {data.reaction.hr_drift_avg_bpm <= 5 ? (
+                  <span className="text-emerald-400 font-medium">Minimal</span>
+                ) : data.reaction.hr_drift_avg_bpm <= 10 ? (
+                  <span className="text-white/80 font-medium">Normal</span>
+                ) : (
+                  <span className="text-amber-400 font-medium">Elevated</span>
+                )}
+                <span className="text-xs text-white/40 ml-1.5">{data.reaction.hr_drift_avg_bpm} bpm</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 4-week trend ── */}
+      <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
+        <div className="text-sm text-white/80 mb-3">4-week trend</div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/60">Aerobic fitness</div>
+            <DeltaIndicator value={data.response?.aerobic?.drift_delta_bpm ?? null} unit=" bpm" invertPositive={true} size="sm" />
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Strength RIR (7d avg)</div>
-            <div className="text-xs text-white/85">
-              {data.reaction.avg_strength_rir_7d != null ? `${data.reaction.avg_strength_rir_7d}` : '—'}
-              {data.reaction.rir_sample_size_7d ? (
-                <span className="text-white/45 ml-2">n={data.reaction.rir_sample_size_7d}</span>
-              ) : null}
-            </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/60">Strength capacity</div>
+            <DeltaIndicator value={data.response?.structural?.rir_delta ?? null} invertPositive={false} size="sm" />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/60">Perceived effort</div>
+            <DeltaIndicator value={data.response?.subjective?.rpe_delta ?? null} invertPositive={true} size="sm" />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/60">Execution quality</div>
+            <DeltaIndicator value={data.response?.absorption?.execution_delta ?? null} unit="%" invertPositive={false} size="sm" />
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/15 bg-white/[0.06] p-3">
-        <div className="text-sm text-white/70">What changed vs your baseline (28d)</div>
-        <div className="mt-2 space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Aerobic (HR drift)</div>
-            <DeltaIndicator
-              value={data.response?.aerobic?.drift_delta_bpm ?? null}
-              unit=" bpm"
-              invertPositive={true}
-              size="sm"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Structural (Strength RIR)</div>
-            <DeltaIndicator
-              value={data.response?.structural?.rir_delta ?? null}
-              invertPositive={false}
-              size="sm"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Subjective (RPE)</div>
-            <DeltaIndicator
-              value={data.response?.subjective?.rpe_delta ?? null}
-              invertPositive={true}
-              size="sm"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-white/55">Absorption (Execution)</div>
-            <DeltaIndicator
-              value={data.response?.absorption?.execution_delta ?? null}
-              unit="%"
-              invertPositive={false}
-              size="sm"
-            />
-          </div>
-        </div>
-      </div>
-
+      {/* ── Run sessions ── */}
       {Array.isArray(data.response?.run_session_types_7d) && data.response.run_session_types_7d.length ? (
-        <div className="rounded-xl border border-white/15 bg-white/[0.06] p-3">
-          <div className="text-sm text-white/70">Run session types (7d)</div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {data.response.run_session_types_7d.slice(0, 6).map((s) => {
+        <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
+          <div className="text-sm text-white/80 mb-2">Run sessions this week</div>
+          <div className="grid grid-cols-2 gap-2">
+            {data.response.run_session_types_7d.slice(0, 6).map((s: any) => {
               const label =
-                s.type === 'z2' ? 'Zone 2'
-                : s.type === 'long' ? 'Long'
-                : s.type === 'tempo' ? 'Tempo'
-                : s.type === 'progressive' ? 'Progressive'
-                : s.type === 'fartlek' ? 'Fartlek'
-                : s.type === 'intervals' ? 'Intervals'
-                : s.type === 'hills' ? 'Hills'
-                : s.type === 'easy' ? 'Easy'
-                : 'Unknown';
+                s.type === 'z2' ? 'Zone 2' : s.type === 'long' ? 'Long Run' : s.type === 'tempo' ? 'Tempo'
+                : s.type === 'progressive' ? 'Progressive' : s.type === 'fartlek' ? 'Fartlek'
+                : s.type === 'intervals' ? 'Intervals' : s.type === 'hills' ? 'Hills'
+                : s.type === 'easy' ? 'Easy' : 'Other';
+
+              const decouple = s.avg_decoupling_pct;
+              const effLbl = efficiencyLabel(decouple);
+              const effClr = efficiencyColor(decouple);
 
               const metric =
                 s.type === 'intervals' || s.type === 'hills'
-                  ? (s.avg_interval_hr_creep_bpm != null ? `HR creep ${s.avg_interval_hr_creep_bpm} bpm` : (s.avg_execution_score != null ? `Exec ${s.avg_execution_score}%` : '—'))
-                  : (s.avg_decoupling_pct != null ? `Decoupling ${s.avg_decoupling_pct}%` : (s.avg_hr_drift_bpm != null ? `Drift ${s.avg_hr_drift_bpm} bpm` : (s.avg_z2_percent != null ? `Z2 ${s.avg_z2_percent}%` : '—')));
+                  ? (s.avg_execution_score != null ? `${s.avg_execution_score}% execution` : '\u2014')
+                  : (effLbl ? `${effLbl} efficiency` : '\u2014');
 
               return (
-                <div key={`${s.type}-${metric}`} className="rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                <div key={`${s.type}-${s.sample_size}`} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-white/80">{label}</div>
-                    <div className="text-2xs text-white/45">n={s.sample_size}</div>
+                    <div className="text-xs text-white/85 font-medium">{label}</div>
+                    <div className="text-[10px] text-white/35">&times;{s.sample_size}</div>
                   </div>
-                  <div className="mt-0.5 text-2xs text-white/60">{metric}</div>
+                  <div className={`mt-0.5 text-xs ${effClr}`}>{metric}</div>
                 </div>
               );
             })}
@@ -508,4 +472,3 @@ export default function CoachWeekTab() {
     </div>
   );
 }
-
