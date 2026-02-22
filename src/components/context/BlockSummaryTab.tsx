@@ -29,6 +29,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
+import { useExerciseLog, type LiftTrend } from '@/hooks/useExerciseLog';
+import { useAthleteSnapshot } from '@/hooks/useAthleteSnapshot';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 import type { BlockAdaptation } from '@/types/fitness';
 
@@ -72,11 +74,107 @@ const STATUS_CONFIG = {
 };
 
 // =============================================================================
+// STRENGTH PROGRESSION (reads from exercise_log — deterministic layer)
+// =============================================================================
+
+const StrengthProgressionSection: React.FC<{
+  liftTrends: LiftTrend[];
+  snapshot: { strength_volume_total: number | null; strength_volume_trend: number | null; strength_top_lifts: any } | null;
+}> = ({ liftTrends, snapshot }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (liftTrends.length === 0) return null;
+
+  const BIG_FOUR = new Set(['squat', 'bench_press', 'deadlift', 'overhead_press']);
+  const mainLifts = liftTrends.filter(t => BIG_FOUR.has(t.canonical));
+  const accessoryLifts = liftTrends.filter(t => !BIG_FOUR.has(t.canonical));
+
+  const DISPLAY_NAMES: Record<string, string> = {
+    squat: 'Squat', bench_press: 'Bench Press', deadlift: 'Deadlift',
+    overhead_press: 'OHP',
+  };
+
+  const renderLift = (lift: LiftTrend) => {
+    const first = lift.entries[0];
+    const last = lift.entries[lift.entries.length - 1];
+    const trendColor = lift.trend == null ? 'text-white/50'
+      : lift.trend > 0 ? 'text-emerald-400'
+      : lift.trend < 0 ? 'text-amber-400'
+      : 'text-white/50';
+    const trendIcon = lift.trend == null ? '' : lift.trend > 0 ? '↑' : lift.trend < 0 ? '↓' : '→';
+    const name = DISPLAY_NAMES[lift.canonical] ?? lift.displayName;
+
+    return (
+      <div key={lift.canonical} className="flex items-center justify-between text-sm py-1">
+        <div className="text-white/85 min-w-[100px]">{name}</div>
+        <div className="flex items-center gap-3 text-white/60">
+          <span>{Math.round(first.estimated_1rm)} → <span className="text-white/90">{Math.round(last.estimated_1rm)}</span></span>
+          <span className={`text-xs ${trendColor} min-w-[52px] text-right`}>
+            {trendIcon} {lift.trend != null ? `${lift.trend > 0 ? '+' : ''}${lift.trend}%` : '—'}
+          </span>
+          <span className="text-xs text-white/30">{lift.entries.length}×</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Dumbbell className="w-4 h-4 text-orange-400" />
+          <h3 className="text-sm font-medium text-white">Strength Progression</h3>
+          <span className="text-xs text-white/40">(12-week)</span>
+        </div>
+        {snapshot?.strength_volume_trend != null && (
+          <span className={`text-xs ${snapshot.strength_volume_trend >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+            Vol {snapshot.strength_volume_trend > 0 ? '+' : ''}{snapshot.strength_volume_trend}% this week
+          </span>
+        )}
+      </div>
+
+      <div className="text-xs uppercase tracking-wide text-white/40 mb-2">Est. 1RM progression</div>
+
+      {mainLifts.length > 0 && (
+        <div className="space-y-0.5 mb-3">
+          {mainLifts.map(renderLift)}
+        </div>
+      )}
+
+      {accessoryLifts.length > 0 && (
+        <>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="text-xs text-white/50 hover:text-white/75 transition-colors mt-1 mb-2"
+            type="button"
+          >
+            {expanded ? 'Hide' : 'Show'} {accessoryLifts.length} accessories
+          </button>
+          {expanded && (
+            <div className="space-y-0.5 border-t border-white/10 pt-2">
+              {accessoryLifts.map(renderLift)}
+            </div>
+          )}
+        </>
+      )}
+
+      {snapshot?.strength_volume_total != null && (
+        <div className="mt-3 pt-2 border-t border-white/10 text-xs text-white/40">
+          Week volume: {Math.round(snapshot.strength_volume_total).toLocaleString()} lbs
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
 const BlockSummaryTab: React.FC = () => {
   const { data, loading, error, refresh } = useOverallContext(4);
+  const { liftTrends } = useExerciseLog(12);
+  const { snapshots, current: currentSnapshot } = useAthleteSnapshot(5);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -205,6 +303,9 @@ const BlockSummaryTab: React.FC = () => {
 
           {/* Fitness Adaptation - Structured (cached server-side) */}
           <FitnessAdaptationSection adaptation={data.fitness_adaptation_structured} />
+
+          {/* Strength Progression — reads from exercise_log (deterministic layer) */}
+          <StrengthProgressionSection liftTrends={liftTrends} snapshot={currentSnapshot} />
 
           {/* Goal Predictor: server-computed (block_verdict, race_day_forecast, durability_risk, interference) */}
           <GoalPredictorBlockSection goalPrediction={data.goal_prediction} />
