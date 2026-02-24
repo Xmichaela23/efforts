@@ -300,7 +300,7 @@ The existing analyzers gradually become thin wrappers: fetch facts, feed to AI, 
 
 **First deliverable: baseline drift suggestion.** "Your squat has progressed to 315 but your baseline says 275 — update?" Low-risk, high-confidence, easy to validate. Data is already in `exercise_log` vs `performance_numbers`. Wires the full suggestion + confirm pipeline end-to-end before tackling harder judgment calls.
 
-- [ ] **Baseline drift suggestion** — Compare `learned_fitness.strength_1rms` (or exercise_log max) vs `performance_numbers` per lift. When learned > baseline by meaningful margin (e.g. 5%+), show inline card: accept updates baseline, dismiss records feedback.
+- [x] **Baseline drift suggestion** — Coach computes drift; CoachWeekTab shows inline card when learned > baseline by 5%+ (medium/high confidence). Accept updates performance_numbers; dismiss stores in dismissed_suggestions with 30-day cooldown.
 - [ ] **Plan adaptation (stalling/overreaching)** — Read `athlete_snapshot` to detect stalls, overreaching. Suggest "deload and rebuild", "add recovery day", etc. Harder judgment calls; ship after baseline drift proves the UX.
 
 **Phase 3 UX (design decision):** Suggestion + confirm as default. Do not auto-apply changes — athletes lose trust when the system changes plans without consent. Instead:

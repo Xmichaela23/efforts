@@ -78,6 +78,7 @@ export type CoachWeekContextV1 = {
     performance_numbers: Record<string, any> | null;
     effort_paces: Record<string, any> | null;
     learned_fitness: Record<string, any> | null;
+    dismissed_suggestions?: Record<string, Record<string, string>> | null;
     learning_status: string | null;
     norms_28d: {
       hr_drift_avg_bpm: number | null;
@@ -180,6 +181,7 @@ export type CoachWeekContextV1 = {
   evidence: Array<{ code: string; label: string; value: number | string; unit?: string }>;
   week_narrative: string | null;
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
+  baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
   interference: {
     aerobic: string;

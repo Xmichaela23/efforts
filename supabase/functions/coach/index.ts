@@ -719,7 +719,7 @@ Deno.serve(async (req) => {
     // =========================================================================
     const { data: ub, error: ubErr } = await supabase
       .from('user_baselines')
-      .select('performance_numbers,effort_paces,learned_fitness')
+      .select('performance_numbers,effort_paces,learned_fitness,dismissed_suggestions')
       .eq('user_id', userId)
       .maybeSingle();
     if (ubErr) throw ubErr;
@@ -788,13 +788,42 @@ Deno.serve(async (req) => {
       execution_score_sample_size: normExecution.length,
     };
 
+    const dismissed = (ub as any)?.dismissed_suggestions || null;
+    const dismissedDrift = (dismissed?.baseline_drift as Record<string, string>) || {};
+
     const baselines: CoachWeekContextResponseV1['baselines'] = {
       performance_numbers: (ub as any)?.performance_numbers || null,
       effort_paces: (ub as any)?.effort_paces || null,
       learned_fitness: learnedFitness || null,
       learning_status: learningStatus,
       norms_28d: norms28d,
+      dismissed_suggestions: dismissed,
     };
+
+    // Baseline drift suggestions: learned 1RM > baseline by 5%+, medium/high confidence
+    const perf = (ub as any)?.performance_numbers || {};
+    const strength = learnedFitness?.strength_1rms || {};
+    const driftPairs: Array<{ lift: string; label: string; baseline: number; learned: number }> = [
+      { lift: 'squat', label: 'Squat', baseline: Number(perf?.squat), learned: Number(strength?.squat?.value) },
+      { lift: 'bench_press', label: 'Bench press', baseline: Number(perf?.bench), learned: Number(strength?.bench_press?.value) },
+      { lift: 'deadlift', label: 'Deadlift', baseline: Number(perf?.deadlift), learned: Number(strength?.deadlift?.value) },
+      { lift: 'overhead_press', label: 'Overhead press', baseline: Number(perf?.overheadPress1RM ?? perf?.ohp ?? perf?.overhead), learned: Number(strength?.overhead_press?.value) },
+    ];
+    const today = asOfDate;
+    const baseline_drift_suggestions: Array<{ lift: string; label: string; baseline: number; learned: number }> = [];
+    for (const p of driftPairs) {
+      if (!Number.isFinite(p.baseline) || p.baseline <= 0) continue;
+      if (!Number.isFinite(p.learned) || p.learned < p.baseline * 1.05) continue;
+      const conf = strength[p.lift as keyof typeof strength]?.confidence;
+      if (conf !== 'high' && conf !== 'medium') continue;
+      const dismissedAt = dismissedDrift[p.lift];
+      if (dismissedAt) {
+        const d = new Date(dismissedAt).getTime();
+        const t = new Date(today).getTime();
+        if (t - d < 30 * 24 * 60 * 60 * 1000) continue; // cooldown 30 days
+      }
+      baseline_drift_suggestions.push(p);
+    }
 
     // =========================================================================
     // Baseline-relative response interpretation (what a coach would show)
@@ -1373,6 +1402,7 @@ ${narrativeFacts.join('\n')}`;
       },
       reaction,
       baselines,
+      baseline_drift_suggestions: baseline_drift_suggestions.length ? baseline_drift_suggestions : undefined,
       response: responseInterp,
       training_state,
       verdict: {

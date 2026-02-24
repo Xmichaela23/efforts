@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { AlertCircle, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase } from '@/lib/supabase';
 import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
@@ -144,6 +144,76 @@ function LinkExtrasDialog({ open, onClose, onLinked, extras, gaps }: LinkExtrasD
 
 function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+type BaselineDriftSuggestion = { lift: string; label: string; baseline: number; learned: number };
+
+function BaselineDriftCard({
+  suggestions,
+  onAccept,
+  onDismiss,
+}: {
+  suggestions: BaselineDriftSuggestion[];
+  onAccept: (lift: string, learned: number) => Promise<void>;
+  onDismiss: (lift: string) => Promise<void>;
+}) {
+  const [actioning, setActioning] = useState<string | null>(null);
+
+  const handleAccept = async (s: BaselineDriftSuggestion) => {
+    setActioning(s.lift);
+    try {
+      await onAccept(s.lift, s.learned);
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleDismiss = async (s: BaselineDriftSuggestion) => {
+    setActioning(s.lift);
+    try {
+      await onDismiss(s.lift);
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-900/5 p-4">
+      <div className="text-sm font-medium text-amber-200/90 mb-2">Update your strength baselines?</div>
+      <div className="text-xs text-white/60 mb-3">
+        Your logged lifts have progressed. Updating keeps planned weights accurate.
+      </div>
+      <div className="space-y-2">
+        {suggestions.map((s) => (
+          <div
+            key={s.lift}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2"
+          >
+            <span className="text-sm text-white/90">
+              {s.label}: {s.baseline} → {s.learned} lb
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleAccept(s)}
+                disabled={actioning !== null}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs bg-emerald-500/80 text-white hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {actioning === s.lift ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                Update
+              </button>
+              <button
+                onClick={() => handleDismiss(s)}
+                disabled={actioning !== null}
+                className="px-2.5 py-1 rounded text-xs bg-white/[0.06] border border-white/15 text-white/70 hover:bg-white/[0.1] disabled:opacity-60"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function CoachWeekTab() {
@@ -398,6 +468,44 @@ export default function CoachWeekTab() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Baseline drift suggestion (Phase 3) ── */}
+      {Array.isArray(data.baseline_drift_suggestions) && data.baseline_drift_suggestions.length > 0 && (
+        <BaselineDriftCard
+          suggestions={data.baseline_drift_suggestions}
+          onAccept={async (lift, learned) => {
+            const { data: u } = await supabase.auth.getUser();
+            if (!u?.user?.id) return;
+            const key = lift === 'overhead_press' ? 'overheadPress1RM' : lift === 'bench_press' ? 'bench' : lift;
+            const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const perf = { ...((ub?.performance_numbers as Record<string, unknown>) || {}), [key]: learned };
+            const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
+            const drift = { ...(dismissed.baseline_drift || {}) };
+            delete drift[lift];
+            await supabase.from('user_baselines').update({
+              performance_numbers: perf,
+              dismissed_suggestions: { ...dismissed, baseline_drift: drift },
+              updated_at: new Date().toISOString(),
+            }).eq('user_id', u.user.id);
+            window.dispatchEvent(new CustomEvent('planned:invalidate'));
+            await refresh();
+          }}
+          onDismiss={async (lift) => {
+            const { data: u } = await supabase.auth.getUser();
+            if (!u?.user?.id) return;
+            const today = new Date().toISOString().slice(0, 10);
+            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
+            const drift = { ...(dismissed.baseline_drift || {}), [lift]: today };
+            await supabase.from('user_baselines').update({
+              dismissed_suggestions: { ...dismissed, baseline_drift: drift },
+              updated_at: new Date().toISOString(),
+            }).eq('user_id', u.user.id);
+            await refresh();
+          }}
+          onRefresh={refresh}
+        />
       )}
 
       {/* ── Coach Narrative ── */}

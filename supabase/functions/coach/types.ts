@@ -134,6 +134,7 @@ export type CoachWeekContextResponseV1 = {
     effort_paces: Record<string, any> | null;
     learned_fitness: Record<string, any> | null;
     learning_status: string | null;
+    dismissed_suggestions?: Record<string, Record<string, string>> | null;
     // Personal norms (computed from last 28d)
     norms_28d: {
       hr_drift_avg_bpm: number | null;
@@ -241,6 +242,8 @@ export type CoachWeekContextResponseV1 = {
   };
   evidence: EvidenceItem[];
   week_narrative: string | null;
+  /** Phase 3: baseline drift suggestions (learned 1RM > baseline by 5%+) */
+  baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
   interference: {
