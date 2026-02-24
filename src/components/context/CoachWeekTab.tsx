@@ -492,7 +492,12 @@ export default function CoachWeekTab() {
           </button>
         </div>
         <button
-          onClick={refresh}
+          onClick={async () => {
+            if (contextExpanded && contextValue !== (data?.plan?.athlete_context_for_week ?? '')) {
+              await saveAthleteContext(contextValue);
+            }
+            await refresh();
+          }}
           className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-white/[0.08] border border-white/15 text-white/80 hover:bg-white/[0.12] transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -511,10 +516,19 @@ export default function CoachWeekTab() {
                 saveAthleteContext(contextValue);
                 if (!contextValue.trim()) setContextExpanded(false);
               }}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  saveAthleteContext(contextValue);
+                  if (!contextValue.trim()) setContextExpanded(false);
+                  (e.target as HTMLTextAreaElement).blur();
+                }
+              }}
               placeholder="e.g. had the flu, travel, increased weights on purpose..."
               className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
               autoFocus
             />
+            <div className="px-3 pb-2 text-[10px] text-white/35">Click away or ⌘↵ to save</div>
           ) : (
             <button
               onClick={() => setContextExpanded(true)}
