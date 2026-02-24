@@ -244,6 +244,8 @@ export type CoachWeekContextResponseV1 = {
   week_narrative: string | null;
   /** Phase 3: baseline drift suggestions (learned 1RM > baseline by 5%+) */
   baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
+  /** Phase 3: plan adaptation (deload, add recovery when overreaching/fatigued) */
+  plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
   interference: {

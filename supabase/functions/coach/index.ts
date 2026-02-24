@@ -1141,6 +1141,35 @@ Deno.serve(async (req) => {
 
     const interference = latestSnapshot?.interference ?? null;
 
+    // Plan adaptation suggestions (Phase 3): deload / add recovery when overreaching or fatigued
+    const planAdaptationDismissed = (dismissed?.plan_adaptation as Record<string, string>) || {};
+    const todayMs = new Date(asOfDate).getTime();
+    const cooldownMs = 30 * 24 * 60 * 60 * 1000;
+    const plan_adaptation_suggestions: Array<{ code: string; title: string; details: string }> = [];
+    if (activePlan && (weekIntent !== 'recovery' && weekIntent !== 'taper')) {
+      const addSuggestion = (code: string, title: string, details: string) => {
+        const dismissedAt = planAdaptationDismissed[code];
+        if (dismissedAt) {
+          const d = new Date(dismissedAt).getTime();
+          if (todayMs - d < cooldownMs) return;
+        }
+        plan_adaptation_suggestions.push({ code, title, details });
+      };
+      if (readinessState === 'overreached' || v.code === 'recover_overreaching') {
+        addSuggestion(
+          'deload',
+          'Consider a deload week',
+          "You're showing signs of overreaching. A deload or recovery week before continuing to build can help you absorb your gains.",
+        );
+      } else if (readinessState === 'fatigued' || v.code === 'caution_ramping_fast') {
+        addSuggestion(
+          'add_recovery',
+          'Consider adding recovery',
+          'Fatigue is elevated. Swap a quality session for easy or add a rest day this week.',
+        );
+      }
+    }
+
     // Athlete-provided context for this week (used in narrative + response)
     const athleteContextByWeek = activePlan?.athlete_context_by_week;
     const athleteContext = (weekIndex != null && athleteContextByWeek && typeof athleteContextByWeek === 'object')
@@ -1417,6 +1446,7 @@ ${narrativeFacts.join('\n')}`;
       fitness_direction: fitnessDirection,
       readiness_state: readinessState,
       interference,
+      plan_adaptation_suggestions: plan_adaptation_suggestions.length ? plan_adaptation_suggestions : undefined,
     };
 
     return new Response(JSON.stringify(response), {

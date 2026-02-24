@@ -182,6 +182,7 @@ export type CoachWeekContextV1 = {
   week_narrative: string | null;
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
   baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
+  plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
   interference: {
     aerobic: string;

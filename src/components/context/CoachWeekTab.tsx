@@ -216,6 +216,72 @@ function BaselineDriftCard({
   );
 }
 
+type PlanAdaptationSuggestion = { code: string; title: string; details: string };
+
+function PlanAdaptationCard({
+  suggestions,
+  onAccept,
+  onDismiss,
+}: {
+  suggestions: PlanAdaptationSuggestion[];
+  onAccept: (code: string) => Promise<void>;
+  onDismiss: (code: string) => Promise<void>;
+}) {
+  const [actioning, setActioning] = useState<string | null>(null);
+
+  const handleAccept = async (s: PlanAdaptationSuggestion) => {
+    setActioning(s.code);
+    try {
+      await onAccept(s.code);
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const handleDismiss = async (s: PlanAdaptationSuggestion) => {
+    setActioning(s.code);
+    try {
+      await onDismiss(s.code);
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-amber-900/5 p-4">
+      <div className="text-sm font-medium text-amber-200/90 mb-2">Plan adjustment suggestion</div>
+      <div className="space-y-2">
+        {suggestions.map((s) => (
+          <div
+            key={s.code}
+            className="rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2"
+          >
+            <div className="text-sm text-white/90 font-medium">{s.title}</div>
+            <div className="text-xs text-white/60 mt-0.5">{s.details}</div>
+            <div className="flex items-center gap-1.5 mt-2">
+              <button
+                onClick={() => handleAccept(s)}
+                disabled={actioning !== null}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs bg-emerald-500/80 text-white hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {actioning === s.code ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                Got it
+              </button>
+              <button
+                onClick={() => handleDismiss(s)}
+                disabled={actioning !== null}
+                className="px-2.5 py-1 rounded text-xs bg-white/[0.06] border border-white/15 text-white/70 hover:bg-white/[0.1] disabled:opacity-60"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CoachWeekTab() {
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week
   const focusDate = useMemo(() => {
@@ -504,7 +570,39 @@ export default function CoachWeekTab() {
             }).eq('user_id', u.user.id);
             await refresh();
           }}
-          onRefresh={refresh}
+        />
+      )}
+
+      {/* ── Plan adaptation suggestion (Phase 3) ── */}
+      {Array.isArray(data.plan_adaptation_suggestions) && data.plan_adaptation_suggestions.length > 0 && (
+        <PlanAdaptationCard
+          suggestions={data.plan_adaptation_suggestions}
+          onAccept={async (code) => {
+            const { data: u } = await supabase.auth.getUser();
+            if (!u?.user?.id) return;
+            const today = new Date().toISOString().slice(0, 10);
+            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
+            const pa = { ...(dismissed.plan_adaptation || {}), [code]: today };
+            await supabase.from('user_baselines').update({
+              dismissed_suggestions: { ...dismissed, plan_adaptation: pa },
+              updated_at: new Date().toISOString(),
+            }).eq('user_id', u.user.id);
+            await refresh();
+          }}
+          onDismiss={async (code) => {
+            const { data: u } = await supabase.auth.getUser();
+            if (!u?.user?.id) return;
+            const today = new Date().toISOString().slice(0, 10);
+            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
+            const pa = { ...(dismissed.plan_adaptation || {}), [code]: today };
+            await supabase.from('user_baselines').update({
+              dismissed_suggestions: { ...dismissed, plan_adaptation: pa },
+              updated_at: new Date().toISOString(),
+            }).eq('user_id', u.user.id);
+            await refresh();
+          }}
         />
       )}
 
