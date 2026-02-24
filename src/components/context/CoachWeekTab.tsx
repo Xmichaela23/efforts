@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { AlertCircle, Link2, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase } from '@/lib/supabase';
 import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
@@ -142,17 +142,35 @@ function LinkExtrasDialog({ open, onClose, onLinked, extras, gaps }: LinkExtrasD
   );
 }
 
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 export default function CoachWeekTab() {
-  const { data, loading, error, refresh } = useCoachWeekContext();
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week
+  const focusDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + weekOffset * 7);
+    return toIsoDate(d);
+  }, [weekOffset]);
+
+  const { data, loading, error, refresh } = useCoachWeekContext(focusDate);
   const [linkOpen, setLinkOpen] = useState(false);
   const [contextExpanded, setContextExpanded] = useState(false);
   const [contextValue, setContextValue] = useState('');
   const [contextSaving, setContextSaving] = useState(false);
+  const [pendingSkipReasons, setPendingSkipReasons] = useState<Record<string, string | null>>({});
+  const [skipReasonError, setSkipReasonError] = useState<string | null>(null);
 
   useEffect(() => {
     const val = data?.plan?.athlete_context_for_week ?? '';
     setContextValue(typeof val === 'string' ? val : '');
   }, [data?.plan?.athlete_context_for_week]);
+
+  useEffect(() => {
+    setPendingSkipReasons({});
+    setSkipReasonError(null);
+  }, [focusDate]);
 
   const saveAthleteContext = async (value: string) => {
     const planId = data?.plan?.plan_id;
@@ -181,14 +199,27 @@ export default function CoachWeekTab() {
   };
 
   const updateSkipReason = async (plannedId: string, reason: string | null, note?: string | null) => {
+    const prev = pendingSkipReasons[plannedId] ?? (data?.reaction?.key_session_gaps_details?.find((g: any) => g.planned_id === plannedId)?.skip_reason ?? null);
+    setPendingSkipReasons((s) => ({ ...s, [plannedId]: reason }));
+    setSkipReasonError(null);
     try {
       const patch: Record<string, unknown> = { skip_reason: reason ?? null };
       if (note !== undefined) patch.skip_note = note || null;
-      await supabase.from('planned_workouts').update(patch).eq('id', plannedId);
+      const { error: updateErr } = await supabase
+        .from('planned_workouts')
+        .update(patch)
+        .eq('id', plannedId);
+      if (updateErr) throw updateErr;
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
       await refresh();
-    } catch {
-      // non-fatal
+      setPendingSkipReasons((s) => {
+        const next = { ...s };
+        delete next[plannedId];
+        return next;
+      });
+    } catch (e: any) {
+      setPendingSkipReasons((s) => ({ ...s, [plannedId]: prev }));
+      setSkipReasonError(e?.message || 'Failed to save. Try again.');
     }
   };
 
@@ -302,10 +333,27 @@ export default function CoachWeekTab() {
         gaps={Array.isArray(data.reaction?.key_session_gaps_details) ? data.reaction.key_session_gaps_details : []}
       />
 
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-white/50">
-          {data.week_start_date} → {data.week_end_date}
-          {weekLabel ? <span className="ml-2 text-white/60">{weekLabel}</span> : null}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setWeekOffset((o) => o - 1)}
+            className="p-1.5 rounded-lg text-white/50 hover:bg-white/[0.06] hover:text-white/70 disabled:opacity-30"
+            aria-label="Previous week"
+            disabled={weekOffset >= 0}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="text-xs text-white/50 min-w-[140px]">
+            {data.week_start_date} → {data.week_end_date}
+            {weekLabel ? <span className="ml-2 text-white/60">{weekLabel}</span> : null}
+          </div>
+          <button
+            onClick={() => setWeekOffset((o) => o + 1)}
+            className="p-1.5 rounded-lg text-white/50 hover:bg-white/[0.06] hover:text-white/70"
+            aria-label="Next week"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
         <button
           onClick={refresh}
@@ -451,8 +499,15 @@ export default function CoachWeekTab() {
           )}
           {data.reaction.key_session_gaps_details && data.reaction.key_session_gaps_details.length > 0 && (
             <div className="mt-3 space-y-2 pt-2 border-t border-white/10">
-              <div className="text-[10px] text-white/45 uppercase tracking-wide">Why missed?</div>
-              {data.reaction.key_session_gaps_details.map((g) => (
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] text-white/45 uppercase tracking-wide">Why missed?</div>
+                {skipReasonError && (
+                  <span className="text-[10px] text-amber-300">{skipReasonError}</span>
+                )}
+              </div>
+              {data.reaction.key_session_gaps_details.map((g) => {
+                const effectiveReason = pendingSkipReasons[g.planned_id] ?? g.skip_reason ?? null;
+                return (
                 <div key={g.planned_id} className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
                   <div className="text-xs text-white/70 mb-1.5">
                     {g.date} · {g.type}{g.name ? ` (${g.name})` : ''}
@@ -461,9 +516,9 @@ export default function CoachWeekTab() {
                     {(['sick', 'travel', 'rest', 'life', 'swapped'] as const).map((tag) => (
                       <button
                         key={tag}
-                        onClick={() => updateSkipReason(g.planned_id, g.skip_reason === tag ? null : tag)}
+                        onClick={() => updateSkipReason(g.planned_id, effectiveReason === tag ? null : tag)}
                         className={`px-2 py-0.5 rounded text-[10px] capitalize transition-colors ${
-                          g.skip_reason === tag
+                          effectiveReason === tag
                             ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40'
                             : 'bg-white/[0.06] text-white/50 border border-white/10 hover:bg-white/[0.1] hover:text-white/70'
                         }`}
@@ -478,12 +533,13 @@ export default function CoachWeekTab() {
                     defaultValue={g.skip_note ?? ''}
                     onBlur={(e) => {
                       const v = e.target.value.trim();
-                      if (v !== (g.skip_note ?? '')) updateSkipReason(g.planned_id, g.skip_reason, v);
+                      if (v !== (g.skip_note ?? '')) updateSkipReason(g.planned_id, effectiveReason, v);
                     }}
                     className="mt-1.5 w-full px-2 py-1 text-[10px] bg-white/[0.04] border border-white/10 rounded text-white/70 placeholder:text-white/30 focus:outline-none focus:border-white/20"
                   />
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

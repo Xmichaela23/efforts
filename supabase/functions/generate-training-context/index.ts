@@ -418,6 +418,20 @@ interface TrainingContextResponse {
   };
 }
 
+/** Monday of week containing date, ISO (YYYY-MM-DD). Matches compute-snapshot week boundary. */
+function weekMondayISO(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - ((day + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 interface WorkoutRecord {
   id: string;
   type: string;
@@ -509,6 +523,44 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================================================
+    // FETCH ATHLETE_SNAPSHOT (Deterministic Layer — use when available)
+    // ==========================================================================
+    const targetWeekMonday = dateRanges.currentWeekStartISO ?? weekMondayISO(focusDate);
+    const priorWeekMonday = addDaysISO(targetWeekMonday, -7);
+    const { data: currentSnap } = await supabase
+      .from('athlete_snapshot')
+      .select('workload_total, acwr, workload_by_discipline, adherence_pct, session_count')
+      .eq('user_id', user_id)
+      .eq('week_start', targetWeekMonday)
+      .maybeSingle();
+    const { data: priorSnap } = await supabase
+      .from('athlete_snapshot')
+      .select('workload_total')
+      .eq('user_id', user_id)
+      .eq('week_start', priorWeekMonday)
+      .maybeSingle();
+    if (!currentSnap) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const res = await fetch(`${supabaseUrl}/functions/v1/compute-snapshot`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${svcKey}`,
+            'apikey': svcKey,
+          },
+          body: JSON.stringify({ user_id, week_start: targetWeekMonday }),
+        });
+        if (res.ok) {
+          console.log(`📊 Computed athlete_snapshot for week ${targetWeekMonday}`);
+        }
+      } catch (e) {
+        console.warn('⚠️ compute-snapshot invoke failed (non-fatal):', e?.message ?? e);
+      }
+    }
+
+    // ==========================================================================
     // FETCH DATA
     // ==========================================================================
 
@@ -579,17 +631,25 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Found ${workouts.length} completed workouts, ${plannedWeek.length} planned workouts (week range), ${runsThisWeekWithAnalysis?.length ?? 0} runs this week with analysis`);
 
-    // ==========================================================================
-    // CALCULATE ACWR (using smart date ranges)
-    // ==========================================================================
-
-    const acwr = calculateACWR(workouts, focusDate, dateRanges, plannedForFocusDate, planContext);
+    // Acute window = full week when focus date is Sunday (Mon–Sun in both plan and rolling)
+    const focusDay = new Date(focusDateISO + 'T12:00:00').getDay();
+    const isEndOfWeek = focusDay === 0;
 
     // ==========================================================================
-    // CALCULATE SPORT BREAKDOWN (using current plan week or last 7 days)
+    // CALCULATE ACWR (use athlete_snapshot when end-of-week and available)
     // ==========================================================================
 
-    const sportBreakdown = calculateSportBreakdown(workouts, dateRanges);
+    const acwr = (isEndOfWeek && currentSnap?.acwr != null && currentSnap?.workload_total != null)
+      ? acwrFromSnapshot(currentSnap, plannedForFocusDate, planContext)
+      : calculateACWR(workouts, focusDate, dateRanges, plannedForFocusDate, planContext);
+
+    // ==========================================================================
+    // CALCULATE SPORT BREAKDOWN (use athlete_snapshot when end-of-week and available)
+    // ==========================================================================
+
+    const sportBreakdown = (isEndOfWeek && currentSnap?.workload_by_discipline)
+      ? sportBreakdownFromSnapshot(currentSnap.workload_by_discipline as Record<string, number>, workouts, dateRanges)
+      : calculateSportBreakdown(workouts, dateRanges);
 
     // ==========================================================================
     // BUILD TIMELINE (last 14 days)
@@ -598,10 +658,18 @@ Deno.serve(async (req) => {
     const timeline = buildTimeline(workouts, plannedForFocusDate, dateRanges.fourteenDaysAgo, focusDate, dateRanges.acuteStart);
 
     // ==========================================================================
-    // CALCULATE WEEK COMPARISON (using plan weeks when available)
+    // CALCULATE WEEK COMPARISON (use athlete_snapshot for prior week when available)
     // ==========================================================================
 
-    const weekComparison = calculateWeekComparison(workouts, dateRanges, planContext);
+    const priorWeekWorkloadFromSnapshot = priorSnap?.workload_total != null
+      ? Number(priorSnap.workload_total)
+      : undefined;
+    const weekComparison = calculateWeekComparison(
+      workouts,
+      dateRanges,
+      planContext,
+      priorWeekWorkloadFromSnapshot
+    );
 
     // ==========================================================================
     // GENERATE SMART INSIGHTS
@@ -2360,7 +2428,54 @@ async function fetchPlanContext(
 }
 
 // =============================================================================
-// ACWR CALCULATION
+// ACWR (from athlete_snapshot when acute = full week)
+// =============================================================================
+
+function acwrFromSnapshot(
+  snap: { workload_total: number; acwr: number },
+  plannedForFocusDate: PlannedWorkoutRecord[],
+  planContext: PlanContext | null
+): ACWRData {
+  const acuteTotal = Number(snap.workload_total) || 0;
+  const ratio = Number(snap.acwr) || 0;
+  const acuteDays = 7;
+  const chronicDays = 28;
+  const acuteDailyAvg = acuteTotal / acuteDays;
+  const chronicDailyAvg = ratio > 0 ? acuteDailyAvg / ratio : 0;
+  const chronicTotal = chronicDailyAvg * chronicDays;
+
+  let projected: ACWRData['projected'] | undefined;
+  if (plannedForFocusDate.length > 0) {
+    const plannedWorkload = plannedForFocusDate.reduce((sum, p) => sum + (p.workload_planned || 0), 0);
+    if (plannedWorkload > 0) {
+      const projectedAcuteTotal = acuteTotal + plannedWorkload;
+      const projectedAcuteDailyAvg = projectedAcuteTotal / acuteDays;
+      const projectedRatio = chronicDailyAvg > 0
+        ? Math.round((projectedAcuteDailyAvg / chronicDailyAvg) * 100) / 100
+        : 0;
+      projected = {
+        ratio: projectedRatio,
+        status: getACWRStatus(projectedRatio, planContext),
+        planned_workload: plannedWorkload
+      };
+    }
+  }
+
+  return {
+    ratio,
+    status: getACWRStatus(ratio, planContext),
+    acute_daily_avg: Math.round(acuteDailyAvg * 10) / 10,
+    chronic_daily_avg: Math.round(chronicDailyAvg * 10) / 10,
+    acute_total: acuteTotal,
+    chronic_total: Math.round(chronicTotal),
+    data_days: chronicDays,
+    plan_context: planContext || undefined,
+    projected
+  };
+}
+
+// =============================================================================
+// ACWR CALCULATION (from workouts when mid-week or no snapshot)
 // =============================================================================
 
 function calculateACWR(
@@ -2500,7 +2615,60 @@ function getACWRStatus(
 }
 
 // =============================================================================
-// SPORT BREAKDOWN
+// SPORT BREAKDOWN (from athlete_snapshot when end-of-week)
+// =============================================================================
+
+function sportBreakdownFromSnapshot(
+  workloadByDisc: Record<string, number>,
+  workouts: WorkoutRecord[],
+  dateRanges: SmartDateRanges
+): SportBreakdown {
+  const map: Record<string, keyof Omit<SportBreakdown, 'total_workload'>> = {
+    run: 'run',
+    ride: 'bike',
+    bike: 'bike',
+    swim: 'swim',
+    strength: 'strength',
+    mobility: 'mobility',
+    pilates_yoga: 'mobility'
+  };
+  const breakdown: SportBreakdown = {
+    run: { workload: 0, percent: 0, sessions: 0 },
+    bike: { workload: 0, percent: 0, sessions: 0 },
+    swim: { workload: 0, percent: 0, sessions: 0 },
+    strength: { workload: 0, percent: 0, sessions: 0 },
+    mobility: { workload: 0, percent: 0, sessions: 0 },
+    total_workload: 0
+  };
+  for (const [disc, load] of Object.entries(workloadByDisc || {})) {
+    const key = map[disc] ?? null;
+    if (key && typeof load === 'number') {
+      breakdown[key].workload += load;
+      breakdown.total_workload += load;
+    }
+  }
+  const acuteWorkouts = workouts.filter(w => {
+    const d = new Date(w.date + 'T12:00:00');
+    return d >= dateRanges.acuteStart && d <= dateRanges.acuteEnd;
+  });
+  acuteWorkouts.forEach(w => {
+    const type = normalizeSportType(w.type);
+    if (type in breakdown && type !== 'total_workload') {
+      (breakdown[type as keyof Omit<SportBreakdown, 'total_workload'>] as SportData).sessions += 1;
+    }
+  });
+  if (breakdown.total_workload > 0) {
+    breakdown.run.percent = Math.round((breakdown.run.workload / breakdown.total_workload) * 100);
+    breakdown.bike.percent = Math.round((breakdown.bike.workload / breakdown.total_workload) * 100);
+    breakdown.swim.percent = Math.round((breakdown.swim.workload / breakdown.total_workload) * 100);
+    breakdown.strength.percent = Math.round((breakdown.strength.workload / breakdown.total_workload) * 100);
+    breakdown.mobility.percent = Math.round((breakdown.mobility.workload / breakdown.total_workload) * 100);
+  }
+  return breakdown;
+}
+
+// =============================================================================
+// SPORT BREAKDOWN (from workouts when mid-week or no snapshot)
 // =============================================================================
 
 function calculateSportBreakdown(
@@ -2678,7 +2846,8 @@ function getDefaultWorkoutName(type: string): string {
 function calculateWeekComparison(
   workouts: WorkoutRecord[],
   dateRanges: SmartDateRanges,
-  planContext: PlanContext | null
+  planContext: PlanContext | null,
+  priorWeekWorkloadFromSnapshot?: number
 ): WeekComparison {
   
   // Current week: use current plan week if available, otherwise last 7 days
@@ -2701,28 +2870,29 @@ function calculateWeekComparison(
   });
   const currentWeekTotal = currentWeekWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
 
-  // Previous week: use previous plan week if available, otherwise previous 7 days
-  let previousWeekStart: Date;
-  let previousWeekEnd: Date;
-  
-  if (planContext?.hasActivePlan && dateRanges.previousWeekStart && dateRanges.previousWeekEnd) {
-    // Use plan-aligned previous week
-    previousWeekStart = dateRanges.previousWeekStart;
-    previousWeekEnd = dateRanges.previousWeekEnd;
+  // Previous week: use athlete_snapshot when available (avoids re-querying workouts)
+  let previousWeekTotal: number;
+  if (priorWeekWorkloadFromSnapshot != null && priorWeekWorkloadFromSnapshot >= 0) {
+    previousWeekTotal = priorWeekWorkloadFromSnapshot;
   } else {
-    // Use rolling previous 7-day window
-    previousWeekStart = new Date(currentWeekStart);
-    previousWeekStart.setDate(currentWeekStart.getDate() - 7);
-    previousWeekEnd = new Date(currentWeekStart);
-    previousWeekEnd.setDate(currentWeekStart.getDate() - 1);
-    previousWeekEnd.setHours(23, 59, 59, 999);
+    let previousWeekStart: Date;
+    let previousWeekEnd: Date;
+    if (planContext?.hasActivePlan && dateRanges.previousWeekStart && dateRanges.previousWeekEnd) {
+      previousWeekStart = dateRanges.previousWeekStart;
+      previousWeekEnd = dateRanges.previousWeekEnd;
+    } else {
+      previousWeekStart = new Date(currentWeekStart);
+      previousWeekStart.setDate(currentWeekStart.getDate() - 7);
+      previousWeekEnd = new Date(currentWeekStart);
+      previousWeekEnd.setDate(currentWeekStart.getDate() - 1);
+      previousWeekEnd.setHours(23, 59, 59, 999);
+    }
+    const previousWeekWorkouts = workouts.filter(w => {
+      const workoutDate = new Date(w.date + 'T12:00:00');
+      return workoutDate >= previousWeekStart && workoutDate <= previousWeekEnd;
+    });
+    previousWeekTotal = previousWeekWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
   }
-  
-  const previousWeekWorkouts = workouts.filter(w => {
-    const workoutDate = new Date(w.date + 'T12:00:00');
-    return workoutDate >= previousWeekStart && workoutDate <= previousWeekEnd;
-  });
-  const previousWeekTotal = previousWeekWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
 
   // Calculate change
   let changePercent = 0;
