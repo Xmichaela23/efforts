@@ -32,25 +32,19 @@ WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_plan_adjustments_plan 
 ON plan_adjustments(plan_id, status);
 
--- RLS policies
 ALTER TABLE plan_adjustments ENABLE ROW LEVEL SECURITY;
 
--- Users can only see their own adjustments
-CREATE POLICY "Users can view own adjustments"
-ON plan_adjustments FOR SELECT
-USING (auth.uid() = user_id);
-
--- Users can insert their own adjustments
-CREATE POLICY "Users can insert own adjustments"
-ON plan_adjustments FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
--- Users can update their own adjustments
-CREATE POLICY "Users can update own adjustments"
-ON plan_adjustments FOR UPDATE
-USING (auth.uid() = user_id);
-
--- Users can delete their own adjustments
-CREATE POLICY "Users can delete own adjustments"
-ON plan_adjustments FOR DELETE
-USING (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='plan_adjustments' AND policyname='Users can view own adjustments') THEN
+    CREATE POLICY "Users can view own adjustments" ON plan_adjustments FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='plan_adjustments' AND policyname='Users can insert own adjustments') THEN
+    CREATE POLICY "Users can insert own adjustments" ON plan_adjustments FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='plan_adjustments' AND policyname='Users can update own adjustments') THEN
+    CREATE POLICY "Users can update own adjustments" ON plan_adjustments FOR UPDATE USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='plan_adjustments' AND policyname='Users can delete own adjustments') THEN
+    CREATE POLICY "Users can delete own adjustments" ON plan_adjustments FOR DELETE USING (auth.uid() = user_id);
+  END IF;
+END $$;

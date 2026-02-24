@@ -413,6 +413,15 @@ function computeAdherence(w: WorkoutRow, planned: PlannedRow | null): Record<str
     }
   }
 
+  // Athlete-provided: weight deviation intentional (strength)
+  const meta = w.workout_metadata ?? {};
+  if (typeof meta.weight_deviation_intentional === "boolean") {
+    result.weight_deviation_intentional = meta.weight_deviation_intentional;
+  }
+  if (typeof meta.weight_deviation_note === "string" && meta.weight_deviation_note.trim()) {
+    result.weight_deviation_note = meta.weight_deviation_note.trim();
+  }
+
   return Object.keys(result).length > 0 ? result : null;
 }
 

@@ -334,7 +334,83 @@ serve(async (req: Request) => {
     const topLifts = buildTopLifts(currentWeekExercises, exercises, targetWeek);
 
     // -----------------------------------------------------------------------
-    // 8. Plan context
+    // 8. Interference detection (engine vs chassis)
+    // -----------------------------------------------------------------------
+    // Aerobic direction: run_easy_hr_trend < 0 means faster at same HR = improving
+    // Strength direction: compare current top lifts vs prior top lifts
+    const priorExercises = exercises.filter((e) => e.date < targetWeek);
+    const priorTopLifts = buildTopLifts(
+      priorExercises.filter((e) => {
+        const wk = weekMonday(new Date(e.date));
+        return wk === weekMonday(new Date(new Date(targetWeek).getTime() - 7 * 24 * 60 * 60 * 1000));
+      }),
+      priorExercises,
+      weekMonday(new Date(new Date(targetWeek).getTime() - 7 * 24 * 60 * 60 * 1000)),
+    );
+
+    let aerobicDirection: 'improving' | 'stable' | 'declining' | null = null;
+    if (runEasyHRTrend != null) {
+      aerobicDirection = runEasyHRTrend < -2 ? 'improving' : runEasyHRTrend > 2 ? 'declining' : 'stable';
+    } else {
+      // Fallback: use run efficiency trend or run workload trajectory
+      const priorRunEfs = priorAggs.map((a) => a.runEfficiency).filter((v): v is number => v != null);
+      const chronicRunEf = avg(priorRunEfs);
+      if (current.runEfficiency != null && chronicRunEf != null && chronicRunEf > 0) {
+        const efDelta = ((current.runEfficiency - chronicRunEf) / chronicRunEf) * 100;
+        aerobicDirection = efDelta > 3 ? 'improving' : efDelta < -3 ? 'declining' : 'stable';
+      } else {
+        // Last resort: compare current vs chronic run workload — increasing load = building
+        const currentRunLoad = current.workloadByDisc['run'] ?? 0;
+        const priorRunLoads = priorAggs.map((a) => a.workloadByDisc['run'] ?? 0);
+        const chronicRunLoad = avg(priorRunLoads.filter(v => v > 0));
+        if (currentRunLoad > 0 && chronicRunLoad != null && chronicRunLoad > 0) {
+          const loadDelta = ((currentRunLoad - chronicRunLoad) / chronicRunLoad) * 100;
+          aerobicDirection = loadDelta > 10 ? 'improving' : loadDelta < -15 ? 'declining' : 'stable';
+        }
+      }
+    }
+
+    let structuralDirection: 'improving' | 'stable' | 'declining' | null = null;
+    const currentAvg1RM = (() => {
+      const vals = Object.values(topLifts).map((l: any) => l.est_1rm).filter((v: any) => typeof v === 'number' && v > 0);
+      return vals.length > 0 ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : null;
+    })();
+    const priorAvg1RM = (() => {
+      const vals = Object.values(priorTopLifts).map((l: any) => l.est_1rm).filter((v: any) => typeof v === 'number' && v > 0);
+      return vals.length > 0 ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : null;
+    })();
+    if (currentAvg1RM != null && priorAvg1RM != null && priorAvg1RM > 0) {
+      const liftDelta = ((currentAvg1RM - priorAvg1RM) / priorAvg1RM) * 100;
+      structuralDirection = liftDelta > 2 ? 'improving' : liftDelta < -2 ? 'declining' : 'stable';
+    } else if (strengthVolumeTrend != null) {
+      structuralDirection = strengthVolumeTrend > 5 ? 'improving' : strengthVolumeTrend < -5 ? 'declining' : 'stable';
+    }
+
+    // Interference: one system improving while the other declines
+    let interferenceScore: Record<string, any> | null = null;
+    if (aerobicDirection && structuralDirection) {
+      const dominated =
+        (aerobicDirection === 'improving' && structuralDirection === 'declining') ? 'endurance_dominating'
+        : (structuralDirection === 'improving' && aerobicDirection === 'declining') ? 'strength_dominating'
+        : null;
+
+      interferenceScore = {
+        aerobic: aerobicDirection,
+        structural: structuralDirection,
+        status: dominated ? 'interference_detected' : 'balanced',
+        dominated_by: dominated ?? null,
+        detail: dominated === 'endurance_dominating'
+          ? 'Aerobic fitness is improving but strength is declining. Current training volume may be favoring endurance at the cost of strength.'
+          : dominated === 'strength_dominating'
+          ? 'Strength is improving but aerobic fitness is declining. Heavy lifting may be limiting endurance adaptation.'
+          : aerobicDirection === 'improving' && structuralDirection === 'improving'
+          ? 'Both systems improving. Training balance is working.'
+          : null,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // 9. Plan context
     // -----------------------------------------------------------------------
     const planIds = [...new Set(targetFacts.map((f) => f.plan_id).filter(Boolean))];
     let planId: string | null = planIds[0] ?? null;
@@ -412,6 +488,8 @@ serve(async (req: Request) => {
       plan_id: planId,
       plan_week_number: planWeekNumber,
       plan_phase: planPhase,
+
+      interference: interferenceScore,
 
       computed_at: new Date().toISOString(),
     };

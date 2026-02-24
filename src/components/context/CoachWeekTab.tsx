@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AlertCircle, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase } from '@/lib/supabase';
@@ -145,6 +145,52 @@ function LinkExtrasDialog({ open, onClose, onLinked, extras, gaps }: LinkExtrasD
 export default function CoachWeekTab() {
   const { data, loading, error, refresh } = useCoachWeekContext();
   const [linkOpen, setLinkOpen] = useState(false);
+  const [contextExpanded, setContextExpanded] = useState(false);
+  const [contextValue, setContextValue] = useState('');
+  const [contextSaving, setContextSaving] = useState(false);
+
+  useEffect(() => {
+    const val = data?.plan?.athlete_context_for_week ?? '';
+    setContextValue(typeof val === 'string' ? val : '');
+  }, [data?.plan?.athlete_context_for_week]);
+
+  const saveAthleteContext = async (value: string) => {
+    const planId = data?.plan?.plan_id;
+    const weekIndex = data?.plan?.week_index;
+    if (!planId || weekIndex == null) return;
+    try {
+      setContextSaving(true);
+      const { data: planRow } = await supabase
+        .from('plans')
+        .select('athlete_context_by_week')
+        .eq('id', planId)
+        .single();
+      const current = (planRow?.athlete_context_by_week ?? {}) as Record<string, string>;
+      const merged = { ...current };
+      const trimmed = value.trim();
+      if (trimmed) merged[String(weekIndex)] = trimmed;
+      else delete merged[String(weekIndex)];
+      await supabase.from('plans').update({ athlete_context_by_week: merged }).eq('id', planId);
+      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      await refresh();
+    } catch {
+      // non-fatal
+    } finally {
+      setContextSaving(false);
+    }
+  };
+
+  const updateSkipReason = async (plannedId: string, reason: string | null, note?: string | null) => {
+    try {
+      const patch: Record<string, unknown> = { skip_reason: reason ?? null };
+      if (note !== undefined) patch.skip_note = note || null;
+      await supabase.from('planned_workouts').update(patch).eq('id', plannedId);
+      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      await refresh();
+    } catch {
+      // non-fatal
+    }
+  };
 
   // Hooks must be called unconditionally (even while loading/error).
   // Keep derived memoized slices above any early returns.
@@ -270,6 +316,42 @@ export default function CoachWeekTab() {
         </button>
       </div>
 
+      {/* ── Week Context Note (athlete-provided) ── */}
+      {data.plan.has_active_plan && data.plan.plan_id && data.plan.week_index != null && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
+          {contextExpanded ? (
+            <textarea
+              value={contextValue}
+              onChange={(e) => setContextValue(e.target.value)}
+              onBlur={() => {
+                saveAthleteContext(contextValue);
+                if (!contextValue.trim()) setContextExpanded(false);
+              }}
+              placeholder="e.g. had the flu, travel, increased weights on purpose..."
+              className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
+              autoFocus
+            />
+          ) : (
+            <button
+              onClick={() => setContextExpanded(true)}
+              className="w-full text-left px-3 py-2.5 text-xs text-white/45 hover:text-white/65 hover:bg-white/[0.04] transition-colors"
+            >
+              {contextValue.trim() ? (
+                <span className="italic">&quot;{contextValue.length > 50 ? contextValue.slice(0, 50) + '…' : contextValue}&quot;</span>
+              ) : (
+                'Add context for this week (sick, travel, etc.) — helps the AI get it right'
+              )}
+            </button>
+          )}
+          {contextSaving && (
+            <div className="px-3 py-1 text-[10px] text-white/40 flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Saving…
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Coach Narrative ── */}
       <div className={`rounded-xl border p-4 ${verdictTone}`}>
         <div className={`text-lg font-semibold ${titleGlow}`}
@@ -365,6 +447,43 @@ export default function CoachWeekTab() {
                   Link
                 </button>
               )}
+            </div>
+          )}
+          {data.reaction.key_session_gaps_details && data.reaction.key_session_gaps_details.length > 0 && (
+            <div className="mt-3 space-y-2 pt-2 border-t border-white/10">
+              <div className="text-[10px] text-white/45 uppercase tracking-wide">Why missed?</div>
+              {data.reaction.key_session_gaps_details.map((g) => (
+                <div key={g.planned_id} className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
+                  <div className="text-xs text-white/70 mb-1.5">
+                    {g.date} · {g.type}{g.name ? ` (${g.name})` : ''}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {(['sick', 'travel', 'rest', 'life', 'swapped'] as const).map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => updateSkipReason(g.planned_id, g.skip_reason === tag ? null : tag)}
+                        className={`px-2 py-0.5 rounded text-[10px] capitalize transition-colors ${
+                          g.skip_reason === tag
+                            ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40'
+                            : 'bg-white/[0.06] text-white/50 border border-white/10 hover:bg-white/[0.1] hover:text-white/70'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Add note (optional)"
+                    defaultValue={g.skip_note ?? ''}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (g.skip_note ?? '')) updateSkipReason(g.planned_id, g.skip_reason, v);
+                    }}
+                    className="mt-1.5 w-full px-2 py-1 text-[10px] bg-white/[0.04] border border-white/10 rounded text-white/70 placeholder:text-white/30 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+              ))}
             </div>
           )}
         </div>

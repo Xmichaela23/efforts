@@ -99,6 +99,8 @@ export type CoachWeekContextResponseV1 = {
       type: string;
       name: string | null;
       category: KeySessionCategory;
+      skip_reason: string | null;
+      skip_note: string | null;
       workload_planned: number | null;
     }>;
     extra_sessions_details: Array<{
@@ -239,5 +241,14 @@ export type CoachWeekContextResponseV1 = {
   };
   evidence: EvidenceItem[];
   week_narrative: string | null;
+  fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
+  readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+  interference: {
+    aerobic: string;
+    structural: string;
+    status: 'interference_detected' | 'balanced';
+    dominated_by: string | null;
+    detail: string | null;
+  } | null;
 };
 

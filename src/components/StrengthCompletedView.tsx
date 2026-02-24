@@ -23,7 +23,7 @@ interface CompletedExercise {
 }
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
-  const { workouts } = useAppContext();
+  const { workouts, updateWorkout } = useAppContext();
   const [showComparison, setShowComparison] = useState(false);
 
 
@@ -197,6 +197,34 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
 
+  // Detect weight deviation: any exercise where actual best weight > planned * 1.05
+  const hasWeightDeviation = useMemo(() => {
+    if (isMobility || !plannedWorkout) return false;
+    const plannedExs = (plannedWorkout as any).strength_exercises || [];
+    for (const compEx of completedExercises) {
+      const plannedEx = plannedExs.find((p: any) => String(p?.name || '').toLowerCase() === String(compEx?.name || '').toLowerCase());
+      if (!plannedEx?.weight || plannedEx.weight <= 0) continue;
+      const plannedW = Number(plannedEx.weight) || 0;
+      const bestActual = Math.max(0, ...(compEx.sets || []).map((s: any) => Number(s?.weight) || 0));
+      if (bestActual > plannedW * 1.05) return true;
+    }
+    return false;
+  }, [isMobility, plannedWorkout, completedExercises]);
+
+  const currentMeta = (workoutData as any)?.workout_metadata;
+  const deviationIntentional = typeof currentMeta?.weight_deviation_intentional === 'boolean' ? currentMeta.weight_deviation_intentional : null;
+  const deviationNote = typeof currentMeta?.weight_deviation_note === 'string' ? currentMeta.weight_deviation_note : '';
+
+  const saveWeightDeviation = async (intentional: boolean | null, note?: string) => {
+    const id = (workoutData as any)?.id;
+    if (!id || !updateWorkout) return;
+    const meta = typeof currentMeta === 'object' && currentMeta ? { ...currentMeta } : {};
+    if (intentional !== null) meta.weight_deviation_intentional = intentional;
+    if (note !== undefined) meta.weight_deviation_note = note || null;
+    if (!meta.weight_deviation_note) delete meta.weight_deviation_note;
+    await updateWorkout(id, { workout_metadata: meta } as any);
+  };
+
   return (
     <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
       {/* Summary line - volume/workload only (title shown in parent) */}
@@ -216,7 +244,35 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             <div className="px-2 py-1 rounded bg-white/10 text-white/70">RPE: {getSessionRPE(workoutData)}</div>
           )}
         </div>
-        
+
+        {/* Weight deviation prompt — only when went heavier than planned */}
+        {hasWeightDeviation && (
+          <div className="mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+            <div className="text-xs text-amber-200/90 mb-2">You went heavier than planned — intentional?</div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => saveWeightDeviation(true)}
+                className={`px-2.5 py-1 rounded text-xs ${deviationIntentional === true ? 'bg-amber-500/30 text-amber-100 border border-amber-400/40' : 'bg-white/[0.06] text-white/60 border border-white/10 hover:bg-white/[0.1]'}`}
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => saveWeightDeviation(false)}
+                className={`px-2.5 py-1 rounded text-xs ${deviationIntentional === false ? 'bg-amber-500/30 text-amber-100 border border-amber-400/40' : 'bg-white/[0.06] text-white/60 border border-white/10 hover:bg-white/[0.1]'}`}
+              >
+                No
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Add note (optional)"
+              defaultValue={deviationNote}
+              onBlur={(e) => { const v = e.target.value.trim(); if (v !== deviationNote) saveWeightDeviation(deviationIntentional, v); }}
+              className="mt-2 w-full px-2 py-1 text-xs bg-white/[0.04] border border-white/10 rounded text-white/70 placeholder:text-white/30 focus:outline-none focus:border-white/20"
+            />
+          </div>
+        )}
+
         {/* Compare to Plan button - only show if planned has exercises */}
         {plannedWorkout && (() => {
           const plannedExercises = (plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || [];

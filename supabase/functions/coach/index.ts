@@ -78,7 +78,7 @@ type ActivePlanLite = {
 async function loadActivePlan(supabase: any, userId: string): Promise<ActivePlanLite | null> {
   const { data } = await supabase
     .from('plans')
-    .select('id,name,config,duration_weeks')
+    .select('id,name,config,duration_weeks,athlete_context_by_week')
     .eq('user_id', userId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
     // Planned rows within the week window (used for totals + remaining + WTD)
     const { data: plannedWeek, error: pErr } = await supabase
       .from('planned_workouts')
-      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id')
+      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
@@ -406,6 +406,8 @@ Deno.serve(async (req) => {
         name: x?.r?.name != null ? String(x.r.name) : null,
         category: x?.cat,
         workload_planned: safeNum(x?.r?.workload_planned),
+        skip_reason: x?.r?.skip_reason ?? null,
+        skip_note: x?.r?.skip_note ?? null,
       }))
       .filter((x: any) => Boolean(x.planned_id));
 
@@ -1062,6 +1064,62 @@ Deno.serve(async (req) => {
     })();
 
     // =========================================================================
+    // Fitness direction + Readiness state + Interference
+    // =========================================================================
+
+    // Fetch latest athlete_snapshot for interference data
+    let latestSnapshot: any = null;
+    try {
+      const { data: snapRows } = await supabase
+        .from('athlete_snapshot')
+        .select('interference, run_easy_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend')
+        .eq('user_id', userId)
+        .order('week_start', { ascending: false })
+        .limit(1);
+      latestSnapshot = snapRows?.[0] ?? null;
+    } catch {}
+
+    // Fitness direction: combine aerobic + structural trends
+    const fitnessDirection = (() => {
+      const aerobic = responseInterp.aerobic;
+      const structural = responseInterp.structural;
+
+      const aerobicGood = aerobic.label === 'efficient';
+      const aerobicBad = aerobic.label === 'stressed';
+      const structGood = structural.label === 'fresh';
+      const structBad = structural.label === 'fatigued';
+
+      if (aerobicGood && (structGood || structural.label === 'stable')) return 'improving';
+      if (aerobicBad && structBad) return 'declining';
+      if (aerobicBad || structBad) return 'mixed';
+      if (aerobicGood || structGood) return 'improving';
+      return 'stable';
+    })() as 'improving' | 'stable' | 'declining' | 'mixed';
+
+    // Readiness state: combine RPE trend, ACWR, and response
+    const readinessState = (() => {
+      const acwrVal = metrics.acwr;
+      const overallLabel = responseInterp.overall.label;
+      const verdictCode = v.code;
+
+      if (verdictCode === 'recover_overreaching') return 'overreached';
+      if (verdictCode === 'caution_ramping_fast' || overallLabel === 'fatigue_signs') return 'fatigued';
+      if (acwrVal != null && acwrVal > 1.3) return 'fatigued';
+      if (acwrVal != null && acwrVal < 0.7) return 'detrained';
+      if (overallLabel === 'absorbing_well') return 'fresh';
+      return 'normal';
+    })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+
+    const interference = latestSnapshot?.interference ?? null;
+
+    // Athlete-provided context for this week (used in narrative + response)
+    const athleteContextByWeek = activePlan?.athlete_context_by_week;
+    const athleteContext = (weekIndex != null && athleteContextByWeek && typeof athleteContextByWeek === 'object')
+      ? (athleteContextByWeek[String(weekIndex)] ?? athleteContextByWeek[weekIndex])
+      : null;
+    const athleteContextStr = (typeof athleteContext === 'string' && athleteContext.trim()) ? athleteContext.trim() : null;
+
+    // =========================================================================
     // AI week narrative — coach paragraph from structured facts
     // =========================================================================
     let week_narrative: string | null = null;
@@ -1090,13 +1148,41 @@ Deno.serve(async (req) => {
         const weekFacts: any[] = wfRes.data || [];
         const weekExercises: any[] = elRes.data || [];
 
+        // Athlete-provided context (highest priority — never guess over this)
+        if (athleteContextStr) {
+          narrativeFacts.unshift(`ATHLETE SAYS (use this, do not guess): ${athleteContextStr}`);
+        }
+
         // Plan context
-        if (weekIntent && weekIntent !== 'unknown') {
-          narrativeFacts.push(`This is a ${weekIntent} week (week ${weekIndex ?? '?'} of the plan).`);
+        if (activePlan) {
+          const planName = activePlan.name || 'training plan';
+          const totalWeeks = activePlan.duration_weeks || null;
+          const weekNum = weekIndex ?? '?';
+          const intentStr = weekIntent && weekIntent !== 'unknown' ? weekIntent : null;
+          let planLine = `The athlete is on "${planName}"`;
+          if (totalWeeks) planLine += ` (${totalWeeks} weeks total)`;
+          planLine += `, currently in week ${weekNum}`;
+          if (intentStr) planLine += ` which is a ${intentStr} week`;
+          planLine += '.';
+          narrativeFacts.push(planLine);
+          narrativeFacts.push('IMPORTANT: There is an active training plan. Do NOT suggest adding extra sessions. If sessions were missed, suggest hitting the planned sessions next week. If suggesting changes, frame them as adjustments within the existing plan.');
+        } else {
+          narrativeFacts.push('The athlete is NOT on a structured plan. Suggestions for adding or adjusting sessions are appropriate.');
         }
 
         // Session completion
         narrativeFacts.push(`Planned key sessions: ${reaction.key_sessions_planned}. Completed and linked: ${reaction.key_sessions_linked}. Missed: ${reaction.key_sessions_gaps}. Extra unplanned sessions: ${reaction.extra_sessions}.`);
+
+        // Missed session reasons (athlete-provided — use these, do not guess)
+        const gapsWithReasons = (reaction.key_session_gaps_details || []).filter((g: any) => g.skip_reason || g.skip_note);
+        if (gapsWithReasons.length > 0) {
+          const lines = gapsWithReasons.map((g: any) => {
+            const parts = [`${g.date} ${g.type}: ${g.skip_reason || 'no tag'}`];
+            if (g.skip_note) parts.push(`(${g.skip_note})`);
+            return parts.join(' ');
+          });
+          narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided): ${lines.join('; ')}.`);
+        }
 
         // ── Per-workout detail with plan deviations ──
         for (const wf of weekFacts) {
@@ -1112,6 +1198,9 @@ Deno.serve(async (req) => {
               ? `DID ${adh.workload_pct - 100}% MORE LOAD than planned`
               : `did ${100 - adh.workload_pct}% less load than planned`);
           }
+          if (adh.weight_deviation_intentional === true) parts.push('ATHLETE SAYS went heavier intentionally');
+          if (adh.weight_deviation_intentional === false) parts.push('ATHLETE SAYS went heavier unintentionally');
+          if (adh.weight_deviation_note) parts.push(`weight deviation note: ${adh.weight_deviation_note}`);
 
           // Strength-specific: per-exercise planned vs actual
           if (wf.discipline === 'strength' && wf.strength_facts?.exercises) {
@@ -1207,8 +1296,24 @@ Deno.serve(async (req) => {
 
         // Deterministic verdict
         narrativeFacts.push(`Overall status: ${training_state.title}.`);
+        narrativeFacts.push(`Fitness direction: ${fitnessDirection}. Readiness: ${readinessState}.`);
 
-        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan. Connect the dots: if they lifted heavier than planned, explain how that connects to their fatigue. If their running efficiency improved, say so. End with one concrete suggestion. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
+        // Interference signal
+        if (interference && interference.status === 'interference_detected') {
+          narrativeFacts.push(`INTERFERENCE ALERT: ${interference.detail}`);
+        } else if (interference && interference.aerobic && interference.structural) {
+          narrativeFacts.push(`System balance: aerobic is ${interference.aerobic}, structural is ${interference.structural}. No interference detected.`);
+        }
+
+        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan.
+
+NEVER GUESS WHY: If the facts include "ATHLETE SAYS" or "MISSED SESSION REASONS" or "went heavier intentionally/unintentionally", use that. Otherwise, state what happened (e.g., "you missed three running sessions") but DO NOT speculate on reasons (no "you may have been tired", "you might have needed rest", etc.). Only explain causes when the athlete has told you.
+
+Connect the dots when you have athlete context: if they said they had the flu, that explains missed sessions. If they said they went heavier on purpose, that explains the weight deviation. If their running efficiency improved, say so. If there is an INTERFERENCE ALERT, explain it in plain language.
+
+CRITICAL: If the athlete has an active training plan, NEVER suggest adding extra sessions or workouts. If they missed sessions, tell them to prioritize hitting those planned sessions next week. Frame adjustments as intensity changes within existing plan sessions (e.g., "ease off the weights in Thursday's strength session" NOT "add a light run").
+
+End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
 
 FACTS:
 ${narrativeFacts.join('\n')}`;
@@ -1258,6 +1363,7 @@ ${narrativeFacts.join('\n')}`;
         week_intent: weekIntent,
         week_focus_label: weekFocusLabel,
         week_start_dow: weekStartDow,
+        athlete_context_for_week: athleteContextStr || null,
       },
       metrics,
       week: {
@@ -1278,6 +1384,9 @@ ${narrativeFacts.join('\n')}`;
       next_action: v.next,
       evidence,
       week_narrative,
+      fitness_direction: fitnessDirection,
+      readiness_state: readinessState,
+      interference,
     };
 
     return new Response(JSON.stringify(response), {

@@ -15,6 +15,7 @@ export type CoachWeekContextV1 = {
     week_intent: string;
     week_focus_label: string | null;
     week_start_dow: string;
+    athlete_context_for_week: string | null;
   };
   metrics: {
     wtd_planned_load: number | null;
@@ -49,6 +50,8 @@ export type CoachWeekContextV1 = {
       name: string | null;
       category: string;
       workload_planned: number | null;
+      skip_reason: string | null;
+      skip_note: string | null;
     }>;
     extra_sessions_details: Array<{
       workout_id: string;
@@ -176,6 +179,15 @@ export type CoachWeekContextV1 = {
   };
   evidence: Array<{ code: string; label: string; value: number | string; unit?: string }>;
   week_narrative: string | null;
+  fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
+  readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+  interference: {
+    aerobic: string;
+    structural: string;
+    status: 'interference_detected' | 'balanced';
+    dominated_by: string | null;
+    detail: string | null;
+  } | null;
 };
 
 export function useCoachWeekContext(date?: string) {

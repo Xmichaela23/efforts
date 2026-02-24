@@ -14,16 +14,23 @@ create table if not exists public.library_plans (
 
 alter table public.library_plans enable row level security;
 
--- For development: allow authenticated users to read/create; tighten later
-create policy "Library plans are readable by all authenticated"
-on public.library_plans for select
-to authenticated
-using (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'library_plans' AND policyname = 'Library plans are readable by all authenticated'
+  ) THEN
+    CREATE POLICY "Library plans are readable by all authenticated"
+    ON public.library_plans FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
 
-create policy "Library plans can be created by authenticated"
-on public.library_plans for insert
-to authenticated
-with check (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'library_plans' AND policyname = 'Library plans can be created by authenticated'
+  ) THEN
+    CREATE POLICY "Library plans can be created by authenticated"
+    ON public.library_plans FOR INSERT TO authenticated WITH CHECK (true);
+  END IF;
+END $$;
 
 create index if not exists idx_library_plans_status on public.library_plans(status);
 create index if not exists idx_library_plans_discipline on public.library_plans(discipline);
