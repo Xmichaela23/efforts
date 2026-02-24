@@ -283,28 +283,36 @@ The existing analyzers gradually become thin wrappers: fetch facts, feed to AI, 
 
 ## Migration Path
 
-### Phase 1: Build the foundation (no UI changes)
-1. Create tables: `workout_facts`, `exercise_log`, `athlete_snapshot`
-2. Build `compute-facts` edge function
-3. Wire it into ingest pipeline (after `compute-workout-summary`)
-4. Backfill existing workouts
+### Phase 1: Build the foundation — DONE
+- [x] Create tables: `workout_facts`, `exercise_log`, `athlete_snapshot`
+- [x] Build `compute-facts` edge function
+- [x] Wire it into ingest pipeline (after `compute-workout-summary`)
+- [x] Build `compute-snapshot` (aggregates facts → athlete_snapshot, includes interference)
+- [x] Coach function reads `athlete_snapshot` (interference, fitness_direction, readiness_state)
 
 ### Phase 2: Wire up consumers
-1. UI reads `exercise_log` for strength progression charts
-2. UI reads `athlete_snapshot` for weekly dashboard
-3. `generate-training-context` reads from `athlete_snapshot` instead of re-computing
-4. Update `user_baselines.learned_fitness` with strength data (auto-update 1RMs)
+- [x] `generate-training-context` reads from `athlete_snapshot` (ACWR, sport breakdown, week comparison when available)
+- [ ] **UI reads `exercise_log` for strength progression charts** — next priority. Straightforward query swap; validates the layer to the athlete ("I can see my squat trending up").
+- [ ] **Update `user_baselines.learned_fitness` from strength data** — auto-update 1RMs from `exercise_log` / `workout_facts`. Stale baselines cascade into wrong planned weights, noisier deviation detection, weaker adherence scores.
+- [ ] UI reads `athlete_snapshot` for weekly dashboard (optional optimization; context tab can continue via generate-training-context)
 
 ### Phase 3: Close the loop
-1. Plan adaptation reads `athlete_snapshot` to detect stalling / overreaching
-2. Mid-plan adjustment suggestions ("bump squat weight 5lbs", "add a recovery day")
-3. AI coaching layer reads facts + snapshot, produces weekly narrative
-4. Existing per-workout analyzers slim down — they read facts instead of re-computing
+- [ ] Plan adaptation reads `athlete_snapshot` to detect stalling / overreaching
+- [ ] **Mid-plan adjustment suggestions** — "bump squat weight 5lbs", "add a recovery day", "deload and rebuild"
 
-### Phase 4: Multi-discipline
-1. Cycling plan generation reads from same pipeline
-2. Triathlon planning composes across disciplines using unified load model
-3. Cross-discipline interference detection (heavy legs + quality run = flag)
+**Phase 3 UX (design decision):** Suggestion + confirm as default. Do not auto-apply changes — athletes lose trust when the system changes plans without consent. Instead:
+
+1. **Suggestion + confirm** — Show an inline card on the week tab: "Your squat has stalled for 3 weeks. Want to deload and rebuild?" One tap to accept or dismiss, optional note when declining.
+2. **Feedback loop** — Track dismissals. If athletes consistently decline certain suggestion types, that's signal to tune the detection or messaging.
+3. Follow the same pattern as athlete context capture: low-friction, inline, on existing screens.
+
+- [x] AI coaching layer reads facts + snapshot, produces weekly narrative (coach function already does this)
+- [ ] **Per-workout analyzers slim down** — `analyze-running-workout` / `analyze-strength-workout` read from facts instead of re-computing. *Deprioritized:* current analyzers work; this is a code-quality pass after Phase 2 and Phase 3 adaptation logic ship.
+
+### Phase 4: Multi-discipline (horizon)
+- [ ] Cycling plan generation reads from same pipeline
+- [ ] Triathlon planning composes across disciplines using unified load model
+- [ ] Cross-discipline interference detection (heavy legs + quality run = flag) — extends existing `athlete_snapshot.interference` pattern
 
 ---
 
