@@ -618,6 +618,12 @@ export default function CoachWeekTab() {
           <div className="text-sm text-white/55 mt-1">{ts.subtitle}</div>
         ) : null}
 
+        {data.week_narrative && !contextValue?.trim() && (
+          <div className="text-[11px] text-white/40 mt-2 italic">
+            AI-generated — add context above to improve accuracy
+          </div>
+        )}
+
         {ts?.load_ramp_acwr != null && (
           <div className="mt-3">
             <TrainingStateBar acwr={ts.load_ramp_acwr} />
