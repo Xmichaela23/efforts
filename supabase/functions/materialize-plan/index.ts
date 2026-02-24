@@ -1711,7 +1711,7 @@ Deno.serve(async (req) => {
     const userId = rows[0]?.user_id;
     let baselines: Baselines = {};
     try {
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, equipment, effort_paces, effort_score, effort_paces_source').eq('user_id', userId).maybeSingle();
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source').eq('user_id', userId).maybeSingle();
       
       // Recalculate effort_paces from effort_score if source is 'calculated' (fixes outdated paces)
       let effortPaces = ub?.effort_paces;
@@ -1752,6 +1752,19 @@ Deno.serve(async (req) => {
         equipment: ub?.equipment || {},
         effort_paces: effortPaces || undefined
       } as any;
+
+      // Merge learned strength 1RMs when performance_numbers is missing for that lift
+      const learned = (typeof ub?.learned_fitness === 'string' ? JSON.parse(ub.learned_fitness || '{}') : ub?.learned_fitness) || {};
+      const strength = learned?.strength_1rms || {};
+      const ok = (s: any) => (s?.confidence === 'high' || s?.confidence === 'medium') && Number.isFinite(s?.value);
+      if (ok(strength.squat) && (baselines.squat == null || baselines.squat === 0))
+        baselines.squat = strength.squat.value;
+      if (ok(strength.bench_press) && (baselines.bench == null || baselines.bench === 0))
+        baselines.bench = strength.bench_press.value;
+      if (ok(strength.deadlift) && (baselines.deadlift == null || baselines.deadlift === 0))
+        baselines.deadlift = strength.deadlift.value;
+      if (ok(strength.overhead_press) && (baselines.overheadPress1RM == null && baselines.ohp == null && baselines.overhead == null))
+        baselines.overheadPress1RM = strength.overhead_press.value;
       if (ub?.effort_paces) {
         console.log(`[Paces] Found effort_paces from PlanWizard:`, baselines.effort_paces);
         console.log(`[Paces] Effort Score: ${ub?.effort_score || 'not set'}, Source: ${ub?.effort_paces_source || 'unknown'}`);

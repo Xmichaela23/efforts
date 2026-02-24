@@ -16,10 +16,17 @@ export interface ExerciseLogRow {
   estimated_1rm: number | null;
 }
 
+export interface LiftTrendEntry {
+  date: string;
+  estimated_1rm: number;
+  best_weight: number;
+  best_reps: number;
+  sets_completed: number;
+}
 export interface LiftTrend {
   canonical: string;
   displayName: string;
-  entries: { date: string; estimated_1rm: number; best_weight: number; best_reps: number }[];
+  entries: LiftTrendEntry[];
   current1RM: number;
   peak1RM: number;
   trend: number | null;
@@ -77,6 +84,7 @@ export function useExerciseLog(weeksBack: number = 12) {
           estimated_1rm: r.estimated_1rm!,
           best_weight: r.best_weight ?? 0,
           best_reps: r.best_reps ?? 0,
+          sets_completed: r.sets_completed ?? 0,
         }));
         const current = entries[entries.length - 1].estimated_1rm;
         const peak = Math.max(...entries.map(e => e.estimated_1rm));

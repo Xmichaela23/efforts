@@ -99,6 +99,102 @@ function epley1RM(weight: number, reps: number): number {
   return Math.round(weight * (1 + reps / 30));
 }
 
+const BIG_FOUR: ReadonlyArray<'squat' | 'bench_press' | 'deadlift' | 'overhead_press'> = [
+  "squat",
+  "bench_press",
+  "deadlift",
+  "overhead_press",
+] as const;
+
+type LearnedMetric = {
+  value: number;
+  confidence: "low" | "medium" | "high";
+  source: string;
+  sample_count: number;
+};
+
+function confidenceFromSamples(n: number): "low" | "medium" | "high" {
+  if (n >= 6) return "high";
+  if (n >= 3) return "medium";
+  return "low";
+}
+
+/** Update learned_fitness.strength_1rms from exercise_log (last 12 weeks). */
+async function updateLearnedStrengthFromExerciseLog(
+  supabase: ReturnType<typeof createClient>,
+  userId: string
+): Promise<void> {
+  try {
+    const twelveWeeksAgo = new Date();
+    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84);
+    const fromDate = twelveWeeksAgo.toISOString().slice(0, 10);
+
+    const { data: rows } = await supabase
+      .from("exercise_log")
+      .select("canonical_name, estimated_1rm")
+      .eq("user_id", userId)
+      .gte("date", fromDate)
+      .in("canonical_name", BIG_FOUR);
+
+    if (!rows?.length) return;
+
+    const agg: Record<string, { max1rm: number; count: number }> = {};
+    for (const r of rows) {
+      const c = r.canonical_name as (typeof BIG_FOUR)[number];
+      if (!BIG_FOUR.includes(c)) continue;
+      const val = Number(r.estimated_1rm);
+      if (!Number.isFinite(val) || val <= 0) continue;
+      const cur = agg[c];
+      if (!cur) agg[c] = { max1rm: val, count: 1 };
+      else {
+        agg[c].max1rm = Math.max(agg[c].max1rm, val);
+        agg[c].count += 1;
+      }
+    }
+
+    const strength_1rms: Record<string, LearnedMetric> = {};
+    for (const lift of BIG_FOUR) {
+      const a = agg[lift];
+      if (!a) continue;
+      strength_1rms[lift] = {
+        value: Math.round(a.max1rm),
+        confidence: confidenceFromSamples(a.count),
+        source: "exercise_log",
+        sample_count: a.count,
+      };
+    }
+    if (Object.keys(strength_1rms).length === 0) return;
+
+    const { data: ub } = await supabase
+      .from("user_baselines")
+      .select("id, learned_fitness")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const existing = (ub?.learned_fitness as Record<string, unknown> | null) ?? {};
+    const merged = {
+      ...existing,
+      strength_1rms,
+    };
+
+    if (ub?.id) {
+      await supabase
+        .from("user_baselines")
+        .update({ learned_fitness: merged, updated_at: new Date().toISOString() })
+        .eq("id", ub.id);
+    } else {
+      await supabase.from("user_baselines").insert({
+        user_id: userId,
+        learned_fitness: merged,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.error("[compute-facts] updateLearnedStrengthFromExerciseLog:", e);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Discipline-specific fact builders
 // ---------------------------------------------------------------------------
@@ -650,6 +746,11 @@ serve(async (req: Request) => {
         );
       }
       exercisesWritten = elRows.length;
+
+      // Update learned_fitness.strength_1rms from exercise_log (fire-and-forget)
+      updateLearnedStrengthFromExerciseLog(supabase, w.user_id).catch((e) => {
+        console.error("[compute-facts] Learned strength update failed:", e?.message ?? e);
+      });
     }
 
     // Fire-and-forget: recompute weekly snapshot for this user

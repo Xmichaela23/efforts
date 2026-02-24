@@ -292,17 +292,20 @@ The existing analyzers gradually become thin wrappers: fetch facts, feed to AI, 
 
 ### Phase 2: Wire up consumers
 - [x] `generate-training-context` reads from `athlete_snapshot` (ACWR, sport breakdown, week comparison when available)
-- [ ] **UI reads `exercise_log` for strength progression charts** — next priority. Straightforward query swap; validates the layer to the athlete ("I can see my squat trending up").
-- [ ] **Update `user_baselines.learned_fitness` from strength data** — auto-update 1RMs from `exercise_log` / `workout_facts`. Stale baselines cascade into wrong planned weights, noisier deviation detection, weaker adherence scores.
-- [ ] UI reads `athlete_snapshot` for weekly dashboard (optional optimization; context tab can continue via generate-training-context)
+- [x] **UI reads `exercise_log` for strength progression charts** — BlockSummaryTab + StrengthSummaryView use useExerciseLog; validates the layer to the athlete.
+- [x] **Update `user_baselines.learned_fitness` from strength data** — auto-update 1RMs from `exercise_log` via `compute-facts`. `learned_fitness.strength_1rms` fills gaps when `performance_numbers` lacks squat/bench/deadlift/overhead. Materialize-plan merges learned into baselines.
+- [~] UI reads `athlete_snapshot` for weekly dashboard — *skipped*; perf optimization only, context tab already works via generate-training-context.
 
 ### Phase 3: Close the loop
-- [ ] Plan adaptation reads `athlete_snapshot` to detect stalling / overreaching
-- [ ] **Mid-plan adjustment suggestions** — "bump squat weight 5lbs", "add a recovery day", "deload and rebuild"
+
+**First deliverable: baseline drift suggestion.** "Your squat has progressed to 315 but your baseline says 275 — update?" Low-risk, high-confidence, easy to validate. Data is already in `exercise_log` vs `performance_numbers`. Wires the full suggestion + confirm pipeline end-to-end before tackling harder judgment calls.
+
+- [ ] **Baseline drift suggestion** — Compare `learned_fitness.strength_1rms` (or exercise_log max) vs `performance_numbers` per lift. When learned > baseline by meaningful margin (e.g. 5%+), show inline card: accept updates baseline, dismiss records feedback.
+- [ ] **Plan adaptation (stalling/overreaching)** — Read `athlete_snapshot` to detect stalls, overreaching. Suggest "deload and rebuild", "add recovery day", etc. Harder judgment calls; ship after baseline drift proves the UX.
 
 **Phase 3 UX (design decision):** Suggestion + confirm as default. Do not auto-apply changes — athletes lose trust when the system changes plans without consent. Instead:
 
-1. **Suggestion + confirm** — Show an inline card on the week tab: "Your squat has stalled for 3 weeks. Want to deload and rebuild?" One tap to accept or dismiss, optional note when declining.
+1. **Suggestion + confirm** — Inline card on the week tab. One tap to accept or dismiss, optional note when declining.
 2. **Feedback loop** — Track dismissals. If athletes consistently decline certain suggestion types, that's signal to tune the detection or messaging.
 3. Follow the same pattern as athlete context capture: low-friction, inline, on existing screens.
 

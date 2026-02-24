@@ -82,6 +82,9 @@ interface LearnedFitnessProfile {
   workouts_analyzed: number;
   last_updated: string;
   learning_status: 'insufficient_data' | 'learning' | 'confident';
+
+  // Strength 1RMs (from compute-facts / exercise_log)
+  strength_1rms?: Record<string, LearnedMetric>;
 }
 
 // =============================================================================
@@ -205,19 +208,27 @@ Deno.serve(async (req) => {
     // STORE IN USER_BASELINES
     // ==========================================================================
 
-    // First, fetch existing baselines
+    // First, fetch existing baselines (preserve strength_1rms from compute-facts)
     const { data: existingBaselines } = await supabase
       .from('user_baselines')
       .select('id, learned_fitness')
       .eq('user_id', user_id)
       .maybeSingle();
 
+    const existing = (typeof existingBaselines?.learned_fitness === 'string'
+      ? JSON.parse(existingBaselines.learned_fitness || '{}')
+      : existingBaselines?.learned_fitness) || {};
+    const mergedLearned = {
+      ...learnedProfile,
+      strength_1rms: existing?.strength_1rms
+    };
+
     if (existingBaselines?.id) {
       // Update existing record
       const { error: updateError } = await supabase
         .from('user_baselines')
         .update({ 
-          learned_fitness: learnedProfile,
+          learned_fitness: mergedLearned,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingBaselines.id);
@@ -233,7 +244,7 @@ Deno.serve(async (req) => {
         .from('user_baselines')
         .insert({
           user_id: user_id,
-          learned_fitness: learnedProfile,
+          learned_fitness: mergedLearned,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
