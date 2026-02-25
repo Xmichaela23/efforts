@@ -571,27 +571,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // Derive compact pace-only rows from the same source the Planned tab renders
   // For unplanned runs: use interval_breakdown from workout_analysis (one row = analysis)
   const intervalBreakdownForUnplanned = (completedSrc as any)?.workout_analysis?.detailed_analysis?.interval_breakdown;
+  const isAutoLapOrSplit = !!(intervalBreakdownForUnplanned?.is_auto_lap_or_split);
   const unplannedIntervals = intervalBreakdownForUnplanned?.available && Array.isArray(intervalBreakdownForUnplanned?.intervals)
     ? intervalBreakdownForUnplanned.intervals
     : [];
-  const hasStructuredWorkoutSteps =
-    !planned &&
-    unplannedIntervals.length > 0 &&
-    unplannedIntervals.some((iv: any) => {
-      const dur = Number(iv?.planned_duration_s);
-      const hasDur = Number.isFinite(dur) && dur > 0;
-      const lo = iv?.planned_pace_range_lower;
-      const hi = iv?.planned_pace_range_upper;
-      const hasPaceRange = lo != null && hi != null && Number.isFinite(Number(lo)) && Number.isFinite(Number(hi));
-      return hasDur || hasPaceRange;
-    });
-  const planLinkNote = !planned
-    ? (hasStructuredWorkoutSteps
-        ? 'No plan session linked. Showing steps from this structured workout.'
-        : 'No plan session linked.')
-    : null;
-  const leftColHeader = planned ? 'Planned' : (hasStructuredWorkoutSteps ? 'Workout steps' : 'Segments');
-  const stepsFromUnplanned = unplannedIntervals.length > 0 && !planned
+  // Don't show step breakdown for auto-lap/split (device laps or 1km splits) - not intentional workout structure
+  const useUnplannedSteps = !planned && unplannedIntervals.length > 0 && !isAutoLapOrSplit;
+  const planLinkNote = !planned ? 'No plan session linked.' : null;
+  const leftColHeader = planned ? 'Planned' : 'Segments';
+  const stepsFromUnplanned = useUnplannedSteps
     ? unplannedIntervals.map((iv: any, idx: number) => ({
         id: iv.interval_id || 'unplanned_interval',
         kind: iv.interval_type || 'work',

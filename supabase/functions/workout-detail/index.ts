@@ -157,8 +157,8 @@ Deno.serve(async (req) => {
       'achievements',
       // Workload data (single source of truth from calculate-workload)
       'workload_actual','workload_planned','intensity_factor',
-      // User feedback (RPE and gear)
-      'rpe','gear_id',
+      // User feedback (RPE, gear, unified metadata)
+      'rpe','gear_id','workout_metadata',
       // GPS trackpoints (polyline) for fallback when gps_track is missing
       'gps_trackpoints',
       // Timestamp for processing trigger deduplication
@@ -331,6 +331,13 @@ Deno.serve(async (req) => {
       try { (detail as any).swim_data = typeof row.swim_data === 'string' ? JSON.parse(row.swim_data) : (row.swim_data || null); } catch { (detail as any).swim_data = row.swim_data || null; }
       (detail as any).number_of_active_lengths = row.number_of_active_lengths ?? null;
       (detail as any).pool_length = row.pool_length ?? null;
+    }
+
+    // User feedback: RPE and gear (always include - sourced from DB)
+    (detail as any).rpe = row.rpe ?? null;
+    (detail as any).gear_id = row.gear_id ?? null;
+    if (row.workout_metadata != null) {
+      try { (detail as any).workout_metadata = typeof row.workout_metadata === 'string' ? JSON.parse(row.workout_metadata) : row.workout_metadata; } catch { (detail as any).workout_metadata = row.workout_metadata; }
     }
 
     // Check if processing is complete (for UI to show loading state if needed)

@@ -53,8 +53,17 @@ function getOverallPaceSecPerMi(row: any): number | null {
 
 function getOverallDurationMin(row: any): number | null {
   const overall = getComputedOverall(row)?.overall;
+  const distMi = getOverallDistanceMi(row);
   const durS = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
-  if (durS != null && durS > 0) return durS / 60;
+  if (durS != null && durS > 0) {
+    let min = durS / 60;
+    // Guardrail: implausibly large (e.g. 1800 min) suggests unit error; treat as seconds→minutes.
+    if (min > 600 && distMi != null && distMi > 0 && distMi < 50) {
+      const corrected = min / 60;
+      if (corrected > 0 && corrected < 600) return corrected;
+    }
+    return min;
+  }
   const mvMin = coerceNumber(row?.moving_time);
   if (mvMin != null && mvMin > 0) {
     // Guardrail: some legacy rows accidentally store seconds in moving_time.

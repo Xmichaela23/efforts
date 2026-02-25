@@ -24,7 +24,7 @@ import { useWorkoutData } from '@/hooks/useWorkoutData';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
 import { getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
-// keeping local logic for now; Today's view uses shared resolver
+import { getSessionRPE } from '@/utils/workoutMetadata';
 
 // Custom styles for range sliders
 const sliderStyles = `
@@ -1625,7 +1625,7 @@ const formatMovingTime = () => {
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               <Select
-                value={((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : ""}
+                value={getSessionRPE(hydrated || workoutData) != null ? String(getSessionRPE(hydrated || workoutData)) : ""}
                 onValueChange={(value) => handleFeedbackChange('rpe', value ? parseInt(value) : null)}
                 disabled={savingFeedback}
               >
@@ -1634,7 +1634,7 @@ const formatMovingTime = () => {
                   style={{ color: 'rgba(255,255,255,0.92)', textShadow: `0 0 12px rgba(${accentRgb}, 0.16)` }}
                 >
                   <SelectValue placeholder="N/A">
-                    {((hydrated || workoutData) as any)?.rpe ? String(((hydrated || workoutData) as any).rpe) : 'N/A'}
+                    {getSessionRPE(hydrated || workoutData) != null ? String(getSessionRPE(hydrated || workoutData)) : 'N/A'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1a2e] border-white/10">

@@ -66,10 +66,15 @@ export function getWorkoutMetadata(workout: any): WorkoutMetadata {
 
 /**
  * Get session RPE from workout (with backward compatibility)
+ * Run/ride: rpe column; strength/pilates: workout_metadata.session_rpe
  */
 export function getSessionRPE(workout: any): number | undefined {
   const meta = getWorkoutMetadata(workout);
-  return meta.session_rpe;
+  const fromMeta = meta?.session_rpe;
+  if (typeof fromMeta === 'number' && fromMeta >= 1 && fromMeta <= 10) return fromMeta;
+  const fromCol = (workout as any)?.rpe ?? (workout as any)?.session_rpe;
+  if (typeof fromCol === 'number' && fromCol >= 1 && fromCol <= 10) return fromCol;
+  return undefined;
 }
 
 /**

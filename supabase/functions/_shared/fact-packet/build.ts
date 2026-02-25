@@ -227,7 +227,16 @@ export async function buildWorkoutFactPacketV1(args: {
 
   const overallDurMin = (() => {
     const s = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
-    if (s != null && s > 0) return s / 60;
+    if (s != null && s > 0) {
+      const min = s / 60;
+      // Guardrail: implausibly large (e.g. 1800 min = 30h) suggests seconds were passed as minutes.
+      // 30 min = 1800 sec; if we erroneously got 1800 "minutes", treat as seconds and convert.
+      if (min > 600 && overallDistMi > 0 && overallDistMi < 50) {
+        const corrected = min / 60;
+        if (corrected > 0 && corrected < 600) return corrected;
+      }
+      return min;
+    }
     // DB convention: moving_time/duration in minutes. Some legacy rows store seconds.
     // Heuristic (matches cycling-v1/build): values >= 1000 are almost certainly seconds.
     const toMin = (v: number) => (v < 1000 ? v : v / 60);
@@ -237,7 +246,19 @@ export async function buildWorkoutFactPacketV1(args: {
     return d != null && d > 0 ? toMin(d) : 0;
   })();
 
-  const overallPace = coerceNumber(overall?.avg_pace_s_per_mi);
+  const overallPace = (() => {
+    const stored = coerceNumber(overall?.avg_pace_s_per_mi);
+    // Fallback: when stored pace is implausible (e.g. 60x off from duration bug), derive from duration + distance.
+    if (overallDistMi > 0 && overallDurMin > 0 && overallDurMin < 600) {
+      const derived = (overallDurMin * 60) / overallDistMi;
+      if (derived > 0 && derived < 7200) {
+        if (stored == null || stored <= 0) return Math.round(derived);
+        const ratio = stored / derived;
+        if (ratio >= 10 || ratio <= 0.1) return Math.round(derived);
+      }
+    }
+    return stored;
+  })();
 
   const hrFromComputedAvg = coerceNumber(overall?.avg_hr);
   const hrFromComputedMax = coerceNumber(overall?.max_hr);

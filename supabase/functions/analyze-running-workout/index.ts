@@ -1809,6 +1809,44 @@ Deno.serve(async (req) => {
         },
       };
 
+      // Repair legacy duration units bug: if duration_s_moving is ~60x off (e.g. 108000 vs 1800),
+      // infer correct seconds from moving_time/duration and patch before fact packet build.
+      try {
+        const overall = (workoutForFact as any)?.computed?.overall;
+        const cur = Number(overall?.duration_s_moving);
+        const mv = Number((workoutForFact as any)?.moving_time);
+        const dur = Number((workoutForFact as any)?.duration);
+        const raw = Number.isFinite(mv) && mv > 0 ? mv : Number.isFinite(dur) && dur > 0 ? dur : null;
+        let inferred: number | null = null;
+        if (raw != null && raw > 0) {
+          inferred = raw < 1000 ? Math.round(raw * 60) : Math.round(raw);
+        }
+        if (
+          Number.isFinite(cur) &&
+          cur > 0 &&
+          inferred != null &&
+          inferred > 0 &&
+          (cur / inferred >= 10 || inferred / cur >= 10)
+        ) {
+          const distM = Number(overall?.distance_m) || (Number((workoutForFact as any)?.distance) || 0) * 1000;
+          const miles = distM > 0 ? distM / 1609.34 : 0;
+          const avgPaceSPerMi = miles > 0 ? Math.round(inferred / miles) : null;
+          const nextOverall = { ...(overall || {}), duration_s_moving: Math.round(inferred) };
+          if (avgPaceSPerMi != null && avgPaceSPerMi > 0 && avgPaceSPerMi < 7200) {
+            nextOverall.avg_pace_s_per_mi = avgPaceSPerMi;
+          }
+          const nextComputed = { ...(workoutForFact as any).computed, overall: nextOverall };
+          (workoutForFact as any).computed = nextComputed;
+          await supabase
+            .from('workouts')
+            .update({ computed: nextComputed })
+            .eq('id', workout_id);
+          console.log('🛠️ Repaired computed.overall.duration_s_moving (unit mismatch).', { cur, inferred });
+        }
+      } catch (e) {
+        console.warn('[analyze-running-workout] duration repair failed (non-fatal):', e);
+      }
+
       const intent = plannedWorkout ? (detectWorkoutIntent(plannedWorkout) as any) : null;
       const { factPacket, flags } = await buildWorkoutFactPacketV1({
         supabase,

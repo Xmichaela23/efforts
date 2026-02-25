@@ -22,6 +22,16 @@ export function generateIntervalBreakdown(
   if (intervalsToAnalyze.length === 0) {
     return { available: false, message: 'No intervals to analyze' };
   }
+
+  // Detect auto-lap/split: device laps (e.g. auto-lap every 1km) or our 1km/60s splits - not intentional structure
+  const AUTO_ROLES = new Set(['lap', 'split_km', 'split_km_tail', 'split_60s', 'split_60s_tail']);
+  const AUTO_PROVENANCE = new Set(['lap', 'split']);
+  const isAutoLapOrSplit = !plannedWorkout &&
+    intervalsToAnalyze.length >= 2 &&
+    intervalsToAnalyze.every((i: any) =>
+      AUTO_ROLES.has(String(i.role || '').toLowerCase()) ||
+      AUTO_PROVENANCE.has(String(i.executed?.provenance || '').toLowerCase())
+    );
   
   const breakdown = intervalsToAnalyze.map((interval, index) => {
     // Extract planned values
@@ -1106,6 +1116,7 @@ export function generateIntervalBreakdown(
   const result = {
     available: true,
     intervals: completeBreakdown, // Use complete breakdown with warmup/recovery/cooldown
+    is_auto_lap_or_split: isAutoLapOrSplit, // True when intervals are device laps or our splits, not intentional structure
     section: sectionText,  // Add section text for UI display
     summary: {
       average_performance_score: workSummary.total > 0 ? Math.round(workSummary.total / workIntervalsOnly.length) : 0,

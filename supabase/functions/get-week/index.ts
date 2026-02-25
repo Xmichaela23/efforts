@@ -451,7 +451,10 @@ Deno.serve(async (req)=>{
       'is_strava_imported',
       'strava_activity_id',
       'garmin_activity_id',
-      'device_info'
+      'device_info',
+      'rpe',
+      'gear_id',
+      'workout_metadata'
     ].join(',');
     const { data: wkRaw, error: wkErr } = await supabase.from('workouts').select(workoutSel).eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
       ascending: true
@@ -820,7 +823,11 @@ Deno.serve(async (req)=>{
         is_strava_imported: w.is_strava_imported || null,
         strava_activity_id: w.strava_activity_id || null,
         garmin_activity_id: w.garmin_activity_id || null,
-        device_info: deviceInfo
+        device_info: deviceInfo,
+        // User feedback (RPE, gear) - for readouts in detail view
+        rpe: w.rpe ?? null,
+        gear_id: w.gear_id ?? null,
+        workout_metadata: w.workout_metadata ?? null
       };
     };
     const items = workouts.map(unify);
