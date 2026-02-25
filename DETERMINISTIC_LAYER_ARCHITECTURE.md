@@ -312,6 +312,9 @@ The existing analyzers gradually become thin wrappers: fetch facts, feed to AI, 
 - [x] AI coaching layer reads facts + snapshot, produces weekly narrative (coach function already does this)
 - [ ] **Per-workout analyzers slim down** — `analyze-running-workout` / `analyze-strength-workout` read from facts instead of re-computing. *Deprioritized:* current analyzers work; this is a code-quality pass after Phase 2 and Phase 3 adaptation logic ship.
 
+### Phase 3.5: Marathon readiness (assessment only)
+- [x] **Marathon readiness checklist** — `_shared/marathon-readiness` queries `workout_facts` (6–8 week lookback). Coach adds `marathon_readiness` to response; CoachWeekTab shows checklist card. No suggestion flow; validation of signals before wiring "suggest long run."
+
 ### Phase 4: Multi-discipline (horizon)
 - [ ] Cycling plan generation reads from same pipeline
 - [ ] Triathlon planning composes across disciplines using unified load model

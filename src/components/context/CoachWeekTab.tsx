@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase } from '@/lib/supabase';
 import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
@@ -632,6 +633,41 @@ export default function CoachWeekTab() {
             await refresh();
           }}
         />
+      )}
+
+      {/* ── Marathon Readiness (Phase 3.5) ── */}
+      {data.marathon_readiness?.applicable && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="text-sm font-medium text-white/90 mb-1">Marathon readiness</div>
+          <div className="text-xs text-white/50 mb-3">
+            Checklist based on last 6–8 weeks. Assessment only — no suggestions.
+          </div>
+          <div className="space-y-2">
+            {data.marathon_readiness.items.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start gap-2 rounded-lg px-2.5 py-2 border border-white/[0.06] bg-white/[0.02]"
+              >
+                {item.pass ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500/90 shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-amber-500/80 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-white/90">{item.label}</div>
+                  <div className="text-[11px] text-white/50 mt-0.5">{item.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {data.marathon_readiness.summary !== 'insufficient_data' && (
+            <div className="mt-2 text-[11px] text-white/40">
+              {data.marathon_readiness.summary === 'on_track'
+                ? 'On track'
+                : 'Needs work'}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── Coach Narrative ── */}

@@ -19,6 +19,7 @@ import type {
 } from './types.ts';
 import { getMethodology } from './methodologies/registry.ts';
 import type { MethodologyContext } from './methodologies/types.ts';
+import { computeMarathonReadiness } from '../_shared/marathon-readiness/index.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -1399,6 +1400,15 @@ ${narrativeFacts.join('\n')}`;
       console.warn('[coach] week narrative generation failed (non-fatal):', narErr?.message || narErr);
     }
 
+    // Phase 3.5: Marathon readiness checklist (when run data exists)
+    let marathon_readiness: CoachWeekContextResponseV1['marathon_readiness'];
+    try {
+      const mr = await computeMarathonReadiness(userId, asOfDate, acwr ?? null, supabase);
+      marathon_readiness = mr ?? undefined;
+    } catch (mrErr: any) {
+      console.warn('[coach] marathon readiness failed (non-fatal):', mrErr?.message ?? mrErr);
+    }
+
     const evidence: EvidenceItem[] = [
       { code: 'week_window', label: 'Week window', value: `${weekStartDate} → ${weekEndDate}` },
       { code: 'wtd_load', label: 'Week-to-date load', value: Math.round(actualWtdLoad), unit: 'pts' },
@@ -1447,6 +1457,7 @@ ${narrativeFacts.join('\n')}`;
       readiness_state: readinessState,
       interference,
       plan_adaptation_suggestions: plan_adaptation_suggestions.length ? plan_adaptation_suggestions : undefined,
+      marathon_readiness,
     };
 
     return new Response(JSON.stringify(response), {

@@ -246,6 +246,12 @@ export type CoachWeekContextResponseV1 = {
   baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
   /** Phase 3: plan adaptation (deload, add recovery when overreaching/fatigued) */
   plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
+  /** Phase 3.5: Marathon readiness checklist (assessment only, no suggestions) */
+  marathon_readiness?: {
+    applicable: boolean;
+    items: Array<{ id: string; label: string; pass: boolean; detail: string; value?: string | number }>;
+    summary: 'on_track' | 'needs_work' | 'insufficient_data';
+  };
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
   interference: {
