@@ -639,9 +639,21 @@ export default function CoachWeekTab() {
       {data.marathon_readiness?.applicable && (
         <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
           <div className="text-sm font-medium text-white/90 mb-1">Marathon readiness</div>
-          <div className="text-xs text-white/50 mb-3">
-            Whether your recent training is enough to finish strong. ✓ = met, ✗ = gap. Based on last 6–8 weeks of runs.
+          <div className="text-xs text-white/50 mb-2">
+            Whether your recent training is enough to finish strong. ✓ = met, ✗ = gap.
           </div>
+          <details className="mb-3 group">
+            <summary className="text-[11px] text-white/40 cursor-pointer hover:text-white/60">
+              How each tells the story
+            </summary>
+            <div className="mt-1.5 text-[11px] text-white/40 space-y-1 pl-1 border-l border-white/10">
+              <div><span className="text-white/55">Long run</span> — Legs ready for 26.2?</div>
+              <div><span className="text-white/55">Volume</span> — Enough weekly base to sustain?</div>
+              <div><span className="text-white/55">M-pace</span> — Recent marathon-pace work to stay sharp?</div>
+              <div><span className="text-white/55">ACWR</span> — Load in a safe range (not ramping too fast or dropping)?</div>
+              <div><span className="text-white/55">Durability</span> — Legs won&apos;t fade in the final 10K?</div>
+            </div>
+          </details>
           <div className="space-y-2">
             {data.marathon_readiness.items.map((item) => (
               <div
