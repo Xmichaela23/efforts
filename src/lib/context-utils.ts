@@ -229,26 +229,24 @@ export function getDisciplinePhosphorPill(
   // Fill color based on state
   // Filled vs outlined is pre-attentive — instant recognition at any glance speed.
   // - Planned (idle/week/active): No fill — border only, outline-only
-  // - Completed (done): Solid discipline-color fill at 40-50% — clearly filled
+  // - Completed (done): Neutral fill — completion is the dominant signal, not type color
   let fillColor = 'transparent';
   if (state === 'done') {
-    // Completed: solid discipline-color fill — filled = done, empty = not done
-    const rgb = hexToRgb(coreColor);
-    const [r, g, b] = rgb.split(',').map(v => parseInt(v.trim()));
-    // 45% opacity: clearly filled, readable white text
-    fillColor = `rgba(${r}, ${g}, ${b}, 0.45)`;
+    // Completed: neutral dark fill so "done" reads clearly regardless of workout type
+    fillColor = 'rgba(40, 40, 44, 0.75)';
   }
   
-  // Border color: always discipline color (muted phosphor)
-  // Border luminance hierarchy: Today > Upcoming > Completed
-  const borderColor = coreColor;
-  // Upcoming: more visible outline (potential)
-  // Completed: solid but no glow (earned)
-  // Today: brightest (active)
-  const borderOpacity = state === 'idle' ? 0.6 : (state === 'week' ? 0.7 : (state === 'done' ? 0.75 : 0.9)); // Higher for upcoming visibility
+  // Border color: discipline color for planned, neutral for completed (completion is dominant signal)
   const borderRgb = hexToRgb(coreColor);
   const [br, bg, bb] = borderRgb.split(',').map(v => parseInt(v.trim()));
-  const borderColorWithOpacity = `rgba(${br}, ${bg}, ${bb}, ${borderOpacity})`;
+  let borderColorWithOpacity: string;
+  if (state === 'done') {
+    // Completed: neutral border — fill + checkmark convey "done", not type color
+    borderColorWithOpacity = 'rgba(255, 255, 255, 0.18)';
+  } else {
+    const borderOpacity = state === 'idle' ? 0.6 : (state === 'week' ? 0.7 : 0.9);
+    borderColorWithOpacity = `rgba(${br}, ${bg}, ${bb}, ${borderOpacity})`;
+  }
   
   // Glow handling: Completed = no glow (earned, solid), Today = slight glow (active), Upcoming = minimal glow (potential)
   let finalBoxShadow: string | undefined;

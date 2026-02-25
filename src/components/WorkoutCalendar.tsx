@@ -1149,7 +1149,7 @@ export default function WorkoutCalendar({
                             size={14}
                             strokeWidth={2}
                             style={{
-                              color: completed ? `rgb(${pillRgb})` : 'rgba(245, 245, 245, 0.5)',
+                              color: completed ? 'rgba(255, 255, 255, 0.9)' : 'rgba(245, 245, 245, 0.5)',
                               opacity: completed ? 1 : 0.85,
                             }}
                           />
@@ -1162,7 +1162,7 @@ export default function WorkoutCalendar({
                           className="inline-flex items-center justify-center flex-shrink-0"
                           style={{
                             marginLeft: 4,
-                            color: `rgb(${pillRgb})`,
+                            color: 'rgba(255, 255, 255, 0.95)',
                             fontSize: 11,
                             fontWeight: 700,
                             lineHeight: 1,
@@ -1239,7 +1239,7 @@ export default function WorkoutCalendar({
                             `,
                             backgroundBlendMode: 'screen, normal, multiply, soft-light',
                             backgroundClip: 'padding-box',
-                            border: `1px solid rgba(${pillRgb}, 0.38)`,
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
                             boxShadow: `
                               0 0 0 1px rgba(255,255,255,0.10) inset,
                               0 0 0 2px rgba(0,0,0,0.24) inset,
@@ -1514,12 +1514,14 @@ export default function WorkoutCalendar({
                       </div>
                     </PopoverContent>
                   </Popover>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
+                    <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Planned</span>
                     <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.planned}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
+                    <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Done</span>
                     <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.completed}</span>
                   </div>
                 </div>

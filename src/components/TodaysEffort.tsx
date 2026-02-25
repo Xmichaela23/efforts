@@ -1413,11 +1413,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           }
                         : null),
                       // Dimensional / “special” feel (gloss + bevel + subtle depth)
-                      backgroundImage: `
-                        radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.00) 52%),
-                        radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
-                        linear-gradient(180deg, rgba(${pillRgb},0.14) 0%, rgba(${pillRgb},0.06) 55%, rgba(0,0,0,0.22) 100%)
-                      `,
+                      backgroundImage: isCompleted
+                        ? `
+                          radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.00) 52%),
+                          radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
+                          linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 55%, rgba(0,0,0,0.22) 100%)
+                        `
+                        : `
+                          radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.00) 52%),
+                          radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
+                          linear-gradient(180deg, rgba(${pillRgb},0.14) 0%, rgba(${pillRgb},0.06) 55%, rgba(0,0,0,0.22) 100%)
+                        `,
                       backgroundBlendMode: 'screen, multiply, normal',
                       backgroundClip: 'padding-box',
                       // Inset stroke so it feels “mounted”
@@ -1451,28 +1457,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       <div
                         className="font-medium tracking-normal text-base"
                         style={{
-                          color: getDisciplinePhosphorCore(workoutType),
+                          color: isCompleted ? 'rgba(255, 255, 255, 0.92)' : getDisciplinePhosphorCore(workoutType),
                           // Legibility: slight dark edge + faint discipline bloom
                           textShadow: isCompleted
-                            ? `0 1px 1px rgba(0,0,0,0.65), 0 0 8px rgba(0,0,0,0.45), 0 0 10px rgba(${pillRgb},0.07)`
+                            ? `0 1px 1px rgba(0,0,0,0.65), 0 0 8px rgba(0,0,0,0.45)`
                             : `0 1px 1px rgba(0,0,0,0.55), 0 0 10px rgba(0,0,0,0.35), 0 0 14px rgba(${pillRgb},0.10)`,
                         }}
                       >
                         {title}
                         {isCompleted && (
                           <span
-                            className="ml-2"
+                            aria-label="Completed"
+                            className="inline-flex items-center justify-center flex-shrink-0 ml-2"
                             style={{
-                              color: 'rgba(245, 245, 245, 0.82)',
-                              fontFamily:
-                                '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                              fontSize: '0.72rem',
-                              letterSpacing: '0.14em',
-                              textTransform: 'uppercase',
-                              opacity: 0.85,
+                              color: 'rgba(255, 255, 255, 0.95)',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              lineHeight: 1,
                             }}
                           >
-                            Complete
+                            ✓
                           </span>
                         )}
                       </div>
