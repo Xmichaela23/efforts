@@ -1856,6 +1856,7 @@ Deno.serve(async (req) => {
           ? {
               planName: (planContextForFact as any).planName ?? null,
               phaseName: (planContextForFact as any).phaseName ?? null,
+              weekFocusLabel: (planContextForFact as any).weekFocusLabel ?? null,
               weekIndex: (planContextForFact as any).weekIndex ?? null,
               weekIntent: (planContextForFact as any).weekIntent ?? null,
               isRecoveryWeek: (planContextForFact as any).isRecoveryWeek ?? null,

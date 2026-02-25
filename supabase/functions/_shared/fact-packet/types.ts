@@ -51,6 +51,7 @@ export type PlanV1 = {
   name: string;
   week_number: number | null;
   phase: string | null; // "base" | "build" | ...
+  week_focus_label?: string | null; // e.g. "Race-specific work" from plan weekly summaries
   workout_purpose: string | null;
   days_until_race: number | null;
   // Optional plan-week context (drives recovery integrity flags/limiter).

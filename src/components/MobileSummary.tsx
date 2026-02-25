@@ -265,6 +265,25 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
   return { text: '—', hr: getAvgHR(completed) };
 };
 
+/** Extract weekly intent from fact packet to explain plan context (e.g. "Week 10 • Race-specific work") */
+function getWeeklyIntentLabel(completedSrc: any): string | null {
+  try {
+    const wa = completedSrc?.workout_analysis;
+    const raw = (wa as any)?.fact_packet_v1 ?? (wa as any)?.factPacketV1 ?? null;
+    const fp = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const plan = fp?.facts?.plan;
+    if (!plan) return null;
+    const weekNum = typeof plan?.week_number === 'number' ? plan.week_number : null;
+    const focusLabel = typeof plan?.week_focus_label === 'string' && plan.week_focus_label ? String(plan.week_focus_label) : null;
+    const phase = typeof plan?.phase === 'string' && plan.phase ? String(plan.phase) : null;
+    const weekIntent = typeof plan?.week_intent === 'string' && plan.week_intent && plan.week_intent !== 'unknown' ? String(plan.week_intent) : null;
+    const humanLabel = focusLabel || phase || (weekIntent ? weekIntent.charAt(0).toUpperCase() + weekIntent.slice(1) : null);
+    if (!humanLabel) return null;
+    if (weekNum != null) return `Week ${weekNum} • ${humanLabel}`;
+    return humanLabel;
+  } catch { return null; }
+}
+
 export default function MobileSummary({ planned, completed, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
   
@@ -1860,10 +1879,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
           // Adherence chips only; summary (technical_insights + plan_impact) is rendered below the intervals table
           const adherenceSummary = completedSrc?.workout_analysis?.adherence_summary;
+          const weeklyIntentLabel = getWeeklyIntentLabel(completedSrc);
 
           return (
             <div className="w-full pt-1 pb-2">
-              {/* Adherence scores — no blurb above */}
+              {/* Weekly intent: explain plan context so grades make sense (e.g. shorter run vs planned) */}
+              {weeklyIntentLabel && (
+                <div className="mb-2 text-center text-xs text-gray-400">
+                  {weeklyIntentLabel}
+                </div>
+              )}
+              {/* Adherence scores */}
               <div className="flex items-center justify-center gap-6 text-center mb-3">
                 <div className="flex items-end gap-3">
                   {chip('Execution', finalExecutionScore, 
@@ -1998,9 +2024,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
             // ✅ FIX: Use server-side values for contextual message instead of client calculations
             const message = getContextualMessage(workoutIntent, durationAdherence, null, paceAdherence, 'swim');
+            const weeklyIntentLabel = getWeeklyIntentLabel(completedSrc);
 
             return (
               <div className="w-full pt-1 pb-2">
+                {weeklyIntentLabel && (
+                  <div className="mb-2 text-center text-xs text-gray-400">
+                    {weeklyIntentLabel}
+                  </div>
+                )}
                 {/* Descriptive blurb first */}
                 {message && (
                   <div className="mb-3 text-xs text-gray-600 text-center">
@@ -2102,9 +2134,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
             // Use server values for contextual message
             const message = getContextualMessage(workoutIntent, durationAdherence, null, powerAdherence, 'bike');
+            const weeklyIntentLabel = getWeeklyIntentLabel(completedSrc);
 
             return (
               <div className="w-full pt-1 pb-2">
+                {weeklyIntentLabel && (
+                  <div className="mb-2 text-center text-xs text-gray-400">
+                    {weeklyIntentLabel}
+                  </div>
+                )}
                 {/* Descriptive blurb first */}
                 {message && (
                   <div className="mb-3 text-xs text-gray-600 text-center">
