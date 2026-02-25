@@ -509,26 +509,28 @@ export default function CoachWeekTab() {
       {data.plan.has_active_plan && data.plan.plan_id && data.plan.week_index != null && (
         <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
           {contextExpanded ? (
-            <textarea
-              value={contextValue}
-              onChange={(e) => setContextValue(e.target.value)}
-              onBlur={() => {
-                saveAthleteContext(contextValue);
-                if (!contextValue.trim()) setContextExpanded(false);
-              }}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                  e.preventDefault();
+            <>
+              <textarea
+                value={contextValue}
+                onChange={(e) => setContextValue(e.target.value)}
+                onBlur={() => {
                   saveAthleteContext(contextValue);
                   if (!contextValue.trim()) setContextExpanded(false);
-                  (e.target as HTMLTextAreaElement).blur();
-                }
-              }}
-              placeholder="e.g. had the flu, travel, increased weights on purpose..."
-              className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
-              autoFocus
-            />
-            <div className="px-3 pb-2 text-[10px] text-white/35">Click away or ⌘↵ to save</div>
+                }}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    saveAthleteContext(contextValue);
+                    if (!contextValue.trim()) setContextExpanded(false);
+                    (e.target as HTMLTextAreaElement).blur();
+                  }
+                }}
+                placeholder="e.g. had the flu, travel, increased weights on purpose..."
+                className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
+                autoFocus
+              />
+              <div className="px-3 pb-2 text-[10px] text-white/35">Click away or ⌘↵ to save</div>
+            </>
           ) : (
             <button
               onClick={() => setContextExpanded(true)}
