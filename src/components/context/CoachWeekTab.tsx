@@ -635,60 +635,6 @@ export default function CoachWeekTab() {
         />
       )}
 
-      {/* ── Marathon Readiness (Phase 3.5) ── */}
-      {data.marathon_readiness?.applicable && (
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-          <div className="text-sm font-medium text-white/90 mb-1">Marathon readiness</div>
-          <div className="text-xs text-white/50 mb-2">
-            Whether your recent training is enough to finish strong. ✓ = met, ✗ = gap.
-          </div>
-          <details className="mb-3 group">
-            <summary className="text-[11px] text-white/40 cursor-pointer hover:text-white/60">
-              How each tells the story
-            </summary>
-            <div className="mt-1.5 text-[11px] text-white/40 space-y-1 pl-1 border-l border-white/10">
-              <div><span className="text-white/55">Long run</span> — Legs ready for 26.2?</div>
-              <div><span className="text-white/55">Volume</span> — Enough weekly base to sustain?</div>
-              <div><span className="text-white/55">M-pace</span> — Recent marathon-pace work to stay sharp?</div>
-              <div><span className="text-white/55">ACWR</span> — Load in a safe range (not ramping too fast or dropping)?</div>
-              <div><span className="text-white/55">Durability</span> — Legs won&apos;t fade in the final 10K?</div>
-            </div>
-          </details>
-          <div className="space-y-2">
-            {data.marathon_readiness.items.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-start gap-2 rounded-lg px-2.5 py-2 border border-white/[0.06] bg-white/[0.02]"
-              >
-                {item.pass ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500/90 shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-amber-500/80 shrink-0 mt-0.5" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white/90">{item.label}</div>
-                  <div className="text-[11px] text-white/50 mt-0.5">{item.detail}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          {data.marathon_readiness.context_note && (
-            <div className="mt-2 rounded-lg px-2.5 py-2 bg-sky-500/10 border border-sky-500/20 text-xs text-sky-200/90">
-              {data.marathon_readiness.context_note}
-            </div>
-          )}
-          {data.marathon_readiness.summary !== 'insufficient_data' && (
-            <div className="mt-2 text-[11px] text-white/50">
-              {data.marathon_readiness.summary === 'on_track'
-                ? 'On track — training base looks sufficient for race day.'
-                : data.marathon_readiness.context_note
-                  ? 'Needs work — but see note above.'
-                  : 'Needs work — address the gaps above before race day.'}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Coach Narrative ── */}
       <div className={`rounded-xl border p-4 ${verdictTone}`}>
         <div className={`text-lg font-semibold ${titleGlow}`}
@@ -949,6 +895,61 @@ export default function CoachWeekTab() {
           </div>
         </div>
       ) : null}
+
+      {/* ── Marathon Readiness (Phase 3.5) — at bottom so context note lands last ── */}
+      {data.marathon_readiness?.applicable && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="text-sm font-medium text-white/90 mb-1">Marathon readiness</div>
+          <div className="text-xs text-white/50 mb-2">
+            Whether your recent training is enough to finish strong. ✓ = met, ✗ = gap.
+          </div>
+          <details className="mb-3 group">
+            <summary className="text-[11px] text-white/40 cursor-pointer hover:text-white/60">
+              How each tells the story
+            </summary>
+            <div className="mt-1.5 text-[11px] text-white/40 space-y-1 pl-1 border-l border-white/10">
+              <div><span className="text-white/55">Long run</span> — Legs ready for 26.2?</div>
+              <div><span className="text-white/55">Volume</span> — Enough weekly base to sustain?</div>
+              <div><span className="text-white/55">M-pace</span> — Recent marathon-pace work to stay sharp?</div>
+              <div><span className="text-white/55">ACWR</span> — Load in a safe range (not ramping too fast or dropping)?</div>
+              <div><span className="text-white/55">Durability</span> — Legs won&apos;t fade in the final 10K?</div>
+            </div>
+          </details>
+          <div className="space-y-2">
+            {data.marathon_readiness.items.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start gap-2 rounded-lg px-2.5 py-2 border border-white/[0.06] bg-white/[0.02]"
+              >
+                {item.pass ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500/90 shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-amber-500/80 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-white/90">{item.label}</div>
+                  <div className="text-[11px] text-white/50 mt-0.5">{item.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {data.marathon_readiness.summary !== 'insufficient_data' && !data.marathon_readiness.context_note && (
+            <div className="mt-2 text-[11px] text-white/50">
+              {data.marathon_readiness.summary === 'on_track'
+                ? 'On track — training base looks sufficient for race day.'
+                : 'Needs work — address the gaps above before race day.'}
+            </div>
+          )}
+          {data.marathon_readiness.context_note && (
+            <div className="mt-2 rounded-lg px-2.5 py-2 bg-sky-500/10 border border-sky-500/20 text-xs text-sky-200/90">
+              {data.marathon_readiness.context_note}
+            </div>
+          )}
+          {data.marathon_readiness.summary !== 'insufficient_data' && data.marathon_readiness.context_note && (
+            <div className="mt-2 text-[11px] text-white/50">Needs work — but see note above.</div>
+          )}
+        </div>
+      )}
 
     </div>
   );
