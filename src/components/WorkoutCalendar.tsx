@@ -5,7 +5,7 @@ import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePill
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
-import { Calendar, CheckCircle, Info } from 'lucide-react';
+import { Calendar, CheckCircle, Info, Activity, Bike, Waves, Dumbbell, Move, CircleDot, Check, type LucideIcon } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -83,6 +83,37 @@ function deriveProvider(w: any): string {
   if (w?.strava_data || w?.strava_activity_id || id.startsWith('strava_')) return 'strava';
   if (w?.source === 'training_plan') return 'workouts';
   return 'workouts';
+}
+
+// Discipline icons (concrete symbols for recognition - research-backed)
+const DISCIPLINE_ICONS: Record<string, LucideIcon> = {
+  run: Activity,
+  running: Activity,
+  ride: Bike,
+  bike: Bike,
+  cycling: Bike,
+  swim: Waves,
+  swimming: Waves,
+  strength: Dumbbell,
+  strength_training: Dumbbell,
+  weight: Dumbbell,
+  weights: Dumbbell,
+  mobility: Move,
+  pilates_yoga: CircleDot,
+  pilates: CircleDot,
+  yoga: CircleDot,
+};
+
+function resolveDisciplineForIcon(workoutType: string, label: string): string {
+  const type = workoutType.toLowerCase();
+  if (type && DISCIPLINE_ICONS[type]) return type;
+  const labelLower = label.toLowerCase();
+  if (/^rn[- ]|run|rnvo2|rn-lr|rn-tmp|rn-int/.test(labelLower)) return 'run';
+  if (/^bk|bike|ride|cycling/.test(labelLower)) return 'ride';
+  if (/^sm|swim|swimming/.test(labelLower)) return 'swim';
+  if (/stg|strength|upper|lower|full|cmp|acc|core/.test(labelLower)) return 'strength';
+  if (/mbl|mobility|pilates|yoga|plt|ygo|py/.test(labelLower)) return 'pilates_yoga';
+  return 'run'; // default fallback
 }
 
 // Backfill guard to avoid repeated server calls per week
@@ -1101,6 +1132,31 @@ export default function WorkoutCalendar({
                     const renderLabel = () => {
                       const label = String(evt.label || '');
                       const hasCheckmark = /✓+$/.test(label);
+                      const discipline = resolveDisciplineForIcon(workoutType, label);
+                      const IconComponent = DISCIPLINE_ICONS[discipline] || Activity;
+
+                      const renderDisciplineIcon = (completed: boolean) => (
+                        <span
+                          aria-label={completed ? 'Completed' : 'Planned'}
+                          className="inline-flex items-center justify-center tabular-nums flex-shrink-0"
+                          style={{
+                            marginLeft: 6,
+                            width: 16,
+                            height: 16,
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <IconComponent
+                            size={14}
+                            strokeWidth={2}
+                            style={{
+                              color: completed ? `rgb(${pillRgb})` : 'rgba(245, 245, 245, 0.5)',
+                              opacity: completed ? 1 : 0.85,
+                            }}
+                          />
+                        </span>
+                      );
+
                       if (hasCheckmark && isCompleted) {
                         const labelText = label.replace(/✓+$/, '').trim();
                         const parts = labelText.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
@@ -1113,68 +1169,21 @@ export default function WorkoutCalendar({
                                 <span key={idx} className="tabular-nums">{part}</span>
                               ) : part;
                             })}
+                            {renderDisciplineIcon(true)}
                             <span
                               aria-label="Completed"
-                              className="inline-flex items-center justify-center tabular-nums"
+                              className="inline-flex items-center justify-center flex-shrink-0"
                               style={{
-                                marginLeft: 8,
-                                width: 22,
-                                height: 12,
-                                position: 'relative',
-                                verticalAlign: 'middle',
-                                transform: 'translateY(1px)',
+                                marginLeft: 4,
+                                color: `rgb(${pillRgb})`,
                               }}
                             >
-                              {/* 3-line “emission” mark (wider to match completed pyramid) */}
-                              <span
-                                aria-hidden="true"
-                                style={{
-                                  position: 'absolute',
-                                  left: '50%',
-                                  top: -6,
-                                  transform: 'translateX(-50%)',
-                                  width: 22,
-                                  height: 6,
-                                  pointerEvents: 'none',
-                                  backgroundImage: `
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.78) 42%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.64) 42%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.52) 42%, rgba(${pillRgb},0.0) 100%)
-                                  `,
-                                  backgroundRepeat: 'no-repeat',
-                                  backgroundSize: '22px 1px, 20px 1px, 18px 1px',
-                                  backgroundPosition: 'center 0px, center 2px, center 4px',
-                                  filter: `drop-shadow(0 0 6px rgba(${pillRgb},0.22))`,
-                                  opacity: 0.95,
-                                }}
-                              />
-                              {/* Pyramid indicator: wider (22px base) to match incomplete visual size */}
-                              <span
-                                aria-hidden="true"
-                                style={{
-                                  width: 22,
-                                  height: 12,
-                                  position: 'relative',
-                                  backgroundImage: `
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 40%, rgba(${pillRgb},0.72) 60%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.76) 35%, rgba(${pillRgb},0.76) 65%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.80) 30%, rgba(${pillRgb},0.80) 70%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.82) 25%, rgba(${pillRgb},0.82) 75%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.78) 20%, rgba(${pillRgb},0.78) 80%, rgba(${pillRgb},0.0) 100%),
-                                    linear-gradient(90deg, rgba(${pillRgb},0.0) 0%, rgba(${pillRgb},0.72) 28%, rgba(${pillRgb},0.72) 72%, rgba(${pillRgb},0.0) 100%)
-                                  `,
-                                  backgroundRepeat: 'no-repeat',
-                                  backgroundSize: '5px 1.25px, 8px 1.25px, 11px 1.25px, 14px 1.25px, 17px 1.25px, 22px 0.5px',
-                                  backgroundPosition: 'center 0px, center 2px, center 4px, center 6px, center 8px, center 10px',
-                                  filter: 'none',
-                                }}
-                              />
+                              <Check size={12} strokeWidth={2.5} />
                             </span>
                           </>
                         );
                       }
 
-                      // Not done: add an outline-only pyramid (no illumination)
                       const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
                       const content = (() => {
                         if (parts.length > 0) {
@@ -1193,57 +1202,7 @@ export default function WorkoutCalendar({
                         return (
                           <>
                             {content}
-                            <span
-                              aria-hidden="true"
-                              className="inline-flex items-center justify-center tabular-nums"
-                              style={{
-                                marginLeft: 8,
-                                width: 18,
-                                height: 12,
-                                position: 'relative',
-                                verticalAlign: 'middle',
-                                transform: 'translateY(1px)',
-                              }}
-                            >
-                              {/* Emission lines above incomplete pyramid (match complete) */}
-                              <span
-                                aria-hidden="true"
-                                style={{
-                                  position: 'absolute',
-                                  left: '50%',
-                                  top: -6,
-                                  transform: 'translateX(-50%)',
-                                  width: 18,
-                                  height: 6,
-                                  pointerEvents: 'none',
-                                  backgroundImage: `
-                                    linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.62) 42%, rgba(255,255,255,0) 100%),
-                                    linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 42%, rgba(255,255,255,0) 100%),
-                                    linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 42%, rgba(255,255,255,0) 100%)
-                                  `,
-                                  backgroundRepeat: 'no-repeat',
-                                  backgroundSize: '18px 1px, 16px 1px, 14px 1px',
-                                  backgroundPosition: 'center 0px, center 2px, center 4px',
-                                  opacity: 0.9,
-                                }}
-                              />
-                              <svg
-                                width="18"
-                                height="12"
-                                viewBox="0 0 18 12"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                                style={{ display: 'block' }}
-                              >
-                                <polygon
-                                  points="9,1 17,11 1,11"
-                                  stroke="rgba(245,245,245,0.62)"
-                                  strokeWidth="1.25"
-                                  strokeLinejoin="round"
-                                  fill="transparent"
-                                />
-                              </svg>
-                            </span>
+                            {renderDisciplineIcon(false)}
                           </>
                         );
                       }
