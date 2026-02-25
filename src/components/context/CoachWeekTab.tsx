@@ -529,7 +529,19 @@ export default function CoachWeekTab() {
                 className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
                 autoFocus
               />
-              <div className="px-3 pb-2 text-[10px] text-white/35">Click away or ⌘↵ to save</div>
+              <div className="px-3 pb-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveAthleteContext(contextValue);
+                    if (!contextValue.trim()) setContextExpanded(false);
+                  }}
+                  disabled={contextSaving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/80 text-white hover:bg-emerald-500 disabled:opacity-60"
+                >
+                  {contextSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
             </>
           ) : (
             <button
