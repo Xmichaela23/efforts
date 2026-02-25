@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 type PlannedWorkout = any;
 
+/** Use server-provided planned_workout when present (smart server, dumb client) */
+const toPlannedWorkout = (item: any): PlannedWorkout =>
+  item?.planned_workout ?? mapUnifiedItemToPlanned(item);
+
 export const usePlannedWorkouts = () => {
   const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,61 +44,9 @@ export const usePlannedWorkouts = () => {
         throw error;
       }
 
-      // Extract planned workouts from unified items (SMART SERVER returns unified format with computed)
       const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
       const plannedItems = items.filter((it: any) => !!it?.planned);
-
-      // Transform unified items to PlannedWorkout format
-      const transformedWorkouts: PlannedWorkout[] = plannedItems
-        .map((item: any) => {
-        // SMART SERVER returns unified format - extract planned data
-        const planned = item.planned || {};
-        return {
-          id: item.id || planned.id || '',
-          name: planned.name || item.type || '',
-          type: item.type || planned.type || '',
-          date: item.date || planned.date || '',
-          description: planned.description || null,
-          duration: planned.duration || null,
-          intervals: [],
-          strength_exercises: planned.strength_exercises || [],
-          mobility_exercises: planned.mobility_exercises || [],
-          workout_status: item.status || planned.workout_status || 'planned',
-          source: planned.source || null,
-          training_plan_id: planned.training_plan_id || null,
-          week_number: planned.week_number || null,
-          day_number: planned.day_number || null,
-          // @ts-ignore
-          tags: planned.tags || [],
-          // @ts-ignore
-          steps_preset: planned.steps_preset || [],
-          export_hints: null,
-          rendered_description: planned.rendered_description || null,
-          // @ts-ignore
-          computed: planned.computed || (planned.steps ? { steps: planned.steps } : null),
-          // @ts-ignore
-          units: planned.units || null,
-          // @ts-ignore
-          workout_structure: planned.workout_structure || null,
-          // @ts-ignore
-          workout_title: planned.workout_title || null,
-          // @ts-ignore
-          friendly_summary: planned.friendly_summary || null,
-          // @ts-ignore
-          total_duration_seconds: planned.total_duration_seconds || null,
-          // @ts-ignore
-          pool_unit: planned.pool_unit || null,
-          // @ts-ignore
-          pool_length_m: planned.pool_length_m || null,
-          // @ts-ignore
-          display_overrides: planned.display_overrides || null,
-          // @ts-ignore
-          expand_spec: planned.expand_spec || null,
-          // @ts-ignore
-          pace_annotation: planned.pace_annotation || null,
-        } as any;
-      });
-
+      const transformedWorkouts: PlannedWorkout[] = plannedItems.map(toPlannedWorkout);
       setPlannedWorkouts(transformedWorkouts);
     } catch (err) {
       console.error('Error fetching planned workouts:', err);
@@ -375,7 +327,7 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
         // Use mapper - SINGLE SOURCE OF TRUTH
         const plannedForDay = items
           .filter((it:any)=> !!it?.planned)
-          .map((it:any)=> mapUnifiedItemToPlanned(it));
+          .map((it:any)=> toPlannedWorkout(it));
         if (!cancelled) setRows(plannedForDay as any);
       } catch (e:any) {
         if (!cancelled) setError(e?.message || 'Failed to load planned workouts');

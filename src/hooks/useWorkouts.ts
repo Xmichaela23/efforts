@@ -225,6 +225,8 @@ export const useWorkouts = () => {
           'workload_planned','workload_actual','intensity_factor',
           // source tracking for display
           'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
+          // user feedback (canonical in workout_metadata after backfill)
+          'rpe','workout_metadata',
           // achievements (PRs, segments)
           'achievements',
           'created_at','updated_at'
@@ -783,39 +785,13 @@ export const useWorkouts = () => {
           } catch { return (w as any).swim_data; }
         })(),
         pool_length: w.pool_length,
-        // Server-side normalization: Merge old fields into unified workout_metadata
+        // workout_metadata: canonical from DB (backfill + trigger sync rpe -> session_rpe)
         workout_metadata: (() => {
           try {
-            const parsed = typeof (w as any).workout_metadata === 'string' 
+            return typeof (w as any).workout_metadata === 'string' 
               ? JSON.parse((w as any).workout_metadata) 
               : ((w as any).workout_metadata || {});
-            
-            // Normalize old fields into workout_metadata (server-side transformation)
-            if (!parsed.session_rpe && (typeof (w as any).rpe === 'number' || typeof (w as any).session_rpe === 'number')) {
-              parsed.session_rpe = (w as any).rpe || (w as any).session_rpe;
-            }
-            if (!parsed.notes && (w as any).notes && typeof (w as any).notes === 'string') {
-              parsed.notes = (w as any).notes;
-            }
-            if (!parsed.readiness && (w as any).readiness && typeof (w as any).readiness === 'object') {
-              parsed.readiness = (w as any).readiness;
-            }
-            
-            return parsed;
-          } catch { 
-            // Fallback: create normalized metadata from old fields
-            const normalized: any = {};
-            if (typeof (w as any).rpe === 'number' || typeof (w as any).session_rpe === 'number') {
-              normalized.session_rpe = (w as any).rpe || (w as any).session_rpe;
-            }
-            if ((w as any).notes && typeof (w as any).notes === 'string') {
-              normalized.notes = (w as any).notes;
-            }
-            if ((w as any).readiness && typeof (w as any).readiness === 'object') {
-              normalized.readiness = (w as any).readiness;
-            }
-            return normalized;
-          }
+          } catch { return {}; }
         })()
       }));
 
@@ -1400,39 +1376,13 @@ export const useWorkouts = () => {
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
         computed: (() => { try { return typeof (data as any).computed === 'string' ? JSON.parse((data as any).computed) : (data as any).computed; } catch { return (data as any).computed; } })(),
-        // Server-side normalization: Merge old fields into unified workout_metadata
+        // workout_metadata: canonical from DB (backfill + trigger sync rpe -> session_rpe)
         workout_metadata: (() => {
           try {
-            const parsed = typeof (data as any).workout_metadata === 'string' 
+            return typeof (data as any).workout_metadata === 'string' 
               ? JSON.parse((data as any).workout_metadata) 
               : ((data as any).workout_metadata || {});
-            
-            // Normalize old fields into workout_metadata (server-side transformation)
-            if (!parsed.session_rpe && (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number')) {
-              parsed.session_rpe = (data as any).rpe || (data as any).session_rpe;
-            }
-            if (!parsed.notes && (data as any).notes && typeof (data as any).notes === 'string') {
-              parsed.notes = (data as any).notes;
-            }
-            if (!parsed.readiness && (data as any).readiness && typeof (data as any).readiness === 'object') {
-              parsed.readiness = (data as any).readiness;
-            }
-            
-            return parsed;
-          } catch { 
-            // Fallback: create normalized metadata from old fields
-            const normalized: any = {};
-            if (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number') {
-              normalized.session_rpe = (data as any).rpe || (data as any).session_rpe;
-            }
-            if ((data as any).notes && typeof (data as any).notes === 'string') {
-              normalized.notes = (data as any).notes;
-            }
-            if ((data as any).readiness && typeof (data as any).readiness === 'object') {
-              normalized.readiness = (data as any).readiness;
-            }
-            return normalized;
-          }
+          } catch { return {}; }
         })(),
         metrics: {
           avg_heart_rate: data.avg_heart_rate,
@@ -1699,39 +1649,13 @@ export const useWorkouts = () => {
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
         computed: (() => { try { return typeof (data as any).computed === 'string' ? JSON.parse((data as any).computed) : (data as any).computed; } catch { return (data as any).computed; } })(),
-        // Server-side normalization: Merge old fields into unified workout_metadata
+        // workout_metadata: canonical from DB (backfill + trigger sync rpe -> session_rpe)
         workout_metadata: (() => {
           try {
-            const parsed = typeof (data as any).workout_metadata === 'string' 
+            return typeof (data as any).workout_metadata === 'string' 
               ? JSON.parse((data as any).workout_metadata) 
               : ((data as any).workout_metadata || {});
-            
-            // Normalize old fields into workout_metadata (server-side transformation)
-            if (!parsed.session_rpe && (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number')) {
-              parsed.session_rpe = (data as any).rpe || (data as any).session_rpe;
-            }
-            if (!parsed.notes && (data as any).notes && typeof (data as any).notes === 'string') {
-              parsed.notes = (data as any).notes;
-            }
-            if (!parsed.readiness && (data as any).readiness && typeof (data as any).readiness === 'object') {
-              parsed.readiness = (data as any).readiness;
-            }
-            
-            return parsed;
-          } catch { 
-            // Fallback: create normalized metadata from old fields
-            const normalized: any = {};
-            if (typeof (data as any).rpe === 'number' || typeof (data as any).session_rpe === 'number') {
-              normalized.session_rpe = (data as any).rpe || (data as any).session_rpe;
-            }
-            if ((data as any).notes && typeof (data as any).notes === 'string') {
-              normalized.notes = (data as any).notes;
-            }
-            if ((data as any).readiness && typeof (data as any).readiness === 'object') {
-              normalized.readiness = (data as any).readiness;
-            }
-            return normalized;
-          }
+          } catch { return {}; }
         })(),
         metrics: {
           avg_heart_rate: data.avg_heart_rate,

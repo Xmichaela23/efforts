@@ -2438,19 +2438,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 const ix = Number((st as any)?.planned_index);
                 if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
               }
-              // Unplanned: row comes from interval_breakdown (not computed.intervals)
+              // Unplanned: row from interval_breakdown (server provides executed + planned_label)
               if (!row && !planned && unplannedIntervals[idx]) {
-                const iv = unplannedIntervals[idx];
-                row = {
-                  ...iv,
-                  executed: {
-                    distance_m: iv.actual_distance_m,
-                    duration_s: iv.actual_duration_s,
-                  },
-                  // Pre-formatted display string from backend (frontend does zero math)
-                  pace_display: iv.pace_display,
-                  planned_label: iv.planned_label || (iv.interval_type === 'work' ? `Work · ${iv.actual_duration_s ? `${Math.round(iv.actual_duration_s / 60)} min` : ''}` : String(iv.interval_type || '')),
-                };
+                row = unplannedIntervals[idx];
               }
             }
             // Use enhanced analysis adherence percentage if available (works for both running and cycling)

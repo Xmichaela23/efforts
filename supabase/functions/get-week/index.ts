@@ -824,10 +824,16 @@ Deno.serve(async (req)=>{
         strava_activity_id: w.strava_activity_id || null,
         garmin_activity_id: w.garmin_activity_id || null,
         device_info: deviceInfo,
-        // User feedback (RPE, gear) - for readouts in detail view
+        // User feedback (RPE, gear) - canonical workout_metadata (smart server, dumb client)
         rpe: w.rpe ?? null,
         gear_id: w.gear_id ?? null,
-        workout_metadata: w.workout_metadata ?? null
+        workout_metadata: (() => {
+          let meta = w.workout_metadata ?? null;
+          try { meta = typeof meta === 'string' ? JSON.parse(meta) : meta; } catch { meta = meta || {}; }
+          meta = meta || {};
+          if (meta.session_rpe == null && w.rpe != null) meta = { ...meta, session_rpe: w.rpe };
+          return meta;
+        })()
       };
     };
     const items = workouts.map(unify);
@@ -1422,9 +1428,52 @@ Deno.serve(async (req)=>{
       console.error('Failed to calculate distance totals:', error);
     }
 
+    // Add planned_workout shape for items with planned (smart server, dumb client)
+    const toPlannedWorkout = (item) => {
+      if (!item?.planned) return null;
+      const p = item.planned;
+      return {
+        id: p.id || item.id || '',
+        name: p.name || item.type || '',
+        type: item.type || p.type || '',
+        date: item.date || p.date || '',
+        description: p.description ?? null,
+        rendered_description: p.rendered_description ?? p.description ?? null,
+        workout_status: (item.status || p.workout_status || 'planned'),
+        computed: (Array.isArray(p.steps) && p.steps.length > 0) ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null } : null,
+        steps_preset: p.steps_preset ?? null,
+        total_duration_seconds: p.total_duration_seconds ?? null,
+        strength_exercises: p.strength_exercises ?? null,
+        mobility_exercises: p.mobility_exercises ?? null,
+        tags: Array.isArray(p.tags) ? p.tags : [],
+        export_hints: p.export_hints ?? null,
+        workout_structure: p.workout_structure ?? null,
+        friendly_summary: p.friendly_summary ?? null,
+        planned_id: p.id,
+        training_plan_id: p.training_plan_id ?? null,
+        source: item.source || 'training_plan',
+        provider: item.provider || 'workouts',
+        workout_metadata: p.workout_metadata ?? null,
+        brick_group_id: p.brick_group_id ?? null,
+        brick_order: p.brick_order ?? null,
+        transition_s: p.transition_s ?? null,
+        units: p.units ?? null,
+        workout_title: p.workout_title ?? null,
+        pool_unit: p.pool_unit ?? null,
+        pool_length_m: p.pool_length_m ?? null,
+        display_overrides: p.display_overrides ?? null,
+        expand_spec: p.expand_spec ?? null,
+        pace_annotation: p.pace_annotation ?? null,
+      };
+    };
+    const itemsWithPlannedWorkout = itemsWithAI.map((it) => {
+      const pw = toPlannedWorkout(it);
+      return pw ? { ...it, planned_workout: pw } : it;
+    });
+
     const warningsOut = errors.concat(debugNotes);
     const responseData = {
-      items: itemsWithAI,
+      items: itemsWithPlannedWorkout,
       weekly_stats: {
         planned: workloadPlanned,
         completed: workloadCompleted,

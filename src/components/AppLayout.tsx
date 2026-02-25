@@ -743,97 +743,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handleWorkoutsImported = (importedWorkouts: any[]) => {
     importedWorkouts.forEach(async (workout) => {
       try {
-        const workoutToSave = {
-          // CORE WORKOUT DATA
-          name: workout.name,
-          type: workout.type,
-          date: workout.date,
-          duration: workout.duration,
-          distance: workout.distance,
-          steps_preset: (workout as any).steps_preset,
-          strength_exercises: (workout as any).strength_exercises,
-          mobility_exercises: (workout as any).mobility_exercises,
-          description: workout.description || "",
-          userComments: "",
-          completedManually: false,
-          workout_status: 'completed',
-
-          // 🆕 NEW TOP-LEVEL FIELDS that CompletedTab expects
-          timestamp: workout.timestamp,
-          start_position_lat: workout.start_position_lat,
-          start_position_long: workout.start_position_long,
-          friendly_name: workout.friendly_name,
-          moving_time: workout.moving_time,
-          elapsed_time: workout.elapsed_time,
-          avg_speed: workout.avg_speed,
-          avg_speed_mps: workout.avg_speed_mps,
-
-          // EXISTING FIELDS - ensure proper data types
-          avg_heart_rate: workout.metrics?.avg_heart_rate,
-          max_heart_rate: workout.metrics?.max_heart_rate,
-          avg_power: workout.metrics?.avg_power,
-          max_power: workout.metrics?.max_power,
-          normalized_power: workout.metrics?.normalized_power,
-          max_speed: workout.max_speed,
-          avg_cadence: workout.metrics?.avg_cadence,
-          max_cadence: workout.metrics?.max_cadence,
-          calories: workout.metrics?.calories,
-          intensity_factor: workout.metrics?.intensity_factor,
-
-          // ELEVATION - check both locations for elevation_gain
-          elevation_gain: workout.metrics?.elevation_gain ?
-            Math.round(Number(workout.metrics.elevation_gain)) :
-            workout.elevation_gain ?
-              Math.round(Number(workout.elevation_gain)) :
-              null,
-          elevation_loss: workout.metrics?.elevation_loss,
-
-          // 🆕 NEW FIELDS - Pass through ALL the metrics that FitFileImporter extracts
-          avg_temperature: workout.metrics?.avg_temperature,
-          max_temperature: workout.metrics?.max_temperature,
-          total_timer_time: workout.metrics?.total_timer_time,
-          total_elapsed_time: workout.metrics?.total_elapsed_time,
-          total_timer_time_seconds: workout.metrics?.total_timer_time_seconds,
-          total_elapsed_time_seconds: workout.metrics?.total_elapsed_time_seconds,
-          total_work: workout.metrics?.total_work,
-          total_descent: workout.metrics?.total_descent,
-          avg_vam: workout.metrics?.avg_vam,
-          total_training_effect: workout.metrics?.total_training_effect,
-          total_anaerobic_effect: workout.metrics?.total_anaerobic_effect,
-
-          // 🆕 ZONES DATA
-          functional_threshold_power: workout.metrics?.functional_threshold_power,
-          threshold_heart_rate: workout.metrics?.threshold_heart_rate,
-          hr_calc_type: workout.metrics?.hr_calc_type,
-          pwr_calc_type: workout.metrics?.pwr_calc_type,
-
-          // 🆕 USER PROFILE DATA
-          age: workout.metrics?.age,
-          weight: workout.metrics?.weight,
-          height: workout.metrics?.height,
-          gender: workout.metrics?.gender,
-          default_max_heart_rate: workout.metrics?.default_max_heart_rate,
-          resting_heart_rate: workout.metrics?.resting_heart_rate,
-          dist_setting: workout.metrics?.dist_setting,
-          weight_setting: workout.metrics?.weight_setting,
-
-          // 🆕 CYCLING DETAILS DATA
-          avg_fractional_cadence: workout.metrics?.avg_fractional_cadence,
-          avg_left_pedal_smoothness: workout.metrics?.avg_left_pedal_smoothness,
-          avg_left_torque_effectiveness: workout.metrics?.avg_left_torque_effectiveness,
-          max_fractional_cadence: workout.metrics?.max_fractional_cadence,
-          left_right_balance: workout.metrics?.left_right_balance,
-          threshold_power: workout.metrics?.threshold_power,
-          total_cycles: workout.metrics?.total_cycles,
-
-          // 🆕 DEVICE INFO
-          deviceInfo: workout.deviceInfo,
-
-          // Keep complete metrics object for CompletedTab compatibility
-          metrics: workout.metrics
-        };
-
-        const savedWorkout = await addWorkout(workoutToSave);
+        const { data, error } = await supabase.functions.invoke('save-imported-workout', {
+          body: { workout },
+        });
+        if (error) throw error;
+        const savedWorkout = data?.workout;
+        if (!savedWorkout?.id) throw new Error('Save failed');
         
         // Auto-attach to planned workout if possible
         try {
@@ -850,27 +765,30 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         try {
           await supabase.functions.invoke('calculate-workload', {
             body: {
-              workout_id: savedWorkout?.id,
+              workout_id: savedWorkout.id,
               workout_data: {
-                type: workoutToSave.type,
-                duration: workoutToSave.duration,
-                steps_preset: workoutToSave.steps_preset,
-                strength_exercises: workoutToSave.strength_exercises,
-                mobility_exercises: workoutToSave.mobility_exercises,
+                type: workout.type ?? savedWorkout.type,
+                duration: workout.duration ?? savedWorkout.duration,
+                steps_preset: workout.steps_preset,
+                strength_exercises: workout.strength_exercises,
+                mobility_exercises: workout.mobility_exercises,
                 workout_status: 'completed'
               }
             }
           });
         } catch {}
         
-        // Show post-workout feedback popup for runs and rides
-        if ((workoutToSave.type === 'run' || workoutToSave.type === 'ride') && savedWorkout?.id) {
+        if ((workout.type === 'run' || workout.type === 'ride') && savedWorkout.id) {
           setFeedbackWorkout({
             id: savedWorkout.id,
-            type: workoutToSave.type as 'run' | 'ride',
-            name: workoutToSave.name || `${workoutToSave.type} workout`,
+            type: workout.type as 'run' | 'ride',
+            name: workout.name || savedWorkout.name || `${workout.type} workout`,
           });
         }
+        try {
+          window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+          window.dispatchEvent(new CustomEvent('week:invalidate'));
+        } catch {}
       } catch {}
     });
     setShowImportPage(false);

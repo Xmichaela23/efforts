@@ -598,8 +598,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // Use mapper for completed workouts
         return mapUnifiedItemToCompleted(it);
       } else {
-        // Use mapper for planned workouts - SINGLE SOURCE OF TRUTH
-        return mapUnifiedItemToPlanned(it);
+        return it?.planned_workout ?? mapUnifiedItemToPlanned(it);
       }
     });
   }, [unifiedItems]);

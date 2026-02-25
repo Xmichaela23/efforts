@@ -484,7 +484,7 @@ export default function WorkoutCalendar({
   // Use mapper - SINGLE SOURCE OF TRUTH
   const unifiedPlanned = unifiedItems
     .filter((it:any)=> !!it?.planned)
-    .map((it:any)=> mapUnifiedItemToPlanned(it));
+    .map((it:any)=> it?.planned_workout ?? mapUnifiedItemToPlanned(it));
   // Only include completed workouts (items with executed data)
   // Planned-only items are already covered by unifiedPlanned to avoid duplicates
   const unifiedWorkouts = unifiedItems

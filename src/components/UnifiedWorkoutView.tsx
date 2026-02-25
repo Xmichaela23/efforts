@@ -162,8 +162,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
     
     if (unifiedPlanned?.planned) {
-      // Use mapper - SINGLE SOURCE OF TRUTH
-      return mapUnifiedItemToPlanned(unifiedPlanned);
+      return unifiedPlanned.planned_workout ?? mapUnifiedItemToPlanned(unifiedPlanned);
     }
     
     // If not found in unified data, use the original workout (this should not happen in normal flow)

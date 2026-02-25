@@ -56,11 +56,10 @@ export interface WorkoutMetadata {
 /**
  * Extract metadata from workout object
  * 
- * NOTE: Server normalizes old fields into workout_metadata in useWorkouts.ts
- * Client just reads the normalized field - no business logic here (dumb client)
+ * Server (backfill + trigger + get-week/workout-detail) ensures workout_metadata.session_rpe
+ * is canonical. Client just reads - no merge logic (dumb client).
  */
 export function getWorkoutMetadata(workout: any): WorkoutMetadata {
-  // Server has already normalized old fields into workout_metadata
   return workout?.workout_metadata || {};
 }
 

@@ -336,9 +336,15 @@ Deno.serve(async (req) => {
     // User feedback: RPE and gear (always include - sourced from DB)
     (detail as any).rpe = row.rpe ?? null;
     (detail as any).gear_id = row.gear_id ?? null;
-    if (row.workout_metadata != null) {
-      try { (detail as any).workout_metadata = typeof row.workout_metadata === 'string' ? JSON.parse(row.workout_metadata) : row.workout_metadata; } catch { (detail as any).workout_metadata = row.workout_metadata; }
-    }
+    // Canonical workout_metadata: merge rpe into session_rpe when missing (smart server, dumb client)
+    let meta: Record<string, unknown> = {};
+    try {
+      meta = row.workout_metadata != null
+        ? (typeof row.workout_metadata === 'string' ? JSON.parse(row.workout_metadata) : row.workout_metadata)
+        : {};
+    } catch { meta = {}; }
+    if (meta.session_rpe == null && row.rpe != null) meta = { ...meta, session_rpe: row.rpe };
+    (detail as any).workout_metadata = meta;
 
     // Check if processing is complete (for UI to show loading state if needed)
     const hasSeries = (computed: any) => {
@@ -351,8 +357,24 @@ Deno.serve(async (req) => {
     };
     const processingComplete = hasSeries((detail as any).computed);
 
-    // Don't trigger processing here - let frontend handle it once
-    // This prevents duplicate triggers from polling
+    // Normalize interval_breakdown: add executed + planned_label for unplanned (smart server, dumb client)
+    const ib = (detail as any).workout_analysis?.detailed_analysis?.interval_breakdown;
+    if (ib?.available && Array.isArray(ib.intervals)) {
+      for (const iv of ib.intervals) {
+        if (!iv.executed && (iv.actual_duration_s != null || iv.actual_distance_m != null || iv.avg_heart_rate_bpm != null)) {
+          iv.executed = {
+            distance_m: iv.actual_distance_m ?? null,
+            duration_s: iv.actual_duration_s ?? null,
+            avg_hr: iv.avg_heart_rate_bpm ?? iv.avg_hr ?? null,
+          };
+        }
+        if (!iv.planned_label && iv.interval_type === 'work') {
+          iv.planned_label = `Work · ${iv.actual_duration_s ? `${Math.round(iv.actual_duration_s / 60)} min` : ''}`;
+        } else if (!iv.planned_label) {
+          iv.planned_label = String(iv.interval_type || '');
+        }
+      }
+    }
 
     // Return workout data immediately (processing happens in background for old workouts)
     return new Response(JSON.stringify({ 
