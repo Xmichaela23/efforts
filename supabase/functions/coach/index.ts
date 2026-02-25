@@ -695,6 +695,21 @@ Deno.serve(async (req) => {
       return { label, score: Number(score.toFixed(2)), explain };
     })();
 
+    // Key-quality extras: only long/tempo/intervals (not easy/z2) — use for Key sessions display
+    const keyQualityExtrasCount = (() => {
+      const ww = Array.isArray(weekWorkouts) ? weekWorkouts : [];
+      return extraSessionsDetails.filter((e) => {
+        const w = ww.find((x: any) => String(x?.id) === e.workout_id);
+        if (!w) return false;
+        const t = String((w as any)?.type || '').toLowerCase();
+        if (t === 'run' || t === 'running') {
+          const rt = runTypeFromWorkout(w as any);
+          return ['long', 'tempo', 'intervals', 'hills', 'progressive', 'fartlek'].includes(rt);
+        }
+        return false;
+      }).length;
+    })();
+
     const reaction: CoachWeekContextResponseV1['reaction'] = {
       key_sessions_planned: keySessionsPlanned.length,
       key_sessions_completed: keySessionsCompleted.length,
@@ -702,6 +717,7 @@ Deno.serve(async (req) => {
       key_sessions_linked: keySessionsLinked,
       key_sessions_gaps: keySessionsGaps,
       extra_sessions: extraSessions,
+      key_quality_extras: keyQualityExtrasCount,
       key_session_gaps_details: keySessionGapsDetails.slice(0, 10),
       extra_sessions_details: extraSessionsDetails.slice(0, 10),
       linking_confidence: linkingConfidence,

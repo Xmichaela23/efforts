@@ -92,6 +92,7 @@ export type CoachWeekContextResponseV1 = {
     key_sessions_linked: number; // planned key sessions that have a completed workout linked
     key_sessions_gaps: number; // planned key sessions without a linked completion
     extra_sessions: number; // completed sessions not linked to any planned workout
+    key_quality_extras?: number; // extras that are key-quality (long/tempo/intervals); use for Key sessions display
     // Details for manual repair flows (IDs needed for explicit linking)
     key_session_gaps_details: Array<{
       planned_id: string;

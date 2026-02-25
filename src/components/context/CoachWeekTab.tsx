@@ -721,14 +721,14 @@ export default function CoachWeekTab() {
               />
             </div>
           </div>
-          {(data.reaction.extra_sessions > 0 || data.reaction.key_sessions_gaps > 0) && (
+          {((typeof data.reaction.key_quality_extras === 'number' ? data.reaction.key_quality_extras : data.reaction.extra_sessions) > 0 || data.reaction.key_sessions_gaps > 0) && (
             <div className="mt-2 flex items-center justify-between text-xs text-white/45">
               <div>
                 {data.reaction.key_sessions_gaps > 0 && (
                   <span className="text-amber-300/80">{data.reaction.key_sessions_gaps} missed</span>
                 )}
-                {data.reaction.extra_sessions > 0 && (
-                  <span className={data.reaction.key_sessions_gaps > 0 ? 'ml-2 text-sky-300/80' : 'text-sky-300/80'}>+{data.reaction.extra_sessions} extra</span>
+                {(typeof data.reaction.key_quality_extras === 'number' ? data.reaction.key_quality_extras : data.reaction.extra_sessions) > 0 && (
+                  <span className={data.reaction.key_sessions_gaps > 0 ? 'ml-2 text-sky-300/80' : 'text-sky-300/80'}>+{typeof data.reaction.key_quality_extras === 'number' ? data.reaction.key_quality_extras : data.reaction.extra_sessions} extra</span>
                 )}
               </div>
               {data.reaction.extra_sessions > 0 && data.reaction.key_sessions_gaps > 0 && (
