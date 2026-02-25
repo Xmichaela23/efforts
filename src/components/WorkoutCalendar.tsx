@@ -602,12 +602,11 @@ export default function WorkoutCalendar({
     const wkCombinedFiltered = [...wkCombined];
     
     // Filter out planned workouts that are linked to completed workouts BEFORE adding them
-    // (completed workouts already in wkCombinedFiltered will show, so we don't need the planned version)
-    // planned is already mapped via plannedWeekRows → unifiedPlanned, so just filter it
+    // Also exclude planned when ANY completed exists for same date+type (handles missing planned_id from auto-attach)
     const mappedPlanned = plannedArr
       .filter((p:any) => {
-        // Don't include planned workouts that are linked to a completed workout
-        // The completed workout will show instead
+        const key = `${String(p?.date)}|${String(p?.type||'').toLowerCase()}`;
+        if (completedWorkoutKeys.has(key)) return false; // never show planned when completed exists for date+type
         return !workoutIdByPlannedId.has(String(p?.id));
       });
 
