@@ -374,7 +374,7 @@ Deno.serve(async (req) => {
     const plannedIds = new Set<string>(plannedWeekArr.map((p: any) => String(p?.id || '')).filter(Boolean));
     const { data: weekWorkouts, error: wwErr } = await supabase
       .from('workouts')
-      .select('id,date,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,strength_exercises')
+      .select('id,date,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', asOfDate);
@@ -412,6 +412,25 @@ Deno.serve(async (req) => {
       }))
       .filter((x: any) => Boolean(x.planned_id));
 
+    const rpeFromWorkout = (w: any): number | null => {
+      let meta: any = {};
+      try {
+        meta = typeof (w as any)?.workout_metadata === 'string' ? JSON.parse((w as any).workout_metadata) : ((w as any)?.workout_metadata || {});
+      } catch {}
+      const v = meta?.session_rpe ?? (w as any)?.session_rpe ?? (w as any)?.rpe ?? null;
+      const n = safeNum(v);
+      return n != null && n >= 1 && n <= 10 ? n : null;
+    };
+    const feelingFromWorkout = (w: any): string | null => {
+      const f = String((w as any)?.feeling || '').toLowerCase();
+      return ['great', 'good', 'ok', 'tired', 'exhausted'].includes(f) ? f : null;
+    };
+    const workoutSignalsRecovery = (w: any): boolean => {
+      const rpe = rpeFromWorkout(w);
+      const feeling = feelingFromWorkout(w);
+      return (rpe != null && rpe <= 4) || (feeling != null && ['great', 'good', 'ok'].includes(feeling));
+    };
+
     const extraSessionsDetails = (Array.isArray(weekWorkouts) ? weekWorkouts : [])
       .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
       .filter((w: any) => w?.planned_id == null || String(w?.planned_id || '') === '')
@@ -421,6 +440,9 @@ Deno.serve(async (req) => {
         type: String(w?.type || ''),
         name: w?.name != null ? String(w.name) : null,
         workload_actual: safeNum((w as any)?.workload_actual),
+        rpe: rpeFromWorkout(w),
+        feeling: feelingFromWorkout(w),
+        signals_recovery: workoutSignalsRecovery(w),
       }))
       .filter((x: any) => Boolean(x.workout_id));
 
@@ -710,6 +732,9 @@ Deno.serve(async (req) => {
       }).length;
     })();
 
+    // Recovery-signaled extras: user explicitly signaled easy (RPE ≤4 or feeling great/good/ok)
+    const recoverySignaledExtrasCount = extraSessionsDetails.filter((e) => e.signals_recovery).length;
+
     const reaction: CoachWeekContextResponseV1['reaction'] = {
       key_sessions_planned: keySessionsPlanned.length,
       key_sessions_completed: keySessionsCompleted.length,
@@ -718,6 +743,7 @@ Deno.serve(async (req) => {
       key_sessions_gaps: keySessionsGaps,
       extra_sessions: extraSessions,
       key_quality_extras: keyQualityExtrasCount,
+      recovery_signaled_extras: recoverySignaledExtrasCount,
       key_session_gaps_details: keySessionGapsDetails.slice(0, 10),
       extra_sessions_details: extraSessionsDetails.slice(0, 10),
       linking_confidence: linkingConfidence,
@@ -1021,6 +1047,14 @@ Deno.serve(async (req) => {
       : weekIntent === 'baseline' ? 'Baseline week'
       : 'Plan';
 
+    const athleteContextByWeek = activePlan?.athlete_context_by_week;
+    const athleteContextStr = (() => {
+      if (!activePlan || weekIndex == null || !athleteContextByWeek || typeof athleteContextByWeek !== 'object') return null;
+      const ctx = athleteContextByWeek[String(weekIndex)] ?? athleteContextByWeek[weekIndex];
+      return (typeof ctx === 'string' && ctx.trim()) ? ctx.trim() : null;
+    })();
+    const athleteContextSuggestsIllness = athleteContextStr && /sick|flu|covid|illness|ill\b|not feeling|under the weather/i.test(athleteContextStr);
+
     const primaryDeltaLine = (() => {
       const d = responseInterp.overall.drivers || [];
       if (d.includes('absorption_exec_down')) {
@@ -1083,6 +1117,18 @@ Deno.serve(async (req) => {
         };
       }
       if (v.code === 'caution_ramping_fast' || responseInterp.overall.drivers.length === 1) {
+        if (athleteContextSuggestsIllness && (v.code === 'undertraining' || recoverySignaledExtrasCount > 0)) {
+          return {
+            code: 'strained',
+            kicker,
+            title: 'Recovery',
+            subtitle: primaryDeltaLine ? `Response markers may reflect illness rather than training load. ${primaryDeltaLine}` : 'Take the time you need. Response markers can be skewed when sick.',
+            confidence: conf,
+            baseline_days,
+            load_ramp_acwr,
+            load_ramp,
+          };
+        }
         return {
           code: 'strained',
           kicker,
@@ -1187,12 +1233,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Athlete-provided context for this week (used in narrative + response)
-    const athleteContextByWeek = activePlan?.athlete_context_by_week;
-    const athleteContext = (weekIndex != null && athleteContextByWeek && typeof athleteContextByWeek === 'object')
-      ? (athleteContextByWeek[String(weekIndex)] ?? athleteContextByWeek[weekIndex])
-      : null;
-    const athleteContextStr = (typeof athleteContext === 'string' && athleteContext.trim()) ? athleteContext.trim() : null;
+    // Athlete-provided context (athleteContextStr computed earlier for training_state)
 
     // =========================================================================
     // AI week narrative — coach paragraph from structured facts
@@ -1247,6 +1288,9 @@ Deno.serve(async (req) => {
 
         // Session completion
         narrativeFacts.push(`Planned key sessions: ${reaction.key_sessions_planned}. Completed and linked: ${reaction.key_sessions_linked}. Missed: ${reaction.key_sessions_gaps}. Extra unplanned sessions: ${reaction.extra_sessions}.`);
+        if (recoverySignaledExtrasCount > 0) {
+          narrativeFacts.push(`ATHLETE SIGNALED RECOVERY: ${recoverySignaledExtrasCount} unplanned session(s) with low RPE or positive feeling (easy/recovery intent).`);
+        }
 
         // Missed session reasons (athlete-provided — use these, do not guess)
         const gapsWithReasons = (reaction.key_session_gaps_details || []).filter((g: any) => g.skip_reason || g.skip_note);
@@ -1259,13 +1303,22 @@ Deno.serve(async (req) => {
           narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided): ${lines.join('; ')}.`);
         }
 
-        // ── Per-workout detail with plan deviations ──
+        // ── Per-workout detail with plan deviations + athlete response (RPE, feeling) ──
+        const weekWorkoutById = new Map<string, any>();
+        for (const w of Array.isArray(weekWorkouts) ? weekWorkouts : []) {
+          const id = String((w as any)?.id || '');
+          if (id) weekWorkoutById.set(id, w);
+        }
         for (const wf of weekFacts) {
+          const w = weekWorkoutById.get(String(wf.workout_id || ''));
+          const rpe = wf.session_rpe ?? (w ? (rpeFromWorkout(w) ?? undefined) : undefined);
+          const feeling = w ? feelingFromWorkout(w) : null;
           const adh = wf.adherence || {};
           const parts = [`${wf.date} ${wf.discipline}`];
           if (wf.duration_minutes) parts.push(`${Math.round(wf.duration_minutes)} min`);
           if (wf.workload) parts.push(`${Math.round(wf.workload)} pts load`);
-          if (wf.session_rpe) parts.push(`RPE ${wf.session_rpe}/10`);
+          if (rpe != null) parts.push(`RPE ${rpe}/10`);
+          if (feeling) parts.push(`feeling: ${feeling}`);
 
           if (adh.execution_score != null) parts.push(`execution ${adh.execution_score}%`);
           if (adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {

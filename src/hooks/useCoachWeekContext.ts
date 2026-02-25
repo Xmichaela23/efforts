@@ -44,6 +44,7 @@ export type CoachWeekContextV1 = {
     key_sessions_gaps: number;
     extra_sessions: number;
     key_quality_extras?: number;
+    recovery_signaled_extras?: number;
     key_session_gaps_details: Array<{
       planned_id: string;
       date: string;
