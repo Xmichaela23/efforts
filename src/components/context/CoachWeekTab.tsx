@@ -662,7 +662,8 @@ export default function CoachWeekTab() {
       {/* ── Training Load ── */}
       {loadDriverRows.length ? (
         <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-          <div className="text-sm text-white/80 mb-2">Training load</div>
+          <div className="text-sm text-white/80 mb-0.5">Training load</div>
+          <div className="text-[10px] text-white/40 mb-2">Workload points by discipline. Planned = from your plan; Extra = unplanned sessions.</div>
           <div className="space-y-2">
             {(() => {
               const maxLoad = Math.max(...loadDriverRows.map(r => r.total_load), 1);
@@ -702,9 +703,12 @@ export default function CoachWeekTab() {
       {/* ── Key Sessions ── */}
       {data.reaction.key_sessions_planned > 0 && (
         <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-white/80">Key sessions</div>
-            <div className="text-sm text-white/90 font-medium">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div>
+              <div className="text-sm text-white/80">Key sessions</div>
+              <div className="text-[10px] text-white/40 mt-0.5">High-priority workouts (intervals, long runs, tempo) from your plan.</div>
+            </div>
+            <div className="text-sm text-white/90 font-medium shrink-0">
               {data.reaction.key_sessions_linked}/{data.reaction.key_sessions_planned} done
             </div>
           </div>
@@ -787,7 +791,8 @@ export default function CoachWeekTab() {
 
       {/* ── Body Response ── */}
       <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-        <div className="text-sm text-white/80 mb-3">Body response</div>
+        <div className="text-sm text-white/80 mb-0.5">Body response</div>
+        <div className="text-[10px] text-white/40 mb-3">How your body is responding this week vs your baseline.</div>
         <div className="space-y-3">
           {data.reaction.avg_execution_score != null && (
             <div className="flex items-center justify-between">
@@ -797,7 +802,7 @@ export default function CoachWeekTab() {
           )}
           {data.reaction.avg_session_rpe_7d != null && (
             <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">Effort level</div>
+              <div className="text-xs text-white/60">Effort level <span className="text-white/30">(RPE)</span></div>
               <div className="text-sm text-white/90">
                 <span className="font-medium">{rpeLabel(data.reaction.avg_session_rpe_7d)}</span>
                 <span className="text-xs text-white/40 ml-1.5">{data.reaction.avg_session_rpe_7d}/10</span>
@@ -806,7 +811,7 @@ export default function CoachWeekTab() {
           )}
           {data.reaction.avg_strength_rir_7d != null && (
             <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">Strength reserve</div>
+              <div className="text-xs text-white/60">Strength reserve <span className="text-white/30">(RIR)</span></div>
               <div className="text-sm text-white/90">
                 <span className="font-medium">{rirLabel(data.reaction.avg_strength_rir_7d)}</span>
                 <span className="text-xs text-white/40 ml-1.5">{data.reaction.avg_strength_rir_7d} reps in tank</span>
@@ -833,7 +838,8 @@ export default function CoachWeekTab() {
 
       {/* ── 4-week trend ── */}
       <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-        <div className="text-sm text-white/80 mb-3">4-week trend</div>
+        <div className="text-sm text-white/80 mb-0.5">4-week trend</div>
+        <div className="text-[10px] text-white/40 mb-3">Change vs your personal norm over the last 4 weeks.</div>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-xs text-white/60">Aerobic fitness</div>
