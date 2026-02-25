@@ -61,6 +61,10 @@ type CompletedDisplay = { text: string; hr: number | null; durationSec?: number 
 
 // Build second-by-second samples from gps_track / sensor_data
 function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> {
+  // Prefer server-provided samples (smart server, dumb client)
+  if (Array.isArray(completed?.samples) && completed.samples.length > 0) {
+    return completed.samples;
+  }
   const out: Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> = [];
   try {
     const sd = Array.isArray(completed?.sensor_data?.samples)
@@ -579,8 +583,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const useUnplannedSteps = !planned && unplannedIntervals.length > 0 && !isAutoLapOrSplit;
   const planLinkNote = !planned ? 'No plan session linked.' : null;
   const leftColHeader = planned ? 'Planned' : 'Segments';
+  // Prefer server-provided steps (smart server, dumb client)
   const stepsFromUnplanned = useUnplannedSteps
-    ? unplannedIntervals.map((iv: any, idx: number) => ({
+    ? (Array.isArray(intervalBreakdownForUnplanned?.steps) ? intervalBreakdownForUnplanned.steps : unplannedIntervals.map((iv: any, idx: number) => ({
         id: iv.interval_id || 'unplanned_interval',
         kind: iv.interval_type || 'work',
         type: iv.interval_type || 'work',
@@ -591,7 +596,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         pace_range: (iv.planned_pace_range_lower != null && iv.planned_pace_range_upper != null)
           ? { lower: iv.planned_pace_range_lower, upper: iv.planned_pace_range_upper }
           : undefined,
-      }))
+      })))
     : [];
   const steps: any[] = (
     plannedStepsFull.length > 0
@@ -604,9 +609,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
   }
 
-  // When the plan is a single steady segment but the executed workout contains extra micro segments
-  // (e.g. strides), allow a "Show details" view sourced from computed.intervals so those segments appear.
+  // Prefer server-provided computed_detail_steps (smart server, dumb client)
   const computedDetailSteps = useMemo(() => {
+    const serverSteps = (completedSrc as any)?.computed_detail_steps;
+    if (Array.isArray(serverSteps) && serverSteps.length > 0) return serverSteps;
     if (!hasServerComputed) return [] as any[];
     const list = Array.isArray(computedIntervals) ? computedIntervals : [];
     return list
@@ -626,7 +632,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           pace_range: it?.pace_range || it?.planned?.pace_range || it?.paceRange || null,
         };
       });
-  }, [hasServerComputed, computedIntervals]);
+  }, [hasServerComputed, computedIntervals, (completedSrc as any)?.computed_detail_steps]);
 
   const planLooksSingleSteady = plannedStepsFull.length <= 1 && plannedStepsLight.length <= 1;
   // If executed mapping isn't ready, collapse to a single row to avoid showing planned-only dashes

@@ -172,7 +172,15 @@ export function generateIntervalBreakdown(
     const overallScore = (paceAdherence * 0.7) + (durationAdherence * 0.3);
     
     // Calculate heart rate metrics for this work interval
-    const hrMetrics = calculateIntervalHeartRate(sensorData || [], interval.sample_idx_start, interval.sample_idx_end);
+    let hrMetrics = calculateIntervalHeartRate(sensorData || [], interval.sample_idx_start, interval.sample_idx_end);
+    // Fallback: lap/split intervals from compute-workout-summary have executed.avg_hr but no sample indices
+    if (!hrMetrics.avg_heart_rate_bpm && interval.executed?.avg_hr) {
+      hrMetrics = {
+        avg_heart_rate_bpm: Math.round(interval.executed.avg_hr),
+        max_heart_rate_bpm: interval.executed.max_hr ?? Math.round(interval.executed.avg_hr),
+        min_heart_rate_bpm: null
+      };
+    }
     
     // Calculate elevation metrics for this work interval
     const elevationMetrics = calculateIntervalElevation(sensorData || [], interval.sample_idx_start, interval.sample_idx_end);

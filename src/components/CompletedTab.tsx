@@ -564,22 +564,26 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   const workoutIdKey = String((hydrated as any)?.id || (workoutData as any)?.id || '');
   const memo = useMemo(() => {
     const src = (hydrated || workoutData) as any;
-    const gpsRaw = src?.gps_track;
-    const gps = Array.isArray(gpsRaw)
-      ? gpsRaw
-      : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-    const track: [number,number][] = gps
-      .map((p:any)=>{
-        const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
-        const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-        if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-        return null;
-      })
-      .filter(Boolean) as [number,number][];
+    // Prefer server-provided track (smart server, dumb client)
+    let track: [number,number][] = Array.isArray(src?.track) ? src.track : [];
+    if (track.length === 0) {
+      const gpsRaw = src?.gps_track;
+      const gps = Array.isArray(gpsRaw)
+        ? gpsRaw
+        : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+      track = gps
+        .map((p:any)=>{
+          const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+          const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+          if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+          return null;
+        })
+        .filter(Boolean) as [number,number][];
+    }
     const series = src?.computed?.analysis?.series || null;
     return { track, series } as const;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutIdKey, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]);
+  }, [workoutIdKey, hydrated?.computed?.analysis?.series, hydrated?.track, workoutData?.computed?.analysis?.series, workoutData?.track]);
 
   // Memoize map props at component level (outside IIFE) to prevent re-renders
   const finalSeries = useMemo(() => 
@@ -590,22 +594,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   const finalTrack = useMemo(() => {
     const trackFromMemo = memo?.track;
     if (trackFromMemo && trackFromMemo.length > 0) return trackFromMemo;
-    
-    // Get GPS track from workout data (server should have decoded polyline if needed)
-    const gpsRaw = (hydrated||workoutData)?.gps_track;
-    const gps = Array.isArray(gpsRaw)
-      ? gpsRaw
-      : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-    
-    return gps
-      .map((p:any)=>{
-        const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
-        const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-        if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-        return null;
-      })
-      .filter(Boolean) as [number,number][];
-  }, [memo?.track, hydrated?.gps_track, workoutData?.gps_track]);
+    // Fallback: server track or gps_track (memo already handles both)
+    return memo?.track ?? [];
+  }, [memo?.track]);
 
   const mapProps = useMemo(() => {
     // Check if data actually changed by comparing array lengths and first/last values

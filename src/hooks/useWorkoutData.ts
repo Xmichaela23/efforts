@@ -32,6 +32,11 @@ export type WorkoutDataNormalized = {
 
 export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
   return useMemo(() => {
+    // Prefer server-provided display_metrics (smart server, dumb client)
+    const dm = workoutData?.display_metrics;
+    if (dm && typeof dm === 'object' && Object.keys(dm).length > 0) {
+      return dm as WorkoutDataNormalized;
+    }
     const distance_m = getDistanceMeters(workoutData);
     const distance_km = computeDistanceKm(workoutData);
     const duration_s = getDurationSeconds(workoutData);

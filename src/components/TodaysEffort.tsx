@@ -595,8 +595,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const isCompleted = String(it?.status||'').toLowerCase()==='completed';
       
       if (isCompleted) {
-        // Use mapper for completed workouts
-        return mapUnifiedItemToCompleted(it);
+        return it?.completed_workout ?? mapUnifiedItemToCompleted(it);
       } else {
         return it?.planned_workout ?? mapUnifiedItemToPlanned(it);
       }

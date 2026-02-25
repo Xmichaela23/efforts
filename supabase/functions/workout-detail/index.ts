@@ -187,7 +187,29 @@ Deno.serve(async (req) => {
     try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
     try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
     try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
-    try { (detail as any).strength_exercises = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })(); } catch {}
+    try {
+      let se = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })();
+      // Normalize strength_exercises sets shape for client (smart server, dumb client)
+      if (Array.isArray(se) && se.length > 0) {
+        se = se.map((exercise: any, index: number) => ({
+          id: exercise.id || `temp-${index}`,
+          name: exercise.name || '',
+          sets: Array.isArray(exercise.sets)
+            ? exercise.sets.map((set: any) => ({
+                reps: Number((set?.reps as any) ?? 0) || 0,
+                weight: Number((set?.weight as any) ?? 0) || 0,
+                rir: typeof set?.rir === 'number' ? set.rir : undefined,
+                completed: Boolean(set?.completed)
+              }))
+            : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
+          reps: Number(exercise.reps || 0) || 0,
+          weight: Number(exercise.weight || 0) || 0,
+          notes: exercise.notes || '',
+          weightMode: exercise.weightMode || 'same'
+        }));
+      }
+      (detail as any).strength_exercises = se;
+    } catch {}
     try { (detail as any).mobility_exercises = (()=>{ try { return typeof row.mobility_exercises === 'string' ? JSON.parse(row.mobility_exercises) : (row.mobility_exercises || null); } catch { return row.mobility_exercises || null; } })(); } catch {}
     try { (detail as any).achievements = (()=>{ try { return typeof row.achievements === 'string' ? JSON.parse(row.achievements) : (row.achievements || null); } catch { return row.achievements || null; } })(); } catch {}
     try { (detail as any).device_info = (()=>{ try { return typeof row.device_info === 'string' ? JSON.parse(row.device_info) : (row.device_info || null); } catch { return row.device_info || null; } })(); } catch {}
@@ -357,7 +379,7 @@ Deno.serve(async (req) => {
     };
     const processingComplete = hasSeries((detail as any).computed);
 
-    // Normalize interval_breakdown: add executed + planned_label for unplanned (smart server, dumb client)
+    // Normalize interval_breakdown: add executed + planned_label + steps (smart server, dumb client)
     const ib = (detail as any).workout_analysis?.detailed_analysis?.interval_breakdown;
     if (ib?.available && Array.isArray(ib.intervals)) {
       for (const iv of ib.intervals) {
@@ -374,7 +396,113 @@ Deno.serve(async (req) => {
           iv.planned_label = String(iv.interval_type || '');
         }
       }
+      // Add steps array for MobileSummary (stepsFromUnplanned)
+      ib.steps = ib.intervals.map((iv: any, idx: number) => ({
+        id: iv.interval_id || 'unplanned_interval',
+        kind: iv.interval_type || 'work',
+        type: iv.interval_type || 'work',
+        planned_index: idx,
+        seconds: iv.planned_duration_s || iv.actual_duration_s,
+        duration_s: iv.actual_duration_s,
+        distanceMeters: iv.actual_distance_m,
+        pace_range: (iv.planned_pace_range_lower != null && iv.planned_pace_range_upper != null)
+          ? { lower: iv.planned_pace_range_lower, upper: iv.planned_pace_range_upper }
+          : undefined,
+      }));
     }
+
+    // computed_detail_steps: from computed.intervals for MobileSummary (smart server, dumb client)
+    const compIntervals = Array.isArray((detail as any).computed?.intervals) ? (detail as any).computed.intervals : [];
+    (detail as any).computed_detail_steps = compIntervals
+      .filter((it: any) => it && (it.executed || it.duration_s || it.distance_m))
+      .map((it: any, idx: number) => {
+        const exec = it.executed || it;
+        const distM = Number(exec?.distance_m ?? exec?.distanceMeters ?? exec?.distance_meters);
+        const durS = Number(exec?.duration_s ?? exec?.durationS ?? it?.duration_s);
+        return {
+          id: String(it?.planned_step_id || it?.id || `exec_${idx}`),
+          kind: String(it?.role || it?.kind || it?.interval_type || it?.type || 'segment'),
+          label: String(it?.label || it?.name || it?.role || it?.kind || `Segment ${idx + 1}`),
+          planned_index: Number.isFinite(Number(it?.planned_index)) ? Number(it.planned_index) : idx,
+          seconds: Number.isFinite(durS) ? durS : undefined,
+          duration_s: Number.isFinite(durS) ? durS : undefined,
+          distanceMeters: Number.isFinite(distM) ? distM : undefined,
+          pace_range: it?.pace_range || it?.planned?.pace_range || it?.paceRange || null,
+        };
+      });
+
+    // track: canonical [lng,lat][] for CompletedTab (smart server, dumb client)
+    const gpsTrack = (detail as any).gps_track;
+    if (Array.isArray(gpsTrack) && gpsTrack.length > 0) {
+      const track: [number, number][] = gpsTrack
+        .map((p: any) => {
+          const lng = p?.lng ?? p?.longitude ?? p?.longitudeInDegree ?? (Array.isArray(p) ? p[0] : undefined);
+          const lat = p?.lat ?? p?.latitude ?? p?.latitudeInDegree ?? (Array.isArray(p) ? p[1] : undefined);
+          if (Number.isFinite(lng) && Number.isFinite(lat)) return [Number(lng), Number(lat)] as [number, number];
+          return null;
+        })
+        .filter(Boolean) as [number, number][];
+      (detail as any).track = track;
+    } else {
+      (detail as any).track = [];
+    }
+
+    // samples: canonical sensor_data for MobileSummary.buildSamples (smart server, dumb client)
+    const sd = Array.isArray((detail as any).sensor_data?.samples)
+      ? (detail as any).sensor_data.samples
+      : (Array.isArray((detail as any).sensor_data) ? (detail as any).sensor_data : []);
+    const samples: Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> = [];
+    for (const s of sd) {
+      const t = Number((s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ?? s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? samples.length));
+      const hr = (s.heartRate ?? s.heart_rate ?? s.hr ?? s.bpm ?? s.heartRateInBeatsPerMinute);
+      const speedMps = (s.speedMetersPerSecond ?? s.speedInMetersPerSecond ?? s.enhancedSpeedInMetersPerSecond ?? s.currentSpeedInMetersPerSecond ?? s.instantaneousSpeedInMetersPerSecond ?? s.speed_mps ?? s.enhancedSpeed ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined) ?? (typeof s.paceInSecondsPerKilometer === 'number' ? (1000 / s.paceInSecondsPerKilometer) : undefined));
+      const cumMeters = (typeof s.totalDistanceInMeters === 'number' ? s.totalDistanceInMeters : (typeof s.distanceInMeters === 'number' ? s.distanceInMeters : (typeof s.cumulativeDistanceInMeters === 'number' ? s.cumulativeDistanceInMeters : (typeof s.totalDistance === 'number' ? s.totalDistance : (typeof s.distance === 'number' ? s.distance : undefined)))));
+      samples.push({ t: Number.isFinite(t) ? t : samples.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined, cumMeters });
+    }
+    // Merge GPS into samples
+    if (Array.isArray(gpsTrack) && gpsTrack.length > 0) {
+      for (let i = 0; i < gpsTrack.length; i++) {
+        const g: any = gpsTrack[i];
+        const lat = (g?.lat ?? g?.latitude ?? g?.latitudeInDegree ?? (Array.isArray(g) ? g[1] : undefined)) as number | undefined;
+        const lng = (g?.lng ?? g?.longitude ?? g?.longitudeInDegree ?? (Array.isArray(g) ? g[0] : undefined)) as number | undefined;
+        const t = Number((g?.startTimeInSeconds ?? g?.elapsed_s ?? g?.t ?? g?.seconds) || i);
+        if (samples[i]) { samples[i].lat = lat; samples[i].lng = lng; samples[i].t = Number.isFinite(t) ? t : samples[i].t; }
+        else { samples.push({ t: Number.isFinite(t) ? t : i, lat, lng }); }
+      }
+      samples.sort((a, b) => (a.t || 0) - (b.t || 0));
+    }
+    (detail as any).samples = samples;
+
+    // display_metrics: WorkoutDataNormalized for useWorkoutData (smart server, dumb client)
+    const d = detail as any;
+    const getDistM = () => { const distKm = Number.isFinite(d?.distance) ? Number(d.distance) * 1000 : null; const distM = d?.computed?.overall?.distance_m ?? null; return Number.isFinite(distM) && distM > 0 ? Number(distM) : (Number.isFinite(distKm) ? Number(distKm) : null); };
+    const distM = getDistM();
+    const distKm = Number.isFinite(distM) && distM > 0 ? distM / 1000 : null;
+    const durS = Number.isFinite(d?.computed?.overall?.duration_s_moving) ? Number(d.computed.overall.duration_s_moving) : (Number.isFinite(d?.moving_time ?? d?.metrics?.moving_time) ? Number(d.moving_time ?? d.metrics.moving_time) * 60 : null);
+    const elapsedS = Number.isFinite(d?.computed?.overall?.duration_s_elapsed) ? Number(d.computed.overall.duration_s_elapsed) : (Number.isFinite(d?.elapsed_time ?? d?.metrics?.elapsed_time) ? Number(d.elapsed_time ?? d.metrics.elapsed_time) * 60 : null) ?? durS;
+    const elevation_gain_m = Number.isFinite(d?.elevation_gain ?? d?.metrics?.elevation_gain) ? Number(d.elevation_gain ?? d.metrics.elevation_gain) : null;
+    const avg_power = Number.isFinite(d?.avg_power ?? d?.metrics?.avg_power) ? Number(d.avg_power ?? d.metrics.avg_power) : null;
+    const avg_hr = Number.isFinite(d?.avg_heart_rate ?? d?.metrics?.avg_heart_rate) ? Number(d.avg_heart_rate ?? d.metrics.avg_heart_rate) : null;
+    const max_hr = Number.isFinite(d?.max_heart_rate ?? d?.metrics?.max_heart_rate) ? Number(d.max_heart_rate ?? d.metrics.max_heart_rate) : null;
+    const max_power = Number.isFinite(d?.max_power ?? d?.metrics?.max_power) ? Number(d.max_power ?? d.metrics.max_power) : null;
+    const avg_speed_kmh = Number.isFinite(d?.metrics?.avg_speed) ? Number(d.metrics.avg_speed) : (Number.isFinite(d?.avg_speed) ? Number(d.avg_speed) : (distKm && durS && durS > 0 ? (distKm / (durS / 3600)) : null));
+    const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? avg_speed_kmh / 3.6 : null;
+    const avg_pace_s_per_km = Number.isFinite(d?.computed?.overall?.avg_pace_s_per_mi) ? Number(d.computed.overall.avg_pace_s_per_mi) / 1.60934 : (Number.isFinite(d?.avg_pace ?? d?.metrics?.avg_pace) ? Number(d.avg_pace ?? d.metrics.avg_pace) : (avg_speed_kmh && avg_speed_kmh > 0 ? (3600 / avg_speed_kmh) : null));
+    const max_speed_mps = Number.isFinite(d?.computed?.overall?.max_speed_mps) ? Number(d.computed.overall.max_speed_mps) : (Number.isFinite(d?.max_speed ?? d?.metrics?.max_speed) ? Number(d.max_speed ?? d.metrics.max_speed) / 3.6 : null);
+    const max_pace_s_per_km = Number.isFinite(d?.computed?.analysis?.bests?.max_pace_s_per_km) ? Number(d.computed.analysis.bests.max_pace_s_per_km) : (Number.isFinite(d?.metrics?.max_pace ?? d?.max_pace) ? Number(d.metrics?.max_pace ?? d.max_pace) : (max_speed_mps && max_speed_mps > 0 ? (1000 / max_speed_mps) : null));
+    const max_cadence_rpm = Number.isFinite(d?.max_cadence ?? d?.max_cycling_cadence ?? d?.max_running_cadence) ? Number(d.max_cadence ?? d.max_cycling_cadence ?? d.max_running_cadence) : null;
+    const avg_running_cadence_spm = Number.isFinite(d?.avg_cadence ?? d?.avg_running_cadence ?? d?.avg_run_cadence) ? Number(d.avg_cadence ?? d.avg_running_cadence ?? d.avg_run_cadence) : null;
+    const avg_cycling_cadence_rpm = Number.isFinite(d?.avg_cadence ?? d?.avg_bike_cadence ?? d?.metrics?.avg_bike_cadence) ? Number(d.avg_cadence ?? d.avg_bike_cadence ?? d.metrics?.avg_bike_cadence) : null;
+    const calories = Number.isFinite(d?.calories ?? d?.metrics?.calories) ? Number(d.calories ?? d.metrics.calories) : null;
+    const powerMetrics = d?.computed?.analysis?.power;
+    const normalized_power = Number.isFinite(powerMetrics?.normalized_power) ? Number(powerMetrics.normalized_power) : null;
+    const intensity_factor = Number.isFinite(powerMetrics?.intensity_factor) ? Number(powerMetrics.intensity_factor) : null;
+    const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
+    const swimMetrics = d?.computed?.analysis?.swim;
+    const avg_swim_pace_per_100m = Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null;
+    const avg_swim_pace_per_100yd = Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null;
+    const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
+    (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport: (d?.type || null), series: d?.computed?.analysis?.series || null };
 
     // Return workout data immediately (processing happens in background for old workouts)
     return new Response(JSON.stringify({ 

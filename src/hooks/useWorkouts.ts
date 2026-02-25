@@ -666,7 +666,7 @@ export const useWorkouts = () => {
                   : w.strength_exercises;
                 
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                  // Transform the logged exercise data to match our interface
+                  // Transform to sets shape; server (workout-detail, get-week) may already normalize
                   return parsed.map((exercise: any, index) => ({
                     id: exercise.id || `temp-${index}`,
                     name: exercise.name || '',

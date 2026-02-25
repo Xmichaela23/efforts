@@ -763,7 +763,25 @@ Deno.serve(async (req)=>{
             if (Array.isArray(parsed)) se = parsed;
           } catch  {}
         }
-        if (se && se.length) executed.strength_exercises = se;
+        if (se && se.length) {
+          // Normalize sets shape for client (smart server, dumb client)
+          executed.strength_exercises = se.map((exercise, index) => ({
+            id: exercise.id || `temp-${index}`,
+            name: exercise.name || '',
+            sets: Array.isArray(exercise.sets)
+              ? exercise.sets.map((set) => ({
+                  reps: Number(set?.reps ?? 0) || 0,
+                  weight: Number(set?.weight ?? 0) || 0,
+                  rir: typeof set?.rir === 'number' ? set.rir : undefined,
+                  completed: Boolean(set?.completed)
+                }))
+              : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
+            reps: Number(exercise.reps || 0) || 0,
+            weight: Number(exercise.weight || 0) || 0,
+            notes: exercise.notes || '',
+            weightMode: exercise.weightMode || 'same'
+          }));
+        }
         const rawME = w?.mobility_exercises;
         let me = [];
         if (Array.isArray(rawME)) me = rawME;
@@ -1428,7 +1446,7 @@ Deno.serve(async (req)=>{
       console.error('Failed to calculate distance totals:', error);
     }
 
-    // Add planned_workout shape for items with planned (smart server, dumb client)
+    // Add planned_workout and completed_workout (smart server, dumb client)
     const toPlannedWorkout = (item) => {
       if (!item?.planned) return null;
       const p = item.planned;
@@ -1466,9 +1484,31 @@ Deno.serve(async (req)=>{
         pace_annotation: p.pace_annotation ?? null,
       };
     };
+    const toCompletedWorkout = (item) => {
+      if (!item?.executed) return null;
+      return {
+        id: item.id,
+        date: item.date,
+        type: item.type,
+        workout_status: 'completed',
+        ...(item.executed || {}),
+        computed: item.executed || null,
+        source: item.source || null,
+        is_strava_imported: item.is_strava_imported || null,
+        strava_activity_id: item.strava_activity_id || null,
+        garmin_activity_id: item.garmin_activity_id || null,
+        device_info: item.device_info || null,
+        planned_id: item.planned?.id || item.planned_id || null,
+      };
+    };
     const itemsWithPlannedWorkout = itemsWithAI.map((it) => {
       const pw = toPlannedWorkout(it);
-      return pw ? { ...it, planned_workout: pw } : it;
+      const cw = toCompletedWorkout(it);
+      return {
+        ...it,
+        ...(pw ? { planned_workout: pw } : {}),
+        ...(cw ? { completed_workout: cw } : {}),
+      };
     });
 
     const warningsOut = errors.concat(debugNotes);
