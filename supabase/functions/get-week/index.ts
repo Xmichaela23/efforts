@@ -454,7 +454,10 @@ Deno.serve(async (req)=>{
       'device_info',
       'rpe',
       'gear_id',
-      'workout_metadata'
+      'workout_metadata',
+      'workout_analysis',
+      'name',
+      'timestamp'
     ].join(',');
     const { data: wkRaw, error: wkErr } = await supabase.from('workouts').select(workoutSel).eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
       ascending: true
@@ -833,6 +836,11 @@ Deno.serve(async (req)=>{
         planned,
         executed,
         planned_id: w.planned_id || null,
+        // computed: same shape as DB row for UI compatibility (MobileSummary, etc.)
+        computed: w?.computed ?? null,
+        workout_analysis: w?.workout_analysis ?? null,
+        name: w?.name ?? null,
+        timestamp: w?.timestamp ?? null,
         // Workload data from database (single source of truth)
         workload_actual: w.workload_actual ?? null,
         intensity_factor: w.intensity_factor ?? null,

@@ -9,9 +9,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function buildMinimalComputed(workout: any, m: Record<string, unknown>) {
+  const distKm = Number(workout?.distance);
+  const distM = Number.isFinite(distKm) && distKm > 0 ? Math.round(distKm * 1000) : null;
+  const movMin = Number(workout?.moving_time ?? m?.moving_time);
+  const durSec = Number.isFinite(movMin) && movMin > 0 ? Math.round(movMin < 1000 ? movMin * 60 : movMin) : null;
+  const paceSecPerMi = (distM != null && durSec != null && distM > 0 && durSec > 0)
+    ? Math.round((durSec / (distM / 1609.34)))
+    : null;
+  const avgHr = Number(m?.avg_heart_rate ?? workout?.avg_heart_rate);
+  return {
+    overall: {
+      distance_m: distM,
+      duration_s_moving: durSec,
+      avg_pace_s_per_mi: paceSecPerMi,
+      avg_hr: Number.isFinite(avgHr) && avgHr > 0 ? avgHr : null,
+    },
+  };
+}
+
 function mapImportToDb(workout: any, userId: string) {
   const m = workout?.metrics || {};
   const elevGain = m.elevation_gain != null ? Math.round(Number(m.elevation_gain)) : (workout.elevation_gain != null ? Math.round(Number(workout.elevation_gain)) : null);
+  const computed = buildMinimalComputed(workout, m);
   return {
     user_id: userId,
     name: workout.name ?? 'Imported Workout',
@@ -79,6 +99,7 @@ function mapImportToDb(workout: any, userId: string) {
     swim_data: workout.swim_data ?? null,
     steps_preset: workout.steps_preset ?? null,
     planned_id: workout.planned_id ?? null,
+    computed,
   };
 }
 
@@ -120,6 +141,17 @@ Deno.serve(async (req) => {
       .single();
 
     if (error) throw error;
+
+    // Invoke compute-workout-summary to add intervals / enhance when sensor_data exists
+    const baseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (baseUrl && serviceKey && data?.id) {
+      fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+        body: JSON.stringify({ workout_id: data.id }),
+      }).catch((e) => console.warn('[save-imported-workout] compute-workout-summary trigger:', e?.message));
+    }
 
     return new Response(JSON.stringify({ workout: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

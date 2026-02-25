@@ -580,6 +580,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // These intervals include both executed data AND granular_metrics from analyze-{discipline}-workout
   const completedSrc: any = hydratedCompleted || completed;
   const completedComputed = (completedSrc as any)?.computed;
+  const overallForDisplay = (completedSrc as any)?.computed?.overall ?? {};
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
     ? completedComputed.intervals 
     : [];
@@ -2544,9 +2545,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
                 const workout = hydratedCompleted || completed;
-                // ✅ ALWAYS use getDisplayPace which reads from detailed_analysis.interval_breakdown (same as Context)
-                // This ensures all intervals (including warmup) use the same source
-                // Pass stepsDisplay and idx so we can count work intervals for matching
                 const secPerMi = getDisplayPace(workout, row, st, stepsDisplay, idx);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
@@ -2562,9 +2560,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const distCell = (() => {
               if (!hasServerComputed || !row) {
                 if (idx !== 0) return '—';
-                // ONLY use server-computed distance - NO fallbacks
-                const overall = (completedSrc as any)?.computed?.overall || {};
-                const distM = Number(overall?.distance_m);
+                // Use overall (computed or executed fallback for pre-analysis/re-import)
+                const distM = Number(overallForDisplay?.distance_m);
                 if (Number.isFinite(distM) && distM > 0) {
                   if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
                   const mi = distM / 1609.34; return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
@@ -2593,18 +2590,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               const stepKind = String(st?.kind || st?.type || '').toLowerCase();
               const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
               
-              // For overall row, use overall moving time
+              // For overall row, use overall moving time (computed or executed fallback)
               if (isOverallRow) {
-                const overall = (completed as any)?.computed?.overall || {};
-                const dur = Number(overall?.duration_s_moving);
+                const dur = Number(overallForDisplay?.duration_s_moving);
                 if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
               
               // For single-interval steady-state runs, use moving time from overall
               if (isSingleIntervalSteadyState && stepKind === 'work') {
-                const overall = (completed as any)?.computed?.overall || {};
-                const movingTime = Number(overall?.duration_s_moving);
+                const movingTime = Number(overallForDisplay?.duration_s_moving);
                 if (Number.isFinite(movingTime) && movingTime > 0) return fmtTime(movingTime);
               }
               
@@ -2618,14 +2613,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
             const hrVal = (() => {
               if (!hasServerComputed || !row) {
-                // Check if this is an overall/summary row (not a real interval step)
                 const stepKind = String(st?.kind || st?.type || '').toLowerCase();
                 const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
-                
-                // For overall row, show overall workout HR
                 if (isOverallRow) {
-                  const overall = (completedSrc as any)?.computed?.overall || {};
-                  const hr = Number(overall?.avg_hr);
+                  const hr = Number(overallForDisplay?.avg_hr);
                   if (Number.isFinite(hr) && hr > 0) return Math.round(hr);
                   const fromMetrics = Number((completedSrc as any)?.avg_heart_rate ?? (completedSrc as any)?.metrics?.avg_heart_rate);
                   if (Number.isFinite(fromMetrics) && fromMetrics > 0) return Math.round(fromMetrics);

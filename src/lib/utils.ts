@@ -65,7 +65,8 @@ export function normalizeDistanceKm(workout: any): number | null {
   if (typeof workout.distance_km === 'number') return workout.distance_km;
   if (typeof workout.distance_m === 'number') return workout.distance_m / 1000;
   if (typeof workout.distance === 'number') return workout.distance; // assume km
-  // If GPS track or steps exist, we intentionally skip heavy computation here
+  const cm = workout?.computed?.overall?.distance_m ?? workout?.executed?.overall?.distance_m;
+  if (typeof cm === 'number' && isFinite(cm)) return cm / 1000;
   return null;
 }
 

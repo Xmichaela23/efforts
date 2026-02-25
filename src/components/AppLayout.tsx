@@ -898,20 +898,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
     
     if (status === 'completed') {
-      let row = workout;
-      try {
-        // If coming from calendar/range feed, fetch full workout by id for complete details
-        const minimal = !('sensor_data' in (workout as any)) && !('gps_track' in (workout as any)) && !('computed' in (workout as any));
-        const hasFewKeys = Object.keys(workout || {}).length < 8; // heuristic
-        if ((minimal || hasFewKeys) && (workout as any)?.id) {
-          const { data } = await supabase
-            .from('workouts')
-            .select('*')
-            .eq('id', String((workout as any).id))
-            .maybeSingle();
-          if (data) row = data as any;
-        }
-      } catch {}
+      // Use passed workout directly when it has complete data (executed, computed from get-week)
+      const hasComplete = (workout as any)?.computed?.overall ?? (workout as any)?.executed?.overall;
+      const row = hasComplete ? workout : (await (async () => {
+        try {
+          if ((workout as any)?.id) {
+            const { data } = await supabase.from('workouts').select('*').eq('id', String((workout as any).id)).maybeSingle();
+            return data as any ?? workout;
+          }
+        } catch {}
+        return workout;
+      })());
       setSelectedWorkout(row);
       // Completed: open on Performance tab (execution scores when linked, analysis when unplanned)
       setActiveTab('summary');
