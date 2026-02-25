@@ -640,7 +640,7 @@ export default function CoachWeekTab() {
         <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
           <div className="text-sm font-medium text-white/90 mb-1">Marathon readiness</div>
           <div className="text-xs text-white/50 mb-3">
-            Checklist based on last 6–8 weeks. Assessment only — no suggestions.
+            Whether your recent training is enough to finish strong. ✓ = met, ✗ = gap. Based on last 6–8 weeks of runs.
           </div>
           <div className="space-y-2">
             {data.marathon_readiness.items.map((item) => (
@@ -661,10 +661,10 @@ export default function CoachWeekTab() {
             ))}
           </div>
           {data.marathon_readiness.summary !== 'insufficient_data' && (
-            <div className="mt-2 text-[11px] text-white/40">
+            <div className="mt-2 text-[11px] text-white/50">
               {data.marathon_readiness.summary === 'on_track'
-                ? 'On track'
-                : 'Needs work'}
+                ? 'On track — training base looks sufficient for race day.'
+                : 'Needs work — address the gaps above before race day.'}
             </div>
           )}
         </div>

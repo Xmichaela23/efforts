@@ -147,7 +147,11 @@ export async function computeMarathonReadiness(
       label: 'ACWR in safe range',
       pass: acwrPass,
       detail: acwr != null
-        ? `ACWR ${acwr.toFixed(2)} (0.8–1.5 optimal)`
+        ? acwr < 0.8
+          ? `ACWR ${acwr.toFixed(2)} — low (undertraining; target 0.8–1.5)`
+          : acwr > 1.5
+            ? `ACWR ${acwr.toFixed(2)} — high (ramping too fast; target 0.8–1.5)`
+            : `ACWR ${acwr.toFixed(2)} (0.8–1.5 optimal)`
         : 'No ACWR data',
       value: acwr != null ? acwr.toFixed(2) : undefined,
     },
@@ -155,7 +159,13 @@ export async function computeMarathonReadiness(
       id: 'durability',
       label: 'Durability risk',
       pass: durabilityPass,
-      detail: durabilityLabel != null ? durabilityLabel : '—',
+      detail: durabilityLabel != null
+        ? durabilityLabel === 'low'
+          ? 'Low — load is sustainable'
+          : durabilityLabel === 'high'
+            ? 'High — legs may fade late in race'
+            : 'Medium — watch recovery'
+        : '— (no block data)',
       value: durabilityLabel ?? '—',
     },
   ];
