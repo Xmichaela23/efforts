@@ -1405,6 +1405,16 @@ ${narrativeFacts.join('\n')}`;
     try {
       const mr = await computeMarathonReadiness(userId, asOfDate, acwr ?? null, supabase);
       marathon_readiness = mr ?? undefined;
+      // When athlete says they're sick/injured and readiness is needs_work, add a recovery-focused note
+      if (marathon_readiness?.summary === 'needs_work' && athleteContextStr) {
+        const ctx = athleteContextStr.toLowerCase();
+        if (/\b(sick|ill|flu|covid|virus|injured|injury|hurt)\b/.test(ctx)) {
+          marathon_readiness = {
+            ...marathon_readiness,
+            context_note: 'Your gaps may reflect being sick — recover first, then reassess. You can still finish; prioritize health over hitting every number.',
+          };
+        }
+      }
     } catch (mrErr: any) {
       console.warn('[coach] marathon readiness failed (non-fatal):', mrErr?.message ?? mrErr);
     }

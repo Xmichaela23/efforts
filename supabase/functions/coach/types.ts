@@ -251,6 +251,8 @@ export type CoachWeekContextResponseV1 = {
     applicable: boolean;
     items: Array<{ id: string; label: string; pass: boolean; detail: string; value?: string | number }>;
     summary: 'on_track' | 'needs_work' | 'insufficient_data';
+    /** When athlete context mentions illness/injury and summary is needs_work */
+    context_note?: string | null;
   };
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';

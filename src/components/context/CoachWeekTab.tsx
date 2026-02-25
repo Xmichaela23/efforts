@@ -660,11 +660,18 @@ export default function CoachWeekTab() {
               </div>
             ))}
           </div>
+          {data.marathon_readiness.context_note && (
+            <div className="mt-2 rounded-lg px-2.5 py-2 bg-sky-500/10 border border-sky-500/20 text-xs text-sky-200/90">
+              {data.marathon_readiness.context_note}
+            </div>
+          )}
           {data.marathon_readiness.summary !== 'insufficient_data' && (
             <div className="mt-2 text-[11px] text-white/50">
               {data.marathon_readiness.summary === 'on_track'
                 ? 'On track — training base looks sufficient for race day.'
-                : 'Needs work — address the gaps above before race day.'}
+                : data.marathon_readiness.context_note
+                  ? 'Needs work — but see note above.'
+                  : 'Needs work — address the gaps above before race day.'}
             </div>
           )}
         </div>
