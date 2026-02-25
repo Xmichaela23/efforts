@@ -227,24 +227,17 @@ export function getDisciplinePhosphorPill(
   }
   
   // Fill color based on state
-  // - Future/Planned: No fill (transparent/dark steel) - outline only
-  // - This Week: No fill (transparent/dark steel) - outline only
-  // - Completed: Solid fill (earned, slightly desaturated)
-  // - Today (uncompleted): No fill (transparent/dark steel) - only completed workouts get fills
+  // Filled vs outlined is pre-attentive — instant recognition at any glance speed.
+  // - Planned (idle/week/active): No fill — border only, outline-only
+  // - Completed (done): Solid discipline-color fill at 40-50% — clearly filled
   let fillColor = 'transparent';
   if (state === 'done') {
-    // Completed: "earned" - solid, slightly desaturated fill
-    // Desaturate by mixing with gray, increase opacity for solid feel
+    // Completed: solid discipline-color fill — filled = done, empty = not done
     const rgb = hexToRgb(coreColor);
     const [r, g, b] = rgb.split(',').map(v => parseInt(v.trim()));
-    // Desaturate: mix with gray (128, 128, 128) at 30% to reduce saturation
-    const desatR = Math.round(r * 0.7 + 128 * 0.3);
-    const desatG = Math.round(g * 0.7 + 128 * 0.3);
-    const desatB = Math.round(b * 0.7 + 128 * 0.3);
-    // Solid fill: 18% opacity (more solid than before)
-    fillColor = `rgba(${desatR}, ${desatG}, ${desatB}, 0.18)`;
+    // 45% opacity: clearly filled, readable white text
+    fillColor = `rgba(${r}, ${g}, ${b}, 0.45)`;
   }
-  // idle, week, and active: transparent (no fill) - uncompleted workouts never get fills
   
   // Border color: always discipline color (muted phosphor)
   // Border luminance hierarchy: Today > Upcoming > Completed

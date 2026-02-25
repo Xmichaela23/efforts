@@ -5,7 +5,7 @@ import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePill
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
-import { Calendar, CheckCircle, Info, Activity, Bike, Waves, Dumbbell, Move, CircleDot, Check, type LucideIcon } from 'lucide-react';
+import { Calendar, CheckCircle, Info, Activity, Bike, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -1130,8 +1130,7 @@ export default function WorkoutCalendar({
                     const workoutId = evt?._src?.id;
 
                     const renderLabel = () => {
-                      const label = String(evt.label || '');
-                      const hasCheckmark = /✓+$/.test(label);
+                      const label = String(evt.label || '').replace(/✓+$/, '').trim();
                       const discipline = resolveDisciplineForIcon(workoutType, label);
                       const IconComponent = DISCIPLINE_ICONS[discipline] || Activity;
 
@@ -1157,32 +1156,21 @@ export default function WorkoutCalendar({
                         </span>
                       );
 
-                      if (hasCheckmark && isCompleted) {
-                        const labelText = label.replace(/✓+$/, '').trim();
-                        const parts = labelText.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
-                        const nonNumericParts = labelText.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
-                        return (
-                          <>
-                            {nonNumericParts.map((part, idx) => {
-                              const isNumeric = parts.includes(part);
-                              return isNumeric ? (
-                                <span key={idx} className="tabular-nums">{part}</span>
-                              ) : part;
-                            })}
-                            {renderDisciplineIcon(true)}
-                            <span
-                              aria-label="Completed"
-                              className="inline-flex items-center justify-center flex-shrink-0"
-                              style={{
-                                marginLeft: 4,
-                                color: `rgb(${pillRgb})`,
-                              }}
-                            >
-                              <Check size={12} strokeWidth={2.5} />
-                            </span>
-                          </>
-                        );
-                      }
+                      const renderCompletedCheckmark = () => (
+                        <span
+                          aria-label="Completed"
+                          className="inline-flex items-center justify-center flex-shrink-0"
+                          style={{
+                            marginLeft: 4,
+                            color: `rgb(${pillRgb})`,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                          }}
+                        >
+                          ✓
+                        </span>
+                      );
 
                       const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
                       const content = (() => {
@@ -1198,16 +1186,22 @@ export default function WorkoutCalendar({
                         return label;
                       })();
 
-                      if (!isCompleted) {
+                      if (isCompleted) {
                         return (
                           <>
                             {content}
-                            {renderDisciplineIcon(false)}
+                            {renderDisciplineIcon(true)}
+                            {renderCompletedCheckmark()}
                           </>
                         );
                       }
 
-                      return content;
+                      return (
+                        <>
+                          {content}
+                          {renderDisciplineIcon(false)}
+                        </>
+                      );
                     };
                     
                     return (
