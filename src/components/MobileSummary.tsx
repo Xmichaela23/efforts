@@ -2586,23 +2586,20 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
             
             const timeCell = (() => {
-              // Check if this is an overall/summary row (not a real interval step)
               const stepKind = String(st?.kind || st?.type || '').toLowerCase();
               const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
-              
+
               // For overall row, use overall moving time (computed or executed fallback)
               if (isOverallRow) {
                 const dur = Number(overallForDisplay?.duration_s_moving);
                 if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
-              
               // For single-interval steady-state runs, use moving time from overall
               if (isSingleIntervalSteadyState && stepKind === 'work') {
                 const movingTime = Number(overallForDisplay?.duration_s_moving);
                 if (Number.isFinite(movingTime) && movingTime > 0) return fmtTime(movingTime);
               }
-              
               // For individual intervals (warmup, work, recovery, cooldown), use interval duration
               if (!hasServerComputed || !row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';

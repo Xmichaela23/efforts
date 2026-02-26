@@ -1140,7 +1140,15 @@ Deno.serve(async (req) => {
         const totalMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
         const totalSecs   = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
         const wantDistanceSplits = (sport === 'run' || sport === 'swim');
-        if (wantDistanceSplits && totalMeters >= 600) {
+        // Simple continuous run: one interval with overall metrics (avoids 0.62 mi display bug)
+        const isSimpleContinuousRun = (sport === 'run' || sport === 'walk') && totalMeters >= 600 && rows.length >= 2;
+        if (isSimpleContinuousRun) {
+          try {
+            outIntervals.push(execFromIdx(rows, 0, rows.length - 1, 'split', 'work'));
+          } catch (err: any) {
+            try { console.error('Exact error location: simple continuous run', { error: err?.message }); } catch {}
+          }
+        } else if (wantDistanceSplits && totalMeters >= 600) {
           try {
             const splitM = 1000; // 1 km
             let startIdx = 0; let nextTarget = (rows[0].d || 0) + splitM;
@@ -1480,6 +1488,140 @@ Deno.serve(async (req) => {
       try { console.error('[compute] mode=snap-to-laps intervals:', snapped.length); } catch {}
       await writeComputed(computed);
       return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+    }
+
+    // ────────────── MISMATCH DETECTOR ──────────────
+    // If the execution fundamentally doesn't match the planned structure,
+    // skip alignment entirely and emit overall-only metrics.
+    // Uses MOVING time (not elapsed) to avoid false positives from pauses.
+    type MismatchResult = { mismatch: boolean; reason: string | null };
+    function detectMismatch(plannedSteps: any[], laps: Lap[], rows: any[], sport: string, w: any): MismatchResult {
+      if (!plannedSteps.length) return { mismatch: false, reason: null };
+
+      // 1) Derive planned total duration (moving time)
+      let plannedTotalSec = 0;
+      for (const st of plannedSteps) {
+        plannedTotalSec += deriveSecondsFromPlannedStep(st) || 0;
+      }
+      if (!plannedTotalSec) {
+        const rootDur = Number(planned?.total_duration_seconds ?? planned?.computed?.total_duration_seconds);
+        if (Number.isFinite(rootDur) && rootDur > 0) plannedTotalSec = rootDur;
+      }
+
+      // 2) Derive executed moving time (prefer moving_time field → prev computed → timestamp span)
+      let executedMovingSec = 0;
+      try {
+        const prevC = typeof w.computed === 'string' ? JSON.parse(w.computed) : (w.computed || {});
+        const prevMov = Number(prevC?.overall?.duration_s_moving);
+        if (Number.isFinite(prevMov) && prevMov > 0) executedMovingSec = prevMov;
+      } catch {}
+      if (!executedMovingSec) {
+        const mvMin = Number((w as any)?.moving_time);
+        if (Number.isFinite(mvMin) && mvMin > 0) executedMovingSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
+      }
+      if (!executedMovingSec && rows.length >= 2) {
+        executedMovingSec = Math.max(1, (rows[rows.length - 1].t || 0) - (rows[0].t || 0));
+      }
+
+      // 3) Duration ratio check (uses moving time to avoid pause false-positives)
+      if (plannedTotalSec > 0 && executedMovingSec > 0) {
+        const ratio = executedMovingSec / plannedTotalSec;
+        if (ratio < 0.40 || ratio > 2.5) {
+          return { mismatch: true, reason: `duration_ratio_${ratio.toFixed(2)}` };
+        }
+      }
+
+      // 4) Structure check: planned has warmup+work+cooldown but execution has no laps
+      const roles = plannedSteps.map((s: any) => stepRole(s));
+      const hasWarmup = roles.includes('warmup');
+      const hasCooldown = roles.includes('cooldown');
+      const workCount = roles.filter(r => r === 'work').length;
+      const isStructured = (hasWarmup || hasCooldown) && workCount >= 2;
+
+      if (isStructured && laps.length === 0 && (sport === 'run' || sport === 'walk')) {
+        // Execution looks continuous (no laps at all) but plan was structured intervals
+        return { mismatch: true, reason: 'structured_plan_continuous_execution' };
+      }
+
+      // 5) Lap count vs step count divergence (structured plans only)
+      if (isStructured && laps.length > 0 && plannedSteps.length >= 4) {
+        const lapRatio = laps.length / plannedSteps.length;
+        if (lapRatio < 0.3) {
+          return { mismatch: true, reason: `lap_step_ratio_${lapRatio.toFixed(2)}` };
+        }
+      }
+
+      // 6) Auto-split steady: many identical ~1km work steps (materialized long run)
+      //    Even if duration matches, alignment to 1km chunks produces misleading intervals
+      if (plannedSteps.length >= 8 && (sport === 'run' || sport === 'walk')) {
+        const kinds = plannedSteps.map((s: any) => String(s?.kind || s?.type || '').toLowerCase());
+        const allWorkish = kinds.every((k: string) => k === 'work' || k === 'interval' || k === 'steady' || k === '');
+        if (allWorkish) {
+          const dm = plannedSteps.map((s: any) => Number(s?.distanceMeters ?? s?.distance_m ?? s?.m ?? 0)).filter((n: number) => Number.isFinite(n) && n > 0);
+          if (dm.length >= Math.floor(plannedSteps.length * 0.7)) {
+            const nearKm = dm.filter((m: number) => m >= 900 && m <= 1100);
+            if (nearKm.length >= Math.floor(dm.length * 0.7)) {
+              return { mismatch: true, reason: 'auto_split_steady_plan' };
+            }
+          }
+        }
+      }
+
+      return { mismatch: false, reason: null };
+    }
+
+    const mismatchCheck = detectMismatch(plannedSteps, laps, rows, sport, w);
+    if (mismatchCheck.mismatch) {
+      console.log(`[compute] mismatch detected: ${mismatchCheck.reason} — emitting overall-only`);
+
+      // Build overall-only from full sensor window
+      const totalM = rows.length >= 2 ? Math.max(0, (rows[rows.length - 1].d || 0) - (rows[0].d || 0)) : 0;
+      const totalSFromRows = rows.length >= 2 ? Math.max(1, (rows[rows.length - 1].t || 0) - (rows[0].t || 0)) : 0;
+      const pace = paceSecPerMiFromMetersSeconds(totalM, totalSFromRows);
+      const gap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+      const hrVals: number[] = []; const cadVals: number[] = [];
+      for (let j = 0; j < rows.length; j++) {
+        const h = rows[j].hr; if (typeof h === 'number' && h >= 50 && h <= 220) hrVals.push(h);
+        const c = rows[j].cad; if (typeof c === 'number') cadVals.push(c);
+      }
+
+      // Prefer moving_time over timestamp span
+      let overallSec = totalSFromRows;
+      try {
+        const prevC = typeof w.computed === 'string' ? JSON.parse(w.computed) : (w.computed || {});
+        const prevDur = Number(prevC?.overall?.duration_s_moving);
+        if (Number.isFinite(prevDur) && prevDur > 0) overallSec = prevDur;
+        else {
+          const mvMin = Number((w as any)?.moving_time);
+          if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
+        }
+      } catch {}
+
+      // Preserve raw laps so the client can optionally show "here's what your watch recorded"
+      const rawLaps = laps.length > 0 ? laps.map((L, i) => {
+        const [sIdx, eIdx] = windowIdxFromT(rows, L.start_ts, L.end_ts);
+        if (eIdx <= sIdx) return null;
+        const lapInterval = execFromIdx(rows, sIdx, eIdx, 'lap', 'lap');
+        return { lap_number: i + 1, ...lapInterval };
+      }).filter(Boolean) : [];
+
+      const computed: any = {
+        version: COMPUTED_VERSION,
+        alignment_mode: 'overall-only',
+        mismatch_reason: mismatchCheck.reason,
+        intervals: [],
+        overall: {
+          duration_s_moving: Math.round(overallSec),
+          distance_m: Math.round(totalM),
+          avg_pace_s_per_mi: pace != null ? Math.round(pace) : null,
+          gap_pace_s_per_mi: gap != null ? Math.round(gap) : null,
+          avg_hr: hrVals.length ? Math.round(avg(hrVals)!) : null,
+          avg_cadence_spm: cadVals.length ? Math.round(avg(cadVals)!) : null,
+        }
+      };
+      if (rawLaps.length > 0) computed.raw_laps = rawLaps;
+      await writeComputed(computed);
+      return new Response(JSON.stringify({ success: true, computed, mode: 'overall-only-mismatch' }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
     // Build lightweight planned snapshot with stable order
