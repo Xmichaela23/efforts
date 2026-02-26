@@ -2549,6 +2549,16 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
                 }
+                // Overall row: read server-provided overall pace when interval breakdown unavailable
+                const stepKindExec = String(st?.kind || st?.type || '').toLowerCase();
+                const isOverallRowExec = stepKindExec === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
+                if (isOverallRowExec) {
+                  const ovrPace = Number(overallForDisplay?.avg_pace_s_per_mi
+                    ?? (completedSrc as any)?.executed?.overall?.avg_pace_s_per_mi);
+                  if (Number.isFinite(ovrPace) && ovrPace > 0) {
+                    return `${Math.floor(ovrPace/60)}:${String(Math.round(ovrPace%60)).padStart(2,'0')}/mi`;
+                  }
+                }
                 return '—';
               }
               // For other sports, use server-computed interval data
@@ -2560,8 +2570,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const distCell = (() => {
               if (!hasServerComputed || !row) {
                 if (idx !== 0) return '—';
-                // Use overall (computed or executed fallback for pre-analysis/re-import)
-                const distM = Number(overallForDisplay?.distance_m);
+                // Use overall from computed, executed, or top-level workout fields
+                const distM = Number(
+                  overallForDisplay?.distance_m
+                  ?? (completedSrc as any)?.executed?.overall?.distance_m
+                  ?? ((completedSrc as any)?.distance_km != null ? Number((completedSrc as any).distance_km) * 1000 : undefined)
+                  ?? (completedSrc as any)?.distance_m
+                  ?? (completedSrc as any)?.distance
+                );
                 if (Number.isFinite(distM) && distM > 0) {
                   if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
                   const mi = distM / 1609.34; return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
@@ -2589,9 +2605,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               const stepKind = String(st?.kind || st?.type || '').toLowerCase();
               const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
 
-              // For overall row, use overall moving time (computed or executed fallback)
+              // For overall row, use overall moving time (computed → executed → top-level)
               if (isOverallRow) {
-                const dur = Number(overallForDisplay?.duration_s_moving);
+                const dur = Number(
+                  overallForDisplay?.duration_s_moving
+                  ?? (completedSrc as any)?.executed?.overall?.duration_s_moving
+                  ?? (completedSrc as any)?.moving_time
+                  ?? overallForDisplay?.duration_s
+                  ?? (completedSrc as any)?.elapsed_time
+                );
                 if (Number.isFinite(dur) && dur > 0) return fmtTime(dur);
                 return '—';
               }
@@ -2613,10 +2635,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 const stepKind = String(st?.kind || st?.type || '').toLowerCase();
                 const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
                 if (isOverallRow) {
-                  const hr = Number(overallForDisplay?.avg_hr);
+                  const hr = Number(
+                    overallForDisplay?.avg_hr
+                    ?? (completedSrc as any)?.executed?.overall?.avg_hr
+                    ?? (completedSrc as any)?.avg_heart_rate
+                    ?? (completedSrc as any)?.metrics?.avg_heart_rate
+                    ?? (completedSrc as any)?.average_heartrate
+                  );
                   if (Number.isFinite(hr) && hr > 0) return Math.round(hr);
-                  const fromMetrics = Number((completedSrc as any)?.avg_heart_rate ?? (completedSrc as any)?.metrics?.avg_heart_rate);
-                  if (Number.isFinite(fromMetrics) && fromMetrics > 0) return Math.round(fromMetrics);
                 }
                 return null;
               }
