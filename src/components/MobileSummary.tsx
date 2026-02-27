@@ -2570,14 +2570,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const distCell = (() => {
               if (!hasServerComputed || !row) {
                 if (idx !== 0) return '—';
-                // Use overall from computed, executed, or top-level workout fields
-                const distM = Number(
-                  overallForDisplay?.distance_m
-                  ?? (completedSrc as any)?.executed?.overall?.distance_m
-                  ?? ((completedSrc as any)?.distance_km != null ? Number((completedSrc as any).distance_km) * 1000 : undefined)
-                  ?? (completedSrc as any)?.distance_m
-                  ?? (completedSrc as any)?.distance
-                );
+                // Use overall from computed, executed, or top-level workout fields (skip 0 values)
+                const distM = [
+                  overallForDisplay?.distance_m,
+                  (completedSrc as any)?.executed?.overall?.distance_m,
+                  (completedSrc as any)?.distance_km != null ? Number((completedSrc as any).distance_km) * 1000 : undefined,
+                  (completedSrc as any)?.distance_m,
+                  (completedSrc as any)?.distance,
+                ].map(Number).find(v => Number.isFinite(v) && v > 0) ?? 0;
                 if (Number.isFinite(distM) && distM > 0) {
                   if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
                   const mi = distM / 1609.34; return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;

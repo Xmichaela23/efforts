@@ -1204,6 +1204,14 @@ Deno.serve(async (req) => {
         }
       } catch {}
 
+    // For non-swim: if sensor data yielded 0 distance, fall back to workout-level scalars
+    if (!(overallMeters > 0)) {
+      const dkm = Number((w as any)?.distance_km); if (Number.isFinite(dkm) && dkm > 0) overallMeters = Math.round(dkm * 1000);
+      if (!(overallMeters > 0)) { const dm = Number((w as any)?.distance_m ?? (w as any)?.distance_meters); if (Number.isFinite(dm) && dm > 0) overallMeters = Math.round(dm); }
+      if (!(overallMeters > 0)) { const sd = (w as any)?.strava_data || {}; const d = Number(sd?.distance); if (Number.isFinite(d) && d > 0) overallMeters = Math.round(d); }
+      if (!(overallMeters > 0)) { const d = Number((w as any)?.distance); if (Number.isFinite(d) && d > 0) overallMeters = Math.round(d * 1000); }
+    }
+
     // For swims, use authoritative scalars first; then fill only if still missing
     try {
       const sportForOverall = String((w as any)?.type || '').toLowerCase();
@@ -1392,7 +1400,14 @@ Deno.serve(async (req) => {
           overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
         }
       } catch {}
-      
+
+      if (!(overallMeters > 0)) {
+        const dkm = Number((w as any)?.distance_km); if (Number.isFinite(dkm) && dkm > 0) overallMeters = Math.round(dkm * 1000);
+        if (!(overallMeters > 0)) { const dm = Number((w as any)?.distance_m ?? (w as any)?.distance_meters); if (Number.isFinite(dm) && dm > 0) overallMeters = Math.round(dm); }
+        if (!(overallMeters > 0)) { const sd = (w as any)?.strava_data || {}; const d = Number(sd?.distance); if (Number.isFinite(d) && d > 0) overallMeters = Math.round(d); }
+        if (!(overallMeters > 0)) { const d = Number((w as any)?.distance); if (Number.isFinite(d) && d > 0) overallMeters = Math.round(d * 1000); }
+      }
+
       // For swims, use authoritative scalars first; then fill only if still missing
       try {
         const sportForOverall = String((w as any)?.type || '').toLowerCase();
@@ -1966,8 +1981,6 @@ Deno.serve(async (req) => {
         }
       })();
       const prevDurationMoving = Number(prevComputed?.overall?.duration_s_moving);
-      // ✅ FIX: Sanity check - if duration is suspiciously small (< 60 seconds), it might be in minutes
-      // Recalculate from moving_time to ensure correct value
       if (Number.isFinite(prevDurationMoving) && prevDurationMoving > 0 && prevDurationMoving >= 60) {
         overallSec = Math.round(prevDurationMoving);
       }
@@ -1985,7 +1998,14 @@ Deno.serve(async (req) => {
         overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
       }
     } catch {}
-    
+
+    if (!(overallMeters > 0)) {
+      const dkm = Number((w as any)?.distance_km); if (Number.isFinite(dkm) && dkm > 0) overallMeters = Math.round(dkm * 1000);
+      if (!(overallMeters > 0)) { const dm = Number((w as any)?.distance_m ?? (w as any)?.distance_meters); if (Number.isFinite(dm) && dm > 0) overallMeters = Math.round(dm); }
+      if (!(overallMeters > 0)) { const sd = (w as any)?.strava_data || {}; const d = Number(sd?.distance); if (Number.isFinite(d) && d > 0) overallMeters = Math.round(d); }
+      if (!(overallMeters > 0)) { const d = Number((w as any)?.distance); if (Number.isFinite(d) && d > 0) overallMeters = Math.round(d * 1000); }
+    }
+
     // For swims, use authoritative scalars first; then fill only if still missing
     // Note: overallSec already set above from moving_time, but swims need additional distance handling
     try {
