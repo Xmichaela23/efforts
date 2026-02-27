@@ -220,6 +220,7 @@ export function useCoachWeekContext(date?: string) {
         body: {
           user_id: user.id,
           date: focusDate,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       });
 

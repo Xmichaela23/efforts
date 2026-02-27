@@ -295,7 +295,10 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const asOfDate = String(payload?.date || new Date().toLocaleDateString('en-CA'));
+    const userTz = String(payload?.timezone || 'America/Los_Angeles');
+    const asOfDate = String(payload?.date || (() => {
+      try { return new Date().toLocaleDateString('en-CA', { timeZone: userTz }); } catch { return new Date().toLocaleDateString('en-CA'); }
+    })());
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
       global: { headers: { Authorization: req.headers.get('Authorization')! } },
@@ -1445,7 +1448,10 @@ Deno.serve(async (req) => {
           narrativeFacts.push(`System balance: aerobic is ${interference.aerobic}, structural is ${interference.structural}. No interference detected.`);
         }
 
-        const todayDay = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()];
+        const todayDay = (() => {
+          try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', timeZone: userTz }); }
+          catch { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()]; }
+        })();
         const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan. Use day names (e.g. "Thursday", "today") instead of raw dates.
 
 NEVER GUESS WHY: If the facts include "ATHLETE SAYS" or "MISSED SESSION REASONS" or "went heavier intentionally/unintentionally", use that. Otherwise, state what happened (e.g., "you missed three running sessions") but DO NOT speculate on reasons (no "you may have been tired", "you might have needed rest", etc.). Only explain causes when the athlete has told you.
@@ -1457,6 +1463,8 @@ CRITICAL: If the athlete has an active training plan, NEVER suggest adding extra
 End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
 
 UNITS: The athlete uses ${isImperial ? 'imperial (lb, miles)' : 'metric (kg, km)'}. Always use ${wUnit} for weights and ${isImperial ? 'miles' : 'km'} for distances. The facts below already use the correct units.
+
+TIMEZONE: The athlete is in ${userTz}. All dates in the facts are in their local time.
 
 FACTS:
 ${narrativeFacts.join('\n')}`;
