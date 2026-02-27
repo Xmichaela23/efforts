@@ -770,7 +770,6 @@ Deno.serve(async (req) => {
     const userUnits = String((ub as any)?.units || 'imperial').toLowerCase();
     const isImperial = userUnits !== 'metric';
     const wUnit = isImperial ? 'lb' : 'kg';
-    const toDisplay = (kg: number) => isImperial ? Math.round(kg * 2.20462) : kg;
 
     const learnedFitness = (() => {
       try { return typeof (ub as any)?.learned_fitness === 'string' ? JSON.parse((ub as any).learned_fitness) : ((ub as any)?.learned_fitness || null); } catch { return (ub as any)?.learned_fitness || null; }
@@ -1350,9 +1349,9 @@ Deno.serve(async (req) => {
               if (ex.planned_weight && ex.best_weight) {
                 const plannedW = parseFloat(ex.planned_weight) || 0;
                 if (plannedW > 0 && ex.best_weight > plannedW * 1.05) {
-                  deviations.push(`${ex.name}: lifted ${toDisplay(ex.best_weight)}${wUnit} but plan said ${toDisplay(parseFloat(ex.planned_weight))}${wUnit} (+${Math.round(((ex.best_weight / plannedW) - 1) * 100)}% heavier)`);
+                  deviations.push(`${ex.name}: lifted ${Math.round(ex.best_weight)}${wUnit} but plan said ${Math.round(plannedW)}${wUnit} (+${Math.round(((ex.best_weight / plannedW) - 1) * 100)}% heavier)`);
                 } else if (plannedW > 0 && ex.best_weight < plannedW * 0.9) {
-                  deviations.push(`${ex.name}: lifted ${toDisplay(ex.best_weight)}${wUnit} vs planned ${toDisplay(parseFloat(ex.planned_weight))}${wUnit} (lighter than plan)`);
+                  deviations.push(`${ex.name}: lifted ${Math.round(ex.best_weight)}${wUnit} vs planned ${Math.round(plannedW)}${wUnit} (lighter than plan)`);
                 }
               }
               if (ex.planned_sets && ex.sets_completed && ex.sets_completed !== ex.planned_sets) {
@@ -1388,7 +1387,7 @@ Deno.serve(async (req) => {
             const bestReps = entries.find((e: any) => e.best_weight === bestW)?.best_reps || 0;
             const best1rm = Math.max(...entries.map((e: any) => e.estimated_1rm || 0));
             const avgRir = entries.filter((e: any) => e.avg_rir != null).reduce((s: number, e: any) => s + e.avg_rir, 0) / (entries.filter((e: any) => e.avg_rir != null).length || 1);
-            exLines.push(`${canon}: best ${toDisplay(bestW)}${wUnit} × ${bestReps}, est 1RM ${toDisplay(Math.round(best1rm))}${wUnit}, avg ${avgRir.toFixed(1)} reps in reserve`);
+            exLines.push(`${canon}: best ${Math.round(bestW)}${wUnit} × ${bestReps}, est 1RM ${Math.round(best1rm)}${wUnit}, avg ${avgRir.toFixed(1)} reps in reserve`);
           }
           narrativeFacts.push(`STRENGTH EXERCISES THIS WEEK: ${exLines.join('; ')}.`);
         }
