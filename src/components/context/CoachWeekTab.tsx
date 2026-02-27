@@ -147,7 +147,7 @@ function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-type BaselineDriftSuggestion = { lift: string; label: string; baseline: number; learned: number };
+type BaselineDriftSuggestion = { lift: string; label: string; baseline: number; learned: number; basis?: string };
 
 function BaselineDriftCard({
   suggestions,
@@ -190,9 +190,14 @@ function BaselineDriftCard({
             key={s.lift}
             className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2"
           >
-            <span className="text-sm text-white/90">
-              {s.label}: {s.baseline} → {s.learned} lb
-            </span>
+            <div className="flex flex-col">
+              <span className="text-sm text-white/90">
+                {s.label}: {s.baseline} → {s.learned} lb
+              </span>
+              {s.basis && (
+                <span className="text-[10px] text-white/40 mt-0.5">{s.basis}</span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleAccept(s)}

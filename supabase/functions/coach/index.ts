@@ -853,19 +853,27 @@ Deno.serve(async (req) => {
       { lift: 'overhead_press', label: 'Overhead press', baseline: Number(perf?.overheadPress1RM ?? perf?.ohp ?? perf?.overhead), learned: Number(strength?.overhead_press?.value) },
     ];
     const today = asOfDate;
-    const baseline_drift_suggestions: Array<{ lift: string; label: string; baseline: number; learned: number }> = [];
+    const baseline_drift_suggestions: Array<{ lift: string; label: string; baseline: number; learned: number; basis: string }> = [];
     for (const p of driftPairs) {
       if (!Number.isFinite(p.baseline) || p.baseline <= 0) continue;
-      if (!Number.isFinite(p.learned) || p.learned < p.baseline * 1.05) continue;
-      const conf = strength[p.lift as keyof typeof strength]?.confidence;
+      const rawLearned = p.learned;
+      const rounded = Math.floor(rawLearned / 5) * 5;
+      if (!Number.isFinite(rounded) || rounded < p.baseline * 1.05) continue;
+      const liftData = strength[p.lift as keyof typeof strength];
+      const conf = liftData?.confidence;
       if (conf !== 'high' && conf !== 'medium') continue;
       const dismissedAt = dismissedDrift[p.lift];
       if (dismissedAt) {
         const d = new Date(dismissedAt).getTime();
         const t = new Date(today).getTime();
-        if (t - d < 30 * 24 * 60 * 60 * 1000) continue; // cooldown 30 days
+        if (t - d < 30 * 24 * 60 * 60 * 1000) continue;
       }
-      baseline_drift_suggestions.push(p);
+      const sessions = liftData?.sample_count ?? 0;
+      baseline_drift_suggestions.push({
+        ...p,
+        learned: rounded,
+        basis: `Epley est. 1RM from ${sessions} session${sessions !== 1 ? 's' : ''} (${conf} confidence)`,
+      });
     }
 
     // =========================================================================
