@@ -1445,7 +1445,8 @@ Deno.serve(async (req) => {
           narrativeFacts.push(`System balance: aerobic is ${interference.aerobic}, structural is ${interference.structural}. No interference detected.`);
         }
 
-        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan.
+        const todayDay = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()];
+        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan. Use day names (e.g. "Thursday", "today") instead of raw dates.
 
 NEVER GUESS WHY: If the facts include "ATHLETE SAYS" or "MISSED SESSION REASONS" or "went heavier intentionally/unintentionally", use that. Otherwise, state what happened (e.g., "you missed three running sessions") but DO NOT speculate on reasons (no "you may have been tired", "you might have needed rest", etc.). Only explain causes when the athlete has told you.
 
