@@ -295,7 +295,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const userTz = String(payload?.timezone || 'America/Los_Angeles');
+    const userTz = String(payload?.timezone || 'UTC');
     const asOfDate = String(payload?.date || (() => {
       try { return new Date().toLocaleDateString('en-CA', { timeZone: userTz }); } catch { return new Date().toLocaleDateString('en-CA'); }
     })());
