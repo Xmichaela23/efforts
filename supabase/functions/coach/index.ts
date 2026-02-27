@@ -295,9 +295,9 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const userTz = String(payload?.timezone || 'UTC');
+    const userTz = payload?.timezone ? String(payload.timezone) : null;
     const asOfDate = String(payload?.date || (() => {
-      try { return new Date().toLocaleDateString('en-CA', { timeZone: userTz }); } catch { return new Date().toLocaleDateString('en-CA'); }
+      try { return userTz ? new Date().toLocaleDateString('en-CA', { timeZone: userTz }) : new Date().toLocaleDateString('en-CA'); } catch { return new Date().toLocaleDateString('en-CA'); }
     })());
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
@@ -1449,7 +1449,7 @@ Deno.serve(async (req) => {
         }
 
         const todayDay = (() => {
-          try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', timeZone: userTz }); }
+          try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }
           catch { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()]; }
         })();
         const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan. Use day names (e.g. "Thursday", "today") instead of raw dates.
@@ -1464,7 +1464,7 @@ End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, 
 
 UNITS: The athlete uses ${isImperial ? 'imperial (lb, miles)' : 'metric (kg, km)'}. Always use ${wUnit} for weights and ${isImperial ? 'miles' : 'km'} for distances. The facts below already use the correct units.
 
-TIMEZONE: The athlete is in ${userTz}. All dates in the facts are in their local time.
+${userTz ? `TIMEZONE: The athlete is in ${userTz}. All dates in the facts are in their local time.` : ''}
 
 FACTS:
 ${narrativeFacts.join('\n')}`;
