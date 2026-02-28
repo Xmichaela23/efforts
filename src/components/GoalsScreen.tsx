@@ -440,7 +440,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
     setSaving(true);
     if (existingGoalPrompt?.action === 'replace') {
-      await updateGoal(existingGoalPrompt.existing.id, { status: 'ended' });
+      const oldGoal = existingGoalPrompt.existing;
+      await updateGoal(oldGoal.id, { status: 'ended' });
+      const linkedPlan = currentPlans.find(p => p.goal_id === oldGoal.id && p.status === 'active');
+      if (linkedPlan) {
+        const today = new Date().toISOString().slice(0, 10);
+        await supabase.from('planned_workouts').delete()
+          .eq('training_plan_id', linkedPlan.id).gte('date', today);
+        await supabase.from('plans').update({ status: 'ended' }).eq('id', linkedPlan.id);
+      }
     }
     await addGoal({
       name: eventName.trim(), goal_type: 'event', target_date: eventDate,
