@@ -560,6 +560,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             <div className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" />Building your plan...</div>
           ) : (() => {
             const readiness = goal.goal_type === 'event' ? getPlanReadiness(goal) : null;
+            const conflictPlan = goal.goal_type === 'event' ? findConflictPlan(goal) : null;
+
+            if (readiness?.ready && conflictPlan) return (
+              <div className="space-y-2">
+                <p className="text-xs text-white/40">You have an active plan: <span className="text-white/60">{conflictPlan.name}</span></p>
+                <div className="flex gap-2">
+                  <button className="rounded-lg bg-white/[0.08] border border-white/10 px-3 py-1.5 text-xs font-medium text-white/60 hover:bg-white/[0.12] transition-all" onClick={() => handleLinkPlan(conflictPlan.id, goal.id)}>Link existing plan</button>
+                  <button className="rounded-lg bg-white/[0.12] border border-white/15 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/[0.18] transition-all" onClick={() => handleBuildPlan(goal)}>End it · Build new →</button>
+                </div>
+              </div>
+            );
             if (readiness?.ready) return (
               <button className="text-sm text-white/50 hover:text-white/70 transition-colors" onClick={() => handleBuildPlan(goal)}>No plan yet · Build Plan →</button>
             );
