@@ -96,22 +96,27 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   // Pre-fill fitness + goal from existing data when the event form opens
   useEffect(() => {
     if (!showEventForm) return;
-    if (!eventFitness) {
+    if (!eventFitness && (currentBaselines || currentSnapshot)) {
       const vdot = currentBaselines?.effort_score;
-      if (vdot) {
-        setEventFitness(vdot >= 50 ? 'advanced' : vdot >= 38 ? 'intermediate' : 'beginner');
-      } else if (currentSnapshot?.acwr != null) {
-        const weeklyMi = currentSnapshot?.workload_by_discipline?.run
-          ? Math.round(currentSnapshot.workload_by_discipline.run / 10)
+      const weeklyMi = currentSnapshot?.weekly_distance
+        ? Math.round(currentSnapshot.weekly_distance)
+        : currentBaselines?.current_volume?.run
+          ? parseFloat(currentBaselines.current_volume.run) || 0
           : 0;
+
+      if (vdot) {
+        setEventFitness(vdot >= 45 ? 'advanced' : vdot >= 33 ? 'intermediate' : 'beginner');
+      } else if (weeklyMi > 0) {
         setEventFitness(weeklyMi >= 30 ? 'advanced' : weeklyMi >= 12 ? 'intermediate' : 'beginner');
+      } else if (currentSnapshot) {
+        setEventFitness('intermediate');
       }
     }
-    if (!eventTrainingGoal) {
+    if (!eventTrainingGoal && (currentBaselines !== undefined)) {
       const hasPaceData = currentBaselines?.effort_score || currentBaselines?.effort_paces?.race;
       setEventTrainingGoal(hasPaceData ? 'speed' : 'complete');
     }
-  }, [showEventForm]);
+  }, [showEventForm, currentBaselines, currentSnapshot]);
   const [capCategory, setCapCategory] = useState('Speed');
   const [capMetric, setCapMetric] = useState('');
   const [capTarget, setCapTarget] = useState('');
