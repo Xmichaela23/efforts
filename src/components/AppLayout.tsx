@@ -19,6 +19,7 @@ import AllEffortsDropdown from './AllEffortsDropdown';
 import ContextTabs from './ContextTabs';
 import LogFAB from './LogFAB';
 import PlansMenu from './PlansMenu';
+import GoalsScreen from './GoalsScreen';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import ScreenErrorBoundary from './ScreenErrorBoundary';
 import PlansDropdown from './PlansDropdown';
@@ -50,6 +51,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     addPlan,
     deletePlan,
     loadProviderData,
+    refreshPlans,
   } = useAppContext();
   
   // plannedWorkouts removed; unified get-week feeds views
@@ -84,6 +86,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const feedbackDismissedRef = useRef<Set<string>>(new Set()); // Client-side cache of dismissed IDs (server is source of truth)
   const checkingFeedbackRef = useRef(false); // Prevent concurrent checks
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
+  const [showGoals, setShowGoals] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -829,7 +832,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowTrainingBaselines(false); // NEW: Reset training baselines
     setShowGear(false); // Reset gear view
-    setShowContext(false); // NEW: Reset context view
+    setShowContext(false);
+    setShowGoals(false);
     setBuilderType('');
     setBuilderSourceContext('');
     setLoggerScheduledWorkout(null);
@@ -1277,6 +1281,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onBuildWorkout={handleBuildWorkout}
               />
             </div>
+          ) : showGoals ? (
+            <div className="pt-4 h-full">
+              <GoalsScreen
+                onClose={handleBackToDashboard}
+                onSelectPlan={(planId) => {
+                  setShowGoals(false);
+                  setFocusPlanId(planId);
+                  setShowAllPlans(true);
+                }}
+                onViewAllPlans={() => {
+                  setShowGoals(false);
+                  setShowAllPlans(true);
+                }}
+                onPlanBuilt={() => { refreshPlans(); }}
+                currentPlans={currentPlans as any}
+                completedPlans={completedPlans as any}
+              />
+            </div>
           ) : showAllPlans ? (
             <div className="pt-4">
               <AllPlansInterface
@@ -1457,9 +1479,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           <div className="w-full">
             <div className="flex justify-center items-center gap-2">
               {(() => {
-                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear && !showContext;
-                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear;
-                const plansActive = plansMenuOpen;
+                const homeActive = activeBottomNav === 'home' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear && !showContext;
+                const contextActive = activeBottomNav === 'insights' && !selectedWorkout && !showAllPlans && !showGoals && !showStrengthPlans && !showPlanBuilder && !showSummary && !showImportPage && !showTrainingBaselines && !showGear;
+                const goalsActive = showGoals;
                 const tabBase =
                   'relative flex-1 flex items-center justify-center gap-2 backdrop-blur-lg transition-all duration-300 shadow-lg hover:shadow-xl tabbar-button';
                 const tabChrome =
@@ -1522,30 +1544,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <span aria-hidden="true" className={sigilClass('context', contextActive)} />
                   <span className={labelClass}>Context</span>
                 </Button>
-                <PlansMenu
-                currentPlans={currentPlans as any}
-                completedPlans={completedPlans as any}
-                  onSelectPlan={handleSelectRoutine}
-                  isOpen={plansMenuOpen}
-                  onOpenChange={setPlansMenuOpen}
-                  trigger={
-              <Button
-                        onClick={() => {
-                          // Close workout detail view or logger if open
-                          if (selectedWorkout || showStrengthLogger) {
-                            handleBackToDashboard();
-                          }
-                          setPlansMenuOpen(true);
-                        }}
-                        className={`${tabBase} ${tabChrome} ${plansActive ? tabActive : ''}`}
-                        style={tabStyle}
-              >
-                        <span aria-hidden="true" style={lampStyle(plansActive)} />
-                        <span aria-hidden="true" className={sigilClass('plans', plansActive)} />
-                        <span className={labelClass}>Plans</span>
-              </Button>
-                  }
-                />
+                <Button
+                  onClick={() => {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showGear || showContext) {
+                      handleBackToDashboard();
+                    }
+                    setShowGoals(true);
+                  }}
+                  className={`${tabBase} ${tabChrome} ${goalsActive ? tabActive : ''}`}
+                  style={tabStyle}
+                >
+                  <span aria-hidden="true" style={lampStyle(goalsActive)} />
+                  <span aria-hidden="true" className={sigilClass('plans', goalsActive)} />
+                  <span className={labelClass}>Goals</span>
+                </Button>
                 <LogFAB onSelectType={handleSelectEffortType} />
                   </>
                 );
