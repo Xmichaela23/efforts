@@ -811,17 +811,30 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </select>
             </label>
           )}
-          <div><span className="text-sm text-white/50 mb-1.5 block">Your fitness level{currentBaselines?.effort_score || currentSnapshot ? ' (based on your data)' : ''}</span>
-            <div className="flex gap-2">
-              {([['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced']] as const).map(([val, label]) => (
-                <button key={val} onClick={() => setEventFitness(val)} className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-all border ${eventFitness === val ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>{label}</button>
+          <div><span className="text-sm text-white/50 mb-1.5 block">Training level</span>
+            <div className="flex flex-col gap-2">
+              {([
+                ['beginner', 'Building up', '< 12 mi/week or new to structured training'],
+                ['intermediate', 'Consistent', '12–30 mi/week with some race experience'],
+                ['advanced', 'Competitive', '30+ mi/week, chasing PRs'],
+              ] as const).map(([val, title, desc]) => (
+                <button key={val} onClick={() => setEventFitness(val)} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventFitness === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                  <span className={`text-sm font-medium ${eventFitness === val ? 'text-white/90' : 'text-white/50'}`}>{title}</span>
+                  <span className={`block text-xs mt-0.5 ${eventFitness === val ? 'text-white/50' : 'text-white/25'}`}>{desc}</span>
+                </button>
               ))}
             </div>
           </div>
           <div><span className="text-sm text-white/50 mb-1.5 block">What's your goal?</span>
-            <div className="flex gap-2">
-              <button onClick={() => setEventTrainingGoal('complete')} className={`flex-1 rounded-xl py-2.5 px-3 text-sm font-medium transition-all border ${eventTrainingGoal === 'complete' ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>Finish it</button>
-              <button onClick={() => setEventTrainingGoal('speed')} className={`flex-1 rounded-xl py-2.5 px-3 text-sm font-medium transition-all border ${eventTrainingGoal === 'speed' ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>Race for time</button>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => setEventTrainingGoal('complete')} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventTrainingGoal === 'complete' ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                <span className={`text-sm font-medium ${eventTrainingGoal === 'complete' ? 'text-white/90' : 'text-white/50'}`}>Finish it</span>
+                <span className={`block text-xs mt-0.5 ${eventTrainingGoal === 'complete' ? 'text-white/50' : 'text-white/25'}`}>Comfortable volume build — cross the line healthy</span>
+              </button>
+              <button onClick={() => setEventTrainingGoal('speed')} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventTrainingGoal === 'speed' ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                <span className={`text-sm font-medium ${eventTrainingGoal === 'speed' ? 'text-white/90' : 'text-white/50'}`}>Race for time</span>
+                <span className={`block text-xs mt-0.5 ${eventTrainingGoal === 'speed' ? 'text-white/50' : 'text-white/25'}`}>Pace-targeted plan with intervals and tempo work</span>
+              </button>
             </div>
           </div>
           <div><span className="text-sm text-white/50 mb-1.5 block">Priority</span>
