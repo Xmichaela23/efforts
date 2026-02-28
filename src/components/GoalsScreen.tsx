@@ -94,6 +94,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [eventTrainingGoal, setEventTrainingGoal] = useState<'complete' | 'speed' | ''>('');
   const [overrideFitness, setOverrideFitness] = useState(false);
   const [overrideGoal, setOverrideGoal] = useState(false);
+  const [eventStrength, setEventStrength] = useState<'none' | 'neural_speed' | 'durability' | 'upper_aesthetics'>('none');
+  const [eventStrengthFreq, setEventStrengthFreq] = useState<2 | 3>(2);
+  const [overrideStrength, setOverrideStrength] = useState(false);
 
   // Pre-fill fitness + goal from existing data when the event form opens
   useEffect(() => {
@@ -117,6 +120,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     if (!eventTrainingGoal && (currentBaselines !== undefined)) {
       const hasPaceData = currentBaselines?.effort_score || currentBaselines?.effort_paces?.race;
       setEventTrainingGoal(hasPaceData ? 'speed' : 'complete');
+    }
+    if (eventStrength === 'none') {
+      const existingPlan = currentPlans.find(p => p.status === 'active' && p.config?.strength_protocol);
+      if (existingPlan?.config?.strength_protocol) {
+        setEventStrength(existingPlan.config.strength_protocol);
+        setEventStrengthFreq(existingPlan.config.strength_frequency || 2);
+      }
     }
   }, [showEventForm, currentBaselines, currentSnapshot]);
   const [capCategory, setCapCategory] = useState('Speed');
@@ -157,7 +167,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false);
+    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false);
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
   }
@@ -410,6 +420,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         if (currentBaselines?.effort_paces) body.effort_paces = currentBaselines.effort_paces;
       }
 
+      if (prefs.strength_protocol && prefs.strength_protocol !== 'none') {
+        body.strength_protocol = prefs.strength_protocol;
+        body.strength_frequency = prefs.strength_frequency || 2;
+        body.strength_tier = 'strength_power';
+      }
+
       return body;
     }
 
@@ -468,7 +484,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       target_metric: null, target_value: null, current_value: null,
       priority: existingGoalPrompt?.action === 'keep' ? 'B' : 'A',
       status: 'active',
-      training_prefs: { fitness: eventFitness, goal_type: eventTrainingGoal },
+      training_prefs: {
+        fitness: eventFitness,
+        goal_type: eventTrainingGoal,
+        ...(eventStrength !== 'none' && { strength_protocol: eventStrength, strength_frequency: eventStrengthFreq }),
+      },
       notes: null,
     });
     setSaving(false); setExistingGoalPrompt(null); resetForms(); refreshGoals();
@@ -940,6 +960,54 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+              <div>
+                <span className="text-sm text-white/50 mb-1.5 block">Strength work</span>
+                {(() => {
+                  const strengthLabels: Record<string, [string, string]> = {
+                    none: ['No strength', 'Running only'],
+                    neural_speed: ['Get faster', 'Heavy lifts for power and running economy'],
+                    durability: ['Stay healthy', 'Injury prevention with progressive strength'],
+                    upper_aesthetics: ['Build upper body', 'Hypertrophy up top, functional legs'],
+                  };
+                  const hasExisting = eventStrength !== 'none';
+                  const freqLabel = `${eventStrengthFreq}x/week`;
+
+                  if (hasExisting && !overrideStrength) return (
+                    <div className="rounded-xl border border-white/15 bg-white/[0.08] px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-medium text-white/90">{strengthLabels[eventStrength]?.[0]} · {freqLabel}</span>
+                          <span className="block text-xs text-white/40 mt-0.5">{strengthLabels[eventStrength]?.[1]}</span>
+                        </div>
+                        <button onClick={() => setOverrideStrength(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-2">
+                        {(['none', 'neural_speed', 'durability', 'upper_aesthetics'] as const).map(val => (
+                          <button key={val} onClick={() => { setEventStrength(val); if (val !== 'none') setOverrideStrength(false); }} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventStrength === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                            <span className={`text-sm font-medium ${eventStrength === val ? 'text-white/90' : 'text-white/50'}`}>{strengthLabels[val][0]}</span>
+                            <span className={`block text-xs mt-0.5 ${eventStrength === val ? 'text-white/50' : 'text-white/25'}`}>{strengthLabels[val][1]}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {eventStrength !== 'none' && (
+                        <div>
+                          <span className="text-xs text-white/40 mb-1.5 block">Sessions per week</span>
+                          <div className="flex gap-2">
+                            {([2, 3] as const).map(n => (
+                              <button key={n} onClick={() => setEventStrengthFreq(n)} className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-all border ${eventStrengthFreq === n ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>{n}x/week</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </>);
           })()}
