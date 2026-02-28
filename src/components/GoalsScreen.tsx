@@ -92,6 +92,26 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [eventPriority, setEventPriority] = useState<'A' | 'B' | 'C'>('A');
   const [eventFitness, setEventFitness] = useState<'beginner' | 'intermediate' | 'advanced' | ''>('');
   const [eventTrainingGoal, setEventTrainingGoal] = useState<'complete' | 'speed' | ''>('');
+
+  // Pre-fill fitness + goal from existing data when the event form opens
+  useEffect(() => {
+    if (!showEventForm) return;
+    if (!eventFitness) {
+      const vdot = currentBaselines?.effort_score;
+      if (vdot) {
+        setEventFitness(vdot >= 50 ? 'advanced' : vdot >= 38 ? 'intermediate' : 'beginner');
+      } else if (currentSnapshot?.acwr != null) {
+        const weeklyMi = currentSnapshot?.workload_by_discipline?.run
+          ? Math.round(currentSnapshot.workload_by_discipline.run / 10)
+          : 0;
+        setEventFitness(weeklyMi >= 30 ? 'advanced' : weeklyMi >= 12 ? 'intermediate' : 'beginner');
+      }
+    }
+    if (!eventTrainingGoal) {
+      const hasPaceData = currentBaselines?.effort_score || currentBaselines?.effort_paces?.race;
+      setEventTrainingGoal(hasPaceData ? 'speed' : 'complete');
+    }
+  }, [showEventForm]);
   const [capCategory, setCapCategory] = useState('Speed');
   const [capMetric, setCapMetric] = useState('');
   const [capTarget, setCapTarget] = useState('');
@@ -791,7 +811,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </select>
             </label>
           )}
-          <div><span className="text-sm text-white/50 mb-1.5 block">Your fitness level</span>
+          <div><span className="text-sm text-white/50 mb-1.5 block">Your fitness level{currentBaselines?.effort_score || currentSnapshot ? ' (based on your data)' : ''}</span>
             <div className="flex gap-2">
               {([['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced']] as const).map(([val, label]) => (
                 <button key={val} onClick={() => setEventFitness(val)} className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-all border ${eventFitness === val ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>{label}</button>
