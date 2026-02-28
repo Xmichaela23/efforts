@@ -425,18 +425,33 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     await updateGoal(goal.id, { status: goal.status === 'paused' ? 'active' : 'paused' });
   }
 
+  const [existingGoalPrompt, setExistingGoalPrompt] = useState<{ existing: Goal; action?: 'keep' | 'replace' } | null>(null);
+
   async function handleSaveEvent() {
     if (!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal) return;
+
+    const sameSportGoal = activeGoals.find(
+      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
+    );
+    if (sameSportGoal && !existingGoalPrompt?.action) {
+      setExistingGoalPrompt({ existing: sameSportGoal });
+      return;
+    }
+
     setSaving(true);
+    if (existingGoalPrompt?.action === 'replace') {
+      await updateGoal(existingGoalPrompt.existing.id, { status: 'ended' });
+    }
     await addGoal({
       name: eventName.trim(), goal_type: 'event', target_date: eventDate,
       sport: eventSport, distance: eventDistance || null, course_profile: {},
       target_metric: null, target_value: null, current_value: null,
-      priority: eventPriority, status: 'active',
+      priority: existingGoalPrompt?.action === 'keep' ? 'B' : 'A',
+      status: 'active',
       training_prefs: { fitness: eventFitness, goal_type: eventTrainingGoal },
       notes: null,
     });
-    setSaving(false); resetForms(); refreshGoals();
+    setSaving(false); setExistingGoalPrompt(null); resetForms(); refreshGoals();
   }
 
   async function handleSaveCapacity() {
@@ -611,6 +626,37 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               ))}
             </div>
             <button onClick={() => setLinkDialog(null)} className="w-full rounded-xl border border-white/10 py-2.5 text-sm font-medium text-white/50 hover:bg-white/[0.06] transition-all">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Existing goal prompt */}
+      {existingGoalPrompt && !existingGoalPrompt.action && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b0b0c]/95 p-5 shadow-2xl">
+            <p className="text-base font-medium text-white/90 mb-2">You already have an active goal</p>
+            <p className="text-sm text-white/50 leading-relaxed mb-5">
+              <span className="text-white/70">{existingGoalPrompt.existing.name}</span>
+              {existingGoalPrompt.existing.target_date && ` · ${format(new Date(existingGoalPrompt.existing.target_date), 'MMM d')}`}.
+              What would you like to do?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'keep' }); handleSaveEvent(); }}
+                className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+              >
+                <span className="text-sm font-medium text-white/80">Keep both</span>
+                <span className="block text-xs text-white/35 mt-0.5">Train for both — the new one becomes secondary</span>
+              </button>
+              <button
+                onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'replace' }); handleSaveEvent(); }}
+                className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+              >
+                <span className="text-sm font-medium text-white/80">Replace it</span>
+                <span className="block text-xs text-white/35 mt-0.5">End {existingGoalPrompt.existing.name} and focus on the new one</span>
+              </button>
+              <button onClick={() => setExistingGoalPrompt(null)} className="w-full rounded-xl py-2.5 text-sm text-white/40 hover:text-white/60 transition-all">Cancel</button>
+            </div>
           </div>
         </div>
       )}
