@@ -34,12 +34,6 @@ const METRIC_OPTIONS: Record<string, string[]> = {
   Power: ['FTP', 'Max power'],
 };
 
-const DISTANCE_TO_API: Record<string, string> = {
-  '5K': '5k', '10K': '10k', 'Half Marathon': 'half', 'Marathon': 'marathon', 'Ultra': 'marathon',
-};
-
-const SUPPORTED_GENERATORS: Record<string, string> = { run: 'generate-run-plan' };
-
 function getGoalTypeIcon(t: string) {
   return t === 'event' ? Flag : t === 'capacity' ? TrendingUp : t === 'maintenance' ? Activity : Target;
 }
@@ -84,6 +78,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [calEasyPace, setCalEasyPace] = useState('');
   const [calFiveKPace, setCalFiveKPace] = useState('');
   const [calSaving, setCalSaving] = useState(false);
+  const [goalFlowError, setGoalFlowError] = useState<string | null>(null);
 
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -170,6 +165,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false);
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
+    setGoalFlowError(null);
   }
 
   // --- Quick Calibration (two-pace baseline) ---
@@ -274,35 +270,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     }
   }
 
-  // --- Plan readiness ---
-
-  function getPlanReadiness(goal: Goal): { ready: boolean; missing: string[] } {
-    const missing: string[] = [];
-    const sport = (goal.sport || '').toLowerCase();
-    const prefs = goal.training_prefs || {};
-
-    if (goal.goal_type !== 'event') return { ready: false, missing: ['Only event goals can auto-generate plans'] };
-    if (!(sport in SUPPORTED_GENERATORS)) { missing.push(`${goal.sport || 'Unknown sport'} plan generation not yet available`); return { ready: false, missing }; }
-    if (!goal.target_date) missing.push('Race date');
-    if (!goal.distance) missing.push('Distance');
-    if (!prefs.fitness) missing.push('Fitness level (edit this goal)');
-    if (!prefs.goal_type) missing.push('Training goal (edit this goal)');
-    if (prefs.goal_type === 'speed') {
-      const hasRaceTime = currentBaselines?.effort_source_distance && currentBaselines?.effort_source_time;
-      const hasEffortScore = !!currentBaselines?.effort_score;
-      const hasThresholdPace = !!currentBaselines?.effort_paces?.race;
-      if (!hasRaceTime && !hasEffortScore && !hasThresholdPace) {
-        missing.push('Pace benchmark — enter a recent race result or time trial so we can set your training zones');
-      }
-    }
-
-    return { ready: missing.length === 0, missing };
-  }
-
-  function canAutoGenerate(goal: Goal): boolean {
-    return getPlanReadiness(goal).ready;
-  }
-
   function findConflictPlan(goal: Goal) {
     if (!goal.sport) return null;
     const sport = goal.sport.toLowerCase();
@@ -312,12 +279,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   }
 
   function handleBuildPlan(goal: Goal) {
-    if (!canAutoGenerate(goal)) return;
     const conflict = findConflictPlan(goal);
     conflict ? setConflictDialog({ goal, conflictPlan: conflict }) : executeBuildPlan(goal, null);
   }
 
-  async function executeBuildPlan(goal: Goal, conflictPlanId: string | null) {
+  async function executeBuildPlan(goal: Goal, _conflictPlanId: string | null): Promise<{ success: boolean; error?: string }> {
     setConflictDialog(null);
     setBuildingGoalId(goal.id);
     setBuildError(null);
@@ -325,120 +291,57 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
-
-      const sport = (goal.sport || '').toLowerCase();
-      const generatorFn = SUPPORTED_GENERATORS[sport];
-      if (!generatorFn) throw new Error(`Plan generation not yet available for ${goal.sport}`);
-
-      const distance = DISTANCE_TO_API[goal.distance || ''] || 'marathon';
-      const fitness = (goal.training_prefs?.fitness as string) || 'beginner';
-      const hasBase = fitness === 'intermediate' || fitness === 'advanced';
-      const minWeeks: Record<string, Record<string, number>> = {
-        marathon:  { beginner: 14, intermediate: 6, advanced: 6 },
-        half:      { beginner: 8,  intermediate: 4, advanced: 4 },
-        '10k':     { beginner: 4,  intermediate: 4, advanced: 4 },
-        '5k':      { beginner: 4,  intermediate: 4, advanced: 4 },
-      };
-      const weeksOut = goal.target_date ? differenceInWeeks(new Date(goal.target_date), new Date()) : 12;
-      const floorWeeks = minWeeks[distance]?.[fitness] ?? 4;
-
-      if (goal.target_date && weeksOut < floorWeeks) {
-        const advice = hasBase
-          ? `Even with your training base, ${goal.distance || distance} needs at least ${floorWeeks} weeks for a proper peak and taper.`
-          : `${goal.distance || distance} needs at least ${floorWeeks} weeks to build safely. Consider a shorter distance or later date.`;
-        throw new Error(`Your race is ${weeksOut} weeks away. ${advice}`);
+      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', {
+        body: {
+          user_id: user.id,
+          mode: 'build_existing',
+          existing_goal_id: goal.id,
+        },
+      });
+      if (error) throw new Error(error.message || 'Unable to build and materialize plan');
+      if (!data?.success) {
+        if (data?.error_code === 'missing_pace_benchmark') setShowCalibration(true);
+        throw new Error(data?.error || 'Unable to build and materialize plan');
       }
-
-      const durationWeeks = Math.max(floorWeeks, Math.min(weeksOut, 20));
-
-      const body = buildGeneratorBody(sport, goal, user.id, durationWeeks);
-
-      const resp = await supabase.functions.invoke(generatorFn, { body });
-      if (resp.error) {
-        let detail = resp.error.message || 'Generation failed';
-        try {
-          const ctx = (resp.error as any).context;
-          if (ctx?.json) { const b = await ctx.json(); detail = b?.error || b?.validation_errors?.join(', ') || detail; }
-          else if (resp.data && typeof resp.data === 'object') { detail = resp.data.error || (resp.data.validation_errors || []).join(', ') || detail; }
-        } catch {}
-        throw new Error(detail);
-      }
-      if (!resp.data?.plan_id) throw new Error(resp.data?.error || 'Plan generation returned no plan_id');
-
-      const planId = resp.data.plan_id;
-      if (conflictPlanId) {
-        const today = new Date().toISOString().slice(0, 10);
-        await supabase.from('planned_workouts').delete()
-          .eq('training_plan_id', conflictPlanId).gte('date', today);
-        await supabase.from('plans').update({ status: 'ended' }).eq('id', conflictPlanId);
-      }
-      await supabase.from('plans').update({ goal_id: goal.id, plan_mode: 'rolling' }).eq('id', planId);
-
-      const { error: actErr } = await supabase.functions.invoke('activate-plan', { body: { plan_id: planId } });
-      if (actErr) throw actErr;
 
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       onPlanBuilt?.();
       refreshGoals();
+      return { success: true };
     } catch (err: any) {
       console.error('Build plan failed:', err);
-      setBuildError({ goalId: goal.id, message: err?.message || 'Failed to build plan' });
+      const message = err?.message || 'Failed to build plan';
+      setBuildError({ goalId: goal.id, message });
+      return { success: false, error: message };
     } finally {
       setBuildingGoalId(null);
     }
   }
 
-  function buildGeneratorBody(sport: string, goal: Goal, userId: string, durationWeeks: number): Record<string, any> {
-    const prefs = goal.training_prefs || {};
-    const rawDays = prefs.days_per_week;
-    const daysPerWeek = rawDays ? `${rawDays}-${Math.min(7, rawDays + 1)}` : '4-5';
-
-    if (sport === 'run') {
-      const distance = DISTANCE_TO_API[goal.distance || ''] || 'marathon';
-      const fitness: string = prefs.fitness;
-      const goalType: string = prefs.goal_type;
-      const approach = goalType === 'complete' ? 'sustainable' : 'performance_build';
-
-      const weeklyMiles = currentSnapshot?.workload_by_discipline?.run
-        ? Math.round(currentSnapshot.workload_by_discipline.run / 10)
-        : undefined;
-
-      const body: Record<string, any> = {
-        user_id: userId, distance, fitness, goal: goalType,
-        duration_weeks: durationWeeks, approach, days_per_week: daysPerWeek,
-        race_date: goal.target_date, race_name: goal.name,
-        current_weekly_miles: weeklyMiles,
-      };
-
-      if (approach === 'performance_build') {
-        if (currentBaselines?.effort_source_distance && currentBaselines?.effort_source_time) {
-          body.effort_source_distance = currentBaselines.effort_source_distance;
-          body.effort_source_time = currentBaselines.effort_source_time;
-        } else if (currentBaselines?.effort_score) {
-          body.effort_score = currentBaselines.effort_score;
-        }
-        if (currentBaselines?.effort_paces) body.effort_paces = currentBaselines.effort_paces;
-      }
-
-      if (prefs.strength_protocol && prefs.strength_protocol !== 'none') {
-        body.strength_protocol = prefs.strength_protocol;
-        body.strength_frequency = prefs.strength_frequency || 2;
-        body.strength_tier = 'strength_power';
-      }
-
-      return body;
-    }
-
-    return { user_id: userId, sport, goal_name: goal.name, duration_weeks: durationWeeks, days_per_week: daysPerWeek, target_date: goal.target_date, distance: goal.distance || undefined };
-  }
-
   // --- Link plan to goal ---
 
   async function handleLinkPlan(planId: string, goalId: string) {
-    await supabase.from('plans').update({ goal_id: goalId }).eq('id', planId);
-    setLinkDialog(null);
-    onPlanBuilt?.();
-    refreshGoals();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', {
+        body: {
+          user_id: user.id,
+          mode: 'link_existing',
+          existing_goal_id: goalId,
+          plan_id: planId,
+        },
+      });
+      if (error) throw new Error(error.message || 'Unable to link plan');
+      if (!data?.success) throw new Error(data?.error || 'Unable to link plan');
+
+      setLinkDialog(null);
+      onPlanBuilt?.();
+      refreshGoals();
+    } catch (err) {
+      console.error('Link plan failed:', err);
+    }
   }
 
   // --- Goal CRUD ---
@@ -457,6 +360,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   async function handleSaveEvent() {
     if (!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal) return;
+    setGoalFlowError(null);
 
     const sameSportGoal = activeGoals.find(
       g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
@@ -467,31 +371,47 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     }
 
     setSaving(true);
-    if (existingGoalPrompt?.action === 'replace') {
-      const oldGoal = existingGoalPrompt.existing;
-      await updateGoal(oldGoal.id, { status: 'ended' });
-      const linkedPlan = currentPlans.find(p => p.goal_id === oldGoal.id && p.status === 'active');
-      if (linkedPlan) {
-        const today = new Date().toISOString().slice(0, 10);
-        await supabase.from('planned_workouts').delete()
-          .eq('training_plan_id', linkedPlan.id).gte('date', today);
-        await supabase.from('plans').update({ status: 'ended' }).eq('id', linkedPlan.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      const action: 'keep' | 'replace' = existingGoalPrompt?.action === 'replace' ? 'replace' : 'keep';
+      const payload = {
+        user_id: user.id,
+        action,
+        existing_goal_id: existingGoalPrompt?.existing.id || null,
+        replace_goal_id: action === 'replace' ? existingGoalPrompt?.existing.id : null,
+        goal: {
+          name: eventName.trim(),
+          target_date: eventDate,
+          sport: eventSport,
+          distance: eventDistance || null,
+          training_prefs: {
+            fitness: eventFitness,
+            goal_type: eventTrainingGoal,
+            ...(eventStrength !== 'none' && { strength_protocol: eventStrength, strength_frequency: eventStrengthFreq }),
+          },
+          notes: null,
+        },
+      };
+
+      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', { body: payload });
+      if (error) throw new Error(error.message || 'Unable to create goal and build plan');
+      if (!data?.success) {
+        if (data?.error_code === 'missing_pace_benchmark') setShowCalibration(true);
+        throw new Error(data?.error || 'Unable to create goal and build plan');
       }
+
+      setExistingGoalPrompt(null);
+      resetForms();
+      onPlanBuilt?.();
+      refreshGoals();
+    } catch (err: any) {
+      console.error('Goal create+build flow failed:', err);
+      setGoalFlowError(err?.message || 'Unable to build and materialize plan for this goal.');
+    } finally {
+      setSaving(false);
     }
-    await addGoal({
-      name: eventName.trim(), goal_type: 'event', target_date: eventDate,
-      sport: eventSport, distance: eventDistance || null, course_profile: {},
-      target_metric: null, target_value: null, current_value: null,
-      priority: existingGoalPrompt?.action === 'keep' ? 'B' : 'A',
-      status: 'active',
-      training_prefs: {
-        fitness: eventFitness,
-        goal_type: eventTrainingGoal,
-        ...(eventStrength !== 'none' && { strength_protocol: eventStrength, strength_frequency: eventStrengthFreq }),
-      },
-      notes: null,
-    });
-    setSaving(false); setExistingGoalPrompt(null); resetForms(); refreshGoals();
   }
 
   async function handleSaveCapacity() {
@@ -559,10 +479,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           ) : buildingGoalId === goal.id ? (
             <div className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" />Building your plan...</div>
           ) : (() => {
-            const readiness = goal.goal_type === 'event' ? getPlanReadiness(goal) : null;
             const conflictPlan = goal.goal_type === 'event' ? findConflictPlan(goal) : null;
 
-            if (readiness?.ready && conflictPlan) return (
+            if (goal.goal_type === 'event' && conflictPlan) return (
               <div className="space-y-2">
                 <p className="text-xs text-white/40">You have an active plan: <span className="text-white/60">{conflictPlan.name}</span></p>
                 <div className="flex gap-2">
@@ -571,21 +490,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 </div>
               </div>
             );
-            if (readiness?.ready) return (
-              <button className="text-sm text-white/50 hover:text-white/70 transition-colors" onClick={() => handleBuildPlan(goal)}>No plan yet · Build Plan →</button>
-            );
-            if (readiness && readiness.missing.length > 0) return (
-              <div className="space-y-1">
-                <p className="text-xs text-white/30">Missing for plan generation:</p>
-                {readiness.missing.map((m, i) => m.startsWith('Pace benchmark') ? (
-                  <button key={i} onClick={() => setShowCalibration(true)} className="block text-xs text-amber-400/60 hover:text-amber-400/90 underline decoration-amber-400/30 transition-colors">· {m}</button>
-                ) : (
-                  <p key={i} className="text-xs text-amber-400/60">· {m}</p>
-                ))}
-              </div>
-            );
             if (goal.goal_type === 'event') return (
-              <button className="text-sm text-white/30 hover:text-white/50 transition-colors" onClick={() => navigate('/plans/generate')}>No plan yet · Create manually →</button>
+              <button className="text-sm text-white/50 hover:text-white/70 transition-colors" onClick={() => handleBuildPlan(goal)}>No plan yet · Build Plan →</button>
             );
             return <p className="text-sm text-white/25">No plan linked</p>;
           })()}
@@ -887,6 +793,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   }
 
   function renderEventForm() {
+    const hasSameSportActiveGoal = activeGoals.some(
+      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
+    );
+
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between px-4 py-4">
@@ -1022,7 +932,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </div>
             </>);
           })()}
-          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save Goal'}</button>
+          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save & Build Plan'}</button>
+          {hasSameSportActiveGoal ? (
+            <p className="mt-2 text-xs text-white/45">
+              You already have an active goal in this sport. You will choose to keep both or replace, and replacement only ends the old plan after the new one materializes.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-white/35">
+              This creates your goal and immediately materializes your new plan.
+            </p>
+          )}
+          {goalFlowError && (
+            <p className="mt-2 text-xs text-red-400/80">{goalFlowError}</p>
+          )}
         </div>
       </div>
     );
