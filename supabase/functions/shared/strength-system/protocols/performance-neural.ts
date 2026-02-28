@@ -1,12 +1,14 @@
 // ============================================================================
 // PERFORMANCE NEURAL PROTOCOL
 // 
-// Philosophy: Heavy, low-volume lifting to support speed and efficiency without adding fatigue.
+// Philosophy: True heavy loading for neural adaptation and running economy.
 // 
-// Focus: Running economy / force without fatigue
-// - Heavy bilateral compounds (Back Squat, Trap Bar DL) for neural adaptation
-// - Upper body strength work (Bench, Rows)
-// - Low volume, high intensity
+// Grounded in Rønnestad et al. and concurrent training research:
+// - Lower body: 85-90% 1RM, 2-3 reps, RIR 1-2 → maximal motor unit recruitment
+//   without hypertrophy (volume too low to trigger muscle growth)
+// - Upper body: real strength work (72-82% 1RM, RIR 1-2) because it doesn't
+//   interfere with running adaptations
+// - Speed phase adds post-activation potentiation (heavy lift → box jumps)
 // - If bodyweight tier: downgrade LOWER_NEURAL → LOWER_MAINTENANCE
 // ============================================================================
 
@@ -29,11 +31,11 @@ export const performanceNeuralProtocol: StrengthProtocol = {
   id: 'neural_speed',
   legacy_ids: ['performance_neural'], // Backwards compatibility
   name: 'Neural Speed',
-  description: 'Heavy, low-rep compound lifts to support power and efficiency without interfering with run training. This is a neural efficiency approach, not a strength-building program. You will not add noticeable muscle mass. Strength numbers may increase slightly, but that is not the goal. The benefit ideally shows up in how easy fast paces feel, not in the gym.',
+  description: 'Heavy compound lifts for genuine neural adaptation and running economy. Lower body: true heavy loading (85-90% 1RM) at low volume for maximal motor unit recruitment without hypertrophy. Upper body: real strength work — it doesn\'t interfere with running so there\'s no reason to hold back.',
   tradeoffs: [
-    'Not a hypertrophy or high-volume program',
-    'Requires good lifting technique and commercial gym equipment',
-    'Bodyweight tier downgrades to maintenance work',
+    'Not a hypertrophy program — low volume by design',
+    'Requires solid lifting technique and access to barbell equipment',
+    'Bodyweight tier downgrades to maintenance (neural loading requires heavy external load)',
   ],
   createWeekSessions,
 };
@@ -111,41 +113,39 @@ function createLowerNeuralSession(
   // Neural work requires barbell - this should only be called for barbell tier
   if (tier === 'barbell') {
     if (isRecovery) {
-      // Recovery: reduced volume, maintain intensity for neural stimulus
       exercises.push(
-        { name: 'Back Squat', sets: 2, reps: 3, weight: '75% 1RM' },
-        { name: 'Trap Bar Deadlift', sets: 2, reps: 3, weight: '75% 1RM' }
+        { name: 'Back Squat', sets: 2, reps: 3, weight: '80% 1RM' },
+        { name: 'Trap Bar Deadlift', sets: 2, reps: 3, weight: '80% 1RM' }
       );
       duration = 25;
-      description = 'Recovery Week - Minimal neural work. Maintain intensity, reduced volume.';
+      description = 'Recovery Week - Touch heavy weights to maintain neural pathways. 80% should feel controlled and crisp.';
     } else if (phase.name === 'Base') {
-      // True micro-dose: 2-3 sets of 2-4 reps @ 80-88%, RIR 3
-      // wip is 1-based, so subtract 1 to get progression step (0,1,2,3...)
+      // 85-88% at 3 reps = RIR 2→1 (5-6RM doing 3). Genuine neural range.
       const step = Math.min(3, Math.max(0, wip - 1));
-      const load = 80 + (step * 2); // Progress 80% → 86% (true neural range)
+      const load = 85 + step; // 85% → 86% → 87% → 88%
       exercises.push(
-        { name: 'Back Squat', sets: 3, reps: 3, weight: `${load}% 1RM` },
-        { name: 'Trap Bar Deadlift', sets: 2, reps: 3, weight: `${load}% 1RM` }
+        { name: 'Back Squat', sets: 3, reps: 3, weight: `${load}% 1RM`, notes: '2-3 min rest between sets. Bar speed should be fast and controlled.' },
+        { name: 'Trap Bar Deadlift', sets: 2, reps: 3, weight: `${load}% 1RM`, notes: '2-3 min rest. Reset each rep from the floor.' }
       );
-      duration = 30;
-      description = `Week ${displayWeek} Base - Heavy neural micro-dose. Target: 3x3 squat, 2x3 trap @ ${load}% 1RM. Focus on speed and technique, RIR 3.`;
+      duration = 35;
+      description = `Week ${displayWeek} Base - Heavy neural loading. 3x3 squat + 2x3 trap bar @ ${load}% 1RM, RIR ${load <= 86 ? 2 : 1}. These should feel genuinely heavy but never grinding.`;
     } else if (phase.name === 'Speed') {
-      // Speed phase: slightly higher intensity, same minimal volume
+      // 87-89% at 2 reps = RIR 1-2 (~3-4RM doing 2). Peak neural stimulus.
       const step = Math.min(2, Math.max(0, wip - 1));
-      const load = 82 + (step * 2); // Progress 82% → 86%
+      const load = 87 + step; // 87% → 88% → 89%
       exercises.push(
-        { name: 'Back Squat', sets: 3, reps: 2, weight: `${load}% 1RM` },
-        { name: 'Trap Bar Deadlift', sets: 2, reps: 2, weight: `${load}% 1RM` }
+        { name: 'Back Squat', sets: 3, reps: 2, weight: `${load}% 1RM`, notes: '3 min rest. Every rep explosive.' },
+        { name: 'Trap Bar Deadlift', sets: 2, reps: 2, weight: `${load}% 1RM` },
+        { name: 'Box Jumps', sets: 3, reps: 3, weight: 'Max height', notes: 'Perform within 60-90s of your last squat set to exploit post-activation potentiation. Full recovery (90s) between box jump sets.' }
       );
-      duration = 25;
-      description = `Week ${displayWeek} Speed - Heavy neural work. Target: 3x2 squat, 2x2 trap @ ${load}% 1RM. Minimal volume, high intensity, RIR 3.`;
+      duration = 35;
+      description = `Week ${displayWeek} Speed - Peak neural work with potentiation. 3x2 squat + 2x2 trap @ ${load}%, then box jumps. RIR 1. Every rep should be explosive.`;
     } else {
-      // Race Prep: minimal maintenance
       exercises.push(
-        { name: 'Back Squat', sets: 2, reps: 2, weight: '70% 1RM' }
+        { name: 'Back Squat', sets: 2, reps: 2, weight: '80% 1RM', notes: 'Maintain neural pathways without accumulating fatigue.' }
       );
       duration = 20;
-      description = `Week ${displayWeek} Race Prep - Minimal neural work. Just enough to maintain adaptations.`;
+      description = `Week ${displayWeek} Race Prep - Maintain neural pathways. 2x2 at 80% should feel easy and fast.`;
     }
   } else {
     // Should not reach here (bodyweight tier should use LOWER_MAINTENANCE)
@@ -276,30 +276,28 @@ function createUpperStrengthSession(
       description = 'Recovery Week - Reduced volume. OHP maintained for posture.';
       repProfile = 'maintenance';
     } else if (phase.name === 'Base') {
-      // Upper supportive work: moderate intensity, RIR 3 to match neural intent
       const step = Math.min(3, Math.max(0, wip - 1));
-      const load = 70 + (step * 2); // Progress 70% → 76% (moderate, not max strength)
+      const load = 72 + (step * 2); // 72% → 74% → 76% → 78%
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 6, weight: `${load}% 1RM` },
         { name: 'Barbell Rows', sets: 3, reps: 6, weight: `${load}% 1RM` },
-        { name: 'Pull-ups', sets: 3, reps: '6-8', weight: 'Add weight if able' },
-        { name: 'Overhead Press', sets: 2, reps: 6, weight: `${Math.max(65, load - 5)}% 1RM` }
+        { name: 'Pull-ups', sets: 3, reps: '6-8', weight: 'Add weight when bodyweight is easy' },
+        { name: 'Overhead Press', sets: 3, reps: 6, weight: `${Math.max(65, load - 5)}% 1RM` }
       );
-      duration = 35;
-      description = `Week ${displayWeek} Base - Upper body supportive work. Target: 3x6 @ ${load}% 1RM, RIR 3.`;
+      duration = 40;
+      description = `Week ${displayWeek} Base - Upper body strength. 3x6 @ ${load}% 1RM, RIR 2. Push these — upper body doesn't interfere with running.`;
       repProfile = 'strength';
     } else if (phase.name === 'Speed') {
-      // Speed phase: slightly higher intensity but still RIR 3 (not RIR 2)
       const step = Math.min(2, Math.max(0, wip - 1));
-      const load = 72 + (step * 2); // Progress 72% → 76%
+      const load = 78 + (step * 2); // 78% → 80% → 82%
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 5, weight: `${load}% 1RM` },
         { name: 'Barbell Rows', sets: 3, reps: 5, weight: `${load}% 1RM` },
-        { name: 'Pull-ups', sets: 3, reps: '5-6', weight: 'Add weight if able' },
-        { name: 'Overhead Press', sets: 2, reps: 5, weight: `${Math.max(67, load - 5)}% 1RM` }
+        { name: 'Pull-ups', sets: 3, reps: '4-6', weight: 'Weighted — add load each week' },
+        { name: 'Overhead Press', sets: 2, reps: 5, weight: `${Math.max(72, load - 5)}% 1RM` }
       );
-      duration = 35;
-      description = `Week ${displayWeek} Speed - Upper body supportive work. Target: 3x5 @ ${load}% 1RM, RIR 3.`;
+      duration = 40;
+      description = `Week ${displayWeek} Speed - Upper body peak strength. 3x5 @ ${load}% 1RM, RIR 1. No reason to hold back on upper body.`;
       repProfile = 'strength';
     } else {
       // Race Prep
@@ -356,8 +354,7 @@ function createUpperStrengthSession(
     }
   }
   
-  // Upper work stays at RIR 3 to match neural low-fatigue intent (not RIR 2)
-  const targetRIR = getTargetRIR(phase, isRecovery, false, true); // true = keep at RIR 3
+  const targetRIR = getTargetRIR(phase, isRecovery, false);
   const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
   
   return {
@@ -489,31 +486,27 @@ function createTaperSessions(
 function getTargetRIR(
   phase: StrengthPhase,
   isRecovery: boolean,
-  isNeural: boolean,
-  keepAtRIR3: boolean = false
+  isNeural: boolean
 ): number {
-  if (isRecovery) return 4;
+  if (isRecovery) return 3;
   
   if (isNeural) {
-    // Neural work: RIR 3 (hard but not to failure, avoids fatigue)
-    // RIR 3 supports speed/efficiency without adding fatigue
-    return 3;
+    switch (phase.name) {
+      case 'Base': return 2;
+      case 'Speed': return 1;
+      case 'Race Prep': return 3;
+      case 'Taper': return 4;
+      default: return 2;
+    }
   }
   
-  // If keepAtRIR3 is true (for upper work in neural protocol), always return 3
-  if (keepAtRIR3) return 3;
-  
+  // Upper body — doesn't interfere with running, push it
   switch (phase.name) {
-    case 'Base':
-      return 3;
-    case 'Speed':
-      return 3; // Keep at RIR 3 to match neural low-fatigue intent
-    case 'Race Prep':
-      return 3;
-    case 'Taper':
-      return 4;
-    default:
-      return 3;
+    case 'Base': return 2;
+    case 'Speed': return 1;
+    case 'Race Prep': return 3;
+    case 'Taper': return 4;
+    default: return 2;
   }
 }
 

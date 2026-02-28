@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Target, Calendar, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
-import { differenceInWeeks, format, nextMonday, isMonday } from 'date-fns';
+import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase } from '@/lib/supabase';
+import { useAppContext } from '@/contexts/AppContext';
 
 interface GoalsScreenProps {
   onClose: () => void;
@@ -64,6 +65,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   currentPlans = [], completedPlans = [],
 }) => {
   const navigate = useNavigate();
+  const { useImperial } = useAppContext();
   const { goals, loading, addGoal, deleteGoal, updateGoal, refreshGoals } = useGoals();
 
   const [showAddGoal, setShowAddGoal] = useState(false);
@@ -74,19 +76,40 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [saving, setSaving] = useState(false);
   const [buildingGoalId, setBuildingGoalId] = useState<string | null>(null);
   const [buildError, setBuildError] = useState<{ goalId: string; message: string } | null>(null);
+  const [currentBaselines, setCurrentBaselines] = useState<any>(null);
+  const [currentSnapshot, setCurrentSnapshot] = useState<any>(null);
   const [conflictDialog, setConflictDialog] = useState<{ goal: Goal; conflictPlan: typeof currentPlans[0] } | null>(null);
   const [linkDialog, setLinkDialog] = useState<{ plan: typeof currentPlans[0] } | null>(null);
+  const [showCalibration, setShowCalibration] = useState(false);
+  const [calEasyPace, setCalEasyPace] = useState('');
+  const [calFiveKPace, setCalFiveKPace] = useState('');
+  const [calSaving, setCalSaving] = useState(false);
 
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventSport, setEventSport] = useState('run');
   const [eventDistance, setEventDistance] = useState('');
   const [eventPriority, setEventPriority] = useState<'A' | 'B' | 'C'>('A');
+  const [eventFitness, setEventFitness] = useState<'beginner' | 'intermediate' | 'advanced' | ''>('');
+  const [eventTrainingGoal, setEventTrainingGoal] = useState<'complete' | 'speed' | ''>('');
   const [capCategory, setCapCategory] = useState('Speed');
   const [capMetric, setCapMetric] = useState('');
   const [capTarget, setCapTarget] = useState('');
   const [maintSport, setMaintSport] = useState('run');
   const [maintDays, setMaintDays] = useState('4');
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const [{ data: bl }, { data: sn }] = await Promise.all([
+        supabase.from('user_baselines').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('athlete_snapshot').select('*').eq('user_id', user.id).order('week_start', { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      setCurrentBaselines(bl);
+      setCurrentSnapshot(sn);
+    })();
+  }, []);
 
   const activeGoals = useMemo(() => goals.filter(g => g.status === 'active'), [goals]);
   const inactiveGoals = useMemo(() => goals.filter(g => g.status !== 'active'), [goals]);
@@ -107,15 +130,140 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A');
+    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal('');
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
   }
 
-  // --- Plan generation ---
+  // --- Quick Calibration (two-pace baseline) ---
+
+  const VDOT_5K: [number, number][] = [
+    [30,1860],[31,1800],[32,1740],[33,1686],[34,1632],[35,1584],[36,1536],[37,1488],
+    [38,1446],[39,1404],[40,1362],[41,1326],[42,1290],[43,1254],[44,1222],[45,1188],
+    [46,1158],[47,1128],[48,1098],[49,1072],[50,1044],[51,1020],[52,996],[53,972],
+    [54,951],[55,930],[56,909],[57,891],[58,873],[59,855],[60,838],[65,762],[70,696],
+    [75,642],[80,594],[85,552],
+  ];
+  const PACE_BY_VDOT: [number, number, number, number, number, number][] = [
+    // vdot, base, race, steady, power, speed  (sec/mile)
+    [30,744,682,622,568,534],[32,708,648,592,540,508],[34,672,618,564,516,484],
+    [36,642,588,538,492,462],[38,612,562,514,470,442],[40,585,537,491,449,422],
+    [42,560,514,470,430,404],[44,536,492,450,412,387],[45,525,482,441,403,379],[46,514,472,432,395,371],
+    [48,494,453,415,379,357],[50,474,436,399,365,343],[52,456,419,383,351,330],
+    [54,439,403,369,338,318],[56,423,388,355,325,306],[58,408,375,343,314,295],
+    [60,394,362,331,303,285],[65,362,332,304,278,262],[70,334,306,280,256,241],
+    [75,309,284,260,238,224],[80,287,264,241,221,208],
+  ];
+
+  function parsePace(s: string): number | null {
+    const m = s.trim().match(/^(\d{1,2}):(\d{2})$/);
+    return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
+  }
+
+  function fmtPace(sec: number): string {
+    const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function vdotFrom5KTime(timeSec: number): number {
+    if (timeSec >= VDOT_5K[0][1]) return VDOT_5K[0][0];
+    if (timeSec <= VDOT_5K[VDOT_5K.length - 1][1]) return VDOT_5K[VDOT_5K.length - 1][0];
+    for (let i = 0; i < VDOT_5K.length - 1; i++) {
+      const [v1, t1] = VDOT_5K[i], [v2, t2] = VDOT_5K[i + 1];
+      if (timeSec <= t1 && timeSec >= t2) {
+        return Math.round((v1 + ((t1 - timeSec) / (t1 - t2)) * (v2 - v1)) * 10) / 10;
+      }
+    }
+    return 40;
+  }
+
+  function pacesFromVdot(vdot: number): { base: number; race: number; steady: number; power: number; speed: number } {
+    const tbl = PACE_BY_VDOT;
+    if (vdot <= tbl[0][0]) return { base: tbl[0][1], race: tbl[0][2], steady: tbl[0][3], power: tbl[0][4], speed: tbl[0][5] };
+    if (vdot >= tbl[tbl.length - 1][0]) { const l = tbl[tbl.length - 1]; return { base: l[1], race: l[2], steady: l[3], power: l[4], speed: l[5] }; }
+    for (let i = 0; i < tbl.length - 1; i++) {
+      if (vdot >= tbl[i][0] && vdot <= tbl[i + 1][0]) {
+        const f = (vdot - tbl[i][0]) / (tbl[i + 1][0] - tbl[i][0]);
+        return {
+          base:   Math.round(tbl[i][1] - f * (tbl[i][1] - tbl[i + 1][1])),
+          race:   Math.round(tbl[i][2] - f * (tbl[i][2] - tbl[i + 1][2])),
+          steady: Math.round(tbl[i][3] - f * (tbl[i][3] - tbl[i + 1][3])),
+          power:  Math.round(tbl[i][4] - f * (tbl[i][4] - tbl[i + 1][4])),
+          speed:  Math.round(tbl[i][5] - f * (tbl[i][5] - tbl[i + 1][5])),
+        };
+      }
+    }
+    return { base: 585, race: 537, steady: 491, power: 449, speed: 422 };
+  }
+
+  const isMetric = !useImperial;
+  const paceUnit = isMetric ? '/km' : '/mi';
+
+  async function handleCalibrationSave() {
+    const easyRaw = parsePace(calEasyPace);
+    const fiveKRaw = parsePace(calFiveKPace);
+    if (!easyRaw || !fiveKRaw) return;
+
+    setCalSaving(true);
+    try {
+      const toSecPerMile = (v: number) => isMetric ? Math.round(v * 1.60934) : v;
+      const fiveKPerMile = toSecPerMile(fiveKRaw);
+      const easyPerMile = toSecPerMile(easyRaw);
+      const fiveKTimeSec = Math.round(fiveKPerMile * 3.10686);
+      const vdot = vdotFrom5KTime(fiveKTimeSec);
+      const paces = pacesFromVdot(vdot);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from('user_baselines').upsert({
+        user_id: user.id,
+        effort_score: vdot,
+        effort_source_distance: 5000,
+        effort_source_time: fiveKTimeSec,
+        effort_paces: paces,
+        effort_paces_source: 'calculated',
+        effort_score_status: 'self_reported',
+        effort_updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+      const { data: bl } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).maybeSingle();
+      setCurrentBaselines(bl);
+      setShowCalibration(false);
+      setCalEasyPace('');
+      setCalFiveKPace('');
+    } finally {
+      setCalSaving(false);
+    }
+  }
+
+  // --- Plan readiness ---
+
+  function getPlanReadiness(goal: Goal): { ready: boolean; missing: string[] } {
+    const missing: string[] = [];
+    const sport = (goal.sport || '').toLowerCase();
+    const prefs = goal.training_prefs || {};
+
+    if (goal.goal_type !== 'event') return { ready: false, missing: ['Only event goals can auto-generate plans'] };
+    if (!(sport in SUPPORTED_GENERATORS)) { missing.push(`${goal.sport || 'Unknown sport'} plan generation not yet available`); return { ready: false, missing }; }
+    if (!goal.target_date) missing.push('Race date');
+    if (!goal.distance) missing.push('Distance');
+    if (!prefs.fitness) missing.push('Fitness level (edit this goal)');
+    if (!prefs.goal_type) missing.push('Training goal (edit this goal)');
+    if (prefs.goal_type === 'speed') {
+      const hasRaceTime = currentBaselines?.effort_source_distance && currentBaselines?.effort_source_time;
+      const hasEffortScore = !!currentBaselines?.effort_score;
+      const hasThresholdPace = !!currentBaselines?.effort_paces?.race;
+      if (!hasRaceTime && !hasEffortScore && !hasThresholdPace) {
+        missing.push('Pace benchmark — enter a recent race result or time trial so we can set your training zones');
+      }
+    }
+
+    return { ready: missing.length === 0, missing };
+  }
 
   function canAutoGenerate(goal: Goal): boolean {
-    return goal.goal_type === 'event' && (goal.sport || '').toLowerCase() in SUPPORTED_GENERATORS;
+    return getPlanReadiness(goal).ready;
   }
 
   function findConflictPlan(goal: Goal) {
@@ -145,20 +293,18 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       const generatorFn = SUPPORTED_GENERATORS[sport];
       if (!generatorFn) throw new Error(`Plan generation not yet available for ${goal.sport}`);
 
+      const distance = DISTANCE_TO_API[goal.distance || ''] || 'marathon';
+      const minWeeks: Record<string, number> = { marathon: 10, half: 6, '10k': 4, '5k': 4 };
       const weeksOut = goal.target_date ? differenceInWeeks(new Date(goal.target_date), new Date()) : 12;
-      const durationWeeks = Math.max(4, Math.min(weeksOut, 20));
-      const today = new Date();
-      const startDate = isMonday(today) ? today : nextMonday(today);
-      const startDateStr = format(startDate, 'yyyy-MM-dd');
+      const floorWeeks = minWeeks[distance] ?? 4;
 
-      let snapshot: any = null;
-      try {
-        const { data } = await supabase.from('athlete_snapshot').select('*')
-          .eq('user_id', user.id).order('week_start', { ascending: false }).limit(1).maybeSingle();
-        snapshot = data;
-      } catch {}
+      if (goal.target_date && weeksOut < floorWeeks) {
+        throw new Error(`${goal.distance || distance} needs at least ${floorWeeks} weeks. Your race is ${weeksOut} weeks away — consider adjusting the date or choosing a shorter distance.`);
+      }
 
-      const body = buildGeneratorBody(sport, goal, user.id, durationWeeks, startDateStr, snapshot);
+      const durationWeeks = Math.max(floorWeeks, Math.min(weeksOut, 20));
+
+      const body = buildGeneratorBody(sport, goal, user.id, durationWeeks);
 
       const resp = await supabase.functions.invoke(generatorFn, { body });
       if (resp.error) {
@@ -173,10 +319,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       if (!resp.data?.plan_id) throw new Error(resp.data?.error || 'Plan generation returned no plan_id');
 
       const planId = resp.data.plan_id;
-      if (conflictPlanId) await supabase.from('plans').update({ status: 'ended' }).eq('id', conflictPlanId);
+      if (conflictPlanId) {
+        const today = new Date().toISOString().slice(0, 10);
+        await supabase.from('planned_workouts').delete()
+          .eq('training_plan_id', conflictPlanId).gte('date', today);
+        await supabase.from('plans').update({ status: 'ended' }).eq('id', conflictPlanId);
+      }
       await supabase.from('plans').update({ goal_id: goal.id, plan_mode: 'rolling' }).eq('id', planId);
 
-      const { error: actErr } = await supabase.functions.invoke('activate-plan', { body: { plan_id: planId, start_date: startDateStr } });
+      const { error: actErr } = await supabase.functions.invoke('activate-plan', { body: { plan_id: planId } });
       if (actErr) throw actErr;
 
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
@@ -190,25 +341,42 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     }
   }
 
-  function buildGeneratorBody(sport: string, goal: Goal, userId: string, durationWeeks: number, startDate: string, snapshot: any): Record<string, any> {
+  function buildGeneratorBody(sport: string, goal: Goal, userId: string, durationWeeks: number): Record<string, any> {
     const prefs = goal.training_prefs || {};
-    const daysPerWeek = prefs.days_per_week ? `${prefs.days_per_week}-${prefs.days_per_week + 1}` : '4-5';
+    const rawDays = prefs.days_per_week;
+    const daysPerWeek = rawDays ? `${rawDays}-${Math.min(7, rawDays + 1)}` : '4-5';
 
     if (sport === 'run') {
       const distance = DISTANCE_TO_API[goal.distance || ''] || 'marathon';
-      const weeklyMiles = snapshot?.workload_by_discipline?.run ? Math.round(snapshot.workload_by_discipline.run / 10) : undefined;
-      const hasHistory = snapshot?.acwr != null;
-      const fitness = hasHistory ? (snapshot.acwr > 1.2 ? 'advanced' : snapshot.acwr > 0.8 ? 'intermediate' : 'beginner') : (prefs.fitness || 'intermediate');
-      const goalType = prefs.goal_type || (fitness === 'beginner' ? 'complete' : 'speed');
-      return {
-        user_id: userId, distance, fitness, goal: goalType, duration_weeks: durationWeeks,
-        start_date: startDate, approach: goalType === 'complete' ? 'sustainable' : 'performance_build',
-        days_per_week: daysPerWeek, race_date: goal.target_date || undefined,
-        race_name: goal.name, current_weekly_miles: weeklyMiles,
+      const fitness: string = prefs.fitness;
+      const goalType: string = prefs.goal_type;
+      const approach = goalType === 'complete' ? 'sustainable' : 'performance_build';
+
+      const weeklyMiles = currentSnapshot?.workload_by_discipline?.run
+        ? Math.round(currentSnapshot.workload_by_discipline.run / 10)
+        : undefined;
+
+      const body: Record<string, any> = {
+        user_id: userId, distance, fitness, goal: goalType,
+        duration_weeks: durationWeeks, approach, days_per_week: daysPerWeek,
+        race_date: goal.target_date, race_name: goal.name,
+        current_weekly_miles: weeklyMiles,
       };
+
+      if (approach === 'performance_build') {
+        if (currentBaselines?.effort_source_distance && currentBaselines?.effort_source_time) {
+          body.effort_source_distance = currentBaselines.effort_source_distance;
+          body.effort_source_time = currentBaselines.effort_source_time;
+        } else if (currentBaselines?.effort_score) {
+          body.effort_score = currentBaselines.effort_score;
+        }
+        if (currentBaselines?.effort_paces) body.effort_paces = currentBaselines.effort_paces;
+      }
+
+      return body;
     }
 
-    return { user_id: userId, sport, goal_name: goal.name, duration_weeks: durationWeeks, start_date: startDate, days_per_week: daysPerWeek, target_date: goal.target_date || undefined, distance: goal.distance || undefined };
+    return { user_id: userId, sport, goal_name: goal.name, duration_weeks: durationWeeks, days_per_week: daysPerWeek, target_date: goal.target_date, distance: goal.distance || undefined };
   }
 
   // --- Link plan to goal ---
@@ -233,9 +401,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   }
 
   async function handleSaveEvent() {
-    if (!eventName.trim() || !eventDate) return;
+    if (!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal) return;
     setSaving(true);
-    await addGoal({ name: eventName.trim(), goal_type: 'event', target_date: eventDate, sport: eventSport, distance: eventDistance || null, course_profile: {}, target_metric: null, target_value: null, current_value: null, priority: eventPriority, status: 'active', training_prefs: {}, notes: null });
+    await addGoal({
+      name: eventName.trim(), goal_type: 'event', target_date: eventDate,
+      sport: eventSport, distance: eventDistance || null, course_profile: {},
+      target_metric: null, target_value: null, current_value: null,
+      priority: eventPriority, status: 'active',
+      training_prefs: { fitness: eventFitness, goal_type: eventTrainingGoal },
+      notes: null,
+    });
     setSaving(false); resetForms(); refreshGoals();
   }
 
@@ -303,13 +478,26 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             </button>
           ) : buildingGoalId === goal.id ? (
             <div className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" />Building your plan...</div>
-          ) : canAutoGenerate(goal) ? (
-            <button className="text-sm text-white/50 hover:text-white/70 transition-colors" onClick={() => handleBuildPlan(goal)}>No plan yet · Build Plan →</button>
-          ) : goal.goal_type === 'event' ? (
-            <button className="text-sm text-white/30 hover:text-white/50 transition-colors" onClick={() => navigate('/plans/generate')}>No plan yet · Create manually →</button>
-          ) : (
-            <p className="text-sm text-white/25">No plan linked</p>
-          )}
+          ) : (() => {
+            const readiness = goal.goal_type === 'event' ? getPlanReadiness(goal) : null;
+            if (readiness?.ready) return (
+              <button className="text-sm text-white/50 hover:text-white/70 transition-colors" onClick={() => handleBuildPlan(goal)}>No plan yet · Build Plan →</button>
+            );
+            if (readiness && readiness.missing.length > 0) return (
+              <div className="space-y-1">
+                <p className="text-xs text-white/30">Missing for plan generation:</p>
+                {readiness.missing.map((m, i) => m.startsWith('Pace benchmark') ? (
+                  <button key={i} onClick={() => setShowCalibration(true)} className="block text-xs text-amber-400/60 hover:text-amber-400/90 underline decoration-amber-400/30 transition-colors">· {m}</button>
+                ) : (
+                  <p key={i} className="text-xs text-amber-400/60">· {m}</p>
+                ))}
+              </div>
+            );
+            if (goal.goal_type === 'event') return (
+              <button className="text-sm text-white/30 hover:text-white/50 transition-colors" onClick={() => navigate('/plans/generate')}>No plan yet · Create manually →</button>
+            );
+            return <p className="text-sm text-white/25">No plan linked</p>;
+          })()}
           {buildError?.goalId === goal.id && <p className="mt-1 text-xs text-red-400/70">{buildError.message}</p>}
         </div>
 
@@ -398,6 +586,80 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               ))}
             </div>
             <button onClick={() => setLinkDialog(null)} className="w-full rounded-xl border border-white/10 py-2.5 text-sm font-medium text-white/50 hover:bg-white/[0.06] transition-all">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Calibration modal */}
+      {showCalibration && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b0b0c]/95 p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white/90 mb-1">Quick Calibration</h3>
+            <p className="text-sm text-white/40 mb-5">Two paces to set your training zones.</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-white/50 block mb-1.5">
+                  Easy pace — conversational, could hold for an hour
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" inputMode="numeric" placeholder={isMetric ? '6:30' : '10:30'}
+                    value={calEasyPace} onChange={e => setCalEasyPace(e.target.value)}
+                    className="bg-white/[0.06] border border-white/10 rounded-xl px-4 py-2.5 text-white/90 text-center text-lg w-28 focus:outline-none focus:border-white/25 transition-colors"
+                  />
+                  <span className="text-sm text-white/30">{paceUnit}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-white/50 block mb-1.5">
+                  5K pace — fastest you could sustain for ~25 minutes
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" inputMode="numeric" placeholder={isMetric ? '5:00' : '8:00'}
+                    value={calFiveKPace} onChange={e => setCalFiveKPace(e.target.value)}
+                    className="bg-white/[0.06] border border-white/10 rounded-xl px-4 py-2.5 text-white/90 text-center text-lg w-28 focus:outline-none focus:border-white/25 transition-colors"
+                  />
+                  <span className="text-sm text-white/30">{paceUnit}</span>
+                </div>
+              </div>
+
+              {parsePace(calEasyPace) && parsePace(calFiveKPace) && (() => {
+                const easyS = parsePace(calEasyPace)!, fiveKS = parsePace(calFiveKPace)!;
+                if (fiveKS >= easyS) return <p className="text-xs text-red-400/70">5K pace should be faster than easy pace</p>;
+                const ratio = easyS / fiveKS;
+                if (ratio > 1.8) return <p className="text-xs text-amber-400/60">That's a large gap — double-check your paces</p>;
+                const fiveKTime = Math.round((isMetric ? fiveKS * 1.60934 : fiveKS) * 3.10686);
+                const vdot = vdotFrom5KTime(fiveKTime);
+                const paces = pacesFromVdot(vdot);
+                const fmt = (s: number) => fmtPace(isMetric ? s / 1.60934 : s);
+                return (
+                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 space-y-1">
+                    <p className="text-xs text-white/40 mb-1.5">Your derived training zones</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="text-white/40">Easy</span><span className="text-white/70 font-mono">{fmt(paces.base)} {paceUnit}</span>
+                      <span className="text-white/40">Tempo</span><span className="text-white/70 font-mono">{fmt(paces.steady)} {paceUnit}</span>
+                      <span className="text-white/40">Interval</span><span className="text-white/70 font-mono">{fmt(paces.power)} {paceUnit}</span>
+                      <span className="text-white/40">Race</span><span className="text-white/70 font-mono">{fmt(paces.race)} {paceUnit}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setShowCalibration(false); setCalEasyPace(''); setCalFiveKPace(''); }}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-medium text-white/50 hover:bg-white/[0.06] transition-all"
+              >Cancel</button>
+              <button
+                onClick={handleCalibrationSave}
+                disabled={!parsePace(calEasyPace) || !parsePace(calFiveKPace) || (parsePace(calFiveKPace)! >= parsePace(calEasyPace)!) || calSaving}
+                className="flex-1 rounded-xl bg-white/[0.15] py-2.5 text-sm font-medium text-white/90 hover:bg-white/[0.22] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >{calSaving ? 'Saving...' : 'Set Baseline'}</button>
+            </div>
           </div>
         </div>
       )}
@@ -529,6 +791,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </select>
             </label>
           )}
+          <div><span className="text-sm text-white/50 mb-1.5 block">Your fitness level</span>
+            <div className="flex gap-2">
+              {([['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced']] as const).map(([val, label]) => (
+                <button key={val} onClick={() => setEventFitness(val)} className={`flex-1 rounded-xl py-2.5 text-sm font-medium transition-all border ${eventFitness === val ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <div><span className="text-sm text-white/50 mb-1.5 block">What's your goal?</span>
+            <div className="flex gap-2">
+              <button onClick={() => setEventTrainingGoal('complete')} className={`flex-1 rounded-xl py-2.5 px-3 text-sm font-medium transition-all border ${eventTrainingGoal === 'complete' ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>Finish it</button>
+              <button onClick={() => setEventTrainingGoal('speed')} className={`flex-1 rounded-xl py-2.5 px-3 text-sm font-medium transition-all border ${eventTrainingGoal === 'speed' ? 'border-white/25 bg-white/[0.12] text-white/90' : 'border-white/10 bg-white/[0.04] text-white/40 hover:bg-white/[0.06]'}`}>Race for time</button>
+            </div>
+          </div>
           <div><span className="text-sm text-white/50 mb-1.5 block">Priority</span>
             <div className="flex gap-2">
               {(['A', 'B', 'C'] as const).map(p => (
@@ -536,7 +811,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               ))}
             </div>
           </div>
-          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save Goal'}</button>
+          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save Goal'}</button>
         </div>
       </div>
     );

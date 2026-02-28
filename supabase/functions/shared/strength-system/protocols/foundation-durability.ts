@@ -1,13 +1,15 @@
 // ============================================================================
 // FOUNDATION DURABILITY PROTOCOL
 // 
-// Philosophy: Build resilient hips, knees, and ankles so you can keep training consistently.
+// Philosophy: Progressive injury-proofing with real overload.
 // 
-// Focus: Durability, not strength PRs
-// - Joint-friendly, low-soreness patterns
-// - Step-ups preferred over split squats
-// - RPE/RIR-based loading for unilateral work
-// - Consistent posture work across phases
+// Grounded in Lauersen et al. 2018, Rio et al. 2015, Harøy et al. 2019:
+// - Progressive overload within phases (early → mid → late Base)
+// - Calf raises: bilateral → single-leg → weighted, all with 3s eccentric
+// - Copenhagen plank: short lever → long lever progression
+// - Step-ups with controlled tempo (2-1-2)
+// - RIR drops from 3 to 2 as Base phase progresses
+// - Durability ≠ maintenance — you must get stronger to get more resilient
 // ============================================================================
 
 import {
@@ -28,11 +30,11 @@ export const foundationDurabilityProtocol: StrengthProtocol = {
   id: 'durability',
   legacy_ids: ['foundation_durability'], // Backwards compatibility
   name: 'Durability',
-  description: 'Classic runner-strength exercises to build muscular support so you can handle training volume more reliably.',
+  description: 'Progressive injury-proofing that actually gets harder over time. Calf and tendon work with controlled eccentrics, Copenhagen plank progression for adductors, and loaded unilateral work. You will measurably get stronger at the movements that keep you running.',
   tradeoffs: [
-    'No heavy compounds or strength PRs',
-    'Progress is subtle and structural, not dramatic',
-    'Designed for consistency, not performance-oriented lifting',
+    'No heavy barbell compounds — uses dumbbells, bodyweight, and bands',
+    'Progress shows up in injury resilience, not gym PRs',
+    'Requires discipline with tempo (3s eccentrics are harder than they sound)',
   ],
   createWeekSessions,
 };
@@ -94,84 +96,136 @@ function createLowerDurabilitySession(
   let duration: number;
   let description: string;
   
+  // Normalize weekInPhase for progression tiers
+  const wip = Number.isFinite(weekInPhase) ? Math.max(1, weekInPhase) : 1;
+  const isEarlyBase = wip <= 2;
+  const isMidBase = wip > 2 && wip <= 4;
+  
   if (variant === 'A') {
     // Variant A: Knee-dominant + calves + lateral hip
     if (tier === 'commercial_gym') {
       if (isRecovery) {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (light-moderate)' },
-          { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'DBs (light-moderate)' },
-          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
-          { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (light)', notes: '2-1-2 tempo' },
+          { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'DBs (light)' },
+          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', notes: '3s eccentric' },
+          { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bodyweight', notes: 'Bent knee, 3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
         duration = 30;
-        description = 'Recovery Week - Light knee-dominant work. Maintain movement patterns, no fatigue.';
+        description = 'Recovery Week - Maintain movement quality and tempo. No progression this week.';
       } else if (phase.name === 'Base') {
-        exercises.push(
-          { name: 'Step-ups', sets: 3, reps: '12/leg', weight: 'DBs (moderate)' },
-          { name: 'Lateral Lunges', sets: 3, reps: '12/leg', weight: 'DBs (moderate)' },
-          { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight → single leg when easy' },
-          { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
-          { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' },
-          { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' }
-        );
-        duration = 40;
-        description = `Week ${weekInPhase} Base - Building knee stability and calf strength. Focus on control and balance.`;
+        if (isEarlyBase) {
+          exercises.push(
+            { name: 'Step-ups', sets: 3, reps: '12/leg', weight: 'DBs (light)', notes: '2-1-2 tempo (2s up, 1s hold, 2s down)' },
+            { name: 'Lateral Lunges', sets: 3, reps: '12/leg', weight: 'DBs (light)' },
+            { name: 'Calf Raises', sets: 3, reps: 15, weight: 'Bilateral, bodyweight', notes: '3s eccentric (lower slowly for 3 full seconds)' },
+            { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bilateral, bodyweight', notes: 'Bent knee, 3s eccentric' },
+            { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' },
+            { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' }
+          );
+          duration = 40;
+          description = `Week ${weekInPhase} Base - Establishing baseline. Focus on controlled tempo and movement quality. Calf raises: 3s lowering phase.`;
+        } else if (isMidBase) {
+          exercises.push(
+            { name: 'Step-ups', sets: 3, reps: '10/leg', weight: 'DBs (moderate)', notes: '2-1-2 tempo' },
+            { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'DBs (moderate)' },
+            { name: 'Single Leg Calf Raises', sets: 3, reps: 12, weight: 'Bodyweight', notes: '3s eccentric. Hold rail for balance only.' },
+            { name: 'Soleus Raises', sets: 2, reps: 12, weight: 'Single leg, bodyweight', notes: 'Bent knee, 3s eccentric' },
+            { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Moderate band' },
+            { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Moderate band' }
+          );
+          duration = 40;
+          description = `Week ${weekInPhase} Base - Progressing to single-leg calf work and heavier step-ups. Maintain 3s eccentric on all calf raises.`;
+        } else {
+          exercises.push(
+            { name: 'Step-ups', sets: 3, reps: '8/leg', weight: 'DBs (challenging for RIR 2)', notes: '2-1-2 tempo' },
+            { name: 'Lateral Lunges', sets: 3, reps: '8/leg', weight: 'DBs (moderate-heavy)' },
+            { name: 'Single Leg Calf Raises', sets: 3, reps: 10, weight: 'Hold DB for load', notes: '3s eccentric' },
+            { name: 'Soleus Raises', sets: 2, reps: 10, weight: 'Single leg, hold DB', notes: 'Bent knee, 3s eccentric' },
+            { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Heavy band' },
+            { name: 'Clamshells', sets: 2, reps: '15/side', weight: 'Heavy band' }
+          );
+          duration = 40;
+          description = `Week ${weekInPhase} Base - Peak dosage. Loaded single-leg calf raises, heavier step-ups. Target RIR 2 on compounds.`;
+        }
       } else if (phase.name === 'Speed') {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (moderate)' },
-          { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'DBs (moderate)' },
-          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'DBs (same load as late Base)', notes: '2-1-2 tempo' },
+          { name: 'Lateral Lunges', sets: 2, reps: '8/leg', weight: 'DBs (moderate)' },
+          { name: 'Single Leg Calf Raises', sets: 2, reps: 10, weight: 'Hold DB (same as late Base)', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Moderate band' }
         );
         duration = 30;
-        description = `Week ${weekInPhase} Speed - Maintain knee stability patterns. Running volume is high - keep this work controlled. Reduced volume to preserve quality.`;
+        description = `Week ${weekInPhase} Speed - Maintain peak loads from Base, reduced volume (2 sets not 3). Running is high — keep intensity, cut volume.`;
       } else {
-        // Race Prep
         exercises.push(
           { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'DBs (light)' },
-          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Single Leg Calf Raises', sets: 2, reps: 12, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
         duration = 25;
-        description = `Week ${weekInPhase} Race Prep - Minimal knee-dominant work. Stay loose, no fatigue.`;
+        description = `Week ${weekInPhase} Race Prep - Minimal knee-dominant work. Maintain patterns, no fatigue.`;
       }
     } else {
       // Home gym tier - Variant A
       if (isRecovery) {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '12/leg', weight: 'Bodyweight' },
+          { name: 'Step-ups', sets: 2, reps: '12/leg', weight: 'Bodyweight', notes: '2-1-2 tempo' },
           { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
         duration = 25;
-        description = 'Recovery Week - Light knee-dominant work. Maintain movement patterns.';
+        description = 'Recovery Week - Maintain movement quality and tempo. No progression this week.';
       } else if (phase.name === 'Base') {
-        exercises.push(
-          { name: 'Step-ups', sets: 3, reps: '15/leg', weight: 'Bodyweight → add light DBs when easy' },
-          { name: 'Lateral Lunges', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
-          { name: 'Calf Raises', sets: 3, reps: 20, weight: 'Bodyweight → single leg when easy' },
-          { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
-          { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' },
-          { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' }
-        );
-        duration = 35;
-        description = `Week ${weekInPhase} Base - Build knee stability with bodyweight. Progress step-ups by adding light dumbbells when 3x15 is easy.`;
+        if (isEarlyBase) {
+          exercises.push(
+            { name: 'Step-ups', sets: 3, reps: '15/leg', weight: 'Bodyweight', notes: '2-1-2 tempo' },
+            { name: 'Lateral Lunges', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
+            { name: 'Calf Raises', sets: 3, reps: 20, weight: 'Bilateral, bodyweight', notes: '3s eccentric' },
+            { name: 'Soleus Raises', sets: 2, reps: 15, weight: 'Bilateral, bodyweight', notes: 'Bent knee, 3s eccentric' },
+            { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' },
+            { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Light band' }
+          );
+          duration = 35;
+          description = `Week ${weekInPhase} Base - Establishing baseline with bodyweight. Master the 3s eccentric on calves before progressing.`;
+        } else if (isMidBase) {
+          exercises.push(
+            { name: 'Step-ups', sets: 3, reps: '12/leg', weight: 'Add light DBs if available', notes: '2-1-2 tempo' },
+            { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'Bodyweight' },
+            { name: 'Single Leg Calf Raises', sets: 3, reps: 15, weight: 'Bodyweight', notes: '3s eccentric. Hold wall for balance.' },
+            { name: 'Soleus Raises', sets: 2, reps: 12, weight: 'Single leg', notes: 'Bent knee, 3s eccentric' },
+            { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Moderate band' },
+            { name: 'Clamshells', sets: 2, reps: '20/side', weight: 'Moderate band' }
+          );
+          duration = 35;
+          description = `Week ${weekInPhase} Base - Progressing to single-leg calf work. Add DBs to step-ups if bodyweight is easy.`;
+        } else {
+          exercises.push(
+            { name: 'Step-ups', sets: 3, reps: '10/leg', weight: 'DBs or backpack for load', notes: '2-1-2 tempo' },
+            { name: 'Lateral Lunges', sets: 3, reps: '10/leg', weight: 'Add load if possible' },
+            { name: 'Single Leg Calf Raises', sets: 3, reps: 12, weight: 'Hold weight for load', notes: '3s eccentric' },
+            { name: 'Soleus Raises', sets: 2, reps: 10, weight: 'Single leg, add weight', notes: 'Bent knee, 3s eccentric' },
+            { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Heavy band' },
+            { name: 'Clamshells', sets: 2, reps: '15/side', weight: 'Heavy band' }
+          );
+          duration = 35;
+          description = `Week ${weekInPhase} Base - Peak dosage. Loaded single-leg calf raises, heavier step-ups. Target RIR 2.`;
+        }
       } else if (phase.name === 'Speed') {
         exercises.push(
-          { name: 'Step-ups', sets: 2, reps: '12/leg', weight: 'Bodyweight' },
+          { name: 'Step-ups', sets: 2, reps: '12/leg', weight: 'Same load as late Base', notes: '2-1-2 tempo' },
           { name: 'Lateral Lunges', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Single Leg Calf Raises', sets: 2, reps: 12, weight: 'Same as late Base', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
         duration = 25;
-        description = `Week ${weekInPhase} Speed - Maintain knee stability patterns. Controlled movement, no fatigue. Reduced volume to preserve quality.`;
+        description = `Week ${weekInPhase} Speed - Maintain loads, reduced volume. Controlled movement.`;
       } else {
         exercises.push(
           { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
-          { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Single Leg Calf Raises', sets: 2, reps: 12, weight: 'Bodyweight', notes: '3s eccentric' },
           { name: 'Lateral Band Walks', sets: 2, reps: '15/side', weight: 'Light band' }
         );
         duration = 20;
@@ -180,45 +234,72 @@ function createLowerDurabilitySession(
     }
   } else {
     // Variant B: Hinge-dominant + hip + foot/ankle
+    // Copenhagen progression: short lever → long lever across Base
+    const copenhagenVariant = isEarlyBase ? 'Short Lever' : 'Long Lever';
+    const copenhagenTime = isEarlyBase ? '20s' : (isMidBase ? '25s' : '30s');
+    
     if (tier === 'commercial_gym') {
       if (isRecovery) {
         exercises.push(
-          { name: 'Single Leg RDL (Supported)', sets: 2, reps: '10/leg', weight: 'DB (light-moderate)' },
+          { name: 'Single Leg RDL (Supported)', sets: 2, reps: '10/leg', weight: 'DB (light)' },
           { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
-          { name: 'Copenhagen Plank (Short Lever)', sets: 2, reps: '30s/side', weight: 'Bodyweight' },
+          { name: 'Copenhagen Plank (Short Lever)', sets: 2, reps: '20s/side', weight: 'Bodyweight' },
           { name: 'Tibialis Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
         );
         duration = 30;
-        description = 'Recovery Week - Light hinge and hip work. Maintain movement patterns, no fatigue.';
+        description = 'Recovery Week - Maintain patterns and tempo. No progression this week.';
       } else if (phase.name === 'Base') {
-        exercises.push(
-          { name: 'Single Leg RDL (Supported)', sets: 3, reps: '12/leg', weight: 'DB (moderate)' },
-          { name: 'Glute Bridges', sets: 2, reps: '12-15', weight: 'Bodyweight → single leg when easy' },
-          { name: 'Copenhagen Plank (Short Lever)', sets: 2, reps: '30s/side', weight: 'Bodyweight' },
-          { name: 'Side Plank Abduction', sets: 2, reps: '12/side', weight: 'Bodyweight' },
-          { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Bodyweight' },
-          { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
-        );
-        duration = 40;
-        description = `Week ${weekInPhase} Base - Building hip stability and foot/ankle strength. Focus on control and balance.`;
+        if (isEarlyBase) {
+          exercises.push(
+            { name: 'Single Leg RDL (Supported)', sets: 3, reps: '12/leg', weight: 'DB (light)' },
+            { name: 'Glute Bridges', sets: 3, reps: 15, weight: 'Bilateral, bodyweight' },
+            { name: `Copenhagen Plank (${copenhagenVariant})`, sets: 2, reps: `${copenhagenTime}/side`, weight: 'Bodyweight' },
+            { name: 'Side Plank Abduction', sets: 2, reps: '12/side', weight: 'Bodyweight' },
+            { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Bodyweight' },
+            { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
+          );
+          duration = 40;
+          description = `Week ${weekInPhase} Base - Establishing baseline. Short-lever Copenhagen, bilateral bridges. Focus on control.`;
+        } else if (isMidBase) {
+          exercises.push(
+            { name: 'Single Leg RDL (Supported)', sets: 3, reps: '10/leg', weight: 'DB (moderate)' },
+            { name: 'Single Leg Glute Bridge', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
+            { name: `Copenhagen Plank (${copenhagenVariant})`, sets: 2, reps: `${copenhagenTime}/side`, weight: 'Bodyweight' },
+            { name: 'Side Plank Abduction', sets: 2, reps: '12/side', weight: 'Bodyweight' },
+            { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Add band resistance if easy' },
+            { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
+          );
+          duration = 40;
+          description = `Week ${weekInPhase} Base - Long-lever Copenhagen, single-leg bridges, heavier SLRDL. Progressive overload in action.`;
+        } else {
+          exercises.push(
+            { name: 'Single Leg RDL (Supported)', sets: 3, reps: '8/leg', weight: 'DB (challenging for RIR 2)' },
+            { name: 'Single Leg Glute Bridge', sets: 3, reps: '10/leg', weight: 'Add weight on hip if able' },
+            { name: `Copenhagen Plank (${copenhagenVariant})`, sets: 3, reps: `${copenhagenTime}/side`, weight: 'Bodyweight', notes: 'Add slow adduction reps if hold is easy' },
+            { name: 'Side Plank Abduction', sets: 2, reps: '15/side', weight: 'Bodyweight' },
+            { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Banded' },
+            { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
+          );
+          duration = 40;
+          description = `Week ${weekInPhase} Base - Peak dosage. Heavy SLRDL, loaded bridges, long-lever Copenhagen with reps. Target RIR 2.`;
+        }
       } else if (phase.name === 'Speed') {
         exercises.push(
-          { name: 'Single Leg RDL (Supported)', sets: 3, reps: '10/leg', weight: 'DB (moderate)' },
-          { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
-          { name: 'Copenhagen Plank (Short Lever)', sets: 2, reps: '30s/side', weight: 'Bodyweight' },
+          { name: 'Single Leg RDL (Supported)', sets: 2, reps: '8/leg', weight: 'DB (same as late Base)' },
+          { name: 'Single Leg Glute Bridge', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
+          { name: 'Copenhagen Plank (Long Lever)', sets: 2, reps: '25s/side', weight: 'Bodyweight' },
           { name: 'Tibialis Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
         );
-        duration = 35;
-        description = `Week ${weekInPhase} Speed - Maintain hip stability patterns. Running volume is high - keep this work controlled.`;
+        duration = 30;
+        description = `Week ${weekInPhase} Speed - Maintain peak loads, reduced volume. Running volume is high — keep intensity, cut sets.`;
       } else {
-        // Race Prep
         exercises.push(
           { name: 'Single Leg RDL (Supported)', sets: 2, reps: '10/leg', weight: 'DB (light)' },
           { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
           { name: 'Tibialis Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
         );
         duration = 25;
-        description = `Week ${weekInPhase} Race Prep - Minimal hinge work. Stay loose, no fatigue.`;
+        description = `Week ${weekInPhase} Race Prep - Minimal hinge work. Maintain patterns, no fatigue.`;
       }
     } else {
       // Home gym tier - Variant B
@@ -230,26 +311,48 @@ function createLowerDurabilitySession(
           { name: 'Tibialis Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
         );
         duration = 25;
-        description = 'Recovery Week - Light hinge and hip work. Maintain movement patterns.';
+        description = 'Recovery Week - Maintain movement quality. No progression this week.';
       } else if (phase.name === 'Base') {
-        exercises.push(
-          { name: 'Single Leg RDL', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
-          { name: 'Glute Bridges', sets: 3, reps: 15, weight: 'Bodyweight → single leg when easy' },
-          { name: 'Side Plank Abduction', sets: 2, reps: '12/side', weight: 'Bodyweight' },
-          { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Bodyweight' },
-          { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
-        );
-        duration = 35;
-        description = `Week ${weekInPhase} Base - Build hip stability and foot/ankle strength with bodyweight.`;
+        if (isEarlyBase) {
+          exercises.push(
+            { name: 'Single Leg RDL', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
+            { name: 'Glute Bridges', sets: 3, reps: 15, weight: 'Bilateral, bodyweight' },
+            { name: 'Side Plank', sets: 2, reps: '30s/side', weight: 'Bodyweight' },
+            { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Bodyweight' },
+            { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
+          );
+          duration = 35;
+          description = `Week ${weekInPhase} Base - Establishing baseline. Bilateral bridges, bodyweight SLRDL. Master form first.`;
+        } else if (isMidBase) {
+          exercises.push(
+            { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: 'Add light weight if available' },
+            { name: 'Single Leg Glute Bridge', sets: 3, reps: '12/leg', weight: 'Bodyweight' },
+            { name: 'Side Plank Abduction', sets: 2, reps: '12/side', weight: 'Bodyweight' },
+            { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Add band if easy' },
+            { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
+          );
+          duration = 35;
+          description = `Week ${weekInPhase} Base - Progressing to single-leg bridges and loaded SLRDL. Add resistance where possible.`;
+        } else {
+          exercises.push(
+            { name: 'Single Leg RDL', sets: 3, reps: '8/leg', weight: 'Heaviest available load' },
+            { name: 'Single Leg Glute Bridge', sets: 3, reps: '10/leg', weight: 'Add weight on hip' },
+            { name: 'Side Plank Abduction', sets: 2, reps: '15/side', weight: 'Bodyweight' },
+            { name: 'Tibialis Raises', sets: 3, reps: 15, weight: 'Banded' },
+            { name: 'Foot Doming', sets: 2, reps: '10/side', weight: 'Bodyweight' }
+          );
+          duration = 35;
+          description = `Week ${weekInPhase} Base - Peak dosage. Heaviest loads available, single-leg everything. Target RIR 2.`;
+        }
       } else if (phase.name === 'Speed') {
         exercises.push(
-          { name: 'Single Leg RDL', sets: 3, reps: '10/leg', weight: 'Bodyweight' },
-          { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight' },
+          { name: 'Single Leg RDL', sets: 2, reps: '10/leg', weight: 'Same as late Base' },
+          { name: 'Single Leg Glute Bridge', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
           { name: 'Side Plank', sets: 2, reps: '30s/side', weight: 'Bodyweight' },
           { name: 'Tibialis Raises', sets: 2, reps: 15, weight: 'Bodyweight' }
         );
         duration = 30;
-        description = `Week ${weekInPhase} Speed - Maintain hip stability patterns. Controlled movement, no fatigue.`;
+        description = `Week ${weekInPhase} Speed - Maintain loads, reduced volume. Controlled movement.`;
       } else {
         exercises.push(
           { name: 'Single Leg RDL', sets: 2, reps: '10/leg', weight: 'Bodyweight' },
@@ -270,8 +373,7 @@ function createLowerDurabilitySession(
     weight: 'Side planks, dead bugs, bird dogs'
   });
   
-  // Apply target RIR
-  const targetRIR = getTargetRIR(phase, isRecovery);
+  const targetRIR = getTargetRIR(phase, isRecovery, weekInPhase);
   const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
   
   return {
@@ -281,7 +383,7 @@ function createLowerDurabilitySession(
     description,
     duration,
     exercises: exercisesWithRIR,
-    repProfile: 'maintenance', // Durability work is maintenance-focused, not growth
+    repProfile: 'hypertrophy', // Progressive durability work — real overload drives adaptation
     tags: ['strength', 'lower_body', `tier:${tier}`, `phase:${phase.name.toLowerCase()}`, 'focus:durability', `variant:${variant}`],
   };
 }
@@ -335,8 +437,7 @@ function createUpperPostureSession(
       : `Week ${weekInPhase} ${phase.name} - Upper back and posture work. Repeatable, low fatigue.`;
   }
   
-  // Apply target RIR
-  const targetRIR = getTargetRIR(phase, isRecovery);
+  const targetRIR = getTargetRIR(phase, isRecovery, weekInPhase);
   const exercisesWithRIR = applyTargetRIR(exercises, targetRIR);
   
   return {
@@ -439,20 +540,24 @@ function createTaperSessions(
 
 function getTargetRIR(
   phase: StrengthPhase,
-  isRecovery: boolean
+  isRecovery: boolean,
+  weekInPhase?: number
 ): number {
-  // Durability should never go hard - hard-cap at RIR 3-4
-  if (isRecovery) return 4;
+  if (isRecovery) return 3;
   
   switch (phase.name) {
-    case 'Base':
-      return 3; // RIR 3-4 (moderate effort)
+    case 'Base': {
+      // Progressive RIR within Base: early weeks conservative, late weeks push harder
+      const wip = weekInPhase ?? 1;
+      if (wip <= 2) return 3;
+      return 2;
+    }
     case 'Speed':
-      return 3; // RIR 3-4 (never harder, even in speed phase)
+      return 2;
     case 'Race Prep':
-      return 4; // RIR 4 (easy effort)
+      return 3;
     case 'Taper':
-      return 4; // RIR 4-5 (very easy)
+      return 4;
     default:
       return 3;
   }

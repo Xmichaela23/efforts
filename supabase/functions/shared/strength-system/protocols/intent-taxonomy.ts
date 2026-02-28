@@ -98,16 +98,16 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     priorityDefault: 'required',
     sessionCost: 'medium',
     avoidWithinHoursOf: {
-      LONG: 24, // Can be closer than neural (less CNS cost)
-      QUALITY: 12, // Can be same day if needed
+      LONG: 24,
+      QUALITY: 12,
     },
-    maxWeeklySets: 15, // Higher volume allowed
-    maxWeeklyWorkingReps: 120, // Higher rep work
+    maxWeeklySets: 18,
+    maxWeeklyWorkingReps: 140,
     repProfileDefaults: ['hypertrophy'],
-    exerciseFamilies: ['unilateral_stability'], // Bulgarian Split Squat, Single Leg RDL, Lateral Lunges
-    repRange: [8, 15],
-    intensityRange: [50, 70],
-    allowedProtocols: ['durability', 'upper_aesthetics'], // Foundation always, upper priority can include
+    exerciseFamilies: ['unilateral_stability', 'calf_eccentric', 'adductor_isometric'],
+    repRange: [8, 20],
+    intensityRange: [40, 75],
+    allowedProtocols: ['durability', 'upper_aesthetics'],
   },
   
   LOWER_POWER: {
@@ -135,14 +135,14 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     isDurability: false,
     priorityDefault: 'optional',
     sessionCost: 'low',
-    avoidWithinHoursOf: undefined, // Can go anywhere (light load)
-    maxWeeklySets: 6,
-    maxWeeklyWorkingReps: 60,
-    repProfileDefaults: ['maintenance'],
-    exerciseFamilies: ['light_compound', 'bodyweight'], // Hip Thrusts @ 50%, Glute Bridges
-    repRange: [10, 15],
-    intensityRange: [50, 60],
-    allowedProtocols: ['upper_aesthetics', 'minimum_dose'], // Upper priority uses this, minimum dose can use it
+    avoidWithinHoursOf: undefined, // Can go anywhere
+    maxWeeklySets: 12,
+    maxWeeklyWorkingReps: 80,
+    repProfileDefaults: ['maintenance', 'strength'],
+    exerciseFamilies: ['light_compound', 'bodyweight', 'bilateral_compound'],
+    repRange: [6, 15],
+    intensityRange: [50, 75],
+    allowedProtocols: ['upper_aesthetics', 'minimum_dose'],
   },
   
   // ============================================================================

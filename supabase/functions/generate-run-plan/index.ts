@@ -27,7 +27,6 @@ import { addTimingLogic } from './timing-logic.ts';
 import { 
   calculateEffortScore, 
   getPacesFromScore, 
-  estimateScoreFromFitness,
   getTargetTime,
   type TrainingPaces 
 } from './effort-score.ts';
@@ -74,48 +73,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Calculate Effort Score for Performance Build plans
+    // Effort Score for Performance Build plans — no estimation, no guessing
     let effortScore: number | undefined;
     let effortPaces: TrainingPaces | undefined;
     
     if (request.approach === 'performance_build') {
-      // SMART SERVER: Prioritize raw data over pre-calculated values
-      // Calculate from raw race/5K time if provided (source of truth)
       if (request.effort_source_distance && request.effort_source_time) {
         effortScore = calculateEffortScore(
           request.effort_source_distance,
           request.effort_source_time
         );
-        console.log(`[EffortScore] Calculated from raw data (${request.effort_source_distance}m in ${request.effort_source_time}s): ${effortScore}`);
+        console.log(`[EffortScore] Calculated from race data (${request.effort_source_distance}m in ${request.effort_source_time}s): ${effortScore}`);
       } else if (request.effort_score) {
-        // Fallback to provided score (for manual entry or when raw data unavailable)
         effortScore = request.effort_score;
         console.log(`[EffortScore] Using provided score: ${effortScore}`);
       } else {
-        // Fallback to estimate from fitness level
-        effortScore = estimateScoreFromFitness(request.fitness);
-        console.log(`[EffortScore] Estimated from fitness: ${effortScore}`);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Performance plans require pace data. Enter a recent race time or complete a time trial.',
+            validation_errors: ['effort_score or effort_source_distance+effort_source_time required for performance_build'],
+            missing: ['effort_data']
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-      
-      // Use provided paces (may be manually edited) or calculate from score
+
       if (request.effort_paces) {
         effortPaces = request.effort_paces;
-        console.log(`[EffortScore] Using provided paces (source: ${request.effort_paces_source || 'unknown'})`);
       } else {
-        // effortScore is guaranteed to be set at this point (set above in lines 79-93)
-        if (effortScore === undefined) {
-          console.error('[EffortScore] effortScore is undefined - this should not happen');
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: 'Failed to calculate effort score. Please provide a race time or effort score.',
-              validation_errors: ['Missing effort_score - required for performance_build plans']
-            }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
         effortPaces = getPacesFromScore(effortScore);
-        console.log(`[EffortScore] Calculated paces from score`);
       }
       console.log(`[EffortScore] Paces - Base: ${effortPaces.base}s/mi, Race: ${effortPaces.race}s/mi`);
     }

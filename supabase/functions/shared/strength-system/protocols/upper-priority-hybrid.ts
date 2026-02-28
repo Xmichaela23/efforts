@@ -1,16 +1,15 @@
 // ============================================================================
 // UPPER PRIORITY HYBRID PROTOCOL
 // 
-// Philosophy: Upper Body Gains + Lower Body Support
+// Philosophy: True hypertrophy → strength periodization for upper body.
 // 
-// Traditional "strength for runners" treats lifting as maintenance. We flip it:
-// - Upper Body: Progressive overload, real strength gains, aesthetic improvements
-// - Lower Body: Injury prevention, power maintenance, running support
-//
-// WHY THIS WORKS:
+// Grounded in Schoenfeld et al., Helms et al., and concurrent training research:
+// - Upper Body: DUP-style periodization — Base 4x12 @ 62% → Speed 4x6 @ 81%
+//   with isolation accessories (lateral raises, face pulls) for complete development
+// - Lower Body: Functional strength, not maintenance — squats, hip thrusts, RDLs
+//   at meaningful loads (65-75% 1RM). Honest about what it is.
 // - Upper body doesn't compete with running adaptations (different muscles)
-// - Users see strength gains throughout training (psychologically motivating)
-// - "Finish your marathon AND set PRs on bench press"
+// - Speed phase adds plyometrics for power transfer
 // ============================================================================
 
 import {
@@ -32,10 +31,10 @@ export const upperPriorityHybridProtocol: StrengthProtocol = {
   id: 'upper_aesthetics',
   legacy_ids: ['upper_priority_hybrid'], // Backwards compatibility
   name: 'Upper Aesthetics',
-  description: 'Prioritizes upper-body strength and posture while keeping lower-body work light so running stays the priority.',
+  description: 'Full hypertrophy-to-strength periodization for the upper body (4x12 → 4x6 across phases) plus isolation accessories. Lower body gets real work — squats, hip thrusts, and RDLs at meaningful loads — just not the primary focus.',
   tradeoffs: [
-    'Lower body is maintained, not pushed for strength PRs',
-    'Not a maximal strength plan; upper body improves faster than lower body',
+    'Lower body builds functional strength but won\'t chase 1RM PRs',
+    'Upper body sessions are longer (45-50 min) to accommodate accessories',
     'Designed for visible upper-body development without compromising running',
   ],
   createWeekSessions,
@@ -113,9 +112,8 @@ function createLowerMaintenanceSession(
       duration = 35;
       description = 'Recovery Week - Same weights, reduced volume. Let your body adapt to recent increases. Target: 2 sets, RIR 4-5.';
     } else if (phase.name === 'Base') {
-      // wip is 1-based, so subtract 1 to get progression step (0,1,2,3...)
       const step = Math.min(4, Math.max(0, wip - 1));
-      const load = 65 + (step * 2); // 65%, 67%, 69%, 71%, 73% (realistic for 8 reps)
+      const load = 65 + (step * 2); // 65% → 67% → 69% → 71% → 73%
       exercises.push(
         { name: 'Back Squat', sets: 3, reps: 8, weight: `${load}% 1RM` },
         { name: 'Hip Thrusts', sets: 4, reps: 8, weight: `${load}% 1RM` },
@@ -123,16 +121,16 @@ function createLowerMaintenanceSession(
         { name: 'Walking Lunges', sets: 3, reps: '8/leg', weight: 'Moderate load' }
       );
       duration = 45;
-      description = `Week ${displayWeek} Base - Building lower body foundation. Target: 3-4x8 @ ${load}% 1RM (bilateral), RIR 2-3. Choose moderate load for walking lunges to hit target RIR.`;
-      repProfile = 'strength'; // Base phase is building, not just maintenance
+      description = `Week ${displayWeek} Base - Functional lower body strength. 3-4x8 @ ${load}% 1RM, RIR 2-3. This is real training — squats and hip thrusts at these loads build strength, not just maintain it.`;
+      repProfile = 'strength';
     } else if (phase.name === 'Speed') {
       exercises.push(
-        { name: 'Box Jumps', sets: 4, reps: 4, weight: 'Explosive - full recovery' },
+        { name: 'Box Jumps', sets: 4, reps: 4, weight: 'Explosive — full recovery between sets' },
         { name: 'Hip Thrusts', sets: 3, reps: 6, weight: '75% 1RM' },
         { name: 'KB/DB Swings', sets: 3, reps: 12, weight: '25% deadlift 1RM' }
       );
       duration = 40;
-      description = `Week ${displayWeek} Speed - Explosive power development. Focus on speed and technique, not max weight. Maintain hip thrust strength from Base phase.`;
+      description = `Week ${displayWeek} Speed - Power development. Box jumps for rate of force, hip thrusts for posterior chain, swings for hip extension power. Quality over quantity.`;
       repProfile = 'strength';
     } else {
       // Race Prep: Minimal maintenance
@@ -238,33 +236,35 @@ function createUpperStrengthSession(
       description = 'Recovery Week - Same weights as last week, fewer sets. OHP maintained for posture. Your muscles adapt during rest. Resume progression next week.';
       repProfile = 'maintenance';
     } else if (phase.name === 'Base') {
-      // wip is 1-based, so subtract 1 to get progression step (0,1,2,3...)
       const step = Math.min(4, Math.max(0, wip - 1));
-      const baseLoad = 65 + (step * 2); // Progress 65% → 73% (realistic for 10 reps)
+      const baseLoad = 62 + (step * 2); // 62% → 64% → 66% → 68% → 70% (wider range for 10-12 reps)
+      const reps = step <= 1 ? 12 : 10;
       exercises.push(
-        { name: 'Bench Press', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
-        { name: 'Barbell Rows', sets: 4, reps: 10, weight: `${baseLoad}% 1RM` },
+        { name: 'Bench Press', sets: 4, reps, weight: `${baseLoad}% 1RM` },
+        { name: 'Barbell Rows', sets: 4, reps, weight: `${baseLoad}% 1RM` },
         { name: 'Pull-ups', sets: 4, reps: '8-10', weight: 'Bodyweight' },
-        { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: `${Math.max(60, baseLoad - 5)}% 1RM` },
+        { name: 'DB Shoulder Press', sets: 3, reps: 10, weight: `${Math.max(57, baseLoad - 5)}% 1RM` },
+        { name: 'Lateral Raises', sets: 3, reps: 12, weight: 'Light-moderate DBs' },
         { name: 'Cable Face Pulls', sets: 3, reps: 15, weight: 'Light cable' }
       );
-      duration = 45;
-      description = `Week ${displayWeek} Base - Building strength foundation. Target: 4x10 @ ${baseLoad}% 1RM.`;
-      repProfile = 'hypertrophy'; // Base phase: higher reps for volume
+      duration = 50;
+      description = `Week ${displayWeek} Base - Hypertrophy block. 4x${reps} @ ${baseLoad}% 1RM, RIR 2-3. Volume is king — chase the pump. Lateral raises for shoulder width.`;
+      repProfile = 'hypertrophy';
     } else if (phase.name === 'Speed') {
-      // wip is 1-based, so subtract 1 to get progression step (0,1,2,3...)
       const step = Math.min(3, Math.max(0, wip - 1));
-      const speedLoad = 72 + (step * 2); // Progress 72% → 78% (realistic for 8 reps)
+      const speedLoad = 72 + (step * 3); // 72% → 75% → 78% → 81% (wider progression into strength territory)
+      const reps = step <= 1 ? 8 : 6;
       exercises.push(
-        { name: 'Bench Press', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
-        { name: 'Barbell Rows', sets: 4, reps: 8, weight: `${speedLoad}% 1RM` },
-        { name: 'Pull-ups', sets: 4, reps: '6-8', weight: 'Add weight if able' },
-        { name: 'DB Shoulder Press', sets: 3, reps: 8, weight: `${Math.max(67, speedLoad - 5)}% 1RM` },
+        { name: 'Bench Press', sets: 4, reps, weight: `${speedLoad}% 1RM` },
+        { name: 'Barbell Rows', sets: 4, reps, weight: `${speedLoad}% 1RM` },
+        { name: 'Pull-ups', sets: 4, reps: '6-8', weight: 'Add weight — track this' },
+        { name: 'DB Shoulder Press', sets: 3, reps, weight: `${Math.max(67, speedLoad - 5)}% 1RM` },
+        { name: 'Lateral Raises', sets: 3, reps: 12, weight: 'Moderate DBs' },
         { name: 'Cable Face Pulls', sets: 3, reps: 15, weight: 'Moderate cable' }
       );
-      duration = 45;
-      description = `Week ${displayWeek} Speed - KEEP BUILDING upper body. Target: 4x8 @ ${speedLoad}% 1RM.`;
-      repProfile = 'strength'; // Speed phase: lower reps, higher intensity
+      duration = 50;
+      description = `Week ${displayWeek} Speed - Strength block. 4x${reps} @ ${speedLoad}% 1RM, RIR 1-2. Heavier loads, fewer reps — the hypertrophy base now converts to strength.`;
+      repProfile = 'strength';
     } else if (isUpperPeakWeek) {
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 5, weight: '80-85% 1RM' },
@@ -306,10 +306,11 @@ function createUpperStrengthSession(
         { name: 'Inverted Rows', sets: 4, reps: 12, weight: 'Feet elevated when easy' },
         { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevate feet to progress' },
         { name: 'Pull-ups', sets: 3, reps: '5-8', weight: 'Assisted or negatives OK' },
+        { name: 'Band Lateral Raises', sets: 3, reps: 15, weight: 'Light band or light DBs' },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Light band' }
       );
-      duration = 40;
-      description = `Week ${displayWeek} Base - Bodyweight progression. Current push-up level: ${pushProgression}. When you hit 4x12 cleanly, progress to next variation.`;
+      duration = 45;
+      description = `Week ${displayWeek} Base - Hypertrophy block. Push-up level: ${pushProgression}. When you hit 4x12 cleanly, progress to next variation. Band lateral raises for shoulder width.`;
       repProfile = 'hypertrophy';
     } else if (phase.name === 'Speed') {
       const pushProgression = 'Decline or archer push-ups';
@@ -318,10 +319,11 @@ function createUpperStrengthSession(
         { name: 'Inverted Rows', sets: 4, reps: 10, weight: 'Feet elevated, slow tempo' },
         { name: 'Pike Push-ups', sets: 3, reps: 10, weight: 'Elevated pike (near HSPU)' },
         { name: 'Pull-ups', sets: 4, reps: 'Max reps', weight: 'Aim for +2 reps vs Week 1' },
+        { name: 'Band Lateral Raises', sets: 3, reps: 15, weight: 'Moderate band or DBs' },
         { name: 'Band Face Pulls', sets: 3, reps: 15, weight: 'Moderate band' }
       );
-      duration = 40;
-      description = `Week ${displayWeek} Speed - Advanced progressions. Track your pull-up max - this is your upper body PR metric. How many more can you do than Week 1?`;
+      duration = 45;
+      description = `Week ${displayWeek} Speed - Strength block. Track your pull-up max — this is your upper body PR metric. How many more can you do than Week 1?`;
       repProfile = 'strength';
     } else if (isUpperPeakWeek) {
       exercises.push(
