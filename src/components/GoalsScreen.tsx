@@ -319,12 +319,22 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       if (!generatorFn) throw new Error(`Plan generation not yet available for ${goal.sport}`);
 
       const distance = DISTANCE_TO_API[goal.distance || ''] || 'marathon';
-      const minWeeks: Record<string, number> = { marathon: 10, half: 6, '10k': 4, '5k': 4 };
+      const fitness = (goal.training_prefs?.fitness as string) || 'beginner';
+      const hasBase = fitness === 'intermediate' || fitness === 'advanced';
+      const minWeeks: Record<string, Record<string, number>> = {
+        marathon:  { beginner: 14, intermediate: 6, advanced: 6 },
+        half:      { beginner: 8,  intermediate: 4, advanced: 4 },
+        '10k':     { beginner: 4,  intermediate: 4, advanced: 4 },
+        '5k':      { beginner: 4,  intermediate: 4, advanced: 4 },
+      };
       const weeksOut = goal.target_date ? differenceInWeeks(new Date(goal.target_date), new Date()) : 12;
-      const floorWeeks = minWeeks[distance] ?? 4;
+      const floorWeeks = minWeeks[distance]?.[fitness] ?? 4;
 
       if (goal.target_date && weeksOut < floorWeeks) {
-        throw new Error(`${goal.distance || distance} needs at least ${floorWeeks} weeks. Your race is ${weeksOut} weeks away — consider adjusting the date or choosing a shorter distance.`);
+        const advice = hasBase
+          ? `Even with your training base, ${goal.distance || distance} needs at least ${floorWeeks} weeks for a proper peak and taper.`
+          : `${goal.distance || distance} needs at least ${floorWeeks} weeks to build safely. Consider a shorter distance or later date.`;
+        throw new Error(`Your race is ${weeksOut} weeks away. ${advice}`);
       }
 
       const durationWeeks = Math.max(floorWeeks, Math.min(weeksOut, 20));

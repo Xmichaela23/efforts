@@ -132,52 +132,38 @@ export function validateRequest(request: GeneratePlanRequest): ValidationResult 
     }
   }
 
-  // Marathon duration validation - stricter requirements for shorter plans
-  if (request.distance === 'marathon' && request.duration_weeks) {
-    const durationReqs = getMarathonDurationRequirements(request.duration_weeks);
-    
-    // Minimum duration check
-    if (request.duration_weeks < 10) {
-      errors.push(
-        `Marathon plans require at least 10 weeks. ${request.duration_weeks} weeks is too short ` +
-        `to safely prepare for 26.2 miles.`
-      );
-    }
-    
-    // Minimum weekly miles check for short plans
-    if (durationReqs.minWeeklyMiles > 0) {
-      if (request.current_weekly_miles === undefined) {
-        warnings.push(
-          `A ${request.duration_weeks}-week marathon plan requires an established running base. ` +
-          `Confirm you are currently running at least ${durationReqs.minWeeklyMiles} miles per week.`
-        );
-      } else if (request.current_weekly_miles < durationReqs.minWeeklyMiles) {
+  // Duration validation — minimums scale with fitness and current volume
+  if (request.distance && request.duration_weeks) {
+    const hasBase = request.fitness === 'intermediate' || request.fitness === 'advanced';
+    const minByDistance: Record<string, { base: number; noBase: number }> = {
+      'marathon': { base: 6, noBase: 14 },
+      'half':     { base: 4, noBase: 8 },
+      '10k':      { base: 4, noBase: 4 },
+      '5k':       { base: 4, noBase: 4 },
+    };
+    const limits = minByDistance[request.distance];
+    if (limits) {
+      const minWeeks = hasBase ? limits.base : limits.noBase;
+      if (request.duration_weeks < minWeeks) {
         errors.push(
-          `A ${request.duration_weeks}-week marathon plan requires at least ${durationReqs.minWeeklyMiles} miles/week baseline. ` +
-          `Your current ${request.current_weekly_miles} mpw suggests a longer plan (14-16 weeks) would be safer.`
+          hasBase
+            ? `Even with your training base, a ${request.distance} plan needs at least ${minWeeks} weeks for a proper peak and taper. Got ${request.duration_weeks}.`
+            : `A ${request.distance} plan needs at least ${minWeeks} weeks to build safely. Got ${request.duration_weeks}.`
         );
       }
     }
-    
-    // Beginner + short plan check
-    if (request.fitness === 'beginner' && request.duration_weeks < 14) {
-      errors.push(
-        `Beginners should use a 14+ week marathon plan. ` +
-        `A ${request.duration_weeks}-week plan is too aggressive for first-time marathoners.`
-      );
-    }
-    
-    // Add warning for aggressive timelines
-    if (durationReqs.warning) {
-      warnings.push(durationReqs.warning);
-    }
-    
-    // Add prerequisite info as warnings
-    if (durationReqs.additionalPrereqs.length > 0) {
-      warnings.push(
-        `Prerequisites for ${request.duration_weeks}-week marathon plan: ` +
-        durationReqs.additionalPrereqs.join('; ')
-      );
+
+    // Marathon-specific: warn if short plan + low mileage
+    if (request.distance === 'marathon' && hasBase && request.duration_weeks <= 8) {
+      const durationReqs = getMarathonDurationRequirements(request.duration_weeks);
+      if (durationReqs.minWeeklyMiles > 0 && request.current_weekly_miles !== undefined
+          && request.current_weekly_miles < durationReqs.minWeeklyMiles) {
+        warnings.push(
+          `A ${request.duration_weeks}-week marathon plan works best with ${durationReqs.minWeeklyMiles}+ mi/week base. ` +
+          `You're at ${request.current_weekly_miles} mpw — the plan will be aggressive.`
+        );
+      }
+      if (durationReqs.warning) warnings.push(durationReqs.warning);
     }
   }
 
