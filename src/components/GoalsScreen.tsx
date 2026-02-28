@@ -842,20 +842,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </button>
             </div>
           </div>
-          <div><span className="text-sm text-white/50 mb-1.5 block">Race priority</span>
-            <div className="flex flex-col gap-2">
-              {([
-                ['A', 'Peak race', 'Full taper — everything builds toward this day'],
-                ['B', 'Important', 'Race hard but no full taper — a stepping stone'],
-                ['C', 'Tune-up', 'Treat as a hard training effort or dress rehearsal'],
-              ] as const).map(([val, title, desc]) => (
-                <button key={val} onClick={() => setEventPriority(val)} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventPriority === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
-                  <span className={`text-sm font-medium ${eventPriority === val ? 'text-white/90' : 'text-white/50'}`}>{val} — {title}</span>
-                  <span className={`block text-xs mt-0.5 ${eventPriority === val ? 'text-white/50' : 'text-white/25'}`}>{desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
           <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save Goal'}</button>
         </div>
       </div>
