@@ -92,6 +92,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [eventPriority, setEventPriority] = useState<'A' | 'B' | 'C'>('A');
   const [eventFitness, setEventFitness] = useState<'beginner' | 'intermediate' | 'advanced' | ''>('');
   const [eventTrainingGoal, setEventTrainingGoal] = useState<'complete' | 'speed' | ''>('');
+  const [overrideFitness, setOverrideFitness] = useState(false);
+  const [overrideGoal, setOverrideGoal] = useState(false);
 
   // Pre-fill fitness + goal from existing data when the event form opens
   useEffect(() => {
@@ -155,7 +157,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal('');
+    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false);
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
   }
@@ -880,32 +882,67 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </select>
             </label>
           )}
-          <div><span className="text-sm text-white/50 mb-1.5 block">Training level</span>
-            <div className="flex flex-col gap-2">
-              {([
-                ['beginner', 'Building up', '< 12 mi/week or new to structured training'],
-                ['intermediate', 'Consistent', '12–30 mi/week with some race experience'],
-                ['advanced', 'Competitive', '30+ mi/week, chasing PRs'],
-              ] as const).map(([val, title, desc]) => (
-                <button key={val} onClick={() => setEventFitness(val)} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventFitness === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
-                  <span className={`text-sm font-medium ${eventFitness === val ? 'text-white/90' : 'text-white/50'}`}>{title}</span>
-                  <span className={`block text-xs mt-0.5 ${eventFitness === val ? 'text-white/50' : 'text-white/25'}`}>{desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div><span className="text-sm text-white/50 mb-1.5 block">What's your goal?</span>
-            <div className="flex flex-col gap-2">
-              <button onClick={() => setEventTrainingGoal('complete')} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventTrainingGoal === 'complete' ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
-                <span className={`text-sm font-medium ${eventTrainingGoal === 'complete' ? 'text-white/90' : 'text-white/50'}`}>Finish it</span>
-                <span className={`block text-xs mt-0.5 ${eventTrainingGoal === 'complete' ? 'text-white/50' : 'text-white/25'}`}>Comfortable volume build — cross the line healthy</span>
-              </button>
-              <button onClick={() => setEventTrainingGoal('speed')} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventTrainingGoal === 'speed' ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
-                <span className={`text-sm font-medium ${eventTrainingGoal === 'speed' ? 'text-white/90' : 'text-white/50'}`}>Race for time</span>
-                <span className={`block text-xs mt-0.5 ${eventTrainingGoal === 'speed' ? 'text-white/50' : 'text-white/25'}`}>Pace-targeted plan with intervals and tempo work</span>
-              </button>
-            </div>
-          </div>
+          {(() => {
+            const hasData = !!(currentBaselines || currentSnapshot);
+            const fitnessLabels: Record<string, [string, string]> = {
+              beginner: ['Building up', '< 12 mi/week or new to structured training'],
+              intermediate: ['Consistent', '12–30 mi/week with some race experience'],
+              advanced: ['Competitive', '30+ mi/week, chasing PRs'],
+            };
+            const goalLabels: Record<string, [string, string]> = {
+              complete: ['Finish it', 'Comfortable volume build — cross the line healthy'],
+              speed: ['Race for time', 'Pace-targeted plan with intervals and tempo work'],
+            };
+
+            return (<>
+              <div>
+                <span className="text-sm text-white/50 mb-1.5 block">Training level</span>
+                {hasData && eventFitness && !overrideFitness ? (
+                  <div className="rounded-xl border border-white/15 bg-white/[0.08] px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white/90">{fitnessLabels[eventFitness]?.[0]}</span>
+                        <span className="block text-xs text-white/40 mt-0.5">{fitnessLabels[eventFitness]?.[1]}</span>
+                      </div>
+                      <button onClick={() => setOverrideFitness(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {(['beginner', 'intermediate', 'advanced'] as const).map(val => (
+                      <button key={val} onClick={() => { setEventFitness(val); if (hasData) setOverrideFitness(false); }} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventFitness === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                        <span className={`text-sm font-medium ${eventFitness === val ? 'text-white/90' : 'text-white/50'}`}>{fitnessLabels[val][0]}</span>
+                        <span className={`block text-xs mt-0.5 ${eventFitness === val ? 'text-white/50' : 'text-white/25'}`}>{fitnessLabels[val][1]}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <span className="text-sm text-white/50 mb-1.5 block">What's your goal?</span>
+                {hasData && eventTrainingGoal && !overrideGoal ? (
+                  <div className="rounded-xl border border-white/15 bg-white/[0.08] px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white/90">{goalLabels[eventTrainingGoal]?.[0]}</span>
+                        <span className="block text-xs text-white/40 mt-0.5">{goalLabels[eventTrainingGoal]?.[1]}</span>
+                      </div>
+                      <button onClick={() => setOverrideGoal(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {(['complete', 'speed'] as const).map(val => (
+                      <button key={val} onClick={() => { setEventTrainingGoal(val); if (hasData) setOverrideGoal(false); }} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventTrainingGoal === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                        <span className={`text-sm font-medium ${eventTrainingGoal === val ? 'text-white/90' : 'text-white/50'}`}>{goalLabels[val][0]}</span>
+                        <span className={`block text-xs mt-0.5 ${eventTrainingGoal === val ? 'text-white/50' : 'text-white/25'}`}>{goalLabels[val][1]}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>);
+          })()}
           <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save Goal'}</button>
         </div>
       </div>
