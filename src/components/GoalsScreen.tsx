@@ -296,6 +296,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           user_id: user.id,
           mode: 'build_existing',
           existing_goal_id: goal.id,
+          replace_plan_id: _conflictPlanId || null,
         },
       });
       if (error) throw new Error(error.message || 'Unable to build and materialize plan');

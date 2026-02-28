@@ -9,6 +9,7 @@ interface CreateGoalRequest {
   action?: GoalAction;
   existing_goal_id?: string | null;
   replace_goal_id?: string | null;
+  replace_plan_id?: string | null;
   plan_id?: string | null;
   goal?: {
     name: string;
@@ -50,6 +51,7 @@ const MIN_WEEKS: Record<string, Record<string, number>> = {
   '10k': { beginner: 4, intermediate: 4, advanced: 4 },
   '5k': { beginner: 4, intermediate: 4, advanced: 4 },
 };
+const MIN_MARATHON_GOAL_SPACING_WEEKS = 12;
 
 function weeksBetween(a: Date, b: Date): number {
   const ms = b.getTime() - a.getTime();
@@ -59,6 +61,10 @@ function weeksBetween(a: Date, b: Date): number {
 function distanceToApiValue(distance: string | null): string {
   if (!distance) return 'marathon';
   return DISTANCE_TO_API[distance] || String(distance).toLowerCase();
+}
+
+function isMarathonDistance(distance: string | null | undefined): boolean {
+  return String(distance || '').trim().toLowerCase() === 'marathon';
 }
 
 async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name: string, body: Record<string, any>) {
@@ -108,7 +114,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const payload = (await req.json()) as CreateGoalRequest;
-    const { user_id, mode = 'create', action, existing_goal_id, replace_goal_id, plan_id, goal } = payload || ({} as CreateGoalRequest);
+    const { user_id, mode = 'create', action, existing_goal_id, replace_goal_id, replace_plan_id, plan_id, goal } = payload || ({} as CreateGoalRequest);
 
     if (!user_id) throw new AppError('missing_user_id', 'user_id required');
     if (!['create', 'build_existing', 'link_existing'].includes(mode)) throw new AppError('invalid_mode', 'mode must be create, build_existing, or link_existing');
@@ -138,6 +144,33 @@ Deno.serve(async (req: Request) => {
     if (mode === 'create') {
       if (!goal?.name || !goal?.target_date || !goal?.sport) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
       if (!action || !['keep', 'replace'].includes(action)) throw new AppError('invalid_action', 'action must be keep or replace');
+
+      // Guardrail: don't allow "keep both" for marathons that are too close together.
+      if (action === 'keep' && existing_goal_id && isMarathonDistance(goal.distance)) {
+        const { data: existingGoal, error: existingGoalErr } = await supabase
+          .from('goals')
+          .select('id, target_date, distance, goal_type, status')
+          .eq('id', existing_goal_id)
+          .eq('user_id', user_id)
+          .maybeSingle();
+        if (existingGoalErr || !existingGoal) throw new AppError('goal_not_found', existingGoalErr?.message || 'Existing goal not found', 404);
+
+        if (
+          existingGoal.goal_type === 'event' &&
+          (existingGoal.status || 'active') === 'active' &&
+          isMarathonDistance(existingGoal.distance) &&
+          existingGoal.target_date &&
+          goal.target_date
+        ) {
+          const deltaWeeks = Math.abs(weeksBetween(new Date(existingGoal.target_date), new Date(goal.target_date)));
+          if (deltaWeeks < MIN_MARATHON_GOAL_SPACING_WEEKS) {
+            throw new AppError(
+              'marathon_conflict_too_close',
+              `These marathons are only ${deltaWeeks} weeks apart. Choose Replace to switch race focus, or pick a race at least ${MIN_MARATHON_GOAL_SPACING_WEEKS}+ weeks away.`,
+            );
+          }
+        }
+      }
     } else if (!existing_goal_id) {
       throw new AppError('missing_goal_id', 'existing_goal_id required for build_existing mode');
     }
@@ -274,6 +307,30 @@ Deno.serve(async (req: Request) => {
     if (linkErr) throw new AppError('plan_link_failed', linkErr.message);
 
     await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: generatedPlanId });
+
+    // If the caller asked to replace a specific plan (e.g., End & Build), end it explicitly.
+    if (replace_plan_id) {
+      const today = new Date().toISOString().slice(0, 10);
+      await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', today);
+      await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
+    }
+
+    // If rebuilding for an existing goal, retire any previously active linked plans for that same goal.
+    if (mode === 'build_existing' && existing_goal_id) {
+      const { data: priorLinkedPlans } = await supabase
+        .from('plans')
+        .select('id,status')
+        .eq('user_id', user_id)
+        .eq('goal_id', existing_goal_id)
+        .eq('status', 'active');
+
+      const today = new Date().toISOString().slice(0, 10);
+      for (const p of priorLinkedPlans || []) {
+        if (p.id === generatedPlanId) continue;
+        await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', today);
+        await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
+      }
+    }
 
     // End unlinked active run plans to avoid duplicate active plan stacks.
     const { data: unlinkedPlans } = await supabase
