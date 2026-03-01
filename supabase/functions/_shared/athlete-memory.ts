@@ -9,6 +9,9 @@ export interface AthleteMemoryRow {
   computed_at: string | null;
 }
 
+export type MarathonReadinessState = 'race_support' | 'bridge_peak' | 'compressed_build' | 'full_build';
+export type MarathonRiskTier = 'low' | 'moderate' | 'high' | 'very_high';
+
 export interface RuleConfig {
   confidenceThreshold: number;
   sufficiencyThreshold: number;
@@ -55,6 +58,36 @@ export const RULE_CONFIGS: Record<string, RuleConfig> = {
     required: 12,
     allowLowConfidence: false,
   },
+  'run.recommended_build_weeks': {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 12,
+    allowLowConfidence: true,
+  },
+  'run.minimum_feasible_weeks': {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 12,
+    allowLowConfidence: true,
+  },
+  'run.recommended_spacing_weeks': {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 10,
+    allowLowConfidence: true,
+  },
+  'run.minimum_feasible_spacing_weeks': {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 10,
+    allowLowConfidence: true,
+  },
+  'run.marathon_readiness_state': {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 10,
+    allowLowConfidence: true,
+  },
   'cross.interference_risk': {
     confidenceThreshold: 0.5,
     sufficiencyThreshold: 3,
@@ -87,6 +120,11 @@ const RULE_CONFIDENCE_KEYS: Record<string, string> = {
   'run.aerobic_floor_hr': 'aerobic_floor_hr',
   'run.efficiency_peak_pace': 'efficiency_peak_pace',
   'run.marathon_min_weeks_recommended': 'marathon_min_weeks_recommended',
+  'run.recommended_build_weeks': 'run_recommended_build_weeks',
+  'run.minimum_feasible_weeks': 'run_minimum_feasible_weeks',
+  'run.recommended_spacing_weeks': 'run_recommended_spacing_weeks',
+  'run.minimum_feasible_spacing_weeks': 'run_minimum_feasible_spacing_weeks',
+  'run.marathon_readiness_state': 'run_recommended_build_weeks',
   'cross.interference_risk': 'cross_interference_risk',
   'cross.concurrent_load_ramp_risk': 'cross_concurrent_load_ramp_risk',
   'cross.taper_sensitivity': 'cross_taper_sensitivity',
@@ -97,6 +135,11 @@ const RULE_SUFFICIENCY_KEYS: Record<string, string> = {
   'run.aerobic_floor_hr': 'aerobic_floor_hr_runs',
   'run.efficiency_peak_pace': 'efficiency_peak_pace_runs',
   'run.marathon_min_weeks_recommended': 'snapshots_weeks',
+  'run.recommended_build_weeks': 'snapshots_weeks',
+  'run.minimum_feasible_weeks': 'snapshots_weeks',
+  'run.recommended_spacing_weeks': 'marathon_spacing_evidence_weeks',
+  'run.minimum_feasible_spacing_weeks': 'marathon_spacing_evidence_weeks',
+  'run.marathon_readiness_state': 'snapshots_weeks',
   'cross.interference_risk': 'cross_overlap_weeks',
   'cross.concurrent_load_ramp_risk': 'weekly_ramp_samples',
   'cross.taper_sensitivity': 'taper_sensitivity_cycles',
@@ -260,5 +303,174 @@ export function resolveMarathonMinWeeksFromMemory(
     minWeeks: Math.max(fallbackFloorWeeks, Math.round(rawWeeks)),
     confidence,
     sufficiencyWeeks,
+  };
+}
+
+export interface AdaptiveMarathonInputs {
+  weeksOut: number;
+  spacingWeeks: number | null;
+  fitness: string;
+}
+
+export interface AdaptiveMarathonDecision {
+  readiness_state: MarathonReadinessState;
+  recommended_mode: MarathonReadinessState;
+  risk_tier: MarathonRiskTier;
+  recommended_build_weeks: number;
+  minimum_feasible_weeks: number;
+  recommended_spacing_weeks: number;
+  minimum_feasible_spacing_weeks: number;
+  why: string[];
+  constraints: string[];
+  next_actions: string[];
+  decision_source: {
+    readiness_rules: 'athlete_memory' | 'fallback';
+    rule_statuses: Record<string, string>;
+    memory_period_start?: string;
+    memory_period_end?: string;
+    memory_confidence?: number;
+  };
+  spacing_assessment: {
+    actual_spacing_weeks: number | null;
+    minimum_feasible: number;
+    recommended: number;
+  };
+}
+
+function clampInt(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+
+function modeFromWeeksOut(weeksOut: number): MarathonReadinessState {
+  if (weeksOut <= 2) return 'race_support';
+  if (weeksOut <= 6) return 'bridge_peak';
+  if (weeksOut <= 10) return 'compressed_build';
+  return 'full_build';
+}
+
+export function resolveAdaptiveMarathonDecisionFromMemory(
+  memory: AthleteMemoryRow | null,
+  input: AdaptiveMarathonInputs,
+): AdaptiveMarathonDecision {
+  const memoryConfidence = Number(memory?.confidence_score ?? 0);
+  const minWeeksResult = getRuleOrInsufficient<number>(memory, 'run.minimum_feasible_weeks', {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 8,
+    allowLowConfidence: true,
+  });
+  const recWeeksResult = getRuleOrInsufficient<number>(memory, 'run.recommended_build_weeks', {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 8,
+    allowLowConfidence: true,
+  });
+  const minSpacingResult = getRuleOrInsufficient<number>(memory, 'run.minimum_feasible_spacing_weeks', {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 8,
+    allowLowConfidence: true,
+  });
+  const recSpacingResult = getRuleOrInsufficient<number>(memory, 'run.recommended_spacing_weeks', {
+    confidenceThreshold: 0.35,
+    sufficiencyThreshold: 4,
+    required: 8,
+    allowLowConfidence: true,
+  });
+
+  const fallbackRecByFitness: Record<string, number> = { beginner: 12, intermediate: 10, advanced: 8 };
+  const fallbackMinByFitness: Record<string, number> = { beginner: 6, intermediate: 4, advanced: 3 };
+  const recWeeks = recWeeksResult.status === 'ok' || recWeeksResult.status === 'low_confidence'
+    ? Number(recWeeksResult.value)
+    : (fallbackRecByFitness[input.fitness] ?? 10);
+  const minWeeks = minWeeksResult.status === 'ok' || minWeeksResult.status === 'low_confidence'
+    ? Number(minWeeksResult.value)
+    : (fallbackMinByFitness[input.fitness] ?? 4);
+  const recSpacing = recSpacingResult.status === 'ok' || recSpacingResult.status === 'low_confidence'
+    ? Number(recSpacingResult.value)
+    : 12;
+  const minSpacing = minSpacingResult.status === 'ok' || minSpacingResult.status === 'low_confidence'
+    ? Number(minSpacingResult.value)
+    : 8;
+
+  const recommendedBuildWeeks = clampInt(recWeeks, 4, 20);
+  const minimumFeasibleWeeks = clampInt(minWeeks, 1, recommendedBuildWeeks);
+  const recommendedSpacingWeeks = clampInt(recSpacing, 6, 24);
+  const minimumFeasibleSpacingWeeks = clampInt(minSpacing, 4, recommendedSpacingWeeks);
+
+  const readiness_state = modeFromWeeksOut(input.weeksOut);
+  const recommended_mode: MarathonReadinessState =
+    input.weeksOut <= minimumFeasibleWeeks
+      ? 'race_support'
+      : input.weeksOut < recommendedBuildWeeks
+        ? (input.weeksOut <= 6 ? 'bridge_peak' : 'compressed_build')
+        : 'full_build';
+
+  const why: string[] = [];
+  const constraints: string[] = [];
+  const next_actions: string[] = [];
+  if (input.weeksOut < recommendedBuildWeeks) {
+    why.push(`Timeline (${input.weeksOut}w) is shorter than recommended build (${recommendedBuildWeeks}w).`);
+    constraints.push('Avoid adding aggressive volume this close to race day.');
+  } else {
+    why.push(`Timeline (${input.weeksOut}w) supports full build progression.`);
+  }
+  if (input.spacingWeeks != null) {
+    if (input.spacingWeeks < recommendedSpacingWeeks) {
+      why.push(`Marathon spacing (${input.spacingWeeks}w) is tighter than recommended (${recommendedSpacingWeeks}w).`);
+      constraints.push('Prioritize recovery quality and conservative intensity between races.');
+    }
+  }
+
+  let risk_tier: MarathonRiskTier = 'low';
+  if (input.weeksOut < minimumFeasibleWeeks) risk_tier = 'high';
+  if (input.weeksOut <= 2) risk_tier = 'moderate';
+  if (input.spacingWeeks != null && input.spacingWeeks < minimumFeasibleSpacingWeeks) {
+    risk_tier = input.weeksOut < minimumFeasibleWeeks ? 'very_high' : 'high';
+  } else if (input.spacingWeeks != null && input.spacingWeeks < recommendedSpacingWeeks && risk_tier === 'low') {
+    risk_tier = 'moderate';
+  }
+  if (!Number.isFinite(memoryConfidence) || memoryConfidence < 0.35) {
+    why.push('Memory confidence is limited; recommendations use conservative fallback bounds.');
+  }
+
+  if (recommended_mode === 'race_support') {
+    next_actions.push('Shift to race-week support: freshness, fueling, logistics, and pacing execution.');
+  } else if (recommended_mode === 'bridge_peak') {
+    next_actions.push('Use bridge-to-peak mode: preserve intensity, avoid large volume ramps.');
+  } else if (recommended_mode === 'compressed_build') {
+    next_actions.push('Use compressed build: focus on key sessions and recovery compliance.');
+  } else {
+    next_actions.push('Proceed with full build progression and scheduled deloads.');
+  }
+
+  return {
+    readiness_state,
+    recommended_mode,
+    risk_tier,
+    recommended_build_weeks: recommendedBuildWeeks,
+    minimum_feasible_weeks: minimumFeasibleWeeks,
+    recommended_spacing_weeks: recommendedSpacingWeeks,
+    minimum_feasible_spacing_weeks: minimumFeasibleSpacingWeeks,
+    why,
+    constraints,
+    next_actions,
+    decision_source: {
+      readiness_rules: memory ? 'athlete_memory' : 'fallback',
+      rule_statuses: {
+        'run.minimum_feasible_weeks': minWeeksResult.status,
+        'run.recommended_build_weeks': recWeeksResult.status,
+        'run.minimum_feasible_spacing_weeks': minSpacingResult.status,
+        'run.recommended_spacing_weeks': recSpacingResult.status,
+      },
+      memory_period_start: memory?.period_start,
+      memory_period_end: memory?.period_end,
+      memory_confidence: Number.isFinite(memoryConfidence) ? memoryConfidence : undefined,
+    },
+    spacing_assessment: {
+      actual_spacing_weeks: input.spacingWeeks,
+      minimum_feasible: minimumFeasibleSpacingWeeks,
+      recommended: recommendedSpacingWeeks,
+    },
   };
 }

@@ -452,6 +452,13 @@ interface TrainingContextResponse {
     affects_rules: string[];
     user_message: string;
   }>;
+  marathon_readiness?: {
+    readiness_state: 'race_support' | 'bridge_peak' | 'compressed_build' | 'full_build' | null;
+    recommended_build_weeks: number | null;
+    minimum_feasible_weeks: number | null;
+    recommended_spacing_weeks: number | null;
+    minimum_feasible_spacing_weeks: number | null;
+  };
 }
 
 /** Monday of week containing date, ISO (YYYY-MM-DD). Matches compute-snapshot week boundary. */
@@ -1072,6 +1079,26 @@ Deno.serve(async (req) => {
       athleteMemory,
       'cross.taper_sensitivity',
     );
+    const marathonStateResult = getRuleOrInsufficient<string>(
+      athleteMemory,
+      'run.marathon_readiness_state',
+    );
+    const marathonRecommendedBuildResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'run.recommended_build_weeks',
+    );
+    const marathonMinimumFeasibleResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'run.minimum_feasible_weeks',
+    );
+    const marathonRecommendedSpacingResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'run.recommended_spacing_weeks',
+    );
+    const marathonMinimumFeasibleSpacingResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'run.minimum_feasible_spacing_weeks',
+    );
 
     console.log(explainRuleResult('strength.injury_hotspots', strengthHotspotsResult, 'server'));
     console.log(explainRuleResult('run.aerobic_floor_hr', runAerobicFloorResult, 'server'));
@@ -1079,6 +1106,7 @@ Deno.serve(async (req) => {
     console.log(explainRuleResult('cross.interference_risk', crossInterferenceResult, 'server'));
     console.log(explainRuleResult('cross.concurrent_load_ramp_risk', crossConcurrentRampResult, 'server'));
     console.log(explainRuleResult('cross.taper_sensitivity', crossTaperSensitivityResult, 'server'));
+    console.log(explainRuleResult('run.marathon_readiness_state', marathonStateResult, 'server'));
 
     const personalization_gaps: TrainingContextResponse['personalization_gaps'] = [];
     const gapCandidates: Array<{ rule: string; result: any }> = [
@@ -1088,6 +1116,10 @@ Deno.serve(async (req) => {
       { rule: 'cross.interference_risk', result: crossInterferenceResult },
       { rule: 'cross.concurrent_load_ramp_risk', result: crossConcurrentRampResult },
       { rule: 'cross.taper_sensitivity', result: crossTaperSensitivityResult },
+      { rule: 'run.recommended_build_weeks', result: marathonRecommendedBuildResult },
+      { rule: 'run.minimum_feasible_weeks', result: marathonMinimumFeasibleResult },
+      { rule: 'run.recommended_spacing_weeks', result: marathonRecommendedSpacingResult },
+      { rule: 'run.minimum_feasible_spacing_weeks', result: marathonMinimumFeasibleSpacingResult },
     ];
     for (const { rule, result } of gapCandidates) {
       if (!result || result.status === 'ok') continue;
@@ -1180,6 +1212,23 @@ Deno.serve(async (req) => {
       crossTaperSensitivityResult.status === 'ok' || crossTaperSensitivityResult.status === 'low_confidence'
         ? Number(crossTaperSensitivityResult.value)
         : NaN;
+    const marathonReadiness = {
+      readiness_state: (marathonStateResult.status === 'ok' || marathonStateResult.status === 'low_confidence')
+        ? (String(marathonStateResult.value) as any)
+        : null,
+      recommended_build_weeks: (marathonRecommendedBuildResult.status === 'ok' || marathonRecommendedBuildResult.status === 'low_confidence')
+        ? Number(marathonRecommendedBuildResult.value)
+        : null,
+      minimum_feasible_weeks: (marathonMinimumFeasibleResult.status === 'ok' || marathonMinimumFeasibleResult.status === 'low_confidence')
+        ? Number(marathonMinimumFeasibleResult.value)
+        : null,
+      recommended_spacing_weeks: (marathonRecommendedSpacingResult.status === 'ok' || marathonRecommendedSpacingResult.status === 'low_confidence')
+        ? Number(marathonRecommendedSpacingResult.value)
+        : null,
+      minimum_feasible_spacing_weeks: (marathonMinimumFeasibleSpacingResult.status === 'ok' || marathonMinimumFeasibleSpacingResult.status === 'low_confidence')
+        ? Number(marathonMinimumFeasibleSpacingResult.value)
+        : null,
+    };
 
     // Strength-first: high-stakes guardrail does not proceed on low confidence.
     if (isRuleUsable(strengthHotspotsResult) && injuryHotspots.length > 0 && display_structural_tier === 'Low') {
@@ -2208,6 +2257,14 @@ Deno.serve(async (req) => {
       if (memory_used_for_decisions && Number.isFinite(crossInterferenceRisk) && crossInterferenceRisk >= 0.65) {
         context_summary.push('Memory note: cross-discipline interference risk is elevated this block.');
       }
+      if (marathonReadiness.readiness_state && (plan_checkin.plan_name || '').toLowerCase().includes('marathon')) {
+        const stateLabel =
+          marathonReadiness.readiness_state === 'race_support' ? 'Race support mode recommended.' :
+          marathonReadiness.readiness_state === 'bridge_peak' ? 'Bridge-to-peak mode recommended.' :
+          marathonReadiness.readiness_state === 'compressed_build' ? 'Compressed build mode recommended.' :
+          'Full build mode supported.';
+        context_summary.push(`Marathon readiness: ${stateLabel}`);
+      }
       if (acwr.ratio > 1.3 && acwr.data_days >= 7) {
         context_summary.push(acwr.ratio > 1.5 ? 'Load is overreaching — avoid adding volume.' : 'Load is ramping fast — avoid adding volume.');
       }
@@ -2285,6 +2342,7 @@ Deno.serve(async (req) => {
       },
       personalization_gaps: personalization_gaps && personalization_gaps.length > 0 ? personalization_gaps : undefined,
       gaps_summary: gaps_summary && gaps_summary.length > 0 ? gaps_summary : undefined,
+      marathon_readiness: marathonReadiness,
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

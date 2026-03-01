@@ -487,8 +487,26 @@ Deno.serve(async (req: Request) => {
       ? Math.round((clamp(Math.max(...weeklyRampJumps), -1, 1) * 100)) / 100
       : null;
 
-    // Marathon readiness rule (deterministic).
+    // Marathon readiness + spacing rules (deterministic).
     const marathonMin = marathonMinWeeksFromHistory(avgWeeklyRunMinutes, maxLongRunMinutes, avgAdherencePct);
+    const minimumFeasibleWeeks = (() => {
+      if (avgWeeklyRunMinutes >= 300 && maxLongRunMinutes >= 90 && avgAdherencePct >= 60) return 2;
+      if (avgWeeklyRunMinutes >= 220 && maxLongRunMinutes >= 75) return 3;
+      if (avgWeeklyRunMinutes >= 160 && maxLongRunMinutes >= 60) return 4;
+      return 6;
+    })();
+    const recommendedBuildWeeks = marathonMin.base;
+    const recommendedSpacingWeeks = (() => {
+      if (avgWeeklyRunMinutes >= 320 && maxLongRunMinutes >= 100 && avgAdherencePct >= 65) return 8;
+      if (avgWeeklyRunMinutes >= 240 && maxLongRunMinutes >= 85) return 10;
+      return 12;
+    })();
+    const minimumFeasibleSpacingWeeks = Math.max(4, recommendedSpacingWeeks - 3);
+    const marathonReadinessState =
+      minimumFeasibleWeeks <= 2 ? 'race_support_ready' :
+      minimumFeasibleWeeks <= 4 ? 'bridge_ready' :
+      minimumFeasibleWeeks <= 6 ? 'compressed_build_ready' :
+      'full_build_needed';
 
     const dataSufficiency = {
       aerobic_floor_hr_runs: easyHrSamples.length,
@@ -506,6 +524,7 @@ Deno.serve(async (req: Request) => {
       strength_rir_samples: strengthRirSamples.length,
       cross_overlap_weeks: crossWeeklyScores.length,
       weekly_ramp_samples: weeklyRampJumps.length,
+      marathon_spacing_evidence_weeks: snapshotRows.length,
     };
 
     const ruleConfidence = {
@@ -524,6 +543,10 @@ Deno.serve(async (req: Request) => {
       cross_interference_risk: confidenceFromSamples(crossWeeklyScores.length, 3, 10),
       cross_concurrent_load_ramp_risk: confidenceFromSamples(weeklyRampJumps.length, 3, 10),
       cross_taper_sensitivity: confidenceFromSamples(taperDeltas.length, 2, 8),
+      run_recommended_build_weeks: confidenceFromSamples(snapshotRows.length + weeklyRunMinuteValues.length, 8, 20),
+      run_minimum_feasible_weeks: confidenceFromSamples(snapshotRows.length + weeklyRunMinuteValues.length, 8, 20),
+      run_recommended_spacing_weeks: confidenceFromSamples(snapshotRows.length, 6, 16),
+      run_minimum_feasible_spacing_weeks: confidenceFromSamples(snapshotRows.length, 6, 16),
     };
 
     const runNamespace: NamespaceResult = {
@@ -580,11 +603,16 @@ Deno.serve(async (req: Request) => {
 
     const derivedRules = {
       run: {
+        marathon_readiness_state: marathonReadinessState,
+        recommended_build_weeks: recommendedBuildWeeks,
+        minimum_feasible_weeks: minimumFeasibleWeeks,
         aerobic_floor_hr: aerobicFloorHr,
         volume_ceiling_min: runVolumeCeilingMin != null ? Math.round(runVolumeCeilingMin) : null,
         efficiency_peak_pace: efficiencyPeakPace, // min/km
         long_run_max_min: maxLongRunMinutes || null,
         marathon_min_weeks_recommended: marathonMin.base,
+        recommended_spacing_weeks: recommendedSpacingWeeks,
+        minimum_feasible_spacing_weeks: minimumFeasibleSpacingWeeks,
         marathon_min_weeks_by_fitness: {
           beginner: marathonMin.beginner,
           intermediate: marathonMin.intermediate,

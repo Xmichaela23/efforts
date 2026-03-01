@@ -1,5 +1,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { getLatestAthleteMemory, resolveMarathonMinWeeksFromMemory } from '../_shared/athlete-memory.ts';
+import {
+  getLatestAthleteMemory,
+  resolveAdaptiveMarathonDecisionFromMemory,
+  resolveMarathonMinWeeksFromMemory,
+} from '../_shared/athlete-memory.ts';
 
 type GoalAction = 'keep' | 'replace';
 type RequestMode = 'create' | 'build_existing' | 'link_existing';
@@ -52,7 +56,7 @@ const MIN_WEEKS: Record<string, Record<string, number>> = {
   '10k': { beginner: 4, intermediate: 4, advanced: 4 },
   '5k': { beginner: 4, intermediate: 4, advanced: 4 },
 };
-const MIN_MARATHON_GOAL_SPACING_WEEKS = 12;
+const ADAPTIVE_MARATHON_DECISIONS_ENABLED = (Deno.env.get('ADAPTIVE_MARATHON_DECISIONS_ENABLED') ?? 'true') !== 'false';
 
 function weeksBetween(a: Date, b: Date): number {
   const ms = b.getTime() - a.getTime();
@@ -157,32 +161,7 @@ Deno.serve(async (req: Request) => {
         throw new AppError('missing_distance', 'Select a race distance to build a plan.');
       }
 
-      // Guardrail: don't allow "keep both" for marathons that are too close together.
-      if (action === 'keep' && existing_goal_id && isMarathonDistance(goal.distance)) {
-        const { data: existingGoal, error: existingGoalErr } = await supabase
-          .from('goals')
-          .select('id, target_date, distance, goal_type, status')
-          .eq('id', existing_goal_id)
-          .eq('user_id', user_id)
-          .maybeSingle();
-        if (existingGoalErr || !existingGoal) throw new AppError('goal_not_found', existingGoalErr?.message || 'Existing goal not found', 404);
-
-        if (
-          existingGoal.goal_type === 'event' &&
-          (existingGoal.status || 'active') === 'active' &&
-          isMarathonDistance(existingGoal.distance) &&
-          existingGoal.target_date &&
-          goal.target_date
-        ) {
-          const deltaWeeks = Math.abs(weeksBetween(new Date(existingGoal.target_date), new Date(goal.target_date)));
-          if (deltaWeeks < MIN_MARATHON_GOAL_SPACING_WEEKS) {
-            throw new AppError(
-              'marathon_conflict_too_close',
-              `These marathons are only ${deltaWeeks} weeks apart. Choose Replace to switch race focus, or pick a race at least ${MIN_MARATHON_GOAL_SPACING_WEEKS}+ weeks away.`,
-            );
-          }
-        }
-      }
+      // Keep-mode marathon spacing is now adaptive and memory-driven later in flow.
     } else if (!existing_goal_id) {
       throw new AppError('missing_goal_id', 'existing_goal_id required for build_existing mode');
     }
@@ -222,6 +201,10 @@ Deno.serve(async (req: Request) => {
     if (!distanceApi) throw new AppError('missing_distance', 'Select a race distance to build a plan.');
     const floorWeeks = MIN_WEEKS[distanceApi]?.[fitness] ?? 4;
     const weeksOut = weeksBetween(new Date(), new Date(String(resolvedGoal?.target_date || '')));
+    if (weeksOut < 1) {
+      throw new AppError('race_date_in_past', 'Race date must be in the future.');
+    }
+    let adaptiveMarathonDecision: any = null;
 
     const [{ data: baseline }, { data: snapshot }] = await Promise.all([
       supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle(),
@@ -241,34 +224,81 @@ Deno.serve(async (req: Request) => {
 
       const latestMemory = await getLatestAthleteMemory(supabase, user_id);
 
-      if (!latestMemory) {
-        throw new AppError(
-          'insufficient_evidence_memory',
-          'Not enough historical data to set marathon timeline yet. Complete more training history, then retry.',
-        );
+      let spacingWeeks: number | null = null;
+      if (mode === 'create' && action === 'keep' && existing_goal_id) {
+        const { data: existingGoal } = await supabase
+          .from('goals')
+          .select('id, target_date, distance, goal_type, status')
+          .eq('id', existing_goal_id)
+          .eq('user_id', user_id)
+          .maybeSingle();
+        if (
+          existingGoal &&
+          existingGoal.goal_type === 'event' &&
+          (existingGoal.status || 'active') === 'active' &&
+          isMarathonDistance(existingGoal.distance) &&
+          existingGoal.target_date &&
+          resolvedGoal?.target_date
+        ) {
+          spacingWeeks = Math.abs(weeksBetween(new Date(existingGoal.target_date), new Date(resolvedGoal.target_date)));
+      }
       }
 
-      const resolved = resolveMarathonMinWeeksFromMemory(latestMemory, fitness, floorWeeks);
-      const confidence = resolved.confidence;
-      const sufficiencyWeeks = resolved.sufficiencyWeeks;
-      if (!Number.isFinite(confidence) || confidence < 0.35 || sufficiencyWeeks < 4) {
-        throw new AppError(
-          'insufficient_evidence_memory',
-          'Marathon timeline needs at least 4 weeks of quality history before we can personalize safely.',
-        );
-      }
+      const adaptive = resolveAdaptiveMarathonDecisionFromMemory(latestMemory, {
+        weeksOut,
+        spacingWeeks,
+        fitness,
+      });
+      adaptiveMarathonDecision = adaptive;
+      console.log('[adaptive-marathon-decision]', {
+        user_id,
+        weeksOut,
+        spacingWeeks,
+        readiness_state: adaptive.readiness_state,
+        recommended_mode: adaptive.recommended_mode,
+        risk_tier: adaptive.risk_tier,
+        decision_source: adaptive.decision_source,
+      });
 
-      if (!resolved.minWeeks) {
-        throw new AppError(
-          'memory_rule_missing',
-          'Athlete memory is missing marathon readiness rules. Recompute memory and try again.',
-        );
+      if (ADAPTIVE_MARATHON_DECISIONS_ENABLED) {
+        personalizedFloorWeeks = Math.max(1, adaptive.minimum_feasible_weeks);
+      } else {
+        const resolved = resolveMarathonMinWeeksFromMemory(latestMemory, fitness, floorWeeks);
+        const confidence = resolved.confidence;
+        const sufficiencyWeeks = resolved.sufficiencyWeeks;
+        if (!Number.isFinite(confidence) || confidence < 0.35 || sufficiencyWeeks < 4) {
+          throw new AppError(
+            'insufficient_evidence_memory',
+            'Marathon timeline needs at least 4 weeks of quality history before we can personalize safely.',
+          );
+        }
+        if (!resolved.minWeeks) {
+          throw new AppError(
+            'memory_rule_missing',
+            'Athlete memory is missing marathon readiness rules. Recompute memory and try again.',
+          );
+        }
+        personalizedFloorWeeks = resolved.minWeeks;
       }
-
-      personalizedFloorWeeks = resolved.minWeeks;
     }
 
-    if (weeksOut < personalizedFloorWeeks) {
+    let allowRaceWeekSupportMode = false;
+    if (distanceApi === 'marathon' && weeksOut <= 2) {
+      const { data: activeRunPlan } = await supabase
+        .from('plans')
+        .select('id, plan_type, config, status')
+        .eq('user_id', user_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const planType = String(activeRunPlan?.plan_type || '').toLowerCase();
+      const planSport = String(activeRunPlan?.config?.sport || '').toLowerCase();
+      const hasActiveRunContext = !!activeRunPlan && (planType.includes('run') || planSport === 'run');
+      allowRaceWeekSupportMode = hasActiveRunContext;
+    }
+
+    if (!ADAPTIVE_MARATHON_DECISIONS_ENABLED && !allowRaceWeekSupportMode && weeksOut < personalizedFloorWeeks) {
       const msg = distanceApi === 'marathon'
         ? `Based on your recent training history, this marathon needs about ${personalizedFloorWeeks}+ weeks. Your selected race is ${weeksOut} weeks out. Choose Replace with a later date or pick a shorter race.`
         : `Your race is ${weeksOut} weeks away. ${distanceApi} needs at least ${personalizedFloorWeeks} weeks.`;
@@ -277,7 +307,15 @@ Deno.serve(async (req: Request) => {
         msg,
       );
     }
-    const durationWeeks = Math.max(personalizedFloorWeeks, Math.min(weeksOut, 20));
+    const adaptiveMode = adaptiveMarathonDecision?.recommended_mode as string | undefined;
+    const adaptiveSupportMode = distanceApi === 'marathon' && ADAPTIVE_MARATHON_DECISIONS_ENABLED
+      ? adaptiveMode === 'race_support' || adaptiveMode === 'bridge_peak'
+      : false;
+    const durationWeeks = adaptiveSupportMode
+      ? Math.max(1, Math.min(weeksOut, adaptiveMode === 'race_support' ? 2 : 6))
+      : allowRaceWeekSupportMode
+        ? Math.max(1, Math.min(weeksOut, 2))
+        : Math.max(personalizedFloorWeeks, Math.min(weeksOut, 20));
 
     if (goalType === 'speed') {
       const hasRaceTime = baseline?.effort_source_distance && baseline?.effort_source_time;
@@ -326,7 +364,7 @@ Deno.serve(async (req: Request) => {
       fitness,
       goal: goalType,
       duration_weeks: durationWeeks,
-      approach: goalType === 'complete' ? 'sustainable' : 'performance_build',
+      approach: (allowRaceWeekSupportMode || adaptiveSupportMode) ? 'sustainable' : (goalType === 'complete' ? 'sustainable' : 'performance_build'),
       days_per_week: resolvedGoal?.training_prefs?.days_per_week
         ? `${resolvedGoal.training_prefs.days_per_week}-${Math.min(7, Number(resolvedGoal.training_prefs.days_per_week) + 1)}`
         : '4-5',
@@ -334,6 +372,9 @@ Deno.serve(async (req: Request) => {
       race_name: resolvedGoal?.name,
       current_weekly_miles: weeklyMiles,
     };
+    if (allowRaceWeekSupportMode || adaptiveSupportMode) {
+      generateBody.race_week_mode = true;
+    }
 
     if (generateBody.approach === 'performance_build') {
       if (baseline?.effort_source_distance && baseline?.effort_source_time) {
@@ -435,6 +476,14 @@ Deno.serve(async (req: Request) => {
         mode,
         goal_id: createdGoalId,
         plan_id: generatedPlanId,
+        readiness_state: adaptiveMarathonDecision?.readiness_state,
+        recommended_mode: adaptiveMarathonDecision?.recommended_mode,
+        risk_tier: adaptiveMarathonDecision?.risk_tier,
+        spacing_assessment: adaptiveMarathonDecision?.spacing_assessment,
+        decision_source: adaptiveMarathonDecision?.decision_source,
+        why: adaptiveMarathonDecision?.why,
+        constraints: adaptiveMarathonDecision?.constraints,
+        next_actions: adaptiveMarathonDecision?.next_actions,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );

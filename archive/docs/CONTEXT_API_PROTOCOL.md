@@ -268,6 +268,21 @@ The system remains protective of the athlete regardless of plan status:
     - `durability_risk` — Mile 20 Fade Risk when aero up / strength down
     - `interference` — strength_speed, power_aerobic, and `all` messages
 
+### create-goal-and-materialize-plan (adaptive marathon decision payload)
+
+- **Input:** existing goal payload (create/build/link modes)
+- **Output (marathon event goals):**
+  - `readiness_state` — `race_support | bridge_peak | compressed_build | full_build`
+  - `recommended_mode` — coach recommendation from memory-derived feasibility/optimality
+  - `risk_tier` — `low | moderate | high | very_high`
+  - `spacing_assessment` — `{ actual_spacing_weeks, minimum_feasible, recommended }`
+  - `decision_source` — `{ readiness_rules, rule_statuses, memory_period_start, memory_period_end, memory_confidence }`
+  - `why[]`, `constraints[]`, `next_actions[]` for deterministic explanation
+
+Notes:
+- Near-race marathon flows are supported with race-support/bridge recommendations instead of generic hard blocking.
+- Rollout flag: `ADAPTIVE_MARATHON_DECISIONS_ENABLED` (default on) allows staged rollout while preserving legacy behavior when needed.
+
 ### Shared Types (goal-predictor)
 
 - **GoalProfile:** `'marathon' | 'strength' | 'speed' | 'power' | 'general'`
