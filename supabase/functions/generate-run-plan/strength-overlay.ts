@@ -12,6 +12,7 @@ import {
   ProtocolContext,
   StrengthPhase,
   PlacedSession,
+  IntentSession,
 } from '../shared/strength-system/protocols/types.ts';
 import type { PlanningMemoryContext } from '../_shared/athlete-memory.ts';
 
@@ -20,6 +21,120 @@ const INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD = 0.65;
 
 type StrengthTier = 'bodyweight' | 'barbell';
 type StrengthFrequency = 2 | 3;
+
+// ============================================================================
+// SENSITIVITY-GATED TAPER STEP-DOWN
+// ============================================================================
+
+interface TaperStrengthParams {
+  /** How many strength sessions to include this taper week. */
+  effectiveFrequency: 0 | 1 | 2;
+  /** 0–1 multiplier applied to exercise sets. Keeps intensity high, cuts volume. */
+  taperLoadScale: number;
+  strategy: 'aggressive' | 'standard' | 'extended';
+}
+
+/**
+ * Compute taper strength parameters based on taper_sensitivity from athlete_memory.
+ *
+ * Science (Mujika & Padilla 2003, Bosquet et al. 2007):
+ * - Maintain intensity; cut volume 40–60%
+ * - Frequency drop of ≤ 1 session/week preserves neuromuscular readiness
+ * - High-sensitivity athletes peak faster → steeper step-down is safe
+ * - Low-sensitivity athletes need gradual de-fatigue → maintain load longer
+ *
+ * Edge case: 1-week taper → normalise to the "final stage" cutback since
+ * the athlete arrives at race week after only one reduced-load week.
+ */
+function getTaperStrengthParams(
+  weekInTaper: number,
+  taperLength: number,
+  taperSensitivity: number | null,
+): TaperStrengthParams {
+  // Short taper (≤ 1 week): treat as final-stage immediately
+  const effectiveWeek = taperLength <= 1 ? 2 : weekInTaper;
+  const sensitivity = taperSensitivity ?? 0.5; // default: moderate
+
+  if (sensitivity >= 0.65) {
+    // Aggressive: cut to 1 session immediately; minimal load in final stage
+    return {
+      effectiveFrequency: 1,
+      taperLoadScale: effectiveWeek === 1 ? 0.6 : 0.4,
+      strategy: 'aggressive',
+    };
+  }
+
+  if (sensitivity >= 0.35) {
+    // Standard: 2 sessions at reduced load → 1 session light
+    return {
+      effectiveFrequency: weekInTaper === 1 ? 2 : 1,
+      taperLoadScale: weekInTaper === 1 ? 0.75 : 0.55,
+      strategy: 'standard',
+    };
+  }
+
+  // Extended: gradual step-down, maintain 2 sessions longer
+  if (weekInTaper <= 2) {
+    return {
+      effectiveFrequency: 2,
+      taperLoadScale: weekInTaper === 1 ? 0.85 : 0.65,
+      strategy: 'extended',
+    };
+  }
+  return { effectiveFrequency: 1, taperLoadScale: 0.5, strategy: 'extended' };
+}
+
+/**
+ * Scale exercise sets by taperLoadScale, floor at 1 set.
+ * Intensity (weight prescription) is deliberately preserved — the golden rule of tapering.
+ * Appends a taper note to the session description so athletes understand the rationale.
+ */
+function applyTaperLoadScale(
+  sessions: IntentSession[],
+  taperLoadScale: number,
+  strategy: TaperStrengthParams['strategy'],
+): IntentSession[] {
+  if (taperLoadScale >= 1.0) return sessions;
+
+  const strategyLabel: Record<TaperStrengthParams['strategy'], string> = {
+    aggressive: 'Aggressive taper: volume cut, intensity preserved.',
+    standard: 'Standard taper: reduced volume, maintained intensity.',
+    extended: 'Extended taper: gradual volume reduction.',
+  };
+
+  return sessions.map(s => ({
+    ...s,
+    description: `${s.description} [${strategyLabel[strategy]}]`,
+    exercises: s.exercises.map(ex => ({
+      ...ex,
+      sets: Math.max(1, Math.round(ex.sets * taperLoadScale)),
+    })),
+    tags: [...s.tags, `taper_load_scale:${taperLoadScale.toFixed(2)}`],
+  }));
+}
+
+/**
+ * After protocol generates taper sessions, filter to effectiveFrequency.
+ * Preference order for a single session: upper/full-body > lower.
+ * Lower sessions avoided when only 1 slot — protects pre-race legs.
+ */
+function filterToTaperFrequency(
+  sessions: IntentSession[],
+  effectiveFrequency: number,
+): IntentSession[] {
+  if (effectiveFrequency === 0 || sessions.length === 0) return [];
+  if (sessions.length <= effectiveFrequency) return sessions;
+
+  if (effectiveFrequency === 1) {
+    // Prefer upper/full-body; only fall back to lower if that's all that exists
+    const preferred = sessions.find(
+      s => !s.intent.startsWith('LOWER') || s.intent === 'FULLBODY_MAINTENANCE'
+    );
+    return [preferred ?? sessions[0]];
+  }
+
+  return sessions.slice(0, effectiveFrequency);
+}
 
 // ============================================================================
 // MAIN OVERLAY FUNCTION
@@ -70,6 +185,22 @@ export function overlayStrength(
         weekInPhase++;
       }
     }
+
+    // Taper sensitivity: compute params when in taper phase
+    const isTaperPhase = phase.name === 'Taper';
+    const taperParams = isTaperPhase
+      ? getTaperStrengthParams(
+          week - phase.start_week + 1,                // weekInTaper (1-based)
+          phase.end_week - phase.start_week + 1,      // taperLength
+          memoryContext?.taperSensitivity ?? null,
+        )
+      : null;
+
+    if (taperParams) {
+      console.log(
+        `[PlanGen] Taper week ${week}: strategy=${taperParams.strategy}, freq=${taperParams.effectiveFrequency}, loadScale=${taperParams.taperLoadScale} (sensitivity=${memoryContext?.taperSensitivity ?? 'default'})`
+      );
+    }
     
     // Build protocol context
     const context: ProtocolContext = {
@@ -86,11 +217,20 @@ export function overlayStrength(
       },
       constraints: {
         maxSessionDuration: 60,
+        taperLoadScale: taperParams?.taperLoadScale,
       },
     };
 
     // Generate intent sessions (no day assignment)
-    const intentSessions = protocol.createWeekSessions(context);
+    let intentSessions = protocol.createWeekSessions(context);
+
+    // Apply taper sensitivity post-protocol:
+    // 1. Scale sets down (preserves intensity — the golden rule of tapering)
+    // 2. Filter to effectiveFrequency (prefer upper/full-body when cutting to 1 session)
+    if (taperParams) {
+      intentSessions = applyTaperLoadScale(intentSessions, taperParams.taperLoadScale, taperParams.strategy);
+      intentSessions = filterToTaperFrequency(intentSessions, taperParams.effectiveFrequency);
+    }
 
     // Filter sessions based on frequency and protocol
     let filteredSessions = intentSessions;
@@ -103,14 +243,21 @@ export function overlayStrength(
       );
     }
     
-    // Filter out optional sessions when frequency = 2
-    // (Optional sessions are only included when frequency = 3)
-    if (frequency === 2) {
+    // Filter out optional sessions when frequency = 2, BUT skip this during taper weeks.
+    // taperParams has already selected the right sessions; don't discard them because a
+    // protocol labels its taper sessions 'optional'.
+    if (frequency === 2 && !taperParams) {
       filteredSessions = filteredSessions.filter(s => s.priority !== 'optional');
     }
 
     // Apply guardrails (for now, empty - will be implemented later)
     const guardrails: any[] = [];
+
+    // In taper weeks, use the sensitivity-gated frequency for slot assignment so
+    // the placement strategy doesn't try to fill more slots than we have sessions.
+    const placementFrequency = taperParams
+      ? (taperParams.effectiveFrequency as 0 | 1 | 2 | 3)
+      : frequency;
 
     // Assign to days using placement policy (with methodology-aware context if available)
     const placedSessions = simplePlacementPolicy.assignSessions(
@@ -120,7 +267,7 @@ export function overlayStrength(
       methodology ? {
         methodology,
         protocol: protocolId,
-        strengthFrequency: frequency,
+        strengthFrequency: placementFrequency,
         noDoubles: effectiveNoDoubles,
         injuryHotspots: memoryContext?.injuryHotspots ?? [],
       } : undefined

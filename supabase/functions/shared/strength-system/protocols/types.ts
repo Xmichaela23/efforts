@@ -64,6 +64,8 @@ export interface ProtocolContext {
   constraints: {
     maxSessionDuration?: number; // Minutes
     preferredDays?: string[]; // User's preferred strength days
+    /** 0–1 scale applied to strength volume during taper. Derived from athlete_memory cross.taper_sensitivity. 1.0 = no change, 0.4 = aggressive cut. */
+    taperLoadScale?: number;
   };
   
   // Optional history (for adaptive protocols later)
