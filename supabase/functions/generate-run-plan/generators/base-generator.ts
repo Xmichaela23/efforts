@@ -119,6 +119,69 @@ export abstract class BaseGenerator {
   }
 
   // ============================================================================
+  // ATHLETE STATE HELPERS
+  // ============================================================================
+
+  /**
+   * Find the first index in a long-run progression table that matches the
+   * athlete's recent long run, so week 1 continues from where they actually are
+   * rather than always resetting to the table's week-1 default.
+   *
+   * Uses a 95% target so there's a very slight pullback (no regression beyond ~5%).
+   * Caps the offset at half the progression length so the plan still builds to peak.
+   */
+  protected getProgressionOffset(progression: number[]): number {
+    const recentLongRun = this.params.recent_long_run_miles;
+    if (!recentLongRun || recentLongRun <= 0 || progression.length === 0) return 0;
+
+    const target = recentLongRun * 0.95;
+    let bestIndex = 0;
+    for (let i = 0; i < progression.length; i++) {
+      if (progression[i] <= target) {
+        bestIndex = i;
+      } else {
+        break;
+      }
+    }
+
+    // Never offset more than half the total plan duration — ensures the plan
+    // still reaches its peak rather than being permanently front-loaded.
+    const maxOffset = Math.floor(Math.min(progression.length, this.params.duration_weeks) / 2);
+    return Math.min(bestIndex, maxOffset);
+  }
+
+  /**
+   * Resolve the effective week-1 weekly volume based on the athlete's actual
+   * current_weekly_miles, volume_trend, and current_acwr.
+   *
+   * Rules:
+   *   • If no current_weekly_miles → fall back to the table's start value.
+   *   • Clamp to [tableStart * 0.7, tablePeak * 0.95] to guard edge cases.
+   *   • ACWR > 1.3: scale down by up to 20% (fatigued athlete).
+   *   • volume_trend 'declining': apply an extra 5% conservative buffer.
+   */
+  protected resolveEffectiveStartVolume(tableStart: number, tablePeak: number): number {
+    const currentMiles = this.params.current_weekly_miles;
+    if (!currentMiles || currentMiles <= 0) return tableStart;
+
+    let effective = Math.max(tableStart * 0.7, Math.min(tablePeak * 0.95, currentMiles));
+
+    // ACWR fatigue guard
+    const acwr = this.params.current_acwr;
+    if (acwr != null && acwr > 1.3) {
+      const fatigueScale = Math.max(0.80, 1.0 - (acwr - 1.3) * 0.5);
+      effective = effective * fatigueScale;
+    }
+
+    // Declining-trend buffer
+    if (this.params.volume_trend === 'declining') {
+      effective = effective * 0.95;
+    }
+
+    return Math.round(effective);
+  }
+
+  // ============================================================================
   // VOLUME CALCULATIONS
   // ============================================================================
 

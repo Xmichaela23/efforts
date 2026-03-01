@@ -312,8 +312,8 @@ export class SustainableGenerator extends BaseGenerator {
   // ============================================================================
 
   private calculateWeeklyMileage(
-    weekNumber: number, 
-    phase: Phase, 
+    weekNumber: number,
+    phase: Phase,
     isRecovery: boolean,
     phaseStructure: PhaseStructure
   ): number {
@@ -321,43 +321,46 @@ export class SustainableGenerator extends BaseGenerator {
     if (!mileageConfig) return 25;
 
     const { start, peak } = mileageConfig;
-    const totalWeeks = this.params.duration_weeks;
-    
+
+    // Use athlete's actual current volume as week-1 anchor when available,
+    // respecting ACWR fatigue and volume trend signals.
+    const effectiveStart = this.resolveEffectiveStartVolume(start, peak);
+
     const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
-    const taperStart = taperPhase?.start_week || totalWeeks;
-    
+    const taperStart = taperPhase?.start_week || this.params.duration_weeks;
+
     let targetMiles: number;
     if (weekNumber < taperStart) {
       const progress = (weekNumber - 1) / Math.max(1, taperStart - 2);
-      targetMiles = start + (peak - start) * Math.min(1, progress);
+      targetMiles = effectiveStart + (peak - effectiveStart) * Math.min(1, progress);
     } else {
-      // Taper: significant reduction
       targetMiles = peak * 0.5;
     }
-    
+
     if (isRecovery) {
       targetMiles = targetMiles * 0.7;
     }
-    
+
     return Math.round(targetMiles);
   }
 
   private getLongRunMiles(weekNumber: number): number {
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
     if (!progression) return 10;
-    
-    // If within the progression array, use it directly
-    if (weekNumber <= progression.length) {
-      return progression[weekNumber - 1] || 10;
+
+    // Offset into the progression based on the athlete's recent long run so
+    // week 1 of the plan continues from where they actually are.
+    const offset = this.getProgressionOffset(progression);
+    const index = weekNumber - 1 + offset;
+
+    if (index < progression.length) {
+      return progression[index] || 10;
     }
-    
-    // For plans longer than the progression array (rare, but handle gracefully)
-    // Use the last value and apply a simple taper pattern
+
+    // Beyond the table: gentle taper (2 miles/week down from the last value)
     const lastValue = progression[progression.length - 1];
-    const weeksBeyond = weekNumber - progression.length;
-    
-    // Taper pattern: reduce by ~2 miles per week for final weeks
-    return Math.max(8, lastValue - (weeksBeyond * 2));
+    const weeksBeyond = index - (progression.length - 1);
+    return Math.max(8, lastValue - weeksBeyond * 2);
   }
 
   // ============================================================================

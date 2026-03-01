@@ -972,14 +972,23 @@ export class PerformanceBuildGenerator extends BaseGenerator {
    * - 30+ mpw: can handle 12-mile start
    */
   private calculateStartingLongRun(defaultStart: number): number {
-    const currentMiles = this.params.current_weekly_miles;
-    
-    // If no current mileage provided, use default from duration requirements
-    if (!currentMiles) {
-      return defaultStart;
+    // If we have a direct long run measurement, use it as the seed (with a 5%
+    // pullback for safety) instead of inferring from weekly mileage tables.
+    const recentLongRun = this.params.recent_long_run_miles;
+    if (recentLongRun && recentLongRun > 0) {
+      const seed = Math.round(recentLongRun * 0.95 * 10) / 10;
+      // Apply ACWR fatigue guard: back off another 5% if athlete is overreached
+      const acwr = this.params.current_acwr;
+      const fatigueAdj = acwr != null && acwr > 1.3
+        ? Math.max(0.85, 1.0 - (acwr - 1.3) * 0.4)
+        : 1.0;
+      return Math.round(seed * fatigueAdj * 10) / 10;
     }
-    
-    // Scale starting long run based on current weekly mileage
+
+    const currentMiles = this.params.current_weekly_miles;
+    if (!currentMiles) return defaultStart;
+
+    // Legacy weekly-mileage gate
     let maxStart: number;
     if (currentMiles < 20) {
       maxStart = 8;
@@ -988,10 +997,8 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     } else if (currentMiles < 30) {
       maxStart = 12;
     } else {
-      maxStart = 12; // Cap at 12 even for high mileage runners
+      maxStart = 12;
     }
-    
-    // Use the lower of default and calculated max
     return Math.min(defaultStart, maxStart);
   }
 
@@ -1085,8 +1092,8 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   private calculateWeeklyMileage(
-    weekNumber: number, 
-    phase: Phase, 
+    weekNumber: number,
+    phase: Phase,
     isRecovery: boolean,
     phaseStructure: PhaseStructure
   ): number {
@@ -1094,29 +1101,32 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     if (!mileageConfig) return 40;
 
     const { start, peak } = mileageConfig;
-    const totalWeeks = this.params.duration_weeks;
-    
-    // Apply days-per-week multiplier
+
+    // Apply days-per-week multiplier to table values
     const daysMultiplier = this.getDaysPerWeekMultiplier();
     const adjustedStart = start * daysMultiplier;
     const adjustedPeak = peak * daysMultiplier;
-    
+
+    // Use athlete's actual current volume as week-1 anchor when available.
+    // resolveEffectiveStartVolume handles ACWR fatigue and volume trend guards.
+    const effectiveStart = this.resolveEffectiveStartVolume(adjustedStart, adjustedPeak);
+
     const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
-    const taperStart = taperPhase?.start_week || totalWeeks;
-    
+    const taperStart = taperPhase?.start_week || this.params.duration_weeks;
+
     let targetMiles: number;
     if (weekNumber < taperStart) {
       const progress = (weekNumber - 1) / Math.max(1, taperStart - 2);
-      targetMiles = adjustedStart + (adjustedPeak - adjustedStart) * Math.min(1, progress);
+      targetMiles = effectiveStart + (adjustedPeak - effectiveStart) * Math.min(1, progress);
     } else {
       const weekInTaper = weekNumber - taperStart + 1;
       targetMiles = adjustedPeak * (weekInTaper === 1 ? 0.6 : 0.4);
     }
-    
+
     if (isRecovery) {
       targetMiles = targetMiles * 0.7;
     }
-    
+
     return Math.round(targetMiles);
   }
 

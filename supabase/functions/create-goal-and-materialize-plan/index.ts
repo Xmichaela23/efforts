@@ -206,16 +206,54 @@ Deno.serve(async (req: Request) => {
     }
     let adaptiveMarathonDecision: any = null;
 
-    const [{ data: baseline }, { data: snapshot }] = await Promise.all([
+    const [{ data: baseline }, { data: recentSnapshots }] = await Promise.all([
       supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle(),
       supabase
         .from('athlete_snapshot')
-        .select('*')
+        .select('week_start, run_long_run_duration, acwr, workload_total, workload_by_discipline')
         .eq('user_id', user_id)
         .order('week_start', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(4),
     ]);
+    // Convenience alias: most recent snapshot (used below for weeklyMiles)
+    const snapshot = recentSnapshots?.[0] ?? null;
+
+    // ── Athlete Current State ─────────────────────────────────────────────────
+    // Derive athlete state signals from recent snapshots so generators can find
+    // the right starting point rather than always using week-1 table defaults.
+    let recent_long_run_miles: number | undefined;
+    let current_acwr: number | undefined;
+    let volume_trend: 'building' | 'holding' | 'declining' | undefined;
+
+    if (recentSnapshots && recentSnapshots.length > 0) {
+      // Recent long run: peak from last 4 weeks (use max to avoid diluting with
+      // recovery weeks that artificially lower the average)
+      const easyPaceSecPerMile: number = baseline?.effort_paces?.base ?? 600; // 10 min/mile default
+      const longRunDurations = recentSnapshots
+        .map((s: any) => s.run_long_run_duration as number | null)
+        .filter((d): d is number => d != null && d > 0);
+      if (longRunDurations.length > 0) {
+        const maxDurationMin = Math.max(...longRunDurations);
+        recent_long_run_miles = Math.round((maxDurationMin * 60 / easyPaceSecPerMile) * 10) / 10;
+      }
+
+      // ACWR from the most recent snapshot
+      const latestAcwr = recentSnapshots[0]?.acwr;
+      if (latestAcwr != null && Number.isFinite(Number(latestAcwr))) {
+        current_acwr = Number(latestAcwr);
+      }
+
+      // Volume trend: compare most-recent vs oldest of the 4 snapshots
+      if (recentSnapshots.length >= 2) {
+        const newest = Number(recentSnapshots[0]?.workload_total ?? 0);
+        const oldest = Number(recentSnapshots[recentSnapshots.length - 1]?.workload_total ?? 0);
+        if (oldest > 0) {
+          const pct = (newest - oldest) / oldest;
+          volume_trend = pct > 0.10 ? 'building' : pct < -0.10 ? 'declining' : 'holding';
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     let personalizedFloorWeeks = floorWeeks;
     if (distanceApi === 'marathon') {
@@ -371,6 +409,9 @@ Deno.serve(async (req: Request) => {
       race_date: resolvedGoal?.target_date,
       race_name: resolvedGoal?.name,
       current_weekly_miles: weeklyMiles,
+      ...(recent_long_run_miles != null ? { recent_long_run_miles } : {}),
+      ...(current_acwr != null ? { current_acwr } : {}),
+      ...(volume_trend ? { volume_trend } : {}),
     };
     if (allowRaceWeekSupportMode || adaptiveSupportMode) {
       generateBody.race_week_mode = true;

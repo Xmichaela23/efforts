@@ -20,8 +20,12 @@ export interface GeneratePlanRequest {
   no_doubles?: boolean; // If true, cannot stack strength on same day as quality runs (default: false, allows doubles)
   race_date?: string;
   race_name?: string;
-  // User's current weekly mileage (for gating short plans)
+  // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
+  // Athlete current state — derived from recent snapshots & workout facts
+  recent_long_run_miles?: number;              // peak long run from last 4 weeks
+  current_acwr?: number;                       // acute:chronic workload ratio
+  volume_trend?: 'building' | 'holding' | 'declining';
   // Effort Score (for Performance Build / speed goal)
   effort_score?: number;
   effort_source_distance?: number; // meters
@@ -79,6 +83,10 @@ export interface GeneratorParams {
   race_name?: string;   // Optional race name (e.g., "Boston Marathon")
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
+  // Athlete current state — from recent snapshots
+  recent_long_run_miles?: number;
+  current_acwr?: number;
+  volume_trend?: 'building' | 'holding' | 'declining';
   // Effort Score for pace calculations (Balanced Build only)
   effort_score?: number;
   effort_paces?: {

@@ -144,6 +144,9 @@ Deno.serve(async (req: Request) => {
       race_date: request.race_date,
       race_name: request.race_name,
       current_weekly_miles: request.current_weekly_miles,
+      recent_long_run_miles: request.recent_long_run_miles,
+      current_acwr: request.current_acwr,
+      volume_trend: request.volume_trend,
       effort_score: effortScore,
       effort_paces: effortPaces
     };
