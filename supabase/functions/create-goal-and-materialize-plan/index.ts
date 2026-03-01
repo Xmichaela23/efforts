@@ -46,7 +46,7 @@ const DISTANCE_TO_API: Record<string, string> = {
 };
 
 const MIN_WEEKS: Record<string, Record<string, number>> = {
-  marathon: { beginner: 14, intermediate: 6, advanced: 6 },
+  marathon: { beginner: 14, intermediate: 10, advanced: 8 },
   half: { beginner: 8, intermediate: 4, advanced: 4 },
   '10k': { beginner: 4, intermediate: 4, advanced: 4 },
   '5k': { beginner: 4, intermediate: 4, advanced: 4 },
@@ -59,12 +59,59 @@ function weeksBetween(a: Date, b: Date): number {
 }
 
 function distanceToApiValue(distance: string | null): string {
-  if (!distance) return 'marathon';
+  if (!distance) return '';
   return DISTANCE_TO_API[distance] || String(distance).toLowerCase();
 }
 
 function isMarathonDistance(distance: string | null | undefined): boolean {
   return String(distance || '').trim().toLowerCase() === 'marathon';
+}
+
+function currentWeekMondayISO(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun ... 6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function personalizedMarathonMinWeeks(
+  fitness: string,
+  snapshotRows: Array<Record<string, any>> | null | undefined,
+): number {
+  const rows = Array.isArray(snapshotRows) ? snapshotRows : [];
+  const runMiles: number[] = [];
+  const longRunMinutes: number[] = [];
+  const adherence: number[] = [];
+
+  for (const row of rows) {
+    const runLoad = Number(row?.workload_by_discipline?.run ?? 0);
+    if (Number.isFinite(runLoad) && runLoad > 0) runMiles.push(runLoad / 10); // app convention: workload/10 ≈ weekly miles
+    const longRun = Number(row?.run_long_run_duration ?? 0);
+    if (Number.isFinite(longRun) && longRun > 0) longRunMinutes.push(longRun);
+    const adh = Number(row?.adherence_pct ?? 0);
+    if (Number.isFinite(adh) && adh > 0) adherence.push(adh);
+  }
+
+  const avgRunMiles = runMiles.length ? runMiles.reduce((a, b) => a + b, 0) / runMiles.length : 0;
+  const maxLongRunMinutes = longRunMinutes.length ? Math.max(...longRunMinutes) : 0;
+  const avgAdherence = adherence.length ? adherence.reduce((a, b) => a + b, 0) / adherence.length : 0;
+
+  // Personalized readiness buckets from recent training state.
+  let minWeeks = 12;
+  if (avgRunMiles >= 35 && maxLongRunMinutes >= 105 && avgAdherence >= 70) minWeeks = 7;
+  else if (avgRunMiles >= 28 && maxLongRunMinutes >= 90 && avgAdherence >= 65) minWeeks = 8;
+  else if (avgRunMiles >= 20 && maxLongRunMinutes >= 75) minWeeks = 10;
+  else if (avgRunMiles >= 14 && maxLongRunMinutes >= 60) minWeeks = 12;
+  else minWeeks = 14;
+
+  // Safety floor by declared fitness.
+  if (fitness === 'beginner') minWeeks = Math.max(minWeeks, 14);
+  else if (fitness === 'intermediate') minWeeks = Math.max(minWeeks, 10);
+  else if (fitness === 'advanced') minWeeks = Math.max(minWeeks, 8);
+  else minWeeks = Math.max(minWeeks, 10);
+
+  return minWeeks;
 }
 
 async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name: string, body: Record<string, any>) {
@@ -144,6 +191,9 @@ Deno.serve(async (req: Request) => {
     if (mode === 'create') {
       if (!goal?.name || !goal?.target_date || !goal?.sport) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
       if (!action || !['keep', 'replace'].includes(action)) throw new AppError('invalid_action', 'action must be keep or replace');
+      if (String(goal.sport || '').toLowerCase() === 'run' && !goal.distance) {
+        throw new AppError('missing_distance', 'Select a race distance to build a plan.');
+      }
 
       // Guardrail: don't allow "keep both" for marathons that are too close together.
       if (action === 'keep' && existing_goal_id && isMarathonDistance(goal.distance)) {
@@ -186,6 +236,9 @@ Deno.serve(async (req: Request) => {
       if (existingGoalErr || !existingGoal) throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
       if (existingGoal.goal_type !== 'event') throw new AppError('invalid_goal_type', 'Only event goals can auto-build');
       if ((existingGoal.status || 'active') !== 'active') throw new AppError('goal_not_active', 'Goal must be active to build a plan');
+      if (String(existingGoal.sport || '').toLowerCase() === 'run' && !existingGoal.distance) {
+        throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
+      }
       resolvedGoal = {
         name: existingGoal.name,
         target_date: existingGoal.target_date,
@@ -204,14 +257,11 @@ Deno.serve(async (req: Request) => {
     if (!fitness || !goalType) throw new AppError('missing_training_prefs', 'Missing fitness or training goal');
 
     const distanceApi = distanceToApiValue(resolvedGoal?.distance || null);
+    if (!distanceApi) throw new AppError('missing_distance', 'Select a race distance to build a plan.');
     const floorWeeks = MIN_WEEKS[distanceApi]?.[fitness] ?? 4;
     const weeksOut = weeksBetween(new Date(), new Date(String(resolvedGoal?.target_date || '')));
-    if (weeksOut < floorWeeks) {
-      throw new AppError('race_too_close', `Your race is ${weeksOut} weeks away. ${distanceApi} needs at least ${floorWeeks} weeks.`);
-    }
-    const durationWeeks = Math.max(floorWeeks, Math.min(weeksOut, 20));
 
-    const [{ data: baseline }, { data: snapshot }] = await Promise.all([
+    const [{ data: baseline }, { data: snapshot }, { data: recentSnapshots }] = await Promise.all([
       supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle(),
       supabase
         .from('athlete_snapshot')
@@ -220,7 +270,28 @@ Deno.serve(async (req: Request) => {
         .order('week_start', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('athlete_snapshot')
+        .select('week_start, workload_by_discipline, run_long_run_duration, adherence_pct')
+        .eq('user_id', user_id)
+        .order('week_start', { ascending: false })
+        .limit(6),
     ]);
+
+    const personalizedFloorWeeks = distanceApi === 'marathon'
+      ? personalizedMarathonMinWeeks(fitness, (recentSnapshots as any[]) || [])
+      : floorWeeks;
+
+    if (weeksOut < personalizedFloorWeeks) {
+      const msg = distanceApi === 'marathon'
+        ? `Based on your recent training history, this marathon needs about ${personalizedFloorWeeks}+ weeks. Your selected race is ${weeksOut} weeks out. Choose Replace with a later date or pick a shorter race.`
+        : `Your race is ${weeksOut} weeks away. ${distanceApi} needs at least ${personalizedFloorWeeks} weeks.`;
+      throw new AppError(
+        distanceApi === 'marathon' ? 'race_too_close_personalized' : 'race_too_close',
+        msg,
+      );
+    }
+    const durationWeeks = Math.max(personalizedFloorWeeks, Math.min(weeksOut, 20));
 
     if (goalType === 'speed') {
       const hasRaceTime = baseline?.effort_source_distance && baseline?.effort_source_time;
@@ -310,8 +381,8 @@ Deno.serve(async (req: Request) => {
 
     // If the caller asked to replace a specific plan (e.g., End & Build), end it explicitly.
     if (replace_plan_id) {
-      const today = new Date().toISOString().slice(0, 10);
-      await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', today);
+      const weekStart = currentWeekMondayISO();
+      await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', weekStart);
       await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
     }
 
@@ -324,10 +395,10 @@ Deno.serve(async (req: Request) => {
         .eq('goal_id', existing_goal_id)
         .eq('status', 'active');
 
-      const today = new Date().toISOString().slice(0, 10);
+      const weekStart = currentWeekMondayISO();
       for (const p of priorLinkedPlans || []) {
         if (p.id === generatedPlanId) continue;
-        await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', today);
+        await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', weekStart);
         await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
       }
     }
@@ -346,8 +417,8 @@ Deno.serve(async (req: Request) => {
       const looksRun = planSport === 'run' || planType.includes('run');
       if (!looksRun || p.id === generatedPlanId) continue;
 
-      const today = new Date().toISOString().slice(0, 10);
-      await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', today);
+      const weekStart = currentWeekMondayISO();
+      await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', weekStart);
       await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
     }
 
@@ -366,8 +437,8 @@ Deno.serve(async (req: Request) => {
         .eq('status', 'active');
 
       for (const lp of linkedPlans || []) {
-        const today = new Date().toISOString().slice(0, 10);
-        await supabase.from('planned_workouts').delete().eq('training_plan_id', lp.id).gte('date', today);
+        const weekStart = currentWeekMondayISO();
+        await supabase.from('planned_workouts').delete().eq('training_plan_id', lp.id).gte('date', weekStart);
         await supabase.from('plans').update({ status: 'ended' }).eq('id', lp.id).eq('user_id', user_id);
       }
     }
@@ -403,8 +474,11 @@ Deno.serve(async (req: Request) => {
         success: false,
         error: err?.message || 'Unknown error',
         error_code: err?.code || 'unknown_error',
+        http_status: err?.status || 400,
       }),
-      { status: err?.status || 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      // Return 200 with structured error payload so clients consistently display
+      // business-rule failures instead of generic transport errors.
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

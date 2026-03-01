@@ -160,6 +160,28 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const totalPlanCount = currentPlans.length + completedPlans.length;
 
+  async function parseFunctionError(error: any, data: any, fallback: string): Promise<{ message: string; code?: string }> {
+    if (data && typeof data === 'object') {
+      const msg = (data as any).error;
+      const code = (data as any).error_code;
+      if (typeof msg === 'string' && msg.trim()) return { message: msg, code };
+    }
+
+    try {
+      const ctx = (error as any)?.context;
+      if (ctx?.json) {
+        const payload = await ctx.json();
+        const msg = payload?.error;
+        const code = payload?.error_code;
+        if (typeof msg === 'string' && msg.trim()) return { message: msg, code };
+      }
+    } catch {
+      // Ignore parse failures and fall back to generic text
+    }
+
+    return { message: error?.message || fallback };
+  }
+
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
     setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false);
@@ -299,10 +321,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           replace_plan_id: _conflictPlanId || null,
         },
       });
-      if (error) throw new Error(error.message || 'Unable to build and materialize plan');
-      if (!data?.success) {
-        if (data?.error_code === 'missing_pace_benchmark') setShowCalibration(true);
-        throw new Error(data?.error || 'Unable to build and materialize plan');
+      if (error || !data?.success) {
+        const parsed = await parseFunctionError(error, data, 'Unable to build and materialize plan');
+        if (parsed.code === 'missing_pace_benchmark') setShowCalibration(true);
+        throw new Error(parsed.message);
       }
 
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
@@ -334,8 +356,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           plan_id: planId,
         },
       });
-      if (error) throw new Error(error.message || 'Unable to link plan');
-      if (!data?.success) throw new Error(data?.error || 'Unable to link plan');
+      if (error || !data?.success) {
+        const parsed = await parseFunctionError(error, data, 'Unable to link plan');
+        throw new Error(parsed.message);
+      }
 
       setLinkDialog(null);
       onPlanBuilt?.();
@@ -397,10 +421,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       };
 
       const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', { body: payload });
-      if (error) throw new Error(error.message || 'Unable to create goal and build plan');
-      if (!data?.success) {
-        if (data?.error_code === 'missing_pace_benchmark') setShowCalibration(true);
-        throw new Error(data?.error || 'Unable to create goal and build plan');
+      if (error || !data?.success) {
+        const parsed = await parseFunctionError(error, data, 'Unable to create goal and build plan');
+        if (parsed.code === 'missing_pace_benchmark') setShowCalibration(true);
+        throw new Error(parsed.message);
       }
 
       setExistingGoalPrompt(null);
@@ -797,6 +821,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const hasSameSportActiveGoal = activeGoals.some(
       g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
     );
+    const requiresDistance = Boolean(DISTANCE_OPTIONS[eventSport]);
 
     return (
       <div className="flex flex-col h-full">
@@ -933,7 +958,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </div>
             </>);
           })()}
-          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save & Build Plan'}</button>
+          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal || (requiresDistance && !eventDistance)} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save & Build Plan'}</button>
+          {requiresDistance && !eventDistance && (
+            <p className="mt-2 text-xs text-white/35">Select a race distance to continue.</p>
+          )}
           {hasSameSportActiveGoal ? (
             <p className="mt-2 text-xs text-white/45">
               You already have an active goal in this sport. You will choose to keep both or replace, and replacement only ends the old plan after the new one materializes.
