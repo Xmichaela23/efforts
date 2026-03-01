@@ -477,8 +477,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               {goal.goal_type === 'event' && goal.target_date && (
                 <div className="mt-1 flex items-center gap-2 text-sm text-white/50">
                   <Calendar className="h-3.5 w-3.5" />
-                  <span>{format(new Date(goal.target_date), 'MMM d, yyyy')}</span>
-                  <span className="text-white/30">{differenceInWeeks(new Date(goal.target_date), new Date())} weeks away</span>
+                  <span>{format(new Date(goal.target_date + 'T12:00:00'), 'MMM d, yyyy')}</span>
+                  <span className="text-white/30">{differenceInWeeks(new Date(goal.target_date + 'T12:00:00'), new Date())} weeks away</span>
                 </div>
               )}
               {goal.goal_type === 'capacity' && (
@@ -619,7 +619,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             <p className="text-base font-medium text-white/90 mb-2">You already have an active goal</p>
             <p className="text-sm text-white/50 leading-relaxed mb-5">
               <span className="text-white/70">{existingGoalPrompt.existing.name}</span>
-              {existingGoalPrompt.existing.target_date && ` · ${format(new Date(existingGoalPrompt.existing.target_date), 'MMM d')}`}.
+              {existingGoalPrompt.existing.target_date && ` · ${format(new Date(existingGoalPrompt.existing.target_date + 'T12:00:00'), 'MMM d')}`}.
               What would you like to do?
             </p>
             <div className="flex flex-col gap-2">
