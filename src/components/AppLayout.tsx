@@ -1516,9 +1516,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || showGear || showContext) {
                       handleBackToDashboard();
                     }
+                    setShowGoals(false);
                     setActiveBottomNav('home');
                   }}
                   className={`${tabBase} ${tabChrome} ${homeActive ? tabActive : ''}`}
@@ -1531,9 +1532,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to context
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines) {
                       handleBackToDashboard();
                     }
+                    setShowGoals(false);
                     setShowContext(false);
                     setActiveBottomNav('insights');
                   }}
