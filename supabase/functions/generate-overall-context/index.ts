@@ -26,6 +26,7 @@ import {
 } from '../_shared/block-analysis/index.ts';
 import { getBlockAdaptation, type BlockFocus } from '../_shared/block-adaptation/index.ts';
 import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
+import { getLatestAthleteMemory } from '../_shared/athlete-memory.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,7 +88,7 @@ Deno.serve(async (req) => {
     console.log(`📊 Active plan: ${activePlan?.name || 'none'} (${activePlanId || 'no id'})`);
 
     // Fetch remaining data in parallel
-    const [plannedResult, workoutsResult, baselinesResult] = await Promise.all([
+    const [plannedResult, workoutsResult, baselinesResult, athleteMemory] = await Promise.all([
       // Planned workouts - ONLY from the active plan
       supabase
         .from('planned_workouts')
@@ -113,7 +114,8 @@ Deno.serve(async (req) => {
         .from('user_baselines')
         .select('performance_numbers')
         .eq('user_id', user_id)
-        .single()
+        .single(),
+      getLatestAthleteMemory(supabase, user_id),
     ]);
 
     if (plannedResult.error) {
@@ -255,6 +257,7 @@ Deno.serve(async (req) => {
       fitness_adaptation_structured: fitnessAdaptationStructured,
       goal: goal, // Include goal so frontend knows context
       goal_prediction, // Server-computed verdicts (block_verdict, race_day_forecast, durability_risk, interference)
+      athlete_memory: athleteMemory,
       generated_at: new Date().toISOString(),
       
       // Legacy text fields (for old frontend - same keys it expects)

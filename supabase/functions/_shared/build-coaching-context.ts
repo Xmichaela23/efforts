@@ -12,11 +12,13 @@
  */
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getLatestAthleteMemory, type AthleteMemoryRow } from "./athlete-memory.ts";
 
 export interface CoachingContext {
   text: string;
   currentSnapshot: any | null;
   priorSnapshot: any | null;
+  athleteMemory: AthleteMemoryRow | null;
   recentFacts: any[];
   planPhase: string | null;
   weekIntent: string | null;
@@ -48,7 +50,7 @@ export async function buildCoachingContext(
   const recentCutoff = fortyEightHoursAgo.toISOString().slice(0, 10);
 
   // Parallel fetches
-  const [snapshotRes, recentRes, planRes] = await Promise.all([
+  const [snapshotRes, recentRes, planRes, athleteMemory] = await Promise.all([
     supabase
       .from("athlete_snapshot")
       .select("*")
@@ -72,6 +74,7 @@ export async function buildCoachingContext(
           .eq("id", planId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    getLatestAthleteMemory(supabase, userId),
   ]);
 
   const snapshots = (snapshotRes.data ?? []) as any[];
@@ -152,6 +155,42 @@ export async function buildCoachingContext(
     if (priorSnapshot.run_long_run_duration) lines.push(`  Longest run: ${Math.round(priorSnapshot.run_long_run_duration)} min`);
   }
 
+  // Longitudinal memory from deterministic memory store (single source of truth).
+  if (athleteMemory) {
+    const rules = athleteMemory.derived_rules ?? {};
+    const confidence = athleteMemory.rule_confidence ?? {};
+    lines.push("");
+    lines.push("LONGITUDINAL ATHLETE MEMORY:");
+    lines.push(`  Window: ${athleteMemory.period_start} -> ${athleteMemory.period_end}`);
+    if (rules.marathon_min_weeks_recommended != null) {
+      lines.push(`  Marathon readiness floor: ${rules.marathon_min_weeks_recommended} weeks`);
+    }
+    if (rules.run?.marathon_min_weeks_recommended != null) {
+      lines.push(`  Run marathon readiness floor: ${rules.run.marathon_min_weeks_recommended} weeks`);
+    }
+    if (rules.volume_ceiling_min != null) {
+      lines.push(`  Volume ceiling (weekly run min): ${rules.volume_ceiling_min}`);
+    }
+    if (rules.bike?.volume_ceiling_min != null) {
+      lines.push(`  Bike volume ceiling (weekly min): ${rules.bike.volume_ceiling_min}`);
+    }
+    if (rules.swim?.volume_ceiling_min != null) {
+      lines.push(`  Swim volume ceiling (weekly min): ${rules.swim.volume_ceiling_min}`);
+    }
+    if (rules.strength?.volume_ceiling_sets != null) {
+      lines.push(`  Strength volume ceiling (sets/week): ${rules.strength.volume_ceiling_sets}`);
+    }
+    if (Array.isArray(rules.injury_hotspots) && rules.injury_hotspots.length > 0) {
+      lines.push(`  Injury hotspots: ${rules.injury_hotspots.join(", ")}`);
+    }
+    if (rules.aerobic_floor_hr != null) {
+      lines.push(`  Aerobic floor HR: ${rules.aerobic_floor_hr}`);
+    }
+    if (confidence.marathon_min_weeks_recommended != null) {
+      lines.push(`  Memory confidence (marathon floor): ${Math.round(Number(confidence.marathon_min_weeks_recommended) * 100)}%`);
+    }
+  }
+
   // Recent workouts (last 48h) for interference detection
   if (recentFacts.length > 0) {
     lines.push("");
@@ -197,6 +236,7 @@ export async function buildCoachingContext(
     text: lines.join("\n"),
     currentSnapshot,
     priorSnapshot,
+    athleteMemory,
     recentFacts,
     planPhase,
     weekIntent,

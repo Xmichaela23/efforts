@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { getLatestAthleteMemory, resolveMarathonMinWeeksFromMemory } from '../_shared/athlete-memory.ts';
 
 type GoalAction = 'keep' | 'replace';
 type RequestMode = 'create' | 'build_existing' | 'link_existing';
@@ -73,45 +74,6 @@ function currentWeekMondayISO(): string {
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d.toISOString().slice(0, 10);
-}
-
-function personalizedMarathonMinWeeks(
-  fitness: string,
-  snapshotRows: Array<Record<string, any>> | null | undefined,
-): number {
-  const rows = Array.isArray(snapshotRows) ? snapshotRows : [];
-  const runMiles: number[] = [];
-  const longRunMinutes: number[] = [];
-  const adherence: number[] = [];
-
-  for (const row of rows) {
-    const runLoad = Number(row?.workload_by_discipline?.run ?? 0);
-    if (Number.isFinite(runLoad) && runLoad > 0) runMiles.push(runLoad / 10); // app convention: workload/10 ≈ weekly miles
-    const longRun = Number(row?.run_long_run_duration ?? 0);
-    if (Number.isFinite(longRun) && longRun > 0) longRunMinutes.push(longRun);
-    const adh = Number(row?.adherence_pct ?? 0);
-    if (Number.isFinite(adh) && adh > 0) adherence.push(adh);
-  }
-
-  const avgRunMiles = runMiles.length ? runMiles.reduce((a, b) => a + b, 0) / runMiles.length : 0;
-  const maxLongRunMinutes = longRunMinutes.length ? Math.max(...longRunMinutes) : 0;
-  const avgAdherence = adherence.length ? adherence.reduce((a, b) => a + b, 0) / adherence.length : 0;
-
-  // Personalized readiness buckets from recent training state.
-  let minWeeks = 12;
-  if (avgRunMiles >= 35 && maxLongRunMinutes >= 105 && avgAdherence >= 70) minWeeks = 7;
-  else if (avgRunMiles >= 28 && maxLongRunMinutes >= 90 && avgAdherence >= 65) minWeeks = 8;
-  else if (avgRunMiles >= 20 && maxLongRunMinutes >= 75) minWeeks = 10;
-  else if (avgRunMiles >= 14 && maxLongRunMinutes >= 60) minWeeks = 12;
-  else minWeeks = 14;
-
-  // Safety floor by declared fitness.
-  if (fitness === 'beginner') minWeeks = Math.max(minWeeks, 14);
-  else if (fitness === 'intermediate') minWeeks = Math.max(minWeeks, 10);
-  else if (fitness === 'advanced') minWeeks = Math.max(minWeeks, 8);
-  else minWeeks = Math.max(minWeeks, 10);
-
-  return minWeeks;
 }
 
 async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name: string, body: Record<string, any>) {
@@ -261,7 +223,7 @@ Deno.serve(async (req: Request) => {
     const floorWeeks = MIN_WEEKS[distanceApi]?.[fitness] ?? 4;
     const weeksOut = weeksBetween(new Date(), new Date(String(resolvedGoal?.target_date || '')));
 
-    const [{ data: baseline }, { data: snapshot }, { data: recentSnapshots }] = await Promise.all([
+    const [{ data: baseline }, { data: snapshot }] = await Promise.all([
       supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle(),
       supabase
         .from('athlete_snapshot')
@@ -270,17 +232,41 @@ Deno.serve(async (req: Request) => {
         .order('week_start', { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from('athlete_snapshot')
-        .select('week_start, workload_by_discipline, run_long_run_duration, adherence_pct')
-        .eq('user_id', user_id)
-        .order('week_start', { ascending: false })
-        .limit(6),
     ]);
 
-    const personalizedFloorWeeks = distanceApi === 'marathon'
-      ? personalizedMarathonMinWeeks(fitness, (recentSnapshots as any[]) || [])
-      : floorWeeks;
+    let personalizedFloorWeeks = floorWeeks;
+    if (distanceApi === 'marathon') {
+      // Recompute memory immediately so marathon gating reads fresh longitudinal state.
+      await invokeFunction(functionsBaseUrl, serviceKey, 'recompute-athlete-memory', { user_id });
+
+      const latestMemory = await getLatestAthleteMemory(supabase, user_id);
+
+      if (!latestMemory) {
+        throw new AppError(
+          'insufficient_evidence_memory',
+          'Not enough historical data to set marathon timeline yet. Complete more training history, then retry.',
+        );
+      }
+
+      const resolved = resolveMarathonMinWeeksFromMemory(latestMemory, fitness, floorWeeks);
+      const confidence = resolved.confidence;
+      const sufficiencyWeeks = resolved.sufficiencyWeeks;
+      if (!Number.isFinite(confidence) || confidence < 0.35 || sufficiencyWeeks < 4) {
+        throw new AppError(
+          'insufficient_evidence_memory',
+          'Marathon timeline needs at least 4 weeks of quality history before we can personalize safely.',
+        );
+      }
+
+      if (!resolved.minWeeks) {
+        throw new AppError(
+          'memory_rule_missing',
+          'Athlete memory is missing marathon readiness rules. Recompute memory and try again.',
+        );
+      }
+
+      personalizedFloorWeeks = resolved.minWeeks;
+    }
 
     if (weeksOut < personalizedFloorWeeks) {
       const msg = distanceApi === 'marathon'

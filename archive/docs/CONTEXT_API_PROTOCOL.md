@@ -197,6 +197,64 @@ The system remains protective of the athlete regardless of plan status:
   - `weekly_readiness` — raw inputs (hr_drift_bpm, pace_adherence_pct) for transparency
   - **`weekly_verdict`** — State of the Athlete (Execution Score): `readiness_pct`, `message`, `drivers`, `label`. May include structural-vs-cardio adaptive guidance when applicable.
   - **`structural_load`** — `{ acute: number; avg_rir_acute?: number | null }` — strength workload and average RIR in acute window; enables "heart ready, legs tired" and "high-repair state" (low RIR) narrative and client display.
+  - **`athlete_memory`** — latest canonical memory row used by server decisioning (single source of truth contract).
+  - **`memory_used_for_decisions`** — boolean flag indicating whether memory rules (not legacy runtime logic) directly influenced decision fields.
+  - **`decision_source`** — provenance object:
+    - `readiness_rules: 'athlete_memory' | 'legacy_runtime'`
+    - `memory_period_start`, `memory_period_end`, `memory_confidence`
+    - `rule_statuses` map for typed rule states (e.g. `ok`, `insufficient_data`, `low_confidence`)
+  - **`personalization_gaps`** — additive (non-blocking) per-rule gaps when personalization could not be fully applied.
+  - **`gaps_summary`** — deduplicated namespace-level summary for UI rendering (`run|bike|swim|strength`) with:
+    - `sessions_needed`
+    - `affects_rules`
+    - `user_message`
+
+#### Memory Personalization Gap Contract (Example)
+
+```json
+{
+  "personalization_gaps": [
+    {
+      "rule": "cross.interference_risk",
+      "status": "insufficient_data",
+      "message": "Need more strength sessions before cross-discipline interference can be personalized.",
+      "evidence_count": 2,
+      "dependencies": {
+        "hasEnduranceSignal": true,
+        "hasStrengthSignal": false
+      }
+    },
+    {
+      "rule": "cross.taper_sensitivity",
+      "status": "insufficient_data",
+      "message": "Need more run data before taper sensitivity can be personalized.",
+      "dependencies": {
+        "hasRunSignal": false,
+        "hasStrengthSignal": true
+      }
+    }
+  ],
+  "gaps_summary": [
+    {
+      "namespace": "strength",
+      "sessions_needed": 3,
+      "affects_rules": [
+        "cross.interference_risk",
+        "cross.concurrent_load_ramp_risk"
+      ],
+      "user_message": "Add about 3 more strength sessions to unlock structural/cross personalization."
+    },
+    {
+      "namespace": "run",
+      "sessions_needed": 2,
+      "affects_rules": [
+        "cross.taper_sensitivity"
+      ],
+      "user_message": "Add about 2 more run sessions to unlock run-based personalization."
+    }
+  ]
+}
+```
 
 ### generate-overall-context
 

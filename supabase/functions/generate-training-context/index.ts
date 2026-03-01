@@ -51,6 +51,15 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
+import {
+  NAMESPACE_SESSION_THRESHOLDS,
+  RULE_CONFIGS,
+  explainRuleResult,
+  getLatestAthleteMemory,
+  getRuleOrInsufficient,
+  isRuleUsable,
+  type AthleteMemoryRow,
+} from '../_shared/athlete-memory.ts';
 
 // =============================================================================
 // CORS HEADERS (matching existing edge functions)
@@ -416,6 +425,33 @@ interface TrainingContextResponse {
       matched_pairs: Array<{ planned_date: string; completed_date: string; planned_id: string; workout_id: string }>;
     };
   };
+  /** Canonical longitudinal memory row used by server-side decisions */
+  athlete_memory?: AthleteMemoryRow | null;
+  /** True when memory met confidence/sufficiency and influenced decision fields */
+  memory_used_for_decisions?: boolean;
+  /** Rule-source metadata for strict server observability */
+  decision_source?: {
+    readiness_rules: 'athlete_memory' | 'legacy_runtime';
+    memory_period_start?: string;
+    memory_period_end?: string;
+    memory_confidence?: number;
+    rule_statuses?: Record<string, string>;
+  };
+  /** Non-blocking personalization gaps when some memory rules are unavailable. */
+  personalization_gaps?: Array<{
+    rule: string;
+    status: 'insufficient_data' | 'low_confidence';
+    message: string;
+    confidence?: number;
+    evidence_count?: number;
+    dependencies?: Record<string, boolean>;
+  }>;
+  gaps_summary?: Array<{
+    namespace: 'run' | 'bike' | 'swim' | 'strength';
+    sessions_needed: number;
+    affects_rules: string[];
+    user_message: string;
+  }>;
 }
 
 /** Monday of week containing date, ISO (YYYY-MM-DD). Matches compute-snapshot week boundary. */
@@ -521,6 +557,25 @@ Deno.serve(async (req) => {
     if (planContext?.hasActivePlan) {
       console.log(`📋 Using plan-aligned windows: current week (${dateRanges.currentWeekStartISO} - ${dateRanges.currentWeekEndISO}), previous week (${dateRanges.previousWeekStartISO} - ${dateRanges.previousWeekEndISO})`);
     }
+
+    // Keep memory current; non-fatal if recompute fails.
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      await fetch(`${supabaseUrl}/functions/v1/recompute-athlete-memory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${svcKey}`,
+          'apikey': svcKey,
+        },
+        body: JSON.stringify({ user_id }),
+      });
+    } catch (e) {
+      console.warn('⚠️ recompute-athlete-memory invoke failed (non-fatal):', (e as any)?.message ?? e);
+    }
+
+    const athleteMemory = await getLatestAthleteMemory(supabase, user_id);
 
     // ==========================================================================
     // FETCH ATHLETE_SNAPSHOT (Deterministic Layer — use when available)
@@ -974,17 +1029,192 @@ Deno.serve(async (req) => {
     const rir = avg_rir_acute ?? null;
     const muscleJointsStatus: 'Fresh' | 'Loaded' | 'Recovering' =
       rir == null ? 'Fresh' : rir >= 2 ? 'Fresh' : rir >= 1 ? 'Loaded' : 'Recovering';
-    const display_aerobic_tier: FatigueTier = heartLungsStatus === 'Fresh' ? 'Low' : heartLungsStatus === 'Stable' ? 'Moderate' : 'Elevated';
-    const display_structural_tier: FatigueTier = muscleJointsStatus === 'Fresh' ? 'Low' : muscleJointsStatus === 'Loaded' ? 'Moderate' : 'Elevated';
+    let display_aerobic_tier: FatigueTier = heartLungsStatus === 'Fresh' ? 'Low' : heartLungsStatus === 'Stable' ? 'Moderate' : 'Elevated';
+    let display_structural_tier: FatigueTier = muscleJointsStatus === 'Fresh' ? 'Low' : muscleJointsStatus === 'Loaded' ? 'Moderate' : 'Elevated';
     const tierOrder: Record<FatigueTier, number> = { Low: 0, Moderate: 1, Elevated: 2 };
-    const display_limiter_line =
+    let display_limiter_line =
       tierOrder[display_aerobic_tier] > tierOrder[display_structural_tier]
         ? 'Today is limited by aerobic fatigue.'
         : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
           ? 'Today is limited by structural fatigue.'
           : 'No clear limiter.';
     const tierWord = (t: FatigueTier) => (t === 'Low' ? 'low' : t === 'Moderate' ? 'moderate' : 'elevated');
-    const display_limiter_label =
+    let display_limiter_label =
+      tierOrder[display_aerobic_tier] > tierOrder[display_structural_tier]
+        ? `Aerobic (${tierWord(display_aerobic_tier)} fatigue)`
+        : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
+          ? `Structural (${tierWord(display_structural_tier)} fatigue)`
+          : 'None';
+    let memory_used_for_decisions = false;
+    const memoryConfidence = Number(athleteMemory?.confidence_score ?? 0);
+
+    const strengthHotspotsResult = getRuleOrInsufficient<string[]>(
+      athleteMemory,
+      'strength.injury_hotspots',
+    );
+    const runAerobicFloorResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'run.aerobic_floor_hr',
+    );
+    const runEfficiencyResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'run.efficiency_peak_pace',
+    );
+    const crossInterferenceResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'cross.interference_risk',
+    );
+    const crossConcurrentRampResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'cross.concurrent_load_ramp_risk',
+    );
+    const crossTaperSensitivityResult = getRuleOrInsufficient<number>(
+      athleteMemory,
+      'cross.taper_sensitivity',
+    );
+
+    console.log(explainRuleResult('strength.injury_hotspots', strengthHotspotsResult, 'server'));
+    console.log(explainRuleResult('run.aerobic_floor_hr', runAerobicFloorResult, 'server'));
+    console.log(explainRuleResult('run.efficiency_peak_pace', runEfficiencyResult, 'server'));
+    console.log(explainRuleResult('cross.interference_risk', crossInterferenceResult, 'server'));
+    console.log(explainRuleResult('cross.concurrent_load_ramp_risk', crossConcurrentRampResult, 'server'));
+    console.log(explainRuleResult('cross.taper_sensitivity', crossTaperSensitivityResult, 'server'));
+
+    const personalization_gaps: TrainingContextResponse['personalization_gaps'] = [];
+    const gapCandidates: Array<{ rule: string; result: any }> = [
+      { rule: 'strength.injury_hotspots', result: strengthHotspotsResult },
+      { rule: 'run.aerobic_floor_hr', result: runAerobicFloorResult },
+      { rule: 'run.efficiency_peak_pace', result: runEfficiencyResult },
+      { rule: 'cross.interference_risk', result: crossInterferenceResult },
+      { rule: 'cross.concurrent_load_ramp_risk', result: crossConcurrentRampResult },
+      { rule: 'cross.taper_sensitivity', result: crossTaperSensitivityResult },
+    ];
+    for (const { rule, result } of gapCandidates) {
+      if (!result || result.status === 'ok') continue;
+      const explained = explainRuleResult(rule, result, 'user');
+      if (typeof explained === 'string') continue;
+      const depFromMemory = (rule === 'cross.interference_risk' || rule === 'cross.concurrent_load_ramp_risk' || rule === 'cross.taper_sensitivity')
+        ? (athleteMemory?.derived_rules as any)?.cross?.dependency_status?.[rule.split('.').slice(1).join('.')]
+        : undefined;
+      let message = explained.message;
+      if ((rule === 'cross.interference_risk' || rule === 'cross.concurrent_load_ramp_risk') && explained.status === 'insufficient_data' && depFromMemory) {
+        const needsEndurance = depFromMemory.hasEnduranceSignal === false;
+        const needsStrength = depFromMemory.hasStrengthSignal === false;
+        const subject = rule === 'cross.interference_risk' ? 'cross-discipline interference' : 'cross-discipline load ramp risk';
+        if (needsEndurance && needsStrength) message = `Need more endurance and strength sessions before ${subject} can be personalized.`;
+        else if (needsEndurance) message = `Need more run or bike data before ${subject} can be personalized.`;
+        else if (needsStrength) message = `Need more strength sessions before ${subject} can be personalized.`;
+      }
+      if (rule === 'cross.taper_sensitivity' && explained.status === 'insufficient_data' && depFromMemory) {
+        const needsRun = depFromMemory.hasRunSignal === false;
+        if (needsRun) message = 'Need more run data before taper sensitivity can be personalized.';
+      }
+      personalization_gaps.push({
+        rule,
+        status: explained.status as 'insufficient_data' | 'low_confidence',
+        message,
+        confidence: explained.confidence,
+        evidence_count: explained.evidence_count,
+        dependencies: depFromMemory && typeof depFromMemory === 'object' ? depFromMemory : undefined,
+      });
+    }
+
+    const gaps_summary: TrainingContextResponse['gaps_summary'] = (() => {
+      const summaryMap = new Map<'run' | 'bike' | 'swim' | 'strength', { sessions_needed: number; affects_rules: Set<string> }>();
+      const ensure = (ns: 'run' | 'bike' | 'swim' | 'strength') => {
+        if (!summaryMap.has(ns)) summaryMap.set(ns, { sessions_needed: 0, affects_rules: new Set<string>() });
+        return summaryMap.get(ns)!;
+      };
+      const addGap = (ns: 'run' | 'bike' | 'swim' | 'strength', rule: string, evidenceCount?: number) => {
+        const item = ensure(ns);
+        const neededBase = NAMESPACE_SESSION_THRESHOLDS[ns] ?? 3;
+        const currentEvidence = Number.isFinite(evidenceCount as number) ? Number(evidenceCount) : 0;
+        const needed = Math.max(0, neededBase - currentEvidence);
+        item.sessions_needed = Math.max(item.sessions_needed, needed || neededBase);
+        item.affects_rules.add(rule);
+      };
+      for (const gap of personalization_gaps || []) {
+        const ns = gap.rule.split('.')[0];
+        if (ns === 'run' || ns === 'bike' || ns === 'swim' || ns === 'strength') {
+          addGap(ns, gap.rule, gap.evidence_count);
+          continue;
+        }
+        if (ns === 'cross' && gap.dependencies) {
+          if (gap.dependencies.hasRunSignal === false) addGap('run', gap.rule, gap.evidence_count);
+          if (gap.dependencies.hasBikeSignal === false) addGap('bike', gap.rule, gap.evidence_count);
+          if (gap.dependencies.hasStrengthSignal === false) addGap('strength', gap.rule, gap.evidence_count);
+          if (gap.dependencies.hasEnduranceSignal === false) {
+            addGap('run', gap.rule, gap.evidence_count);
+            addGap('bike', gap.rule, gap.evidence_count);
+          }
+        }
+      }
+      const renderMessage = (ns: 'run' | 'bike' | 'swim' | 'strength', n: number) => {
+        if (ns === 'run') return `Add about ${Math.max(1, n)} more run session${Math.max(1, n) === 1 ? '' : 's'} to unlock run-based personalization.`;
+        if (ns === 'bike') return `Add about ${Math.max(1, n)} more bike session${Math.max(1, n) === 1 ? '' : 's'} to unlock bike/cross personalization.`;
+        if (ns === 'swim') return `Add about ${Math.max(1, n)} more swim session${Math.max(1, n) === 1 ? '' : 's'} to unlock swim personalization.`;
+        return `Add about ${Math.max(1, n)} more strength session${Math.max(1, n) === 1 ? '' : 's'} to unlock structural/cross personalization.`;
+      };
+      return Array.from(summaryMap.entries()).map(([namespace, v]) => ({
+        namespace,
+        sessions_needed: Math.max(1, v.sessions_needed),
+        affects_rules: Array.from(v.affects_rules),
+        user_message: renderMessage(namespace, v.sessions_needed),
+      }));
+    })();
+
+    const strengthHotspots =
+      strengthHotspotsResult.status === 'ok' || strengthHotspotsResult.status === 'low_confidence'
+        ? strengthHotspotsResult.value
+        : [];
+    const injuryHotspots = Array.isArray(strengthHotspots) ? strengthHotspots : [];
+    const crossInterferenceRisk =
+      crossInterferenceResult.status === 'ok' || crossInterferenceResult.status === 'low_confidence'
+        ? Number(crossInterferenceResult.value)
+        : NaN;
+    const crossConcurrentRampRisk =
+      crossConcurrentRampResult.status === 'ok' || crossConcurrentRampResult.status === 'low_confidence'
+        ? Number(crossConcurrentRampResult.value)
+        : NaN;
+    const crossTaperSensitivity =
+      crossTaperSensitivityResult.status === 'ok' || crossTaperSensitivityResult.status === 'low_confidence'
+        ? Number(crossTaperSensitivityResult.value)
+        : NaN;
+
+    // Strength-first: high-stakes guardrail does not proceed on low confidence.
+    if (isRuleUsable(strengthHotspotsResult) && injuryHotspots.length > 0 && display_structural_tier === 'Low') {
+      display_structural_tier = 'Moderate';
+      memory_used_for_decisions = true;
+    }
+    if (isRuleUsable(crossInterferenceResult) && Number.isFinite(crossInterferenceRisk) && crossInterferenceRisk >= 0.65 && display_structural_tier !== 'Elevated') {
+      display_structural_tier = 'Elevated';
+      memory_used_for_decisions = true;
+    }
+    if (isRuleUsable(crossConcurrentRampResult) && Number.isFinite(crossConcurrentRampRisk) && crossConcurrentRampRisk >= 0.35) {
+      memory_used_for_decisions = true;
+    }
+    if (isRuleUsable(crossTaperSensitivityResult) && Number.isFinite(crossTaperSensitivity) && crossTaperSensitivity >= 0.6) {
+      memory_used_for_decisions = true;
+    }
+
+    // Run-first: for low-data cardio days, use memory to avoid over-confident "fresh" verdicts.
+    const runRuleCanProceed =
+      isRuleUsable(runAerobicFloorResult) ||
+      (runAerobicFloorResult.status === 'low_confidence' && (RULE_CONFIGS['run.aerobic_floor_hr']?.allowLowConfidence ?? false)) ||
+      isRuleUsable(runEfficiencyResult) ||
+      (runEfficiencyResult.status === 'low_confidence' && (RULE_CONFIGS['run.efficiency_peak_pace']?.allowLowConfidence ?? false));
+    if (runRuleCanProceed && !weekly_verdict && display_aerobic_tier === 'Low') {
+      display_aerobic_tier = 'Moderate';
+      memory_used_for_decisions = true;
+    }
+
+    display_limiter_line =
+      tierOrder[display_aerobic_tier] > tierOrder[display_structural_tier]
+        ? 'Today is limited by aerobic fatigue.'
+        : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
+          ? 'Today is limited by structural fatigue.'
+          : 'No clear limiter.';
+    display_limiter_label =
       tierOrder[display_aerobic_tier] > tierOrder[display_structural_tier]
         ? `Aerobic (${tierWord(display_aerobic_tier)} fatigue)`
         : tierOrder[display_structural_tier] > tierOrder[display_aerobic_tier]
@@ -1972,6 +2202,12 @@ Deno.serve(async (req) => {
         const limiterWord = limiter === 'Aerobic' ? aerobicShort : structuralShort;
         context_summary.push(`Note: ${limiter} fatigue is ${limiterWord} — keep today controlled.`);
       }
+      if (memory_used_for_decisions && injuryHotspots.length > 0) {
+        context_summary.push(`Memory note: chronic hotspots (${injuryHotspots.slice(0, 3).join(', ')}) informed today’s structural guardrail.`);
+      }
+      if (memory_used_for_decisions && Number.isFinite(crossInterferenceRisk) && crossInterferenceRisk >= 0.65) {
+        context_summary.push('Memory note: cross-discipline interference risk is elevated this block.');
+      }
       if (acwr.ratio > 1.3 && acwr.data_days >= 7) {
         context_summary.push(acwr.ratio > 1.5 ? 'Load is overreaching — avoid adding volume.' : 'Load is ramping fast — avoid adding volume.');
       }
@@ -2030,7 +2266,25 @@ Deno.serve(async (req) => {
       has_planned_stimulus: todayIsRestDay ? undefined : plannedForFocusDate.some(p => ['run', 'ride', 'strength', 'swim'].includes((p.type || '').toLowerCase())),
       plan_checkin,
       week_review,
-      week_narrative
+      week_narrative,
+      athlete_memory: athleteMemory ?? null,
+      memory_used_for_decisions,
+      decision_source: {
+        readiness_rules: memory_used_for_decisions ? 'athlete_memory' : 'legacy_runtime',
+        memory_period_start: athleteMemory?.period_start,
+        memory_period_end: athleteMemory?.period_end,
+        memory_confidence: Number.isFinite(memoryConfidence) ? memoryConfidence : undefined,
+        rule_statuses: {
+          'strength.injury_hotspots': strengthHotspotsResult.status,
+          'run.aerobic_floor_hr': runAerobicFloorResult.status,
+          'run.efficiency_peak_pace': runEfficiencyResult.status,
+          'cross.interference_risk': crossInterferenceResult.status,
+          'cross.concurrent_load_ramp_risk': crossConcurrentRampResult.status,
+          'cross.taper_sensitivity': crossTaperSensitivityResult.status,
+        }
+      },
+      personalization_gaps: personalization_gaps && personalization_gaps.length > 0 ? personalization_gaps : undefined,
+      gaps_summary: gaps_summary && gaps_summary.length > 0 ? gaps_summary : undefined,
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);
