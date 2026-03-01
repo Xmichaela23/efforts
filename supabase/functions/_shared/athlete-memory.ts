@@ -483,6 +483,14 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
  * Planning-relevant signals resolved from athlete_memory for use in
  * plan generation (session sequencing, interference gating, taper shaping).
  */
+/** Per-lift 1RM estimate with confidence score for protocol weight resolution. */
+export interface Strength1RMRule {
+  value: number;       // estimated 1RM in lbs
+  confidence: number;  // 0–1: time decay × (1 - interference tax)
+  days_since: number;  // days since last logged
+  last_logged: string | null;
+}
+
 export interface PlanningMemoryContext {
   /** Concurrent training interference risk 0–1. null = insufficient data. */
   interferenceRisk: number | null;
@@ -490,10 +498,20 @@ export interface PlanningMemoryContext {
   taperSensitivity: number | null;
   /** Flagged anatomical areas prone to injury (e.g. ['achilles', 'it_band']). */
   injuryHotspots: string[];
+  /**
+   * Per-lift 1RM estimates with decay-adjusted confidence.
+   * Keys: squat_1rm_est, bench_press_1rm_est, deadlift_1rm_est,
+   *       trap_bar_deadlift_1rm_est, overhead_press_1rm_est,
+   *       hip_thrust_1rm_est, barbell_row_1rm_est
+   */
+  strength1RMs: Record<string, Strength1RMRule>;
+  /** Lifts that dropped >7% since last memory snapshot (auto-regulatory trigger). */
+  driftFlaggedLifts: string[];
   decisionSource: {
     interferenceRisk: 'memory' | 'default';
     taperSensitivity: 'memory' | 'default';
     injuryHotspots: 'memory' | 'default';
+    strength1RMs: 'memory' | 'default';
   };
 }
 
@@ -512,14 +530,42 @@ export function resolveMemoryContextForPlanning(
   const tsUsable = isRuleUsable(tsResult);
   const hsUsable = isRuleUsable(hsResult);
 
+  // Extract per-lift 1RM rules from derived_rules.strength.*_1rm_est
+  const strength1RMs: Record<string, Strength1RMRule> = {};
+  const ANCHOR_KEYS = [
+    'squat', 'bench_press', 'deadlift', 'trap_bar_deadlift',
+    'overhead_press', 'hip_thrust', 'barbell_row',
+  ];
+  const strengthRules = (memory?.derived_rules as any)?.strength ?? {};
+  for (const lift of ANCHOR_KEYS) {
+    const key = `${lift}_1rm_est`;
+    const rule = strengthRules[key];
+    if (rule && Number.isFinite(rule.value) && rule.value > 0) {
+      strength1RMs[key] = {
+        value: Number(rule.value),
+        confidence: Number(rule.confidence ?? 0),
+        days_since: Number(rule.days_since ?? 999),
+        last_logged: rule.last_logged ?? null,
+      };
+    }
+  }
+  const hasMem1RMs = Object.keys(strength1RMs).length > 0;
+
+  const driftFlaggedLifts: string[] = Array.isArray(strengthRules.drift_flagged_lifts)
+    ? strengthRules.drift_flagged_lifts
+    : [];
+
   return {
     interferenceRisk: irUsable ? (irResult as Extract<RuleResult<number>, { status: 'ok' }>).value : null,
     taperSensitivity: tsUsable ? (tsResult as Extract<RuleResult<number>, { status: 'ok' }>).value : null,
     injuryHotspots: hsUsable ? ((hsResult as Extract<RuleResult<string[]>, { status: 'ok' }>).value ?? []) : [],
+    strength1RMs,
+    driftFlaggedLifts,
     decisionSource: {
       interferenceRisk: irUsable ? 'memory' : 'default',
       taperSensitivity: tsUsable ? 'memory' : 'default',
       injuryHotspots: hsUsable ? 'memory' : 'default',
+      strength1RMs: hasMem1RMs ? 'memory' : 'default',
     },
   };
 }

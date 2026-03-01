@@ -601,6 +601,77 @@ Deno.serve(async (req: Request) => {
       ) * 100
     ) / 100;
 
+    // ── Strength 1RM Intelligence ─────────────────────────────────────────────
+    // Read learned strength_1rms from user_baselines and apply two confidence
+    // penalties before writing to derived_rules:
+    //
+    //   TimeDecay:       -1/14 per day since last logged (reaches 0 at 14 days)
+    //   InterferenceTax: -30% if recent run workload > 120% of baseline avg
+    //                    (heavy mileage suppresses maximal strength expression)
+    //
+    //   C = max(0, 1 - days_since/14) × (1 - InterferenceTax)
+    //
+    // Confidence >= 0.7 → protocol shows actual computed weight ("225 lbs (85%)")
+    // Confidence <  0.7 → protocol falls back to instructional text ("85% 1RM")
+
+    const learnedStrength = (baselines as any)?.learned_fitness?.strength_1rms as
+      Record<string, { value: number; confidence: string; sample_count: number; last_logged?: string }> | undefined;
+
+    // Interference tax: if most recent week's run workload > 120% of recent avg
+    const recentRunWorkloads = snapshotRows
+      .slice(-4)
+      .map((s: any) => Number(s.workload_by_discipline?.run ?? 0));
+    let interferenceTax = 0;
+    if (recentRunWorkloads.length >= 2) {
+      const avgWorkload = recentRunWorkloads.slice(0, -1).reduce((a: number, b: number) => a + b, 0)
+        / (recentRunWorkloads.length - 1);
+      const latestWorkload = recentRunWorkloads[recentRunWorkloads.length - 1];
+      if (avgWorkload > 0 && latestWorkload > avgWorkload * 1.2) {
+        interferenceTax = 0.3;
+      }
+    }
+
+    const today = new Date();
+    const strength1rmRules: Record<string, { value: number; confidence: number; days_since: number; last_logged: string | null }> = {};
+    if (learnedStrength) {
+      for (const [lift, data] of Object.entries(learnedStrength)) {
+        if (!data?.value || !Number.isFinite(data.value) || data.value <= 0) continue;
+        const lastLogged = data.last_logged ?? null;
+        let timeDecay = 1.0; // full decay if no date
+        if (lastLogged) {
+          const daysSince = Math.max(0, (today.getTime() - new Date(lastLogged).getTime()) / (1000 * 60 * 60 * 24));
+          timeDecay = Math.max(0, 1 - daysSince / 14);
+        }
+        const computedConfidence = Math.round(timeDecay * (1 - interferenceTax) * 100) / 100;
+        const daysSince = lastLogged
+          ? Math.floor((today.getTime() - new Date(lastLogged).getTime()) / (1000 * 60 * 60 * 24))
+          : 999;
+        strength1rmRules[`${lift}_1rm_est`] = {
+          value: data.value,
+          confidence: computedConfidence,
+          days_since: daysSince,
+          last_logged: lastLogged,
+        };
+      }
+    }
+
+    // 1RM drift detection: flag interference if any anchor lift dropped >7% over
+    // the last two available data points in learned_fitness history.
+    // (Stored for generate-training-context to surface auto-regulatory set reduction)
+    const driftFlagged: string[] = [];
+    if (learnedStrength && existingMemory?.derived_rules?.strength) {
+      const prevStrength = (existingMemory.derived_rules.strength as any);
+      for (const [lift, current] of Object.entries(strength1rmRules)) {
+        const prevKey = lift; // same key format
+        const prevVal = Number(prevStrength[prevKey]?.value ?? 0);
+        const currentVal = current.value;
+        if (prevVal > 0 && currentVal > 0 && (prevVal - currentVal) / prevVal > 0.07) {
+          driftFlagged.push(lift.replace('_1rm_est', ''));
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const derivedRules = {
       run: {
         marathon_readiness_state: marathonReadinessState,
@@ -636,6 +707,13 @@ Deno.serve(async (req: Request) => {
         intensity_tolerance: strengthIntensityTolerance,
         recovery_half_life_days: strengthRecoveryHalfLifeDays,
         injury_hotspots: injuryHotspots,
+        // Per-lift 1RM estimates with time decay + interference tax applied.
+        // confidence >= 0.7 → protocol resolves actual weight in lbs.
+        // confidence <  0.7 → protocol falls back to "X% 1RM" instructional text.
+        ...strength1rmRules,
+        // Lifts that dropped >7% vs previous memory snapshot — used to trigger
+        // auto-regulatory set reduction in generate-training-context.
+        drift_flagged_lifts: driftFlagged,
       },
       cross: {
         interference_risk: crossRules.interference_risk.value,

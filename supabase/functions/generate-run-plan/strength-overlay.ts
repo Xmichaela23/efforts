@@ -19,6 +19,99 @@ import type { PlanningMemoryContext } from '../_shared/athlete-memory.ts';
 /** Interference risk threshold above which we force noDoubles. Science: AMPK/mTOR conflict is highest within 6 hrs of concurrent sessions. */
 const INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD = 0.65;
 
+/** Minimum confidence required to display computed weight instead of "X% 1RM" text. */
+const WEIGHT_RESOLUTION_CONFIDENCE_THRESHOLD = 0.7;
+
+// ============================================================================
+// STRENGTH 1RM WEIGHT RESOLVER
+// ============================================================================
+
+/**
+ * Maps protocol exercise display names to their canonical anchor lift keys.
+ * Must match the canonical keys in canonicalize.ts and STRENGTH_ANCHORS.
+ */
+const DISPLAY_TO_ANCHOR: Record<string, string> = {
+  'back squat':          'squat',
+  'squat':               'squat',
+  'trap bar deadlift':   'trap_bar_deadlift',
+  'deadlift':            'deadlift',
+  'hip thrusts':         'hip_thrust',
+  'hip thrust':          'hip_thrust',
+  'bench press':         'bench_press',
+  'barbell rows':        'barbell_row',
+  'barbell row':         'barbell_row',
+  'bent over row':       'barbell_row',
+  'overhead press':      'overhead_press',
+  'ohp':                 'overhead_press',
+  'shoulder press':      'overhead_press',
+};
+
+/**
+ * Parse a percentage from a weight string like "85% 1RM" or "75% 1RM".
+ * Returns the percentage as a decimal (0.85), or null if not parseable.
+ */
+function parsePercentage(weight: string): number | null {
+  const match = weight.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (!match) return null;
+  const pct = parseFloat(match[1]);
+  return Number.isFinite(pct) && pct > 0 && pct <= 100 ? pct / 100 : null;
+}
+
+/**
+ * Post-process all exercises in placed sessions to substitute computed weights
+ * when the athlete's 1RM is known with sufficient confidence.
+ *
+ * "85% 1RM" → "225 lbs (85%)"  [when confidence >= 0.7]
+ * "85% 1RM" → "85% 1RM"        [when confidence < 0.7 or no data]
+ *
+ * Also applies auto-regulatory set reduction for drift-flagged lifts:
+ * a lift that dropped >7% since last memory snapshot gets sets cut by 1
+ * (e.g., 3×3 → 2×3) and a note added.
+ */
+function resolveExerciseWeights(
+  sessions: PlacedSession[],
+  memoryContext: PlanningMemoryContext,
+): PlacedSession[] {
+  const { strength1RMs, driftFlaggedLifts } = memoryContext;
+  if (Object.keys(strength1RMs).length === 0) return sessions;
+
+  return sessions.map(session => {
+    if (!session.exercises?.length) return session;
+
+    const resolvedExercises = session.exercises.map((ex: StrengthExercise) => {
+      const nameLower = (ex.name ?? '').toLowerCase().trim();
+      const anchorKey = DISPLAY_TO_ANCHOR[nameLower];
+      if (!anchorKey) return ex;
+
+      const ruleKey = `${anchorKey}_1rm_est`;
+      const rule = strength1RMs[ruleKey];
+      if (!rule) return ex;
+
+      let updatedEx = { ...ex };
+
+      // Weight resolution: substitute actual lbs when confidence is sufficient
+      if (rule.confidence >= WEIGHT_RESOLUTION_CONFIDENCE_THRESHOLD) {
+        const pct = parsePercentage(String(ex.weight ?? ''));
+        if (pct !== null) {
+          const computedLbs = Math.round((rule.value * pct) / 5) * 5; // round to nearest 5 lbs
+          updatedEx.weight = `${computedLbs} lbs (${Math.round(pct * 100)}%)`;
+        }
+      }
+
+      // Auto-regulatory drift reduction: if this lift is flagged, cut sets by 1
+      if (driftFlaggedLifts.includes(anchorKey) && typeof updatedEx.sets === 'number' && updatedEx.sets > 1) {
+        updatedEx.sets = updatedEx.sets - 1;
+        updatedEx.notes = (updatedEx.notes ? updatedEx.notes + ' · ' : '')
+          + 'Auto-reduced: strength dipping as mileage increases. Maintain intensity, cut volume.';
+      }
+
+      return updatedEx;
+    });
+
+    return { ...session, exercises: resolvedExercises };
+  });
+}
+
 type StrengthTier = 'bodyweight' | 'barbell';
 type StrengthFrequency = 2 | 3;
 
@@ -273,8 +366,13 @@ export function overlayStrength(
       } : undefined
     );
 
+    // Resolve exercise weights from 1RM memory before converting to Session[]
+    const resolvedPlaced = memoryContext
+      ? resolveExerciseWeights(placedSessions, memoryContext)
+      : placedSessions;
+
     // Convert PlacedSession[] to Session[]
-    const strengthSessions = placedSessions.map(placed => convertToSession(placed, tier));
+    const strengthSessions = resolvedPlaced.map(placed => convertToSession(placed, tier));
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
   }

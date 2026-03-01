@@ -93,18 +93,36 @@ function distanceMeters(w: WorkoutRow): number {
   return 0;
 }
 
-function epley1RM(weight: number, reps: number): number {
-  if (reps <= 0 || weight <= 0) return 0;
-  if (reps === 1) return Math.floor(weight / 5) * 5 || weight;
-  return Math.floor((weight * (1 + reps / 30)) / 5) * 5;
+/**
+ * Brzycki formula with RIR offset.
+ * effectiveReps = logged_reps + logged_rir treats "leftover capacity" as
+ * completed work, giving a stable 1RM estimate without requiring a failure set.
+ * Brzycki is more accurate than Epley at the low rep ranges (2-5) used in
+ * neural_speed and performance protocols.
+ */
+function brzycki1RM(weight: number, reps: number, rir: number): number {
+  if (weight <= 0) return 0;
+  const effectiveReps = Math.max(1, reps + Math.round(rir));
+  if (effectiveReps === 1) return Math.round(weight / 5) * 5 || weight;
+  // Brzycki: weight × (36 / (37 - effectiveReps))
+  // Cap at effectiveReps = 30 to avoid division-by-zero / nonsense at high reps
+  const capped = Math.min(effectiveReps, 30);
+  const raw = weight * (36 / (37 - capped));
+  return Math.round(raw / 5) * 5; // round to nearest 5 lbs
 }
 
-const BIG_FOUR: ReadonlyArray<'squat' | 'bench_press' | 'deadlift' | 'overhead_press'> = [
+// Seven anchor lifts tracked for 1RM progression.
+// Expanded from the original Big Four to cover all three strength protocols.
+const STRENGTH_ANCHORS = [
   "squat",
   "bench_press",
   "deadlift",
+  "trap_bar_deadlift",
   "overhead_press",
+  "hip_thrust",
+  "barbell_row",
 ] as const;
+type StrengthAnchor = typeof STRENGTH_ANCHORS[number];
 
 type LearnedMetric = {
   value: number;
@@ -131,29 +149,32 @@ async function updateLearnedStrengthFromExerciseLog(
 
     const { data: rows } = await supabase
       .from("exercise_log")
-      .select("canonical_name, estimated_1rm")
+      .select("canonical_name, estimated_1rm, date")
       .eq("user_id", userId)
       .gte("date", fromDate)
-      .in("canonical_name", BIG_FOUR);
+      .in("canonical_name", STRENGTH_ANCHORS);
 
     if (!rows?.length) return;
 
-    const agg: Record<string, { max1rm: number; count: number }> = {};
+    const agg: Record<string, { max1rm: number; count: number; last_logged: string }> = {};
     for (const r of rows) {
-      const c = r.canonical_name as (typeof BIG_FOUR)[number];
-      if (!BIG_FOUR.includes(c)) continue;
+      const c = r.canonical_name as StrengthAnchor;
+      if (!(STRENGTH_ANCHORS as readonly string[]).includes(c)) continue;
       const val = Number(r.estimated_1rm);
       if (!Number.isFinite(val) || val <= 0) continue;
       const cur = agg[c];
-      if (!cur) agg[c] = { max1rm: val, count: 1 };
-      else {
+      if (!cur) {
+        agg[c] = { max1rm: val, count: 1, last_logged: r.date };
+      } else {
         agg[c].max1rm = Math.max(agg[c].max1rm, val);
         agg[c].count += 1;
+        // Track most recent date
+        if (r.date > agg[c].last_logged) agg[c].last_logged = r.date;
       }
     }
 
-    const strength_1rms: Record<string, LearnedMetric> = {};
-    for (const lift of BIG_FOUR) {
+    const strength_1rms: Record<string, LearnedMetric & { last_logged: string }> = {};
+    for (const lift of STRENGTH_ANCHORS) {
       const a = agg[lift];
       if (!a) continue;
       strength_1rms[lift] = {
@@ -161,6 +182,7 @@ async function updateLearnedStrengthFromExerciseLog(
         confidence: confidenceFromSamples(a.count),
         source: "exercise_log",
         sample_count: a.count,
+        last_logged: a.last_logged,
       };
     }
     if (Object.keys(strength_1rms).length === 0) return;
@@ -418,7 +440,9 @@ function buildStrengthFacts(w: WorkoutRow, planned: PlannedRow | null): {
       ? Math.round((rirValues.reduce((a, b) => a + b, 0) / rirValues.length) * 10) / 10
       : null;
 
-    const est1rm = bestWeight > 0 && bestReps > 0 ? epley1RM(bestWeight, bestReps) : 0;
+    const est1rm = bestWeight > 0 && bestReps > 0
+      ? brzycki1RM(bestWeight, bestReps, avgRir ?? 0)
+      : 0;
 
     const plannedEx = plannedExMap.get(rawName.toLowerCase());
 

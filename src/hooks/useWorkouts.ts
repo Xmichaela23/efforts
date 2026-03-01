@@ -1488,6 +1488,17 @@ export const useWorkouts = () => {
         (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: data.id } } as any)
           .catch(() => {});
       } catch {}
+
+      // Refresh athlete memory after strength workouts so 1RM rules stay current.
+      // Runs after compute-facts with a small delay to let exercise_log settle.
+      if (newWorkout.type === 'strength' && newWorkout.workout_status === 'completed') {
+        setTimeout(() => {
+          try {
+            (supabase.functions.invoke as any)?.('recompute-athlete-memory', { body: { user_id: newWorkout.user_id } } as any)
+              .catch(() => {});
+          } catch {}
+        }, 3000);
+      }
       
       return newWorkout;
     } catch (err) {
@@ -1730,6 +1741,16 @@ export const useWorkouts = () => {
         (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: id } } as any)
           .catch(() => {});
       } catch {}
+
+      // Refresh athlete memory after strength workout edits
+      if (String(data.type || '').toLowerCase() === 'strength' && data.workout_status === 'completed') {
+        setTimeout(() => {
+          try {
+            (supabase.functions.invoke as any)?.('recompute-athlete-memory', { body: { user_id: data.user_id } } as any)
+              .catch(() => {});
+          } catch {}
+        }, 3000);
+      }
 
       return updated;
     } catch (err) {

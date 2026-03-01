@@ -125,6 +125,7 @@ export function canonicalize(raw: string): string {
 /**
  * The four major compound lifts tracked for 1RM progression.
  * Returns the canonical name if it's a big-4 lift, null otherwise.
+ * @deprecated Use bigAnchorLift which covers all seven protocol anchors.
  */
 export function bigFourLift(canonical: string): 'squat' | 'bench_press' | 'deadlift' | 'overhead_press' | null {
   switch (canonical) {
@@ -133,6 +134,43 @@ export function bigFourLift(canonical: string): 'squat' | 'bench_press' | 'deadl
     case 'deadlift': return 'deadlift';
     case 'overhead_press': return 'overhead_press';
     default: return null;
+  }
+}
+
+export type StrengthAnchor =
+  | 'squat'
+  | 'bench_press'
+  | 'deadlift'
+  | 'trap_bar_deadlift'
+  | 'overhead_press'
+  | 'hip_thrust'
+  | 'barbell_row';
+
+export const STRENGTH_ANCHOR_KEYS: ReadonlyArray<StrengthAnchor> = [
+  'squat',
+  'bench_press',
+  'deadlift',
+  'trap_bar_deadlift',
+  'overhead_press',
+  'hip_thrust',
+  'barbell_row',
+];
+
+/**
+ * Seven anchor lifts tracked for 1RM progression across all three
+ * strength protocols (durability, neural_speed, upper_aesthetics).
+ * Returns the canonical anchor key, or null for non-anchor exercises.
+ */
+export function bigAnchorLift(canonical: string): StrengthAnchor | null {
+  switch (canonical) {
+    case 'squat':            return 'squat';
+    case 'bench_press':      return 'bench_press';
+    case 'deadlift':         return 'deadlift';
+    case 'trap_bar_deadlift': return 'trap_bar_deadlift';
+    case 'overhead_press':   return 'overhead_press';
+    case 'hip_thrust':       return 'hip_thrust';
+    case 'barbell_row':      return 'barbell_row';
+    default:                 return null;
   }
 }
 
