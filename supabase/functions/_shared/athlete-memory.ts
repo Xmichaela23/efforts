@@ -474,3 +474,52 @@ export function resolveAdaptiveMarathonDecisionFromMemory(
     },
   };
 }
+
+// ============================================================================
+// PLANNING MEMORY CONTEXT
+// ============================================================================
+
+/**
+ * Planning-relevant signals resolved from athlete_memory for use in
+ * plan generation (session sequencing, interference gating, taper shaping).
+ */
+export interface PlanningMemoryContext {
+  /** Concurrent training interference risk 0–1. null = insufficient data. */
+  interferenceRisk: number | null;
+  /** How strongly this athlete responds to taper 0–1. null = insufficient data. */
+  taperSensitivity: number | null;
+  /** Flagged anatomical areas prone to injury (e.g. ['achilles', 'it_band']). */
+  injuryHotspots: string[];
+  decisionSource: {
+    interferenceRisk: 'memory' | 'default';
+    taperSensitivity: 'memory' | 'default';
+    injuryHotspots: 'memory' | 'default';
+  };
+}
+
+/**
+ * Resolve planning-relevant memory signals.
+ * Returns safe defaults when memory is absent or rules have insufficient data.
+ */
+export function resolveMemoryContextForPlanning(
+  memory: AthleteMemoryRow | null,
+): PlanningMemoryContext {
+  const irResult = getRuleOrInsufficient<number>(memory, 'cross.interference_risk');
+  const tsResult = getRuleOrInsufficient<number>(memory, 'cross.taper_sensitivity');
+  const hsResult = getRuleOrInsufficient<string[]>(memory, 'strength.injury_hotspots');
+
+  const irUsable = isRuleUsable(irResult);
+  const tsUsable = isRuleUsable(tsResult);
+  const hsUsable = isRuleUsable(hsResult);
+
+  return {
+    interferenceRisk: irUsable ? (irResult as Extract<RuleResult<number>, { status: 'ok' }>).value : null,
+    taperSensitivity: tsUsable ? (tsResult as Extract<RuleResult<number>, { status: 'ok' }>).value : null,
+    injuryHotspots: hsUsable ? ((hsResult as Extract<RuleResult<string[]>, { status: 'ok' }>).value ?? []) : [],
+    decisionSource: {
+      interferenceRisk: irUsable ? 'memory' : 'default',
+      taperSensitivity: tsUsable ? 'memory' : 'default',
+      injuryHotspots: hsUsable ? 'memory' : 'default',
+    },
+  };
+}

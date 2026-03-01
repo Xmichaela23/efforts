@@ -13,6 +13,10 @@ import {
   StrengthPhase,
   PlacedSession,
 } from '../shared/strength-system/protocols/types.ts';
+import type { PlanningMemoryContext } from '../_shared/athlete-memory.ts';
+
+/** Interference risk threshold above which we force noDoubles. Science: AMPK/mTOR conflict is highest within 6 hrs of concurrent sessions. */
+const INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD = 0.65;
 
 type StrengthTier = 'bodyweight' | 'barbell';
 type StrengthFrequency = 2 | 3;
@@ -28,11 +32,23 @@ export function overlayStrength(
   tier: StrengthTier = 'bodyweight',
   protocolId?: string,
   methodology?: 'hal_higdon_complete' | 'jack_daniels_performance',
-  noDoubles?: boolean
+  noDoubles?: boolean,
+  memoryContext?: PlanningMemoryContext,
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
   const totalWeeks = Object.keys(plan.sessions_by_week).length;
+
+  // Memory-driven noDoubles: if interference_risk is high, separate all sessions.
+  const memoryDrivenNoDoubles =
+    memoryContext?.interferenceRisk != null &&
+    memoryContext.interferenceRisk >= INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD;
+  const effectiveNoDoubles = (noDoubles ?? false) || memoryDrivenNoDoubles;
+  if (memoryDrivenNoDoubles && !noDoubles) {
+    console.log(
+      `[PlanGen] Memory: interference_risk=${memoryContext!.interferenceRisk!.toFixed(2)} ≥ ${INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD} → noDoubles forced`
+    );
+  }
 
   // Get protocol
   // - If protocolId is undefined (PlanWizard case - not exposed yet): use default
@@ -105,7 +121,8 @@ export function overlayStrength(
         methodology,
         protocol: protocolId,
         strengthFrequency: frequency,
-        noDoubles: noDoubles || false,
+        noDoubles: effectiveNoDoubles,
+        injuryHotspots: memoryContext?.injuryHotspots ?? [],
       } : undefined
     );
 
@@ -223,11 +240,12 @@ export function overlayStrengthLegacy(
   _equipment: 'home_gym' | 'commercial_gym' = 'home_gym',
   protocolId?: string,
   methodology?: 'hal_higdon_complete' | 'jack_daniels_performance',
-  noDoubles?: boolean
+  noDoubles?: boolean,
+  memoryContext?: PlanningMemoryContext,
 ): TrainingPlan {
   // Map old tier names to new
   const newTier: StrengthTier = tier === 'injury_prevention' ? 'bodyweight' : 'barbell';
-  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId, methodology, noDoubles);
+  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId, methodology, noDoubles, memoryContext);
 }
 
 // OLD FUNCTIONS REMOVED - Now in protocol system

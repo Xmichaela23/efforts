@@ -24,6 +24,18 @@ export function getPlacementStrategy(ctx: PlacementContext): PlacementStrategy {
   }
 }
 
+/** Returns true if the hotspot list contains any lower-body injury flags. */
+function hasLowerBodyHotspot(hotspots: string[]): boolean {
+  const lowerTerms = [
+    'it_band', 'iliotibial', 'knee', 'hip', 'achilles', 'quad', 'quadricep',
+    'hamstring', 'calf', 'shin', 'plantar', 'glute', 'ankle', 'foot',
+    'tibial', 'peroneal', 'patellar', 'femoral',
+  ];
+  return hotspots.some(h =>
+    lowerTerms.some(t => h.toLowerCase().includes(t))
+  );
+}
+
 /**
  * Hal Higdon (Completion) Strategy
  * 
@@ -33,7 +45,7 @@ export function getPlacementStrategy(ctx: PlacementContext): PlacementStrategy {
  * Schedule:
  * - Monday: Upper Body (Priority)
  * - Wednesday: Lower Body (Priority) - furthest from Sunday long run
- * - Friday: Optional / Durability (Light)
+ * - Friday: Optional / Durability (Light) — upper only when lower-body hotspots are flagged
  */
 function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
   const slots: Partial<Record<Weekday, Slot>> = {
@@ -41,9 +53,11 @@ function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
     wed: 'lower_primary',
   };
 
-  // Add optional slot on Friday if frequency >= 3
   if (ctx.strengthFrequency >= 3) {
-    slots.fri = 'lower_optional'; // Protocol decides what goes here
+    // Friday lower creates fatigue the day before Saturday easy run and two days before Sunday long run.
+    // When lower-body hotspots are flagged (e.g. achilles, IT band), protect that window.
+    const lowerBodyRisk = hasLowerBodyHotspot(ctx.injuryHotspots ?? []);
+    slots.fri = lowerBodyRisk ? 'upper_optional' : 'lower_optional';
   }
 
   return {
@@ -121,17 +135,23 @@ function getDanielsFallbackStrategy(ctx: PlacementContext): PlacementStrategy {
   }
 
   if (ctx.protocol === 'durability') {
-    // Durability: Lower on Saturday (light/maintenance only)
-    slots.sat = 'lower_primary'; // Will be forced to light durability
+    // Saturday is adjacent to Sunday long run. When lower-body hotspots are flagged,
+    // skip the lower session entirely — the long run is the priority stressor.
+    const lowerBodyRisk = hasLowerBodyHotspot(ctx.injuryHotspots ?? []);
+    slots.sat = lowerBodyRisk ? 'none' : 'lower_primary';
 
     if (ctx.strengthFrequency >= 3) {
       slots.fri = 'upper_optional';
     }
 
+    const hotspotNote = lowerBodyRisk
+      ? ' Saturday lower omitted: lower-body injury flags detected — protecting Sunday long run.'
+      : '';
+
     return {
       name: 'Jack Daniels (Performance) - Durability Fallback',
       slotsByDay: slots,
-      notes: 'Lower durability on Saturday (light/maintenance) to preserve Sunday long run performance.',
+      notes: `Lower durability on Saturday (light/maintenance) to preserve Sunday long run performance.${hotspotNote}`,
     };
   }
 

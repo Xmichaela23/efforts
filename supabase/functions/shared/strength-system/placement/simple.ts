@@ -49,6 +49,7 @@ function assignSessions(
     protocol?: string;
     strengthFrequency?: number;
     noDoubles?: boolean;
+    injuryHotspots?: string[];
   }
 ): PlacedSession[] {
   const placed: PlacedSession[] = [];
@@ -59,7 +60,13 @@ function assignSessions(
       intentSessions,
       primarySchedule,
       guardrails,
-      placementContext
+      placementContext as {
+        methodology: 'hal_higdon_complete' | 'jack_daniels_performance';
+        protocol?: string;
+        strengthFrequency?: number;
+        noDoubles?: boolean;
+        injuryHotspots?: string[];
+      }
     );
   }
   
@@ -79,6 +86,7 @@ function assignSessionsWithStrategy(
     protocol?: string;
     strengthFrequency?: number;
     noDoubles?: boolean;
+    injuryHotspots?: string[];
   }
 ): PlacedSession[] {
   const placed: PlacedSession[] = [];
@@ -96,6 +104,7 @@ function assignSessionsWithStrategy(
     noDoubles: placementContext.noDoubles || false,
     qualityDays,
     longRunDay,
+    injuryHotspots: placementContext.injuryHotspots ?? [],
   };
   
   // Get strategy

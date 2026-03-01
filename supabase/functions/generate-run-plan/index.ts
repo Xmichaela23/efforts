@@ -30,6 +30,11 @@ import {
   getTargetTime,
   type TrainingPaces 
 } from './effort-score.ts';
+import {
+  getLatestAthleteMemory,
+  resolveMemoryContextForPlanning,
+  type PlanningMemoryContext,
+} from '../_shared/athlete-memory.ts';
 
 // ============================================================================
 // MAIN HANDLER
@@ -110,6 +115,23 @@ Deno.serve(async (req: Request) => {
     // Calculate start date early so generators can use it for race-day-aware tapering
     const startDate = request.start_date || calculateStartDate(request.duration_weeks, request.race_date);
 
+    // Fetch athlete memory for interference-aware session sequencing.
+    // Non-fatal: if memory is absent or fetch fails, planning proceeds with safe defaults.
+    let memoryContext: PlanningMemoryContext | undefined;
+    if (request.user_id && request.strength_frequency && request.strength_frequency > 0) {
+      try {
+        const supabaseEarly = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+        );
+        const memory = await getLatestAthleteMemory(supabaseEarly, request.user_id);
+        memoryContext = resolveMemoryContextForPlanning(memory);
+        console.log(`[PlanGen] Memory context resolved: interferenceRisk=${memoryContext.interferenceRisk}, taperSensitivity=${memoryContext.taperSensitivity}, hotspots=${memoryContext.injuryHotspots.length} (sources: ${JSON.stringify(memoryContext.decisionSource)})`);
+      } catch (memErr) {
+        console.warn(`[PlanGen] Memory fetch failed (non-fatal): ${memErr}`);
+      }
+    }
+
     // Select and run generator
     const generatorParams = {
       distance: request.distance,
@@ -183,7 +205,7 @@ Deno.serve(async (req: Request) => {
         const noDoubles = request.no_doubles || false; // Default to allowing doubles
         
         // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
-        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId, methodology, noDoubles);
+        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId, methodology, noDoubles, memoryContext);
       } catch (error: any) {
         // Protocol validation error - log canonical protocol for debugging
         const protocolId = request.strength_protocol || 'none';
