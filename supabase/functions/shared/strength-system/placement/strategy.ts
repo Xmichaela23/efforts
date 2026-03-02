@@ -86,11 +86,13 @@ function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
  */
 function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
   if (!ctx.noDoubles) {
-    // Preferred: Stack on Tuesday
+    // Mon upper + Thu lower: Monday pairs with easy run (upper won't tax legs),
+    // Thursday pairs with easy run and sits 48h after Tuesday quality + 72h before
+    // Sunday long run — ideal recovery windows on both sides.
     const slots: Partial<Record<Weekday, Slot>> = {
       mon: 'upper_primary',
-      tue: 'lower_primary', // Stacked PM after quality run
-      wed: 'none', // Recovery valley
+      wed: 'none', // Protected recovery valley
+      thu: 'lower_primary',
     };
 
     // Add optional slot on Friday if frequency >= 3
@@ -99,9 +101,9 @@ function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
     }
 
     return {
-      name: 'Jack Daniels (Performance) - Stacked',
+      name: 'Jack Daniels (Performance) - Distributed',
       slotsByDay: slots,
-      notes: 'Lower body stacked on Tuesday PM to consolidate stress. Wednesday remains recovery valley.',
+      notes: 'Upper Monday, lower Thursday. Wednesday stays clean. Thursday lower is 48h after Tuesday quality and 72h before Sunday long run.',
     };
   }
 
