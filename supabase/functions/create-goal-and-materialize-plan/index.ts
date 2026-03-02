@@ -63,6 +63,14 @@ function weeksBetween(a: Date, b: Date): number {
   return Math.floor(ms / (7 * 24 * 60 * 60 * 1000));
 }
 
+// How many weeks of plan do we need to cover a future race date?
+// Uses ceil so a race on day 48 (6.857 weeks) counts as 7 plan weeks,
+// placing the race correctly in the final week rather than one week past it.
+function weeksUntilRace(today: Date, raceDate: Date): number {
+  const ms = raceDate.getTime() - today.getTime();
+  return Math.ceil(ms / (7 * 24 * 60 * 60 * 1000));
+}
+
 function distanceToApiValue(distance: string | null): string {
   if (!distance) return '';
   return DISTANCE_TO_API[distance] || String(distance).toLowerCase();
@@ -200,7 +208,7 @@ Deno.serve(async (req: Request) => {
     const distanceApi = distanceToApiValue(resolvedGoal?.distance || null);
     if (!distanceApi) throw new AppError('missing_distance', 'Select a race distance to build a plan.');
     const floorWeeks = MIN_WEEKS[distanceApi]?.[fitness] ?? 4;
-    const weeksOut = weeksBetween(new Date(), new Date(String(resolvedGoal?.target_date || '')));
+    const weeksOut = weeksUntilRace(new Date(), new Date(String(resolvedGoal?.target_date || '') + 'T12:00:00'));
     if (weeksOut < 1) {
       throw new AppError('race_date_in_past', 'Race date must be in the future.');
     }
