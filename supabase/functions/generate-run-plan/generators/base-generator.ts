@@ -162,7 +162,9 @@ export abstract class BaseGenerator {
     const recentLongRun = this.params.recent_long_run_miles;
     if (!recentLongRun || progression.length === 0) return false;
     const peakValue = Math.max(...progression);
-    return recentLongRun >= peakValue * 0.80; // within 20% of the table's peak
+    // 72% threshold (vs 80%) gives tolerance for pace-conversion variance —
+    // a runner who's done 16+ mi long runs qualifies for the peak-bridge arc.
+    return recentLongRun >= peakValue * 0.72;
   }
 
   /**
@@ -892,36 +894,54 @@ export abstract class BaseGenerator {
    */
   protected calculateTotalMilesFromSessions(sessions: Session[]): number {
     let totalMiles = 0;
-    
+
     for (const session of sessions) {
       if (session.type !== 'run') continue;
-      
+
+      let sessionMiles = 0;
       const tokens = session.steps_preset || [];
+
       for (const token of tokens) {
-        // Match patterns like: run_easy_5mi, longrun_10mi_easypace, run_mp_4mi, tempo_3mi_threshold
-        // Also: longrun_12mi_easypace_last2mi_MP, cruise_3x1mi_threshold_r60s
-        // Use negative lookahead (?!n) so "150min" tokens don't match as 150 miles.
-        const miMatch = token.match(/(\d+(?:\.\d+)?)\s*mi(?!n)/);
-        if (miMatch) {
-          totalMiles += parseFloat(miMatch[1]);
-        }
-        
-        // For cruise intervals like cruise_3x1.5mi, calculate total
+        let tokenHandled = false;
+
+        // Cruise intervals: cruise_3x1.5mi → 3 × 1.5 mi. Handle first so the
+        // plain miMatch below doesn't also count the inline "1.5mi" portion.
         const cruiseMatch = token.match(/cruise_(\d+)x([\d.]+)mi/);
         if (cruiseMatch) {
-          totalMiles += parseInt(cruiseMatch[1]) * parseFloat(cruiseMatch[2]);
+          sessionMiles += parseInt(cruiseMatch[1]) * parseFloat(cruiseMatch[2]);
+          tokenHandled = true;
         }
-        
-        // For interval tokens, estimate based on distance (800m = 0.5mi, 1000m = 0.62mi)
+
+        // Interval tokens: interval_6x800m → distance in miles
         const intervalMatch = token.match(/interval_(\d+)x(\d+)m/);
         if (intervalMatch) {
-          const reps = parseInt(intervalMatch[1]);
-          const meters = parseInt(intervalMatch[2]);
-          totalMiles += reps * (meters / 1609.34);
+          sessionMiles += parseInt(intervalMatch[1]) * (parseInt(intervalMatch[2]) / 1609.34);
+          tokenHandled = true;
+        }
+
+        // Plain mileage tokens: run_easy_5mi, longrun_10mi_easypace, run_mp_4mi.
+        // Negative lookahead (?!n) prevents matching "min" in run_easy_35min.
+        if (!tokenHandled) {
+          const miMatch = token.match(/(\d+(?:\.\d+)?)\s*mi(?!n)/);
+          if (miMatch) {
+            sessionMiles += parseFloat(miMatch[1]);
+          }
         }
       }
+
+      // Fallback for time-based sessions (run_easy_35min, longrun_185min_easypace)
+      // that carry no mileage token — parse the miles figure from the description,
+      // e.g. "35 minutes (3.1 miles) at E pace" or "5 miles at E pace".
+      if (sessionMiles === 0 && session.description) {
+        const descMatch = session.description.match(/(\d+(?:\.\d+)?)\s*miles?/i);
+        if (descMatch) {
+          sessionMiles = parseFloat(descMatch[1]);
+        }
+      }
+
+      totalMiles += sessionMiles;
     }
-    
-    return Math.round(totalMiles * 10) / 10; // Round to 1 decimal
+
+    return Math.round(totalMiles * 10) / 10;
   }
 }

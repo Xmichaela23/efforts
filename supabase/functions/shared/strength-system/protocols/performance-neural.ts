@@ -141,11 +141,14 @@ function createLowerNeuralSession(
       duration = 35;
       description = `Week ${displayWeek} Speed - Peak neural work with potentiation. 3x2 squat + 2x2 trap @ ${load}%, then box jumps. RIR 1. Every rep should be explosive.`;
     } else {
+      // Race Prep: keep both bilateral lifts but reduce volume vs. recovery week.
+      // 2×2 @80% — enough to fire the nervous system without adding fatigue.
       exercises.push(
-        { name: 'Back Squat', sets: 2, reps: 2, weight: '80% 1RM', notes: 'Maintain neural pathways without accumulating fatigue.' }
+        { name: 'Back Squat', sets: 2, reps: 2, weight: '80% 1RM', notes: 'Maintain neural pathways without accumulating fatigue.' },
+        { name: 'Trap Bar Deadlift', sets: 2, reps: 2, weight: '75% 1RM', notes: 'Light and fast. No grinding — just keeping the pattern sharp.' }
       );
-      duration = 20;
-      description = `Week ${displayWeek} Race Prep - Maintain neural pathways. 2x2 at 80% should feel easy and fast.`;
+      duration = 25;
+      description = `Week ${displayWeek} Race Prep - Maintain neural pathways. 2x2 squat + 2x2 trap bar, light and fast. Nothing that creates soreness.`;
     }
   } else {
     // Should not reach here (bodyweight tier should use LOWER_MAINTENANCE)
