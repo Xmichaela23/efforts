@@ -95,6 +95,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [currentSnapshots, setCurrentSnapshots] = useState<any[]>([]);
   const [athleteMemory, setAthleteMemory] = useState<any>(null);
   const [prefillSource, setPrefillSource] = useState<{ fitness?: string; goal?: string; strength?: string }>({});
+  const [planStartDate, setPlanStartDate] = useState('');
+  const [showStartDate, setShowStartDate] = useState(false);
 
   // Pre-fill fitness + goal + strength from athlete memory and recent snapshots
   useEffect(() => {
@@ -236,7 +238,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({});
+    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({}); setPlanStartDate(''); setShowStartDate(false);
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
     setGoalFlowError(null);
@@ -458,6 +460,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         action,
         existing_goal_id: existingGoalPrompt?.existing.id || null,
         replace_goal_id: action === 'replace' ? existingGoalPrompt?.existing.id : null,
+        ...(planStartDate ? { plan_start_date: planStartDate } : {}),
         goal: {
           name: eventName.trim(),
           target_date: eventDate,
@@ -894,9 +897,21 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Name</span>
             <input type="text" placeholder="e.g. Boston Marathon" value={eventName} onChange={e => setEventName(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors" />
           </label>
-          <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Date</span>
+          <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Race Date</span>
             <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]" />
           </label>
+          <div>
+            <button type="button" onClick={() => setShowStartDate(v => !v)} className="text-xs text-white/30 hover:text-white/50 transition-colors">
+              {showStartDate ? '▾ Hide start date' : '▸ Set plan start date (optional)'}
+            </button>
+            {showStartDate && (
+              <label className="block mt-2">
+                <span className="text-sm text-white/50 mb-1.5 block">Plan Starts</span>
+                <input type="date" value={planStartDate} onChange={e => setPlanStartDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]" />
+                <span className="text-xs text-white/25 mt-1 block">Defaults to this Monday if left blank</span>
+              </label>
+            )}
+          </div>
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Sport</span>
             <select value={eventSport} onChange={e => { setEventSport(e.target.value); setEventDistance(''); }} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors appearance-none">
               <option value="run">Run</option><option value="ride">Ride</option><option value="swim">Swim</option><option value="triathlon">Triathlon</option><option value="other">Other</option>

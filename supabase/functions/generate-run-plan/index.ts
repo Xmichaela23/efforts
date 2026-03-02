@@ -501,21 +501,22 @@ function deriveKeySessionTypes(sessions: { tags?: string[]; type?: string }[]): 
  */
 function calculateStartDate(durationWeeks: number, raceDate?: string): string {
   if (raceDate) {
-    // Start date = race date - duration weeks
-    const race = new Date(raceDate);
-    race.setDate(race.getDate() - (durationWeeks * 7));
-    // Adjust to Monday
-    const day = race.getDay();
-    const diff = (day === 0 ? -6 : 1) - day;
-    race.setDate(race.getDate() + diff);
+    // Parse as local noon to avoid UTC-midnight timezone shift
+    const race = new Date(raceDate + 'T12:00:00');
+    // Step 1: find Monday of the race week (race day is the last day of that week)
+    const day = race.getDay(); // 0=Sun ... 6=Sat
+    const daysToMonday = day === 0 ? -6 : 1 - day;
+    race.setDate(race.getDate() + daysToMonday); // now = Monday of race week
+    // Step 2: go back (durationWeeks - 1) full weeks — this Monday is week 1
+    race.setDate(race.getDate() - (durationWeeks - 1) * 7);
     return toISO(race);
   }
 
-  // Default: next Monday
+  // Default: this Monday (today if Monday, else the Monday just passed)
   const today = new Date();
   const day = today.getDay();
-  const daysUntilMonday = (8 - day) % 7 || 7;
-  today.setDate(today.getDate() + daysUntilMonday);
+  const daysToThisMonday = day === 0 ? -6 : 1 - day;
+  today.setDate(today.getDate() + daysToThisMonday);
   return toISO(today);
 }
 

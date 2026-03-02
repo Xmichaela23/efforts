@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const payload = (await req.json()) as CreateGoalRequest;
-    const { user_id, mode = 'create', action, existing_goal_id, replace_goal_id, replace_plan_id, plan_id, goal } = payload || ({} as CreateGoalRequest);
+    const { user_id, mode = 'create', action, existing_goal_id, replace_goal_id, replace_plan_id, plan_id, goal, plan_start_date } = payload || ({} as CreateGoalRequest);
 
     if (!user_id) throw new AppError('missing_user_id', 'user_id required');
     if (!['create', 'build_existing', 'link_existing'].includes(mode)) throw new AppError('invalid_mode', 'mode must be create, build_existing, or link_existing');
@@ -506,6 +506,7 @@ Deno.serve(async (req: Request) => {
       ...(current_acwr != null ? { current_acwr } : {}),
       ...(volume_trend ? { volume_trend } : {}),
       transition_mode: trainingTransition.mode,
+      ...(plan_start_date ? { start_date: plan_start_date } : {}),
     };
     if (allowRaceWeekSupportMode || adaptiveSupportMode) {
       generateBody.race_week_mode = true;
