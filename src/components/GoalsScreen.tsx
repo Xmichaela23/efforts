@@ -96,7 +96,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [athleteMemory, setAthleteMemory] = useState<any>(null);
   const [prefillSource, setPrefillSource] = useState<{ fitness?: string; goal?: string; strength?: string }>({});
   const [planStartDate, setPlanStartDate] = useState('');
-  const [showStartDate, setShowStartDate] = useState(false);
 
   // Pre-fill fitness + goal + strength from athlete memory and recent snapshots
   useEffect(() => {
@@ -238,7 +237,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({}); setPlanStartDate(''); setShowStartDate(false);
+    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({}); setPlanStartDate('');
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
     setGoalFlowError(null);
@@ -897,21 +896,18 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Name</span>
             <input type="text" placeholder="e.g. Boston Marathon" value={eventName} onChange={e => setEventName(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors" />
           </label>
-          <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Race Date</span>
-            <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]" />
-          </label>
-          <div>
-            <button type="button" onClick={() => setShowStartDate(v => !v)} className="text-xs text-white/30 hover:text-white/50 transition-colors">
-              {showStartDate ? '▾ Hide start date' : '▸ Set plan start date (optional)'}
-            </button>
-            {showStartDate && (
-              <label className="block mt-2">
-                <span className="text-sm text-white/50 mb-1.5 block">Plan Starts</span>
-                <input type="date" value={planStartDate} onChange={e => setPlanStartDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]" />
-                <span className="text-xs text-white/25 mt-1 block">Defaults to this Monday if left blank</span>
-              </label>
-            )}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Race Date</span>
+              <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]" />
+            </label>
+            <label className="block">
+              <span className="text-sm text-white/50 mb-1.5 block">Plan Starts</span>
+              <input type="date" value={planStartDate} onChange={e => setPlanStartDate(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]" />
+            </label>
           </div>
+          {!planStartDate && (
+            <p className="text-xs text-white/30 -mt-1">Plan start defaults to this Monday — set a date above to control when training begins.</p>
+          )}
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Sport</span>
             <select value={eventSport} onChange={e => { setEventSport(e.target.value); setEventDistance(''); }} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors appearance-none">
               <option value="run">Run</option><option value="ride">Ride</option><option value="swim">Swim</option><option value="triathlon">Triathlon</option><option value="other">Other</option>
@@ -1037,17 +1033,23 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </div>
             </>);
           })()}
-          <button onClick={handleSaveEvent} disabled={saving || !eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal || (requiresDistance && !eventDistance)} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">{saving ? 'Saving...' : 'Save & Build Plan'}</button>
-          {requiresDistance && !eventDistance && (
+          {saving ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4 text-center space-y-1.5">
+              <div className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4 text-white/50" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                <span className="text-sm font-medium text-white/80">Building your plan…</span>
+              </div>
+              <p className="text-xs text-white/40">This can take a few moments. You can leave this screen — your plan will be ready when you come back.</p>
+            </div>
+          ) : (
+            <button onClick={handleSaveEvent} disabled={!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal || (requiresDistance && !eventDistance)} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">Save & Build Plan</button>
+          )}
+          {!saving && requiresDistance && !eventDistance && (
             <p className="mt-2 text-xs text-white/35">Select a race distance to continue.</p>
           )}
-          {hasSameSportActiveGoal ? (
+          {!saving && hasSameSportActiveGoal && (
             <p className="mt-2 text-xs text-white/45">
-              You already have an active goal in this sport. You will choose to keep both or replace, and replacement only ends the old plan after the new one materializes.
-            </p>
-          ) : (
-            <p className="mt-2 text-xs text-white/35">
-              This creates your goal and immediately materializes your new plan.
+              You already have an active goal in this sport. You will choose to keep both or replace.
             </p>
           )}
           {goalFlowError && (
