@@ -206,17 +206,92 @@ Deno.serve(async (req: Request) => {
     }
     let adaptiveMarathonDecision: any = null;
 
-    const [{ data: baseline }, { data: recentSnapshots }] = await Promise.all([
+    const [{ data: baseline }, { data: recentSnapshots }, { data: recentEndedPlans }] = await Promise.all([
       supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle(),
       supabase
         .from('athlete_snapshot')
         .select('week_start, run_long_run_duration, acwr, workload_total, workload_by_discipline')
         .eq('user_id', user_id)
         .order('week_start', { ascending: false })
-        .limit(4),
+        .limit(8),
+      // Read recent ended plans for tombstone-based transition classification
+      supabase
+        .from('plans')
+        .select('id, config, duration_weeks, created_at')
+        .eq('user_id', user_id)
+        .in('status', ['ended', 'completed'])
+        .order('created_at', { ascending: false })
+        .limit(3),
     ]);
     // Convenience alias: most recent snapshot (used below for weeklyMiles)
     const snapshot = recentSnapshots?.[0] ?? null;
+
+    // ── Training Transition Classification ────────────────────────────────────
+    // Read tombstones from recently ended plans to understand where the athlete
+    // is coming from. This drives the plan shape (taper vs build vs bridge).
+    type TransitionMode = 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
+    interface TrainingTransition {
+      mode: TransitionMode;
+      reasoning: string;
+      peak_long_run_miles?: number;
+      weeks_since_last_plan?: number;
+    }
+
+    function classifyTrainingTransition(): TrainingTransition {
+      const tombstone = recentEndedPlans?.[0]?.config?.tombstone;
+
+      if (!tombstone) {
+        return { mode: 'fresh_build', reasoning: 'No previous plan history found — building from current fitness.' };
+      }
+
+      const endedAt = tombstone.ended_at ? new Date(tombstone.ended_at) : null;
+      const weeksSinceEnd = endedAt
+        ? Math.floor((new Date().getTime() - endedAt.getTime()) / (7 * 24 * 60 * 60 * 1000))
+        : 999;
+
+      const completionPct = tombstone.completion_pct ?? 0;
+      const peakLongRun = tombstone.peak_long_run_miles ?? 0;
+      const prevDiscipline = tombstone.discipline ?? 'run';
+      const newDiscipline = (resolvedGoal?.sport || 'run').toLowerCase();
+      const sameDiscipline = prevDiscipline === newDiscipline;
+
+      // Peak bridge: was in a build, near or at peak, same discipline, new race ≤ 12 weeks out
+      if (
+        sameDiscipline &&
+        completionPct >= 40 &&
+        peakLongRun >= 14 &&
+        weeksSinceEnd <= 3 &&
+        weeksOut <= 12
+      ) {
+        return {
+          mode: 'peak_bridge',
+          reasoning: `You ended your ${tombstone.goal_name || 'previous plan'} at week ${tombstone.weeks_completed}/${tombstone.total_weeks} with a ${peakLongRun}-mile long run ${weeksSinceEnd <= 0 ? 'this week' : `${weeksSinceEnd} week${weeksSinceEnd === 1 ? '' : 's'} ago`}. Your fitness is at or near peak — bridging into ${weeksOut}-week taper.`,
+          peak_long_run_miles: peakLongRun,
+          weeks_since_last_plan: weeksSinceEnd,
+        };
+      }
+
+      // Recovery rebuild: ended a plan but fitness has had time to decay (3-12 weeks ago)
+      if (sameDiscipline && completionPct >= 20 && weeksSinceEnd > 3 && weeksSinceEnd <= 12) {
+        return {
+          mode: 'recovery_rebuild',
+          reasoning: `Your last ${tombstone.goal_name || 'plan'} ended ${weeksSinceEnd} weeks ago at ${completionPct}% completion. Rebuilding conservatively from current fitness.`,
+          peak_long_run_miles: peakLongRun,
+          weeks_since_last_plan: weeksSinceEnd,
+        };
+      }
+
+      // Default: fresh build
+      return {
+        mode: 'fresh_build',
+        reasoning: weeksSinceEnd > 12
+          ? `Last training block was ${weeksSinceEnd} weeks ago — treating as a fresh build.`
+          : 'Building from current fitness.',
+      };
+    }
+
+    const trainingTransition = classifyTrainingTransition();
+    // ─────────────────────────────────────────────────────────────────────────
 
     // ── Athlete Current State ─────────────────────────────────────────────────
     // Derive athlete state signals from recent snapshots so generators can find
@@ -225,16 +300,26 @@ Deno.serve(async (req: Request) => {
     let current_acwr: number | undefined;
     let volume_trend: 'building' | 'holding' | 'declining' | undefined;
 
+    // Seed recent_long_run_miles from tombstone if available (catches same-day
+    // plan switches before the snapshot has been recomputed for today's run).
+    if (trainingTransition.peak_long_run_miles && trainingTransition.peak_long_run_miles > 0) {
+      recent_long_run_miles = trainingTransition.peak_long_run_miles;
+    }
+
     if (recentSnapshots && recentSnapshots.length > 0) {
-      // Recent long run: peak from last 4 weeks (use max to avoid diluting with
-      // recovery weeks that artificially lower the average)
+      // Recent long run: peak from last 8 weeks (extended window, use max to avoid
+      // diluting with recovery weeks that artificially lower the average)
       const easyPaceSecPerMile: number = baseline?.effort_paces?.base ?? 600; // 10 min/mile default
       const longRunDurations = recentSnapshots
         .map((s: any) => s.run_long_run_duration as number | null)
         .filter((d): d is number => d != null && d > 0);
       if (longRunDurations.length > 0) {
         const maxDurationMin = Math.max(...longRunDurations);
-        recent_long_run_miles = Math.round((maxDurationMin * 60 / easyPaceSecPerMile) * 10) / 10;
+        const snapshotLongRun = Math.round((maxDurationMin * 60 / easyPaceSecPerMile) * 10) / 10;
+        // Use whichever is higher: tombstone peak or snapshot peak
+        if (!recent_long_run_miles || snapshotLongRun > recent_long_run_miles) {
+          recent_long_run_miles = snapshotLongRun;
+        }
       }
 
       // ACWR from the most recent snapshot
@@ -412,6 +497,7 @@ Deno.serve(async (req: Request) => {
       ...(recent_long_run_miles != null ? { recent_long_run_miles } : {}),
       ...(current_acwr != null ? { current_acwr } : {}),
       ...(volume_trend ? { volume_trend } : {}),
+      transition_mode: trainingTransition.mode,
     };
     if (allowRaceWeekSupportMode || adaptiveSupportMode) {
       generateBody.race_week_mode = true;
@@ -517,6 +603,9 @@ Deno.serve(async (req: Request) => {
         mode,
         goal_id: createdGoalId,
         plan_id: generatedPlanId,
+        // Training transition context — tells the UI how the plan was shaped
+        transition_mode: trainingTransition.mode,
+        transition_reasoning: trainingTransition.reasoning,
         readiness_state: adaptiveMarathonDecision?.readiness_state,
         recommended_mode: adaptiveMarathonDecision?.recommended_mode,
         risk_tier: adaptiveMarathonDecision?.risk_tier,
