@@ -348,17 +348,47 @@ export class SustainableGenerator extends BaseGenerator {
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
     if (!progression) return 10;
 
-    // Peak pivot: if the athlete is already at or near peak fitness and this is
-    // a short plan (≤8 weeks), use a taper arc downward from their current long
-    // run rather than offsetting into a build table. This is the key "pivot"
-    // behaviour — someone who just ran 18 miles gets 16→14→12→10→8→6, not 8→10→12.
+    // Peak pivot: athlete is already at or near peak fitness and this is a
+    // short plan. Use a phase-aware arc that maintains near-peak mileage in
+    // build weeks, drops for recovery, re-engages, then tapers.
     const recentLongRun = this.params.recent_long_run_miles;
-    if (recentLongRun && this.isAtPeakFitness(progression) && this.params.duration_weeks <= 8) {
-      const taperStart = Math.round(recentLongRun * 0.90); // slight pullback week 1
-      const raceWeekMiles = Math.max(4, Math.round(taperStart * 0.35));
-      const totalDrop = taperStart - raceWeekMiles;
-      const dropPerWeek = totalDrop / Math.max(1, this.params.duration_weeks - 1);
-      return Math.max(raceWeekMiles, Math.round(taperStart - (weekNumber - 1) * dropPerWeek));
+    if (recentLongRun && this.isAtPeakFitness(progression) && this.params.duration_weeks <= 10) {
+      const totalWeeks = this.params.duration_weeks;
+      const raceWeekMiles = Math.max(4, Math.round(recentLongRun * 0.30));
+
+      // Approximate taper start (last 2 weeks for ≤8-week plans, last 1 for shorter)
+      const taperStartWeek = totalWeeks <= 6
+        ? totalWeeks - 1
+        : Math.round(totalWeeks * 0.72);
+
+      // Recovery weeks: every 4th week not in taper
+      const recoveryWeeks: number[] = [];
+      for (let w = 4; w <= totalWeeks; w += 4) {
+        if (w < taperStartWeek) recoveryWeeks.push(w);
+      }
+      const isThisRecovery = recoveryWeeks.includes(weekNumber);
+
+      if (isThisRecovery) {
+        return Math.max(6, Math.round(recentLongRun * 0.55));
+      }
+      if (weekNumber >= taperStartWeek) {
+        const taperWeeksTotal = totalWeeks - taperStartWeek + 1;
+        const taperWeekIdx = weekNumber - taperStartWeek;
+        const taperEntryMiles = Math.round(recentLongRun * 0.70);
+        const dropPerWeek = (taperEntryMiles - raceWeekMiles) / Math.max(1, taperWeeksTotal);
+        return Math.max(raceWeekMiles, Math.round(taperEntryMiles - taperWeekIdx * dropPerWeek));
+      }
+      // Pre-taper, non-recovery: maintain near peak with gentle step
+      const lastRecovery = [...recoveryWeeks].reverse()[0] ?? null;
+      if (!lastRecovery || weekNumber < lastRecovery) {
+        const preBuildWeeks = lastRecovery ? lastRecovery - 1 : taperStartWeek - 1;
+        const highMark = Math.round(recentLongRun * 0.90);
+        const dropMark = Math.round(recentLongRun * 0.78);
+        const dropPerWeek = preBuildWeeks > 1 ? (highMark - dropMark) / (preBuildWeeks - 1) : 0;
+        return Math.max(dropMark, Math.round(highMark - (weekNumber - 1) * dropPerWeek));
+      }
+      // Post-recovery re-engagement
+      return Math.round(recentLongRun * 0.76);
     }
 
     // Standard path: find where the athlete sits in the progression table.

@@ -83,8 +83,8 @@ export abstract class BaseGenerator {
   protected getRaceProximitySession(daysUntilRace: number | null): 'race' | 'shakeout' | 'easy_short' | 'easy_medium' | 'reduced_quality' | 'normal' {
     if (daysUntilRace === null) return 'normal';
     if (daysUntilRace <= 0) return 'race';
-    if (daysUntilRace <= 2) return 'shakeout';
-    if (daysUntilRace <= 4) return 'easy_short';
+    if (daysUntilRace <= 1) return 'shakeout';   // day-before only (e.g. Saturday before Sunday race)
+    if (daysUntilRace <= 4) return 'easy_short';  // Fri + Thu: short easy
     if (daysUntilRace <= 7) return 'easy_medium';
     if (daysUntilRace <= 14) return 'reduced_quality';
     return 'normal';

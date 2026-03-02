@@ -1165,16 +1165,17 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const weekIdx = weekNumber - 1; // 0-based index
     const totalWeeks = this.params.duration_weeks;
 
-    // Peak pivot: athlete is already at or near their peak long-run fitness
-    // and this is a short plan. Switch to a taper arc rather than building.
+    // Peak bridge pivot: athlete is already at or near their peak long-run
+    // fitness and this is a short plan. Use a phase-aware arc that:
+    //   • Keeps long runs near-peak during build/speed weeks
+    //   • Drops to ~55% for recovery weeks (avoids double-reduction in resolveLongRun)
+    //   • Steps down progressively through taper weeks
+    // NOTE: this returns the TARGET miles for the week. resolveLongRun will pass
+    // these straight to createVDOTLongRun for recovery weeks (no extra 75% cut).
     const recentLongRun = this.params.recent_long_run_miles;
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
-    if (recentLongRun && progression && this.isAtPeakFitness(progression) && totalWeeks <= 8) {
-      const taperStart = Math.round(recentLongRun * 0.90);
-      const raceWeekMiles = Math.max(4, Math.round(taperStart * 0.35));
-      const totalDrop = taperStart - raceWeekMiles;
-      const dropPerWeek = totalDrop / Math.max(1, totalWeeks - 1);
-      return Math.max(raceWeekMiles, Math.round(taperStart - weekIdx * dropPerWeek));
+    if (recentLongRun && progression && this.isAtPeakFitness(progression) && totalWeeks <= 10) {
+      return this.calculatePeakBridgeLongRun(weekNumber, isRecovery, phaseStructure, recentLongRun);
     }
 
     // Safety: Week 1 or invalid index
@@ -1348,6 +1349,62 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   /**
    * Get long run target miles for a week (for mileage calculation)
    */
+  /**
+   * Phase-aware long run arc for peak-bridge plans (athlete already at peak).
+   *
+   * Arc shape:
+   *   Pre-recovery build weeks  → maintain near peak (90% → 78% gentle step)
+   *   Recovery week             → significant drop (55%) to flush fatigue
+   *   Post-recovery, pre-taper  → re-engagement (76%)
+   *   Taper weeks               → linear step-down from 70% to raceWeekMiles
+   *
+   * This is the single source of truth — resolveLongRun must NOT apply another
+   * 75% reduction on top for recovery weeks when this path is active.
+   */
+  private calculatePeakBridgeLongRun(
+    weekNumber: number,
+    isRecovery: boolean,
+    phaseStructure: PhaseStructure,
+    recentLongRun: number
+  ): number {
+    const totalWeeks = this.params.duration_weeks;
+    const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
+    const taperStartWeek = taperPhase?.start_week ?? Math.max(totalWeeks - 1, 1);
+    const raceWeekMiles = Math.max(6, Math.round(recentLongRun * 0.30));
+
+    // Recovery week: significant drop to flush accumulated fatigue
+    if (isRecovery) {
+      return Math.max(8, Math.round(recentLongRun * 0.55));
+    }
+
+    // Taper weeks: linear step-down to race-week floor
+    if (weekNumber >= taperStartWeek) {
+      const taperWeeksTotal = totalWeeks - taperStartWeek + 1;
+      const taperWeekIdx = weekNumber - taperStartWeek; // 0-based
+      const taperEntryMiles = Math.round(recentLongRun * 0.70);
+      const dropPerWeek = (taperEntryMiles - raceWeekMiles) / Math.max(1, taperWeeksTotal);
+      return Math.max(raceWeekMiles, Math.round(taperEntryMiles - taperWeekIdx * dropPerWeek));
+    }
+
+    // Pre-taper, non-recovery: maintain fitness with gentle step-down approaching recovery
+    const lastRecoveryBeforeTaper = [...phaseStructure.recovery_weeks]
+      .filter(w => w < taperStartWeek)
+      .sort((a, b) => b - a)[0] ?? null;
+
+    if (!lastRecoveryBeforeTaper || weekNumber < lastRecoveryBeforeTaper) {
+      // Before the recovery week: gentle step from 90% down toward 78%
+      const preBuildWeeks = lastRecoveryBeforeTaper ? lastRecoveryBeforeTaper - 1 : taperStartWeek - 1;
+      const weekIdx = weekNumber - 1; // 0-based
+      const highMark = Math.round(recentLongRun * 0.90);
+      const dropMark = Math.round(recentLongRun * 0.78);
+      const dropPerWeek = preBuildWeeks > 1 ? (highMark - dropMark) / (preBuildWeeks - 1) : 0;
+      return Math.max(dropMark, Math.round(highMark - weekIdx * dropPerWeek));
+    }
+
+    // After recovery week, before taper: re-engagement run
+    return Math.round(recentLongRun * 0.76);
+  }
+
   private getLongRunMilesForWeek(weekNumber: number, isRecovery: boolean, phaseStructure: PhaseStructure): number {
     if (this.params.distance === 'marathon') {
       return this.calculateStateAwareLongRun(weekNumber, isRecovery, phaseStructure);
@@ -1391,8 +1448,16 @@ export class PerformanceBuildGenerator extends BaseGenerator {
 
     // PRIORITY 2: Recovery week → reduced easy long run
     if (weekType === 'RECOVERY') {
-      // Recovery weeks: 75% of previous week, capped at 2 hours
-      const recoveryMiles = Math.max(8, Math.floor(longRunMiles * 0.75));
+      // When in peak-bridge mode, calculatePeakBridgeLongRun already returns a
+      // recovery-appropriate value (~55% of peak) — skip the second 75% cut.
+      const isPeakBridge = !!(
+        this.params.recent_long_run_miles &&
+        this.isAtPeakFitness(LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness] ?? []) &&
+        this.params.duration_weeks <= 10
+      );
+      const recoveryMiles = isPeakBridge
+        ? longRunMiles // already reduced by calculatePeakBridgeLongRun
+        : Math.max(8, Math.floor(longRunMiles * 0.75));
       return this.createVDOTLongRun(recoveryMiles, 0);
     }
 
@@ -1516,12 +1581,23 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   /**
-   * Get time cap for long runs based on Jack Daniels' method
-   * - 2.5 hours (150 min) for easy long runs
-   * - 3 hours (180 min) for long runs with M-pace segments
+   * Get time cap for long runs based on Jack Daniels' method, extended when
+   * the athlete has proven fitness beyond the default ceiling.
+   *
+   * - Default: 150 min easy, 180 min with M-pace segments
+   * - If recent_long_run_miles is set (athlete has proven capacity), the cap
+   *   expands to match their actual fitness so taper-arc weeks are not silently
+   *   truncated back to 13.5 miles.
    */
   private getLongRunTimeCap(hasMPaceSegments: boolean): number {
-    return hasMPaceSegments ? 180 : 150; // 3 hours with M-pace, 2.5 hours easy
+    const base = hasMPaceSegments ? 180 : 150;
+    const recentLongRun = this.params.recent_long_run_miles;
+    if (recentLongRun && recentLongRun > 0) {
+      const easyPace = this.getEasyPaceForTimeCalc(); // min/mile
+      const provenCapacity = Math.ceil(recentLongRun * easyPace);
+      return Math.max(base, provenCapacity);
+    }
+    return base;
   }
 
   /**
