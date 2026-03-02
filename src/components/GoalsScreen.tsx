@@ -92,38 +92,83 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [eventStrength, setEventStrength] = useState<'none' | 'neural_speed' | 'durability' | 'upper_aesthetics'>('none');
   const [eventStrengthFreq, setEventStrengthFreq] = useState<2 | 3>(2);
   const [overrideStrength, setOverrideStrength] = useState(false);
+  const [currentSnapshots, setCurrentSnapshots] = useState<any[]>([]);
+  const [athleteMemory, setAthleteMemory] = useState<any>(null);
+  const [prefillSource, setPrefillSource] = useState<{ fitness?: string; goal?: string; strength?: string }>({});
 
-  // Pre-fill fitness + goal from existing data when the event form opens
+  // Pre-fill fitness + goal + strength from athlete memory and recent snapshots
   useEffect(() => {
     if (!showEventForm) return;
-    if (!eventFitness && (currentBaselines || currentSnapshot)) {
-      const vdot = currentBaselines?.effort_score;
-      const weeklyMi = currentSnapshot?.weekly_distance
-        ? Math.round(currentSnapshot.weekly_distance)
-        : currentBaselines?.current_volume?.run
-          ? parseFloat(currentBaselines.current_volume.run) || 0
-          : 0;
+    const sources: { fitness?: string; goal?: string; strength?: string } = {};
 
-      if (vdot) {
+    // === Fitness level ===
+    if (!eventFitness) {
+      const vdot = currentBaselines?.effort_score;
+      const weeklyMi = currentBaselines?.current_volume?.run
+        ? parseFloat(currentBaselines.current_volume.run) || 0
+        : 0;
+
+      if (vdot && vdot > 0) {
         setEventFitness(vdot >= 45 ? 'advanced' : vdot >= 33 ? 'intermediate' : 'beginner');
+        sources.fitness = `From your fitness score (${Math.round(vdot)} vDOT)`;
       } else if (weeklyMi > 0) {
         setEventFitness(weeklyMi >= 30 ? 'advanced' : weeklyMi >= 12 ? 'intermediate' : 'beginner');
+        sources.fitness = `Avg ${Math.round(weeklyMi)} mi/week`;
       } else if (currentSnapshot) {
         setEventFitness('intermediate');
+        sources.fitness = 'Estimated from your activity';
       }
     }
-    if (!eventTrainingGoal && (currentBaselines !== undefined)) {
+
+    // === Training goal (complete vs speed) ===
+    if (!eventTrainingGoal) {
       const hasPaceData = currentBaselines?.effort_score || currentBaselines?.effort_paces?.race;
-      setEventTrainingGoal(hasPaceData ? 'speed' : 'complete');
+      const hasMemoryRunData = athleteMemory?.derived_rules?.run?.efficiency_peak_pace;
+      if (hasPaceData || hasMemoryRunData) {
+        setEventTrainingGoal('speed');
+        sources.goal = 'You have pace history — race for time';
+      } else {
+        setEventTrainingGoal('complete');
+        sources.goal = 'Set to finish goal — change if you want to chase a time';
+      }
     }
+
+    // === Strength protocol ===
     if (eventStrength === 'none') {
+      // Existing active plan takes priority
       const existingPlan = currentPlans.find(p => p.status === 'active' && p.config?.strength_protocol);
       if (existingPlan?.config?.strength_protocol) {
         setEventStrength(existingPlan.config.strength_protocol);
         setEventStrengthFreq(existingPlan.config.strength_frequency || 2);
+        sources.strength = 'Matched to your active plan';
+      } else {
+        // Check athlete memory for strength 1RM signals
+        const strengthRules = athleteMemory?.derived_rules?.strength ?? {};
+        const anchorKeys = [
+          'squat_1rm_est', 'bench_press_1rm_est', 'deadlift_1rm_est',
+          'trap_bar_deadlift_1rm_est', 'overhead_press_1rm_est',
+        ];
+        const activeLifts = anchorKeys.filter(k => {
+          const r = strengthRules[k];
+          return r && Number(r.value) > 0 && Number(r.confidence ?? 0) > 0.2;
+        });
+        // Count recent weeks with any strength volume
+        const strengthWeeks = currentSnapshots.filter(s => Number(s.strength_volume_total ?? 0) > 0).length;
+
+        if (activeLifts.length >= 2 || strengthWeeks >= 2) {
+          const hasHeavyLifts = ['squat_1rm_est', 'deadlift_1rm_est', 'trap_bar_deadlift_1rm_est']
+            .some(k => Number(strengthRules[k]?.value ?? 0) > 100);
+          setEventStrength(hasHeavyLifts ? 'neural_speed' : 'durability');
+          const weeksLabel = strengthWeeks > 0
+            ? `${strengthWeeks}/${currentSnapshots.length} recent weeks included lifting`
+            : `${activeLifts.length} lifts tracked`;
+          sources.strength = weeksLabel;
+        }
       }
     }
-  }, [showEventForm, currentBaselines, currentSnapshot]);
+
+    setPrefillSource(sources);
+  }, [showEventForm, currentBaselines, currentSnapshot, currentSnapshots, athleteMemory]);
   const [capCategory, setCapCategory] = useState('Speed');
   const [capMetric, setCapMetric] = useState('');
   const [capTarget, setCapTarget] = useState('');
@@ -134,12 +179,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const [{ data: bl }, { data: sn }] = await Promise.all([
+      const [{ data: bl }, { data: snaps }, { data: mem }] = await Promise.all([
         supabase.from('user_baselines').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('athlete_snapshot').select('*').eq('user_id', user.id).order('week_start', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('athlete_snapshot')
+          .select('week_start,workload_by_discipline,strength_volume_total,run_long_run_duration,workload_total')
+          .eq('user_id', user.id)
+          .order('week_start', { ascending: false })
+          .limit(4),
+        supabase.from('athlete_memory').select('derived_rules,provenance').eq('user_id', user.id).maybeSingle(),
       ]);
       setCurrentBaselines(bl);
-      setCurrentSnapshot(sn);
+      setCurrentSnapshot(snaps?.[0] ?? null);
+      setCurrentSnapshots(snaps ?? []);
+      setAthleteMemory(mem);
     })();
   }, []);
 
@@ -184,7 +236,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function resetForms() {
     setShowAddGoal(false); setShowEventForm(false); setShowCapacityForm(false); setShowMaintenanceForm(false);
-    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false);
+    setEventName(''); setEventDate(''); setEventSport('run'); setEventDistance(''); setEventPriority('A'); setEventFitness(''); setEventTrainingGoal(''); setOverrideFitness(false); setOverrideGoal(false); setEventStrength('none'); setEventStrengthFreq(2); setOverrideStrength(false); setPrefillSource({});
     setCapCategory('Speed'); setCapMetric(''); setCapTarget('');
     setMaintSport('run'); setMaintDays('4');
     setGoalFlowError(null);
@@ -830,6 +882,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <button onClick={resetForms} className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white/80 transition-all"><X className="h-5 w-5" /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-4">
+          {!currentBaselines && !athleteMemory && currentSnapshots.length === 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-white/60">Connect Strava to personalize this</p>
+                <p className="text-xs text-white/30 mt-0.5">We'll auto-fill your training level and suggest the right plan</p>
+              </div>
+              <button onClick={() => { resetForms(); navigate('/connections'); }} className="shrink-0 rounded-lg bg-orange-500/20 px-3 py-1.5 text-xs font-medium text-orange-400 hover:bg-orange-500/30 transition-colors">Connect</button>
+            </div>
+          )}
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Name</span>
             <input type="text" placeholder="e.g. Boston Marathon" value={eventName} onChange={e => setEventName(e.target.value)} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors" />
           </label>
@@ -870,6 +931,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       <div>
                         <span className="text-sm font-medium text-white/90">{fitnessLabels[eventFitness]?.[0]}</span>
                         <span className="block text-xs text-white/40 mt-0.5">{fitnessLabels[eventFitness]?.[1]}</span>
+                        {prefillSource.fitness && <span className="block text-xs text-white/25 mt-1">↑ {prefillSource.fitness}</span>}
                       </div>
                       <button onClick={() => setOverrideFitness(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
                     </div>
@@ -893,6 +955,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       <div>
                         <span className="text-sm font-medium text-white/90">{goalLabels[eventTrainingGoal]?.[0]}</span>
                         <span className="block text-xs text-white/40 mt-0.5">{goalLabels[eventTrainingGoal]?.[1]}</span>
+                        {prefillSource.goal && <span className="block text-xs text-white/25 mt-1">↑ {prefillSource.goal}</span>}
                       </div>
                       <button onClick={() => setOverrideGoal(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
                     </div>
@@ -926,6 +989,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                         <div>
                           <span className="text-sm font-medium text-white/90">{strengthLabels[eventStrength]?.[0]} · {freqLabel}</span>
                           <span className="block text-xs text-white/40 mt-0.5">{strengthLabels[eventStrength]?.[1]}</span>
+                          {prefillSource.strength && <span className="block text-xs text-white/25 mt-1">↑ {prefillSource.strength}</span>}
                         </div>
                         <button onClick={() => setOverrideStrength(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
                       </div>
