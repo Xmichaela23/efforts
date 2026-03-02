@@ -95,10 +95,9 @@ function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
       thu: 'lower_primary',
     };
 
-    // Add optional slot on Friday if frequency >= 3
-    if (ctx.strengthFrequency >= 3) {
-      slots.fri = 'upper_optional';
-    }
+    // Always include Friday as an optional upper slot — athletes doing 2x/week
+    // can skip it, but it should always be offered.
+    slots.fri = 'upper_optional';
 
     return {
       name: 'Jack Daniels (Performance) - Distributed',

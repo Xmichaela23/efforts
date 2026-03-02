@@ -336,12 +336,9 @@ export function overlayStrength(
       );
     }
     
-    // Filter out optional sessions when frequency = 2, BUT skip this during taper weeks.
-    // taperParams has already selected the right sessions; don't discard them because a
-    // protocol labels its taper sessions 'optional'.
-    if (frequency === 2 && !taperParams) {
-      filteredSessions = filteredSessions.filter(s => s.priority !== 'optional');
-    }
+    // Do not strip optional sessions at frequency=2 — optional sessions are bonus
+    // work the athlete can take or skip. They are placed on Friday by the strategy
+    // and labelled optional in the UI. Taper sessions are handled separately above.
 
     // Apply guardrails (for now, empty - will be implemented later)
     const guardrails: any[] = [];

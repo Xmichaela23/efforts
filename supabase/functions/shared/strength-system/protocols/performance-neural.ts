@@ -69,25 +69,17 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const freqRaw = strengthFrequency ?? 2;
   const freq = Number.isFinite(freqRaw) ? Math.max(2, freqRaw) : 2;
   
-  // If frequency = 2: LOWER_NEURAL (or LOWER_MAINTENANCE if bodyweight) + UPPER_STRENGTH
-  // If frequency = 3: LOWER_NEURAL (or LOWER_MAINTENANCE) + UPPER_STRENGTH + UPPER_MAINTENANCE (optional)
-  if (freq <= 2) {
-    if (lowerIntent === 'LOWER_NEURAL') {
-      sessions.push(createLowerNeuralSession(phase, weekInPhase, isRecovery, tier));
-    } else {
-      sessions.push(createLowerMaintenanceSession(phase, weekInPhase, isRecovery, tier));
-    }
-    sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
+  // Always: LOWER (required) + UPPER_STRENGTH (required) + UPPER_MAINTENANCE (optional bonus).
+  // The optional session is always generated so it shows as a 3rd day athletes can take or skip.
+  // The overlay's placement policy assigns it to Friday.
+  if (lowerIntent === 'LOWER_NEURAL') {
+    sessions.push(createLowerNeuralSession(phase, weekInPhase, isRecovery, tier));
   } else {
-    // 3x or higher
-    if (lowerIntent === 'LOWER_NEURAL') {
-      sessions.push(createLowerNeuralSession(phase, weekInPhase, isRecovery, tier));
-    } else {
-      sessions.push(createLowerMaintenanceSession(phase, weekInPhase, isRecovery, tier));
-    }
-    sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
-    sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
+    sessions.push(createLowerMaintenanceSession(phase, weekInPhase, isRecovery, tier));
   }
+  sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
+  // Optional 3rd day — upper maintenance. Athletes doing 2x/week can skip this.
+  sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
   
   return sessions;
 }
