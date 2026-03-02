@@ -144,10 +144,25 @@ export abstract class BaseGenerator {
       }
     }
 
-    // Never offset more than half the total plan duration — ensures the plan
-    // still reaches its peak rather than being permanently front-loaded.
-    const maxOffset = Math.floor(Math.min(progression.length, this.params.duration_weeks) / 2);
+    // Allow entering up to (progression.length - duration_weeks) positions in
+    // so there's always enough remaining table for the full plan duration.
+    // The old cap of duration_weeks/2 was too conservative: for a 6-week plan
+    // it capped at 3, forcing week 1 to start at position 3 (8 miles) even
+    // for athletes already at 18-mile peak fitness.
+    const maxOffset = Math.max(0, progression.length - this.params.duration_weeks);
     return Math.min(bestIndex, maxOffset);
+  }
+
+  /**
+   * Returns true when the athlete is already at or near their peak long-run
+   * fitness for this progression. Used to switch short plans into taper mode
+   * rather than continuing a build arc.
+   */
+  protected isAtPeakFitness(progression: number[]): boolean {
+    const recentLongRun = this.params.recent_long_run_miles;
+    if (!recentLongRun || progression.length === 0) return false;
+    const peakValue = Math.max(...progression);
+    return recentLongRun >= peakValue * 0.80; // within 20% of the table's peak
   }
 
   /**

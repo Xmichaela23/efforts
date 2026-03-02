@@ -1164,7 +1164,19 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   ): number {
     const weekIdx = weekNumber - 1; // 0-based index
     const totalWeeks = this.params.duration_weeks;
-    
+
+    // Peak pivot: athlete is already at or near their peak long-run fitness
+    // and this is a short plan. Switch to a taper arc rather than building.
+    const recentLongRun = this.params.recent_long_run_miles;
+    const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
+    if (recentLongRun && progression && this.isAtPeakFitness(progression) && totalWeeks <= 8) {
+      const taperStart = Math.round(recentLongRun * 0.90);
+      const raceWeekMiles = Math.max(4, Math.round(taperStart * 0.35));
+      const totalDrop = taperStart - raceWeekMiles;
+      const dropPerWeek = totalDrop / Math.max(1, totalWeeks - 1);
+      return Math.max(raceWeekMiles, Math.round(taperStart - weekIdx * dropPerWeek));
+    }
+
     // Safety: Week 1 or invalid index
     if (weekIdx < 0) {
       return this.getBaseLongRunDistance();

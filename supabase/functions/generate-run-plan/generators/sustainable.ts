@@ -348,8 +348,20 @@ export class SustainableGenerator extends BaseGenerator {
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
     if (!progression) return 10;
 
-    // Offset into the progression based on the athlete's recent long run so
-    // week 1 of the plan continues from where they actually are.
+    // Peak pivot: if the athlete is already at or near peak fitness and this is
+    // a short plan (≤8 weeks), use a taper arc downward from their current long
+    // run rather than offsetting into a build table. This is the key "pivot"
+    // behaviour — someone who just ran 18 miles gets 16→14→12→10→8→6, not 8→10→12.
+    const recentLongRun = this.params.recent_long_run_miles;
+    if (recentLongRun && this.isAtPeakFitness(progression) && this.params.duration_weeks <= 8) {
+      const taperStart = Math.round(recentLongRun * 0.90); // slight pullback week 1
+      const raceWeekMiles = Math.max(4, Math.round(taperStart * 0.35));
+      const totalDrop = taperStart - raceWeekMiles;
+      const dropPerWeek = totalDrop / Math.max(1, this.params.duration_weeks - 1);
+      return Math.max(raceWeekMiles, Math.round(taperStart - (weekNumber - 1) * dropPerWeek));
+    }
+
+    // Standard path: find where the athlete sits in the progression table.
     const offset = this.getProgressionOffset(progression);
     const index = weekNumber - 1 + offset;
 
