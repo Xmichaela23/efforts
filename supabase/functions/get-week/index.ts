@@ -1150,8 +1150,8 @@ Deno.serve(async (req)=>{
     
     if (trainingPlanId) {
       try {
-        const { data: planData } = await supabase.from('plans').select('config, name, current_week, duration_weeks, sessions_by_week').eq('id', trainingPlanId).single();
-        if (planData?.config) {
+        const { data: planData } = await supabase.from('plans').select('config, name, current_week, duration_weeks, sessions_by_week, status').eq('id', trainingPlanId).single();
+        if (planData?.config && planData?.status === 'active') {
           const config = planData.config;
           let weeklySummaries = config.weekly_summaries || {};
           
@@ -1261,8 +1261,13 @@ Deno.serve(async (req)=>{
           
           const weekSummary = weeklySummaries[String(currentWeek)] || {};
           
-          // Calculate weeks till race
-          const weeksToRace = durationWeeks > 0 ? Math.max(0, durationWeeks - currentWeek + 1) : null;
+          // Calculate weeks till race — only show if race date is still in the future
+          const raceInFuture = config.race_date
+            ? new Date(config.race_date + 'T12:00:00') > new Date()
+            : true;
+          const weeksToRace = durationWeeks > 0 && raceInFuture
+            ? Math.max(0, durationWeeks - currentWeek + 1)
+            : null;
           
           // Extract focus - handle both string and empty/null cases
           let focus = weekSummary.focus;
