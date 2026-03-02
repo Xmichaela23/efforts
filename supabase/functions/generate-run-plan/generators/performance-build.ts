@@ -281,10 +281,10 @@ export class PerformanceBuildGenerator extends BaseGenerator {
           break;
           
         case 'easy_medium':
-          // 5-7 days before race: normal easy or light quality
+          // 5-7 days before race: easy running + activation strides only.
+          // I-pace work this close to the marathon adds fatigue without benefit.
           if (day === 'Tuesday') {
-            // Light sharpening workout
-            sessions.push(this.createTaperInterval());
+            sessions.push(this.createRaceWeekActivation());
           } else if (day === 'Sunday') {
             // Reduced long run (8-10 miles max)
             sessions.push(this.createVDOTLongRun(8, 0));
@@ -2128,7 +2128,8 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   }
 
   /**
-   * Taper sharpening workout
+   * Taper sharpening workout — used 8-14 days out (taper week).
+   * 4×400m I pace is appropriate here; enough quality to stay sharp.
    */
   private createTaperInterval(): Session {
     return this.createSession(
@@ -2144,6 +2145,27 @@ export class PerformanceBuildGenerator extends BaseGenerator {
         TOKEN_PATTERNS.cooldown_1mi
       ],
       ['moderate_run', 'intervals']
+    );
+  }
+
+  /**
+   * Race week activation — used 5-7 days out.
+   * Light strides only: no I-pace work within 5 days of the marathon.
+   * Goal is to fire fast-twitch fibers and keep legs feeling snappy, not add load.
+   */
+  private createRaceWeekActivation(): Session {
+    return this.createSession(
+      'Tuesday',
+      'Race Week Activation',
+      `20 min easy + 4×100m strides (walk back recovery). ` +
+      `Strides should feel effortless and fast — not a workout. ` +
+      `Legs should feel bouncy after, not tired.`,
+      25,
+      [
+        TOKEN_PATTERNS.easy_run(20),
+        TOKEN_PATTERNS.strides_4x100m,
+      ],
+      ['easy_run', 'strides', 'taper']
     );
   }
 

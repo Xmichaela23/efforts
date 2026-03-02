@@ -86,13 +86,14 @@ function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
  */
 function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
   if (!ctx.noDoubles) {
-    // Mon upper + Thu lower: Monday pairs with easy run (upper won't tax legs),
-    // Thursday pairs with easy run and sits 48h after Tuesday quality + 72h before
-    // Sunday long run — ideal recovery windows on both sides.
+    // Mon upper + Wed lower: Wednesday is always an easy-run day in JD plans,
+    // so lower neural here never conflicts with quality work. Thursday stays
+    // clean for T-pace / I-pace sessions. 72h from Wed lower → Sat, 96h → Sun
+    // long run — plenty of recovery on both ends.
     const slots: Partial<Record<Weekday, Slot>> = {
       mon: 'upper_primary',
-      wed: 'none', // Protected recovery valley
-      thu: 'lower_primary',
+      wed: 'lower_primary',
+      thu: 'none', // Quality run day — no strength stacking
     };
 
     // Always include Friday as an optional upper slot — athletes doing 2x/week
