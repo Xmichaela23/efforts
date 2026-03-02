@@ -213,7 +213,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Planned workouts are sourced via unified server paths now
   const plannedWorkouts: any[] = [];
   const queryClient = useQueryClient();
-  const { loadUserBaselines, updatePlan, pausePlan, endPlan } = useAppContext();
+  const { loadUserBaselines, updatePlan, pausePlan, endPlan, resumePlan } = useAppContext();
+  const [resumingPlanId, setResumingPlanId] = useState<string | null>(null);
+  const [resumeDialog, setResumeDialog] = useState<{ plan: any; weeksCompleted: number; totalWeeks: number } | null>(null);
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
@@ -2278,18 +2280,88 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
       {completedPlans.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-medium text-white">Completed Plans</h2>
-          {completedPlans.map((plan) => (
-            <div
-              key={plan.id}
-              onClick={() => handlePlanClick(plan.id)}
-              className="p-4 cursor-pointer bg-white/[0.05] hover:bg-white/[0.10] transition-colors rounded-xl border border-white/15"
-            >
-              <div className="font-medium text-white">{plan.name}</div>
-              <div className="text-sm text-white/60 mt-1">{plan.description}</div>
-              <div className="text-xs text-green-400 mt-1">✓ Completed</div>
+          <h2 className="text-lg font-medium text-white">Past Plans</h2>
+          {completedPlans.map((plan: any) => {
+            const isEnded = plan.status === 'ended';
+            const tombstone = plan.config?.tombstone;
+            const weeksCompleted = tombstone?.weeks_completed ?? plan.currentWeek ?? 1;
+            const totalWeeks = plan.duration_weeks || plan.config?.duration_weeks || 0;
+            return (
+              <div key={plan.id} className="p-4 bg-white/[0.05] rounded-xl border border-white/15">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handlePlanClick(plan.id)}>
+                    <div className="font-medium text-white truncate">{plan.name}</div>
+                    {plan.description && <div className="text-sm text-white/50 mt-0.5 truncate">{plan.description}</div>}
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {isEnded ? (
+                        <span className="text-xs text-amber-400/80">
+                          Ended · Week {weeksCompleted}{totalWeeks > 0 ? `/${totalWeeks}` : ''}
+                          {tombstone?.peak_long_run_miles ? ` · ${tombstone.peak_long_run_miles}mi peak` : ''}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-green-400">✓ Completed</span>
+                      )}
+                    </div>
+                  </div>
+                  {isEnded && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setResumeDialog({ plan, weeksCompleted, totalWeeks });
+                      }}
+                      className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/20 transition-colors"
+                    >
+                      Resume
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Resume dialog */}
+      {resumeDialog && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setResumeDialog(null)}>
+          <div className="w-full max-w-md bg-[#1a1a1a] rounded-t-2xl p-6 pb-8 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-white">Resume {resumeDialog.plan.name}</h3>
+            <p className="text-sm text-white/50">Pick up where you left off or start fresh from week 1.</p>
+            <div className="space-y-2">
+              {resumeDialog.weeksCompleted > 1 && (
+                <button
+                  disabled={!!resumingPlanId}
+                  onClick={async () => {
+                    setResumingPlanId(resumeDialog.plan.id);
+                    try { await resumePlan(resumeDialog.plan.id, resumeDialog.weeksCompleted); } finally {
+                      setResumingPlanId(null); setResumeDialog(null);
+                    }
+                  }}
+                  className="w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-left hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+                >
+                  <span className="text-sm font-medium text-white/90">
+                    Continue from Week {resumeDialog.weeksCompleted}
+                    {resumeDialog.totalWeeks > 0 ? ` of ${resumeDialog.totalWeeks}` : ''}
+                  </span>
+                  <span className="block text-xs text-white/40 mt-0.5">Pick up where you left off — today becomes Week {resumeDialog.weeksCompleted}</span>
+                </button>
+              )}
+              <button
+                disabled={!!resumingPlanId}
+                onClick={async () => {
+                  setResumingPlanId(resumeDialog.plan.id);
+                  try { await resumePlan(resumeDialog.plan.id, 1); } finally {
+                    setResumingPlanId(null); setResumeDialog(null);
+                  }
+                }}
+                className="w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-left hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+              >
+                <span className="text-sm font-medium text-white/90">Start from Week 1</span>
+                <span className="block text-xs text-white/40 mt-0.5">Begin the full plan from today</span>
+              </button>
             </div>
-          ))}
+            <button onClick={() => setResumeDialog(null)} className="w-full text-center text-sm text-white/30 hover:text-white/60 pt-1">Cancel</button>
+          </div>
         </div>
       )}
 

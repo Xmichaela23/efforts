@@ -129,6 +129,7 @@ interface AppContextType {
   addPlan: (plan: any) => Promise<void>;
   deletePlan: (planId: string) => Promise<void>;
   endPlan: (planId: string) => Promise<any>;
+  resumePlan: (planId: string, resumeFromWeek?: number) => Promise<any>;
   pausePlan: (planId: string) => Promise<any>;
   updatePlan: (planId: string, updates: any) => Promise<void>;
   refreshPlans: () => Promise<void>;
@@ -157,6 +158,9 @@ const defaultAppContext: AppContextType = {
   plansLoading: false,
   addPlan: async () => {},
   deletePlan: async () => {},
+  endPlan: async () => {},
+  resumePlan: async () => {},
+  pausePlan: async () => {},
   updatePlan: async () => {},
   refreshPlans: async () => {},
   saveUserBaselines: async () => {},
@@ -680,6 +684,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const resumePlan = async (planId: string, resumeFromWeek?: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User must be authenticated to resume plans');
+      const { data, error } = await supabase.functions.invoke('resume-plan', {
+        body: { plan_id: String(planId), ...(resumeFromWeek ? { resume_from_week: resumeFromWeek } : {}) }
+      }) as any;
+      if (error) throw error as any;
+      if (!data?.success) throw new Error(data?.error || 'Failed to resume plan');
+      await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      return data;
+    } catch (error) {
+      console.error('Error in resumePlan:', error);
+      throw error;
+    }
+  };
+
   const pausePlan = async (planId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -825,6 +848,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addPlan,
         deletePlan,
         endPlan,
+        resumePlan,
         pausePlan,
         updatePlan,
         refreshPlans: loadPlans,
