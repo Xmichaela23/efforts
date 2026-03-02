@@ -900,7 +900,8 @@ export abstract class BaseGenerator {
       for (const token of tokens) {
         // Match patterns like: run_easy_5mi, longrun_10mi_easypace, run_mp_4mi, tempo_3mi_threshold
         // Also: longrun_12mi_easypace_last2mi_MP, cruise_3x1mi_threshold_r60s
-        const miMatch = token.match(/(\d+(?:\.\d+)?)\s*mi/);
+        // Use negative lookahead (?!n) so "150min" tokens don't match as 150 miles.
+        const miMatch = token.match(/(\d+(?:\.\d+)?)\s*mi(?!n)/);
         if (miMatch) {
           totalMiles += parseFloat(miMatch[1]);
         }
