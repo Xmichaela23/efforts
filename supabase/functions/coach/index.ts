@@ -317,13 +317,18 @@ Deno.serve(async (req) => {
     const weekFocusLabel = weekIntentInfo.focus_label as string | null;
     const methodologyCtx: MethodologyContext = { week_intent: weekIntent as any, week_start_dow: weekStartDow };
 
-    // Planned rows within the week window (used for totals + remaining + WTD)
-    const { data: plannedWeek, error: pErr } = await supabase
+    // Planned rows within the week window — scoped to the active plan so
+    // rows from old ended plans in the same date range are excluded.
+    let plannedWeekQuery = supabase
       .from('planned_workouts')
       .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
+    if (activePlan?.id) {
+      plannedWeekQuery = plannedWeekQuery.eq('training_plan_id', activePlan.id);
+    }
+    const { data: plannedWeek, error: pErr } = await plannedWeekQuery;
     if (pErr) throw pErr;
 
     // WTD actual load: completed workouts within [week_start, as_of]
@@ -1263,7 +1268,7 @@ Deno.serve(async (req) => {
         const [wfRes, elRes] = await Promise.all([
           supabase
             .from('workout_facts')
-            .select('workout_id, date, discipline, duration_minutes, workload, session_rpe, adherence, run_facts, strength_facts, ride_facts, swim_facts')
+            .select('workout_id, date, discipline, duration_minutes, workload, session_rpe, adherence, run_facts, strength_facts, ride_facts, swim_facts, plan_id')
             .eq('user_id', userId)
             .gte('date', weekStartDate)
             .lte('date', weekEndDate)
@@ -1335,8 +1340,13 @@ Deno.serve(async (req) => {
           if (rpe != null) parts.push(`RPE ${rpe}/10`);
           if (feeling) parts.push(`feeling: ${feeling}`);
 
+          // Only report plan adherence deviations when the workout_facts row was
+          // computed against the *current* active plan. If plan_id doesn't match
+          // (e.g. facts pre-date a plan change), the comparison is meaningless.
+          const factsAreFromActivePlan = !wf.plan_id || !activePlan?.id || wf.plan_id === activePlan.id;
+
           if (adh.execution_score != null) parts.push(`execution ${adh.execution_score}%`);
-          if (adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
+          if (factsAreFromActivePlan && adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
             parts.push(adh.workload_pct > 100
               ? `DID ${adh.workload_pct - 100}% MORE LOAD than planned`
               : `did ${100 - adh.workload_pct}% less load than planned`);
@@ -1346,7 +1356,8 @@ Deno.serve(async (req) => {
           if (adh.weight_deviation_note) parts.push(`weight deviation note: ${adh.weight_deviation_note}`);
 
           // Strength-specific: per-exercise planned vs actual
-          if (wf.discipline === 'strength' && wf.strength_facts?.exercises) {
+          // Skip exercise-level deviations if this session was matched against a different plan
+          if (factsAreFromActivePlan && wf.discipline === 'strength' && wf.strength_facts?.exercises) {
             const deviations: string[] = [];
             for (const ex of wf.strength_facts.exercises) {
               if (ex.planned_weight && ex.best_weight) {
