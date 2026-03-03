@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
     // previous training cycle, making load-ratio comparisons unreliable.
     const isPlanTransitionPeriod = (() => {
       if (!planConfig) return false;
-      const startIso = String(planConfig?.start_date || '');
+      const startIso = String(planConfig?.user_selected_start_date || planConfig?.start_date || '');
       if (!startIso) return false;
       try {
         const planStartMs = parseISODateOnly(startIso).getTime();
