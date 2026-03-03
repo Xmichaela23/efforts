@@ -975,7 +975,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const optTag = String(L.optional_tag || 'optional').toLowerCase();
       const xorTag = String(L.xor_tag || 'xor:swim_or_quality_bike').toLowerCase();
       const weeklyCap = Number(L.weekly_quality_cap || 1);
-      const tz = L.week_boundary?.timezone || 'America/Los_Angeles';
+      const tz = L.week_boundary?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
       const toDateOnly = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { timeZone: tz });
       const startOfWeek = (iso: string) => {
         const d = new Date(iso + 'T00:00:00');
@@ -1076,7 +1076,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         const L = spec.logic || {};
         const qTag = String(L.quality_tag || 'bike_intensity').toLowerCase();
         const optTag = String(L.optional_tag || 'optional').toLowerCase();
-        const tz = L.week_boundary?.timezone || 'America/Los_Angeles';
+        const tz = L.week_boundary?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
         const toDateOnly = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { timeZone: tz });
         const startOfWeek = (iso: string) => {
           const d = new Date(iso + 'T00:00:00');
@@ -1142,7 +1142,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         const spec: any = optionalUiSpec as any;
         const xorTag = String(spec?.logic?.xor_tag || 'xor:swim_or_quality_bike').toLowerCase();
         const optTag = String(spec?.logic?.optional_tag || 'optional').toLowerCase();
-        const tz = spec?.logic?.week_boundary?.timezone || 'America/Los_Angeles';
+        const tz = spec?.logic?.week_boundary?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
         const toDateOnly = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { timeZone: tz });
         const startOfWeek = (iso: string) => {
           const d = new Date(iso + 'T00:00:00');

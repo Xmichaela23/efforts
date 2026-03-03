@@ -2428,7 +2428,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     const completedWorkout = isMobilityMode ? {
       id: scheduledWorkout?.id || Date.now().toString(),
-      name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
+      name: scheduledWorkout?.name || `Mobility - ${new Date().toLocaleDateString('en-US')}`,
       type: 'mobility' as const,
       date: workoutDate,
       description: 'Mobility session',
@@ -2441,7 +2441,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       planned_id: sourcePlannedId || undefined
     } : {
       id: scheduledWorkout?.id || Date.now().toString(),
-      name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
+      name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US')}`,
       type: 'strength' as const,
       date: workoutDate,
       description: validExercises
