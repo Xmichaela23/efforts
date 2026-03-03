@@ -520,7 +520,8 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { user_id, date, workout_id } = payload;
+    const { user_id, date, workout_id, timezone } = payload;
+    const userTz: string | null = timezone ? String(timezone) : null;
 
     // Validate required fields
     if (!user_id) {
@@ -543,10 +544,22 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log(`📊 Generating training context for user ${user_id}, date ${date}`);
+    // Resolve today's local date using the user's timezone when the caller
+    // doesn't provide an explicit date (defensive: client always sends one now).
+    const resolvedDate = date || (() => {
+      try {
+        return userTz
+          ? new Date().toLocaleDateString('en-CA', { timeZone: userTz })
+          : new Date().toLocaleDateString('en-CA');
+      } catch {
+        return new Date().toLocaleDateString('en-CA');
+      }
+    })();
 
-    const focusDate = new Date(date + 'T12:00:00');
-    const focusDateISO = date;
+    console.log(`📊 Generating training context for user ${user_id}, date ${resolvedDate} (tz: ${userTz ?? 'local'})`);
+
+    const focusDate = new Date(resolvedDate + 'T12:00:00');
+    const focusDateISO = resolvedDate;
 
     // ==========================================================================
     // FETCH PLAN CONTEXT FIRST (needed for smart date range calculation)

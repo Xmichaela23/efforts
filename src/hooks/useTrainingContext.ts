@@ -431,7 +431,8 @@ export function useTrainingContext(date: string): UseTrainingContextResult {
         {
           body: {
             user_id: user.id,
-            date: date
+            date: date,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           }
         }
       );

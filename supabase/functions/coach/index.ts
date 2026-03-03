@@ -1350,7 +1350,12 @@ Deno.serve(async (req) => {
             const deviations: string[] = [];
             for (const ex of wf.strength_facts.exercises) {
               if (ex.planned_weight && ex.best_weight) {
-                const plannedW = parseFloat(ex.planned_weight) || 0;
+                const plannedStr = String(ex.planned_weight);
+                // Skip comparison if planned_weight is a % notation ("72% 1RM") — we
+                // can't meaningfully compare it to actual pounds without knowing the 1RM.
+                // Only compare when planned_weight is a concrete lb/kg value ("95 lb").
+                if (plannedStr.includes('%')) continue;
+                const plannedW = parseFloat(plannedStr) || 0;
                 if (plannedW > 0 && ex.best_weight > plannedW * 1.05) {
                   deviations.push(`${ex.name}: lifted ${Math.round(ex.best_weight)}${wUnit} but plan said ${Math.round(plannedW)}${wUnit} (+${Math.round(((ex.best_weight / plannedW) - 1) * 100)}% heavier)`);
                 } else if (plannedW > 0 && ex.best_weight < plannedW * 0.9) {

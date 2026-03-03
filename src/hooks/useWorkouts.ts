@@ -301,7 +301,8 @@ export const useWorkouts = () => {
               const workoutType = getWorkoutType(activity.activity_type || (activity as any).provider_sport || '');
               const activityDate = (() => {
                 const d = activity.start_time ? new Date(activity.start_time) : new Date();
-                return d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+                // Use device/browser local timezone — not hardcoded LA
+                return d.toLocaleDateString('en-CA');
               })();
               
               const locationTitle = generateLocationTitleSync(
