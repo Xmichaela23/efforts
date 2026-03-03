@@ -138,11 +138,16 @@ function buildVerdict(
   metrics: CoachWeekContextResponseV1['metrics'],
   methodologyId: MethodologyId,
   ctx: MethodologyContext,
-  reaction: CoachWeekContextResponseV1['reaction']
+  reaction: CoachWeekContextResponseV1['reaction'],
+  planWeekIndex: number | null = null,
 ): { code: WeekVerdictCode; label: string; confidence: number; reason_codes: string[]; next: { code: NextActionCode; title: string; details: string } } {
   const reason_codes: string[] = [];
   const acwr = metrics.acwr;
   const completion = metrics.wtd_completion_ratio;
+  // Week 1 of a new plan: the 7-day acute window spans the final days of the
+  // previous plan. ACWR-only caution is unreliable here — suppress it unless
+  // the ratio is critically high (>= high threshold) or execution is poor.
+  const isPlanWeek1 = planWeekIndex === 1;
   const methodology = getMethodology(methodologyId);
   const t = methodology.thresholds(ctx);
   const warn = t.warn_acwr;
@@ -198,7 +203,7 @@ function buildVerdict(
     };
   }
 
-  if (acwr >= warn) {
+  if (acwr >= warn && !isPlanWeek1) {
     reason_codes.push('acwr_elevated');
     return {
       code: 'caution_ramping_fast',
@@ -1054,7 +1059,7 @@ Deno.serve(async (req) => {
       acwr,
     };
 
-    const v = buildVerdict(metrics, methodologyId, methodologyCtx, reaction);
+    const v = buildVerdict(metrics, methodologyId, methodologyCtx, reaction, weekIndex);
 
     // =========================================================================
     // Deterministic training state (plan-aware topline for dumb clients)
@@ -1302,6 +1307,9 @@ Deno.serve(async (req) => {
           planLine += '.';
           narrativeFacts.push(planLine);
           narrativeFacts.push('IMPORTANT: There is an active training plan. Do NOT suggest adding extra sessions. If sessions were missed, suggest hitting the planned sessions next week. If suggesting changes, frame them as adjustments within the existing plan.');
+          if (weekIndex === 1) {
+            narrativeFacts.push('NOTE: This is Week 1 of a new plan. Any load ratio data this week spans the transition from a previous training cycle — do NOT flag load as elevated or suggest recovery based on ACWR alone. Treat this week as an onboarding week and focus on execution quality of the first planned sessions.');
+          }
         } else {
           narrativeFacts.push('The athlete is NOT on a structured plan. Suggestions for adding or adjusting sessions are appropriate.');
         }
