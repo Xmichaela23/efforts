@@ -139,15 +139,15 @@ function buildVerdict(
   methodologyId: MethodologyId,
   ctx: MethodologyContext,
   reaction: CoachWeekContextResponseV1['reaction'],
-  planWeekIndex: number | null = null,
+  isPlanTransitionPeriod: boolean = false,
 ): { code: WeekVerdictCode; label: string; confidence: number; reason_codes: string[]; next: { code: NextActionCode; title: string; details: string } } {
   const reason_codes: string[] = [];
   const acwr = metrics.acwr;
   const completion = metrics.wtd_completion_ratio;
-  // Week 1 of a new plan: the 7-day acute window spans the final days of the
-  // previous plan. ACWR-only caution is unreliable here — suppress it unless
-  // the ratio is critically high (>= high threshold) or execution is poor.
-  const isPlanWeek1 = planWeekIndex === 1;
+  // Early weeks of a new plan: the 7-day acute window overlaps with the final
+  // days of the previous training cycle, making ACWR unreliable. Suppress
+  // ACWR-only caution unless the ratio is critically high or execution is poor.
+  const isPlanWeek1 = isPlanTransitionPeriod;
   const methodology = getMethodology(methodologyId);
   const t = methodology.thresholds(ctx);
   const warn = t.warn_acwr;
@@ -317,6 +317,22 @@ Deno.serve(async (req) => {
     const weekStartDate = weekStartOf(asOfDate, weekStartDow);
     const weekEndDate = addDaysISO(weekStartDate, 6);
     const weekIndex = activePlan ? computeWeekIndex(planConfig, asOfDate, weekStartDow, activePlan.duration_weeks || null) : null;
+
+    // Plan transition period: plan started within the last 14 days.
+    // The 7-day ACWR acute window and 28-day baselines both overlap with the
+    // previous training cycle, making load-ratio comparisons unreliable.
+    const isPlanTransitionPeriod = (() => {
+      if (!planConfig) return false;
+      const startIso = String(planConfig?.start_date || '');
+      if (!startIso) return false;
+      try {
+        const planStartMs = parseISODateOnly(startIso).getTime();
+        const todayMs = parseISODateOnly(asOfDate).getTime();
+        const daysSinceStart = Math.floor((todayMs - planStartMs) / (24 * 60 * 60 * 1000));
+        return daysSinceStart >= 0 && daysSinceStart < 14;
+      } catch { return false; }
+    })();
+
     const weekIntentInfo = activePlan ? weekIntentFromContract(planConfig, weekIndex) : { intent: 'unknown', focus_label: null };
     const weekIntent = weekIntentInfo.intent as CoachWeekContextResponseV1['plan']['week_intent'];
     const weekFocusLabel = weekIntentInfo.focus_label as string | null;
@@ -1059,7 +1075,7 @@ Deno.serve(async (req) => {
       acwr,
     };
 
-    const v = buildVerdict(metrics, methodologyId, methodologyCtx, reaction, weekIndex);
+    const v = buildVerdict(metrics, methodologyId, methodologyCtx, reaction, isPlanTransitionPeriod);
 
     // =========================================================================
     // Deterministic training state (plan-aware topline for dumb clients)
@@ -1141,7 +1157,7 @@ Deno.serve(async (req) => {
           load_ramp,
         };
       }
-      if (v.code === 'caution_ramping_fast' || responseInterp.overall.drivers.length === 1) {
+      if (v.code === 'caution_ramping_fast' || (responseInterp.overall.drivers.length === 1 && !isPlanTransitionPeriod)) {
         if (athleteContextSuggestsIllness && (v.code === 'undertraining' || recoverySignaledExtrasCount > 0)) {
           return {
             code: 'strained',
@@ -1220,8 +1236,9 @@ Deno.serve(async (req) => {
       const verdictCode = v.code;
 
       if (verdictCode === 'recover_overreaching') return 'overreached';
-      if (verdictCode === 'caution_ramping_fast' || overallLabel === 'fatigue_signs') return 'fatigued';
-      if (acwrVal != null && acwrVal > 1.3) return 'fatigued';
+      if (verdictCode === 'caution_ramping_fast') return 'fatigued';
+      if (overallLabel === 'fatigue_signs' && !isPlanTransitionPeriod) return 'fatigued';
+      if (acwrVal != null && acwrVal > 1.3 && !isPlanTransitionPeriod) return 'fatigued';
       if (acwrVal != null && acwrVal < 0.7) return 'detrained';
       if (overallLabel === 'absorbing_well') return 'fresh';
       return 'normal';
@@ -1234,7 +1251,7 @@ Deno.serve(async (req) => {
     const todayMs = new Date(asOfDate).getTime();
     const cooldownMs = 30 * 24 * 60 * 60 * 1000;
     const plan_adaptation_suggestions: Array<{ code: string; title: string; details: string }> = [];
-    if (activePlan && (weekIntent !== 'recovery' && weekIntent !== 'taper')) {
+    if (activePlan && !isPlanTransitionPeriod && (weekIntent !== 'recovery' && weekIntent !== 'taper')) {
       const addSuggestion = (code: string, title: string, details: string) => {
         const dismissedAt = planAdaptationDismissed[code];
         if (dismissedAt) {
@@ -1307,8 +1324,8 @@ Deno.serve(async (req) => {
           planLine += '.';
           narrativeFacts.push(planLine);
           narrativeFacts.push('IMPORTANT: There is an active training plan. Do NOT suggest adding extra sessions. If sessions were missed, suggest hitting the planned sessions next week. If suggesting changes, frame them as adjustments within the existing plan.');
-          if (weekIndex === 1) {
-            narrativeFacts.push('NOTE: This is Week 1 of a new plan. Any load ratio data this week spans the transition from a previous training cycle — do NOT flag load as elevated or suggest recovery based on ACWR alone. Treat this week as an onboarding week and focus on execution quality of the first planned sessions.');
+          if (isPlanTransitionPeriod) {
+            narrativeFacts.push(`NOTE: This is an early week of a new plan (within the first 2 weeks). The 7-day load ratio and 28-day baseline both overlap with the previous training cycle, so any "overreaching" or elevated load signals are unreliable artifacts of the plan transition — do NOT flag load as elevated or suggest recovery based on the load ratio. Focus exclusively on execution quality of the planned sessions and whether the athlete feels good.`);
           }
         } else {
           narrativeFacts.push('The athlete is NOT on a structured plan. Suggestions for adding or adjusting sessions are appropriate.');
@@ -1444,7 +1461,9 @@ Deno.serve(async (req) => {
 
         // ACWR
         if (metrics.acwr != null) {
-          const acwrLabel = metrics.acwr < 0.8 ? 'under-reached' : metrics.acwr > 1.3 ? 'overreaching' : 'in the optimal zone';
+          const acwrLabel = isPlanTransitionPeriod
+            ? 'in plan transition (includes prior training cycle — ignore this ratio)'
+            : metrics.acwr < 0.8 ? 'under-reached' : metrics.acwr > 1.3 ? 'overreaching' : 'in the optimal zone';
           narrativeFacts.push(`Training volume ratio (this week vs last 4 weeks): ${metrics.acwr.toFixed(2)} — ${acwrLabel}.`);
         }
 
