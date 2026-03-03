@@ -1329,6 +1329,14 @@ Deno.serve(async (req) => {
           const id = String((w as any)?.id || '');
           if (id) weekWorkoutById.set(id, w);
         }
+        // Build a set of planned_workout IDs that belong to the *active* plan
+        // (from the already plan-scoped plannedWeek query above).
+        const activePlanPlannedIds = new Set<string>(
+          (Array.isArray(plannedWeek) ? plannedWeek : [])
+            .map((p: any) => String(p?.id || ''))
+            .filter(Boolean)
+        );
+
         for (const wf of weekFacts) {
           const w = weekWorkoutById.get(String(wf.workout_id || ''));
           const rpe = wf.session_rpe ?? (w ? (rpeFromWorkout(w) ?? undefined) : undefined);
@@ -1340,13 +1348,20 @@ Deno.serve(async (req) => {
           if (rpe != null) parts.push(`RPE ${rpe}/10`);
           if (feeling) parts.push(`feeling: ${feeling}`);
 
-          // Only report plan adherence deviations when the workout_facts row was
-          // computed against the *current* active plan. If plan_id doesn't match
-          // (e.g. facts pre-date a plan change), the comparison is meaningless.
-          const factsAreFromActivePlan = !wf.plan_id || !activePlan?.id || wf.plan_id === activePlan.id;
+          // Only show plan deviation data when the completed workout is linked to a
+          // planned session from the *current* active plan. Three-way check:
+          //   1. workout_facts.plan_id matches active plan (reliable if column exists)
+          //   2. workout's planned_id is in the active plan's planned sessions
+          //   3. No active plan → no comparison possible
+          const wPlannedId = w?.planned_id ? String(w.planned_id) : null;
+          const linkedToActivePlan = !activePlan?.id
+            ? false  // no active plan → never compare
+            : wPlannedId
+              ? activePlanPlannedIds.has(wPlannedId)  // linked workout — check it's in current plan
+              : (!wf.plan_id || wf.plan_id === activePlan.id); // unlinked — allow only if facts match plan
 
           if (adh.execution_score != null) parts.push(`execution ${adh.execution_score}%`);
-          if (factsAreFromActivePlan && adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
+          if (linkedToActivePlan && adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
             parts.push(adh.workload_pct > 100
               ? `DID ${adh.workload_pct - 100}% MORE LOAD than planned`
               : `did ${100 - adh.workload_pct}% less load than planned`);
@@ -1356,8 +1371,8 @@ Deno.serve(async (req) => {
           if (adh.weight_deviation_note) parts.push(`weight deviation note: ${adh.weight_deviation_note}`);
 
           // Strength-specific: per-exercise planned vs actual
-          // Skip exercise-level deviations if this session was matched against a different plan
-          if (factsAreFromActivePlan && wf.discipline === 'strength' && wf.strength_facts?.exercises) {
+          // Skip exercise-level deviations if the workout was matched to an old plan
+          if (linkedToActivePlan && wf.discipline === 'strength' && wf.strength_facts?.exercises) {
             const deviations: string[] = [];
             for (const ex of wf.strength_facts.exercises) {
               if (ex.planned_weight && ex.best_weight) {
