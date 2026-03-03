@@ -71,6 +71,7 @@ function parsePercentage(weight: string): number | null {
 function resolveExerciseWeights(
   sessions: PlacedSession[],
   memoryContext: PlanningMemoryContext,
+  isMetric = false,
 ): PlacedSession[] {
   const { strength1RMs, driftFlaggedLifts } = memoryContext;
   if (Object.keys(strength1RMs).length === 0) return sessions;
@@ -89,12 +90,15 @@ function resolveExerciseWeights(
 
       let updatedEx = { ...ex };
 
-      // Weight resolution: substitute actual lbs when confidence is sufficient
+      // Weight resolution: substitute actual weight when confidence is sufficient
       if (rule.confidence >= WEIGHT_RESOLUTION_CONFIDENCE_THRESHOLD) {
         const pct = parsePercentage(String(ex.weight ?? ''));
         if (pct !== null) {
-          const computedLbs = Math.round((rule.value * pct) / 5) * 5; // round to nearest 5 lbs
-          updatedEx.weight = `${computedLbs} lbs (${Math.round(pct * 100)}%)`;
+          const increment = isMetric ? 2.5 : 5;
+          const minWeight = isMetric ? 2.5 : 5;
+          const computedWeight = Math.max(minWeight, Math.round((rule.value * pct) / increment) * increment);
+          const unitLabel = isMetric ? 'kg' : 'lbs';
+          updatedEx.weight = `${computedWeight} ${unitLabel} (${Math.round(pct * 100)}%)`;
         }
       }
 
@@ -242,6 +246,7 @@ export function overlayStrength(
   methodology?: 'hal_higdon_complete' | 'jack_daniels_performance',
   noDoubles?: boolean,
   memoryContext?: PlanningMemoryContext,
+  isMetric = false,
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
@@ -365,7 +370,7 @@ export function overlayStrength(
 
     // Resolve exercise weights from 1RM memory before converting to Session[]
     const resolvedPlaced = memoryContext
-      ? resolveExerciseWeights(placedSessions, memoryContext)
+      ? resolveExerciseWeights(placedSessions, memoryContext, isMetric)
       : placedSessions;
 
     // Convert PlacedSession[] to Session[]
@@ -484,10 +489,11 @@ export function overlayStrengthLegacy(
   methodology?: 'hal_higdon_complete' | 'jack_daniels_performance',
   noDoubles?: boolean,
   memoryContext?: PlanningMemoryContext,
+  isMetric = false,
 ): TrainingPlan {
   // Map old tier names to new
   const newTier: StrengthTier = tier === 'injury_prevention' ? 'bodyweight' : 'barbell';
-  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId, methodology, noDoubles, memoryContext);
+  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId, methodology, noDoubles, memoryContext, isMetric);
 }
 
 // OLD FUNCTIONS REMOVED - Now in protocol system

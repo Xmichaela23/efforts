@@ -30,7 +30,7 @@ export class TimeEfficientGenerator extends BaseGenerator {
       name: this.generatePlanName(),
       description: this.generateFIRSTDescription(),
       duration_weeks: this.params.duration_weeks,
-      units: 'imperial',
+      units: this.params.units ?? 'imperial',
       baselines_required: {
         run: ['fiveK_pace', 'easyPace']
       },

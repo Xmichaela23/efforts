@@ -11,6 +11,7 @@
  */
 
 import React, { useState } from 'react';
+import { useAppContext } from '@/contexts/AppContext';
 import { 
   RefreshCw, 
   TrendingUp, 
@@ -169,7 +170,7 @@ const StrengthProgressionSection: React.FC<{
 
       {snapshot?.strength_volume_total != null && (
         <div className="mt-3 pt-2 border-t border-white/10 text-xs text-white/40">
-          Week volume: {Math.round(snapshot.strength_volume_total).toLocaleString()} lbs
+          Week volume: {Math.round(snapshot.strength_volume_total).toLocaleString()} {weightUnit}
         </div>
       )}
     </div>
@@ -184,6 +185,8 @@ const BlockSummaryTab: React.FC = () => {
   const { data, loading, error, refresh } = useOverallContext(4);
   const { liftTrends } = useExerciseLog(12);
   const { snapshots, current: currentSnapshot } = useAthleteSnapshot(5);
+  const { useImperial } = useAppContext();
+  const weightUnit = useImperial ? 'lbs' : 'kg';
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {

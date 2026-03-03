@@ -30,7 +30,7 @@ export class HybridAthleteGenerator extends BaseGenerator {
       name: this.generatePlanName(),
       description: this.generateHybridDescription(),
       duration_weeks: this.params.duration_weeks,
-      units: 'imperial',
+      units: this.params.units ?? 'imperial',
       baselines_required: {
         run: ['fiveK_pace', 'easyPace'],
         strength: ['squat', 'deadlift', 'bench', 'overheadPress1RM']

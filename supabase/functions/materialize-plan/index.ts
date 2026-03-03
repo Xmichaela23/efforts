@@ -30,7 +30,8 @@ function applyAdjustment(
   exerciseName: string, 
   calculatedWeight: number | undefined, 
   adjustments: PlanAdjustment[], 
-  workoutDate: string
+  workoutDate: string,
+  isMetric = false
 ): { weight: number | undefined; adjusted: boolean; adjustmentId?: string } {
   if (calculatedWeight == null || !adjustments.length) {
     return { weight: calculatedWeight, adjusted: false };
@@ -56,11 +57,11 @@ function applyAdjustment(
   let adjustedWeight: number;
   if (adjustment.weight_offset != null) {
     // Offset maintains plan progression: 25→27→30 with -10 offset = 15→17→20
-    adjustedWeight = Math.max(0, Math.round((calculatedWeight + adjustment.weight_offset) / 5) * 5);
+    adjustedWeight = roundToIncrement(Math.max(0, calculatedWeight + adjustment.weight_offset), isMetric);
   } else if (adjustment.absolute_weight != null) {
     adjustedWeight = adjustment.absolute_weight;
   } else if (adjustment.adjustment_factor != null) {
-    adjustedWeight = Math.round(calculatedWeight * adjustment.adjustment_factor / 5) * 5;
+    adjustedWeight = roundToIncrement(calculatedWeight * adjustment.adjustment_factor, isMetric);
   } else {
     return { weight: calculatedWeight, adjusted: false };
   }
@@ -216,11 +217,20 @@ function calculateWeightFromConfig(
     notes: config.notes
   };
 }
-function round5(n: number): number { return Math.max(5, Math.round(n / 5) * 5); }
-function pctWeight(oneRm: number | null, pct?: number): number | undefined {
+// Round to the nearest equipment increment:
+// - imperial: 5 lb plates → round to nearest 5
+// - metric: 2.5 kg plates → round to nearest 2.5
+function roundToIncrement(n: number, isMetric = false): number {
+  const increment = isMetric ? 2.5 : 5;
+  const min = isMetric ? 2.5 : 5;
+  return Math.max(min, Math.round(n / increment) * increment);
+}
+// Backwards-compat alias (default imperial)
+function round5(n: number): number { return roundToIncrement(n, false); }
+function pctWeight(oneRm: number | null, pct?: number, isMetric = false): number | undefined {
   if (oneRm == null) return undefined;
   if (!(typeof pct === 'number' && isFinite(pct) && pct > 0)) return undefined;
-  return round5(oneRm * pct);
+  return roundToIncrement(oneRm * pct, isMetric);
 }
 
 // Smart exercise type detection (matches client-side logic)
@@ -1009,17 +1019,19 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             const base1RM = pick.base;
             const ratio = pick.ratio;
             const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
+            const isMetric = !!(baselines as any).isMetric;
+            const wUnit = isMetric ? 'kg' : 'lb';
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
             if (parsed.weight != null) prescribed = parsed.weight;
             else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
               const scaled = inferred1RM * percentRaw * repScaleFor(reps);
-              prescribed = round5(scaled);
+              prescribed = roundToIncrement(scaled, isMetric);
             }
             if (prescribed != null && isDumbbellExercise(name)) {
-              prescribed = round5(prescribed / 2);
-              weightDisplay = `${prescribed} lb each`;
+              prescribed = roundToIncrement(prescribed / 2, isMetric);
+              weightDisplay = `${prescribed} ${wUnit} each`;
             } else if (prescribed != null) {
-              weightDisplay = `${prescribed} lb`;
+              weightDisplay = `${prescribed} ${wUnit}`;
             }
             // Check if baseline is missing for non-bodyweight exercises
             if (prescribed == null && pick.ref != null) {
@@ -1131,6 +1143,8 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             resolved_from = exerciseConfig.primaryRef || undefined;
           } else if (!isBandExercise) {
             // Fallback to legacy calculation
+            const isMetric = !!(baselines as any).isMetric;
+            const wUnit = isMetric ? 'kg' : 'lb';
             const pick = pickPrimary1RMAndBase(name, baselines as any);
             const base1RM = pick.base;
             const ratio = pick.ratio;
@@ -1139,13 +1153,13 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             if (parsed.weight != null) prescribed = parsed.weight;
             else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
               const scaled = inferred1RM * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
-              prescribed = round5(scaled);
+              prescribed = roundToIncrement(scaled, isMetric);
             }
             if (prescribed != null && isDumbbellExercise(name)) {
-              prescribed = round5(prescribed / 2);
-              weightDisplay = `${prescribed} lb each`;
+              prescribed = roundToIncrement(prescribed / 2, isMetric);
+              weightDisplay = `${prescribed} ${wUnit} each`;
             } else if (prescribed != null) {
-              weightDisplay = `${prescribed} lb`;
+              weightDisplay = `${prescribed} ${wUnit}`;
             }
             // Check if baseline is missing for non-bodyweight exercises
             if (prescribed == null && pick.ref != null) {
@@ -1711,7 +1725,7 @@ Deno.serve(async (req) => {
     const userId = rows[0]?.user_id;
     let baselines: Baselines = {};
     try {
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source').eq('user_id', userId).maybeSingle();
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source, units').eq('user_id', userId).maybeSingle();
       
       // Recalculate effort_paces from effort_score if source is 'calculated' (fixes outdated paces)
       let effortPaces = ub?.effort_paces;
@@ -1750,7 +1764,8 @@ Deno.serve(async (req) => {
       baselines = {
         ...(ub?.performance_numbers || {}),
         equipment: ub?.equipment || {},
-        effort_paces: effortPaces || undefined
+        effort_paces: effortPaces || undefined,
+        isMetric: ub?.units === 'metric',
       } as any;
 
       // Merge learned strength 1RMs when performance_numbers is missing for that lift

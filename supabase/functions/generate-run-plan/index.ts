@@ -148,7 +148,8 @@ Deno.serve(async (req: Request) => {
       current_acwr: request.current_acwr,
       volume_trend: request.volume_trend,
       effort_score: effortScore,
-      effort_paces: effortPaces
+      effort_paces: effortPaces,
+      units: request.units ?? 'imperial',
     };
 
     let plan: TrainingPlan;
@@ -208,7 +209,7 @@ Deno.serve(async (req: Request) => {
         const noDoubles = request.no_doubles || false; // Default to allowing doubles
         
         // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
-        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId, methodology, noDoubles, memoryContext);
+        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId, methodology, noDoubles, memoryContext, (request.units ?? 'imperial') === 'metric');
       } catch (error: any) {
         // Protocol validation error - log canonical protocol for debugging
         const protocolId = request.strength_protocol || 'none';

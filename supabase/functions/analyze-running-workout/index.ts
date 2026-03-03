@@ -1015,7 +1015,7 @@ Deno.serve(async (req) => {
         trend: historicalDriftData.recentTrend,
         lastSimilar: historicalDriftData.lastWeekSimilar
       } : undefined,
-      userUnits: 'imperial',
+      userUnits: userUnits as 'imperial' | 'metric',
       hrZones: hrZonesFromBaseline,
       // Pace adherence from granular analysis (0-1 fraction → 0-100 percentage)
       paceAdherencePct: analysis.overall_adherence != null 

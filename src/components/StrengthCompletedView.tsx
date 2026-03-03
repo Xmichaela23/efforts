@@ -23,7 +23,8 @@ interface CompletedExercise {
 }
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
-  const { workouts, updateWorkout } = useAppContext();
+  const { workouts, updateWorkout, useImperial } = useAppContext();
+  const weightUnit = useImperial ? 'lbs' : 'kg';
   const [showComparison, setShowComparison] = useState(false);
 
 
@@ -232,7 +233,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         <div className="flex items-center justify-between text-sm text-white/60">
           <div className="flex items-center gap-4">
             {!isMobility && workoutStats.actual.volume > 0 && (
-              <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
+              <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} {weightUnit} total</span>
             )}
             {(workoutData as any).workload_actual || (workoutData as any).workload_planned ? (
               <span>
@@ -339,7 +340,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                     {hasWeight && exerciseVolume > 0 && (
                       <div className="text-right">
                         <div className="text-sm font-medium text-white/70">
-                          {exerciseVolume.toLocaleString()} lbs
+                          {exerciseVolume.toLocaleString()} {weightUnit}
                         </div>
                       </div>
                     )}
@@ -368,7 +369,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                               <span className="text-white/70">{setIndex + 1}</span>
                               {hasWeight && (
                                 <span className="font-medium">
-                                  {set.weight || 0} lbs
+                                  {set.weight || 0} {weightUnit}
                                 </span>
                               )}
                               <span>
@@ -455,7 +456,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             </div>
             <div>
               <div className="text-lg font-semibold">{workoutStats.actual.volume.toLocaleString()}</div>
-              <div className="text-xs text-white/50">Volume (lbs)</div>
+              <div className="text-xs text-white/50">Volume ({weightUnit})</div>
             </div>
           </div>
         </div>

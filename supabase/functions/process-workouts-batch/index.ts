@@ -1,4 +1,6 @@
 // Process a batch of workouts that need computed.analysis.series
+// Accepts either an explicit list of workout IDs or auto-discovers
+// completed workouts that haven't been analyzed yet.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -7,7 +9,6 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -21,19 +22,41 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Last 10 workout IDs that need processing
-    const workoutIds = [
-      '3698ec60-84fa-4d32-8bb4-81f67a1e56bf', // ride, 2026-01-05
-      'b85e797b-135c-488a-8e15-71edc0236ad9', // run, 2026-01-04
-      '0c2b43df-7806-44d9-b5a3-af652342b348', // ride, 2026-01-03
-      '32179ccd-9008-4d4a-81d5-df5912688996', // ride, 2026-01-02
-      '361d3165-d52a-4271-b4b1-f091ca0cef61', // run, 2026-01-01
-      '830508fc-e780-453b-9de2-de515cda3c7d', // run, 2025-12-31
-      'f75edc59-4492-40cb-88ec-3f42ec30ec7c', // run, 2025-12-29
-      '2f51666b-315e-42b0-b0b6-916f45178a72', // run, 2025-12-22
-      '697a5c25-9363-4c55-b463-c94c658a9b0a', // ride, 2025-12-14
-      'c6132234-c169-49d2-add2-803adc8b3875', // ride, 2025-12-13
-    ];
+    const payload = await req.json().catch(() => ({}));
+
+    // Accept an explicit list, or auto-discover workouts missing analysis
+    // for the requesting user (requires user_id in payload).
+    let workoutIds: string[] = [];
+
+    if (Array.isArray(payload.workout_ids) && payload.workout_ids.length > 0) {
+      workoutIds = payload.workout_ids.map(String);
+    } else if (payload.user_id) {
+      // Auto mode: find completed workouts that lack computed analysis
+      const limit = Number(payload.limit) || 25;
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', payload.user_id)
+        .eq('workout_status', 'completed')
+        .is('computed', null)
+        .order('date', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      workoutIds = (data ?? []).map((r: any) => r.id);
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Provide workout_ids (array) or user_id to auto-discover unprocessed workouts.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (workoutIds.length === 0) {
+      return new Response(
+        JSON.stringify({ processed: 0, success: 0, errors: 0, results: [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`🚀 Processing ${workoutIds.length} workouts...`);
 
@@ -42,7 +65,7 @@ Deno.serve(async (req) => {
     for (const workoutId of workoutIds) {
       try {
         console.log(`Processing workout ${workoutId}...`);
-        
+
         const { error } = await supabase.functions.invoke('compute-workout-analysis', {
           body: { workout_id: workoutId }
         });
@@ -55,7 +78,6 @@ Deno.serve(async (req) => {
           console.log(`✅ Success: ${workoutId}`);
         }
 
-        // Small delay between requests
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (err: any) {
         results.push({ id: workoutId, status: 'error', error: err.message });

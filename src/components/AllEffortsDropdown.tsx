@@ -7,7 +7,7 @@ DropdownMenuContent,
 DropdownMenuItem,
 DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Activity, Bike, Waves, Dumbbell, Move, TrendingUp, Target, Zap } from 'lucide-react';
+import { ChevronDown, Activity, Bike, Waves, Dumbbell, Move, Target, Zap } from 'lucide-react';
 
 interface AllEffortsDropdownProps {
 onSelectWorkout: (workout: any) => void;
@@ -21,15 +21,6 @@ workouts.filter((workout: any) =>
 workout.workout_status === 'completed' || workout.completedManually
 ), [workouts]);
 
-// Mock analytics data for preview
-const mockAnalytics = {
-  recoveryStatus: 'Ready',
-  fitnessLevel: '72',
-  fatigueLevel: '68',
-  readiness: '+4',
-  trainingStrain: '156',
-  personalBests: '3'
-};
 
 const getIcon = (type: string) => {
 switch (type) {
@@ -67,40 +58,6 @@ align="start"
 className="max-h-80 overflow-y-auto bg-white border border-gray-200 shadow-xl"
 style={{borderRadius: '12px', padding: '8px', minWidth: '320px'}}
 >
-{/* Analytics Preview Section */}
-<div className="px-4 py-3 border-b border-gray-100">
-  <div className="flex items-center gap-2 mb-3">
-    <TrendingUp className="h-4 w-4 text-gray-600" />
-    <span className="font-medium text-sm text-gray-900">Insight</span>
-  </div>
-  
-  <div className="space-y-2 text-sm">
-    <div className="flex justify-between">
-      <span className="text-gray-600">Recovery Status</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.recoveryStatus}</span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-600">Fitness Level</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.fitnessLevel}</span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-600">Fatigue Level</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.fatigueLevel}</span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-600">Readiness</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.readiness}</span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-600">Training Strain</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.trainingStrain}</span>
-    </div>
-    <div className="flex justify-between">
-      <span className="text-gray-600">Personal Bests</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.personalBests}</span>
-    </div>
-  </div>
-</div>
 
 {/* Quick Actions */}
 <div className="px-4 py-3 border-b border-gray-100">

@@ -92,7 +92,7 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       name: this.generatePlanName(),
       description: this.generatePlanDescription(),
       duration_weeks: this.params.duration_weeks,
-      units: 'imperial',
+      units: this.params.units ?? 'imperial',
       baselines_required: {
         run: ['fiveK_pace', 'easyPace'] // Need 5K time for VDOT calculations
       },
