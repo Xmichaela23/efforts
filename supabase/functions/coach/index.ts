@@ -45,6 +45,55 @@ function addDaysISO(iso: string, deltaDays: number): string {
   return toISODate(base);
 }
 
+function weekdayFromISODate(iso: string): string {
+  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  try {
+    return names[parseISODateOnly(iso).getDay()] || 'Unknown';
+  } catch {
+    return 'Unknown';
+  }
+}
+
+function sessionLocalLabel(workout: any, fallbackIsoDate: string, timezone?: string | null): string {
+  const tsRaw = workout?.timestamp || workout?.start_time || null;
+  if (tsRaw) {
+    try {
+      const dt = new Date(String(tsRaw));
+      if (!Number.isNaN(dt.getTime())) {
+        const opts: Intl.DateTimeFormatOptions = {
+          weekday: 'long',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        };
+        if (timezone) opts.timeZone = timezone;
+        return dt.toLocaleDateString('en-US', opts);
+      }
+    } catch {
+      // fall through to date-only label
+    }
+  }
+  const day = weekdayFromISODate(fallbackIsoDate);
+  return `${day}`;
+}
+
+function workoutLocalDate(workout: any, fallbackIsoDate: string, timezone?: string | null): string {
+  const tsRaw = workout?.timestamp || workout?.start_time || null;
+  if (tsRaw) {
+    try {
+      const dt = new Date(String(tsRaw));
+      if (!Number.isNaN(dt.getTime())) {
+        const opts: Intl.DateTimeFormatOptions = {};
+        if (timezone) opts.timeZone = timezone;
+        return dt.toLocaleDateString('en-CA', opts);
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return String(fallbackIsoDate || '').slice(0, 10);
+}
+
 const DOW_INDEX: Record<WeekStartDow, number> = {
   sun: 0,
   mon: 1,
@@ -401,13 +450,27 @@ Deno.serve(async (req) => {
 
     // Pull completed workouts in-week for execution_score sampling (linked workouts usually have planned_id)
     const plannedIds = new Set<string>(plannedWeekArr.map((p: any) => String(p?.id || '')).filter(Boolean));
-    const { data: weekWorkouts, error: wwErr } = await supabase
+    const workoutQueryFrom = addDaysISO(weekStartDate, -2);
+    const workoutQueryTo = addDaysISO(asOfDate, 2);
+    const { data: weekWorkoutsRows, error: wwErr } = await supabase
       .from('workouts')
-      .select('id,date,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises')
+      .select('id,date,timestamp,start_time,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises')
       .eq('user_id', userId)
-      .gte('date', weekStartDate)
-      .lte('date', asOfDate);
+      .gte('date', workoutQueryFrom)
+      .lte('date', workoutQueryTo);
     if (wwErr) throw wwErr;
+
+    // Date truth for weekly rollups should be user-local timestamp when present,
+    // not stored UTC-sliced date strings that can drift across midnight.
+    const weekWorkouts = (Array.isArray(weekWorkoutsRows) ? weekWorkoutsRows : [])
+      .map((w: any) => {
+        const localDate = workoutLocalDate(w, String(w?.date || '').slice(0, 10), userTz);
+        return { ...w, __local_date: localDate };
+      })
+      .filter((w: any) => {
+        const d = String(w?.__local_date || '');
+        return d >= weekStartDate && d <= asOfDate;
+      });
 
     const completedPlannedIdsFromWorkouts = new Set<string>(
       (Array.isArray(weekWorkouts) ? weekWorkouts : [])
@@ -486,7 +549,7 @@ Deno.serve(async (req) => {
     const daysWithActivity = new Set<string>(
       (Array.isArray(weekWorkouts) ? weekWorkouts : [])
         .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
-        .map((w: any) => String(w?.date || '').slice(0, 10))
+        .map((w: any) => String((w as any)?.__local_date || (w as any)?.date || '').slice(0, 10))
         .filter(Boolean)
     ).size;
     const coverageRatio = Math.max(0, Math.min(1, daysWithActivity / daysInWindow));
@@ -1367,7 +1430,9 @@ Deno.serve(async (req) => {
           const rpe = wf.session_rpe ?? (w ? (rpeFromWorkout(w) ?? undefined) : undefined);
           const feeling = w ? feelingFromWorkout(w) : null;
           const adh = wf.adherence || {};
-          const parts = [`${wf.date} ${wf.discipline}`];
+          const wfIsoDate = String(wf.date || '').slice(0, 10);
+          const localWhen = sessionLocalLabel(w, wfIsoDate, userTz);
+          const parts = [`${localWhen} ${wfIsoDate} ${wf.discipline}`];
           if (wf.duration_minutes) parts.push(`${Math.round(wf.duration_minutes)} min`);
           if (wf.workload) parts.push(`${Math.round(wf.workload)} pts load`);
           if (rpe != null) parts.push(`RPE ${rpe}/10`);
@@ -1386,7 +1451,7 @@ Deno.serve(async (req) => {
               : (!wf.plan_id || wf.plan_id === activePlan.id); // unlinked — allow only if facts match plan
 
           if (adh.execution_score != null) parts.push(`execution ${adh.execution_score}%`);
-          if (linkedToActivePlan && adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
+          if (!isPlanTransitionPeriod && linkedToActivePlan && adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
             parts.push(adh.workload_pct > 100
               ? `DID ${adh.workload_pct - 100}% MORE LOAD than planned`
               : `did ${100 - adh.workload_pct}% less load than planned`);
@@ -1516,6 +1581,8 @@ Deno.serve(async (req) => {
         const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific and practical. Use day names (e.g. "Thursday", "today") instead of raw dates.
 
 NEVER GUESS WHY: If the facts include "ATHLETE SAYS" or "MISSED SESSION REASONS" or "went heavier intentionally/unintentionally", use that. Otherwise, state what happened (e.g., "you missed three running sessions") but DO NOT speculate on reasons (no "you may have been tired", "you might have needed rest", etc.). Only explain causes when the athlete has told you.
+
+TIME ANCHORING IS STRICT: For each SESSION fact, use the provided local day/time label exactly as the source of truth. Do not rename the day or infer a different day from dates.
 
 Connect the dots when you have athlete context: if they said they had the flu, that explains missed sessions. If they said they went heavier on purpose, that explains the weight deviation. If their running efficiency improved, say so. If there is an INTERFERENCE ALERT, explain it in plain language.
 
@@ -1663,8 +1730,8 @@ ${narrativeFacts.join('\n')}`;
       load: {
         wtd_planned_load: plannedWtdLoad ?? null,
         wtd_actual_load: actualWtdLoad ?? null,
-        acute7_actual_load: acute7 ?? null,
-        chronic28_actual_load: chronic28 ?? null,
+        acute7_actual_load: acute7Load ?? null,
+        chronic28_actual_load: chronic28Load ?? null,
         acwr: acwr ?? null,
         by_discipline: (training_state.load_ramp.acute7_by_type || []).map((r: any) => ({
           discipline: String(r.type || 'other'),

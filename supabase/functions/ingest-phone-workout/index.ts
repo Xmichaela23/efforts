@@ -55,6 +55,7 @@ interface RequestBody {
   total_distance_m: number;
   total_duration_s: number;
   execution_context: ExecutionContext;
+  timezone?: string;
 }
 
 // ============================================================================
@@ -111,6 +112,21 @@ function calculateOverallMetrics(samples: ExecutionSample[]): {
   };
 }
 
+function dateOnlyInTimezone(timestampMs: number, timezone?: string): string {
+  const d = new Date(timestampMs);
+  try {
+    if (timezone && timezone.trim().length > 0) {
+      return d.toLocaleDateString('en-CA', { timeZone: timezone });
+    }
+  } catch {
+    // fall through to local date extraction
+  }
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // ============================================================================
 // Main Handler
 // ============================================================================
@@ -155,6 +171,7 @@ serve(async (req) => {
       total_distance_m,
       total_duration_s,
       execution_context,
+      timezone,
     } = body;
 
     console.log(`[ingest-phone-workout] Processing session ${session_id} for user ${user.id}`);
@@ -168,7 +185,7 @@ serve(async (req) => {
 
     // Determine workout date (from first sample or now)
     const workout_timestamp = samples.length > 0 ? samples[0].timestamp : Date.now();
-    const workout_date = new Date(workout_timestamp).toISOString().split('T')[0];
+    const workout_date = dateOnlyInTimezone(workout_timestamp, timezone);
 
     // Calculate average speed for rides
     let avg_speed: number | undefined;

@@ -324,6 +324,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
           total_distance_m: execution.state.total_distance_m,
           total_duration_s: execution.state.total_elapsed_s,
           execution_context: session.execution_context,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       });
       

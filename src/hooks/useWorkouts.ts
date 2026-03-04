@@ -624,6 +624,19 @@ export const useWorkouts = () => {
         return 'run';
       };
 
+      const toLocalDateOnly = (raw: any): string | undefined => {
+        if (!raw) return undefined;
+        try {
+          const s = String(raw);
+          if (!s.includes('T')) return s;
+          const d = new Date(s);
+          if (Number.isNaN(d.getTime())) return s.slice(0, 10);
+          return d.toLocaleDateString('en-CA');
+        } catch {
+          return String(raw).slice(0, 10);
+        }
+      };
+
       const mapped = uniqueWorkouts.map((w: any) => ({
         id: w.id,
         name: (() => {
@@ -642,12 +655,7 @@ export const useWorkouts = () => {
         })(),
         strava_data: (w as any)?.strava_data,
         duration: w.duration,
-        date: (() => {
-          const d = w.date || w.start_time || w.timestamp;
-          if (!d) return undefined;
-          const s = String(d);
-          return s.includes('T') ? s.slice(0, 10) : s;
-        })(),
+        date: toLocalDateOnly(w.date || w.start_time || w.timestamp),
         description: w.description,
         userComments: w.userComments ?? w.usercomments ?? "",
         completedManually: w.completedManually ?? w.completedmanually ?? false,
@@ -1043,7 +1051,14 @@ export const useWorkouts = () => {
           const workoutData = {
             name: locationTitle || activity.activity_name || `Garmin ${activity.activity_type || 'Activity'}`,
             type: workoutType,
-            date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
+            date: (() => {
+              try {
+                const d = activity.start_time ? new Date(activity.start_time) : new Date();
+                return d.toLocaleDateString('en-CA');
+              } catch {
+                return new Date().toLocaleDateString('en-CA');
+              }
+            })(),
             duration: Math.round((activity.duration_seconds || 0) / 60), // Convert seconds to minutes
             distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined, // Convert meters to km
             description: `Imported from Garmin Connect - ${activity.activity_type}`,
