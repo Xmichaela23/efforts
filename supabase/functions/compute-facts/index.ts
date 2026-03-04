@@ -38,6 +38,7 @@ interface WorkoutRow {
   user_id: string;
   type: string;
   date: string;
+  timestamp: string | null;
   duration: number | null;
   moving_time: number | null;
   distance: number | null;
@@ -57,6 +58,9 @@ interface WorkoutRow {
   workout_status: string | null;
   workload_actual: number | null;
   sensor_data: Record<string, any> | null;
+  gps_track: any[] | null;
+  start_position_lat: number | null;
+  start_position_long: number | null;
 }
 
 interface PlannedRow {
@@ -109,6 +113,282 @@ function brzycki1RM(weight: number, reps: number, rir: number): number {
   const capped = Math.min(effectiveReps, 30);
   const raw = weight * (36 / (37 - capped));
   return Math.round(raw / 5) * 5; // round to nearest 5 lbs
+}
+
+function isRunDiscipline(type: string | null | undefined): boolean {
+  const t = String(type ?? "").toLowerCase();
+  return t === "run" || t === "running" || t === "walk" || t.includes("run");
+}
+
+function toNum(v: any): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const dLat = (bLat - aLat) * Math.PI / 180;
+  const dLng = (bLng - aLng) * Math.PI / 180;
+  const aa = Math.sin(dLat / 2) ** 2 +
+    Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+  return R * c;
+}
+
+function parseJsonSafe(v: any): any {
+  try {
+    return typeof v === "string" ? JSON.parse(v) : v;
+  } catch {
+    return null;
+  }
+}
+
+type RouteFeatures = {
+  distance_m: number;
+  elevation_gain_m: number;
+  start_lat: number | null;
+  start_lng: number | null;
+  end_lat: number | null;
+  end_lng: number | null;
+  shape_hint: string;
+};
+
+function deriveRouteFeatures(w: WorkoutRow): RouteFeatures {
+  const distance_m = Math.round(distanceMeters(w));
+  const elevation_gain_m = Math.round(toNum(w.elevation_gain) ?? 0);
+  let start_lat = toNum(w.start_position_lat);
+  let start_lng = toNum(w.start_position_long);
+  let end_lat: number | null = null;
+  let end_lng: number | null = null;
+
+  const trackRaw = parseJsonSafe(w.gps_track) ?? [];
+  const track = Array.isArray(trackRaw) ? trackRaw : [];
+  if (track.length > 0) {
+    const first = track[0] || {};
+    const last = track[track.length - 1] || {};
+    const fLat = toNum(first.lat ?? first.latitude);
+    const fLng = toNum(first.lng ?? first.lon ?? first.longitude);
+    const lLat = toNum(last.lat ?? last.latitude);
+    const lLng = toNum(last.lng ?? last.lon ?? last.longitude);
+    if (start_lat == null && fLat != null) start_lat = fLat;
+    if (start_lng == null && fLng != null) start_lng = fLng;
+    end_lat = lLat;
+    end_lng = lLng;
+  }
+
+  const shapeHint = (() => {
+    if (!track.length) return "";
+    const sampleIdx = [0, Math.floor(track.length / 4), Math.floor(track.length / 2), Math.floor((3 * track.length) / 4), track.length - 1];
+    const pts: string[] = [];
+    for (const i of sampleIdx) {
+      const p = track[Math.max(0, Math.min(track.length - 1, i))] || {};
+      const lat = toNum(p.lat ?? p.latitude);
+      const lng = toNum(p.lng ?? p.lon ?? p.longitude);
+      if (lat == null || lng == null) continue;
+      pts.push(`${lat.toFixed(3)},${lng.toFixed(3)}`);
+    }
+    return pts.join("|");
+  })();
+
+  return { distance_m, elevation_gain_m, start_lat, start_lng, end_lat, end_lng, shape_hint: shapeHint };
+}
+
+function buildRouteFingerprint(f: RouteFeatures): string {
+  const distBucket = Math.round(f.distance_m / 200); // 200m bucket
+  const elevBucket = Math.round((f.elevation_gain_m || 0) / 10); // 10m bucket
+  const sLat = f.start_lat != null ? f.start_lat.toFixed(3) : "na";
+  const sLng = f.start_lng != null ? f.start_lng.toFixed(3) : "na";
+  const eLat = f.end_lat != null ? f.end_lat.toFixed(3) : "na";
+  const eLng = f.end_lng != null ? f.end_lng.toFixed(3) : "na";
+  const shape = f.shape_hint ? `|${f.shape_hint}` : "";
+  return `d${distBucket}-e${elevBucket}-s${sLat},${sLng}-x${eLat},${eLng}${shape}`;
+}
+
+async function upsertRouteIntelligence(
+  supabase: ReturnType<typeof createClient>,
+  w: WorkoutRow,
+  runFacts: Record<string, any> | null,
+): Promise<void> {
+  if (!isRunDiscipline(w.type)) return;
+  if (String(w.workout_status || "").toLowerCase() !== "completed") return;
+
+  const features = deriveRouteFeatures(w);
+  if (!features.distance_m || features.distance_m < 1000) return; // ignore very short segments
+
+  const fingerprint = buildRouteFingerprint(features);
+  const { data: existingExact } = await supabase
+    .from("route_clusters")
+    .select("id,name,fingerprint,distance_m,elevation_gain_m,sample_count,metadata")
+    .eq("user_id", w.user_id)
+    .eq("fingerprint", fingerprint)
+    .maybeSingle();
+
+  let cluster: any = existingExact ?? null;
+  if (!cluster) {
+    const { data: candidates } = await supabase
+      .from("route_clusters")
+      .select("id,name,fingerprint,distance_m,elevation_gain_m,sample_count,metadata")
+      .eq("user_id", w.user_id)
+      .eq("is_active", true)
+      .gte("distance_m", Math.max(1000, features.distance_m - Math.max(600, features.distance_m * 0.2)))
+      .lte("distance_m", features.distance_m + Math.max(600, features.distance_m * 0.2))
+      .limit(30);
+
+    const scored = (Array.isArray(candidates) ? candidates : []).map((c: any) => {
+      const cMeta = parseJsonSafe(c.metadata) || {};
+      const cDist = toNum(c.distance_m) ?? 0;
+      const distDen = Math.max(800, cDist * 0.2);
+      const distScore = Math.max(0, 1 - Math.abs(features.distance_m - cDist) / distDen);
+
+      const cStartLat = toNum(cMeta.start_lat);
+      const cStartLng = toNum(cMeta.start_lng);
+      const cEndLat = toNum(cMeta.end_lat);
+      const cEndLng = toNum(cMeta.end_lng);
+
+      const startScore = (features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null)
+        ? Math.max(0, 1 - (haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng) / 2.0))
+        : 0.4;
+      const endScore = (features.end_lat != null && features.end_lng != null && cEndLat != null && cEndLng != null)
+        ? Math.max(0, 1 - (haversineKm(features.end_lat, features.end_lng, cEndLat, cEndLng) / 2.0))
+        : 0.4;
+
+      const score = (0.5 * distScore) + (0.3 * startScore) + (0.2 * endScore);
+      return { c, score };
+    }).sort((a, b) => b.score - a.score);
+
+    if (scored.length && scored[0].score >= 0.62) {
+      cluster = scored[0].c;
+    }
+  }
+
+  if (!cluster) {
+    const { count: clusterCount } = await supabase
+      .from("route_clusters")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", w.user_id);
+    const routeNumber = (clusterCount ?? 0) + 1;
+    const nowIso = new Date().toISOString();
+    const insertPayload = {
+      user_id: w.user_id,
+      name: `Route ${routeNumber}`,
+      fingerprint,
+      distance_m: features.distance_m,
+      elevation_gain_m: features.elevation_gain_m,
+      sample_count: 1,
+      first_seen_at: nowIso,
+      last_seen_at: nowIso,
+      metadata: {
+        start_lat: features.start_lat,
+        start_lng: features.start_lng,
+        end_lat: features.end_lat,
+        end_lng: features.end_lng,
+        shape_hint: features.shape_hint || null,
+      },
+    };
+    const { data: created, error: createErr } = await supabase
+      .from("route_clusters")
+      .insert(insertPayload)
+      .select("id,name,fingerprint,distance_m,elevation_gain_m,sample_count,metadata")
+      .single();
+    if (createErr) throw createErr;
+    cluster = created;
+  } else {
+    const meta = parseJsonSafe(cluster.metadata) || {};
+    const nextSampleCount = Number(cluster.sample_count || 0) + 1;
+    await supabase
+      .from("route_clusters")
+      .update({
+        sample_count: nextSampleCount,
+        last_seen_at: new Date().toISOString(),
+        distance_m: Math.round((((toNum(cluster.distance_m) ?? features.distance_m) * (nextSampleCount - 1)) + features.distance_m) / nextSampleCount),
+        elevation_gain_m: Math.round((((toNum(cluster.elevation_gain_m) ?? features.elevation_gain_m) * (nextSampleCount - 1)) + features.elevation_gain_m) / nextSampleCount),
+        metadata: {
+          ...meta,
+          start_lat: meta.start_lat ?? features.start_lat,
+          start_lng: meta.start_lng ?? features.start_lng,
+          end_lat: meta.end_lat ?? features.end_lat,
+          end_lng: meta.end_lng ?? features.end_lng,
+          shape_hint: meta.shape_hint ?? (features.shape_hint || null),
+        },
+      })
+      .eq("id", cluster.id);
+  }
+
+  const clusterMeta = parseJsonSafe(cluster.metadata) || {};
+  const cStartLat = toNum(clusterMeta.start_lat);
+  const cStartLng = toNum(clusterMeta.start_lng);
+  const startKm = (features.start_lat != null && features.start_lng != null && cStartLat != null && cStartLng != null)
+    ? haversineKm(features.start_lat, features.start_lng, cStartLat, cStartLng)
+    : 1.5;
+  const cDist = toNum(cluster.distance_m) ?? features.distance_m;
+  const distScore = Math.max(0, 1 - Math.abs(features.distance_m - cDist) / Math.max(800, cDist * 0.2));
+  const startScore = Math.max(0, 1 - (startKm / 2));
+  const matchConfidence = Math.max(0, Math.min(1, (0.65 * distScore) + (0.35 * startScore)));
+
+  await supabase
+    .from("workout_route_match")
+    .upsert({
+      user_id: w.user_id,
+      workout_id: w.id,
+      route_cluster_id: cluster.id,
+      match_confidence: Number(matchConfidence.toFixed(4)),
+      match_method: "distance_start_shape_v1",
+      condition_bucket: "unknown",
+      weather: {},
+    }, { onConflict: "workout_id" });
+
+  const metricDate = String(w.date || "").slice(0, 10);
+  const paceSecPerKm = toNum(runFacts?.pace_avg_s_per_km);
+  const avgHr = toNum(runFacts?.hr_avg);
+  const refHr = toNum((w.workout_metadata as any)?.readiness?.threshold_hr) ?? 145;
+  const effortAdjusted = (paceSecPerKm != null && avgHr != null && refHr > 0)
+    ? Math.round((paceSecPerKm * (avgHr / refHr)) * 10) / 10
+    : null;
+  const consistency = (() => {
+    const drift = toNum(runFacts?.hr_drift_pct);
+    if (drift == null) return null;
+    return Math.max(0, Math.min(100, Math.round(100 - Math.abs(drift) * 8)));
+  })();
+
+  const { data: prevRows } = await supabase
+    .from("route_progress_metrics")
+    .select("effort_adjusted_pace_sec_per_km")
+    .eq("user_id", w.user_id)
+    .eq("route_cluster_id", cluster.id)
+    .lt("metric_date", metricDate)
+    .order("metric_date", { ascending: false })
+    .limit(8);
+  const prevVals = (Array.isArray(prevRows) ? prevRows : [])
+    .map((r: any) => toNum(r.effort_adjusted_pace_sec_per_km))
+    .filter((n: number | null): n is number => n != null);
+  const baseline = prevVals.length ? (prevVals.reduce((a, b) => a + b, 0) / prevVals.length) : null;
+  const improvement = (baseline != null && effortAdjusted != null && baseline > 0)
+    ? Number((((baseline - effortAdjusted) / baseline) * 100).toFixed(3))
+    : null;
+
+  await supabase
+    .from("route_progress_metrics")
+    .upsert({
+      user_id: w.user_id,
+      route_cluster_id: cluster.id,
+      workout_id: w.id,
+      metric_date: metricDate,
+      workout_intent: (w.computed as any)?.analysis?.heart_rate?.workout_type ?? null,
+      moving_time_s: Math.max(0, Math.round(durationMinutes(w) * 60)),
+      elapsed_time_s: Math.max(0, Math.round(durationMinutes(w) * 60)),
+      distance_m: features.distance_m,
+      elevation_gain_m: features.elevation_gain_m,
+      avg_hr_bpm: avgHr,
+      avg_pace_sec_per_km: paceSecPerKm,
+      effort_adjusted_pace_sec_per_km: effortAdjusted,
+      decoupling_pct: toNum(runFacts?.hr_drift_pct),
+      consistency_score: consistency,
+      improvement_score: improvement,
+      confidence_score: Number(matchConfidence.toFixed(4)),
+      metadata: {
+        fingerprint,
+      },
+    }, { onConflict: "route_cluster_id,workout_id" });
 }
 
 // Seven anchor lifts tracked for 1RM progression.
@@ -619,10 +899,10 @@ serve(async (req: Request) => {
     const { data: workout, error: wErr } = await supabase
       .from("workouts")
       .select(
-        "id, user_id, type, date, duration, moving_time, distance, " +
+        "id, user_id, type, date, timestamp, duration, moving_time, distance, " +
         "avg_heart_rate, max_heart_rate, avg_pace, avg_power, max_power, normalized_power, " +
         "avg_cadence, elevation_gain, strength_exercises, mobility_exercises, " +
-        "workout_metadata, computed, planned_id, workout_status, workload_actual, sensor_data",
+        "workout_metadata, computed, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long",
       )
       .eq("id", workout_id)
       .maybeSingle();
@@ -738,6 +1018,17 @@ serve(async (req: Request) => {
         JSON.stringify({ error: `workout_facts write failed: ${fErr.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // -----------------------------------------------------------------------
+    // 8.5 Route intelligence (run routes / regular places)
+    // -----------------------------------------------------------------------
+    if (discipline === "run" || discipline === "running" || discipline === "walk") {
+      try {
+        await upsertRouteIntelligence(supabase, w, runFacts);
+      } catch (routeErr) {
+        console.error("[compute-facts] route intelligence upsert failed:", routeErr);
+      }
     }
 
     // -----------------------------------------------------------------------

@@ -1356,6 +1356,75 @@ Deno.serve(async (req) => {
       const openaiKey = Deno.env.get('OPENAI_API_KEY');
       if (openaiKey) {
         const narrativeFacts: string[] = [];
+        let routeInsightLine: string | null = null;
+
+        // Regular routes intelligence (course-specific progression)
+        try {
+          const { data: routeWeekRows } = await supabase
+            .from('route_progress_metrics')
+            .select('route_cluster_id,metric_date,effort_adjusted_pace_sec_per_km,avg_pace_sec_per_km,improvement_score,confidence_score,distance_m')
+            .eq('user_id', userId)
+            .gte('metric_date', weekStartDate)
+            .lte('metric_date', weekEndDate)
+            .order('metric_date', { ascending: false })
+            .limit(30);
+
+          const weekRouteRows = Array.isArray(routeWeekRows) ? routeWeekRows : [];
+          const routeIds = Array.from(new Set(weekRouteRows.map((r: any) => String(r.route_cluster_id || '')).filter(Boolean)));
+          if (routeIds.length > 0) {
+            const [{ data: clusterRows }, { data: priorRows }] = await Promise.all([
+              supabase
+                .from('route_clusters')
+                .select('id,name')
+                .eq('user_id', userId)
+                .in('id', routeIds),
+              supabase
+                .from('route_progress_metrics')
+                .select('route_cluster_id,effort_adjusted_pace_sec_per_km,metric_date')
+                .eq('user_id', userId)
+                .in('route_cluster_id', routeIds)
+                .lt('metric_date', weekStartDate)
+                .gte('metric_date', addDaysISO(weekStartDate, -84))
+                .order('metric_date', { ascending: false }),
+            ]);
+
+            const nameById = new Map<string, string>();
+            for (const c of (Array.isArray(clusterRows) ? clusterRows : [])) {
+              nameById.set(String((c as any)?.id || ''), String((c as any)?.name || 'regular route'));
+            }
+
+            const summarize = routeIds.slice(0, 2).map((rid) => {
+              const nowRows = weekRouteRows.filter((r: any) => String(r.route_cluster_id) === rid);
+              const prevVals = (Array.isArray(priorRows) ? priorRows : [])
+                .filter((r: any) => String(r.route_cluster_id) === rid)
+                .map((r: any) => safeNum((r as any).effort_adjusted_pace_sec_per_km))
+                .filter((n: number | null): n is number => n != null)
+                .slice(0, 6);
+              const nowVals = nowRows
+                .map((r: any) => safeNum((r as any).effort_adjusted_pace_sec_per_km))
+                .filter((n: number | null): n is number => n != null);
+              if (!nowVals.length || !prevVals.length) return null;
+              const nowAvg = nowVals.reduce((a, b) => a + b, 0) / nowVals.length;
+              const prevAvg = prevVals.reduce((a, b) => a + b, 0) / prevVals.length;
+              if (prevAvg <= 0) return null;
+              const pct = ((prevAvg - nowAvg) / prevAvg) * 100;
+              const routeName = nameById.get(rid) || 'regular route';
+              const direction = pct >= 0 ? 'faster' : 'slower';
+              const magnitude = Math.abs(pct);
+              const conf = nowRows
+                .map((r: any) => safeNum((r as any).confidence_score))
+                .filter((n: number | null): n is number => n != null);
+              const confAvg = conf.length ? (conf.reduce((a, b) => a + b, 0) / conf.length) : null;
+              return `${routeName}: ${magnitude.toFixed(1)}% ${direction}${confAvg != null ? ` (confidence ${Math.round(confAvg * 100)}%)` : ''}`;
+            }).filter(Boolean) as string[];
+
+            if (summarize.length) {
+              routeInsightLine = `REGULAR ROUTE PROGRESS: ${summarize.join('; ')}.`;
+            }
+          }
+        } catch (routeErr) {
+          console.warn('[coach] route progression summary failed (non-fatal):', (routeErr as any)?.message || routeErr);
+        }
 
         // Narrative facts are built from the same canonical weekly inputs used for
         // deterministic state. Do not read parallel fact pipelines here.
@@ -1395,6 +1464,7 @@ Deno.serve(async (req) => {
 
         // Session completion
         narrativeFacts.push(`Planned key sessions: ${reaction.key_sessions_planned}. Completed and linked: ${reaction.key_sessions_linked}. Missed: ${reaction.key_sessions_gaps}. Extra unplanned sessions: ${reaction.extra_sessions}.`);
+        if (routeInsightLine) narrativeFacts.push(routeInsightLine);
         if (recoverySignaledExtrasCount > 0) {
           narrativeFacts.push(`ATHLETE SIGNALED RECOVERY: ${recoverySignaledExtrasCount} unplanned session(s) with low RPE or positive feeling (easy/recovery intent).`);
         }
@@ -1558,7 +1628,8 @@ ${narrativeFacts.join('\n')}`;
               { role: 'system', content: 'You are an expert endurance and strength coach. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable.' },
               { role: 'user', content: narrativePrompt },
             ],
-            temperature: 0.6,
+            temperature: 0,
+            seed: 42,
             max_tokens: 300,
           }),
         });
