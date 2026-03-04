@@ -454,7 +454,7 @@ Deno.serve(async (req) => {
     const workoutQueryTo = addDaysISO(asOfDate, 2);
     const { data: weekWorkoutsRows, error: wwErr } = await supabase
       .from('workouts')
-      .select('id,date,timestamp,start_time,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises')
+      .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises')
       .eq('user_id', userId)
       .gte('date', workoutQueryFrom)
       .lte('date', workoutQueryTo);
@@ -486,11 +486,19 @@ Deno.serve(async (req) => {
       return Boolean(statusDone || hardLinked || viaWorkoutRef);
     };
 
-    const keySessionsCompleted = keySessionsPlanned.filter((x: any) => isPlannedCompleted(x?.r));
-    const keySessionsCompletionRatio = keySessionsPlanned.length > 0 ? keySessionsCompleted.length / keySessionsPlanned.length : null;
+    // Do not mark same-day sessions as "missed" unless they are already completed.
+    // This prevents morning/midday check-ins from prematurely counting today's
+    // planned key session as a gap.
+    const keySessionsPlannedEffective = keySessionsPlanned.filter((x: any) => {
+      const d = String(x?.r?.date || '').slice(0, 10);
+      if (d !== asOfDate) return true;
+      return isPlannedCompleted(x?.r);
+    });
+    const keySessionsCompleted = keySessionsPlannedEffective.filter((x: any) => isPlannedCompleted(x?.r));
+    const keySessionsCompletionRatio = keySessionsPlannedEffective.length > 0 ? keySessionsCompleted.length / keySessionsPlannedEffective.length : null;
 
     // Linking breakdown (WTD): linked vs gaps vs extras
-    const keySessionGapsDetails = keySessionsPlanned
+    const keySessionGapsDetails = keySessionsPlannedEffective
       .filter((x: any) => !isPlannedCompleted(x?.r))
       .map((x: any) => ({
         planned_id: String(x?.r?.id || ''),
@@ -538,7 +546,7 @@ Deno.serve(async (req) => {
       }))
       .filter((x: any) => Boolean(x.workout_id));
 
-    const keySessionsLinked = keySessionsPlanned.length - keySessionGapsDetails.length;
+    const keySessionsLinked = keySessionsPlannedEffective.length - keySessionGapsDetails.length;
     const keySessionsGaps = keySessionGapsDetails.length;
     const extraSessions = extraSessionsDetails.length;
 
@@ -828,7 +836,7 @@ Deno.serve(async (req) => {
     const recoverySignaledExtrasCount = extraSessionsDetails.filter((e) => e.signals_recovery).length;
 
     const reaction: CoachWeekContextResponseV1['reaction'] = {
-      key_sessions_planned: keySessionsPlanned.length,
+      key_sessions_planned: keySessionsPlannedEffective.length,
       key_sessions_completed: keySessionsCompleted.length,
       key_sessions_completion_ratio: keySessionsCompletionRatio,
       key_sessions_linked: keySessionsLinked,
@@ -1349,25 +1357,16 @@ Deno.serve(async (req) => {
       if (openaiKey) {
         const narrativeFacts: string[] = [];
 
-        // ── Pull workout-level + exercise-level detail from deterministic layer ──
-        const [wfRes, elRes] = await Promise.all([
-          supabase
-            .from('workout_facts')
-            .select('workout_id, date, discipline, duration_minutes, workload, session_rpe, adherence, run_facts, strength_facts, ride_facts, swim_facts, plan_id')
-            .eq('user_id', userId)
-            .gte('date', weekStartDate)
-            .lte('date', weekEndDate)
-            .order('date', { ascending: true }),
-          supabase
-            .from('exercise_log')
-            .select('workout_id, date, exercise_name, canonical_name, sets_completed, best_weight, best_reps, total_volume, avg_rir, estimated_1rm')
-            .eq('user_id', userId)
-            .gte('date', weekStartDate)
-            .lte('date', weekEndDate)
-            .order('date', { ascending: true }),
-        ]);
-        const weekFacts: any[] = wfRes.data || [];
-        const weekExercises: any[] = elRes.data || [];
+        // Narrative facts are built from the same canonical weekly inputs used for
+        // deterministic state. Do not read parallel fact pipelines here.
+        const completedNarrativeWorkouts = (Array.isArray(weekWorkouts) ? weekWorkouts : [])
+          .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+          .sort((a: any, b: any) => {
+            const da = String(a?.__local_date || a?.date || '');
+            const db = String(b?.__local_date || b?.date || '');
+            if (da !== db) return da.localeCompare(db);
+            return String(a?.timestamp || '').localeCompare(String(b?.timestamp || ''));
+          });
 
         // Athlete-provided context (highest priority — never guess over this)
         if (athleteContextStr) {
@@ -1411,111 +1410,59 @@ Deno.serve(async (req) => {
           narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided): ${lines.join('; ')}.`);
         }
 
-        // ── Per-workout detail with plan deviations + athlete response (RPE, feeling) ──
-        const weekWorkoutById = new Map<string, any>();
-        for (const w of Array.isArray(weekWorkouts) ? weekWorkouts : []) {
-          const id = String((w as any)?.id || '');
-          if (id) weekWorkoutById.set(id, w);
-        }
-        // Build a set of planned_workout IDs that belong to the *active* plan
-        // (from the already plan-scoped plannedWeek query above).
-        const activePlanPlannedIds = new Set<string>(
-          (Array.isArray(plannedWeek) ? plannedWeek : [])
-            .map((p: any) => String(p?.id || ''))
-            .filter(Boolean)
-        );
-
-        for (const wf of weekFacts) {
-          const w = weekWorkoutById.get(String(wf.workout_id || ''));
-          const rpe = wf.session_rpe ?? (w ? (rpeFromWorkout(w) ?? undefined) : undefined);
-          const feeling = w ? feelingFromWorkout(w) : null;
-          const adh = wf.adherence || {};
-          const wfIsoDate = String(wf.date || '').slice(0, 10);
-          const localWhen = sessionLocalLabel(w, wfIsoDate, userTz);
-          const parts = [`${localWhen} ${wfIsoDate} ${wf.discipline}`];
-          if (wf.duration_minutes) parts.push(`${Math.round(wf.duration_minutes)} min`);
-          if (wf.workload) parts.push(`${Math.round(wf.workload)} pts load`);
+        // ── Per-workout detail from canonical weekly workouts only ──
+        for (const w of completedNarrativeWorkouts) {
+          const discipline = normalizeType((w as any)?.type);
+          const localDate = String((w as any)?.__local_date || (w as any)?.date || '').slice(0, 10);
+          const localWhen = sessionLocalLabel(w, localDate, userTz);
+          const parts = [`${localWhen} ${localDate} ${discipline}`];
+          const wl = safeNum((w as any)?.workload_actual);
+          if (wl != null) parts.push(`${Math.round(wl)} pts load`);
+          const rpe = rpeFromWorkout(w);
           if (rpe != null) parts.push(`RPE ${rpe}/10`);
+          const feeling = feelingFromWorkout(w);
           if (feeling) parts.push(`feeling: ${feeling}`);
-
-          // Only show plan deviation data when the completed workout is linked to a
-          // planned session from the *current* active plan. Three-way check:
-          //   1. workout_facts.plan_id matches active plan (reliable if column exists)
-          //   2. workout's planned_id is in the active plan's planned sessions
-          //   3. No active plan → no comparison possible
-          const wPlannedId = w?.planned_id ? String(w.planned_id) : null;
-          const linkedToActivePlan = !activePlan?.id
-            ? false  // no active plan → never compare
-            : wPlannedId
-              ? activePlanPlannedIds.has(wPlannedId)  // linked workout — check it's in current plan
-              : (!wf.plan_id || wf.plan_id === activePlan.id); // unlinked — allow only if facts match plan
-
-          if (adh.execution_score != null) parts.push(`execution ${adh.execution_score}%`);
-          if (!isPlanTransitionPeriod && linkedToActivePlan && adh.workload_pct != null && Math.abs(adh.workload_pct - 100) >= 10) {
-            parts.push(adh.workload_pct > 100
-              ? `DID ${adh.workload_pct - 100}% MORE LOAD than planned`
-              : `did ${100 - adh.workload_pct}% less load than planned`);
-          }
-          if (adh.weight_deviation_intentional === true) parts.push('ATHLETE SAYS went heavier intentionally');
-          if (adh.weight_deviation_intentional === false) parts.push('ATHLETE SAYS went heavier unintentionally');
-          if (adh.weight_deviation_note) parts.push(`weight deviation note: ${adh.weight_deviation_note}`);
-
-          // Strength-specific: per-exercise planned vs actual
-          // Skip exercise-level deviations if the workout was matched to an old plan
-          if (linkedToActivePlan && wf.discipline === 'strength' && wf.strength_facts?.exercises) {
-            const deviations: string[] = [];
-            for (const ex of wf.strength_facts.exercises) {
-              if (ex.planned_weight && ex.best_weight) {
-                const plannedStr = String(ex.planned_weight);
-                // Skip comparison if planned_weight is a % notation ("72% 1RM") — we
-                // can't meaningfully compare it to actual pounds without knowing the 1RM.
-                // Only compare when planned_weight is a concrete lb/kg value ("95 lb").
-                if (plannedStr.includes('%')) continue;
-                const plannedW = parseFloat(plannedStr) || 0;
-                if (plannedW > 0 && ex.best_weight > plannedW * 1.05) {
-                  deviations.push(`${ex.name}: lifted ${Math.round(ex.best_weight)}${wUnit} but plan said ${Math.round(plannedW)}${wUnit} (+${Math.round(((ex.best_weight / plannedW) - 1) * 100)}% heavier)`);
-                } else if (plannedW > 0 && ex.best_weight < plannedW * 0.9) {
-                  deviations.push(`${ex.name}: lifted ${Math.round(ex.best_weight)}${wUnit} vs planned ${Math.round(plannedW)}${wUnit} (lighter than plan)`);
-                }
-              }
-              if (ex.planned_sets && ex.sets_completed && ex.sets_completed !== ex.planned_sets) {
-                deviations.push(`${ex.name}: did ${ex.sets_completed} sets vs ${ex.planned_sets} planned`);
-              }
-            }
-            // During the first 14 days of a new plan, planned-vs-actual deviation
-            // math is noisy because prescriptions and baselines are still settling.
-            // Suppress deviation lines so the narrative stays action-oriented.
-            if (deviations.length && !isPlanTransitionPeriod) parts.push(`DEVIATIONS: ${deviations.join('; ')}`);
-          }
-
-          // Run-specific: pacing adherence
-          if (wf.discipline === 'run' && wf.run_facts) {
-            if (wf.run_facts.z2_pct != null) parts.push(`zone 2 time: ${wf.run_facts.z2_pct}%`);
-            if (wf.run_facts.decoupling_pct != null) parts.push(`cardiac decoupling: ${wf.run_facts.decoupling_pct}%`);
-            if (wf.run_facts.intervals_hit != null && wf.run_facts.intervals_total != null) {
-              parts.push(`intervals: ${wf.run_facts.intervals_hit}/${wf.run_facts.intervals_total} on target`);
-            }
-          }
-
+          const ex = executionScoreFromWorkout(w);
+          if (ex != null) parts.push(`execution ${Math.round(ex)}%`);
           narrativeFacts.push(`SESSION: ${parts.join(' | ')}`);
         }
 
-        // ── Strength exercise summary with context ──
-        if (weekExercises.length > 0) {
-          const byExercise = new Map<string, any[]>();
-          for (const e of weekExercises) {
-            const arr = byExercise.get(e.canonical_name) || [];
-            arr.push(e);
-            byExercise.set(e.canonical_name, arr);
+        // ── Strength exercise summary from workout payloads only ──
+        const strengthEntries: Array<{ name: string; best_weight: number; best_reps: number; avg_rir: number | null }> = [];
+        for (const w of completedNarrativeWorkouts) {
+          if (normalizeType((w as any)?.type) !== 'strength') continue;
+          const exRaw = (w as any)?.strength_exercises;
+          const exArr = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (parseJson(exRaw) || []) : []);
+          if (!Array.isArray(exArr)) continue;
+          for (const ex of exArr) {
+            const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+            const weights: number[] = [];
+            const reps: number[] = [];
+            const rirs: number[] = [];
+            for (const s of sets) {
+              const wt = safeNum((s as any)?.weight);
+              const rp = safeNum((s as any)?.reps);
+              const rr = safeNum((s as any)?.rir);
+              if (wt != null) weights.push(wt);
+              if (rp != null) reps.push(rp);
+              if (rr != null) rirs.push(rr);
+            }
+            const bestWeight = weights.length ? Math.max(...weights) : safeNum(ex?.weight) || 0;
+            const bestReps = reps.length ? Math.max(...reps) : safeNum(ex?.reps) || 0;
+            const avgRir = rirs.length ? (rirs.reduce((a, b) => a + b, 0) / rirs.length) : null;
+            strengthEntries.push({
+              name: String(ex?.name || 'exercise'),
+              best_weight: bestWeight,
+              best_reps: bestReps,
+              avg_rir: avgRir,
+            });
           }
-          const exLines: string[] = [];
-          for (const [canon, entries] of byExercise) {
-            const bestW = Math.max(...entries.map((e: any) => e.best_weight || 0));
-            const bestReps = entries.find((e: any) => e.best_weight === bestW)?.best_reps || 0;
-            const best1rm = Math.max(...entries.map((e: any) => e.estimated_1rm || 0));
-            const avgRir = entries.filter((e: any) => e.avg_rir != null).reduce((s: number, e: any) => s + e.avg_rir, 0) / (entries.filter((e: any) => e.avg_rir != null).length || 1);
-            exLines.push(`${canon}: best ${Math.round(bestW)}${wUnit} × ${bestReps}, est 1RM ${Math.round(best1rm)}${wUnit}, avg ${avgRir.toFixed(1)} reps in reserve`);
-          }
+        }
+        if (strengthEntries.length > 0) {
+          const exLines = strengthEntries.slice(0, 10).map((e) => {
+            const rirPart = e.avg_rir != null ? `, avg ${e.avg_rir.toFixed(1)} reps in reserve` : '';
+            return `${e.name}: best ${Math.round(e.best_weight)}${wUnit} × ${Math.round(e.best_reps)}${rirPart}`;
+          });
           narrativeFacts.push(`STRENGTH EXERCISES THIS WEEK: ${exLines.join('; ')}.`);
         }
 
@@ -1543,11 +1490,11 @@ Deno.serve(async (req) => {
 
         // Per-discipline execution breakdown
         const execByDiscipline: Record<string, number[]> = {};
-        for (const wf of weekFacts) {
-          const score = wf.adherence?.execution_score;
-          if (score != null) {
-            (execByDiscipline[wf.discipline] = execByDiscipline[wf.discipline] || []).push(score);
-          }
+        for (const w of completedNarrativeWorkouts) {
+          const score = executionScoreFromWorkout(w);
+          if (score == null) continue;
+          const d = normalizeType((w as any)?.type);
+          (execByDiscipline[d] = execByDiscipline[d] || []).push(score);
         }
         const execLines = Object.entries(execByDiscipline).map(([d, scores]) => {
           const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
@@ -1578,15 +1525,19 @@ Deno.serve(async (req) => {
           try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }
           catch { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()]; }
         })();
-        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific and practical. Use day names (e.g. "Thursday", "today") instead of raw dates.
+        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-4 sentences in second person. Be specific and practical. Use day names instead of raw dates.
 
-NEVER GUESS WHY: If the facts include "ATHLETE SAYS" or "MISSED SESSION REASONS" or "went heavier intentionally/unintentionally", use that. Otherwise, state what happened (e.g., "you missed three running sessions") but DO NOT speculate on reasons (no "you may have been tired", "you might have needed rest", etc.). Only explain causes when the athlete has told you.
+STYLE (Training Status): sentence 1 = status + why in plain language. sentence 2 = what happened this week (completed vs missed, only past sessions). sentence 3 = one clear next action.
+
+NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reasons. Otherwise, state what happened without speculation. Only explain causes when the athlete explicitly provided them.
 
 TIME ANCHORING IS STRICT: For each SESSION fact, use the provided local day/time label exactly as the source of truth. Do not rename the day or infer a different day from dates.
 
 Connect the dots when you have athlete context: if they said they had the flu, that explains missed sessions. If they said they went heavier on purpose, that explains the weight deviation. If their running efficiency improved, say so. If there is an INTERFERENCE ALERT, explain it in plain language.
 
-CRITICAL: If the athlete has an active training plan, NEVER suggest adding extra sessions or workouts. If they missed sessions, tell them to prioritize hitting those planned sessions next week. Frame adjustments as intensity changes within existing plan sessions (e.g., "ease off the weights in Thursday's strength session" NOT "add a light run").
+CRITICAL: If the athlete has an active training plan, NEVER suggest adding extra sessions or workouts. If sessions were missed, tell them to prioritize the planned sessions next week. Frame adjustments only as intensity changes within existing planned sessions.
+
+DAY PRECISION RULE: Never mention a specific day unless that exact day appears in SESSION or key-session facts for this week. If unsure, use generic wording about the next planned session.
 
 End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
 

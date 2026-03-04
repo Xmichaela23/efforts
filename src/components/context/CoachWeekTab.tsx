@@ -380,6 +380,13 @@ export default function CoachWeekTab() {
   const showTrends = ws?.guards?.show_trends ?? false;
   const showReadiness = ws?.guards?.show_readiness ?? false;
   const suppressBaselineDeltas = ws?.guards?.suppress_baseline_deltas ?? false;
+  const trendDeltas = {
+    aerobic: responseSignals?.aerobic?.drift_delta_bpm ?? null,
+    structural: responseSignals?.structural?.rir_delta ?? null,
+    subjective: responseSignals?.subjective?.rpe_delta ?? null,
+    absorption: responseSignals?.absorption?.execution_delta ?? null,
+  };
+  const hasAnyTrendDelta = Object.values(trendDeltas).some((v) => v != null);
 
   const loadDriverRows = useMemo(() => {
     const ownerRows = (ws && Array.isArray(ws?.load?.by_discipline))
@@ -468,6 +475,26 @@ export default function CoachWeekTab() {
     return parts.join(' · ');
   })();
 
+  const weekPosition = (() => {
+    const start = ws?.week?.start_date;
+    const end = ws?.week?.end_date;
+    const asOf = ws?.as_of_date;
+    if (!start || !end || !asOf) return null;
+    try {
+      const s = new Date(`${start}T12:00:00`);
+      const e = new Date(`${end}T12:00:00`);
+      const a = new Date(`${asOf}T12:00:00`);
+      const totalDays = Math.max(1, Math.floor((e.getTime() - s.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+      const elapsedRaw = Math.floor((a.getTime() - s.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      const elapsedDays = Math.max(1, Math.min(totalDays, elapsedRaw));
+      const pct = Math.round((elapsedDays / totalDays) * 100);
+      const dayName = a.toLocaleDateString('en-US', { weekday: 'long' });
+      return { totalDays, elapsedDays, pct, dayName };
+    } catch {
+      return null;
+    }
+  })();
+
   const rpeLabel = (rpe: number | null) => {
     if (rpe == null) return null;
     if (rpe <= 3) return 'Light';
@@ -545,6 +572,24 @@ export default function CoachWeekTab() {
           Refresh
         </button>
       </div>
+
+      {weekPosition ? (
+        <div className="rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className="text-white/75">
+              <span className="text-white/45">Week position:</span> {weekPosition.dayName} · Day {weekPosition.elapsedDays}/{weekPosition.totalDays}
+            </span>
+            <span className="text-white/45">•</span>
+            <span className="text-white/75">
+              <span className="text-white/45">Progress:</span> {weekPosition.pct}%
+            </span>
+            <span className="text-white/45">•</span>
+            <span className="text-white/75">
+              <span className="text-white/45">Key sessions:</span> {keySessionsLinked}/{keySessionsPlanned}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Week Context Note (athlete-provided) ── */}
       {ws.plan.has_active_plan && ws.plan.plan_id && ws.week.index != null && (
@@ -882,25 +927,37 @@ export default function CoachWeekTab() {
         <div className="text-sm text-white/80 mb-0.5">4-week trend</div>
         {showTrends ? (
           <>
-            <div className="text-[10px] text-white/40 mb-3">Change vs your personal norm over the last 4 weeks.</div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-white/60">Aerobic fitness</div>
-                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.aerobic?.drift_delta_bpm ?? null)} unit=" bpm" invertPositive={true} size="sm" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-white/60">Strength capacity</div>
-                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.structural?.rir_delta ?? null)} invertPositive={false} size="sm" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-white/60">Perceived effort</div>
-                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.subjective?.rpe_delta ?? null)} invertPositive={true} size="sm" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-white/60">Execution quality</div>
-                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.absorption?.execution_delta ?? null)} unit="%" invertPositive={false} size="sm" />
-              </div>
+            <div className="text-[10px] text-white/40 mb-3">
+              Change vs your personal norm over the last 4 weeks.
             </div>
+            {suppressBaselineDeltas ? (
+              <div className="text-xs text-white/55">
+                Trend deltas are hidden during early plan transition to avoid misleading comparisons with your prior cycle.
+              </div>
+            ) : hasAnyTrendDelta ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-white/60">Aerobic fitness</div>
+                  <DeltaIndicator value={trendDeltas.aerobic} unit=" bpm" invertPositive={true} size="sm" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-white/60">Strength capacity</div>
+                  <DeltaIndicator value={trendDeltas.structural} invertPositive={false} size="sm" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-white/60">Perceived effort</div>
+                  <DeltaIndicator value={trendDeltas.subjective} invertPositive={true} size="sm" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-white/60">Execution quality</div>
+                  <DeltaIndicator value={trendDeltas.absorption} unit="%" invertPositive={false} size="sm" />
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-white/55">
+                Trend deltas are not available yet. Keep logging sessions this week to establish a reliable baseline comparison.
+              </div>
+            )}
           </>
         ) : (
           <div className="text-xs text-white/45 mt-2">Building baseline... trends will appear after more consistent data.</div>
