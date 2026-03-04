@@ -199,6 +199,102 @@ export type CoachWeekContextV1 = {
     dominated_by: string | null;
     detail: string | null;
   } | null;
+  weekly_state_v1: {
+    version: 1;
+    owner: 'coach';
+    generated_at: string;
+    as_of_date: string;
+    week: {
+      start_date: string;
+      end_date: string;
+      week_start_dow: string;
+      index: number | null;
+      intent: string;
+      focus_label: string | null;
+    };
+    plan: {
+      has_active_plan: boolean;
+      plan_id: string | null;
+      plan_name: string | null;
+      athlete_context_for_week: string | null;
+    };
+    guards: {
+      is_transition_window: boolean;
+      suppress_deviation_language: boolean;
+      suppress_baseline_deltas: boolean;
+      show_trends: boolean;
+      show_readiness: boolean;
+    };
+    glance: {
+      training_state_code: string;
+      training_state_title: string;
+      training_state_subtitle: string;
+      verdict_code: string;
+      verdict_label: string;
+      next_action_code: string;
+      next_action_title: string;
+      next_action_details: string;
+      completion_ratio: number | null;
+      key_sessions_linked: number;
+      key_sessions_planned: number;
+    };
+    coach: {
+      narrative: string | null;
+      baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
+      plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
+    };
+    load: {
+      wtd_planned_load: number | null;
+      wtd_actual_load: number | null;
+      acute7_actual_load: number | null;
+      chronic28_actual_load: number | null;
+      acwr: number | null;
+      by_discipline: Array<{
+        discipline: string;
+        planned_load: number | null;
+        actual_load: number;
+        extra_load: number;
+        session_count: number;
+      }>;
+    };
+    details: {
+      reaction: CoachWeekContextV1['reaction'];
+      response: CoachWeekContextV1['response'];
+      marathon_readiness?: CoachWeekContextV1['marathon_readiness'];
+      training_state: {
+        code: string;
+        kicker: string;
+        title: string;
+        subtitle: string;
+        confidence: number;
+        baseline_days: number;
+        load_ramp_acwr: number | null;
+        load_ramp: {
+          acute7_total_load: number | null;
+          chronic28_total_load: number | null;
+          acute7_by_type: Array<{
+            type: string;
+            total_sessions: number;
+            total_load: number;
+            linked_sessions: number;
+            linked_load: number;
+            extra_sessions: number;
+            extra_load: number;
+          }>;
+          chronic28_by_type: Array<{
+            type: string;
+            total_sessions: number;
+            total_load: number;
+            linked_sessions: number;
+            linked_load: number;
+            extra_sessions: number;
+            extra_load: number;
+          }>;
+          top_sessions_acute7: Array<{ date: string; type: string; name: string | null; workload_actual: number; linked: boolean }>;
+        };
+      };
+    };
+  };
 };
 
 export function useCoachWeekContext(date?: string) {
@@ -226,6 +322,7 @@ export function useCoachWeekContext(date?: string) {
 
       if (apiError) throw apiError;
       if (!resp) throw new Error('No response from server');
+      if (!(resp as any)?.weekly_state_v1) throw new Error('Weekly data contract missing');
 
       setData(resp as CoachWeekContextV1);
     } catch (e: any) {

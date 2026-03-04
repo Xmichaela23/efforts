@@ -265,5 +265,86 @@ export type CoachWeekContextResponseV1 = {
     dominated_by: string | null;
     detail: string | null;
   } | null;
+  /**
+   * Canonical weekly owner contract for smart-server / dumb-client migration.
+   * Non-breaking: legacy fields above remain during rollout.
+   */
+  weekly_state_v1: {
+    version: 1;
+    owner: 'coach';
+    generated_at: string;
+    as_of_date: string;
+    week: {
+      start_date: string;
+      end_date: string;
+      week_start_dow: WeekStartDow;
+      index: number | null;
+      intent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
+      focus_label: string | null;
+    };
+    plan: {
+      has_active_plan: boolean;
+      plan_id: string | null;
+      plan_name: string | null;
+      athlete_context_for_week: string | null;
+    };
+    guards: {
+      is_transition_window: boolean;
+      suppress_deviation_language: boolean;
+      suppress_baseline_deltas: boolean;
+      show_trends: boolean;
+      show_readiness: boolean;
+    };
+    glance: {
+      training_state_code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';
+      training_state_title: string;
+      training_state_subtitle: string;
+      verdict_code: WeekVerdictCode;
+      verdict_label: string;
+      next_action_code: NextActionCode;
+      next_action_title: string;
+      next_action_details: string;
+      completion_ratio: number | null;
+      key_sessions_linked: number;
+      key_sessions_planned: number;
+    };
+    coach: {
+      narrative: string | null;
+      baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
+      plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
+    };
+    load: {
+      wtd_planned_load: number | null;
+      wtd_actual_load: number | null;
+      acute7_actual_load: number | null;
+      chronic28_actual_load: number | null;
+      acwr: number | null;
+      by_discipline: Array<{
+        discipline: string;
+        planned_load: number | null;
+        actual_load: number;
+        extra_load: number;
+        session_count: number;
+      }>;
+    };
+    trends: {
+      fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
+      readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+      signals: Array<{
+        metric: 'aerobic_efficiency' | 'strength_reserve' | 'effort_level' | 'execution_quality';
+        direction: 'improving' | 'stable' | 'declining';
+        magnitude: 'slight' | 'notable';
+        delta: number | null;
+      }>;
+    };
+    details: {
+      evidence: EvidenceItem[];
+      reaction: CoachWeekContextResponseV1['reaction'];
+      response: CoachWeekContextResponseV1['response'];
+      training_state: CoachWeekContextResponseV1['training_state'];
+      marathon_readiness?: CoachWeekContextResponseV1['marathon_readiness'];
+      interference: CoachWeekContextResponseV1['interference'];
+    };
+  };
 };
 

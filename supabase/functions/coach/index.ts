@@ -1417,7 +1417,10 @@ Deno.serve(async (req) => {
                 deviations.push(`${ex.name}: did ${ex.sets_completed} sets vs ${ex.planned_sets} planned`);
               }
             }
-            if (deviations.length) parts.push(`DEVIATIONS: ${deviations.join('; ')}`);
+            // During the first 14 days of a new plan, planned-vs-actual deviation
+            // math is noisy because prescriptions and baselines are still settling.
+            // Suppress deviation lines so the narrative stays action-oriented.
+            if (deviations.length && !isPlanTransitionPeriod) parts.push(`DEVIATIONS: ${deviations.join('; ')}`);
           }
 
           // Run-specific: pacing adherence
@@ -1510,7 +1513,7 @@ Deno.serve(async (req) => {
           try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }
           catch { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()]; }
         })();
-        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific — name exercises, weights, and sessions when they deviated from the plan. Use day names (e.g. "Thursday", "today") instead of raw dates.
+        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-5 sentences in second person ("you"). Be specific and practical. Use day names (e.g. "Thursday", "today") instead of raw dates.
 
 NEVER GUESS WHY: If the facts include "ATHLETE SAYS" or "MISSED SESSION REASONS" or "went heavier intentionally/unintentionally", use that. Otherwise, state what happened (e.g., "you missed three running sessions") but DO NOT speculate on reasons (no "you may have been tired", "you might have needed rest", etc.). Only explain causes when the athlete has told you.
 
@@ -1523,6 +1526,7 @@ End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, 
 UNITS: The athlete uses ${isImperial ? 'imperial (lb, miles)' : 'metric (kg, km)'}. Always use ${wUnit} for weights and ${isImperial ? 'miles' : 'km'} for distances. The facts below already use the correct units.
 
 ${userTz ? `TIMEZONE: The athlete is in ${userTz}. All dates in the facts are in their local time.` : ''}
+${isPlanTransitionPeriod ? `TRANSITION MODE (first 14 days of a new plan): Do NOT mention percentage-over-plan language, deviation percentages, "more/less than planned" math, or fatigue/load warnings derived from plan-transition data. Focus only on execution quality, consistency, and the next planned sessions.` : ''}
 
 FACTS:
 ${narrativeFacts.join('\n')}`;
@@ -1577,6 +1581,114 @@ ${narrativeFacts.join('\n')}`;
       { code: 'remaining_plan_load', label: 'Remaining planned load', value: Math.round(plannedRemainingLoad), unit: 'pts' },
     ];
 
+    const trendSignals: NonNullable<NonNullable<CoachWeekContextResponseV1['weekly_state_v1']>['trends']>['signals'] = [
+      {
+        metric: 'aerobic_efficiency',
+        direction: responseInterp.aerobic.drift_delta_bpm == null
+          ? 'stable'
+          : responseInterp.aerobic.drift_delta_bpm <= -2 ? 'improving' : responseInterp.aerobic.drift_delta_bpm >= 3 ? 'declining' : 'stable',
+        magnitude: responseInterp.aerobic.drift_delta_bpm != null && Math.abs(responseInterp.aerobic.drift_delta_bpm) >= 3 ? 'notable' : 'slight',
+        delta: responseInterp.aerobic.drift_delta_bpm,
+      },
+      {
+        metric: 'strength_reserve',
+        direction: responseInterp.structural.rir_delta == null
+          ? 'stable'
+          : responseInterp.structural.rir_delta >= 0.5 ? 'improving' : responseInterp.structural.rir_delta <= -0.5 ? 'declining' : 'stable',
+        magnitude: responseInterp.structural.rir_delta != null && Math.abs(responseInterp.structural.rir_delta) >= 0.5 ? 'notable' : 'slight',
+        delta: responseInterp.structural.rir_delta,
+      },
+      {
+        metric: 'effort_level',
+        direction: responseInterp.subjective.rpe_delta == null
+          ? 'stable'
+          : responseInterp.subjective.rpe_delta <= -0.7 ? 'improving' : responseInterp.subjective.rpe_delta >= 0.7 ? 'declining' : 'stable',
+        magnitude: responseInterp.subjective.rpe_delta != null && Math.abs(responseInterp.subjective.rpe_delta) >= 0.7 ? 'notable' : 'slight',
+        delta: responseInterp.subjective.rpe_delta,
+      },
+      {
+        metric: 'execution_quality',
+        direction: responseInterp.absorption.execution_delta == null
+          ? 'stable'
+          : responseInterp.absorption.execution_delta >= 3 ? 'improving' : responseInterp.absorption.execution_delta <= -5 ? 'declining' : 'stable',
+        magnitude: responseInterp.absorption.execution_delta != null && Math.abs(responseInterp.absorption.execution_delta) >= 5 ? 'notable' : 'slight',
+        delta: responseInterp.absorption.execution_delta,
+      },
+    ];
+
+    const weekly_state_v1: NonNullable<CoachWeekContextResponseV1['weekly_state_v1']> = {
+      version: 1,
+      owner: 'coach',
+      generated_at: new Date().toISOString(),
+      as_of_date: asOfDate,
+      week: {
+        start_date: weekStartDate,
+        end_date: weekEndDate,
+        week_start_dow: weekStartDow,
+        index: weekIndex,
+        intent: weekIntent,
+        focus_label: weekFocusLabel,
+      },
+      plan: {
+        has_active_plan: Boolean(activePlan),
+        plan_id: activePlan?.id || null,
+        plan_name: activePlan?.name || null,
+        athlete_context_for_week: athleteContextStr || null,
+      },
+      guards: {
+        is_transition_window: isPlanTransitionPeriod,
+        suppress_deviation_language: isPlanTransitionPeriod,
+        suppress_baseline_deltas: isPlanTransitionPeriod,
+        show_trends: training_state.baseline_days >= 14,
+        show_readiness: Boolean(marathon_readiness?.applicable),
+      },
+      glance: {
+        training_state_code: training_state.code,
+        training_state_title: training_state.title,
+        training_state_subtitle: training_state.subtitle,
+        verdict_code: v.code,
+        verdict_label: v.label,
+        next_action_code: v.next.code,
+        next_action_title: v.next.title,
+        next_action_details: v.next.details,
+        completion_ratio: wtdCompletionRatio ?? null,
+        key_sessions_linked: reaction.key_sessions_linked,
+        key_sessions_planned: reaction.key_sessions_planned,
+      },
+      coach: {
+        narrative: week_narrative,
+        baseline_drift_suggestions: baseline_drift_suggestions.length ? baseline_drift_suggestions : undefined,
+        plan_adaptation_suggestions: plan_adaptation_suggestions.length ? plan_adaptation_suggestions : undefined,
+      },
+      load: {
+        wtd_planned_load: plannedWtdLoad ?? null,
+        wtd_actual_load: actualWtdLoad ?? null,
+        acute7_actual_load: acute7 ?? null,
+        chronic28_actual_load: chronic28 ?? null,
+        acwr: acwr ?? null,
+        by_discipline: (training_state.load_ramp.acute7_by_type || []).map((r: any) => ({
+          discipline: String(r.type || 'other'),
+          planned_load: typeof r.linked_load === 'number' ? r.linked_load : null,
+          actual_load: Number(r.total_load || 0),
+          extra_load: Number(r.extra_load || 0),
+          session_count: Number(r.total_sessions || 0),
+        })),
+      },
+      trends: {
+        fitness_direction: fitnessDirection,
+        readiness_state: readinessState,
+        signals: trendSignals,
+      },
+      details: {
+        evidence,
+        reaction,
+        response: responseInterp,
+        training_state,
+        marathon_readiness,
+        interference,
+      },
+    };
+
     const response: CoachWeekContextResponseV1 = {
       version: 1,
       as_of_date: asOfDate,
@@ -1618,6 +1730,7 @@ ${narrativeFacts.join('\n')}`;
       interference,
       plan_adaptation_suggestions: plan_adaptation_suggestions.length ? plan_adaptation_suggestions : undefined,
       marathon_readiness,
+      weekly_state_v1,
     };
 
     return new Response(JSON.stringify(response), {

@@ -2708,25 +2708,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })}
           </tbody>
         </table>
-        {/* Summary below intervals: coach paragraph, structured, legacy, or fallback (all disciplines) */}
+        {/* Summary below intervals: canonical session insight (single source) */}
         {(() => {
           const completedSrc: any = hydratedCompleted || completed;
           const workoutAnalysis = completedSrc?.workout_analysis;
-          const standardizedSummary = workoutAnalysis?.summary;
-          const factPacketV1 = workoutAnalysis?.fact_packet_v1;
-          const flagsV1 = workoutAnalysis?.flags_v1;
-          const adherenceSummary = workoutAnalysis?.adherence_summary;
-          const narrativeInsights = workoutAnalysis?.narrative_insights;
-          const scoreExplanation = workoutAnalysis?.score_explanation;
-          const aiSummary = typeof workoutAnalysis?.ai_summary === 'string' ? workoutAnalysis.ai_summary.trim() : '';
-          const hasAISummary = aiSummary.length > 0;
-          const isRideSportForSummary = /ride|bike|cycling/i.test(String(type || ''));
-          const hasStandardized =
-            standardizedSummary &&
-            standardizedSummary.version === 1 &&
-            (typeof standardizedSummary.title === 'string' && standardizedSummary.title.length > 0) &&
-            Array.isArray(standardizedSummary.bullets) &&
-            standardizedSummary.bullets.length > 0;
+          const sessionState = workoutAnalysis?.session_state_v1;
+          const hasSessionState = !!(sessionState && sessionState.version === 1);
+          const summaryTitle = String(sessionState?.summary?.title || 'Insights');
+          const summaryBullets = Array.isArray(sessionState?.summary?.bullets)
+            ? sessionState.summary.bullets.filter((b: any) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
+            : [];
+          const narrativeText = typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '';
+          const hasNarrative = narrativeText.length > 0;
+          const hasSummaryBullets = summaryBullets.length > 0;
+          const factPacketV1 = sessionState?.details?.fact_packet_v1 ?? null;
+          const flagsV1 = sessionState?.details?.flags_v1 ?? null;
+          const adherenceSummary = sessionState?.details?.adherence_summary ?? null;
           const hasFactPacketV1 =
             factPacketV1 &&
             factPacketV1.version === 1 &&
@@ -2750,7 +2747,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const technicalInsightsAll = Array.isArray(adherenceSummary?.technical_insights)
             ? adherenceSummary.technical_insights
             : [];
-          const technicalInsightsForRender = hasStandardized
+          const technicalInsightsForRender = hasSummaryBullets
             ? technicalInsightsAll.filter((t: { label: string }) => !SUMMARY_LABELS.has(String(t?.label || '').trim()))
             : technicalInsightsAll;
 
@@ -2758,11 +2755,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             !!(adherenceSummary?.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.');
           const hasTechnicalForRender = technicalInsightsForRender.length > 0;
           const hasStructuredForRender = !!adherenceSummary && (hasTechnicalForRender || hasPlanImpactForRender);
-          // For cycling, we intentionally do NOT render legacy narrative_insights/verdict; we want the packet→flags→ai_summary pipeline only.
-          const hasNarrative = !isRideSportForSummary && Array.isArray(narrativeInsights) && narrativeInsights.length > 0;
-          const hasLegacyVerdict = !isRideSportForSummary && typeof scoreExplanation === 'string' && scoreExplanation.trim().length > 0;
-          const hasNothing = !hasAISummary && !hasStandardized && !hasStructuredForRender && !hasNarrative && !hasLegacyVerdict;
-          if (hasNothing) {
+          const hasNothing = !hasNarrative && !hasSummaryBullets && !hasStructuredForRender && !hasFactPacketV1;
+          if (!hasSessionState || hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
                 {noPlannedCompare && (
@@ -2784,9 +2778,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   <p className="text-sm text-red-400 mb-1">{recomputeError}</p>
                 )}
                 <p className="text-sm text-gray-500 italic">
-                  {planned
-                    ? 'No summary for this workout. Re-attach to a planned workout and open the Performance tab to generate execution insights.'
-                    : 'No analysis for this workout yet. Click “Recompute analysis” to generate it.'}
+                  {hasSessionState
+                    ? 'No insights available for this workout yet. Recompute analysis to refresh.'
+                    : 'No session insight contract found for this workout yet. Click "Recompute analysis" to generate it.'}
                 </p>
               </div>
             );
@@ -2813,25 +2807,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   {recomputing ? 'Recomputing…' : 'Recompute analysis'}
                 </button>
               </div>
-              {hasAISummary && (
+              {hasNarrative && (
                 <div>
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                    Coach
+                    Insights
                   </span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-1">{aiSummary}</p>
+                  <p className="text-sm text-gray-300 leading-relaxed mt-1">{narrativeText}</p>
                 </div>
               )}
-              {!hasAISummary && hasStandardized && (
+              {!hasNarrative && hasSummaryBullets && (
                 <div>
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                    {standardizedSummary.title || 'Summary'}
+                    {summaryTitle}
                   </span>
                   <div className="mt-1 space-y-1.5">
                     {(() => {
-                      const bulletsIn = Array.isArray(standardizedSummary?.bullets) ? standardizedSummary.bullets : [];
-                      const bullets: string[] = bulletsIn
-                        .filter((b: any) => typeof b === 'string' && b.trim().length > 0)
-                        .map((b: string) => b.trim());
+                      const bullets: string[] = summaryBullets;
 
                       const seen = new Set<string>();
                       const out = bullets.filter((b) => {
@@ -2985,7 +2976,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
                       // Avoid redundancy: if the standardized Summary is present, it already renders top flags.
                       // Only show "Flag" rows in Analysis Details when the Summary isn't shown (e.g. ai_summary mode).
-                      if (!hasStandardized) {
+                      if (!hasSummaryBullets) {
                         try {
                           const flags = Array.isArray(flagsV1) ? flagsV1 : [];
                           const top = flags
@@ -3017,7 +3008,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   )}
                 </div>
               )}
-              {!hasAISummary && hasStructuredForRender && adherenceSummary && (
+              {!hasNarrative && hasStructuredForRender && adherenceSummary && (
                 <>
                   {technicalInsightsForRender.length > 0 && (
                     <div className="space-y-2">
@@ -3031,21 +3022,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   )}
                   {adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.' && (
                     <div>
-                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{adherenceSummary.plan_impact.focus || "Coach's Outlook"}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(adherenceSummary.plan_impact.focus || 'Weekly outlook').replace(/coach/ig, 'training')}</span>
                       <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{adherenceSummary.plan_impact.outlook}</p>
                     </div>
                   )}
                 </>
-              )}
-              {!hasAISummary && !hasStructuredForRender && hasNarrative && (
-                <div className="space-y-2">
-                  {narrativeInsights.map((insight: string, i: number) => (
-                    <p key={i} className="text-sm text-gray-300 leading-relaxed">{insight}</p>
-                  ))}
-                </div>
-              )}
-              {!hasAISummary && !hasStructuredForRender && !hasNarrative && hasLegacyVerdict && (
-                <p className="text-sm text-gray-300 leading-relaxed">{scoreExplanation}</p>
               )}
             </div>
           );

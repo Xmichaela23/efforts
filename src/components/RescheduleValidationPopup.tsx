@@ -230,7 +230,7 @@ export default function RescheduleValidationPopup({
         {/* Coach Brain Options - Show FIRST if available */}
         {coachOptions && coachOptions.length > 0 && (
           <div className="mb-4">
-            <p className="text-xs text-white/60 font-light mb-3">Coach's recommendations:</p>
+            <p className="text-xs text-white/60 font-light mb-3">Recommended options:</p>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {coachOptions.map((option, idx) => {
                 const getRiskColor = () => {

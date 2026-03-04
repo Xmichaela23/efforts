@@ -538,12 +538,42 @@ Generate 3-4 observations about this swim workout:`;
     };
 
     // Save analysis to database
+    const sessionStateV1 = {
+      version: 1,
+      owner: 'analysis',
+      generated_at: new Date().toISOString(),
+      workout_id: workout_id,
+      discipline: 'swim',
+      glance: {
+        status_label: typeof analysis?.performance?.execution_adherence === 'number'
+          ? (analysis.performance.execution_adherence >= 85 ? 'Strong execution' : analysis.performance.execution_adherence >= 70 ? 'Solid execution' : 'Needs adjustment')
+          : null,
+        execution_score: typeof analysis?.performance?.execution_adherence === 'number' ? analysis.performance.execution_adherence : null,
+      },
+      narrative: {
+        text: Array.isArray(analysis?.insights) && analysis.insights.length > 0 ? String(analysis.insights[0] || '') : null,
+        source: Array.isArray(analysis?.insights) && analysis.insights.length > 0 ? 'analysis' : 'none',
+      },
+      summary: {
+        title: 'Insights',
+        bullets: Array.isArray(analysis?.insights) ? analysis.insights.slice(0, 4).map((s: any) => String(s || '').trim()).filter(Boolean) : [],
+      },
+      details: {
+        workout_summary: analysis?.detailed_analysis?.workout_summary || null,
+      },
+      guards: {
+        is_transition_window: false,
+        suppress_deviation_language: false,
+      },
+    };
+
     const updatePayload = {
       workout_analysis: {
         performance: analysis.performance,
         detailed_analysis: analysis.detailed_analysis,
         narrative_insights: analysis.insights,
-        insights: analysis.insights // Keep for backward compatibility
+        insights: analysis.insights, // Keep for backward compatibility
+        session_state_v1: sessionStateV1,
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()

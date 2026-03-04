@@ -303,11 +303,12 @@ export default function CoachWeekTab() {
   const [contextSaving, setContextSaving] = useState(false);
   const [pendingSkipReasons, setPendingSkipReasons] = useState<Record<string, string | null>>({});
   const [skipReasonError, setSkipReasonError] = useState<string | null>(null);
+  const ws = data?.weekly_state_v1;
 
   useEffect(() => {
-    const val = data?.plan?.athlete_context_for_week ?? '';
+    const val = ws?.plan?.athlete_context_for_week ?? '';
     setContextValue(typeof val === 'string' ? val : '');
-  }, [data?.plan?.athlete_context_for_week]);
+  }, [ws?.plan?.athlete_context_for_week]);
 
   useEffect(() => {
     setPendingSkipReasons({});
@@ -315,8 +316,8 @@ export default function CoachWeekTab() {
   }, [focusDate]);
 
   const saveAthleteContext = async (value: string) => {
-    const planId = data?.plan?.plan_id;
-    const weekIndex = data?.plan?.week_index;
+    const planId = ws?.plan?.plan_id;
+    const weekIndex = ws?.week?.index;
     if (!planId || weekIndex == null) return;
     try {
       setContextSaving(true);
@@ -367,11 +368,30 @@ export default function CoachWeekTab() {
 
   // Hooks must be called unconditionally (even while loading/error).
   // Keep derived memoized slices above any early returns.
-  const ts = data?.training_state;
+  const ts = ws?.details?.training_state;
+  const reaction = ws?.details?.reaction;
+  const responseSignals = ws?.details?.response;
+  const readiness = ws?.details?.marathon_readiness;
+  const narrativeText = ws?.coach?.narrative ?? null;
+  const planAdaptationSuggestions = ws?.coach?.plan_adaptation_suggestions ?? [];
+  const keySessionsPlanned = ws?.glance?.key_sessions_planned ?? 0;
+  const keySessionsLinked = ws?.glance?.key_sessions_linked ?? 0;
+  const verdictCode = ws?.glance?.verdict_code ?? 'on_track';
+  const showTrends = ws?.guards?.show_trends ?? false;
+  const showReadiness = ws?.guards?.show_readiness ?? false;
+  const suppressBaselineDeltas = ws?.guards?.suppress_baseline_deltas ?? false;
+
   const loadDriverRows = useMemo(() => {
-    const rows = (ts && Array.isArray(ts?.load_ramp?.acute7_by_type)) ? ts.load_ramp.acute7_by_type : [];
-    return rows.slice(0, 3);
-  }, [ts?.load_ramp?.acute7_by_type]);
+    const ownerRows = (ws && Array.isArray(ws?.load?.by_discipline))
+      ? ws.load.by_discipline.map((r: any) => ({
+          type: r.discipline,
+          total_load: r.actual_load,
+          linked_load: r.planned_load ?? 0,
+          extra_load: r.extra_load,
+        }))
+      : [];
+    return ownerRows.slice(0, 3);
+  }, [ws?.load?.by_discipline]);
 
   if (loading && !data) {
     return (
@@ -405,25 +425,40 @@ export default function CoachWeekTab() {
     );
   }
 
+  if (!ws) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-red-300">
+        <AlertCircle className="w-8 h-8 mb-3" />
+        <div className="text-sm text-center">Weekly data contract missing. Please refresh.</div>
+        <button
+          onClick={refresh}
+          className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
+    );
+  }
+
 
 
   const verdictTone =
-    data.verdict.code === 'recover_overreaching' ? 'border-red-500/40 bg-gradient-to-br from-red-500/15 to-red-900/10'
-    : data.verdict.code === 'caution_ramping_fast' ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 to-amber-900/10'
-    : data.verdict.code === 'undertraining' ? 'border-sky-500/40 bg-gradient-to-br from-sky-500/12 to-sky-900/8'
+    verdictCode === 'recover_overreaching' ? 'border-red-500/40 bg-gradient-to-br from-red-500/15 to-red-900/10'
+    : verdictCode === 'caution_ramping_fast' ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/15 to-amber-900/10'
+    : verdictCode === 'undertraining' ? 'border-sky-500/40 bg-gradient-to-br from-sky-500/12 to-sky-900/8'
     : 'border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-emerald-900/5';
 
   const titleGlow =
-    data.verdict.code === 'recover_overreaching' ? 'text-red-300'
-    : data.verdict.code === 'caution_ramping_fast' ? 'text-amber-300'
-    : data.verdict.code === 'undertraining' ? 'text-sky-300'
+    verdictCode === 'recover_overreaching' ? 'text-red-300'
+    : verdictCode === 'caution_ramping_fast' ? 'text-amber-300'
+    : verdictCode === 'undertraining' ? 'text-sky-300'
     : 'text-emerald-300';
 
   const weekLabel = (() => {
     const parts: string[] = [];
-    if (data.plan.has_active_plan && data.plan.week_index != null) parts.push(`Week ${data.plan.week_index}`);
-    if (data.plan.week_intent) {
-      const intent = String(data.plan.week_intent).toLowerCase();
+    if (ws.plan.has_active_plan && ws.week.index != null) parts.push(`Week ${ws.week.index}`);
+    if (ws.week.intent) {
+      const intent = String(ws.week.intent).toLowerCase();
       if (intent === 'peak') parts.push('Peak phase');
       else if (intent === 'recovery') parts.push('Recovery week');
       else if (intent === 'taper') parts.push('Taper');
@@ -471,8 +506,8 @@ export default function CoachWeekTab() {
         open={linkOpen}
         onClose={() => setLinkOpen(false)}
         onLinked={async () => { await refresh(); }}
-        extras={Array.isArray(data.reaction?.extra_sessions_details) ? data.reaction.extra_sessions_details : []}
-        gaps={Array.isArray(data.reaction?.key_session_gaps_details) ? data.reaction.key_session_gaps_details : []}
+        extras={Array.isArray(reaction?.extra_sessions_details) ? reaction.extra_sessions_details : []}
+        gaps={Array.isArray(reaction?.key_session_gaps_details) ? reaction.key_session_gaps_details : []}
       />
 
       <div className="flex items-center justify-between gap-2">
@@ -486,7 +521,7 @@ export default function CoachWeekTab() {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <div className="text-xs text-white/50 min-w-[140px]">
-            {data.week_start_date} → {data.week_end_date}
+            {ws.week.start_date} → {ws.week.end_date}
             {weekLabel ? <span className="ml-2 text-white/60">{weekLabel}</span> : null}
           </div>
           <button
@@ -499,7 +534,7 @@ export default function CoachWeekTab() {
         </div>
         <button
           onClick={async () => {
-            if (contextExpanded && contextValue !== (data?.plan?.athlete_context_for_week ?? '')) {
+            if (contextExpanded && contextValue !== (ws?.plan?.athlete_context_for_week ?? '')) {
               await saveAthleteContext(contextValue);
             }
             await refresh();
@@ -512,7 +547,7 @@ export default function CoachWeekTab() {
       </div>
 
       {/* ── Week Context Note (athlete-provided) ── */}
-      {data.plan.has_active_plan && data.plan.plan_id && data.plan.week_index != null && (
+      {ws.plan.has_active_plan && ws.plan.plan_id && ws.week.index != null && (
         <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
           {contextExpanded ? (
             <>
@@ -571,9 +606,9 @@ export default function CoachWeekTab() {
       )}
 
       {/* ── Baseline drift suggestion (Phase 3) ── */}
-      {Array.isArray(data.baseline_drift_suggestions) && data.baseline_drift_suggestions.length > 0 && (
+      {Array.isArray(ws.coach.baseline_drift_suggestions) && ws.coach.baseline_drift_suggestions.length > 0 && (
         <BaselineDriftCard
-          suggestions={data.baseline_drift_suggestions}
+          suggestions={ws.coach.baseline_drift_suggestions}
           onAccept={async (lift, learned) => {
             const { data: u } = await supabase.auth.getUser();
             if (!u?.user?.id) return;
@@ -608,9 +643,9 @@ export default function CoachWeekTab() {
       )}
 
       {/* ── Plan adaptation suggestion (Phase 3) ── */}
-      {Array.isArray(data.plan_adaptation_suggestions) && data.plan_adaptation_suggestions.length > 0 && (
+      {Array.isArray(planAdaptationSuggestions) && planAdaptationSuggestions.length > 0 && (
         <PlanAdaptationCard
-          suggestions={data.plan_adaptation_suggestions}
+          suggestions={planAdaptationSuggestions}
           onAccept={async (code) => {
             const { data: u } = await supabase.auth.getUser();
             if (!u?.user?.id) return;
@@ -646,13 +681,13 @@ export default function CoachWeekTab() {
           style={{ textShadow: `0 0 12px currentColor` }}
         >{ts?.title || '—'}</div>
 
-        {data.week_narrative ? (
-          <div className="text-sm text-white/75 mt-2 leading-relaxed">{data.week_narrative}</div>
+        {narrativeText ? (
+          <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
         ) : ts?.subtitle ? (
           <div className="text-sm text-white/55 mt-1">{ts.subtitle}</div>
         ) : null}
 
-        {data.week_narrative && !contextValue?.trim() && (
+        {narrativeText && !contextValue?.trim() && (
           <div className="text-[11px] text-white/40 mt-2 italic">
             AI-generated — add context above to improve accuracy
           </div>
@@ -707,7 +742,7 @@ export default function CoachWeekTab() {
 
 
       {/* ── Key Sessions ── */}
-      {data.reaction.key_sessions_planned > 0 && (
+      {keySessionsPlanned > 0 && (
         <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div>
@@ -715,28 +750,28 @@ export default function CoachWeekTab() {
               <div className="text-[10px] text-white/40 mt-0.5">High-priority workouts (intervals, long runs, tempo) from your plan.</div>
             </div>
             <div className="text-sm text-white/90 font-medium shrink-0">
-              {data.reaction.key_sessions_linked}/{data.reaction.key_sessions_planned} done
+              {keySessionsLinked}/{keySessionsPlanned} done
             </div>
           </div>
           <div className="h-2.5 w-full rounded-full bg-white/10 overflow-hidden border border-white/10">
             <div className="h-full flex">
               <div
                 className="h-full bg-emerald-400/70"
-                style={{ width: `${Math.round((data.reaction.key_sessions_linked / data.reaction.key_sessions_planned) * 100)}%` }}
+                style={{ width: `${Math.round((keySessionsLinked / Math.max(1, keySessionsPlanned)) * 100)}%` }}
               />
             </div>
           </div>
-          {((typeof data.reaction.key_quality_extras === 'number' ? data.reaction.key_quality_extras : data.reaction.extra_sessions) > 0 || data.reaction.key_sessions_gaps > 0) && (
+          {((typeof reaction?.key_quality_extras === 'number' ? reaction.key_quality_extras : (reaction?.extra_sessions || 0)) > 0 || (reaction?.key_sessions_gaps || 0) > 0) && (
             <div className="mt-2 flex items-center justify-between text-xs text-white/45">
               <div>
-                {data.reaction.key_sessions_gaps > 0 && (
-                  <span className="text-amber-300/80">{data.reaction.key_sessions_gaps} missed</span>
+                {(reaction?.key_sessions_gaps || 0) > 0 && (
+                  <span className="text-amber-300/80">{reaction?.key_sessions_gaps || 0} missed</span>
                 )}
-                {(typeof data.reaction.key_quality_extras === 'number' ? data.reaction.key_quality_extras : data.reaction.extra_sessions) > 0 && (
-                  <span className={data.reaction.key_sessions_gaps > 0 ? 'ml-2 text-sky-300/80' : 'text-sky-300/80'}>+{typeof data.reaction.key_quality_extras === 'number' ? data.reaction.key_quality_extras : data.reaction.extra_sessions} extra</span>
+                {(typeof reaction?.key_quality_extras === 'number' ? reaction.key_quality_extras : (reaction?.extra_sessions || 0)) > 0 && (
+                  <span className={(reaction?.key_sessions_gaps || 0) > 0 ? 'ml-2 text-sky-300/80' : 'text-sky-300/80'}>+{typeof reaction?.key_quality_extras === 'number' ? reaction.key_quality_extras : (reaction?.extra_sessions || 0)} extra</span>
                 )}
               </div>
-              {data.reaction.extra_sessions > 0 && data.reaction.key_sessions_gaps > 0 && (
+              {(reaction?.extra_sessions || 0) > 0 && (reaction?.key_sessions_gaps || 0) > 0 && (
                 <button
                   onClick={() => setLinkOpen(true)}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/[0.10]"
@@ -747,7 +782,7 @@ export default function CoachWeekTab() {
               )}
             </div>
           )}
-          {data.reaction.key_session_gaps_details && data.reaction.key_session_gaps_details.length > 0 && (
+          {reaction?.key_session_gaps_details && reaction.key_session_gaps_details.length > 0 && (
             <div className="mt-3 space-y-2 pt-2 border-t border-white/10">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] text-white/45 uppercase tracking-wide">Why missed?</div>
@@ -755,7 +790,7 @@ export default function CoachWeekTab() {
                   <span className="text-[10px] text-amber-300">{skipReasonError}</span>
                 )}
               </div>
-              {data.reaction.key_session_gaps_details.map((g) => {
+              {reaction.key_session_gaps_details.map((g) => {
                 const effectiveReason = pendingSkipReasons[g.planned_id] ?? g.skip_reason ?? null;
                 return (
                 <div key={g.planned_id} className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
@@ -800,42 +835,42 @@ export default function CoachWeekTab() {
         <div className="text-sm text-white/80 mb-0.5">Body response</div>
         <div className="text-[10px] text-white/40 mb-3">How your body is responding this week vs your baseline.</div>
         <div className="space-y-3">
-          {data.reaction.avg_execution_score != null && (
+          {reaction?.avg_execution_score != null && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/60">Plan execution</div>
-              <div className="text-sm text-white/90 font-medium">{data.reaction.avg_execution_score}%</div>
+              <div className="text-sm text-white/90 font-medium">{reaction.avg_execution_score}%</div>
             </div>
           )}
-          {data.reaction.avg_session_rpe_7d != null && (
+          {reaction?.avg_session_rpe_7d != null && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/60">Effort level <span className="text-white/30">(RPE)</span></div>
               <div className="text-sm text-white/90">
-                <span className="font-medium">{rpeLabel(data.reaction.avg_session_rpe_7d)}</span>
-                <span className="text-xs text-white/40 ml-1.5">{data.reaction.avg_session_rpe_7d}/10</span>
+                <span className="font-medium">{rpeLabel(reaction.avg_session_rpe_7d)}</span>
+                <span className="text-xs text-white/40 ml-1.5">{reaction.avg_session_rpe_7d}/10</span>
               </div>
             </div>
           )}
-          {data.reaction.avg_strength_rir_7d != null && (
+          {reaction?.avg_strength_rir_7d != null && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/60">Strength reserve <span className="text-white/30">(RIR)</span></div>
               <div className="text-sm text-white/90">
-                <span className="font-medium">{rirLabel(data.reaction.avg_strength_rir_7d)}</span>
-                <span className="text-xs text-white/40 ml-1.5">{data.reaction.avg_strength_rir_7d} reps in tank</span>
+                <span className="font-medium">{rirLabel(reaction.avg_strength_rir_7d)}</span>
+                <span className="text-xs text-white/40 ml-1.5">{reaction.avg_strength_rir_7d} reps in tank</span>
               </div>
             </div>
           )}
-          {data.reaction.hr_drift_avg_bpm != null && (
+          {reaction?.hr_drift_avg_bpm != null && (
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/60">Cardiac drift</div>
               <div className="text-sm text-white/90">
-                {data.reaction.hr_drift_avg_bpm <= 5 ? (
+                {reaction.hr_drift_avg_bpm <= 5 ? (
                   <span className="text-emerald-400 font-medium">Minimal</span>
-                ) : data.reaction.hr_drift_avg_bpm <= 10 ? (
+                ) : reaction.hr_drift_avg_bpm <= 10 ? (
                   <span className="text-white/80 font-medium">Normal</span>
                 ) : (
                   <span className="text-amber-400 font-medium">Elevated</span>
                 )}
-                <span className="text-xs text-white/40 ml-1.5">{data.reaction.hr_drift_avg_bpm} bpm</span>
+                <span className="text-xs text-white/40 ml-1.5">{reaction.hr_drift_avg_bpm} bpm</span>
               </div>
             </div>
           )}
@@ -845,33 +880,39 @@ export default function CoachWeekTab() {
       {/* ── 4-week trend ── */}
       <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
         <div className="text-sm text-white/80 mb-0.5">4-week trend</div>
-        <div className="text-[10px] text-white/40 mb-3">Change vs your personal norm over the last 4 weeks.</div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-white/60">Aerobic fitness</div>
-            <DeltaIndicator value={data.response?.aerobic?.drift_delta_bpm ?? null} unit=" bpm" invertPositive={true} size="sm" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-white/60">Strength capacity</div>
-            <DeltaIndicator value={data.response?.structural?.rir_delta ?? null} invertPositive={false} size="sm" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-white/60">Perceived effort</div>
-            <DeltaIndicator value={data.response?.subjective?.rpe_delta ?? null} invertPositive={true} size="sm" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-white/60">Execution quality</div>
-            <DeltaIndicator value={data.response?.absorption?.execution_delta ?? null} unit="%" invertPositive={false} size="sm" />
-          </div>
-        </div>
+        {showTrends ? (
+          <>
+            <div className="text-[10px] text-white/40 mb-3">Change vs your personal norm over the last 4 weeks.</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/60">Aerobic fitness</div>
+                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.aerobic?.drift_delta_bpm ?? null)} unit=" bpm" invertPositive={true} size="sm" />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/60">Strength capacity</div>
+                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.structural?.rir_delta ?? null)} invertPositive={false} size="sm" />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/60">Perceived effort</div>
+                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.subjective?.rpe_delta ?? null)} invertPositive={true} size="sm" />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-white/60">Execution quality</div>
+                <DeltaIndicator value={suppressBaselineDeltas ? null : (responseSignals?.absorption?.execution_delta ?? null)} unit="%" invertPositive={false} size="sm" />
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-xs text-white/45 mt-2">Building baseline... trends will appear after more consistent data.</div>
+        )}
       </div>
 
       {/* ── Run sessions ── */}
-      {Array.isArray(data.response?.run_session_types_7d) && data.response.run_session_types_7d.length ? (
+      {Array.isArray(responseSignals?.run_session_types_7d) && responseSignals.run_session_types_7d.length ? (
         <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
           <div className="text-sm text-white/80 mb-2">Run sessions this week</div>
           <div className="grid grid-cols-2 gap-2">
-            {data.response.run_session_types_7d.slice(0, 6).map((s: any) => {
+            {responseSignals.run_session_types_7d.slice(0, 6).map((s: any) => {
               const label =
                 s.type === 'z2' ? 'Zone 2' : s.type === 'long' ? 'Long Run' : s.type === 'tempo' ? 'Tempo'
                 : s.type === 'progressive' ? 'Progressive' : s.type === 'fartlek' ? 'Fartlek'
@@ -902,7 +943,7 @@ export default function CoachWeekTab() {
       ) : null}
 
       {/* ── Marathon Readiness (Phase 3.5) — at bottom so context note lands last ── */}
-      {data.marathon_readiness?.applicable && (
+      {showReadiness && readiness?.applicable && (
         <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
           <div className="text-sm font-medium text-white/90 mb-1">Marathon readiness</div>
           <div className="text-xs text-white/50 mb-2">
@@ -921,7 +962,7 @@ export default function CoachWeekTab() {
             </div>
           </details>
           <div className="space-y-2">
-            {data.marathon_readiness.items.map((item) => (
+            {readiness.items.map((item) => (
               <div
                 key={item.id}
                 className="flex items-start gap-2 rounded-lg px-2.5 py-2 border border-white/[0.06] bg-white/[0.02]"
@@ -938,19 +979,19 @@ export default function CoachWeekTab() {
               </div>
             ))}
           </div>
-          {data.marathon_readiness.summary !== 'insufficient_data' && !data.marathon_readiness.context_note && (
+          {readiness.summary !== 'insufficient_data' && !readiness.context_note && (
             <div className="mt-2 text-[11px] text-white/50">
-              {data.marathon_readiness.summary === 'on_track'
+              {readiness.summary === 'on_track'
                 ? 'On track — training base looks sufficient for race day.'
                 : 'Needs work — address the gaps above before race day.'}
             </div>
           )}
-          {data.marathon_readiness.context_note && (
+          {readiness.context_note && (
             <div className="mt-2 rounded-lg px-2.5 py-2 bg-sky-500/10 border border-sky-500/20 text-xs text-sky-200/90">
-              {data.marathon_readiness.context_note}
+              {readiness.context_note}
             </div>
           )}
-          {data.marathon_readiness.summary !== 'insufficient_data' && data.marathon_readiness.context_note && (
+          {readiness.summary !== 'insufficient_data' && readiness.context_note && (
             <div className="mt-2 text-[11px] text-white/50">Needs work — but see note above.</div>
           )}
         </div>

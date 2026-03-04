@@ -2195,6 +2195,35 @@ Deno.serve(async (req) => {
     }
     const existingAnalysis = existingRowForMerge?.workout_analysis || {};
 
+    const sessionStateV1 = {
+      version: 1,
+      owner: 'analysis',
+      generated_at: new Date().toISOString(),
+      workout_id: workout_id,
+      discipline: 'run',
+      glance: {
+        status_label: adherenceSummary?.verdict?.label || null,
+        execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+      },
+      narrative: {
+        text: ai_summary || null,
+        source: ai_summary ? 'ai' : 'none',
+      },
+      summary: {
+        title: (summaryV1?.title && String(summaryV1.title).trim()) ? String(summaryV1.title).trim() : 'Insights',
+        bullets: Array.isArray(summaryV1?.bullets) ? summaryV1.bullets : [],
+      },
+      details: {
+        adherence_summary: adherenceSummary ?? null,
+        fact_packet_v1: fact_packet_v1 ?? null,
+        flags_v1: flags_v1 ?? null,
+      },
+      guards: {
+        is_transition_window: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
+        suppress_deviation_language: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
+      },
+    };
+
     // Update workout_analysis separately (doesn't conflict with computed)
     const updatePayload = {
       workout_analysis: {
@@ -2212,6 +2241,7 @@ Deno.serve(async (req) => {
         flags_v1: flags_v1,
         ai_summary: ai_summary,
         ai_summary_generated_at: ai_summary_generated_at,
+        session_state_v1: sessionStateV1,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         // NEW: Structured HR summary for weekly/block context aggregation
         heart_rate_summary: hrAnalysisResult.summary

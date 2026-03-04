@@ -1808,6 +1808,35 @@ Deno.serve(async (req) => {
       console.log('⚠️ Failed to read existing workout_analysis for cycling merge:', existingRowErr.message);
     }
     const existingAnalysis = (existingRowForMerge as any)?.workout_analysis || {};
+    const sessionStateV1 = {
+      version: 1,
+      owner: 'analysis',
+      generated_at: new Date().toISOString(),
+      workout_id: workout_id,
+      discipline: 'ride',
+      glance: {
+        status_label: typeof performance?.execution_score === 'number'
+          ? (performance.execution_score >= 85 ? 'Strong execution' : performance.execution_score >= 70 ? 'Solid execution' : 'Needs adjustment')
+          : null,
+        execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+      },
+      narrative: {
+        text: ai_summary || null,
+        source: ai_summary ? 'ai' : 'none',
+      },
+      summary: {
+        title: 'Insights',
+        bullets: Array.isArray(cyclingFlagsV1) ? cyclingFlagsV1.slice(0, 4).map((f: any) => String(f?.detail || f?.label || '').trim()).filter(Boolean) : [],
+      },
+      details: {
+        fact_packet_v1: cyclingFactPacketV1 ?? null,
+        flags_v1: cyclingFlagsV1 ?? null,
+      },
+      guards: {
+        is_transition_window: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
+        suppress_deviation_language: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
+      },
+    };
 
     const { error: updateError } = await supabase
       .from('workouts')
@@ -1820,6 +1849,7 @@ Deno.serve(async (req) => {
           flags_v1: cyclingFlagsV1,
           ai_summary,
           ai_summary_generated_at,
+          session_state_v1: sessionStateV1,
         },
         analysis_status: 'complete',
         analyzed_at: new Date().toISOString()

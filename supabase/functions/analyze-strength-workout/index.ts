@@ -2580,6 +2580,37 @@ Deno.serve(async (req) => {
     };
     
     // Save analysis results to database
+    const sessionStateV1 = {
+      version: 1,
+      owner: 'analysis',
+      generated_at: new Date().toISOString(),
+      workout_id: workout_id,
+      discipline: 'strength',
+      glance: {
+        status_label: typeof performance?.execution_score === 'number'
+          ? (performance.execution_score >= 85 ? 'Strong execution' : performance.execution_score >= 70 ? 'Solid execution' : 'Needs adjustment')
+          : null,
+        execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+      },
+      narrative: {
+        text: Array.isArray(analysis.insights) && analysis.insights.length > 0
+          ? String(analysis.insights[0] || '')
+          : null,
+        source: Array.isArray(analysis.insights) && analysis.insights.length > 0 ? 'analysis' : 'none',
+      },
+      summary: {
+        title: 'Insights',
+        bullets: Array.isArray(analysis.insights) ? analysis.insights.slice(0, 4).map((s: any) => String(s || '').trim()).filter(Boolean) : [],
+      },
+      details: {
+        execution_summary: analysis.execution_summary || null,
+      },
+      guards: {
+        is_transition_window: false,
+        suppress_deviation_language: false,
+      },
+    };
+
     const updatePayload = {
       workout_analysis: {
         performance: performance,
@@ -2587,6 +2618,7 @@ Deno.serve(async (req) => {
         narrative_insights: Array.isArray(analysis.insights) ? analysis.insights : [analysis.insights || 'Analysis completed'], // AI-generated insights
         insights: analysis.insights || [], // Keep for backward compatibility
         strengths: [], // Extract from progression_data if needed
+        session_state_v1: sessionStateV1,
         red_flags: [] // Extract from adherence if needed
       },
       analysis_status: 'complete',
