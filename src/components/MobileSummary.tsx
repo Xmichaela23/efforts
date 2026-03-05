@@ -1777,22 +1777,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           console.log('🔍 [DATA STRUCTURE DEBUG] workoutAnalysis:', workoutAnalysis);
           console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
           
-          // 🎯 TEMPORARY FIX: Read from both old and new locations
+          // Server-owned execution/adherence values (single source of truth)
           const performance = completedSrc?.workout_analysis?.performance;
-          console.log('🎯 [FRONTEND] Reading performance:', performance);
-          
-          // Try new Garmin metrics first, fallback to old calculation
           const executionAdherence = performance?.execution_adherence;
           const paceAdherence = performance?.pace_adherence;
           const durationAdherence = performance?.duration_adherence;
+          const sessionState = completedSrc?.workout_analysis?.session_state_v1;
+          const executionFromSessionState = Number.isFinite(sessionState?.glance?.execution_score)
+            ? Math.round(sessionState.glance.execution_score)
+            : null;
           
           const performanceAssessment = granularAnalysis?.performance_assessment;
-          console.log('🎯 [FRONTEND] Execution:', executionAdherence, 'Pace:', paceAdherence, 'Duration:', durationAdherence);
           
-          // Convert to display format with fallbacks
-          // ✅ FIX: Convert to display format - use null instead of 0 when analysis unavailable
-          const finalExecutionScore = Number.isFinite(executionAdherence) ? Math.round(executionAdherence) : 
-            (Number.isFinite(Number(compOverall?.execution_score)) ? Math.round(Number(compOverall.execution_score)) : null);
+          // Strict server-only execution score: performance first, then canonical session_state.
+          const finalExecutionScore = Number.isFinite(executionAdherence)
+            ? Math.round(executionAdherence)
+            : executionFromSessionState;
           const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : null;
           const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : null;
           const finalDistPct = null;  // Not used in Garmin formula
@@ -2004,11 +2004,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const fmtDeltaTime = (s:number) => { const sign = s>=0 ? '+' : '−'; const v = Math.abs(Math.round(s)); const m=Math.floor(v/60); const ss=v%60; return `${sign}${m}:${String(ss).padStart(2,'0')}`; };
             const fmtDeltaPer100 = (s:number) => { const faster = s>0; const v = Math.abs(s); const m=Math.floor(v/60); const ss=Math.round(v%60); return `${m?`${m}m `:''}${ss}s/${swimUnit==='yd'?'100yd':'100m'} ${faster? 'faster' : 'slower'}`.trim(); };
 
-            // Use server-computed metrics from workout_analysis.performance (new unified source)
+            // Use server-computed metrics only (no local execution fallback)
             const performance = completedSrc?.workout_analysis?.performance;
+            const sessionState = completedSrc?.workout_analysis?.session_state_v1;
             const executionScore = Number.isFinite(performance?.execution_adherence) 
               ? Math.round(performance.execution_adherence)
-              : ((completedSrc as any)?.computed?.overall?.execution_score || null);
+              : (Number.isFinite(sessionState?.glance?.execution_score) ? Math.round(sessionState.glance.execution_score) : null);
             // ✅ FIX: Only use server-side granular analysis, no fallback to client calculations
             const paceAdherence = Number.isFinite(performance?.pace_adherence)
               ? Math.round(performance.pace_adherence)
