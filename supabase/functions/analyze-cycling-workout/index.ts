@@ -5,6 +5,7 @@ import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts'
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
+import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1833,8 +1834,8 @@ Deno.serve(async (req) => {
         flags_v1: cyclingFlagsV1 ?? null,
       },
       guards: {
-        is_transition_window: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
-        suppress_deviation_language: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
+        is_transition_window: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
+        suppress_deviation_language: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
       },
     };
 

@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
+import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 /**
  * =============================================================================
@@ -2580,6 +2581,12 @@ Deno.serve(async (req) => {
     };
     
     // Save analysis results to database
+    const transitionWeekIndex =
+      Number((analysis as any)?.plan_metadata?.parsed_week ?? (analysis as any)?.plan_metadata?.week ?? null);
+    const isTransitionWindow = isPlanTransitionWindowByWeekIndex(
+      Number.isFinite(transitionWeekIndex) ? transitionWeekIndex : null,
+    );
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',
@@ -2606,8 +2613,8 @@ Deno.serve(async (req) => {
         execution_summary: analysis.execution_summary || null,
       },
       guards: {
-        is_transition_window: false,
-        suppress_deviation_language: false,
+        is_transition_window: isTransitionWindow,
+        suppress_deviation_language: isTransitionWindow,
       },
     };
 

@@ -2,6 +2,7 @@
  * Plan context: fetch plan/phase and week intent for a workout date.
  * Shared between analyzers (running/cycling/etc).
  */
+import { resolvePlanWeekIndex } from './plan-week.ts';
 
 export interface PlanContext {
   hasActivePlan: boolean;
@@ -42,28 +43,9 @@ export async function fetchPlanContextForWorkout(
     const startDateStr = config.user_selected_start_date || config.start_date;
     if (!startDateStr) return null;
 
-    // Normalize start date to Monday
-    const mondayOf = (iso: string): string => {
-      const d = new Date(iso);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      return monday.toLocaleDateString('en-CA');
-    };
-
-    const startDateMonday = mondayOf(startDateStr);
-    const startDate = new Date(startDateMonday);
-    const viewedDate = new Date(workoutDate);
-    startDate.setHours(0, 0, 0, 0);
-    viewedDate.setHours(0, 0, 0, 0);
-    const diffMs = viewedDate.getTime() - startDate.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    let weekIndex = Math.max(1, Math.floor(diffDays / 7) + 1);
-
     const durationWeeks = plan.duration_weeks || config.duration_weeks || 0;
-    if (durationWeeks > 0) {
-      weekIndex = Math.min(weekIndex, durationWeeks);
-    }
+    const weekIndex = resolvePlanWeekIndex(config, workoutDate, durationWeeks > 0 ? durationWeeks : null);
+    if (weekIndex == null) return null;
 
     // Get weekly summaries
     let weeklySummaries = config.weekly_summaries || {};

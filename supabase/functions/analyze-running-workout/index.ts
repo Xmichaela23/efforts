@@ -14,6 +14,7 @@ import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-co
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
+import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -2219,8 +2220,8 @@ Deno.serve(async (req) => {
         flags_v1: flags_v1 ?? null,
       },
       guards: {
-        is_transition_window: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
-        suppress_deviation_language: Number(planContext?.weekIndex || 0) > 0 && Number(planContext?.weekIndex || 0) <= 2,
+        is_transition_window: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
+        suppress_deviation_language: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
       },
     };
 

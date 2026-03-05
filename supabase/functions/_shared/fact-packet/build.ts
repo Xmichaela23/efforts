@@ -341,7 +341,7 @@ export async function buildWorkoutFactPacketV1(args: {
     if (!plannedWorkout && !planContext) return null;
     return {
       name: String(planContext?.planName || plannedWorkout?.plan_name || plannedWorkout?.planName || 'Plan'),
-      week_number: (typeof planContext?.weekIndex === 'number') ? (Number(planContext.weekIndex) + 1) : (coerceNumber(plannedWorkout?.week_number) ?? null),
+      week_number: (typeof planContext?.weekIndex === 'number') ? Number(planContext.weekIndex) : (coerceNumber(plannedWorkout?.week_number) ?? null),
       phase: (planContext?.phaseName ? String(planContext.phaseName) : (plannedWorkout?.phase ? String(plannedWorkout.phase) : null)),
       week_focus_label: (planContext as any)?.weekFocusLabel ? String((planContext as any).weekFocusLabel) : null,
       workout_purpose: (plannedWorkout?.focus ? String(plannedWorkout.focus) : (plannedWorkout?.description ? String(plannedWorkout.description) : null)),

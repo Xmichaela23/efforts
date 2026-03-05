@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
+import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 // =============================================================================
 // ANALYZE-SWIM-WORKOUT - SWIMMING ANALYSIS EDGE FUNCTION
@@ -538,6 +539,10 @@ Generate 3-4 observations about this swim workout:`;
     };
 
     // Save analysis to database
+    const isTransitionWindow = isPlanTransitionWindowByWeekIndex(
+      typeof planContext?.week === 'number' ? planContext.week : Number(planContext?.week ?? null),
+    );
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',
@@ -562,8 +567,8 @@ Generate 3-4 observations about this swim workout:`;
         workout_summary: analysis?.detailed_analysis?.workout_summary || null,
       },
       guards: {
-        is_transition_window: false,
-        suppress_deviation_language: false,
+        is_transition_window: isTransitionWindow,
+        suppress_deviation_language: isTransitionWindow,
       },
     };
 

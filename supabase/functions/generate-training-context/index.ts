@@ -51,6 +51,12 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
+import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
+import {
+  ACWR_RATIO_THRESHOLDS,
+  getAcwrRiskFlag,
+  getAcwrStatus,
+} from '../_shared/acwr-state.ts';
 import {
   NAMESPACE_SESSION_THRESHOLDS,
   RULE_CONFIGS,
@@ -1292,7 +1298,7 @@ Deno.serve(async (req) => {
             : 'Overreaching';
     // On plan + low ACWR: label as planned; if down-week, append "— expected this week" so it doesn't feel like a problem.
     let display_load_change_risk_helper: string | null = null;
-    if (planContext?.hasActivePlan && acwr.ratio < 0.8) {
+    if (planContext?.hasActivePlan && acwr.ratio < ACWR_RATIO_THRESHOLDS.undertrained) {
       const isDownWeek = planContext.isRecoveryWeek || planContext.isTaperWeek;
       display_load_change_risk_label = isDownWeek ? 'Below baseline (planned — expected this week)' : 'Below baseline (planned)';
       if (isDownWeek) {
@@ -1326,12 +1332,13 @@ Deno.serve(async (req) => {
               ? 'Hold target pace; keep the session controlled.'
               : 'Prioritize recovery.'
           : 'Follow your planned sessions.';
+      const acwrRisk = getAcwrRiskFlag(acwr.ratio);
       const acwr_clause =
-        acwr.ratio > 1.3
-          ? acwr.ratio > 1.5
-            ? 'Load Change Risk is overreaching — avoid adding volume.'
-            : 'Load Change Risk is ramping fast — avoid adding volume.'
-          : null;
+        acwrRisk === 'overreaching'
+          ? 'Load Change Risk is overreaching — avoid adding volume.'
+          : acwrRisk === 'fast'
+            ? 'Load Change Risk is ramping fast — avoid adding volume.'
+            : null;
       context_banner = { line1, line2, line3, acwr_clause: acwr_clause ?? undefined };
     }
 
@@ -1349,7 +1356,11 @@ Deno.serve(async (req) => {
       const chronic_daily = acwr.chronic_total / 28;
       const projected_ratio = chronic_daily > 0 ? projected_acute_daily / chronic_daily : 0;
       const projected_label: 'below' | 'in range' | 'ramping' =
-        projected_ratio < 0.8 ? 'below' : projected_ratio <= 1.3 ? 'in range' : 'ramping';
+        projected_ratio < ACWR_RATIO_THRESHOLDS.undertrained
+          ? 'below'
+          : projected_ratio <= ACWR_RATIO_THRESHOLDS.ramp_fast
+            ? 'in range'
+            : 'ramping';
       const isRecovery = planContext?.isRecoveryWeek ?? false;
       const isTaper = planContext?.isTaperWeek ?? false;
       const weekIntentMsg = planContext?.weekIntent ?? 'build';
@@ -1988,7 +1999,7 @@ Deno.serve(async (req) => {
           : acwr.status === 'optimal' ? 'similar'
           : acwr.status === 'elevated' || acwr.status === 'high_risk' ? 'heavier'
           : null;
-      const ramp_flag: 'stable' | 'fast' | null = acwr.ratio > 1.3 ? 'fast' : 'stable';
+      const ramp_flag: 'stable' | 'fast' | null = getAcwrRiskFlag(acwr.ratio) === 'fast' ? 'fast' : 'stable';
       const aerobicTier = display_aerobic_tier === 'Low' ? 'low' : display_aerobic_tier === 'Moderate' ? 'moderate' : 'elevated';
       const structuralTier = display_structural_tier === 'Low' ? 'low' : display_structural_tier === 'Moderate' ? 'moderate' : 'elevated';
       const limiter: 'aerobic' | 'structural' | 'none' =
@@ -2278,19 +2289,21 @@ Deno.serve(async (req) => {
           'Full build mode supported.';
         context_summary.push(`Marathon readiness: ${stateLabel}`);
       }
-      if (acwr.ratio > 1.3 && acwr.data_days >= 7) {
-        context_summary.push(acwr.ratio > 1.5 ? 'Load is overreaching — avoid adding volume.' : 'Load is ramping fast — avoid adding volume.');
+      const acwrRisk = getAcwrRiskFlag(acwr.ratio);
+      if (acwrRisk !== 'stable' && acwr.data_days >= 7) {
+        context_summary.push(acwrRisk === 'overreaching' ? 'Load is overreaching — avoid adding volume.' : 'Load is ramping fast — avoid adding volume.');
       }
     } else {
       context_summary.push(`${phaseLabel} — ${todayIsRestDay ? 'REST' : 'TRAINING'}`);
       context_summary.push(todayIsRestDay ? 'Rest day.' : 'Training day.');
       context_summary.push(`Aerobic: ${aerobicShort} fatigue. Structural: ${structuralShort}.`);
-      if (acwr.ratio > 1.3 && acwr.data_days >= 7) {
-        context_summary.push(acwr.ratio > 1.5 ? 'Load change risk is overreaching — avoid adding volume.' : 'Load change risk is ramping fast — avoid adding volume.');
+      const acwrRisk = getAcwrRiskFlag(acwr.ratio);
+      if (acwrRisk !== 'stable' && acwr.data_days >= 7) {
+        context_summary.push(acwrRisk === 'overreaching' ? 'Load change risk is overreaching — avoid adding volume.' : 'Load change risk is ramping fast — avoid adding volume.');
       }
     }
     const next_action =
-      acwr.ratio > 1.3 && acwr.data_days >= 7
+      getAcwrRiskFlag(acwr.ratio) !== 'stable' && acwr.data_days >= 7
         ? 'Do not add volume this week.'
         : todayIsRestDay
           ? (hasActivePlan ? 'Rest today. Resume tomorrow.' : 'Recover today. Resume when ready.')
@@ -2627,27 +2640,11 @@ async function fetchPlanContext(
       return null;
     }
 
-    // Normalize start date to Monday (matching get-week logic)
-    const mondayOf = (iso: string): string => {
-      const d = new Date(iso);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
-      const monday = new Date(d.setDate(diff));
-      return monday.toLocaleDateString('en-CA');
-    };
-
-    const startDateMonday = mondayOf(startDateStr);
-    const startDate = new Date(startDateMonday);
-    const viewedDate = new Date(focusDateISO);
-    startDate.setHours(0, 0, 0, 0);
-    viewedDate.setHours(0, 0, 0, 0);
-    const diffMs = viewedDate.getTime() - startDate.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    let weekIndex = Math.max(1, Math.floor(diffDays / 7) + 1);
-    
     const durationWeeks = plan.duration_weeks || config.duration_weeks || 0;
-    if (durationWeeks > 0) {
-      weekIndex = Math.min(weekIndex, durationWeeks);
+    const weekIndex = resolvePlanWeekIndex(config, focusDateISO, durationWeeks > 0 ? durationWeeks : null);
+    if (weekIndex == null) {
+      console.log('⚠️ Plan exists but no resolvable week index');
+      return null;
     }
 
     // Plan contract v1 only — no inference, no fallback
@@ -2780,7 +2777,7 @@ function acwrFromSnapshot(
         : 0;
       projected = {
         ratio: projectedRatio,
-        status: getACWRStatus(projectedRatio, planContext),
+        status: getAcwrStatus(projectedRatio, planContext),
         planned_workload: plannedWorkload
       };
     }
@@ -2788,7 +2785,7 @@ function acwrFromSnapshot(
 
   return {
     ratio,
-    status: getACWRStatus(ratio, planContext),
+    status: getAcwrStatus(ratio, planContext),
     acute_daily_avg: Math.round(acuteDailyAvg * 10) / 10,
     chronic_daily_avg: Math.round(chronicDailyAvg * 10) / 10,
     acute_total: acuteTotal,
@@ -2846,7 +2843,7 @@ function calculateACWR(
     : 0;
 
   // Determine status (plan-aware)
-  const status = getACWRStatus(ratio, planContext);
+  const status = getAcwrStatus(ratio, planContext);
 
   // Count days with data (for progressive disclosure)
   const uniqueDates = new Set(chronicWorkouts.map(w => w.date));
@@ -2868,7 +2865,7 @@ function calculateACWR(
 
       projected = {
         ratio: projectedRatio,
-        status: getACWRStatus(projectedRatio, planContext),
+        status: getAcwrStatus(projectedRatio, planContext),
         planned_workload: plannedWorkload
       };
     }
@@ -2887,56 +2884,6 @@ function calculateACWR(
     plan_context: planContext || undefined,
     projected
   };
-}
-
-/**
- * Get ACWR status based on ratio and plan context
- * Plan-aware: recovery/taper weeks have different thresholds
- */
-function getACWRStatus(
-  ratio: number,
-  planContext: PlanContext | null
-): 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | 'recovery' | 'optimal_recovery' {
-  
-  // No plan: use general ACWR principles
-  if (!planContext || !planContext.hasActivePlan) {
-    if (ratio < 0.80) return 'undertrained';
-    if (ratio <= 1.30) return 'optimal';
-    if (ratio <= 1.50) return 'elevated';
-    return 'high_risk';
-  }
-
-  const { weekIntent, isRecoveryWeek, isTaperWeek } = planContext;
-
-  // Recovery week: low load is EXPECTED and GOOD
-  if (isRecoveryWeek || weekIntent === 'recovery') {
-    if (ratio < 0.80) return 'optimal_recovery'; // Not "undertrained" - this is intentional!
-    if (ratio <= 1.05) return 'optimal';
-    if (ratio <= 1.20) return 'elevated'; // Even recovery weeks shouldn't spike too high
-    return 'high_risk';
-  }
-
-  // Taper week: low load is expected
-  if (isTaperWeek || weekIntent === 'taper') {
-    if (ratio < 0.80) return 'optimal'; // Expected low load
-    if (ratio <= 1.10) return 'optimal';
-    if (ratio <= 1.25) return 'elevated';
-    return 'high_risk';
-  }
-
-  // Build/Peak weeks: use plan-aware thresholds (trust the plan's periodization)
-  if (weekIntent === 'build' || weekIntent === 'peak' || weekIntent === 'baseline') {
-    if (ratio < 0.80) return 'undertrained';
-    if (ratio <= 1.50) return 'optimal'; // Higher threshold when on plan (trust periodization)
-    if (ratio <= 1.70) return 'elevated';
-    return 'high_risk';
-  }
-
-  // Unknown intent: default to general principles (shouldn't happen, but safety fallback)
-  if (ratio < 0.80) return 'undertrained';
-  if (ratio <= 1.30) return 'optimal';
-  if (ratio <= 1.50) return 'elevated';
-  return 'high_risk';
 }
 
 // =============================================================================
@@ -3500,7 +3447,7 @@ function generateInsights(
 
   // 3b. Low load: only "behind plan" insight; never lead with ACWR. Banner (context_banner) replaces
   //     "on plan, stay the course, ACWR below base" messaging — see handler where context_banner is built.
-  if (!isRecoveryWeek && !isTaperWeek && acwr.ratio < 0.80 && hasActivePlan && weekIntent === 'build') {
+  if (!isRecoveryWeek && !isTaperWeek && acwr.ratio < ACWR_RATIO_THRESHOLDS.undertrained && hasActivePlan && weekIntent === 'build') {
     if (planProgress && planProgress.planned_sessions_to_date > 0 && planProgress.planned_to_date_total > 0 && planProgress.status === 'behind') {
       insights.push({
         type: 'weekly_jump',

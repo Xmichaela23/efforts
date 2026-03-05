@@ -20,6 +20,18 @@ import type {
 import { getMethodology } from './methodologies/registry.ts';
 import type { MethodologyContext } from './methodologies/types.ts';
 import { computeMarathonReadiness } from '../_shared/marathon-readiness/index.ts';
+import {
+  getAcwrRiskFlag,
+  getAcwrStatus,
+  isAcwrDetrainedSignal,
+  isAcwrFatiguedSignal,
+} from '../_shared/acwr-state.ts';
+import {
+  isPlanTransitionWindowByWeekIndex,
+  resolvePlanWeekIndex,
+  resolveWeekStartDowFromPlanConfig,
+  weekStartOf,
+} from '../_shared/plan-week.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -94,25 +106,6 @@ function workoutLocalDate(workout: any, fallbackIsoDate: string, timezone?: stri
   return String(fallbackIsoDate || '').slice(0, 10);
 }
 
-const DOW_INDEX: Record<WeekStartDow, number> = {
-  sun: 0,
-  mon: 1,
-  tue: 2,
-  wed: 3,
-  thu: 4,
-  fri: 5,
-  sat: 6,
-};
-
-function weekStartOf(focusIso: string, weekStartDow: WeekStartDow): string {
-  const d = parseISODateOnly(focusIso);
-  const jsDow = d.getDay(); // 0=Sun..6=Sat
-  const target = DOW_INDEX[weekStartDow];
-  const diff = (jsDow - target + 7) % 7;
-  d.setDate(d.getDate() - diff);
-  return toISODate(d);
-}
-
 function safeNum(n: any): number | null {
   const x = Number(n);
   return Number.isFinite(x) ? x : null;
@@ -145,24 +138,12 @@ function inferMethodologyId(planConfig: any): MethodologyId {
 }
 
 function resolveWeekStartDow(planConfig: any): WeekStartDow {
-  const dow = String(planConfig?.plan_contract_v1?.week_start || 'mon').toLowerCase();
-  if (dow === 'sun' || dow === 'mon' || dow === 'tue' || dow === 'wed' || dow === 'thu' || dow === 'fri' || dow === 'sat') return dow;
-  return 'mon';
+  return resolveWeekStartDowFromPlanConfig(planConfig) as WeekStartDow;
 }
 
 function computeWeekIndex(planConfig: any, focusIso: string, weekStartDow: WeekStartDow, durationWeeks: number | null): number | null {
-  const start = String(planConfig?.user_selected_start_date || planConfig?.start_date || '');
-  if (!start) return null;
-  // Align the plan start to the start of its first training week.
-  const planWeek1Start = weekStartOf(start, weekStartDow);
-  const a = parseISODateOnly(planWeek1Start);
-  const b = parseISODateOnly(focusIso);
-  a.setHours(0, 0, 0, 0);
-  b.setHours(0, 0, 0, 0);
-  const diffDays = Math.floor((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
-  let w = Math.max(1, Math.floor(diffDays / 7) + 1);
-  if (durationWeeks && durationWeeks > 0) w = Math.min(w, durationWeeks);
-  return w;
+  void weekStartDow; // week start is resolved canonically from plan config
+  return resolvePlanWeekIndex(planConfig, focusIso, durationWeeks);
 }
 
 function weekIntentFromContract(planConfig: any, weekIndex: number | null): { intent: CoachWeekContextResponseV1['plan']['week_intent']; focus_label: string | null } {
@@ -367,20 +348,9 @@ Deno.serve(async (req) => {
     const weekEndDate = addDaysISO(weekStartDate, 6);
     const weekIndex = activePlan ? computeWeekIndex(planConfig, asOfDate, weekStartDow, activePlan.duration_weeks || null) : null;
 
-    // Plan transition period: plan started within the last 14 days.
-    // The 7-day ACWR acute window and 28-day baselines both overlap with the
-    // previous training cycle, making load-ratio comparisons unreliable.
-    const isPlanTransitionPeriod = (() => {
-      if (!planConfig) return false;
-      const startIso = String(planConfig?.user_selected_start_date || planConfig?.start_date || '');
-      if (!startIso) return false;
-      try {
-        const planStartMs = parseISODateOnly(startIso).getTime();
-        const todayMs = parseISODateOnly(asOfDate).getTime();
-        const daysSinceStart = Math.floor((todayMs - planStartMs) / (24 * 60 * 60 * 1000));
-        return daysSinceStart >= 0 && daysSinceStart < 14;
-      } catch { return false; }
-    })();
+    // Plan transition period: first two plan weeks.
+    // During this window, load-ratio comparisons are often contaminated by the prior cycle.
+    const isPlanTransitionPeriod = isPlanTransitionWindowByWeekIndex(weekIndex);
 
     const weekIntentInfo = activePlan ? weekIntentFromContract(planConfig, weekIndex) : { intent: 'unknown', focus_label: null };
     const weekIntent = weekIntentInfo.intent as CoachWeekContextResponseV1['plan']['week_intent'];
@@ -947,9 +917,34 @@ Deno.serve(async (req) => {
       dismissed_suggestions: dismissed,
     };
 
-    // Baseline drift suggestions: learned 1RM > baseline by 5%+, medium/high confidence
+    // Baseline drift suggestions: learned 1RM > baseline by 5%+, medium/high confidence.
+    // Plan-aware guardrails:
+    // - Hide during transition window, recovery/taper intent, or near-race window.
+    // - Require meaningful sample count so suggestions are stable and goal-relevant.
     const perf = (ub as any)?.performance_numbers || {};
     const strength = learnedFitness?.strength_1rms || {};
+    const raceDateIso = String(
+      planConfig?.race_date ||
+      planConfig?.event_date ||
+      planConfig?.target_date ||
+      '',
+    ).slice(0, 10);
+    const daysToRace = (() => {
+      if (!raceDateIso) return null;
+      try {
+        const raceMs = parseISODateOnly(raceDateIso).getTime();
+        const asOfMs = parseISODateOnly(asOfDate).getTime();
+        return Math.floor((raceMs - asOfMs) / (24 * 60 * 60 * 1000));
+      } catch {
+        return null;
+      }
+    })();
+    const shouldSuppressBaselineDriftSuggestions =
+      isPlanTransitionPeriod ||
+      weekIntent === 'recovery' ||
+      weekIntent === 'taper' ||
+      (daysToRace != null && daysToRace <= 28);
+
     const driftPairs: Array<{ lift: string; label: string; baseline: number; learned: number }> = [
       { lift: 'squat', label: 'Squat', baseline: Number(perf?.squat), learned: Number(strength?.squat?.value) },
       { lift: 'bench_press', label: 'Bench press', baseline: Number(perf?.bench), learned: Number(strength?.bench_press?.value) },
@@ -958,26 +953,29 @@ Deno.serve(async (req) => {
     ];
     const today = asOfDate;
     const baseline_drift_suggestions: Array<{ lift: string; label: string; baseline: number; learned: number; basis: string }> = [];
-    for (const p of driftPairs) {
-      if (!Number.isFinite(p.baseline) || p.baseline <= 0) continue;
-      const rawLearned = p.learned;
-      const rounded = Math.floor(rawLearned / 5) * 5;
-      if (!Number.isFinite(rounded) || rounded < p.baseline * 1.05) continue;
-      const liftData = strength[p.lift as keyof typeof strength];
-      const conf = liftData?.confidence;
-      if (conf !== 'high' && conf !== 'medium') continue;
-      const dismissedAt = dismissedDrift[p.lift];
-      if (dismissedAt) {
-        const d = new Date(dismissedAt).getTime();
-        const t = new Date(today).getTime();
-        if (t - d < 30 * 24 * 60 * 60 * 1000) continue;
+    if (!shouldSuppressBaselineDriftSuggestions) {
+      for (const p of driftPairs) {
+        if (!Number.isFinite(p.baseline) || p.baseline <= 0) continue;
+        const rawLearned = p.learned;
+        const rounded = Math.floor(rawLearned / 5) * 5;
+        if (!Number.isFinite(rounded) || rounded < p.baseline * 1.05) continue;
+        const liftData = strength[p.lift as keyof typeof strength];
+        const conf = liftData?.confidence;
+        if (conf !== 'high' && conf !== 'medium') continue;
+        const dismissedAt = dismissedDrift[p.lift];
+        if (dismissedAt) {
+          const d = new Date(dismissedAt).getTime();
+          const t = new Date(today).getTime();
+          if (t - d < 30 * 24 * 60 * 60 * 1000) continue;
+        }
+        const sessions = Number(liftData?.sample_count ?? 0);
+        if (sessions < 4) continue;
+        baseline_drift_suggestions.push({
+          ...p,
+          learned: rounded,
+          basis: `Estimated 1RM from ${sessions} session${sessions !== 1 ? 's' : ''} (${conf} confidence)`,
+        });
       }
-      const sessions = liftData?.sample_count ?? 0;
-      baseline_drift_suggestions.push({
-        ...p,
-        learned: rounded,
-        basis: `Epley est. 1RM from ${sessions} session${sessions !== 1 ? 's' : ''} (${conf} confidence)`,
-      });
     }
 
     // =========================================================================
@@ -1309,8 +1307,8 @@ Deno.serve(async (req) => {
       if (verdictCode === 'recover_overreaching') return 'overreached';
       if (verdictCode === 'caution_ramping_fast') return 'fatigued';
       if (overallLabel === 'fatigue_signs' && !isPlanTransitionPeriod) return 'fatigued';
-      if (acwrVal != null && acwrVal > 1.3 && !isPlanTransitionPeriod) return 'fatigued';
-      if (acwrVal != null && acwrVal < 0.7) return 'detrained';
+      if (isAcwrFatiguedSignal(acwrVal, isPlanTransitionPeriod)) return 'fatigued';
+      if (isAcwrDetrainedSignal(acwrVal)) return 'detrained';
       if (overallLabel === 'absorbing_well') return 'fresh';
       return 'normal';
     })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
@@ -1546,9 +1544,22 @@ Deno.serve(async (req) => {
 
         // ACWR
         if (metrics.acwr != null) {
+          const acwrStatus = getAcwrStatus(metrics.acwr, activePlan ? {
+            hasActivePlan: true,
+            weekIntent: weekIntent as any,
+            isRecoveryWeek: weekIntent === 'recovery',
+            isTaperWeek: weekIntent === 'taper',
+          } : null);
+          const acwrRisk = getAcwrRiskFlag(metrics.acwr, isPlanTransitionPeriod);
           const acwrLabel = isPlanTransitionPeriod
             ? 'in plan transition (includes prior training cycle — ignore this ratio)'
-            : metrics.acwr < 0.8 ? 'under-reached' : metrics.acwr > 1.3 ? 'overreaching' : 'in the optimal zone';
+            : acwrStatus === 'undertrained'
+              ? 'under-reached'
+              : acwrRisk === 'overreaching'
+                ? 'overreaching'
+                : acwrRisk === 'fast'
+                  ? 'ramping fast'
+                  : (acwrStatus === 'optimal_recovery' ? 'planned recovery zone' : 'in the optimal zone');
           narrativeFacts.push(`Training volume ratio (this week vs last 4 weeks): ${metrics.acwr.toFixed(2)} — ${acwrLabel}.`);
         }
 
@@ -1614,7 +1625,7 @@ End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, 
 UNITS: The athlete uses ${isImperial ? 'imperial (lb, miles)' : 'metric (kg, km)'}. Always use ${wUnit} for weights and ${isImperial ? 'miles' : 'km'} for distances. The facts below already use the correct units.
 
 ${userTz ? `TIMEZONE: The athlete is in ${userTz}. All dates in the facts are in their local time.` : ''}
-${isPlanTransitionPeriod ? `TRANSITION MODE (first 14 days of a new plan): Do NOT mention percentage-over-plan language, deviation percentages, "more/less than planned" math, or fatigue/load warnings derived from plan-transition data. Focus only on execution quality, consistency, and the next planned sessions.` : ''}
+${isPlanTransitionPeriod ? `TRANSITION MODE (first 2 weeks of a new plan): Do NOT mention percentage-over-plan language, deviation percentages, "more/less than planned" math, or fatigue/load warnings derived from plan-transition data. Focus only on execution quality, consistency, and the next planned sessions.` : ''}
 
 FACTS:
 ${narrativeFacts.join('\n')}`;
