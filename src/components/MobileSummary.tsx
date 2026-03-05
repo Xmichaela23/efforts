@@ -1846,15 +1846,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
           if (!anyVal || hideTopAdherence) return null;
 
-          // Determine workout intent for rule-based coloring
-          const workoutIntent = determineWorkoutIntent(planned);
-
           const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
             if (pct==null) return null;
-            const color = getRuleBasedColor(workoutIntent, metricType, pct);
+            void metricType;
             return (
               <div className="flex flex-col items-center px-2">
-                <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                <div className="text-sm font-semibold text-gray-100">{pct}%</div>
                 <div className="text-[12px] text-gray-300">{label}</div>
                 <div className="text-[12px] text-gray-400">{text}</div>
               </div>
@@ -1987,15 +1984,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const durationPct = (plannedSecondsTotal && executedSeconds) ? Math.round((executedSeconds as number / (plannedSecondsTotal as number)) * 100) : null;
             const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
 
-            // Determine workout intent for rule-based coloring
-            const workoutIntent = determineWorkoutIntent(planned);
-
             const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
               if (pct==null) return null;
-              const color = getRuleBasedColor(workoutIntent, metricType, pct);
+            void metricType;
               return (
                 <div className="flex flex-col items-center px-2">
-                  <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                <div className="text-sm font-semibold text-gray-100">{pct}%</div>
                   <div className="text-[11px] text-gray-700">{label}</div>
                   <div className="text-[11px] text-gray-600">{text}</div>
                 </div>
@@ -2024,8 +2018,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                           (executionScore != null && executionScore >= 0);
             if (!anyVal) return null;
 
-            // ✅ FIX: Use server-side values for contextual message instead of client calculations
-            const message = getContextualMessage(workoutIntent, durationAdherence, null, paceAdherence, 'swim');
             const weeklyIntentLabel = getWeeklyIntentLabel(completedSrc);
 
             return (
@@ -2035,13 +2027,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     {weeklyIntentLabel}
                   </div>
                 )}
-                {/* Descriptive blurb first */}
-                {message && (
-                  <div className="mb-3 text-xs text-gray-600 text-center">
-                    {message.icon} {message.text}
-                  </div>
-                )}
-                
                 {/* Adherence scores */}
                 <div className="flex items-center justify-center gap-6 text-center mb-3">
                   <div className="flex items-end gap-3">
@@ -2112,15 +2097,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
             const durationDelta = (plannedSecondsTotal && executedSeconds) ? ((executedSeconds as number) - (plannedSecondsTotal as number)) : null;
 
-            // Determine workout intent for rule-based coloring
-            const workoutIntent = determineWorkoutIntent(planned);
-
             const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
               if (pct==null) return null;
-              const color = getRuleBasedColor(workoutIntent, metricType, pct);
+              void metricType;
               return (
                 <div className="flex flex-col items-center px-2">
-                  <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                  <div className="text-sm font-semibold text-gray-100">{pct}%</div>
                   <div className="text-[11px] text-gray-700">{label}</div>
                   <div className="text-[11px] text-gray-600">{text}</div>
                 </div>
@@ -2134,8 +2116,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                           (durationAdherence != null && durationAdherence >= 0);
             if (!anyVal) return null;
 
-            // Use server values for contextual message
-            const message = getContextualMessage(workoutIntent, durationAdherence, null, powerAdherence, 'bike');
             const weeklyIntentLabel = getWeeklyIntentLabel(completedSrc);
 
             return (
@@ -2145,13 +2125,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     {weeklyIntentLabel}
                   </div>
                 )}
-                {/* Descriptive blurb first */}
-                {message && (
-                  <div className="mb-3 text-xs text-gray-600 text-center">
-                    {message.icon} {message.text}
-                  </div>
-                )}
-                
                 {/* Adherence scores - all from server */}
                 <div className="flex items-center justify-center gap-6 text-center mb-3">
                   <div className="flex items-end gap-3">
@@ -2268,15 +2241,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const distDelta = plannedTotalMeters > 0 && executedMeters > 0 ? executedMeters - plannedTotalMeters : null;
             const timeDelta = plannedTotalSeconds > 0 && executedSeconds > 0 ? executedSeconds - plannedTotalSeconds : null;
             
-            // Determine workout intent for rule-based coloring
-            const workoutIntent = determineWorkoutIntent(planned);
-
             const chip = (label: string, pct: number | null, text: string, metricType: MetricType) => {
               if (pct == null) return null;
-              const color = getRuleBasedColor(workoutIntent, metricType, pct);
+              void metricType;
               return (
                 <div className="flex flex-col items-center px-2">
-                  <div className={`text-sm font-semibold ${color}`}>{pct}%</div>
+                  <div className="text-sm font-semibold text-gray-100">{pct}%</div>
                   <div className="text-[11px] text-gray-700">{label}</div>
                   <div className="text-[11px] text-gray-600">{text}</div>
                 </div>
@@ -2307,9 +2277,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const fmtDist = (m: number) => useImperial ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
             const fmtTime = (s: number) => { const min = Math.floor(s / 60); const sec = Math.round(s % 60); return `${min}:${String(sec).padStart(2, '0')}`; };
             
-            // Get contextual message
-            const message = getContextualMessage(workoutIntent, timePct, distPct, null, 'swim');
-
             return (
               <>
                 <div className="flex items-center justify-center gap-6 text-center">
@@ -2318,12 +2285,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                     {chip('Duration', timePct, timeDelta != null ? fmtTimeDelta(timeDelta) : '—', 'duration')}
                   </div>
                 </div>
-                {message && (
-                  <div className="mt-2 text-xs text-gray-600 text-center">
-                    {message.icon} {message.text}
-                  </div>
-                )}
-                
                 {/* Simple summary row showing planned vs executed */}
                 <div className="mt-4 px-4 py-3 bg-gray-50 rounded-lg">
                   <div className="grid grid-cols-2 gap-4 text-sm">
