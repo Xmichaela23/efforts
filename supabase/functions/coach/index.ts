@@ -26,6 +26,7 @@ import {
   isAcwrDetrainedSignal,
   isAcwrFatiguedSignal,
 } from '../_shared/acwr-state.ts';
+import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import {
   isPlanTransitionWindowByWeekIndex,
   resolvePlanWeekIndex,
@@ -381,19 +382,12 @@ Deno.serve(async (req) => {
     if (wErr) throw wErr;
 
     const plannedWeekArr = Array.isArray(plannedWeek) ? plannedWeek : [];
-    const plannedWtdLoad = plannedWeekArr
-      .filter((r: any) => String(r?.date || '') <= asOfDate)
-      .reduce((sum: number, r: any) => sum + (safeNum(r?.workload_planned) || 0), 0);
-    const plannedWeekTotalLoad = plannedWeekArr.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_planned) || 0), 0);
-    const plannedRemainingLoad = plannedWeekArr
-      .filter((r: any) => String(r?.date || '') >= asOfDate && String(r?.workout_status || '').toLowerCase() !== 'completed')
-      .reduce((sum: number, r: any) => sum + (safeNum(r?.workload_planned) || 0), 0);
-
-    const actualWtdLoad = (actualWtd || [])
-      .filter((r: any) => String(r?.workout_status || '').toLowerCase() === 'completed')
-      .reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
-
-    const wtdCompletionRatio = plannedWtdLoad > 0 ? Math.max(0, Math.min(1, actualWtdLoad / plannedWtdLoad)) : null;
+    const wtd = computeWtdLoadSummary(plannedWeekArr as any[], (actualWtd || []) as any[], asOfDate);
+    const plannedWtdLoad = wtd.planned_wtd_load;
+    const plannedWeekTotalLoad = wtd.planned_week_total_load;
+    const plannedRemainingLoad = wtd.planned_remaining_load;
+    const actualWtdLoad = wtd.actual_wtd_load;
+    const wtdCompletionRatio = wtd.wtd_completion_ratio;
 
     const plannedWtdArr = plannedWeekArr.filter((r: any) => String(r?.date || '') <= asOfDate);
 

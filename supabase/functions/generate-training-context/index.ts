@@ -57,6 +57,7 @@ import {
   getAcwrRiskFlag,
   getAcwrStatus,
 } from '../_shared/acwr-state.ts';
+import { computePlanProgressSummary } from '../_shared/adherence-plan.ts';
 import {
   NAMESPACE_SESSION_THRESHOLDS,
   RULE_CONFIGS,
@@ -3210,106 +3211,13 @@ function calculatePlanProgress(
 
   const weekStartISO = dateRanges.currentWeekStartISO || dateRanges.acuteStartISO;
   const weekEndISO = dateRanges.currentWeekEndISO || dateRanges.acuteEndISO;
-
-  // Planned workouts for the week (already filtered by date range in query)
-  const plannedWeekAll = plannedWeek || [];
-  const plannedToDate = plannedWeekAll.filter(p => p.date <= focusDateISO);
-
-  const plannedWeekTotal = plannedWeekAll.reduce((sum, p) => sum + (Number(p.workload_planned) || 0), 0);
-  const plannedToDateTotal = plannedToDate.reduce((sum, p) => sum + (Number(p.workload_planned) || 0), 0);
-
-  // Completed workouts to date for the week (use acute window start and focus date)
-  const weekCompletedToDate = completed.filter(w => w.date >= weekStartISO && w.date <= focusDateISO);
-  const completedToDateTotal = weekCompletedToDate.reduce((sum, w) => sum + (Number(w.workload_actual) || 0), 0);
-
-  // Link planned -> completed conservatively:
-  // - Primary: planned_id match (high confidence)
-  // - Secondary: same-day discipline match (medium confidence)
-  // Use "contains" normalization so planned names like "Long Run", "Easy Run", "Run — Tempo"
-  // and completed types like "run", "running", "Run" all map to the same discipline.
-  const normalizeSportTypeLocal = (type: string): string => {
-    const t = (type || '').toLowerCase();
-    if (t.includes('swim')) return 'swim';
-    if (t.includes('ride') || t.includes('bike') || t.includes('cycl')) return 'bike';
-    if (t.includes('run') || t.includes('jog')) return 'run';
-    if (t.includes('walk') || t.includes('hike')) return 'run'; // treat walk as run for matching
-    if (t.includes('strength') || t.includes('weight')) return 'strength';
-    if (t.includes('mobility') || t.includes('pilates') || t.includes('yoga') || t.includes('stretch') || t === 'pt') return 'mobility';
-    return 'other';
-  };
-
-  const completedByPlannedId = new Map<string, WorkoutRecord>();
-  for (const w of weekCompletedToDate) {
-    if (w.planned_id) {
-      completedByPlannedId.set(String(w.planned_id), w);
-    }
-  }
-
-  // Build a lookup by date+discipline for secondary matching
-  const completedByDateDiscipline = new Map<string, WorkoutRecord[]>();
-  for (const w of weekCompletedToDate) {
-    const key = `${w.date}::${normalizeSportTypeLocal(w.type)}`;
-    const arr = completedByDateDiscipline.get(key) || [];
-    arr.push(w);
-    completedByDateDiscipline.set(key, arr);
-  }
-
-  let matchedPlanned = 0;
-  for (const p of plannedToDate) {
-    const pid = String(p.id);
-    if (completedByPlannedId.has(pid)) {
-      matchedPlanned += 1;
-      continue;
-    }
-    const key = `${p.date}::${normalizeSportTypeLocal(p.type)}`;
-    if ((completedByDateDiscipline.get(key) || []).length > 0) {
-      matchedPlanned += 1;
-    }
-  }
-
-  const plannedSessionsToDate = plannedToDate.length;
-  const plannedSessionsWeek = plannedWeekAll.length;
-  const completedSessionsToDate = weekCompletedToDate.length;
-
-  const matchConfidence = plannedSessionsToDate > 0 ? matchedPlanned / plannedSessionsToDate : 0;
-
-  // Determine on-track/behind/ahead using workload ratio, but only when meaningful:
-  // - Need planned_to_date_total > 0
-  // - Need at least moderate matching confidence
-  let status: PlanProgress['status'] = 'unknown';
-  let pct: number | null = null;
-
-  if (plannedToDateTotal > 0 && plannedSessionsToDate > 0) {
-    const ratio = completedToDateTotal / plannedToDateTotal;
-    pct = Math.round(ratio * 100);
-
-    // Require some confidence before asserting behind/ahead.
-    // If we can't reliably link plan->completed, we refuse to prescribe changes.
-    const confidentEnough = matchConfidence >= 0.5;
-    if (confidentEnough) {
-      if (ratio < 0.85) status = 'behind';
-      else if (ratio > 1.15) status = 'ahead';
-      else status = 'on_track';
-    } else {
-      status = 'unknown';
-    }
-  }
-
-  return {
-    week_start: weekStartISO,
-    week_end: weekEndISO,
-    focus_date: focusDateISO,
-    planned_week_total: Math.round(plannedWeekTotal),
-    planned_to_date_total: Math.round(plannedToDateTotal),
-    planned_sessions_week: plannedSessionsWeek,
-    planned_sessions_to_date: plannedSessionsToDate,
-    completed_to_date_total: Math.round(completedToDateTotal),
-    completed_sessions_to_date: completedSessionsToDate,
-    matched_planned_sessions_to_date: matchedPlanned,
-    match_confidence: Math.round(matchConfidence * 100) / 100,
-    status,
-    percent_of_planned_to_date: pct
-  };
+  return computePlanProgressSummary({
+    plannedWeek: plannedWeek || [],
+    completed: completed || [],
+    weekStartISO,
+    weekEndISO,
+    focusDateISO,
+  });
 }
 
 // =============================================================================
