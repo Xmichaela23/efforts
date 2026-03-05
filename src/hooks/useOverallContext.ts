@@ -4,6 +4,26 @@ import type { BlockAdaptation } from '@/types/fitness';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 
 export interface OverallContextData {
+  block_state_v1: {
+    version: 'v1';
+    glance: {
+      title: string;
+      generated_at: string;
+      goal_name: string | null;
+      goal_type: string | null;
+      weeks_remaining: number | null;
+    };
+    performance_trends: any;
+    plan_adherence: any;
+    workout_quality: any;
+    this_week: any;
+    focus_areas: any;
+    data_quality: any;
+    fitness_adaptation: any;
+    goal: any;
+    goal_prediction: GoalPredictionResult | null;
+    athlete_memory: any;
+  };
   // Structured data (v2)
   performance_trends_structured?: any;
   plan_adherence_structured?: any;
@@ -28,7 +48,7 @@ interface CacheData {
 }
 
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-const CACHE_KEY = 'overall_context_cache';
+const CACHE_KEY = 'overall_context_cache_v2';
 
 export function useOverallContext(weeksBack: number = 4) {
   const [data, setData] = useState<OverallContextData | null>(null);
@@ -72,6 +92,10 @@ export function useOverallContext(weeksBack: number = 4) {
         throw new Error('No response from server');
       }
 
+      if (!response.block_state_v1) {
+        throw new Error('Block data contract missing');
+      }
+
       // Cache the result
       cacheData(response);
 
@@ -98,6 +122,10 @@ export function useOverallContext(weeksBack: number = 4) {
         return null;
       }
 
+      if (!cacheData.data?.block_state_v1) {
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      }
       return cacheData.data;
     } catch (error) {
       localStorage.removeItem(CACHE_KEY);

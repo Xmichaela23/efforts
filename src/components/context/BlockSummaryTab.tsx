@@ -82,7 +82,8 @@ const STATUS_CONFIG = {
 const StrengthProgressionSection: React.FC<{
   liftTrends: LiftTrend[];
   snapshot: { strength_volume_total: number | null; strength_volume_trend: number | null; strength_top_lifts: any } | null;
-}> = ({ liftTrends, snapshot }) => {
+  weightUnit: string;
+}> = ({ liftTrends, snapshot, weightUnit }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (liftTrends.length === 0) return null;
@@ -245,9 +246,25 @@ const BlockSummaryTab: React.FC = () => {
     );
   }
 
-  // Determine which data format we're using (structured vs legacy)
-  // Structured data uses `_structured` suffix to avoid conflicts with legacy string fields
-  const hasStructuredData = data.performance_trends_structured && typeof data.performance_trends_structured === 'object';
+  const bs = data.block_state_v1;
+  if (!bs) {
+    return (
+      <div className="px-4 py-8">
+        <div className="text-center">
+          <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
+          <h3 className="text-base font-semibold text-white mb-2">Block Data Unavailable</h3>
+          <p className="text-sm text-white/60 mb-4">Block data contract missing</p>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 pb-6">
@@ -308,40 +325,29 @@ const BlockSummaryTab: React.FC = () => {
 
       <div aria-hidden="true" className="instrument-divider" />
 
-      {hasStructuredData ? (
-        <>
-          {/* Performance Trends - Structured */}
-          <PerformanceTrendsSection trends={data.performance_trends_structured} quality={data.data_quality} />
+      {/* Performance Trends - canonical */}
+      <PerformanceTrendsSection trends={bs.performance_trends} quality={bs.data_quality} />
 
-          {/* Fitness Adaptation - Structured (cached server-side) */}
-          <FitnessAdaptationSection adaptation={data.fitness_adaptation_structured} />
+      {/* Fitness Adaptation - canonical */}
+      <FitnessAdaptationSection adaptation={bs.fitness_adaptation} />
 
-          {/* Strength Progression — reads from exercise_log (deterministic layer) */}
-          <StrengthProgressionSection liftTrends={liftTrends} snapshot={currentSnapshot} />
+      {/* Strength Progression — deterministic layer from exercise log */}
+      <StrengthProgressionSection liftTrends={liftTrends} snapshot={currentSnapshot} weightUnit={weightUnit} />
 
-          {/* Goal Predictor: server-computed (block_verdict, race_day_forecast, durability_risk, interference) */}
-          <GoalPredictorBlockSection goalPrediction={data.goal_prediction} />
-          
-          {/* Plan Adherence - Structured */}
-          <PlanAdherenceSection adherence={data.plan_adherence_structured} />
-          
-          {/* Workout Quality - Structured */}
-          <WorkoutQualitySection quality={data.workout_quality} />
-          
-          {/* This Week - Structured */}
-          <ThisWeekSection week={data.this_week} />
-          
-          {/* Focus Areas - Structured */}
-          <FocusAreasSection focusAreas={data.focus_areas} goal={data.goal} />
-        </>
-      ) : (
-        <>
-          {/* Legacy text-based rendering */}
-          <LegacyPerformanceTrends data={data} />
-          <LegacyPlanAdherence data={data} />
-          <LegacyWeeklySummary data={data} />
-        </>
-      )}
+      {/* Goal Predictor - canonical */}
+      <GoalPredictorBlockSection goalPrediction={bs.goal_prediction} />
+
+      {/* Plan Adherence - canonical */}
+      <PlanAdherenceSection adherence={bs.plan_adherence} />
+
+      {/* Workout Quality - canonical */}
+      <WorkoutQualitySection quality={bs.workout_quality} />
+
+      {/* This Week - canonical */}
+      <ThisWeekSection week={bs.this_week} />
+
+      {/* Focus Areas - canonical */}
+      <FocusAreasSection focusAreas={bs.focus_areas} goal={bs.goal} />
     </div>
   );
 };

@@ -244,9 +244,32 @@ Deno.serve(async (req) => {
     // Filter adherence to only show relevant disciplines for the goal
     const relevantAdherence = filterRelevantDisciplines(planAdherence, goal);
     
-    // Return BOTH structured data AND legacy text fields
-    // Legacy fields use the same keys so old frontend still works
+    const blockStateV1 = {
+      version: 'v1',
+      glance: {
+        title: `${weeks_back}-Week Block`,
+        generated_at: new Date().toISOString(),
+        goal_name: goal?.name ?? null,
+        goal_type: goal?.type ?? null,
+        weeks_remaining: goal?.weeks_remaining ?? null,
+      },
+      performance_trends: performanceTrends,
+      plan_adherence: relevantAdherence,
+      workout_quality: workoutQuality,
+      this_week: thisWeek,
+      focus_areas: focusAreas,
+      data_quality: dataQuality,
+      fitness_adaptation: fitnessAdaptationStructured,
+      goal,
+      goal_prediction,
+      athlete_memory: athleteMemory,
+    };
+
+    // Return BOTH canonical and legacy fields during migration
     const response = {
+      // Canonical block contract (single source for block UI consumers)
+      block_state_v1: blockStateV1,
+
       // New structured data (for new frontend)
       performance_trends_structured: performanceTrends,
       plan_adherence_structured: relevantAdherence,
@@ -258,7 +281,7 @@ Deno.serve(async (req) => {
       goal: goal, // Include goal so frontend knows context
       goal_prediction, // Server-computed verdicts (block_verdict, race_day_forecast, durability_risk, interference)
       athlete_memory: athleteMemory,
-      generated_at: new Date().toISOString(),
+      generated_at: blockStateV1.glance.generated_at,
       
       // Legacy text fields (for old frontend - same keys it expects)
       performance_trends: formatPerformanceTrendsText(performanceTrends),
