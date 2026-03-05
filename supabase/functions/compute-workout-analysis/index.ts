@@ -812,12 +812,22 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-    // Correct workouts.date to provider-local date (prefer explicit local seconds if present)
-    // Skip for Strava - the date is already set correctly from start_date_local in ingest-activity
+    // Correct workouts.date from provider-local signals only.
+    // IMPORTANT: never rewrite date from plain UTC timestamp fallback.
+    // Skip for Strava - date is already set from start_date_local in ingest-activity.
     const isStrava = (w as any)?.source === 'strava' || (w as any)?.strava_activity_id;
     if (!isStrava) {
       try {
-        const tsIso: string | null = (w as any)?.timestamp || null;
+        const isoDateFromEpochAndOffset = (epochSeconds: number, offsetSeconds: number): string | null => {
+          if (!Number.isFinite(epochSeconds) || !Number.isFinite(offsetSeconds)) return null;
+          // Convert to "local wall-clock" seconds by applying provider offset,
+          // then derive date bucket without host timezone involvement.
+          const localSeconds = Math.floor(epochSeconds + offsetSeconds);
+          const dayIndex = Math.floor(localSeconds / 86400);
+          const utcMidnight = new Date(dayIndex * 86400 * 1000);
+          return `${utcMidnight.getUTCFullYear()}-${String(utcMidnight.getUTCMonth() + 1).padStart(2, '0')}-${String(utcMidnight.getUTCDate()).padStart(2, '0')}`;
+        };
+
         let expectedLocal: string | null = null;
         if (ga) {
           // Fallback: parse from raw_data if columns are not present
@@ -827,14 +837,12 @@ Deno.serve(async (req) => {
             const gIn = Number(gSummary?.startTimeInSeconds ?? raw?.startTimeInSeconds);
             const gOff = Number(gSummary?.startTimeOffsetInSeconds ?? raw?.startTimeOffsetInSeconds ?? ga.start_time_offset_seconds);
             if (Number.isFinite(gIn) && Number.isFinite(gOff)) {
-              expectedLocal = new Date((gIn + gOff) * 1000).toISOString().split('T')[0];
+              expectedLocal = isoDateFromEpochAndOffset(gIn, gOff);
             } else if (ga.start_time && Number.isFinite(ga.start_time_offset_seconds)) {
-              expectedLocal = new Date(Date.parse(ga.start_time) + Number(ga.start_time_offset_seconds) * 1000).toISOString().split('T')[0];
+              const startEpoch = Math.floor(Date.parse(ga.start_time) / 1000);
+              expectedLocal = isoDateFromEpochAndOffset(startEpoch, Number(ga.start_time_offset_seconds));
             }
           } catch {}
-        } else if (tsIso) {
-          // As a last resort, treat timestamp as local already
-          try { expectedLocal = new Date(tsIso).toISOString().split('T')[0]; } catch {}
         }
         if (expectedLocal && expectedLocal !== (w as any)?.date) {
           await supabase.from('workouts').update({ date: expectedLocal }).eq('id', (w as any).id);

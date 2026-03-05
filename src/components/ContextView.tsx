@@ -1,8 +1,5 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, TrendingUp, Target, Calendar } from 'lucide-react';
 import { useOverallContext } from '@/hooks/useOverallContext';
-import { supabase } from '@/lib/supabase';
 
 interface ContextViewProps {
   onClose?: () => void;
@@ -142,6 +139,34 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
     );
   }
 
+  const bs = data.block_state_v1;
+  if (!bs) {
+    return (
+      <div className="w-full">
+        <div className="px-4 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-black" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Context
+              </h2>
+              <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
+                Block data unavailable
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              {loading ? 'Refreshing...' : 'Try Again'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
 
@@ -153,7 +178,7 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               Context
             </h2>
             <p className="text-sm text-gray-600 mt-1" style={{ fontFamily: 'Inter, sans-serif' }}>
-              9/15 - 10/15
+              {bs.glance?.title || '4-Week Block'}
             </p>
           </div>
           <button
@@ -177,7 +202,9 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               Performance Trends
             </h2>
             <div className="text-gray-600 leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-              {data.performance_trends}
+              {bs.performance_trends?.run?.reliable || bs.performance_trends?.bike?.reliable
+                ? 'Performance trend signals are available for this block.'
+                : 'Insufficient data for reliable trend signals.'}
             </div>
           </div>
 
@@ -190,7 +217,9 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               Plan Adherence
             </h2>
             <div className="text-gray-600 leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-              {data.plan_adherence}
+              {bs.plan_adherence?.overall
+                ? `${bs.plan_adherence.overall.percent}% overall completion (${bs.plan_adherence.overall.completed}/${bs.plan_adherence.overall.planned}).`
+                : 'No adherence data available.'}
             </div>
           </div>
 
@@ -203,7 +232,9 @@ const ContextView: React.FC<ContextViewProps> = ({ onClose }) => {
               This Week
             </h2>
             <div className="text-gray-600 leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-              {data.weekly_summary}
+              {bs.this_week
+                ? `${bs.this_week.completed_count}/${bs.this_week.planned_count} sessions completed this week.`
+                : 'No weekly summary available.'}
             </div>
           </div>
         </div>
