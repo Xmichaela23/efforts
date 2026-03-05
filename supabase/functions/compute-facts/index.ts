@@ -204,6 +204,526 @@ function buildRouteFingerprint(f: RouteFeatures): string {
   return `d${distBucket}-e${elevBucket}-s${sLat},${sLng}-x${eLat},${eLng}${shape}`;
 }
 
+type GpsPoint = {
+  lat: number;
+  lng: number;
+  elevation_m: number | null;
+};
+
+type TerrainSegment = {
+  segment_type: "flat" | "rolling" | "climb";
+  distance_m: number;
+  elev_gain_m: number;
+  avg_grade_pct: number;
+  start_lat: number;
+  start_lng: number;
+  end_lat: number;
+  end_lng: number;
+  start_idx: number;
+  end_idx: number;
+};
+
+function buildGpsPoints(w: WorkoutRow): GpsPoint[] {
+  const raw = parseJsonSafe(w.gps_track);
+  const arr = (() => {
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray((raw as any).points)) return (raw as any).points;
+    if (raw && Array.isArray((raw as any).track)) return (raw as any).track;
+    if (raw && Array.isArray((raw as any).samples)) return (raw as any).samples;
+    return [];
+  })();
+  const out: GpsPoint[] = [];
+  for (const p of arr) {
+    const lat = toNum(
+      p?.lat ??
+      p?.latitude ??
+      p?.position?.lat ??
+      p?.coords?.latitude ??
+      (Array.isArray(p?.position) ? p.position[0] : null) ??
+      (Array.isArray(p) ? p[0] : null)
+    );
+    const lng = toNum(
+      p?.lng ??
+      p?.lon ??
+      p?.longitude ??
+      p?.position?.lng ??
+      p?.position?.lon ??
+      p?.coords?.longitude ??
+      (Array.isArray(p?.position) ? p.position[1] : null) ??
+      (Array.isArray(p) ? p[1] : null)
+    );
+    if (lat == null || lng == null) continue;
+    const elevation = toNum(
+      p?.elevation ??
+      p?.ele ??
+      p?.altitude ??
+      p?.position?.ele ??
+      p?.coords?.altitude
+    );
+    out.push({ lat, lng, elevation_m: elevation });
+  }
+  if (out.length > 0) return out;
+
+  // Fallback: derive points from sensor_data samples when gps_track has wrapper/empty payload.
+  const sensor = parseJsonSafe(w.sensor_data);
+  const samples = Array.isArray(sensor?.samples) ? sensor.samples : (Array.isArray(sensor) ? sensor : []);
+  for (const s of samples) {
+    const lat = toNum(
+      s?.lat ??
+      s?.latitude ??
+      s?.position?.lat ??
+      s?.coords?.latitude
+    );
+    const lng = toNum(
+      s?.lng ??
+      s?.lon ??
+      s?.longitude ??
+      s?.position?.lng ??
+      s?.position?.lon ??
+      s?.coords?.longitude
+    );
+    if (lat == null || lng == null) continue;
+    const elevation = toNum(s?.elevation ?? s?.ele ?? s?.altitude ?? s?.coords?.altitude);
+    out.push({ lat, lng, elevation_m: elevation });
+  }
+  return out;
+}
+
+function classifyTerrainProfile(elevGainM: number, distanceM: number): { terrain_class: "flat" | "rolling" | "hilly" | "mountainous"; elev_gain_per_km: number; confidence: number } {
+  const gainPerKm = distanceM > 0 ? (elevGainM / (distanceM / 1000)) : 0;
+  if (gainPerKm < 15) return { terrain_class: "flat", elev_gain_per_km: Number(gainPerKm.toFixed(3)), confidence: 0.9 };
+  if (gainPerKm < 40) return { terrain_class: "rolling", elev_gain_per_km: Number(gainPerKm.toFixed(3)), confidence: 0.85 };
+  if (gainPerKm < 70) return { terrain_class: "hilly", elev_gain_per_km: Number(gainPerKm.toFixed(3)), confidence: 0.85 };
+  return { terrain_class: "mountainous", elev_gain_per_km: Number(gainPerKm.toFixed(3)), confidence: 0.8 };
+}
+
+function extractTerrainSegments(points: GpsPoint[]): TerrainSegment[] {
+  if (points.length < 8) return [];
+  const cumDist: number[] = new Array(points.length).fill(0);
+  for (let i = 1; i < points.length; i++) {
+    const dKm = haversineKm(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
+    cumDist[i] = cumDist[i - 1] + (dKm * 1000);
+  }
+
+  const out: TerrainSegment[] = [];
+  let start = 0;
+  const targetMinM = 360;
+  const targetMaxM = 700;
+  while (start < points.length - 3 && out.length < 16) {
+    let end = start + 1;
+    while (end < points.length && (cumDist[end] - cumDist[start]) < targetMinM) end++;
+    if (end >= points.length) break;
+    while (end + 1 < points.length && (cumDist[end + 1] - cumDist[start]) <= targetMaxM) end++;
+
+    const distance_m = cumDist[end] - cumDist[start];
+    if (distance_m < 220) {
+      start = end;
+      continue;
+    }
+
+    let elev_gain_m = 0;
+    for (let i = start + 1; i <= end; i++) {
+      const a = points[i - 1].elevation_m;
+      const b = points[i].elevation_m;
+      if (a == null || b == null) continue;
+      const delta = b - a;
+      if (delta > 0) elev_gain_m += delta;
+    }
+    elev_gain_m = Math.max(0, Math.round(elev_gain_m));
+    const avg_grade_pct = distance_m > 0 ? Number(((elev_gain_m / distance_m) * 100).toFixed(3)) : 0;
+
+    const segment_type: "flat" | "rolling" | "climb" =
+      avg_grade_pct >= 2.0 ? "climb" :
+      avg_grade_pct >= 0.6 ? "rolling" :
+      "flat";
+
+    out.push({
+      segment_type,
+      distance_m: Math.round(distance_m),
+      elev_gain_m,
+      avg_grade_pct,
+      start_lat: points[start].lat,
+      start_lng: points[start].lng,
+      end_lat: points[end].lat,
+      end_lng: points[end].lng,
+      start_idx: start,
+      end_idx: end,
+    });
+    start = end;
+  }
+
+  return out;
+}
+
+function segmentFingerprint(s: TerrainSegment): string {
+  return [
+    s.segment_type,
+    `d${Math.round(s.distance_m / 20)}`,
+    `g${Math.round(s.elev_gain_m / 2)}`,
+    `p${Math.round(s.avg_grade_pct * 10)}`,
+    `s${s.start_lat.toFixed(4)},${s.start_lng.toFixed(4)}`,
+    `e${s.end_lat.toFixed(4)},${s.end_lng.toFixed(4)}`,
+  ].join("|");
+}
+
+async function writeWorkoutSegmentMatch(
+  supabase: ReturnType<typeof createClient>,
+  w: WorkoutRow,
+  segmentId: string,
+  matchConfidence: number,
+): Promise<boolean> {
+  // Variant A: common schema with user_id + segment_id
+  try {
+    const { error } = await supabase
+      .from("workout_segment_match")
+      .upsert({
+        user_id: w.user_id,
+        workout_id: w.id,
+        segment_id: segmentId,
+        match_confidence: matchConfidence,
+        match_method: "gps_corridor_v1",
+      }, { onConflict: "workout_id,segment_id" });
+    if (!error) return true;
+  } catch {}
+
+  // Variant B: insert without upsert conflict target
+  try {
+    const { error } = await supabase
+      .from("workout_segment_match")
+      .insert({
+        user_id: w.user_id,
+        workout_id: w.id,
+        segment_id: segmentId,
+        match_confidence: matchConfidence,
+      });
+    if (!error) return true;
+  } catch {}
+
+  // Variant C: terrain_segment_id naming
+  try {
+    const { error } = await supabase
+      .from("workout_segment_match")
+      .insert({
+        workout_id: w.id,
+        terrain_segment_id: segmentId,
+        match_confidence: matchConfidence,
+      });
+    if (!error) return true;
+  } catch {}
+
+  return false;
+}
+
+async function writeSegmentProgressMetric(
+  supabase: ReturnType<typeof createClient>,
+  w: WorkoutRow,
+  payload: Record<string, any>,
+): Promise<void> {
+  // Variant A: richer schema with upsert key
+  try {
+    const { error } = await supabase
+      .from("segment_progress_metrics")
+      .upsert(payload, { onConflict: "segment_id,workout_id" });
+    if (!error) return;
+  } catch {}
+
+  // Variant B: insert with canonical keys
+  try {
+    const { error } = await supabase
+      .from("segment_progress_metrics")
+      .insert(payload);
+    if (!error) return;
+  } catch {}
+
+  // Variant C: minimal shape, no user_id requirement
+  const minimal = {
+    workout_id: w.id,
+    segment_id: payload.segment_id,
+    metric_date: payload.metric_date,
+    avg_pace_sec_per_km: payload.avg_pace_sec_per_km ?? null,
+    confidence_score: payload.confidence_score ?? null,
+  };
+  await supabase.from("segment_progress_metrics").insert(minimal);
+}
+
+async function upsertTerrainIntelligence(
+  supabase: ReturnType<typeof createClient>,
+  w: WorkoutRow,
+  runFacts: Record<string, any> | null,
+): Promise<{ extracted: number; matched: number; created_segments: number; failed_segment_inserts: number; failed_match_writes: number; last_error: string | null }> {
+  if (!isRunDiscipline(w.type)) return { extracted: 0, matched: 0, created_segments: 0, failed_segment_inserts: 0, failed_match_writes: 0, last_error: null };
+  if (String(w.workout_status || "").toLowerCase() !== "completed") return { extracted: 0, matched: 0, created_segments: 0, failed_segment_inserts: 0, failed_match_writes: 0, last_error: null };
+
+  const points = buildGpsPoints(w);
+  if (points.length < 8) return { extracted: 0, matched: 0, created_segments: 0, failed_segment_inserts: 0, failed_match_writes: 0, last_error: null };
+
+  const distM = distanceMeters(w);
+  const elevGainM = Number(toNum(w.elevation_gain) ?? toNum(runFacts?.elevation_gain_m) ?? 0);
+  const profile = classifyTerrainProfile(Math.max(0, elevGainM), Math.max(1, distM));
+  try {
+    await supabase
+      .from("workout_terrain_profile")
+      .upsert({
+        user_id: w.user_id,
+        workout_id: w.id,
+        terrain_class: profile.terrain_class,
+        elev_gain_per_km: profile.elev_gain_per_km,
+        classification_confidence: profile.confidence,
+      }, { onConflict: "workout_id" });
+  } catch {
+    // Fallback for schema variants
+    await supabase
+      .from("workout_terrain_profile")
+      .upsert({
+        workout_id: w.id,
+        terrain_class: profile.terrain_class,
+        elev_gain_per_km: profile.elev_gain_per_km,
+        classification_confidence: profile.confidence,
+      }, { onConflict: "workout_id" });
+  }
+
+  const extracted = extractTerrainSegments(points);
+  if (!extracted.length) return { extracted: 0, matched: 0, created_segments: 0, failed_segment_inserts: 0, failed_match_writes: 0, last_error: null };
+
+  const touchedSegmentIds = new Set<string>();
+  let createdSegments = 0;
+  let failedSegmentInserts = 0;
+  let failedMatchWrites = 0;
+  let lastError: string | null = null;
+  const metricDate = String(w.date || "").slice(0, 10);
+  const avgPaceSecPerKm = toNum(runFacts?.pace_avg_s_per_km);
+  const avgHr = toNum(runFacts?.hr_avg);
+  const avgPower = toNum(w.avg_power);
+  const avgCadence = toNum(w.avg_cadence);
+
+  for (const seg of extracted) {
+    const corridorKm = 0.07; // 70m corridor tolerance
+    let candidates: any[] = [];
+    try {
+      const { data } = await supabase
+        .from("terrain_segments")
+        .select("id,distance_m,elev_gain_m,avg_grade_pct,start_lat,start_lng,end_lat,end_lng,sample_count")
+        .eq("user_id", w.user_id)
+        .gte("distance_m", Math.max(120, seg.distance_m * 0.65))
+        .lte("distance_m", seg.distance_m * 1.35)
+        .limit(60);
+      candidates = Array.isArray(data) ? data : [];
+    } catch {
+      const { data } = await supabase
+        .from("terrain_segments")
+        .select("id,distance_m,elev_gain_m,avg_grade_pct,sample_count")
+        .limit(60);
+      candidates = Array.isArray(data) ? data : [];
+    }
+
+    const scored = candidates.map((c: any) => {
+      const cStartLat = toNum(c.start_lat);
+      const cStartLng = toNum(c.start_lng);
+      const cEndLat = toNum(c.end_lat);
+      const cEndLng = toNum(c.end_lng);
+      const hasGeo = cStartLat != null && cStartLng != null && cEndLat != null && cEndLng != null;
+
+      const dist = toNum(c.distance_m) ?? seg.distance_m;
+      const grade = toNum(c.avg_grade_pct) ?? seg.avg_grade_pct;
+      const distScore = Math.max(0, 1 - Math.abs(seg.distance_m - dist) / Math.max(120, seg.distance_m * 0.25));
+      const gradeScore = Math.max(0, 1 - Math.abs(seg.avg_grade_pct - grade) / 1.8);
+      if (!hasGeo) {
+        // Schema variant without geo columns: score by distance/grade only.
+        return { c, score: (0.75 * distScore) + (0.25 * gradeScore) };
+      }
+      const startKm = haversineKm(seg.start_lat, seg.start_lng, cStartLat!, cStartLng!);
+      const endKm = haversineKm(seg.end_lat, seg.end_lng, cEndLat!, cEndLng!);
+      const revStartKm = haversineKm(seg.start_lat, seg.start_lng, cEndLat!, cEndLng!);
+      const revEndKm = haversineKm(seg.end_lat, seg.end_lng, cStartLat!, cStartLng!);
+      const direct = startKm <= corridorKm && endKm <= corridorKm;
+      const reverse = revStartKm <= corridorKm && revEndKm <= corridorKm;
+      if (!direct && !reverse) return { c, score: -1 };
+      const corridorScore = direct
+        ? Math.max(0, 1 - ((startKm + endKm) / (2 * corridorKm)))
+        : Math.max(0, 1 - ((revStartKm + revEndKm) / (2 * corridorKm)));
+      return { c, score: (0.5 * corridorScore) + (0.3 * distScore) + (0.2 * gradeScore) };
+    }).filter((x: any) => x.score >= 0).sort((a: any, b: any) => b.score - a.score);
+
+    let segmentId: string | null = null;
+    let matchConfidence = 0.0;
+    if (scored.length && scored[0].score >= 0.58) {
+      segmentId = String(scored[0].c.id);
+      matchConfidence = Number(scored[0].score.toFixed(4));
+    } else {
+      const fp = segmentFingerprint(seg);
+      try {
+        const basePayloadMinimal = {
+          user_id: w.user_id,
+          distance_m: seg.distance_m,
+          elev_gain_m: seg.elev_gain_m,
+          avg_grade_pct: seg.avg_grade_pct,
+          sample_count: 0,
+        } as Record<string, any>;
+        const geoPayload = {
+          start_lat: seg.start_lat,
+          start_lng: seg.start_lng,
+          end_lat: seg.end_lat,
+          end_lng: seg.end_lng,
+        };
+
+        let createdId: string | null = null;
+
+        // Attempt A: schemas that support both fingerprint + polyline_hash
+        try {
+          const { data, error } = await supabase
+            .from("terrain_segments")
+            .insert({
+              ...basePayloadMinimal,
+              ...geoPayload,
+              fingerprint: fp,
+              polyline_hash: fp,
+            })
+            .select("id")
+            .single();
+          if (error) throw error;
+          if (data?.id) createdId = String(data.id);
+        } catch (eA) {
+          // Attempt B: schemas that support only polyline_hash
+          try {
+            const { data, error } = await supabase
+              .from("terrain_segments")
+              .insert({
+                ...basePayloadMinimal,
+                ...geoPayload,
+                polyline_hash: fp,
+              })
+              .select("id")
+              .single();
+            if (error) throw error;
+            if (data?.id) createdId = String(data.id);
+          } catch (eB) {
+            // Attempt C: minimal payload for older schemas
+            try {
+              const { data, error } = await supabase
+                .from("terrain_segments")
+                .insert(basePayloadMinimal)
+                .select("id")
+                .single();
+              if (error) throw error;
+              if (data?.id) createdId = String(data.id);
+            } catch (eC) {
+              failedSegmentInserts += 1;
+              lastError = (eC as any)?.message ?? String(eC);
+              console.error("[compute-facts] terrain segment insert failed (all schema variants):", {
+                workout_id: w.id,
+                segment_type: seg.segment_type,
+                distance_m: seg.distance_m,
+                elev_gain_m: seg.elev_gain_m,
+                err_a: (eA as any)?.message ?? String(eA),
+                err_b: (eB as any)?.message ?? String(eB),
+                err_c: (eC as any)?.message ?? String(eC),
+              });
+            }
+          }
+        }
+
+        if (createdId) {
+          segmentId = createdId;
+          matchConfidence = 1.0;
+          createdSegments += 1;
+        } else {
+          failedSegmentInserts += 1;
+        }
+      } catch (insertErr) {
+        failedSegmentInserts += 1;
+        lastError = (insertErr as any)?.message ?? String(insertErr);
+        console.error("[compute-facts] unexpected terrain segment insert wrapper error:", insertErr);
+      }
+    }
+
+    if (!segmentId) continue;
+    touchedSegmentIds.add(segmentId);
+
+    const matchWritten = await writeWorkoutSegmentMatch(supabase, w, segmentId, matchConfidence);
+    if (!matchWritten) {
+      failedMatchWrites += 1;
+      console.error("[compute-facts] failed writing workout_segment_match", { workout_id: w.id, segment_id: segmentId });
+      continue;
+    }
+
+    const segDistM = Math.max(1, seg.distance_m);
+    const estMovingTimeS = Math.max(1, Math.round((durationMinutes(w) * 60) * (segDistM / Math.max(1, distM))));
+    const segPaceSecPerKm = avgPaceSecPerKm != null ? Number((avgPaceSecPerKm * (1 + (seg.avg_grade_pct / 100) * 0.12)).toFixed(1)) : null;
+    const gradeAdjusted = segPaceSecPerKm != null ? Number((segPaceSecPerKm * (1 - Math.min(0.2, seg.avg_grade_pct / 1000))).toFixed(1)) : null;
+    const vam = seg.elev_gain_m > 0 ? Math.round((seg.elev_gain_m / Math.max(1, estMovingTimeS)) * 3600) : null;
+    const effortScore = (() => {
+      const hrScore = avgHr != null ? Math.min(100, Math.max(0, (avgHr - 90) * 0.9)) : 45;
+      const gradeScore = Math.min(30, seg.avg_grade_pct * 8);
+      return Math.round(Math.min(100, hrScore + gradeScore));
+    })();
+
+    await writeSegmentProgressMetric(supabase, w, {
+      user_id: w.user_id,
+      segment_id: segmentId,
+      workout_id: w.id,
+      metric_date: metricDate,
+      segment_type: seg.segment_type,
+      moving_time_s: estMovingTimeS,
+      distance_m: segDistM,
+      elev_gain_m: seg.elev_gain_m,
+      avg_grade_pct: seg.avg_grade_pct,
+      avg_hr_bpm: avgHr,
+      avg_power_w: avgPower,
+      avg_cadence_spm: avgCadence,
+      avg_pace_sec_per_km: segPaceSecPerKm,
+      grade_adjusted_pace_sec_per_km: gradeAdjusted,
+      vam_m_per_h: vam,
+      hr_drift_pct: toNum(runFacts?.hr_drift_pct),
+      effort_score: effortScore,
+      confidence_score: matchConfidence,
+    });
+  }
+
+  if (touchedSegmentIds.size > 0) {
+    const ids = Array.from(touchedSegmentIds);
+    const map = new Map<string, number>();
+    let counted = false;
+    try {
+      const { data: counts } = await supabase
+        .from("workout_segment_match")
+        .select("segment_id")
+        .in("segment_id", ids);
+      for (const row of (counts ?? [])) {
+        const sid = String((row as any).segment_id || "");
+        if (!sid) continue;
+        map.set(sid, (map.get(sid) ?? 0) + 1);
+      }
+      counted = true;
+    } catch {}
+    if (!counted) {
+      const { data: counts2 } = await supabase
+        .from("workout_segment_match")
+        .select("terrain_segment_id")
+        .in("terrain_segment_id", ids);
+      for (const row of (counts2 ?? [])) {
+        const sid = String((row as any).terrain_segment_id || "");
+        if (!sid) continue;
+        map.set(sid, (map.get(sid) ?? 0) + 1);
+      }
+    }
+    for (const sid of ids) {
+      await supabase
+        .from("terrain_segments")
+        .update({ sample_count: map.get(sid) ?? 0 })
+        .eq("id", sid);
+    }
+  }
+
+  return {
+    extracted: extracted.length,
+    matched: touchedSegmentIds.size,
+    created_segments: createdSegments,
+    failed_segment_inserts: failedSegmentInserts,
+    failed_match_writes: failedMatchWrites,
+    last_error: lastError,
+  };
+}
+
 async function upsertRouteIntelligence(
   supabase: ReturnType<typeof createClient>,
   w: WorkoutRow,
@@ -1023,11 +1543,33 @@ serve(async (req: Request) => {
     // -----------------------------------------------------------------------
     // 8.5 Route intelligence (run routes / regular places)
     // -----------------------------------------------------------------------
+    let terrainDebug: Record<string, any> | null = null;
     if (discipline === "run" || discipline === "running" || discipline === "walk") {
       try {
         await upsertRouteIntelligence(supabase, w, runFacts);
       } catch (routeErr) {
         console.error("[compute-facts] route intelligence upsert failed:", routeErr);
+      }
+      try {
+        const terrainResult = await upsertTerrainIntelligence(supabase, w, runFacts);
+        terrainDebug = terrainResult;
+        if (runFacts) {
+          runFacts.terrain_context = {
+            extracted_segments_count: terrainResult.extracted,
+            matched_segments_count: terrainResult.matched,
+            created_segments_count: terrainResult.created_segments,
+            failed_segment_inserts: terrainResult.failed_segment_inserts,
+            failed_match_writes: terrainResult.failed_match_writes,
+            last_error: terrainResult.last_error,
+            gps_points_count: buildGpsPoints(w).length,
+          };
+          await supabase
+            .from("workout_facts")
+            .update({ run_facts: runFacts, computed_at: new Date().toISOString() })
+            .eq("workout_id", w.id);
+        }
+      } catch (terrainErr) {
+        console.error("[compute-facts] terrain intelligence upsert failed:", terrainErr);
       }
     }
 
@@ -1091,6 +1633,7 @@ serve(async (req: Request) => {
         workload,
         facts_written: true,
         exercises_written: exercisesWritten,
+        terrain_debug: terrainDebug,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
