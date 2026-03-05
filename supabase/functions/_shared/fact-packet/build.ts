@@ -431,6 +431,62 @@ export async function buildWorkoutFactPacketV1(args: {
     }
   })();
 
+  const terrain_context = await (async () => {
+    try {
+      const workoutId = String(workout?.id || '').trim();
+      if (!workoutId) return null;
+
+      const { data: profileData } = await supabase
+        .from('workout_terrain_profile')
+        .select('terrain_class')
+        .eq('workout_id', workoutId)
+        .maybeSingle();
+
+      const { data: matchData } = await supabase
+        .from('workout_segment_match')
+        .select('segment_id')
+        .eq('workout_id', workoutId)
+        .limit(200);
+
+      const segmentIds = Array.from(
+        new Set(
+          (Array.isArray(matchData) ? matchData : [])
+            .map((m: any) => String(m?.segment_id || '').trim())
+            .filter(Boolean)
+        )
+      );
+
+      let segmentRows: any[] = [];
+      if (segmentIds.length > 0) {
+        const { data: segData } = await supabase
+          .from('terrain_segments')
+          .select('id, sample_count')
+          .in('id', segmentIds);
+        segmentRows = Array.isArray(segData) ? segData : [];
+      }
+
+      const insightEligibleCount = segmentRows.filter(
+        (s: any) => Number(s?.sample_count || 0) >= 3
+      ).length;
+      const trendEligibleCount = segmentRows.filter(
+        (s: any) => Number(s?.sample_count || 0) >= 6
+      ).length;
+
+      return {
+        terrain_class:
+          typeof profileData?.terrain_class === 'string'
+            ? profileData.terrain_class
+            : (terrain_type || null),
+        segment_matches: segmentIds.length,
+        segment_insight_eligible: insightEligibleCount > 0,
+        segment_trend_eligible: trendEligibleCount > 0,
+      };
+    } catch (e) {
+      console.warn('[fact-packet] terrain_context derivation failed (non-fatal):', e);
+      return null;
+    }
+  })();
+
   const plannedDistMi = plannedWorkout ? derivePlannedDistanceMi(plannedWorkout) : null;
   const execution = (() => {
     const planned = plannedDistMi != null && plannedDistMi > 0 ? plannedDistMi : null;
@@ -532,6 +588,7 @@ export async function buildWorkoutFactPacketV1(args: {
       stimulus,
       primary_limiter: limiter.primary,
       contributing_limiters: limiter.contributors,
+      terrain_context,
     },
   };
 

@@ -320,6 +320,14 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
             evidence: Array.isArray(derived.primary_limiter.evidence) ? derived.primary_limiter.evidence.slice(0, 3) : [],
           }
         : null,
+      terrain: derived?.terrain_context
+        ? {
+            terrain_class: typeof derived.terrain_context.terrain_class === 'string' ? derived.terrain_context.terrain_class : null,
+            segment_matches: coerceNumber(derived.terrain_context.segment_matches) ?? 0,
+            segment_insight_eligible: !!derived.terrain_context.segment_insight_eligible,
+            segment_trend_eligible: !!derived.terrain_context.segment_trend_eligible,
+          }
+        : null,
     },
     segments: displaySegments,
   };
@@ -354,6 +362,10 @@ RULES:
 - If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost (don’t call it “achieved recovery”).
 - Do not call it an "interval session" unless DISPLAY PACKET workout.type explicitly indicates intervals/tempo/track repeats.
 - If TOP FLAGS include a message that HR drift is consistent with hilly terrain, explicitly connect drift→terrain in ONE sentence and do not treat drift as a fatigue/effort signal.
+- Terrain continuity rule:
+  - You MAY include segment-level terrain insight only when DISPLAY PACKET signals.terrain.segment_insight_eligible is true.
+  - You MAY mention segment-level improvement/decline trends only when DISPLAY PACKET signals.terrain.segment_trend_eligible is true.
+  - If segment_trend_eligible is false, do NOT claim segment-specific improvement or decline.
 - Never show raw field names (no snake_case).
 
 TOP FLAGS (lead with these):

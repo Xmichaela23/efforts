@@ -160,6 +160,12 @@ export type FactPacketV1 = {
     stimulus: StimulusAssessmentV1 | null;
     primary_limiter: LimiterAssessmentV1;
     contributing_limiters: ContributorV1[];
+    terrain_context?: {
+      terrain_class: string | null;
+      segment_matches: number;
+      segment_insight_eligible: boolean; // true when any matched segment has sample_count >= 3
+      segment_trend_eligible: boolean; // true when any matched segment has sample_count >= 6
+    } | null;
   };
 };
 
