@@ -1127,9 +1127,15 @@ Deno.serve(async (req) => {
       // - Multi-interval workouts: Use time-in-range (sample-by-sample) since each interval has different targets
       
       // Detect if this is a single-interval steady-state workout
-      const workStepsForDetection = plannedWorkout?.computed?.steps?.filter((step: any) =>
-        (step.kind === 'work' || step.role === 'work') && step.pace_range
-      ) || [];
+      const workStepsForDetection = plannedWorkout?.computed?.steps?.filter((step: any) => {
+        const stepKind = String(step?.kind ?? step?.role ?? '').toLowerCase();
+        const stepType = String(step?.step_type ?? step?.type ?? '').toLowerCase();
+        const label = String(step?.name ?? step?.label ?? step?.description ?? '').toLowerCase();
+        const hasPaceRange = !!step?.pace_range;
+        const looksRecovery = /warm|cool|recover|rest/.test(stepKind) || /warm|cool|recover|rest/.test(stepType) || /warm.?up|cool.?down|recovery|rest/.test(label);
+        const looksWork = stepKind === 'work' || stepKind === 'interval' || stepType === 'work' || stepType === 'interval' || stepType === 'repeat';
+        return hasPaceRange && looksWork && !looksRecovery;
+      }) || [];
       const isSingleIntervalSteadyState = workStepsForDetection.length === 1;
       
       let granularPaceAdherence = 0;
@@ -1458,9 +1464,15 @@ Deno.serve(async (req) => {
     } | null = null;
     
     if (plannedWorkout?.computed?.steps) {
-      const workSteps = plannedWorkout.computed.steps.filter((step: any) =>
-        (step.kind === 'work' || step.role === 'work') && step.pace_range
-      );
+      const workSteps = plannedWorkout.computed.steps.filter((step: any) => {
+        const stepKind = String(step?.kind ?? step?.role ?? '').toLowerCase();
+        const stepType = String(step?.step_type ?? step?.type ?? '').toLowerCase();
+        const label = String(step?.name ?? step?.label ?? step?.description ?? '').toLowerCase();
+        const hasPaceRange = !!step?.pace_range;
+        const looksRecovery = /warm|cool|recover|rest/.test(stepKind) || /warm|cool|recover|rest/.test(stepType) || /warm.?up|cool.?down|recovery|rest/.test(label);
+        const looksWork = stepKind === 'work' || stepKind === 'interval' || stepType === 'work' || stepType === 'interval' || stepType === 'repeat';
+        return hasPaceRange && looksWork && !looksRecovery;
+      });
 
       if (workSteps.length > 0) {
         const paceRanges = workSteps.map((step: any) => ({
@@ -2204,7 +2216,7 @@ Deno.serve(async (req) => {
       discipline: 'run',
       glance: {
         status_label: adherenceSummary?.verdict?.label || null,
-        execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+        execution_score: typeof performance?.execution_adherence === 'number' ? performance.execution_adherence : null,
       },
       narrative: {
         text: ai_summary || null,

@@ -1548,6 +1548,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                         (finalDurationPct != null && finalDurationPct >= 0) || 
                         (finalDistPct != null) || 
                         (finalExecutionScore != null && finalExecutionScore >= 0);
+          const allZeroAdherence =
+            finalExecutionScore === 0 &&
+            finalPacePct === 0 &&
+            finalDurationPct === 0;
           console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
           // Adherence requires a planned target (or server-planned snapshot). Without a comparator it's misleading.
           if (noPlannedCompare) return null;
@@ -1566,6 +1570,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })();
           if (planModified) return null;
 
+          // Guard against invalid placeholder values (0/0/0) for completed planned sessions.
+          if (allZeroAdherence) return null;
           if (!anyVal || hideTopAdherence) return null;
 
           const chip = (label:string, pct:number|null, text:string, metricType: MetricType) => {
