@@ -580,11 +580,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // These intervals include both executed data AND granular_metrics from analyze-{discipline}-workout
   const completedSrc: any = hydratedCompleted || completed;
   const sessionState: any = (completedSrc as any)?.workout_analysis?.session_state_v1 ?? null;
+  const intervalDisplay: any = sessionState?.details?.interval_display ?? null;
+  const intervalDisplayMode: string | null = typeof intervalDisplay?.mode === 'string' ? intervalDisplay.mode : null;
+  const intervalDisplayReason: string | null = typeof intervalDisplay?.reason === 'string' ? intervalDisplay.reason : null;
   const sessionIntervalRows: any[] = Array.isArray(sessionState?.details?.interval_rows)
     ? sessionState.details.interval_rows
     : [];
   const hasCanonicalIntervalRows = !!planned && sessionIntervalRows.length > 0;
-  const missingCanonicalRowsForPlanned = !!planned && !hasCanonicalIntervalRows;
+  const waitingForCanonicalRows = !!planned && (intervalDisplayMode === 'awaiting_recompute' || !hasCanonicalIntervalRows);
   const needsCanonicalHydration = !!planned && !hasCanonicalIntervalRows;
   const completedComputed = (completedSrc as any)?.computed;
   const overallForDisplay = (completedSrc as any)?.computed?.overall ?? {};
@@ -2067,13 +2070,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         </div>
       ) : (
         <>
-        {missingCanonicalRowsForPlanned ? (
+        {waitingForCanonicalRows ? (
           <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
             <p className="text-sm text-red-200">Session interval contract missing for this planned workout.</p>
-            <p className="text-xs text-red-300/90 mt-1">Recompute analysis to generate canonical interval rows.</p>
+            <p className="text-xs text-red-300/90 mt-1">
+              {intervalDisplayReason === 'no_measured_execution_and_no_overall'
+                ? 'Measured execution data is not ready yet. Recompute analysis to refresh.'
+                : 'Recompute analysis to generate canonical interval rows.'}
+            </p>
           </div>
         ) : null}
-        {!missingCanonicalRowsForPlanned ? (
+        {!waitingForCanonicalRows ? (
         <table className="w-full text-[13px] table-fixed">
           <colgroup>
             <col className="w-[36%]" />

@@ -2182,10 +2182,11 @@ Deno.serve(async (req) => {
     }
     const existingAnalysis = existingRowForMerge?.workout_analysis || {};
 
-    const sessionIntervalRows = buildSessionIntervalRows(
+    const intervalDisplay = buildSessionIntervalRows(
       plannedWorkout,
       detailedAnalysis,
-      computedIntervals
+      computedIntervals,
+      workout
     );
 
     const sessionStateV1 = {
@@ -2210,7 +2211,13 @@ Deno.serve(async (req) => {
         adherence_summary: adherenceSummary ?? null,
         fact_packet_v1: fact_packet_v1 ?? null,
         flags_v1: flags_v1 ?? null,
-        interval_rows: sessionIntervalRows,
+        interval_rows: intervalDisplay.rows,
+        interval_display: {
+          mode: intervalDisplay.mode,
+          reason: intervalDisplay.reason,
+          expected_work_rows: intervalDisplay.expected_work_rows,
+          measured_work_rows: intervalDisplay.measured_work_rows,
+        },
       },
       guards: {
         is_transition_window: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
@@ -3413,9 +3420,29 @@ function fmtPaceRangeLabel(lower?: number, upper?: number): string {
   return `${lm}:${String(ls).padStart(2, '0')}-${um}:${String(us).padStart(2, '0')}/mi`;
 }
 
-function buildSessionIntervalRows(plannedWorkout: any, detailedAnalysis: any, computedIntervals: any[]): any[] {
+function buildSessionIntervalRows(
+  plannedWorkout: any,
+  detailedAnalysis: any,
+  computedIntervals: any[],
+  workout: any
+): {
+  rows: any[];
+  mode: 'interval_compare_ready' | 'overall_only' | 'awaiting_recompute';
+  reason: string | null;
+  expected_work_rows: number;
+  measured_work_rows: number;
+} {
   const plannedSteps: any[] = Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [];
-  if (!plannedSteps.length) return [];
+  const expectedWorkRows = getPlannedWorkSteps(plannedWorkout).length;
+  if (!plannedSteps.length) {
+    return {
+      rows: [],
+      mode: 'awaiting_recompute',
+      reason: 'no_planned_steps',
+      expected_work_rows: expectedWorkRows,
+      measured_work_rows: 0,
+    };
+  }
 
   const breakdown = detailedAnalysis?.interval_breakdown;
   const breakdownIntervals: any[] = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
@@ -3433,7 +3460,7 @@ function buildSessionIntervalRows(plannedWorkout: any, detailedAnalysis: any, co
     work: breakdownIntervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'work'),
   };
 
-  return plannedSteps.map((step: any, idx: number) => {
+  const rows = plannedSteps.map((step: any, idx: number) => {
     const stepId = String(step?.id || '').trim();
     const stepKindRaw = String(step?.kind ?? step?.role ?? step?.step_type ?? step?.type ?? '').toLowerCase();
     const stepKind = /warm/.test(stepKindRaw)
@@ -3505,6 +3532,114 @@ function buildSessionIntervalRows(plannedWorkout: any, detailedAnalysis: any, co
       },
     };
   });
+
+  // If no per-interval measured execution exists, emit one measured overall row instead
+  // of rendering a full planned table with dashes.
+  const measuredRows = rows.filter((r: any) => {
+    const ex = r?.executed || {};
+    return Number(ex?.duration_s || 0) > 0 || Number(ex?.distance_m || 0) > 0 || Number(ex?.pace_s_per_mi || 0) > 0;
+  });
+  if (measuredRows.length === 0) {
+    const overall = workout?.computed?.overall || {};
+    const distM = Number(overall?.distance_m ?? ((Number(workout?.distance) > 0) ? Number(workout.distance) * 1000 : 0));
+    const durS = Number(
+      overall?.duration_s_moving ??
+      ((Number(workout?.moving_time) > 0) ? Number(workout.moving_time) * 60 : 0)
+    );
+    const directPaceS = Number(overall?.avg_pace_s_per_mi ?? 0);
+    const derivedPaceS = (durS > 0 && distM > 0) ? (durS / (distM / 1609.34)) : 0;
+    const paceS = Number.isFinite(directPaceS) && directPaceS > 0 ? directPaceS : (Number.isFinite(derivedPaceS) && derivedPaceS > 0 ? derivedPaceS : 0);
+    const hr = Number(overall?.avg_hr ?? workout?.avg_heart_rate ?? workout?.metrics?.avg_heart_rate ?? 0);
+
+    if (durS > 0 || distM > 0 || paceS > 0) {
+      return {
+        rows: [{
+          row_id: 'overall',
+          planned_step_id: null,
+          planned_index: 0,
+          kind: 'overall',
+          planned_label: 'Overall session',
+          planned_pace_display: null,
+          adherence_pct: null,
+          executed: {
+            pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : null,
+            avg_pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : null,
+            distance_m: Number.isFinite(distM) && distM > 0 ? Math.round(distM) : null,
+            duration_s: Number.isFinite(durS) && durS > 0 ? Math.round(durS) : null,
+            avg_hr: Number.isFinite(hr) && hr > 0 ? Math.round(hr) : null,
+          },
+        }],
+        mode: 'overall_only',
+        reason: 'no_measured_interval_execution',
+        expected_work_rows: expectedWorkRows,
+        measured_work_rows: 0,
+      };
+    }
+    return {
+      rows: [],
+      mode: 'awaiting_recompute',
+      reason: 'no_measured_execution_and_no_overall',
+      expected_work_rows: expectedWorkRows,
+      measured_work_rows: 0,
+    };
+  }
+  const measuredWorkRows = rows.filter((r: any) => {
+    if (String(r?.kind || '').toLowerCase() !== 'work') return false;
+    const ex = r?.executed || {};
+    return Number(ex?.duration_s || 0) > 0 || Number(ex?.distance_m || 0) > 0 || Number(ex?.pace_s_per_mi || 0) > 0;
+  }).length;
+  const compareReady = expectedWorkRows > 0 && measuredWorkRows >= expectedWorkRows;
+  if (compareReady) {
+    return {
+      rows,
+      mode: 'interval_compare_ready',
+      reason: null,
+      expected_work_rows: expectedWorkRows,
+      measured_work_rows: measuredWorkRows,
+    };
+  }
+  // Partial linkage: preserve trust by collapsing to measured overall row.
+  const overall = workout?.computed?.overall || {};
+  const distM = Number(overall?.distance_m ?? ((Number(workout?.distance) > 0) ? Number(workout.distance) * 1000 : 0));
+  const durS = Number(
+    overall?.duration_s_moving ??
+    ((Number(workout?.moving_time) > 0) ? Number(workout.moving_time) * 60 : 0)
+  );
+  const directPaceS = Number(overall?.avg_pace_s_per_mi ?? 0);
+  const derivedPaceS = (durS > 0 && distM > 0) ? (durS / (distM / 1609.34)) : 0;
+  const paceS = Number.isFinite(directPaceS) && directPaceS > 0 ? directPaceS : (Number.isFinite(derivedPaceS) && derivedPaceS > 0 ? derivedPaceS : 0);
+  const hr = Number(overall?.avg_hr ?? workout?.avg_heart_rate ?? workout?.metrics?.avg_heart_rate ?? 0);
+  if (durS > 0 || distM > 0 || paceS > 0) {
+    return {
+      rows: [{
+        row_id: 'overall',
+        planned_step_id: null,
+        planned_index: 0,
+        kind: 'overall',
+        planned_label: 'Overall session',
+        planned_pace_display: null,
+        adherence_pct: null,
+        executed: {
+          pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : null,
+          avg_pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : null,
+          distance_m: Number.isFinite(distM) && distM > 0 ? Math.round(distM) : null,
+          duration_s: Number.isFinite(durS) && durS > 0 ? Math.round(durS) : null,
+          avg_hr: Number.isFinite(hr) && hr > 0 ? Math.round(hr) : null,
+        },
+      }],
+      mode: 'overall_only',
+      reason: 'partial_interval_execution_linkage',
+      expected_work_rows: expectedWorkRows,
+      measured_work_rows: measuredWorkRows,
+    };
+  }
+  return {
+    rows: [],
+    mode: 'awaiting_recompute',
+    reason: 'partial_interval_execution_linkage',
+    expected_work_rows: expectedWorkRows,
+    measured_work_rows: measuredWorkRows,
+  };
 }
 
 /**
