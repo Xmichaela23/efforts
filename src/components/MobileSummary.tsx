@@ -579,6 +579,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // Read intervals from computed.intervals (single source of truth)
   // These intervals include both executed data AND granular_metrics from analyze-{discipline}-workout
   const completedSrc: any = hydratedCompleted || completed;
+  const sessionState: any = (completedSrc as any)?.workout_analysis?.session_state_v1 ?? null;
+  const sessionIntervalRows: any[] = Array.isArray(sessionState?.details?.interval_rows)
+    ? sessionState.details.interval_rows
+    : [];
   const completedComputed = (completedSrc as any)?.computed;
   const overallForDisplay = (completedSrc as any)?.computed?.overall ?? {};
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
@@ -2166,7 +2170,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             
             const rangeSubtitle = formatPaceRange(st);
             let row: any = null;
-            if (hasServerComputed) {
+            const sessionRow = sessionIntervalRows[idx] || null;
+            if (sessionRow && sessionRow.executed) {
+              row = sessionRow;
+            }
+            if (!row && hasServerComputed) {
               const pid = String((st as any)?.id || '');
               row = pid ? intervalByPlannedId.get(pid) : null;
               if (!row) {
@@ -2178,8 +2186,69 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 row = unplannedIntervals[idx];
               }
             }
+            // Planned workouts can carry richer per-interval detail in detailed_analysis.interval_breakdown.
+            // If computed row matching misses, resolve from interval_breakdown and normalize to executed shape.
+            if (!row && planned) {
+              const breakdown = (completedSrc as any)?.workout_analysis?.detailed_analysis?.interval_breakdown;
+              const intervals = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
+              if (intervals.length > 0) {
+                const pid = String((st as any)?.id || '');
+                const stepKindRaw = String((st as any)?.kind || (st as any)?.type || '').toLowerCase();
+                const stepKind = /warm/.test(stepKindRaw)
+                  ? 'warmup'
+                  : /cool/.test(stepKindRaw)
+                    ? 'cooldown'
+                    : /recover|rest/.test(stepKindRaw)
+                      ? 'recovery'
+                      : (/overall|steady/.test(stepKindRaw) ? 'overall' : 'work');
+
+                const findById = pid
+                  ? intervals.find((iv: any) => String(iv?.interval_id || '') === pid)
+                  : null;
+                if (findById) {
+                  row = findById;
+                } else if (stepKind === 'warmup' || stepKind === 'cooldown') {
+                  row = intervals.find((iv: any) => String(iv?.interval_type || '').toLowerCase() === stepKind) || null;
+                } else if (stepKind === 'recovery') {
+                  const recoveryIdx = stepsDisplay
+                    .slice(0, idx + 1)
+                    .filter((s: any) => /recover|rest/.test(String(s?.kind || s?.type || '').toLowerCase())).length;
+                  const recRows = intervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'recovery');
+                  row = recRows[recoveryIdx - 1] || recRows[0] || null;
+                } else if (stepKind === 'work') {
+                  const workIdx = stepsDisplay
+                    .slice(0, idx + 1)
+                    .filter((s: any) => {
+                      const k = String(s?.kind || s?.type || '').toLowerCase();
+                      return !/warm|cool|recover|rest|overall|steady/.test(k);
+                    }).length;
+                  const workRows = intervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'work');
+                  row = workRows[workIdx - 1] || workRows[0] || null;
+                }
+              }
+            }
+            if (row && !row?.executed) {
+              const paceS = Number(
+                (row as any)?.pace_s_per_mi ??
+                (((row as any)?.actual_pace_min_per_mi != null)
+                  ? Number((row as any).actual_pace_min_per_mi) * 60
+                  : 0)
+              );
+              row = {
+                ...row,
+                executed: {
+                  duration_s: Number((row as any)?.actual_duration_s ?? 0) || undefined,
+                  distance_m: Number((row as any)?.actual_distance_m ?? 0) || undefined,
+                  avg_hr: Number((row as any)?.avg_heart_rate_bpm ?? 0) || undefined,
+                  avg_pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : undefined,
+                },
+              };
+            }
             // Use enhanced analysis adherence percentage if available (works for both running and cycling)
             const getEnhancedAdherence = () => {
+              if (typeof sessionRow?.adherence_pct === 'number') {
+                return Math.round(sessionRow.adherence_pct);
+              }
               // Check for enhanced analysis from analyze-running-workout or analyze-cycling-workout
               const workoutAnalysis = completedSrc?.workout_analysis;
               if (workoutAnalysis?.granular_analysis?.interval_breakdown) {
@@ -2214,6 +2283,10 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const pct = getEnhancedAdherence() || null;
             // Planned label: prioritize server-computed label, fallback to simple client-side generation
             const plannedLabel = (() => {
+              // Canonical contract (server-owned)
+              if (sessionRow?.planned_label && typeof sessionRow.planned_label === 'string' && sessionRow.planned_label.trim()) {
+                return sessionRow.planned_label;
+              }
               // Priority 1: Use server-computed planned_label if available
               if (row?.planned_label && typeof row.planned_label === 'string' && row.planned_label.trim()) {
                 return row.planned_label;

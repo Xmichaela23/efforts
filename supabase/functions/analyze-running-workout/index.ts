@@ -570,10 +570,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use computed.intervals as the base (already has matched executed data)
-    // Enhance with pace ranges from planned workout
-    const computedIntervals = workout?.computed?.intervals || [];
-    console.log(`🔍 Using ${computedIntervals.length} computed intervals as base`);
+    // Contract branch:
+    // - LINKED workout (planned_id + plan steps): plan structure is the primary source of truth.
+    // - UNLINKED workout: use computed/sensor-derived intervals.
+    const linkedPlanSteps = getPlannedWorkSteps(plannedWorkout);
+    const plannedStructuredIntervals = Array.isArray(intervals) ? intervals : [];
+    const isPlanLinkedWorkout =
+      !!plannedWorkout &&
+      (
+        linkedPlanSteps.length > 0 ||
+        plannedStructuredIntervals.length > 0
+      );
+    const computedOnlyIntervals = Array.isArray(workout?.computed?.intervals) ? workout.computed.intervals : [];
+    const computedIntervals = isPlanLinkedWorkout
+      ? plannedStructuredIntervals
+      : (computedOnlyIntervals.length > 0 ? computedOnlyIntervals : plannedStructuredIntervals);
+    console.log(`🔍 [INTERVAL SOURCE] ${isPlanLinkedWorkout ? 'linked-plan-primary' : 'unlinked-sensor-primary'} (${computedIntervals.length} intervals)`);
     
     // Enrich intervals with pace ranges from planned workout
     const intervalsToAnalyze = computedIntervals.map(interval => {
@@ -935,10 +947,11 @@ Deno.serve(async (req) => {
     // - Otherwise, fall back to deterministic detection (today: interval-structure heuristic).
     // - HR analyzer may observe interval-like patterns, but must not override plan intent.
     const planClassifiedTypeKey = resolveClassifiedTypeKey(plannedWorkout, planContextForDrift);
-    const classifiedTypeKey =
-      planClassifiedTypeKey ||
-      String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').trim() ||
-      'steady_state';
+    const linkedPlanWorkSteps = getPlannedWorkSteps(plannedWorkout);
+    const isLinkedPlanSession = !!plannedWorkout && linkedPlanWorkSteps.length > 0;
+    const classifiedTypeKey = isLinkedPlanSession
+      ? (planClassifiedTypeKey || 'easy')
+      : (planClassifiedTypeKey || String(detectWorkoutTypeFromIntervals(intervalsToAnalyze, plannedWorkout) || '').trim() || 'steady_state');
     const classifiedHrWorkoutType: WorkoutType = mapClassifiedTypeToHrWorkoutType(classifiedTypeKey);
 
     const hrAnalysisContext: HRAnalysisContext = {
@@ -1127,15 +1140,7 @@ Deno.serve(async (req) => {
       // - Multi-interval workouts: Use time-in-range (sample-by-sample) since each interval has different targets
       
       // Detect if this is a single-interval steady-state workout
-      const workStepsForDetection = plannedWorkout?.computed?.steps?.filter((step: any) => {
-        const stepKind = String(step?.kind ?? step?.role ?? '').toLowerCase();
-        const stepType = String(step?.step_type ?? step?.type ?? '').toLowerCase();
-        const label = String(step?.name ?? step?.label ?? step?.description ?? '').toLowerCase();
-        const hasPaceRange = !!step?.pace_range;
-        const looksRecovery = /warm|cool|recover|rest/.test(stepKind) || /warm|cool|recover|rest/.test(stepType) || /warm.?up|cool.?down|recovery|rest/.test(label);
-        const looksWork = stepKind === 'work' || stepKind === 'interval' || stepType === 'work' || stepType === 'interval' || stepType === 'repeat';
-        return hasPaceRange && looksWork && !looksRecovery;
-      }) || [];
+      const workStepsForDetection = getPlannedWorkSteps(plannedWorkout);
       const isSingleIntervalSteadyState = workStepsForDetection.length === 1;
       
       let granularPaceAdherence = 0;
@@ -1165,28 +1170,11 @@ Deno.serve(async (req) => {
         const targetPaceUpper = workStepsForDetection[0]?.pace_range?.upper;
         
         if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
-          // Determine interval type: check if it's an easy/long run or a work interval
-          // Check multiple sources to catch easy runs
-          const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-          const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
-          const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
           const stepKind = String(workStepsForDetection[0]?.kind || workStepsForDetection[0]?.role || '').toLowerCase();
-          
-          // Expanded detection for easy/recovery runs vs interval workouts
-          // Check for interval workout indicators first (prevents "jog recovery between reps" false positive)
-          const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
-          const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
-          const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
-          const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
-          const isIntervalWorkout = hasIntervalKeywordsInName || hasRepeatPattern;
-          
-          const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-          const hasEasyKeywords = easyKeywords.some(kw => 
-            workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
-          );
-          // Only classify as easy if NOT an interval workout AND (has easy keywords OR step kind indicates easy)
-          const isEasyOrLongRun = !isIntervalWorkout && (hasEasyKeywords || stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic' || stepKind === 'recovery');
-          console.log(`🔍 [EASY RUN DETECTION] isEasyOrLongRun=${isEasyOrLongRun}, isIntervalWorkout=${isIntervalWorkout}, workoutName="${workoutName}", workoutToken="${workoutToken}", stepKind="${stepKind}"`);
+          const isEasyOrLongRun =
+            (planContextForDrift?.isRecoveryWeek === true || planContextForDrift?.weekIntent === 'recovery') ||
+            stepKind === 'easy' || stepKind === 'long' || stepKind === 'aerobic' || stepKind === 'recovery';
+          console.log(`🔍 [LINKED PLAN TYPE] single-work-step intent: ${isEasyOrLongRun ? 'easy/recovery' : 'work'}`);
           
           const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
           console.log(`🔍 [INTERVAL TYPE] Detected as '${intervalType}' - token: ${workoutToken}, name: ${workoutName}, stepKind: ${stepKind}`);
@@ -1215,29 +1203,11 @@ Deno.serve(async (req) => {
         
         const intervalAdherences: number[] = [];
         
-        // Check if this is an easy/recovery workout (overrides interval role)
-        // Note: Multi-interval workouts with 2+ work steps are almost always NOT easy/recovery runs
-        // The word "recovery" in "jog recovery between reps" refers to rest periods, not workout type
-        const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-        const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
-        const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
-        const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
-        
-        // Check for interval workout indicators
-        const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
-        const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
-        const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
-        // Multiple work intervals = interval workout, not easy/recovery
-        const hasMultipleWorkIntervals = workIntervalsForAdherence.length >= 2;
-        const isIntervalWorkout = hasMultipleWorkIntervals || hasIntervalKeywordsInName || hasRepeatPattern;
-        
-        const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-        const hasEasyKeywords = easyKeywords.some(kw => 
-          workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
+        const isIntervalWorkout = workStepsForDetection.length >= 2;
+        const isEasyOrLongRunWorkout = !isIntervalWorkout && (
+          planContextForDrift?.isRecoveryWeek === true || planContextForDrift?.weekIntent === 'recovery'
         );
-        // Only classify as easy if NOT an interval workout
-        const isEasyOrLongRunWorkout = !isIntervalWorkout && hasEasyKeywords;
-        console.log(`🔍 [EASY RUN DETECTION MULTI] isEasyOrLongRunWorkout=${isEasyOrLongRunWorkout}, isIntervalWorkout=${isIntervalWorkout}, workIntervals=${workIntervalsForAdherence.length}, workoutName="${workoutName}"`);
+        console.log(`🔍 [LINKED PLAN TYPE] multi-work-step=${workStepsForDetection.length}, interval=${isIntervalWorkout}`);
         
         for (const interval of workIntervalsForAdherence) {
           // Get the interval's actual average pace
@@ -1299,26 +1269,10 @@ Deno.serve(async (req) => {
           }
           
           if (avgPaceSecondsForAdherence && targetPaceLower && targetPaceUpper) {
-            // Determine interval type for this steady-state workout
-            const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
-            const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
-            const workoutDesc = String(plannedWorkout?.workout_description || plannedWorkout?.description || plannedWorkout?.notes || '').toLowerCase();
-            
-            // Expanded detection for easy/recovery runs vs interval workouts
-            // Note: "recovery" in "jog recovery between reps" refers to rest periods, not workout type
-            const combinedText = `${workoutToken} ${workoutName} ${workoutDesc}`;
-            const intervalKeywords = ['interval', 'repeat', 'tempo', 'threshold', 'fartlek', 'speed', 'track', 'vo2', 'i pace', 'r pace', 't pace'];
-            const hasIntervalKeywordsInName = intervalKeywords.some(kw => workoutToken.includes(kw) || workoutName.includes(kw));
-            const hasRepeatPattern = /\d+\s*[x×]\s*\d+/i.test(combinedText);
-            const isIntervalWorkout = hasIntervalKeywordsInName || hasRepeatPattern;
-            
-            const easyKeywords = ['easy', 'long', 'recovery', 'aerobic', 'base', 'endurance', 'e pace', 'easy pace', 'z2', 'zone 2', 'easy run'];
-            const hasEasyKeywords = easyKeywords.some(kw => 
-              workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
-            );
-            const isEasyOrLongRun = !isIntervalWorkout && hasEasyKeywords;
+            const isEasyOrLongRun =
+              (planContextForDrift?.isRecoveryWeek === true || planContextForDrift?.weekIntent === 'recovery');
             const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
-            console.log(`🔍 [EASY RUN DETECTION FALLBACK] isEasyOrLongRun=${isEasyOrLongRun}, isIntervalWorkout=${isIntervalWorkout}, workoutName="${workoutName}"`);
+            console.log(`🔍 [LINKED PLAN TYPE] steady-state fallback intent=${isEasyOrLongRun ? 'easy/recovery' : 'work'}`);
             
             granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
             console.log(`🔍 [PACE ADHERENCE] Steady-state average pace adherence (${intervalType}): ${granularPaceAdherence}%`);
@@ -1367,6 +1321,34 @@ Deno.serve(async (req) => {
       console.log(`🎯 Pace adherence: ${granularPaceAdherence}% (${isSingleIntervalSteadyState ? 'AVERAGE pace' : 'per-interval AVERAGE pace'})`);
       console.log(`🎯 Duration adherence: ${granularDurationAdherence}% (from moving time)`);
       console.log(`🎯 Overall execution: ${performance.execution_adherence}% = (${performance.pace_adherence}% + ${performance.duration_adherence}%) / 2`);
+    }
+
+    const plannedWorkStepsForContract = getPlannedWorkSteps(plannedWorkout);
+
+    const looksPlanLinkedZeroed =
+      !!plannedWorkout &&
+      plannedWorkStepsForContract.length > 0 &&
+      performance.execution_adherence === 0 &&
+      performance.pace_adherence === 0 &&
+      performance.duration_adherence === 0;
+
+    if (looksPlanLinkedZeroed) {
+      const fallbackPace = enhancedAnalysis.overall_adherence != null
+        ? Math.round(enhancedAnalysis.overall_adherence * 100)
+        : 0;
+      const fallbackDuration = enhancedAnalysis.duration_adherence?.adherence_percentage != null
+        ? Math.round(enhancedAnalysis.duration_adherence.adherence_percentage)
+        : 0;
+      performance.pace_adherence = fallbackPace;
+      performance.duration_adherence = fallbackDuration;
+      performance.execution_adherence = Math.round((fallbackPace + fallbackDuration) / 2);
+      performance.total_steps = Math.max(performance.total_steps, plannedWorkStepsForContract.length);
+      console.warn('⚠️ [PLAN CONTRACT GUARD] Recovered plan-linked adherence from granular metrics to avoid invalid 0/0/0 payload.', {
+        workout_id,
+        planned_work_steps: plannedWorkStepsForContract.length,
+        fallbackPace,
+        fallbackDuration,
+      });
     }
 
     console.log('✅ Performance calculated:', performance);
@@ -1464,15 +1446,7 @@ Deno.serve(async (req) => {
     } | null = null;
     
     if (plannedWorkout?.computed?.steps) {
-      const workSteps = plannedWorkout.computed.steps.filter((step: any) => {
-        const stepKind = String(step?.kind ?? step?.role ?? '').toLowerCase();
-        const stepType = String(step?.step_type ?? step?.type ?? '').toLowerCase();
-        const label = String(step?.name ?? step?.label ?? step?.description ?? '').toLowerCase();
-        const hasPaceRange = !!step?.pace_range;
-        const looksRecovery = /warm|cool|recover|rest/.test(stepKind) || /warm|cool|recover|rest/.test(stepType) || /warm.?up|cool.?down|recovery|rest/.test(label);
-        const looksWork = stepKind === 'work' || stepKind === 'interval' || stepType === 'work' || stepType === 'interval' || stepType === 'repeat';
-        return hasPaceRange && looksWork && !looksRecovery;
-      });
+      const workSteps = getPlannedWorkSteps(plannedWorkout);
 
       if (workSteps.length > 0) {
         const paceRanges = workSteps.map((step: any) => ({
@@ -2208,6 +2182,12 @@ Deno.serve(async (req) => {
     }
     const existingAnalysis = existingRowForMerge?.workout_analysis || {};
 
+    const sessionIntervalRows = buildSessionIntervalRows(
+      plannedWorkout,
+      detailedAnalysis,
+      computedIntervals
+    );
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',
@@ -2230,6 +2210,7 @@ Deno.serve(async (req) => {
         adherence_summary: adherenceSummary ?? null,
         fact_packet_v1: fact_packet_v1 ?? null,
         flags_v1: flags_v1 ?? null,
+        interval_rows: sessionIntervalRows,
       },
       guards: {
         is_transition_window: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
@@ -3397,6 +3378,124 @@ function detectWorkoutTypeFromIntervals(
 }
 
 /**
+ * Extract planned WORK steps (exclude warmup/recovery/cooldown).
+ * This is the canonical workout structure for plan-linked sessions.
+ */
+function getPlannedWorkSteps(plannedWorkout: any): any[] {
+  const steps: any[] = Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [];
+  return steps.filter((step: any) => {
+    const kind = String(step?.kind ?? step?.role ?? step?.step_type ?? step?.type ?? '').toLowerCase();
+    const label = String(step?.name ?? step?.label ?? step?.description ?? '').toLowerCase();
+    const hasPaceRange = !!step?.pace_range;
+    const recoveryLike = /warm|cool|recover|rest/.test(kind) || /warm.?up|cool.?down|recovery|rest/.test(label);
+    // Accept any pace-targeted non-recovery step to keep plan linkage robust across generator variants
+    // (e.g. kind: easy/tempo/threshold/work/repeat).
+    return hasPaceRange && !recoveryLike;
+  });
+}
+
+function fmtDurationLabel(totalSeconds: number | null): string {
+  if (!Number.isFinite(totalSeconds as number) || (totalSeconds as number) <= 0) return '';
+  const s = Math.round(totalSeconds as number);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+function fmtPaceRangeLabel(lower?: number, upper?: number): string {
+  if (!Number.isFinite(lower as number) || !Number.isFinite(upper as number) || (lower as number) <= 0 || (upper as number) <= 0) return '';
+  const l = Math.round(lower as number);
+  const u = Math.round(upper as number);
+  const lm = Math.floor(l / 60);
+  const ls = l % 60;
+  const um = Math.floor(u / 60);
+  const us = u % 60;
+  return `${lm}:${String(ls).padStart(2, '0')}-${um}:${String(us).padStart(2, '0')}/mi`;
+}
+
+function buildSessionIntervalRows(plannedWorkout: any, detailedAnalysis: any, computedIntervals: any[]): any[] {
+  const plannedSteps: any[] = Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [];
+  if (!plannedSteps.length) return [];
+
+  const breakdown = detailedAnalysis?.interval_breakdown;
+  const breakdownIntervals: any[] = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
+  const byId = new Map<string, any>();
+  for (const iv of breakdownIntervals) {
+    const id = String(iv?.interval_id || '').trim();
+    if (id) byId.set(id, iv);
+  }
+
+  const byKindCounters: Record<string, number> = { warmup: 0, cooldown: 0, recovery: 0, work: 0 };
+  const byKindBuckets: Record<string, any[]> = {
+    warmup: breakdownIntervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'warmup'),
+    cooldown: breakdownIntervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'cooldown'),
+    recovery: breakdownIntervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'recovery'),
+    work: breakdownIntervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'work'),
+  };
+
+  return plannedSteps.map((step: any, idx: number) => {
+    const stepId = String(step?.id || '').trim();
+    const stepKindRaw = String(step?.kind ?? step?.role ?? step?.step_type ?? step?.type ?? '').toLowerCase();
+    const stepKind = /warm/.test(stepKindRaw)
+      ? 'warmup'
+      : /cool/.test(stepKindRaw)
+        ? 'cooldown'
+        : /recover|rest/.test(stepKindRaw)
+          ? 'recovery'
+          : 'work';
+
+    let match = stepId ? byId.get(stepId) : null;
+    if (!match) {
+      const bucket = byKindBuckets[stepKind] || [];
+      const cursor = byKindCounters[stepKind] || 0;
+      match = bucket[cursor] || null;
+      byKindCounters[stepKind] = cursor + 1;
+    }
+    if (!match) {
+      match = computedIntervals.find((it: any) =>
+        String(it?.planned_step_id || '') === stepId ||
+        Number(it?.planned_index) === idx
+      ) || null;
+    }
+
+    const paceRange = step?.pace_range || match?.pace_range || null;
+    const plannedDuration = Number(step?.duration_s ?? step?.seconds ?? step?.duration ?? match?.planned_duration_s ?? 0);
+    const plannedLabel = (() => {
+      const t = fmtDurationLabel(Number.isFinite(plannedDuration) && plannedDuration > 0 ? plannedDuration : null);
+      const p = fmtPaceRangeLabel(paceRange?.lower, paceRange?.upper);
+      if (t && p) return `${t} @ ${p}`;
+      return t || p || (stepKind === 'work' ? `Work ${idx + 1}` : stepKind.charAt(0).toUpperCase() + stepKind.slice(1));
+    })();
+
+    const executedDuration = Number(match?.actual_duration_s ?? match?.executed?.duration_s ?? match?.duration_s ?? 0);
+    const executedDistance = Number(match?.actual_distance_m ?? match?.executed?.distance_m ?? match?.distance_m ?? 0);
+    const executedHr = Number(match?.avg_heart_rate_bpm ?? match?.executed?.avg_hr ?? match?.avg_hr ?? 0);
+    const executedPaceS = Number(
+      match?.pace_s_per_mi ??
+      match?.executed?.avg_pace_s_per_mi ??
+      (Number.isFinite(Number(match?.actual_pace_min_per_mi)) ? Number(match.actual_pace_min_per_mi) * 60 : 0)
+    );
+
+    return {
+      row_id: stepId || `planned_${idx}`,
+      planned_step_id: stepId || null,
+      planned_index: idx,
+      kind: stepKind,
+      planned_label: plannedLabel,
+      planned_pace_display: fmtPaceRangeLabel(paceRange?.lower, paceRange?.upper) || null,
+      adherence_pct: Number.isFinite(Number(match?.pace_adherence_percent)) ? Math.round(Number(match.pace_adherence_percent)) : null,
+      executed: {
+        pace_s_per_mi: Number.isFinite(executedPaceS) && executedPaceS > 0 ? Math.round(executedPaceS) : null,
+        avg_pace_s_per_mi: Number.isFinite(executedPaceS) && executedPaceS > 0 ? Math.round(executedPaceS) : null,
+        distance_m: Number.isFinite(executedDistance) && executedDistance > 0 ? Math.round(executedDistance) : null,
+        duration_s: Number.isFinite(executedDuration) && executedDuration > 0 ? Math.round(executedDuration) : null,
+        avg_hr: Number.isFinite(executedHr) && executedHr > 0 ? Math.round(executedHr) : null,
+      },
+    };
+  });
+}
+
+/**
  * Detect workout intent from planned workout metadata.
  */
 function detectWorkoutIntent(plannedWorkout: any): 'easy' | 'long' | 'tempo' | 'intervals' | 'recovery' | undefined {
@@ -3407,8 +3506,13 @@ function detectWorkoutIntent(plannedWorkout: any): 'easy' | 'long' | 'tempo' | '
   const name = (plannedWorkout.name || plannedWorkout.workout_name || '').toLowerCase();
   
   const combined = `${token} ${desc} ${name}`;
-  
-  if (combined.includes('recovery')) return 'recovery';
+
+  // Interval signals must win over "jog recovery" wording inside interval descriptions.
+  if (combined.includes('interval') || combined.includes('repeat') || combined.includes('speed')) return 'intervals';
+  if (combined.includes('tempo') || combined.includes('threshold')) return 'tempo';
+
+  // Recovery should match actual recovery session intent, not interval recovery segments.
+  if (/\brecovery run\b|\brecovery session\b|\brest day\b/.test(combined)) return 'recovery';
   // Strides are commonly appended to easy/recovery runs; do not treat them as interval intent by default.
   if (combined.includes('stride')) {
     const hard = combined.includes('tempo') || combined.includes('threshold') || combined.includes('interval');
@@ -3416,8 +3520,6 @@ function detectWorkoutIntent(plannedWorkout: any): 'easy' | 'long' | 'tempo' | '
   }
   if (combined.includes('easy') || combined.includes('aerobic') || combined.includes('base')) return 'easy';
   if (combined.includes('long')) return 'long';
-  if (combined.includes('tempo') || combined.includes('threshold')) return 'tempo';
-  if (combined.includes('interval') || combined.includes('repeat') || combined.includes('speed')) return 'intervals';
   
   return undefined;
 }
@@ -3436,7 +3538,18 @@ function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any): string
     return null;
   }
 
-  // Contract: planned_workouts.workout_type wins when present.
+  // Contract for linked workouts:
+  // 1) Planned step structure is primary source
+  // 2) workout_type metadata is secondary
+  // 3) description/token keyword guessing is last resort
+  const workStepCount = getPlannedWorkSteps(plannedWorkout).length;
+  if (workStepCount >= 2) return 'intervals';
+  if (workStepCount === 1) {
+    if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
+    return 'easy';
+  }
+
+  // Secondary: planned_workouts.workout_type
   const plannedTypeRaw = String(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? '').toLowerCase().trim();
   const normalizePlannedType = (t: string): string | null => {
     const k = String(t || '').toLowerCase().trim();
@@ -3449,6 +3562,12 @@ function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any): string
   const plannedType = normalizePlannedType(plannedTypeRaw);
 
   if (plannedType) {
+    // Generic "run" type must be disambiguated from planned structure.
+    if (plannedType === 'run') {
+      if (workStepCount >= 2) return 'intervals';
+      if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
+      return 'easy';
+    }
     if (plannedType === 'recovery') return 'recovery';
     if (plannedType === 'easy') {
       // Upgrade easy -> recovery when the plan week intent is explicitly recovery.
@@ -3461,7 +3580,7 @@ function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any): string
     return plannedType;
   }
 
-  // Fallback to keyword-based intent detection when planned_workouts.workout_type is missing.
+  // Last resort: keyword-based intent detection (linked but missing structure+type).
   const intent = detectWorkoutIntent(plannedWorkout);
   if (intent === 'recovery') return 'recovery';
   if (intent === 'easy') {

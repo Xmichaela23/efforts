@@ -924,8 +924,9 @@ function buildIntervalInterpretation(
   // Detect patterns
   const patterns = detectExecutionPatterns(repExecutions);
   
-  // Recovery quality for physiology bridge
-  const recoveryQuality = hrIntervals.recovery.quality;
+  // Recovery quality for physiology bridge (guard against partial interval analysis objects)
+  const recovery = (hrIntervals as any)?.recovery ?? null;
+  const recoveryQuality = String(recovery?.quality ?? 'unknown');
   
   // Format pace helper
   const formatPace = (secs: number) => {
@@ -1005,11 +1006,14 @@ function buildIntervalInterpretation(
     // All on target already handled above
   } else {
     // Fallback if no pace data
-    parts.push(`${hrIntervals.workIntervalCount} work intervals completed.`);
+    const workCount = Number((hrIntervals as any)?.workIntervalCount ?? workIntervals.length ?? 0);
+    parts.push(`${workCount} work intervals completed.`);
   }
   
   // HR metrics as supporting evidence
-  const { creepBpm, assessment: creepAssessment } = hrIntervals.hrCreep;
+  const hrCreep = (hrIntervals as any)?.hrCreep ?? null;
+  const creepBpm = Number(hrCreep?.creepBpm ?? 0);
+  const creepAssessment = String(hrCreep?.assessment ?? 'unknown');
   if (creepAssessment === 'minimal' || creepAssessment === 'normal') {
     parts.push(`HR crept ${creepBpm > 0 ? '+' : ''}${creepBpm} bpm — well controlled across the set.`);
   } else if (creepAssessment === 'elevated') {
@@ -1019,7 +1023,7 @@ function buildIntervalInterpretation(
   }
   
   // Recovery quality
-  const { avgDropBpm } = hrIntervals.recovery;
+  const avgDropBpm = Number(recovery?.avgDropBpm ?? 0);
   if (recoveryQuality === 'excellent') {
     parts.push(`Recovery was excellent (${avgDropBpm} bpm drop).`);
   } else if (recoveryQuality === 'good') {
