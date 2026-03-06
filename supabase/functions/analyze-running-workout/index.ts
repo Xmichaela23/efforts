@@ -3469,12 +3469,25 @@ function buildSessionIntervalRows(plannedWorkout: any, detailedAnalysis: any, co
 
     const executedDuration = Number(match?.actual_duration_s ?? match?.executed?.duration_s ?? match?.duration_s ?? 0);
     const executedDistance = Number(match?.actual_distance_m ?? match?.executed?.distance_m ?? match?.distance_m ?? 0);
-    const executedHr = Number(match?.avg_heart_rate_bpm ?? match?.executed?.avg_hr ?? match?.avg_hr ?? 0);
-    const executedPaceS = Number(
+    const executedHr = Number(
+      match?.avg_heart_rate_bpm ??
+      match?.executed?.avg_hr ??
+      match?.avg_hr ??
+      match?.executed?.avgHr ??
+      0
+    );
+    const directPaceS = Number(
       match?.pace_s_per_mi ??
       match?.executed?.avg_pace_s_per_mi ??
       (Number.isFinite(Number(match?.actual_pace_min_per_mi)) ? Number(match.actual_pace_min_per_mi) * 60 : 0)
     );
+    const derivedPaceS =
+      executedDuration > 0 && executedDistance > 0
+        ? (executedDuration / (executedDistance / 1609.34))
+        : 0;
+    const executedPaceS = Number.isFinite(directPaceS) && directPaceS > 0
+      ? directPaceS
+      : (Number.isFinite(derivedPaceS) && derivedPaceS > 0 ? derivedPaceS : 0);
 
     return {
       row_id: stepId || `planned_${idx}`,

@@ -583,6 +583,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const sessionIntervalRows: any[] = Array.isArray(sessionState?.details?.interval_rows)
     ? sessionState.details.interval_rows
     : [];
+  const hasCanonicalIntervalRows = !!planned && sessionIntervalRows.length > 0;
+  const missingCanonicalRowsForPlanned = !!planned && !hasCanonicalIntervalRows;
+  const needsCanonicalHydration = !!planned && !hasCanonicalIntervalRows;
   const completedComputed = (completedSrc as any)?.computed;
   const overallForDisplay = (completedSrc as any)?.computed?.overall ?? {};
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
@@ -622,12 +625,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           : undefined,
       })))
     : [];
+  const stepsFromSessionRows: any[] = hasCanonicalIntervalRows
+    ? sessionIntervalRows.map((r: any, idx: number) => ({
+        id: r?.planned_step_id || r?.row_id || `row_${idx}`,
+        kind: r?.kind || 'work',
+        type: r?.kind || 'work',
+        planned_index: Number.isFinite(Number(r?.planned_index)) ? Number(r.planned_index) : idx,
+      }))
+    : [];
   const steps: any[] = (
-    plannedStepsFull.length > 0
-      ? plannedStepsFull
-      : plannedStepsLight.length > 0
-        ? plannedStepsLight
-        : stepsFromUnplanned
+    hasCanonicalIntervalRows
+      ? stepsFromSessionRows
+      : plannedStepsFull.length > 0
+        ? plannedStepsFull
+        : plannedStepsLight.length > 0
+          ? plannedStepsLight
+          : stepsFromUnplanned
   );
   if (!steps.length) {
     steps.push({ kind: 'steady', id: 'overall', planned_index: 0, seconds: (planned as any)?.computed?.total_duration_seconds || undefined });
@@ -660,12 +673,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
 
   const planLooksSingleSteady = plannedStepsFull.length <= 1 && plannedStepsLight.length <= 1;
   // If executed mapping isn't ready, collapse to a single row to avoid showing planned-only dashes
-  const stepsDisplayBase = useMemo(() => (hasServerComputed ? steps : [steps[0]]), [hasServerComputed, steps]);
+  const stepsDisplayBase = useMemo(() => ((hasCanonicalIntervalRows || hasServerComputed) ? steps : [steps[0]]), [hasCanonicalIntervalRows, hasServerComputed, steps]);
 
   // Collapse micro-steps (e.g. 4×100m strides) for easy/recovery runs so the table doesn't become noise.
   const stepsDisplay = useMemo(() => {
     // "Show details": for single-steady planned workouts, show executed segments from computed.intervals (strides, etc.)
-    if (showFullIntervalBreakdown && planLooksSingleSteady && computedDetailSteps.length > 1) {
+    if (!hasCanonicalIntervalRows && showFullIntervalBreakdown && planLooksSingleSteady && computedDetailSteps.length > 1) {
       return computedDetailSteps;
     }
     if (showFullIntervalBreakdown) return stepsDisplayBase;
@@ -775,7 +788,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       return best ? [best] : stepsDisplayBase;
     }
     return stepsDisplayBase;
-  }, [stepsDisplayBase, completedSrc, showFullIntervalBreakdown, computedDetailSteps, planLooksSingleSteady]);
+  }, [stepsDisplayBase, completedSrc, showFullIntervalBreakdown, computedDetailSteps, planLooksSingleSteady, hasCanonicalIntervalRows]);
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const rows = completedSrc ? accumulate(completedSrc) : [];
@@ -959,12 +972,11 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     const workoutAnalysis = workout?.workout_analysis;
     const intervalBreakdownObj = workoutAnalysis?.detailed_analysis?.interval_breakdown;
     
-    // interval_breakdown is an object with .intervals array, not an array itself
-    if (!intervalBreakdownObj || !intervalBreakdownObj.available || !Array.isArray(intervalBreakdownObj.intervals) || intervalBreakdownObj.intervals.length === 0 || !step) {
-      return null;
-    }
-    
-    const intervals = intervalBreakdownObj.intervals;
+    // interval_breakdown is optional; if absent, fall back to direct row pace.
+    const intervals = (intervalBreakdownObj && intervalBreakdownObj.available && Array.isArray(intervalBreakdownObj.intervals))
+      ? intervalBreakdownObj.intervals
+      : [];
+    if (!step) return null;
     const stepId = String((step as any)?.id || '');
     const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
@@ -1023,7 +1035,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
       interval_type: matchingInterval.interval_type,
       interval_id: matchingInterval.interval_id,
       actual_pace_min_per_mi: matchingInterval.actual_pace_min_per_mi
-    } : 'NOT FOUND');
+    } : 'NOT FOUND (will use row fallback when available)');
     
     // Field is actual_pace_min_per_mi (minutes per mile), convert to seconds per mile
     if (matchingInterval?.actual_pace_min_per_mi) {
@@ -1338,19 +1350,27 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   // Poll for server-computed after invoke (or when attached without data)
   useEffect(() => {
     let cancelled = false;
-    if (!isAttachedToPlan || hasServerComputed || !(completed as any)?.id) return;
+    if (!isAttachedToPlan || (!needsCanonicalHydration && hasServerComputed) || !(completed as any)?.id) return;
     let tries = 0;
     const maxTries = 10;
     const tick = async () => {
       try {
         const { data } = await supabase
           .from('workouts')
-          .select('computed')
+          .select('computed,workout_analysis,analysis_status,analyzed_at')
           .eq('id', (completed as any).id)
           .maybeSingle();
         const compd = (data as any)?.computed;
+        const waRaw = (data as any)?.workout_analysis;
+        const wa = typeof waRaw === 'string' ? (() => { try { return JSON.parse(waRaw); } catch { return waRaw; } })() : waRaw;
         if (!cancelled && compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-          setHydratedCompleted((prev:any) => ({ ...(prev || completed), computed: compd }));
+          setHydratedCompleted((prev:any) => ({
+            ...(prev || completed),
+            computed: compd,
+            workout_analysis: wa ?? (prev as any)?.workout_analysis,
+            analysis_status: (data as any)?.analysis_status ?? (prev as any)?.analysis_status,
+            analyzed_at: (data as any)?.analyzed_at ?? (prev as any)?.analyzed_at,
+          }));
           return; // stop polling
         }
       } catch {}
@@ -1359,25 +1379,34 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     };
     setTimeout(tick, 1200);
     return () => { cancelled = true; };
-  }, [isAttachedToPlan, hasServerComputed, completed]);
+  }, [isAttachedToPlan, hasServerComputed, completed, needsCanonicalHydration]);
 
   // Poll path when only planned has a completed_workout_id
   useEffect(() => {
     let cancelled = false;
     const cid = (planned as any)?.completed_workout_id ? String((planned as any).completed_workout_id) : null;
-    if (!isAttachedToPlan || hasServerComputed || !cid) return;
+    if (!isAttachedToPlan || (!needsCanonicalHydration && hasServerComputed) || !cid) return;
     let tries = 0;
     const maxTries = 10;
     const tick = async () => {
       try {
         const { data } = await supabase
           .from('workouts')
-          .select('computed')
+          .select('computed,workout_analysis,analysis_status,analyzed_at')
           .eq('id', cid)
           .maybeSingle();
         const compd = (data as any)?.computed;
+        const waRaw = (data as any)?.workout_analysis;
+        const wa = typeof waRaw === 'string' ? (() => { try { return JSON.parse(waRaw); } catch { return waRaw; } })() : waRaw;
         if (!cancelled && compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-          setHydratedCompleted((prev:any) => ({ ...(prev || {}), id: cid, computed: compd }));
+          setHydratedCompleted((prev:any) => ({
+            ...(prev || {}),
+            id: cid,
+            computed: compd,
+            workout_analysis: wa ?? (prev as any)?.workout_analysis,
+            analysis_status: (data as any)?.analysis_status ?? (prev as any)?.analysis_status,
+            analyzed_at: (data as any)?.analyzed_at ?? (prev as any)?.analyzed_at,
+          }));
           return;
         }
       } catch {}
@@ -1386,7 +1415,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     };
     setTimeout(tick, 1200);
     return () => { cancelled = true; };
-  }, [isAttachedToPlan, hasServerComputed, planned]);
+  }, [isAttachedToPlan, hasServerComputed, planned, needsCanonicalHydration]);
 
   // Detect sport for display formatting
   const sportType = String((completed?.type || planned?.type || '')).toLowerCase();
@@ -2038,6 +2067,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
         </div>
       ) : (
         <>
+        {missingCanonicalRowsForPlanned ? (
+          <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
+            <p className="text-sm text-red-200">Session interval contract missing for this planned workout.</p>
+            <p className="text-xs text-red-300/90 mt-1">Recompute analysis to generate canonical interval rows.</p>
+          </div>
+        ) : null}
+        {!missingCanonicalRowsForPlanned ? (
         <table className="w-full text-[13px] table-fixed">
           <colgroup>
             <col className="w-[36%]" />
@@ -2168,13 +2204,23 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               return null;
             };
             
-            const rangeSubtitle = formatPaceRange(st);
             let row: any = null;
-            const sessionRow = sessionIntervalRows[idx] || null;
+            const sessionRow = (() => {
+              if (!hasCanonicalIntervalRows) return null;
+              const pid = String((st as any)?.id || '');
+              const pidx = Number((st as any)?.planned_index);
+              return sessionIntervalRows.find((r: any) =>
+                String(r?.planned_step_id || r?.row_id || '') === pid ||
+                (Number.isFinite(pidx) && Number(r?.planned_index) === pidx)
+              ) || null;
+            })();
             if (sessionRow && sessionRow.executed) {
               row = sessionRow;
             }
-            if (!row && hasServerComputed) {
+            const rangeSubtitle = (sessionRow?.planned_pace_display && typeof sessionRow.planned_pace_display === 'string')
+              ? sessionRow.planned_pace_display
+              : formatPaceRange(st);
+            if (!row && !planned && hasServerComputed) {
               const pid = String((st as any)?.id || '');
               row = pid ? intervalByPlannedId.get(pid) : null;
               if (!row) {
@@ -2184,47 +2230,6 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               // Unplanned: row from interval_breakdown (server provides executed + planned_label)
               if (!row && !planned && unplannedIntervals[idx]) {
                 row = unplannedIntervals[idx];
-              }
-            }
-            // Planned workouts can carry richer per-interval detail in detailed_analysis.interval_breakdown.
-            // If computed row matching misses, resolve from interval_breakdown and normalize to executed shape.
-            if (!row && planned) {
-              const breakdown = (completedSrc as any)?.workout_analysis?.detailed_analysis?.interval_breakdown;
-              const intervals = Array.isArray(breakdown?.intervals) ? breakdown.intervals : [];
-              if (intervals.length > 0) {
-                const pid = String((st as any)?.id || '');
-                const stepKindRaw = String((st as any)?.kind || (st as any)?.type || '').toLowerCase();
-                const stepKind = /warm/.test(stepKindRaw)
-                  ? 'warmup'
-                  : /cool/.test(stepKindRaw)
-                    ? 'cooldown'
-                    : /recover|rest/.test(stepKindRaw)
-                      ? 'recovery'
-                      : (/overall|steady/.test(stepKindRaw) ? 'overall' : 'work');
-
-                const findById = pid
-                  ? intervals.find((iv: any) => String(iv?.interval_id || '') === pid)
-                  : null;
-                if (findById) {
-                  row = findById;
-                } else if (stepKind === 'warmup' || stepKind === 'cooldown') {
-                  row = intervals.find((iv: any) => String(iv?.interval_type || '').toLowerCase() === stepKind) || null;
-                } else if (stepKind === 'recovery') {
-                  const recoveryIdx = stepsDisplay
-                    .slice(0, idx + 1)
-                    .filter((s: any) => /recover|rest/.test(String(s?.kind || s?.type || '').toLowerCase())).length;
-                  const recRows = intervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'recovery');
-                  row = recRows[recoveryIdx - 1] || recRows[0] || null;
-                } else if (stepKind === 'work') {
-                  const workIdx = stepsDisplay
-                    .slice(0, idx + 1)
-                    .filter((s: any) => {
-                      const k = String(s?.kind || s?.type || '').toLowerCase();
-                      return !/warm|cool|recover|rest|overall|steady/.test(k);
-                    }).length;
-                  const workRows = intervals.filter((iv: any) => String(iv?.interval_type || '').toLowerCase() === 'work');
-                  row = workRows[workIdx - 1] || workRows[0] || null;
-                }
               }
             }
             if (row && !row?.executed) {
@@ -2249,6 +2254,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
               if (typeof sessionRow?.adherence_pct === 'number') {
                 return Math.round(sessionRow.adherence_pct);
               }
+              if (planned) return null;
               // Check for enhanced analysis from analyze-running-workout or analyze-cycling-workout
               const workoutAnalysis = completedSrc?.workout_analysis;
               if (workoutAnalysis?.granular_analysis?.interval_breakdown) {
@@ -2331,8 +2337,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             })();
 
             const distCell = (() => {
-              if (!hasServerComputed || !row) {
-                if (idx !== 0) return '—';
+              if (!row) {
+                if (idx !== 0 || hasCanonicalIntervalRows) return '—';
                 // Use overall from computed, executed, or top-level workout fields (skip 0 values)
                 const distM = [
                   overallForDisplay?.distance_m,
@@ -2386,7 +2392,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 if (Number.isFinite(movingTime) && movingTime > 0) return fmtTime(movingTime);
               }
               // For individual intervals (warmup, work, recovery, cooldown), use interval duration
-              if (!hasServerComputed || !row) return '—';
+              if (!row) return '—';
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
             
@@ -2394,9 +2400,9 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             const showMovingTimeLabel = isSingleIntervalSteadyState && String(st?.kind || st?.type || '').toLowerCase() === 'work';
 
             const hrVal = (() => {
-              if (!hasServerComputed || !row) {
+              if (!row) {
                 const stepKind = String(st?.kind || st?.type || '').toLowerCase();
-                const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed);
+                const isOverallRow = stepKind === 'overall' || st?.id === 'overall' || (idx === 0 && !hasServerComputed && !hasCanonicalIntervalRows);
                 if (isOverallRow) {
                   const hr = Number(
                     overallForDisplay?.avg_hr
@@ -2409,7 +2415,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                 }
                 return null;
               }
-              const hr = row?.executed?.avg_hr; return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
+              const hr = Number(
+                row?.executed?.avg_hr ??
+                row?.executed?.avgHr ??
+                row?.avg_heart_rate_bpm ??
+                row?.avg_hr
+              );
+              return Number.isFinite(hr) && hr > 0 ? Math.round(hr) : null;
             })();
 
             return (
@@ -2471,6 +2483,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           })}
           </tbody>
         </table>
+        ) : null}
         {/* Summary below intervals: canonical session insight (single source) */}
         {(() => {
           const completedSrc: any = hydratedCompleted || completed;
