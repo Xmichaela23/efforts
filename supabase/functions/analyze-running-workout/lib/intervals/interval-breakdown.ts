@@ -38,8 +38,8 @@ export function generateIntervalBreakdown(
     const plannedDuration = interval.planned?.duration_s || 0;
     const plannedPace = interval.planned?.target_pace_s_per_mi || 0;
     
-    // Extract actual values from executed object (elapsed from stream)
-    const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
+    // Extract actual values from executed object only (no planned fallbacks)
+    const actualDuration = interval.executed?.duration_s || 0;
     
     // ✅ Use moving time for overall row so Time and Pace match Readouts (Duration vs Moving Time difference)
     // -------------------------------------------------------------------------

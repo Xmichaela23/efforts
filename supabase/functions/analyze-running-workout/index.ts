@@ -3467,12 +3467,11 @@ function buildSessionIntervalRows(plannedWorkout: any, detailedAnalysis: any, co
       return t || p || (stepKind === 'work' ? `Work ${idx + 1}` : stepKind.charAt(0).toUpperCase() + stepKind.slice(1));
     })();
 
-    const executedDuration = Number(match?.actual_duration_s ?? match?.executed?.duration_s ?? match?.duration_s ?? 0);
-    const executedDistance = Number(match?.actual_distance_m ?? match?.executed?.distance_m ?? match?.distance_m ?? 0);
+    const executedDuration = Number(match?.actual_duration_s ?? match?.executed?.duration_s ?? 0);
+    const executedDistance = Number(match?.actual_distance_m ?? match?.executed?.distance_m ?? 0);
     const executedHr = Number(
       match?.avg_heart_rate_bpm ??
       match?.executed?.avg_hr ??
-      match?.avg_hr ??
       match?.executed?.avgHr ??
       0
     );
