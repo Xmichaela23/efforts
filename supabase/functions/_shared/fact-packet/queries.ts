@@ -129,18 +129,30 @@ function inferWorkoutTypeKey(row: any): string | null {
 }
 
 /** For comparison queries: group similar workout types so we have enough history (e.g. recovery + easy + run). */
+function getDiscipline(key: string | null): string {
+  if (!key) return 'workout';
+  const k = safeLower(key);
+  if (['run', 'recovery', 'easy', 'easy_run', 'steady_state', 'long', 'long_run', 'long_run_fast_finish', 'intervals', 'interval', 'interval_run', 'tempo', 'tempo_run', 'track', 'speed', 'fartlek', 'threshold'].includes(k)) return 'run';
+  if (['ride', 'bike', 'cycle', 'cycling'].includes(k)) return 'ride';
+  if (['swim', 'swimming'].includes(k)) return 'swim';
+  if (['strength', 'mobility', 'weights'].includes(k)) return 'strength';
+  if (k.includes('run') || k.includes('jog')) return 'run';
+  if (k.includes('ride') || k.includes('bike') || k.includes('cycle')) return 'ride';
+  return 'workout';
+}
+
 function getComparableTypeKeys(key: string | null): string[] {
   if (!key) return [];
   const k = safeLower(key);
   const easyLike = ['recovery', 'easy', 'easy_run', 'steady_state', 'run'];
   if (easyLike.includes(k)) return easyLike;
-  // Long runs are often stored historically as generic steady-state/run types.
-  // We rely on duration bands elsewhere to keep the comparison set appropriate.
   const longLike = ['long', 'long_run', 'long_run_fast_finish'];
   if (longLike.includes(k)) {
     const uniq = (xs: string[]) => Array.from(new Set(xs.filter(Boolean)));
     return uniq(['long_run', 'long_run_fast_finish', ...easyLike]);
   }
+  const intervalLike = ['intervals', 'interval', 'interval_run', 'tempo', 'tempo_run', 'track', 'speed', 'fartlek', 'threshold'];
+  if (intervalLike.includes(k)) return intervalLike;
   return [k];
 }
 
@@ -363,17 +375,13 @@ export async function getNotableAchievements(
     const end = new Date().toISOString().slice(0, 10);
     const start = isoDateAddDays(end, -lookbackDays);
     const rows = await fetchRecentWorkouts(supabase, userId, start, end, 120);
-    const comparableKeys = getComparableTypeKeys(workoutTypeKey);
+    // Use discipline-level (all runs) for achievements to avoid classification mismatch
+    const discipline = getDiscipline(workoutTypeKey);
     const completed = rows
       .filter((r) => String(r.workout_status || '').toLowerCase() === 'completed')
       .filter((r) => String(r.id) !== String(currentWorkoutId))
-      .filter((r) => {
-        if (!workoutTypeKey) return true;
-        const inferred = inferWorkoutTypeKey(r);
-        return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
-      });
+      .filter((r) => getDiscipline(inferWorkoutTypeKey(r)) === discipline);
 
-    // Need current workout info too; fetch it quickly.
     const { data: cur } = await supabase
       .from('workouts')
       .select('id,user_id,type,date,workout_status,computed,workout_analysis,workload_actual,workload_planned,duration,moving_time,distance,elevation_gain')
@@ -389,23 +397,9 @@ export async function getNotableAchievements(
       const maxDist = Math.max(...completed.map((r) => getOverallDistanceMi(r) || 0), 0);
       if (curDist > maxDist + 0.05) {
         const margin = curDist - maxDist;
-        const typeLabel = (() => {
-          const k = String(workoutTypeKey || 'workout').toLowerCase();
-          if (!k || k === 'unknown') return 'workout';
-          if (k.includes('recovery')) return 'recovery run';
-          if (k.includes('easy')) return 'easy run';
-          if (k.includes('long')) return 'long run';
-          if (k.includes('tempo')) return 'tempo run';
-          if (k.includes('interval')) return 'interval workout';
-          if (k === 'run') return 'run';
-          return k.replace(/_/g, ' ');
-        })();
         achievements.push({
           type: 'longest_distance',
-          description:
-            maxDist <= 0.05
-              ? `First ${typeLabel} in ${lookbackDays}d (${curDist.toFixed(1)} mi).`
-              : `Longest distance in ${lookbackDays}d (${curDist.toFixed(1)} mi vs previous ${maxDist.toFixed(1)} mi).`,
+          description: `Longest ${discipline} distance in ${lookbackDays}d (${curDist.toFixed(1)} mi vs previous ${maxDist.toFixed(1)} mi).`,
           significance: margin >= 2 ? 'major' : margin >= 0.7 ? 'moderate' : 'minor',
         });
       }
@@ -417,26 +411,26 @@ export async function getNotableAchievements(
         const margin = curDur - maxDur;
         achievements.push({
           type: 'longest_duration',
-          description: `Longest duration in ${lookbackDays}d (${Math.round(curDur)} min vs previous ${Math.round(maxDur)} min).`,
+          description: `Longest ${discipline} duration in ${lookbackDays}d (${Math.round(curDur)} min vs previous ${Math.round(maxDur)} min).`,
           significance: margin >= 25 ? 'major' : margin >= 10 ? 'moderate' : 'minor',
         });
       }
     }
 
-    // First in a while (>14d gap)
-    const prior = completed
+    // First in a while (>14d gap) — completed is already discipline-level
+    const priorDate = completed
       .map((r) => String(r.date || ''))
       .filter(Boolean)
       .sort()
       .pop();
-    if (prior) {
+    if (priorDate) {
       const curDate = String(current?.date || '');
       if (curDate) {
-        const gapDays = Math.round((new Date(`${curDate}T00:00:00Z`).getTime() - new Date(`${prior}T00:00:00Z`).getTime()) / (24 * 3600 * 1000));
+        const gapDays = Math.round((new Date(`${curDate}T00:00:00Z`).getTime() - new Date(`${priorDate}T00:00:00Z`).getTime()) / (24 * 3600 * 1000));
         if (gapDays >= 14) {
           achievements.push({
             type: 'first_in_a_while',
-            description: `First ${workoutTypeKey || 'workout'} in ${gapDays} days.`,
+            description: `First ${discipline} in ${gapDays} days.`,
             significance: gapDays >= 28 ? 'moderate' : 'minor',
           });
         }
