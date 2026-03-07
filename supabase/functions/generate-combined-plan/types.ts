@@ -1,0 +1,128 @@
+// generate-combined-plan/types.ts
+// All type definitions for the multi-sport combined plan engine.
+
+export type Sport = 'run' | 'bike' | 'swim' | 'strength';
+export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
+export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery';
+export type Priority = 'A' | 'B' | 'C';
+export type LoadingPattern = '3:1' | '2:1';
+
+// ── Request ──────────────────────────────────────────────────────────────────
+
+export interface GoalInput {
+  id: string;
+  event_name: string;
+  event_date: string;      // ISO 8601 "YYYY-MM-DD"
+  distance: string;        // "sprint" | "olympic" | "70.3" | "ironman" | "marathon" | "half_marathon" | ...
+  sport: string;           // "triathlon" | "run" | "cycling" | ...
+  priority: Priority;
+}
+
+export interface AthleteState {
+  current_ctl: number;
+  ctl_by_sport?: { run?: number; bike?: number; swim?: number };
+  run_threshold_pace?: string;  // "8:00" min/mi
+  bike_ftp?: number;            // watts
+  swim_threshold_pace?: string; // "2:00" per 100yd
+  weekly_hours_available: number;
+  loading_pattern: LoadingPattern;
+  limiter_sport?: Sport;
+  /** 0=Sunday … 6=Saturday */
+  rest_days: number[];
+  long_run_day?: number;
+  long_ride_day?: number;
+}
+
+export interface AthleteMemory {
+  run_volume_ceiling?: number;   // max weekly run miles tolerated
+  injury_hotspots?: string[];
+  aerobic_floor_hr?: number;
+  historical_peak_ctl?: number;
+}
+
+export interface CombinedPlanRequest {
+  user_id: string;
+  goals: GoalInput[];
+  athlete_state: AthleteState;
+  athlete_memory?: AthleteMemory;
+  start_date?: string;
+}
+
+// ── Internal phase timeline ──────────────────────────────────────────────────
+
+/**
+ * Each entry describes one contiguous block of weeks with a fixed phase,
+ * primary goal, and TSS target.
+ */
+export interface PhaseBlock {
+  phase: Phase;
+  startWeek: number;    // 1-indexed
+  endWeek: number;
+  primaryGoalId: string;
+  isRecovery: boolean;
+  tssMultiplier: number;  // 1.0 normal, 0.65 recovery, declining for taper
+  sportDistribution: Partial<Record<Sport, number>>; // fractions summing ≤ 1
+}
+
+export interface EventRelationship {
+  type: 'sequential' | 'overlapping' | 'compressed' | 'single_peak';
+  gapWeeks: number;
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+
+export interface PlannedSession {
+  day: string;           // 'Monday' … 'Sunday'
+  type: Sport;
+  name: string;
+  description: string;
+  duration: number;      // minutes
+  tss: number;           // raw sport TSS
+  weighted_tss: number;  // tss × sport impact multiplier (§1.1)
+  intensity_class: Intensity;
+  steps_preset: string[];
+  tags: string[];
+  serves_goal: string;   // goal.id or 'shared'
+  zone_targets: string;  // "Z2" | "Z4 intervals" | etc.
+  timing?: 'AM' | 'PM';
+}
+
+export interface GeneratedWeek {
+  weekNum: number;
+  phase: Phase;
+  isRecovery: boolean;
+  sessions: PlannedSession[];
+  total_raw_tss: number;
+  total_weighted_tss: number;
+  sport_raw_tss: Record<Sport, number>;
+  zone1_2_minutes: number;
+  zone3_plus_minutes: number;
+  eighty_twenty_ratio: number; // fraction of time at Z1-2
+}
+
+// ── Output ───────────────────────────────────────────────────────────────────
+
+export interface PlanValidation {
+  no_consecutive_hard_days: boolean;
+  eighty_twenty_compliant: boolean;
+  tss_within_budget: boolean;
+  ramp_rate_safe: boolean;
+  recovery_weeks_present: boolean;
+  tapers_present: boolean;
+  maintenance_floors_met: boolean;
+  post_race_recovery_inserted: boolean;
+  brick_placement_valid: boolean;
+  run_impact_multiplier_applied: boolean;
+  no_same_sport_hard_stacking: boolean;
+  phase_progression_valid: boolean;
+}
+
+export interface CombinedPlanOutput {
+  name: string;
+  description: string;
+  duration_weeks: number;
+  sessions_by_week: Record<number, PlannedSession[]>;
+  phase_blocks: PhaseBlock[];
+  plan_contract: any;
+  validation: PlanValidation;
+}
