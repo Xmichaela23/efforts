@@ -415,34 +415,35 @@ Deno.serve(async (req) => {
       if (error) throw error
       inserted = rows.length
       
-      // Calculate workload for each inserted planned workout (now with actual IDs)
+      // Calculate workload for all inserted planned workouts in parallel (batches of 20
+      // to avoid overwhelming the function concurrency limit on large triathlon plans).
       const insertedWorkouts = Array.isArray(insertedRows) ? insertedRows : []
-      for (const workout of insertedWorkouts) {
-        try {
-          console.log('🔧 Calculating workload for planned workout:', workout.id, workout.type);
-          const { data, error } = await supabase.functions.invoke('calculate-workload', {
-            body: {
-              workout_id: workout.id,
-              workout_data: {
-                type: workout.type,
-                duration: workout.duration,
-                steps_preset: workout.steps_preset,
-                strength_exercises: workout.strength_exercises,
-                mobility_exercises: workout.mobility_exercises,
-                workout_status: 'planned'
+      console.log(`🔧 Calculating workload for ${insertedWorkouts.length} planned workouts in parallel`);
+      const BATCH = 20;
+      for (let i = 0; i < insertedWorkouts.length; i += BATCH) {
+        const batch = insertedWorkouts.slice(i, i + BATCH);
+        await Promise.all(batch.map(async (workout) => {
+          try {
+            const { error } = await supabase.functions.invoke('calculate-workload', {
+              body: {
+                workout_id: workout.id,
+                workout_data: {
+                  type: workout.type,
+                  duration: workout.duration,
+                  steps_preset: workout.steps_preset,
+                  strength_exercises: workout.strength_exercises,
+                  mobility_exercises: workout.mobility_exercises,
+                  workout_status: 'planned'
+                }
               }
-            }
-          });
-          
-          if (error) {
-            console.error('❌ Edge Function error for planned workout:', workout.id, error);
-          } else {
-            console.log('✅ Workload calculated for planned workout:', workout.id, data);
+            });
+            if (error) console.error('❌ Workload calc error for planned workout:', workout.id, error);
+          } catch (err) {
+            console.error('❌ Failed to calculate workload for planned workout:', workout.id, err);
           }
-        } catch (error) {
-          console.error('❌ Failed to calculate workload for planned workout:', workout.id, error);
-        }
+        }));
       }
+      console.log(`✅ Workload calculations complete for ${insertedWorkouts.length} workouts`);
     }
 
     // Materialize steps for the whole plan (server-side expansion)
