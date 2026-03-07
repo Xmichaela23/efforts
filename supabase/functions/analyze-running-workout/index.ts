@@ -1905,6 +1905,18 @@ Deno.serve(async (req) => {
       });
       fact_packet_v1 = factPacket;
       flags_v1 = flags;
+
+      if (fact_packet_v1 && performance) {
+        const fp = fact_packet_v1 as any;
+        if (!fp.derived) fp.derived = {};
+        fp.derived.interval_execution = {
+          execution_score: performance.execution_adherence ?? null,
+          pace_adherence: performance.pace_adherence ?? null,
+          duration_adherence: performance.duration_adherence ?? null,
+          completed_steps: performance.completed_steps ?? null,
+          total_steps: performance.total_steps ?? null,
+        };
+      }
     } catch (e) {
       console.warn('[analyze-running-workout] fact_packet_v1 build failed:', e);
       fact_packet_v1 = null;
@@ -1940,6 +1952,16 @@ Deno.serve(async (req) => {
       ai_summary = null;
       ai_summary_generated_at = null;
     }
+
+    // =========================================================================
+    // Interval display (needed by summaryV1 below and session_state_v1)
+    // =========================================================================
+    const intervalDisplay = buildSessionIntervalRows(
+      plannedWorkout,
+      detailedAnalysis,
+      computedIntervals,
+      workout
+    );
 
     // =========================================================================
     // Standardized per-workout summary (v1)
@@ -1998,15 +2020,38 @@ Deno.serve(async (req) => {
           };
           if (Number.isFinite(dist) && dist > 0 && Number.isFinite(dur) && dur > 0) {
             const isRecovery = weekIntent === 'recovery' || wt.includes('recovery');
-            const prefix = isRecovery ? 'Recovery run' : 'Run';
+            const execScore = typeof performance?.execution_adherence === 'number' ? performance.execution_adherence : null;
+            const paceAdh = typeof performance?.pace_adherence === 'number' ? performance.pace_adherence : null;
+            const completedSteps = typeof performance?.completed_steps === 'number' ? performance.completed_steps : null;
+            const totalSteps = typeof performance?.total_steps === 'number' ? performance.total_steps : null;
+            const isInterval = intervalDisplay?.mode === 'interval_compare_ready' && (intervalDisplay?.expected_work_rows ?? 0) >= 2;
 
-            const core = `${fmtMi(dist)} in ${fmtMin(dur)}`;
-            const extras: string[] = [];
-            if (Number.isFinite(pace) && pace > 0) extras.push(`${fmtPace(pace)}`);
-            if (Number.isFinite(hr) && hr > 0) extras.push(`${Math.round(hr)} bpm avg HR`);
-            if (terrain) extras.push(`${terrain} terrain`);
+            if (isInterval && execScore != null && completedSteps != null && totalSteps != null) {
+              const workRows = (intervalDisplay?.rows || []).filter((r: any) => r?.kind === 'work');
+              const paceStrings = workRows
+                .map((r: any) => {
+                  const p = r?.executed?.avg_pace_s_per_mi;
+                  return (typeof p === 'number' && p > 0) ? fmtPace(p) : null;
+                })
+                .filter(Boolean);
+              const targetDisplay = workRows[0]?.planned_pace_display || null;
 
-            bullets.push(`${prefix}: ${core}${extras.length ? ` — ${extras.join(', ')}` : ''}.`);
+              let line = `Interval workout: ${fmtMi(dist)} in ${fmtMin(dur)}`;
+              if (targetDisplay) line += ` @ ${targetDisplay} target`;
+              line += ` — ${execScore}% execution`;
+              if (paceStrings.length > 0) line += ` (${paceStrings.join(', ')})`;
+              line += '.';
+              bullets.push(line);
+            } else {
+              const prefix = isRecovery ? 'Recovery run' : 'Run';
+              const core = `${fmtMi(dist)} in ${fmtMin(dur)}`;
+              const extras: string[] = [];
+              if (Number.isFinite(pace) && pace > 0) extras.push(`${fmtPace(pace)}`);
+              if (Number.isFinite(hr) && hr > 0) extras.push(`${Math.round(hr)} bpm avg HR`);
+              if (terrain) extras.push(`${terrain} terrain`);
+              if (execScore != null && execScore > 0) extras.push(`${execScore}% execution`);
+              bullets.push(`${prefix}: ${core}${extras.length ? ` — ${extras.join(', ')}` : ''}.`);
+            }
           }
         } catch {}
 
@@ -2231,13 +2276,6 @@ Deno.serve(async (req) => {
       console.warn('[analyze-running-workout] failed to read existing workout_analysis for merge:', existingRowErr.message);
     }
     const existingAnalysis = existingRowForMerge?.workout_analysis || {};
-
-    const intervalDisplay = buildSessionIntervalRows(
-      plannedWorkout,
-      detailedAnalysis,
-      computedIntervals,
-      workout
-    );
 
     const sessionStateV1 = {
       version: 1,

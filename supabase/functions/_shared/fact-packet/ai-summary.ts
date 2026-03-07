@@ -313,6 +313,15 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
             partial_credit: derived.stimulus.partial_credit ?? null,
           }
         : null,
+      interval_execution: derived?.interval_execution
+        ? {
+            execution_score: typeof derived.interval_execution.execution_score === 'number' ? `${Math.round(derived.interval_execution.execution_score)}%` : null,
+            pace_adherence: typeof derived.interval_execution.pace_adherence === 'number' ? `${Math.round(derived.interval_execution.pace_adherence)}%` : null,
+            completed_steps: (typeof derived.interval_execution.completed_steps === 'number' && typeof derived.interval_execution.total_steps === 'number')
+              ? `${derived.interval_execution.completed_steps}/${derived.interval_execution.total_steps}`
+              : null,
+          }
+        : null,
       limiter: derived?.primary_limiter
         ? {
             limiter: derived.primary_limiter.limiter ?? null,
