@@ -50,6 +50,29 @@ const DISTANCE_TO_API: Record<string, string> = {
   Ultra: 'marathon',
 };
 
+// Triathlon distance label → generate-triathlon-plan distance key
+const TRI_DISTANCE_TO_API: Record<string, string> = {
+  'Sprint': 'sprint',
+  'sprint': 'sprint',
+  'Olympic': 'olympic',
+  'olympic': 'olympic',
+  '70.3': '70.3',
+  'Half-Iron': '70.3',
+  'Half Iron': '70.3',
+  'half-iron': '70.3',
+  'Ironman': 'ironman',
+  'ironman': 'ironman',
+  'Full': 'ironman',
+  'full': 'ironman',
+};
+
+const TRI_MIN_WEEKS: Record<string, Record<string, number>> = {
+  sprint:  { beginner: 8,  intermediate: 6,  advanced: 6  },
+  olympic: { beginner: 10, intermediate: 8,  advanced: 8  },
+  '70.3':  { beginner: 14, intermediate: 12, advanced: 10 },
+  ironman: { beginner: 20, intermediate: 18, advanced: 16 },
+};
+
 const MIN_WEEKS: Record<string, Record<string, number>> = {
   marathon: { beginner: 14, intermediate: 10, advanced: 8 },
   half: { beginner: 8, intermediate: 4, advanced: 4 },
@@ -199,11 +222,113 @@ Deno.serve(async (req: Request) => {
     }
 
     const sport = String(resolvedGoal?.sport || '').toLowerCase();
-    if (sport !== 'run') throw new AppError('unsupported_sport', 'Only run event goals can auto-build right now');
+    const isTri = sport === 'triathlon' || sport === 'tri';
+
+    if (!['run', 'triathlon', 'tri'].includes(sport)) {
+      throw new AppError('unsupported_sport', `Auto-build is not yet supported for "${sport}" goals. Supported: run, triathlon.`);
+    }
 
     const fitness = String(resolvedGoal?.training_prefs?.fitness || '').toLowerCase();
     const goalType = String(resolvedGoal?.training_prefs?.goal_type || '').toLowerCase();
     if (!fitness || !goalType) throw new AppError('missing_training_prefs', 'Missing fitness or training goal');
+
+    // ── Triathlon path ────────────────────────────────────────────────────
+    if (isTri) {
+      const triDistanceApi = TRI_DISTANCE_TO_API[String(resolvedGoal?.distance || '')] ?? null;
+      if (!triDistanceApi) {
+        throw new AppError('missing_distance', 'Select a triathlon distance (Sprint, Olympic, 70.3, Ironman) to build a plan.');
+      }
+      const triFloorWeeks = TRI_MIN_WEEKS[triDistanceApi]?.[fitness] ?? 8;
+      const weeksOutTri   = weeksUntilRace(new Date(), new Date(String(resolvedGoal?.target_date || '') + 'T12:00:00'));
+      if (weeksOutTri < 1)  throw new AppError('race_date_in_past', 'Race date must be in the future.');
+      if (weeksOutTri < triFloorWeeks) {
+        throw new AppError('race_too_close',
+          `A ${triDistanceApi} triathlon for a ${fitness} athlete needs at least ${triFloorWeeks} weeks. Your race is ${weeksOutTri} weeks out.`);
+      }
+      const triDurationWeeks = Math.max(triFloorWeeks, Math.min(weeksOutTri, 32));
+
+      if (mode === 'create') {
+        const newGoalPriority = action === 'keep' && existing_goal_id ? 'B' : 'A';
+        const { data: createdGoal, error: goalInsertErr } = await supabase
+          .from('goals')
+          .insert({
+            user_id,
+            name: String(resolvedGoal?.name || '').trim(),
+            goal_type: 'event',
+            target_date: resolvedGoal?.target_date,
+            sport: 'triathlon',
+            distance: resolvedGoal?.distance || null,
+            course_profile: {},
+            target_metric: null,
+            target_value: null,
+            current_value: null,
+            priority: newGoalPriority,
+            status: 'active',
+            training_prefs: resolvedGoal?.training_prefs || {},
+            notes: resolvedGoal?.notes || null,
+          })
+          .select('*')
+          .single();
+        if (goalInsertErr || !createdGoal) throw new AppError('goal_create_failed', goalInsertErr?.message || 'Failed to create goal');
+        createdGoalId = createdGoal.id;
+      } else {
+        createdGoalId = existing_goal_id || null;
+      }
+
+      // Read athlete baselines for discipline seeding
+      const { data: triBaseline } = await supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle();
+      const { data: triSnapshots } = await supabase
+        .from('athlete_snapshot')
+        .select('week_start, workload_by_discipline, acwr, workload_total')
+        .eq('user_id', user_id)
+        .order('week_start', { ascending: false })
+        .limit(8);
+
+      const latestSnap = triSnapshots?.[0] ?? null;
+      const triGenerateBody: Record<string, any> = {
+        user_id,
+        distance:         triDistanceApi,
+        fitness,
+        goal:             goalType === 'speed' ? 'performance' : 'complete',
+        duration_weeks:   triDurationWeeks,
+        race_date:        resolvedGoal?.target_date,
+        race_name:        resolvedGoal?.name,
+        ftp:              triBaseline?.performance_numbers?.ftp ?? undefined,
+        swim_pace_per_100_sec: triBaseline?.performance_numbers?.swimPacePer100 ?? triBaseline?.swim_pace_per_100_sec ?? undefined,
+        days_per_week:    resolvedGoal?.training_prefs?.days_per_week ?? undefined,
+        strength_frequency: resolvedGoal?.training_prefs?.strength_frequency ?? 0,
+        ...(plan_start_date ? { start_date: plan_start_date } : {}),
+      };
+
+      // Seed current discipline volumes from snapshot
+      if (latestSnap?.workload_by_discipline) {
+        const wd = latestSnap.workload_by_discipline;
+        if (wd.run)   triGenerateBody.current_weekly_run_miles   = Math.round(wd.run / 10);
+        if (wd.bike)  triGenerateBody.current_weekly_bike_hours  = Math.round(wd.bike / 60 * 10) / 10;
+        if (wd.swim)  triGenerateBody.current_weekly_swim_yards  = Math.round(wd.swim / 2);
+      }
+      if (latestSnap?.acwr != null) triGenerateBody.current_acwr = Number(latestSnap.acwr);
+
+      const triGenerated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-triathlon-plan', triGenerateBody);
+      const triPlanId = triGenerated?.plan_id;
+      if (!triPlanId) throw new AppError('plan_generation_failed', triGenerated?.error || 'Triathlon plan generation returned no plan_id');
+      createdPlanId = triPlanId;
+
+      await supabase.from('plans').update({ goal_id: createdGoalId, plan_mode: 'rolling' }).eq('id', triPlanId).eq('user_id', user_id);
+      await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: triPlanId });
+
+      if (replace_plan_id) {
+        const weekStart = currentWeekMondayISO();
+        await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', weekStart);
+        await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: triPlanId, sport: 'triathlon', distance: triDistanceApi }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    // ── End triathlon path ────────────────────────────────────────────────
 
     const distanceApi = distanceToApiValue(resolvedGoal?.distance || null);
     if (!distanceApi) throw new AppError('missing_distance', 'Select a race distance to build a plan.');

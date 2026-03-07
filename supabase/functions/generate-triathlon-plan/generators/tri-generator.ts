@@ -1,0 +1,666 @@
+// Triathlon Plan Generator
+//
+// Philosophy: Periodized multi-sport training aligned with run plan patterns.
+// - Base → Build → Race-Specific → Taper phase structure
+// - Brick sessions introduced in Build, peak in Race-Specific phase
+// - Three-discipline weekly load budget seeded from athlete current state
+// - Existing materialize-plan bike_ / swim_ / run token vocabulary
+// - Session types use the same 'run' | 'bike' | 'swim' type field as workouts table
+
+import {
+  TriGeneratorParams,
+  TriSession,
+  TriTrainingPlan,
+  TriPhase,
+  TriPhaseStructure,
+  TriWeeklySummary,
+  TRI_VOLUME,
+  TriDistance,
+} from '../types.ts';
+
+// ============================================================================
+// SWIM VOLUME TABLES (yards/week at peak by distance × fitness)
+// ============================================================================
+
+const SWIM_YARDS_PEAK: Record<TriDistance, Record<string, number>> = {
+  sprint:  { beginner: 5000,  intermediate: 8000,  advanced: 12000 },
+  olympic: { beginner: 8000,  intermediate: 12000, advanced: 16000 },
+  '70.3':  { beginner: 10000, intermediate: 15000, advanced: 20000 },
+  ironman: { beginner: 14000, intermediate: 20000, advanced: 26000 },
+};
+
+const SWIM_YARDS_START: Record<TriDistance, Record<string, number>> = {
+  sprint:  { beginner: 2500,  intermediate: 4000,  advanced: 6000  },
+  olympic: { beginner: 4000,  intermediate: 6000,  advanced: 8000  },
+  '70.3':  { beginner: 5000,  intermediate: 7500,  advanced: 10000 },
+  ironman: { beginner: 7000,  intermediate: 10000, advanced: 13000 },
+};
+
+// ============================================================================
+// LONG RUN PROGRESSIONS (miles) — mirrors sustainable generator tables
+// ============================================================================
+
+const LONG_RUN_PROGRESSION: Record<TriDistance, Record<string, number[]>> = {
+  sprint: {
+    beginner:     [3, 4, 4, 3, 4, 5, 5, 4, 5, 6, 6, 4],
+    intermediate: [4, 5, 5, 4, 5, 6, 6, 5, 6, 7, 7, 5],
+    advanced:     [5, 6, 7, 5, 7, 8, 8, 6, 8, 9, 9, 7],
+  },
+  olympic: {
+    beginner:     [4, 5, 5, 4, 5, 6, 7, 5, 6, 7, 8, 6, 8, 5, 3],
+    intermediate: [5, 6, 7, 5, 7, 8, 9, 7, 8, 9, 10, 7, 9, 6, 4],
+    advanced:     [6, 7, 8, 6, 8, 9, 10, 8, 10, 11, 12, 8, 10, 7, 5],
+  },
+  '70.3': {
+    beginner:     [5, 6, 6, 5, 6, 7, 8, 6, 7, 8, 9, 7, 9, 10, 7, 5, 3],
+    intermediate: [6, 7, 8, 6, 8, 9, 10, 7, 9, 10, 11, 8, 11, 12, 9, 6, 4],
+    advanced:     [8, 9, 10, 7, 9, 10, 11, 8, 11, 12, 13, 9, 12, 14, 10, 7, 5],
+  },
+  ironman: {
+    beginner:     [6, 7, 7, 6, 7, 8, 9, 7, 9, 10, 11, 8, 11, 13, 15, 11, 14, 16, 12, 8, 5, 3],
+    intermediate: [8, 9, 10, 8, 10, 11, 12, 9, 11, 13, 14, 10, 13, 15, 17, 12, 16, 18, 14, 10, 6, 4],
+    advanced:     [10, 11, 12, 9, 12, 13, 14, 10, 14, 15, 16, 11, 15, 17, 19, 13, 17, 20, 15, 11, 7, 5],
+  },
+};
+
+// Long ride progressions (hours)
+const LONG_RIDE_PROGRESSION: Record<TriDistance, Record<string, number[]>> = {
+  sprint: {
+    beginner:     [0.75, 1.0, 1.25, 1.0, 1.25, 1.5, 1.5, 1.0, 1.5, 1.75, 1.75, 1.25],
+    intermediate: [1.0,  1.25, 1.5, 1.0, 1.5, 1.75, 2.0, 1.5, 1.75, 2.0, 2.0, 1.5],
+    advanced:     [1.25, 1.5, 1.75, 1.25, 1.75, 2.0, 2.25, 1.75, 2.0, 2.25, 2.5, 1.75],
+  },
+  olympic: {
+    beginner:     [1.25, 1.5, 1.75, 1.25, 1.75, 2.0, 2.25, 1.5, 2.0, 2.25, 2.5, 1.75, 2.5, 1.5, 1.0],
+    intermediate: [1.5, 1.75, 2.0, 1.5, 2.0, 2.25, 2.5, 1.75, 2.25, 2.75, 3.0, 2.0, 3.0, 1.75, 1.25],
+    advanced:     [2.0, 2.25, 2.5, 1.75, 2.5, 2.75, 3.0, 2.25, 2.75, 3.0, 3.5, 2.5, 3.5, 2.0, 1.5],
+  },
+  '70.3': {
+    beginner:     [1.75, 2.0, 2.25, 1.75, 2.25, 2.5, 2.75, 2.0, 2.75, 3.0, 3.25, 2.5, 3.25, 3.5, 2.5, 1.75, 1.25],
+    intermediate: [2.5, 2.75, 3.0, 2.25, 3.0, 3.25, 3.5, 2.5, 3.5, 3.75, 4.0, 3.0, 4.0, 4.5, 3.0, 2.0, 1.5],
+    advanced:     [3.0, 3.25, 3.5, 2.5, 3.5, 3.75, 4.0, 3.0, 4.0, 4.5, 5.0, 3.5, 4.75, 5.5, 3.75, 2.5, 1.75],
+  },
+  ironman: {
+    beginner:     [2.75, 3.0, 3.25, 2.5, 3.25, 3.5, 3.75, 2.75, 3.75, 4.0, 4.25, 3.0, 4.25, 4.75, 5.25, 3.75, 4.75, 5.5, 4.0, 2.75, 1.75, 1.25],
+    intermediate: [3.5, 3.75, 4.0, 3.0, 4.0, 4.25, 4.5, 3.25, 4.5, 5.0, 5.5, 4.0, 5.5, 6.0, 6.5, 4.5, 6.0, 7.0, 5.0, 3.5, 2.25, 1.5],
+    advanced:     [4.5, 4.75, 5.0, 3.5, 5.0, 5.25, 5.5, 4.0, 5.5, 6.0, 6.5, 4.5, 6.5, 7.0, 7.5, 5.0, 7.0, 8.5, 5.75, 4.0, 2.5, 1.75],
+  },
+};
+
+// ============================================================================
+// MAIN GENERATOR CLASS
+// ============================================================================
+
+export class TriathlonGenerator {
+  protected params: TriGeneratorParams;
+
+  constructor(params: TriGeneratorParams) {
+    this.params = params;
+  }
+
+  generatePlan(): TriTrainingPlan {
+    const phaseStructure = this.determinePhaseStructure();
+    const sessions_by_week: Record<string, TriSession[]> = {};
+    const weekly_summaries: Record<string, TriWeeklySummary> = {};
+
+    for (let week = 1; week <= this.params.duration_weeks; week++) {
+      const phase = this.getCurrentPhase(week, phaseStructure);
+      const isRecovery = this.isRecoveryWeek(week, phaseStructure);
+      const weekSessions = this.generateWeek(week, phase, phaseStructure, isRecovery);
+      sessions_by_week[String(week)] = weekSessions;
+      weekly_summaries[String(week)] = this.buildWeeklySummary(week, weekSessions, phase, isRecovery);
+    }
+
+    return {
+      name: this.planName(),
+      description: this.planDescription(phaseStructure),
+      duration_weeks: this.params.duration_weeks,
+      units: this.params.units ?? 'imperial',
+      swim_unit: 'yd',
+      baselines_required: {
+        run:  ['easyPace'],
+        bike: ['ftp'],
+        swim: ['swim_pace_per_100_sec'],
+      },
+      weekly_summaries,
+      sessions_by_week,
+    };
+  }
+
+  // ============================================================================
+  // PHASE STRUCTURE
+  // ============================================================================
+
+  determinePhaseStructure(): TriPhaseStructure {
+    const d = this.params.duration_weeks;
+    const vol = TRI_VOLUME[this.params.distance]?.[this.params.fitness];
+    const taperW = vol?.taperWeeks ?? 2;
+
+    let phases: TriPhase[];
+
+    if (d <= 10) {
+      // Short: Base + Build + Taper
+      const base  = Math.max(2, Math.round(d * 0.40));
+      const build = Math.max(2, d - base - taperW);
+      phases = [
+        { name: 'Base',  start_week: 1,          end_week: base,           weeks_in_phase: base,  focus: 'Aerobic foundation across all three disciplines', quality_density: 'low',  volume_multiplier: 0.70, bricks_per_week: 0 },
+        { name: 'Build', start_week: base + 1,    end_week: base + build,   weeks_in_phase: build, focus: 'Discipline-specific quality + first bricks',       quality_density: 'high', volume_multiplier: 1.00, bricks_per_week: 1 },
+        { name: 'Taper', start_week: base+build+1,end_week: d,              weeks_in_phase: taperW,focus: 'Race sharpening and recovery',                       quality_density: 'low',  volume_multiplier: 0.55, bricks_per_week: 0 },
+      ];
+    } else if (d <= 16) {
+      // Medium: Base + Build + Race-Specific + Taper
+      const base  = Math.max(3, Math.round(d * 0.30));
+      const rs    = Math.max(2, Math.round(d * 0.18));
+      const build = Math.max(3, d - base - rs - taperW);
+      const bStart = base + 1;
+      const rsStart = bStart + build;
+      phases = [
+        { name: 'Base',          start_week: 1,       end_week: base,          weeks_in_phase: base,  focus: 'Multi-sport aerobic base',                              quality_density: 'low',    volume_multiplier: 0.70, bricks_per_week: 0 },
+        { name: 'Build',         start_week: bStart,  end_week: bStart+build-1, weeks_in_phase: build, focus: 'Threshold work + weekly bricks',                        quality_density: 'high',   volume_multiplier: 1.00, bricks_per_week: 1 },
+        { name: 'Race-Specific', start_week: rsStart, end_week: rsStart+rs-1,   weeks_in_phase: rs,    focus: 'Race-pace rehearsal + back-to-back long sessions',      quality_density: 'medium', volume_multiplier: 0.95, bricks_per_week: 2 },
+        { name: 'Taper',         start_week: rsStart+rs, end_week: d,           weeks_in_phase: taperW,focus: 'Race sharpening',                                       quality_density: 'low',    volume_multiplier: 0.55, bricks_per_week: 0 },
+      ];
+    } else {
+      // Long (Ironman / 70.3): Base + Build + Race-Specific + Taper
+      const base  = Math.max(4, Math.round(d * 0.28));
+      const rs    = Math.max(3, Math.round(d * 0.18));
+      const build = Math.max(4, d - base - rs - taperW);
+      const bStart  = base + 1;
+      const rsStart = bStart + build;
+      phases = [
+        { name: 'Base',          start_week: 1,        end_week: base,           weeks_in_phase: base,  focus: 'Aerobic base + technique across disciplines',           quality_density: 'low',    volume_multiplier: 0.68, bricks_per_week: 0 },
+        { name: 'Build',         start_week: bStart,   end_week: bStart+build-1, weeks_in_phase: build, focus: 'Volume + quality: threshold + brick integration',       quality_density: 'high',   volume_multiplier: 1.00, bricks_per_week: 1 },
+        { name: 'Race-Specific', start_week: rsStart,  end_week: rsStart+rs-1,   weeks_in_phase: rs,    focus: 'Race-pace simulation + back-to-back long days',         quality_density: 'medium', volume_multiplier: 0.90, bricks_per_week: 2 },
+        { name: 'Taper',         start_week: rsStart+rs,end_week: d,             weeks_in_phase: taperW,focus: 'Race sharpening and full recovery',                      quality_density: 'low',    volume_multiplier: 0.50, bricks_per_week: 0 },
+      ];
+    }
+
+    // Recovery weeks every 4th week (not in taper)
+    const taperStart = phases.find(p => p.name === 'Taper')?.start_week ?? d;
+    const recovery_weeks: number[] = [];
+    for (let w = 4; w < taperStart; w += 4) {
+      recovery_weeks.push(w);
+    }
+
+    return { phases, recovery_weeks };
+  }
+
+  protected getCurrentPhase(week: number, ps: TriPhaseStructure): TriPhase {
+    for (const p of ps.phases) {
+      if (week >= p.start_week && week <= p.end_week) return p;
+    }
+    return ps.phases[ps.phases.length - 1];
+  }
+
+  protected isRecoveryWeek(week: number, ps: TriPhaseStructure): boolean {
+    return ps.recovery_weeks.includes(week);
+  }
+
+  // ============================================================================
+  // WEEK GENERATION
+  // ============================================================================
+
+  protected generateWeek(
+    week: number,
+    phase: TriPhase,
+    ps: TriPhaseStructure,
+    isRecovery: boolean,
+  ): TriSession[] {
+    const vol = TRI_VOLUME[this.params.distance]?.[this.params.fitness]!;
+
+    // Scale long run from progression table (seeded by recent fitness if provided)
+    const longRunMi = this.getLongRun(week, phase, isRecovery);
+    // Scale long ride from progression table
+    const longRideHr = this.getLongRide(week, phase, isRecovery);
+
+    // Volume multiplier
+    const vm = isRecovery ? 0.65 : phase.volume_multiplier;
+
+    // Weekly run mileage (excluding long run)
+    const peakRunMi  = vol.peakRunMiles;
+    const startRunMi = this.resolveStartRunMiles(vol.startRunMiles);
+    const weekRunMi  = this.lerp(startRunMi, peakRunMi, week, this.params.duration_weeks) * vm;
+    const supportRunMi = Math.max(0, weekRunMi - longRunMi);
+
+    // Weekly swim yardage
+    const peakSwimYd  = SWIM_YARDS_PEAK[this.params.distance]?.[this.params.fitness] ?? 10000;
+    const startSwimYd = this.resolveStartSwimYards(SWIM_YARDS_START[this.params.distance]?.[this.params.fitness] ?? 5000);
+    const weekSwimYd  = Math.round(this.lerp(startSwimYd, peakSwimYd, week, this.params.duration_weeks) * vm);
+
+    const isTaper = phase.name === 'Taper';
+    const bricksThisWeek = isRecovery || isTaper ? 0 : phase.bricks_per_week;
+
+    const sessions: TriSession[] = [];
+
+    // ── Sunday: Long Run ────────────────────────────────────────────────────
+    if (longRunMi > 0) {
+      sessions.push(this.longRunSession(longRunMi, 'Sunday'));
+    }
+
+    // ── Saturday: Long Ride (or Brick in Build/Race-Specific) ───────────────
+    if (longRideHr > 0) {
+      if (bricksThisWeek >= 1 && phase.name !== 'Base') {
+        sessions.push(...this.brickSession(longRideHr, Math.min(20, Math.round(longRunMi * 0.20)), 'Saturday'));
+      } else {
+        sessions.push(this.longRideSession(longRideHr, 'Saturday'));
+      }
+    }
+
+    // ── Tuesday: Bike Quality ────────────────────────────────────────────────
+    if (!isTaper || isRecovery) {
+      sessions.push(this.bikeQualitySession(phase, isRecovery, 'Tuesday'));
+    } else {
+      // Taper: short openers ride
+      sessions.push(this.bikeOpenersSession('Tuesday'));
+    }
+
+    // ── Wednesday: Run Quality + Swim (can be same day) ─────────────────────
+    const runQualMi = this.runQualityMiles(phase, isRecovery, week);
+    sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
+    sessions.push(this.swimQualitySession(weekSwimYd, phase, isRecovery, 'Wednesday'));
+
+    // ── Thursday: Second Brick (Race-Specific) or Endurance Ride ─────────────
+    if (bricksThisWeek >= 2) {
+      const brickBikeHr = Math.max(0.75, longRideHr * 0.5);
+      const brickRunMin = 20;
+      sessions.push(...this.brickSession(brickBikeHr, brickRunMin, 'Thursday'));
+    } else {
+      const midRideHr = isRecovery ? longRideHr * 0.5 : longRideHr * 0.6;
+      sessions.push(this.midRideSession(midRideHr, 'Thursday'));
+    }
+
+    // ── Monday: Easy Recovery Swim ───────────────────────────────────────────
+    const recSwimYd = Math.max(1500, Math.round(weekSwimYd * 0.35));
+    sessions.push(this.easySwimSession(recSwimYd, 'Monday'));
+
+    // ── Friday: Easy Run (if support run mileage remains) ────────────────────
+    if (supportRunMi >= 3 && !isTaper) {
+      const easyRunMi = Math.max(3, Math.round(supportRunMi * 0.6));
+      sessions.push(this.easyRunSession(easyRunMi, 'Friday'));
+    }
+
+    // ── Strength (optional, Monday AM or Friday) ──────────────────────────────
+    if ((this.params.strength_frequency ?? 0) > 0 && !isRecovery) {
+      sessions.push(this.strengthSession('Monday'));
+      if ((this.params.strength_frequency ?? 0) >= 2) {
+        sessions.push(this.strengthSession('Friday'));
+      }
+    }
+
+    return sessions;
+  }
+
+  // ============================================================================
+  // PROGRESSION HELPERS
+  // ============================================================================
+
+  protected getLongRun(week: number, phase: TriPhase, isRecovery: boolean): number {
+    const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness] ?? [];
+    if (progression.length === 0) return 0;
+
+    const offset = this.getProgressionOffset(progression);
+    const idx = Math.min(offset + (week - 1), progression.length - 1);
+    let miles = progression[idx];
+
+    if (isRecovery) miles = Math.round(miles * 0.70);
+    if (phase.name === 'Taper') miles = Math.max(3, Math.round(miles * 0.55));
+
+    return Math.max(0, miles);
+  }
+
+  protected getLongRide(week: number, phase: TriPhase, isRecovery: boolean): number {
+    const progression = LONG_RIDE_PROGRESSION[this.params.distance]?.[this.params.fitness] ?? [];
+    if (progression.length === 0) return 0;
+
+    const offset = this.getRideProgressionOffset(progression);
+    const idx = Math.min(offset + (week - 1), progression.length - 1);
+    let hours = progression[idx];
+
+    if (isRecovery) hours = Math.round(hours * 0.70 * 4) / 4; // round to 0.25
+    if (phase.name === 'Taper') hours = Math.max(0.75, Math.round(hours * 0.55 * 4) / 4);
+
+    return Math.max(0, Math.round(hours * 4) / 4);
+  }
+
+  protected getProgressionOffset(progression: number[]): number {
+    const recentLR = this.params.recent_long_run_miles;
+    if (!recentLR || recentLR <= 0) return 0;
+    const target = recentLR * 0.95;
+    let best = 0;
+    for (let i = 0; i < progression.length; i++) {
+      if (progression[i] <= target) best = i; else break;
+    }
+    const max = Math.max(0, progression.length - this.params.duration_weeks);
+    return Math.min(best, max);
+  }
+
+  protected getRideProgressionOffset(progression: number[]): number {
+    const recentRide = this.params.recent_long_ride_hours;
+    if (!recentRide || recentRide <= 0) return 0;
+    const target = recentRide * 0.95;
+    let best = 0;
+    for (let i = 0; i < progression.length; i++) {
+      if (progression[i] <= target) best = i; else break;
+    }
+    const max = Math.max(0, progression.length - this.params.duration_weeks);
+    return Math.min(best, max);
+  }
+
+  protected resolveStartRunMiles(tableStart: number): number {
+    const current = this.params.current_weekly_run_miles;
+    if (!current || current <= 0) return tableStart;
+    const vol = TRI_VOLUME[this.params.distance]?.[this.params.fitness]!;
+    let effective = Math.max(tableStart * 0.7, Math.min(vol.peakRunMiles * 0.95, current));
+    if (this.params.current_acwr != null && this.params.current_acwr > 1.3) {
+      effective *= Math.max(0.80, 1.0 - (this.params.current_acwr - 1.3) * 0.5);
+    }
+    if (this.params.volume_trend === 'declining') effective *= 0.95;
+    return Math.round(effective);
+  }
+
+  protected resolveStartSwimYards(tableStart: number): number {
+    const current = this.params.current_weekly_swim_yards;
+    if (!current || current <= 0) return tableStart;
+    const peakYd = SWIM_YARDS_PEAK[this.params.distance]?.[this.params.fitness] ?? 15000;
+    return Math.max(tableStart * 0.7, Math.min(peakYd * 0.95, current));
+  }
+
+  protected runQualityMiles(phase: TriPhase, isRecovery: boolean, week: number): number {
+    if (isRecovery || phase.name === 'Taper') return 4;
+    const vol = TRI_VOLUME[this.params.distance]?.[this.params.fitness]!;
+    const start = Math.max(3, Math.round(vol.startRunMiles * 0.20));
+    const peak  = Math.max(5, Math.round(vol.peakRunMiles  * 0.22));
+    return Math.round(this.lerp(start, peak, week, this.params.duration_weeks));
+  }
+
+  /** Linear interpolation scaled to week position (0→1 across plan) */
+  protected lerp(start: number, end: number, week: number, total: number): number {
+    const t = Math.min(1, (week - 1) / Math.max(1, total - 1));
+    return start + (end - start) * t;
+  }
+
+  // ============================================================================
+  // SESSION FACTORIES
+  // ============================================================================
+
+  protected longRunSession(miles: number, day: string): TriSession {
+    return {
+      day, type: 'run', name: 'Long Run',
+      description: `${miles} miles at easy, conversational pace. Heart rate Zone 2.`,
+      duration: Math.round(miles * this.easyPaceMinPerMile()),
+      steps_preset: [`longrun_${miles}mi_easypace`],
+      tags: ['long_run', 'endurance'],
+    };
+  }
+
+  protected easyRunSession(miles: number, day: string): TriSession {
+    return {
+      day, type: 'run', name: 'Easy Run',
+      description: `${miles} miles easy. Active recovery from bike/swim sessions.`,
+      duration: Math.round(miles * this.easyPaceMinPerMile()),
+      steps_preset: [`run_easy_${miles}mi`],
+      tags: ['easy_run'],
+    };
+  }
+
+  protected runQualitySession(miles: number, phase: TriPhase, day: string): TriSession {
+    const isTaper = phase.name === 'Taper';
+    if (isTaper) {
+      return this.easyRunSession(miles, day);
+    }
+    if (phase.name === 'Base') {
+      return {
+        day, type: 'run', name: 'Easy Run + Strides',
+        description: `${miles} miles easy with 6×20s strides to maintain leg turnover.`,
+        duration: Math.round(miles * this.easyPaceMinPerMile()) + 5,
+        steps_preset: [`run_easy_${miles}mi`, 'strides_6x20s'],
+        tags: ['easy_run', 'strides'],
+      };
+    }
+    // Build / Race-Specific: tempo or intervals
+    if (phase.name === 'Race-Specific') {
+      const tempoMi = Math.max(2, Math.round(miles * 0.55));
+      return {
+        day, type: 'run', name: 'Tempo Run',
+        description: `Warm-up 1 mi, ${tempoMi} mi at threshold / 10K effort, cool-down 1 mi.`,
+        duration: Math.round((miles + 2) * this.easyPaceMinPerMile()) + 5,
+        steps_preset: ['warmup_run_easy_1mi', `tempo_${tempoMi}mi_threshold`, 'cooldown_easy_1mi'],
+        tags: ['tempo', 'hard_run', 'threshold'],
+      };
+    }
+    // Build: intervals
+    const reps = this.params.distance === 'sprint' ? 4 : this.params.distance === 'olympic' ? 5 : 6;
+    return {
+      day, type: 'run', name: 'Run Intervals',
+      description: `Warm-up 1 mi, ${reps}×800m at 5K effort (90s jog recovery), cool-down 1 mi.`,
+      duration: Math.round(miles * this.easyPaceMinPerMile()) + 10,
+      steps_preset: ['warmup_run_easy_1mi', `interval_${reps}x800m_5kpace_r90s`, 'cooldown_easy_1mi'],
+      tags: ['intervals', 'hard_run'],
+    };
+  }
+
+  protected longRideSession(hours: number, day: string): TriSession {
+    const mins = Math.round(hours * 60);
+    return {
+      day, type: 'bike', name: 'Long Ride',
+      description: `${hours.toFixed(2).replace(/\.?0+$/, '')}h aerobic endurance ride. Stay in Zone 2 (55–75% FTP). Focus on fueling practice.`,
+      duration: mins,
+      steps_preset: [`bike_endurance_${mins}min_Z2`],
+      tags: ['long_ride', 'endurance'],
+    };
+  }
+
+  protected midRideSession(hours: number, day: string): TriSession {
+    const mins = Math.round(hours * 60);
+    return {
+      day, type: 'bike', name: 'Aerobic Ride',
+      description: `${Math.round(hours * 60)} min steady aerobic ride at 65–75% FTP.`,
+      duration: mins,
+      steps_preset: [`bike_endurance_${mins}min_Z2`],
+      tags: ['aerobic_ride'],
+    };
+  }
+
+  protected bikeQualitySession(phase: TriPhase, isRecovery: boolean, day: string): TriSession {
+    if (isRecovery || phase.name === 'Base') {
+      return {
+        day, type: 'bike', name: 'Aerobic Ride',
+        description: `60 min steady aerobic ride. Zone 2 effort (55–75% FTP). Good pedal mechanics.`,
+        duration: 60,
+        steps_preset: ['bike_endurance_60min_Z2'],
+        tags: ['aerobic_ride'],
+      };
+    }
+    if (phase.name === 'Taper') {
+      return this.bikeOpenersSession(day);
+    }
+    if (phase.name === 'Race-Specific') {
+      return {
+        day, type: 'bike', name: 'Sweet Spot Intervals',
+        description: `Warm-up 10 min, 3×15 min at sweet spot (88–93% FTP) with 5 min recovery, cool-down 10 min.`,
+        duration: 75,
+        steps_preset: ['warmup_bike_quality_10min_fastpedal', 'bike_ss_3x15min_r5min', 'cooldown_easy_10min'],
+        tags: ['sweet_spot', 'hard_ride', 'threshold'],
+      };
+    }
+    // Build: threshold intervals
+    return {
+      day, type: 'bike', name: 'Threshold Intervals',
+      description: `Warm-up 10 min, 4×8 min at threshold (95–105% FTP) with 5 min recovery, cool-down 10 min.`,
+      duration: 82,
+      steps_preset: ['warmup_bike_quality_10min_fastpedal', 'bike_thr_4x8min_r5min', 'cooldown_easy_10min'],
+      tags: ['threshold', 'hard_ride'],
+    };
+  }
+
+  protected bikeOpenersSession(day: string): TriSession {
+    return {
+      day, type: 'bike', name: 'Race Openers',
+      description: `30 min easy spin with 4×30s race-pace efforts to open the legs. Stay relaxed.`,
+      duration: 35,
+      steps_preset: ['bike_openers'],
+      tags: ['openers', 'easy_ride'],
+    };
+  }
+
+  /** Returns TWO sessions: the bike leg and the run leg, both on the same day.
+   *  Swim timing mirrors run+strength doubles: bike = AM, run = PM. */
+  protected brickSession(bikeHours: number, runMinutes: number, day: string): TriSession[] {
+    const bikeMins = Math.round(bikeHours * 60);
+    const runMi    = Math.max(2, Math.round(runMinutes / this.easyPaceMinPerMile()));
+    return [
+      {
+        day, type: 'bike', name: 'Brick — Bike Leg',
+        description: `${bikeHours.toFixed(2).replace(/\.?0+$/, '')}h at aerobic/race effort. Finish strong last 10 min. Transition directly to run.`,
+        duration: bikeMins,
+        steps_preset: [`bike_endurance_${bikeMins}min_Z2`],
+        tags: ['brick', 'long_ride'],
+        timing: 'AM',
+      },
+      {
+        day, type: 'run', name: 'Brick — Run Leg',
+        description: `${runMi} miles off the bike. First mile feels awkward — this is normal. Settle into race effort.`,
+        duration: Math.round(runMi * this.easyPaceMinPerMile()),
+        steps_preset: [`run_easy_${runMi}mi`],
+        tags: ['brick', 'easy_run'],
+        timing: 'PM (immediately after bike)',
+      },
+    ];
+  }
+
+  protected swimQualitySession(weekYards: number, phase: TriPhase, isRecovery: boolean, day: string): TriSession {
+    // Main swim session is ~40% of weekly yardage
+    const yd = Math.max(1500, Math.round(weekYards * 0.40 / 50) * 50);
+
+    if (isRecovery || phase.name === 'Base') {
+      const mainYd = Math.max(800, yd - 600);
+      return {
+        day, type: 'swim', name: 'Aerobic Swim',
+        description: `${yd} yards. Warm-up 300, ${mainYd} yards aerobic, cool-down 200. Focus on technique.`,
+        duration: Math.round(yd / 50),
+        steps_preset: ['swim_warmup_300yd_easy', `swim_aerobic_${Math.floor(mainYd/100)}x100yd_easy_r15`, 'swim_cooldown_200yd'],
+        tags: ['aerobic_swim'],
+      };
+    }
+    if (phase.name === 'Race-Specific') {
+      const sets = Math.max(4, Math.round((yd - 500) / 100));
+      return {
+        day, type: 'swim', name: 'CSS Intervals',
+        description: `${yd} yards. Warm-up 300, ${sets}×100 at CSS pace (10s rest), cool-down 200.`,
+        duration: Math.round(yd / 45),
+        steps_preset: ['swim_warmup_300yd_easy', `swim_threshold_${sets}x100yd_r10`, 'swim_cooldown_200yd'],
+        tags: ['swim_intervals', 'hard_swim', 'threshold'],
+      };
+    }
+    // Build: aerobic sets with some pace work
+    const sets = Math.max(4, Math.round((yd - 500) / 150));
+    return {
+      day, type: 'swim', name: 'Swim Build',
+      description: `${yd} yards. Warm-up 300, ${sets}×150 aerobic (20s rest), cool-down 200.`,
+      duration: Math.round(yd / 48),
+      steps_preset: ['swim_warmup_300yd_easy', `swim_aerobic_${sets}x150yd_r20`, 'swim_cooldown_200yd'],
+      tags: ['aerobic_swim', 'swim_build'],
+    };
+  }
+
+  protected easySwimSession(yards: number, day: string): TriSession {
+    const roundedYd = Math.round(yards / 50) * 50;
+    return {
+      day, type: 'swim', name: 'Easy Swim',
+      description: `${roundedYd} yards easy. Drills + aerobic sets. Active recovery.`,
+      duration: Math.round(roundedYd / 50),
+      steps_preset: ['swim_warmup_300yd_easy', `swim_aerobic_${Math.max(3, Math.round((roundedYd - 500) / 100))}x100yd_easy_r20`, 'swim_cooldown_200yd'],
+      tags: ['easy_swim'],
+    };
+  }
+
+  protected strengthSession(day: string): TriSession {
+    return {
+      day, type: 'strength', name: 'Triathlon Strength',
+      description: 'Single-leg stability, hip strength, shoulder endurance. 40 min total.',
+      duration: 40,
+      tags: ['strength', 'durability'],
+    };
+  }
+
+  // ============================================================================
+  // PACE HELPERS
+  // ============================================================================
+
+  protected easyPaceMinPerMile(): number {
+    const paces: Record<string, number> = { beginner: 11.0, intermediate: 9.5, advanced: 8.0 };
+    return paces[this.params.fitness] ?? 9.5;
+  }
+
+  // ============================================================================
+  // WEEKLY SUMMARY
+  // ============================================================================
+
+  protected buildWeeklySummary(
+    _week: number,
+    sessions: TriSession[],
+    phase: TriPhase,
+    isRecovery: boolean,
+  ): TriWeeklySummary {
+    const hardCount = sessions.filter(s =>
+      s.tags.some(t => ['hard_run', 'hard_ride', 'hard_swim', 'threshold', 'intervals', 'sweet_spot', 'swim_intervals'].includes(t))
+    ).length;
+
+    const totalMins = sessions.reduce((sum, s) => sum + s.duration, 0);
+    const hours = Math.round(totalMins / 60 * 10) / 10;
+
+    const runMi = sessions
+      .filter(s => s.type === 'run')
+      .reduce((sum, s) => {
+        const m = s.description.match(/(\d+)\s*miles?/i);
+        return sum + (m ? Number(m[1]) : 0);
+      }, 0);
+
+    const bikeHr = sessions
+      .filter(s => s.type === 'bike')
+      .reduce((sum, s) => sum + s.duration / 60, 0);
+
+    const swimYd = sessions
+      .filter(s => s.type === 'swim')
+      .reduce((sum, s) => {
+        const m = s.description.match(/(\d+)\s*yards?/i);
+        return sum + (m ? Number(m[1]) : 0);
+      }, 0);
+
+    const keyWorkouts = sessions
+      .filter(s => s.tags.some(t => ['long_run', 'long_ride', 'brick', 'threshold', 'swim_intervals'].includes(t)))
+      .map(s => s.name);
+
+    return {
+      focus: isRecovery ? 'Recovery Week' : phase.focus,
+      key_workouts: [...new Set(keyWorkouts)],
+      estimated_hours: hours,
+      hard_sessions: hardCount,
+      total_run_miles: Math.round(runMi * 10) / 10,
+      total_bike_hours: Math.round(bikeHr * 10) / 10,
+      total_swim_yards: Math.round(swimYd),
+      notes: isRecovery ? 'Reduced volume for recovery and adaptation' : '',
+    };
+  }
+
+  // ============================================================================
+  // PLAN METADATA
+  // ============================================================================
+
+  protected planName(): string {
+    const distLabel: Record<string, string> = {
+      sprint: 'Sprint Triathlon', olympic: 'Olympic Triathlon',
+      '70.3': '70.3 Half-Iron', ironman: 'Ironman',
+    };
+    const goalLabel = this.params.goal === 'performance' ? 'Performance' : 'Finisher';
+    const label = distLabel[this.params.distance] ?? this.params.distance;
+    if (this.params.race_name) return `${this.params.race_name} — ${goalLabel} Plan`;
+    return `${label} ${goalLabel} Plan — ${this.params.duration_weeks} Weeks`;
+  }
+
+  protected planDescription(ps: TriPhaseStructure): string {
+    const phaseNames = ps.phases.map(p => p.name).join(' → ');
+    return `A ${this.params.duration_weeks}-week ${this.params.fitness}-level triathlon plan for ${this.params.distance} racing. ` +
+      `Progresses through ${phaseNames} phases with swim, bike, run, and brick sessions each week.`;
+  }
+}

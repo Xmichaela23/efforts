@@ -24,7 +24,7 @@ const DISTANCE_OPTIONS: Record<string, string[]> = {
   run: ['5K', '10K', 'Half Marathon', 'Marathon', 'Ultra'],
   ride: ['Century', 'Metric Century', 'Gran Fondo'],
   swim: ['Sprint', 'Mile', 'Open Water'],
-  triathlon: ['Sprint', 'Olympic', '70.3', '140.6'],
+  triathlon: ['Sprint', 'Olympic', '70.3', 'Ironman'],
 };
 
 const METRIC_OPTIONS: Record<string, string[]> = {
