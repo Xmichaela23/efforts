@@ -19,11 +19,8 @@ function normalizeParagraph(text: string): string {
 function extractNumericTokens(text: string): string[] {
   const s = String(text || '');
   const out = new Set<string>();
-  // Pace tokens like 10:16/mi
   for (const m of s.matchAll(/\b\d{1,2}:\d{2}\/mi\b/g)) out.add(m[0]);
-  // Percent tokens
   for (const m of s.matchAll(/\b\d+(?:\.\d+)?%\b/g)) out.add(m[0]);
-  // Plain numbers (integers/decimals). We keep them as they appear.
   for (const m of s.matchAll(/\b\d+(?:\.\d+)?\b/g)) out.add(m[0]);
   return Array.from(out);
 }
@@ -33,8 +30,7 @@ function validateNoNewNumbers(summary: string, displayPacket: any): { ok: boolea
   const tokens = extractNumericTokens(summary);
   const bad: string[] = [];
   for (const t of tokens) {
-    // Ignore tokens that are trivially common and non-meaningful.
-    if (t === '1') continue; // version numbers etc
+    if (t === '1') continue;
     if (!displayStr.includes(t)) bad.push(t);
   }
   return { ok: bad.length === 0, bad };
@@ -55,6 +51,9 @@ function validateNoGenericFiller(summary: string): { ok: boolean; why?: string }
     'likely accumulation of fatigue',
     'consider adjusting upcoming sessions',
     'attention should be paid',
+    'be mindful of',
+    'prioritize recovery to support',
+    'in future workouts',
   ];
   const hit = banned.find((p) => s.includes(p));
   return hit ? { ok: false, why: `Generic filler phrase: "${hit}"` } : { ok: true };
@@ -62,8 +61,6 @@ function validateNoGenericFiller(summary: string): { ok: boolean; why?: string }
 
 function validateNoZoneTimeClaims(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
   const s = String(summary || '').toLowerCase();
-  // We do not currently provide time-in-zone / % in zone in the display packet.
-  // Reject any language that implies it.
   const mentionsZoneTime =
     /time spent/.test(s) ||
     /percent of the time/.test(s) ||
@@ -80,7 +77,6 @@ function validateNoZoneTimeClaims(summary: string, displayPacket: any): { ok: bo
 function countSentences(text: string): number {
   const s = normalizeParagraph(text);
   if (!s) return 0;
-  // naive sentence split; good enough for enforcing caps
   const parts = s.split(/[.!?]+/).map((p) => p.trim()).filter(Boolean);
   return parts.length;
 }
@@ -103,11 +99,11 @@ function validateAdaptiveLength(summary: string, displayPacket: any): { ok: bool
   const hasConcern = top.some((f) => f.type === 'concern' && f.priority <= 2);
   const sentences = countSentences(summary);
   const words = countWords(summary);
-  // If nothing concerning at top priority, keep it short and sharp.
   if (!hasConcern) {
-    if (sentences > 3) return { ok: false, why: `too many sentences (${sentences}) for low-signal workout` };
-    if (words > 55) return { ok: false, why: `too many words (${words}) for low-signal workout` };
+    if (sentences > 4) return { ok: false, why: `too many sentences (${sentences}) for low-signal workout` };
+    if (words > 80) return { ok: false, why: `too many words (${words}) for low-signal workout` };
   }
+  if (sentences > 6) return { ok: false, why: `too many sentences (${sentences})` };
   return { ok: true, why: null };
 }
 
@@ -123,7 +119,6 @@ function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok
   const connects = /terrain-driven|driven by the (hills|terrain)|consistent with (the )?hills|consistent with (the )?terrain|hill-driven/.test(s);
   if (!connects) return { ok: false, why: 'drift mentioned without explicitly attributing it to terrain' };
 
-  // Disallow framing drift as a negative signal when the terrain-explains flag exists.
   const negativePhrases = /despite.*drift|drift.*suggests|drift.*increase in effort|elevated drift/.test(s);
   if (negativePhrases) return { ok: false, why: 'drift framed as effort/fatigue signal despite terrain-drift flag' };
 
@@ -143,12 +138,12 @@ async function callOpenAIParagraph(openaiKey: string, prompt: string, temperatur
         {
           role: 'system',
           content:
-            'You are an expert endurance coach. Output must be a single paragraph (3-5 sentences). No bullets. No headers.',
+            'You are an expert endurance coach. Output must be a single paragraph (2-5 sentences). No bullets. No headers. No generic advice.',
         },
         { role: 'user', content: prompt },
       ],
       temperature,
-      max_tokens: 260,
+      max_tokens: 300,
     }),
   });
 
@@ -239,7 +234,6 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       elevation_gain: (coerceNumber(facts?.elevation_gain_ft) != null) ? `${Math.round(Number(facts.elevation_gain_ft))} ft` : null,
       terrain: typeof facts?.terrain_type === 'string' ? facts.terrain_type : null,
     },
-    // Plan: exclude plan name/race identifiers to prevent the LLM from inventing race-specific context.
     plan: facts?.plan
       ? {
           week_number: typeof facts.plan?.week_number === 'number' ? facts.plan.week_number : null,
@@ -249,7 +243,6 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
           is_recovery_week: typeof facts.plan?.is_recovery_week === 'boolean' ? facts.plan.is_recovery_week : null,
         }
       : null,
-    // Conditions: only include when heat stress is a factor (spec: hide weather when "nothing to report").
     conditions: (() => {
       const wx = facts?.weather;
       const level = String(wx?.heat_stress_level || '');
@@ -372,43 +365,51 @@ export async function generateAISummaryV1(
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
 
-  const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
-${coachingContext ? `\n${coachingContext}\n` : ''}
-RULES:
-- Output ONE paragraph. Sentence count must match signal:
-  - If TOP FLAGS contain no priority≤2 concerns: 2–3 sentences max.
-  - If there is a priority≤2 concern: 3–5 sentences max.
-- Lead with the most important insight (see TOP FLAGS).
-- Be specific and grounded: reference 2-4 concrete details (pace, HR, drift/decoupling, conditions, fatigue, plan intent) ONLY when they explain the outcome.
-- No filler. Avoid generic phrases like "indicating", "effective endurance training", "attention should be paid", "ensure", "focus on", "in future workouts".
-- FORBIDDEN phrasing: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing confidence", "effective management", "overall", "aligns well", "recovery-integrity cost".
-- Never say "I".
-- Never calculate.
-- CRITICAL: NEVER output pace as raw seconds. Use the provided display strings like "10:16/mi". If a pace is missing, omit it.
-- CRITICAL: Do not introduce ANY proper nouns (races, cities, events) unless they appear verbatim in DISPLAY PACKET.
-- CRITICAL: Do not introduce ANY numbers or percentages that are not present verbatim in DISPLAY PACKET.
-- If DISPLAY PACKET signals.execution.assessed_against is "actual", do NOT frame this as adherence failure. Acknowledge the plan modification briefly, then evaluate how the body handled the actual session using pace fade, drift/decoupling, terrain/conditions, and training load. Note downstream impact in one sentence (e.g., recovery priority elevated) without moralizing.
-- If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost (don’t call it “achieved recovery”).
-- Do not call it an "interval session" unless DISPLAY PACKET workout.type explicitly indicates intervals/tempo/track repeats.
-- If TOP FLAGS include a message that HR drift is consistent with hilly terrain, explicitly connect drift→terrain in ONE sentence and do not treat drift as a fatigue/effort signal.
-- Terrain continuity rule:
-  - You MAY include segment-level terrain insight only when DISPLAY PACKET signals.terrain.segment_insight_eligible is true.
-  - You MAY mention segment-level improvement/decline trends only when DISPLAY PACKET signals.terrain.segment_trend_eligible is true.
-  - If segment_trend_eligible is false, do NOT claim segment-specific improvement or decline.
-  - When signals.terrain.segment_comparisons contains data, use the ACTUAL pace_delta and hr_delta values. These are pre-calculated comparisons of this workout's performance on familiar terrain segments vs historical averages. Reference them naturally (e.g. "X seconds faster on the climb segment compared to your average").
-  - When signals.terrain.route is present, acknowledge route familiarity briefly (e.g. "on your regular route" or "Xth time on this route").
-- Interval execution rule:
-  - When signals.interval_execution is present, reference execution_score and completed_steps in context (e.g. "98% execution, all 7 steps completed").
-  - Do not repeat raw field names. Translate into coaching language.
-- Never show raw field names (no snake_case).
+  const hasIntervalExecution = !!(displayPacket as any)?.signals?.interval_execution?.execution_score;
+  const hasRoute = !!(displayPacket as any)?.signals?.terrain?.route;
+  const hasSegmentComparisons = ((displayPacket as any)?.signals?.terrain?.segment_comparisons?.length ?? 0) > 0;
 
-TOP FLAGS (lead with these):
-${(displayPacket as any).top_flags.map((f: any) => `[${f.type}] ${f.message}`).join('\n')}
+  const priorityRules: string[] = [];
+  if (hasIntervalExecution) {
+    priorityRules.push('  1. INTERVAL EXECUTION (MANDATORY LEAD): signals.interval_execution exists. Your FIRST sentence MUST reference the execution score, completed steps, and actual per-rep paces from the summary. This is the headline.');
+  } else {
+    priorityRules.push('  1. Lead with the most important insight from TOP FLAGS.');
+  }
+  if (hasRoute) {
+    priorityRules.push('  2. ROUTE CONTEXT: signals.terrain.route exists. Weave in route familiarity naturally (e.g. "on a familiar route" or reference the run count).');
+  }
+  if (hasSegmentComparisons) {
+    priorityRules.push('  3. SEGMENT COMPARISONS: Use the ACTUAL pace_delta and hr_delta values on familiar terrain segments.');
+  }
+  priorityRules.push(`  ${hasIntervalExecution ? '4' : '2'}. TOP FLAGS: address concerns (ACWR, drift, fatigue) as secondary context, not the headline. One sentence max for load/fatigue.`);
 
-DISPLAY PACKET (already formatted; use these strings verbatim):
-${JSON.stringify(displayPacket, null, 2)}
-
-Write the summary now.`;
+  const prompt = [
+    'You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.',
+    coachingContext ? '\n' + coachingContext + '\n' : '',
+    'RULES:',
+    '- Output ONE paragraph, 2-5 sentences.',
+    '- PRIORITY ORDER for what to lead with:',
+    ...priorityRules,
+    '- Be specific: reference concrete numbers from the DISPLAY PACKET (execution score, per-rep paces, HR, drift, terrain class, plan week/phase).',
+    '- No filler. No generic advice.',
+    '- FORBIDDEN: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "overall", "aligns well", "recovery-integrity cost", "prioritize recovery to support", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts".',
+    '- Never say "I". Never calculate. Never show raw field names.',
+    '- CRITICAL: NEVER output pace as raw seconds. Use display strings like "10:16/mi".',
+    '- CRITICAL: Do not introduce ANY numbers/percentages not present verbatim in DISPLAY PACKET.',
+    '- CRITICAL: Do not introduce ANY proper nouns unless they appear verbatim in DISPLAY PACKET.',
+    '- If execution.assessed_against is "actual", do NOT frame as adherence failure.',
+    '- If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost.',
+    '- If TOP FLAGS mention HR drift consistent with hilly terrain, connect drift to terrain and do not treat it as fatigue.',
+    '- Terrain: MAY include segment insight only when segment_insight_eligible is true. MAY mention trends only when segment_trend_eligible is true.',
+    '',
+    'TOP FLAGS:',
+    (displayPacket as any).top_flags.map((f: any) => '[' + f.type + '] ' + f.message).join('\n'),
+    '',
+    'DISPLAY PACKET:',
+    JSON.stringify(displayPacket, null, 2),
+    '',
+    'Write the summary now.',
+  ].join('\n');
 
   try {
     const s1 = await callOpenAIParagraph(openaiKey, prompt, 0.2);
@@ -419,9 +420,13 @@ Write the summary now.`;
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
     if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok) return s1;
-    console.warn(`[ai-summary] attempt 1 rejected: num=${v1.ok}(${v1.bad?.join(',')}) zone=${z1.ok}(${z1.why}) len=${len1.ok}(${len1.why}) td=${td1.ok}(${td1.why}) filler=${g1.ok}(${g1.why})`);
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why }));
 
-    const corrective = `${prompt}\n\nYou violated constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\n- Length violation: ${len1.why || '(none)'}\n- Terrain/drift connection violation: ${td1.why || '(none)'}\n- Coach voice violation: ${g1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided. Keep it short when there is nothing concerning.`;
+    const corrections = [
+      v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
+      z1.why, len1.why, td1.why, g1.why,
+    ].filter(Boolean);
+    const corrective = prompt + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
     if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
     const v2 = validateNoNewNumbers(s2, displayPacket);
@@ -430,12 +435,10 @@ Write the summary now.`;
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
     if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) return s2;
-    console.warn(`[ai-summary] attempt 2 also rejected: num=${v2.ok}(${v2.bad?.join(',')}) zone=${z2.ok}(${z2.why}) len=${len2.ok}(${len2.why}) td=${td2.ok}(${td2.why}) filler=${g2.ok}(${g2.why})`);
-    console.warn(`[ai-summary] returning attempt 2 anyway to avoid empty narrative`);
+    console.warn('[ai-summary] attempt 2 also rejected, returning anyway');
     return s2;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;
   }
 }
-
