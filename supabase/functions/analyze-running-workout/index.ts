@@ -582,10 +582,43 @@ Deno.serve(async (req) => {
         plannedStructuredIntervals.length > 0
       );
     const computedOnlyIntervals = Array.isArray(workout?.computed?.intervals) ? workout.computed.intervals : [];
+    const hasExecutionEvidence = (iv: any): boolean => {
+      const sIdx = Number(iv?.sample_idx_start);
+      const eIdx = Number(iv?.sample_idx_end);
+      const hasMeasuredWindow = Number.isFinite(sIdx) && Number.isFinite(eIdx) && eIdx > sIdx;
+      const hasExecutedEnvelope = !!iv?.executed && (
+        Number(iv?.executed?.duration_s ?? 0) > 0 ||
+        Number(iv?.executed?.distance_m ?? 0) > 0 ||
+        Number(iv?.executed?.avg_pace_s_per_mi ?? 0) > 0 ||
+        Number(iv?.executed?.avg_hr ?? 0) > 0
+      );
+      const hasTopLevelActuals =
+        Number(iv?.actual_duration_s ?? iv?.duration_s ?? 0) > 0 ||
+        Number(iv?.actual_distance_m ?? iv?.distance_m ?? 0) > 0 ||
+        Number(iv?.pace_s_per_mi ?? iv?.avg_pace_s_per_mi ?? iv?.actual_pace_min_per_mi ?? 0) > 0 ||
+        Number(iv?.avg_heart_rate_bpm ?? iv?.avg_hr ?? 0) > 0;
+      return hasMeasuredWindow || hasExecutedEnvelope || hasTopLevelActuals;
+    };
+
+    const plannedHasMeasuredEvidence = plannedStructuredIntervals.some((iv: any) => hasExecutionEvidence(iv));
+    const computedHasMeasuredEvidence = computedOnlyIntervals.some((iv: any) => hasExecutionEvidence(iv));
+
+    const intervalSource = isPlanLinkedWorkout
+      ? (
+          plannedHasMeasuredEvidence
+            ? 'linked-plan-primary'
+            : (computedHasMeasuredEvidence ? 'linked-plan-computed-fallback' : 'linked-plan-primary')
+        )
+      : (computedOnlyIntervals.length > 0 ? 'unlinked-sensor-primary' : 'unlinked-planned-fallback');
+
     const computedIntervals = isPlanLinkedWorkout
-      ? plannedStructuredIntervals
+      ? (
+          plannedHasMeasuredEvidence
+            ? plannedStructuredIntervals
+            : (computedHasMeasuredEvidence ? computedOnlyIntervals : plannedStructuredIntervals)
+        )
       : (computedOnlyIntervals.length > 0 ? computedOnlyIntervals : plannedStructuredIntervals);
-    console.log(`🔍 [INTERVAL SOURCE] ${isPlanLinkedWorkout ? 'linked-plan-primary' : 'unlinked-sensor-primary'} (${computedIntervals.length} intervals)`);
+    console.log(`🔍 [INTERVAL SOURCE] ${intervalSource} (${computedIntervals.length} intervals)`);
     
     // Enrich intervals with pace ranges from planned workout
     const intervalsToAnalyze = computedIntervals.map(interval => {
@@ -1197,9 +1230,11 @@ Deno.serve(async (req) => {
         
         // Calculate adherence for WORK intervals only (matches Summary view - single source of truth)
         // Summary view shows pace adherence for work intervals, not all intervals
-        const workIntervalsForAdherence = computedIntervals.filter((i: any) => 
-          (i.role === 'work' || i.kind === 'work') && i.executed
-        );
+        const workIntervalsForAdherence = computedIntervals.filter((i: any) => {
+          const role = String(i?.role ?? i?.kind ?? i?.type ?? '').toLowerCase();
+          const isWork = role === 'work' || role === 'interval' || role === 'repeat';
+          return isWork && hasExecutionEvidence(i);
+        });
         
         const intervalAdherences: number[] = [];
         
@@ -1211,7 +1246,15 @@ Deno.serve(async (req) => {
         
         for (const interval of workIntervalsForAdherence) {
           // Get the interval's actual average pace
-          const actualPace = interval.executed?.avg_pace_s_per_mi || interval.executed?.pace_s_per_mi || 0;
+          const actualPace = Number(
+            interval?.executed?.avg_pace_s_per_mi ??
+            interval?.executed?.pace_s_per_mi ??
+            interval?.pace_s_per_mi ??
+            interval?.avg_pace_s_per_mi ??
+            (Number.isFinite(Number(interval?.actual_pace_min_per_mi))
+              ? Number(interval.actual_pace_min_per_mi) * 60
+              : 0)
+          );
           
           // Get the interval's target pace range
           const paceRange = interval.pace_range || interval.target_pace || interval.planned?.pace_range;
@@ -1231,8 +1274,8 @@ Deno.serve(async (req) => {
         if (intervalAdherences.length > 0) {
           granularPaceAdherence = Math.round(intervalAdherences.reduce((sum, a) => sum + a, 0) / intervalAdherences.length);
           console.log(`🔍 [PACE ADHERENCE] Average of ${intervalAdherences.length} WORK intervals: ${granularPaceAdherence}% (matches Summary view)`);
-        } else if (workIntervalsForAdherence.length === 0) {
-          // No work intervals - this is a steady-state run, use average pace vs target (matches single-interval logic)
+        } else if (workIntervalsForAdherence.length === 0 && !isIntervalWorkout) {
+          // True steady-state run (single work step): use average pace vs target.
           console.log(`🔍 [PACE ADHERENCE] No work intervals (steady-state), calculating average pace vs target`);
           
           // Calculate overall average pace
@@ -1285,6 +1328,11 @@ Deno.serve(async (req) => {
               : 0;
             console.log(`🔍 [PACE ADHERENCE] Steady-state fallback to time-in-range: ${granularPaceAdherence}% (couldn't calculate average pace)`);
           }
+        } else if (workIntervalsForAdherence.length === 0 && isIntervalWorkout) {
+          // Planned interval workout with missing attached work executions.
+          // Keep interval classification; do not cross into steady-state logic.
+          granularPaceAdherence = 0;
+          console.warn(`⚠️ [PACE ADHERENCE] Interval workout missing attached work executions; adherence held at 0 until interval linkage is present.`);
         } else {
           // Fallback to time-in-range if we couldn't calculate per-interval adherence
           granularPaceAdherence = enhancedAnalysis.overall_adherence != null 
@@ -1697,7 +1745,9 @@ Deno.serve(async (req) => {
     // CRITICAL: Preserve analysis.series and overall from compute-workout-analysis (contains chart data and metrics)
     const minimalComputed: any = {
       version: workoutToUse.computed?.version || workout.computed?.version || '1.0',
-      intervals: computedIntervals,  // Enhanced with granular_metrics
+      // computed.* is owned by compute-workout-analysis/summary.
+      // Do not overwrite intervals here to avoid persisting plan-shaped analysis artifacts.
+      intervals: workoutToUse.computed?.intervals || workout.computed?.intervals || [],
       planned_steps_light: workoutToUse.computed?.planned_steps_light || workout.computed?.planned_steps_light || null
     };
     // Only include overall/analysis if they exist (preserve from compute-workout-analysis)
@@ -3434,6 +3484,7 @@ function buildSessionIntervalRows(
 } {
   const plannedSteps: any[] = Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [];
   const expectedWorkRows = getPlannedWorkSteps(plannedWorkout).length;
+  const isStructuredIntervalSession = expectedWorkRows >= 2;
   if (!plannedSteps.length) {
     return {
       rows: [],
@@ -3481,7 +3532,9 @@ function buildSessionIntervalRows(
     if (!match) {
       match = computedIntervals.find((it: any) =>
         String(it?.planned_step_id || '') === stepId ||
-        Number(it?.planned_index) === idx
+        Number(it?.planned_index) === idx ||
+        Number(it?.step_index) === idx ||
+        (Number.isFinite(Number(it?.interval_number)) && (Number(it.interval_number) - 1) === idx)
       ) || null;
     }
 
@@ -3494,19 +3547,51 @@ function buildSessionIntervalRows(
       return t || p || (stepKind === 'work' ? `Work ${idx + 1}` : stepKind.charAt(0).toUpperCase() + stepKind.slice(1));
     })();
 
-    const executedDuration = Number(match?.actual_duration_s ?? match?.executed?.duration_s ?? 0);
-    const executedDistance = Number(match?.actual_distance_m ?? match?.executed?.distance_m ?? 0);
-    const executedHr = Number(
-      match?.avg_heart_rate_bpm ??
-      match?.executed?.avg_hr ??
-      match?.executed?.avgHr ??
-      0
+    const sIdx = Number(match?.sample_idx_start);
+    const eIdx = Number(match?.sample_idx_end);
+    const hasMeasuredWindow = Number.isFinite(sIdx) && Number.isFinite(eIdx) && eIdx > sIdx;
+    const hasActualTopLevel =
+      Number(match?.actual_duration_s ?? 0) > 0 ||
+      Number(match?.actual_distance_m ?? 0) > 0 ||
+      Number(match?.actual_pace_min_per_mi ?? 0) > 0 ||
+      Number(match?.avg_heart_rate_bpm ?? 0) > 0;
+    const hasExecutedEnvelope = !!match?.executed && (
+      Number(match?.executed?.duration_s ?? 0) > 0 ||
+      Number(match?.executed?.distance_m ?? 0) > 0 ||
+      Number(match?.executed?.avg_pace_s_per_mi ?? 0) > 0 ||
+      Number(match?.executed?.avg_hr ?? 0) > 0
     );
-    const directPaceS = Number(
-      match?.pace_s_per_mi ??
-      match?.executed?.avg_pace_s_per_mi ??
-      (Number.isFinite(Number(match?.actual_pace_min_per_mi)) ? Number(match.actual_pace_min_per_mi) * 60 : 0)
-    );
+    const hasExecutionEvidence = hasMeasuredWindow || hasActualTopLevel || hasExecutedEnvelope;
+
+    const executedDuration = hasExecutionEvidence
+      ? Number(
+          match?.actual_duration_s ??
+          match?.executed?.duration_s ??
+          0
+        )
+      : 0;
+    const executedDistance = hasExecutionEvidence
+      ? Number(
+          match?.actual_distance_m ??
+          match?.executed?.distance_m ??
+          0
+        )
+      : 0;
+    const executedHr = hasExecutionEvidence
+      ? Number(
+          match?.avg_heart_rate_bpm ??
+          match?.executed?.avg_hr ??
+          match?.executed?.avgHr ??
+          0
+        )
+      : 0;
+    const directPaceS = hasExecutionEvidence
+      ? Number(
+          match?.pace_s_per_mi ??
+          match?.executed?.avg_pace_s_per_mi ??
+          (Number.isFinite(Number(match?.actual_pace_min_per_mi)) ? Number(match.actual_pace_min_per_mi) * 60 : 0)
+        )
+      : 0;
     const derivedPaceS =
       executedDuration > 0 && executedDistance > 0
         ? (executedDuration / (executedDistance / 1609.34))
@@ -3533,13 +3618,22 @@ function buildSessionIntervalRows(
     };
   });
 
-  // If no per-interval measured execution exists, emit one measured overall row instead
-  // of rendering a full planned table with dashes.
+  // If no per-interval measured execution exists, return explicit recompute state
+  // for structured interval sessions. Do not emit synthetic summary rows.
   const measuredRows = rows.filter((r: any) => {
     const ex = r?.executed || {};
     return Number(ex?.duration_s || 0) > 0 || Number(ex?.distance_m || 0) > 0 || Number(ex?.pace_s_per_mi || 0) > 0;
   });
   if (measuredRows.length === 0) {
+    if (isStructuredIntervalSession) {
+      return {
+        rows: [],
+        mode: 'awaiting_recompute',
+        reason: 'missing_interval_execution',
+        expected_work_rows: expectedWorkRows,
+        measured_work_rows: 0,
+      };
+    }
     const overall = workout?.computed?.overall || {};
     const distM = Number(overall?.distance_m ?? ((Number(workout?.distance) > 0) ? Number(workout.distance) * 1000 : 0));
     const durS = Number(
@@ -3598,7 +3692,17 @@ function buildSessionIntervalRows(
       measured_work_rows: measuredWorkRows,
     };
   }
-  // Partial linkage: preserve trust by collapsing to measured overall row.
+  // Partial linkage on structured interval sessions is explicit recompute-only.
+  if (isStructuredIntervalSession) {
+    return {
+      rows: [],
+      mode: 'awaiting_recompute',
+      reason: 'partial_interval_execution_linkage',
+      expected_work_rows: expectedWorkRows,
+      measured_work_rows: measuredWorkRows,
+    };
+  }
+  // Non-interval partial linkage can collapse to measured overall row.
   const overall = workout?.computed?.overall || {};
   const distM = Number(overall?.distance_m ?? ((Number(workout?.distance) > 0) ? Number(workout.distance) * 1000 : 0));
   const durS = Number(

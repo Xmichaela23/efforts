@@ -896,18 +896,43 @@ Deno.serve(async (req) => {
     }
 
     // normalize laps JSON to Lap[]
-    type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number };
+    type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number };
     function normalizeLaps(raw:any): Lap[] {
       if (!raw) return [];
       const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.laps) ? raw.laps : []);
       const out: Lap[] = [];
       for (const L of arr) {
-        const start_ts = Number(L?.startTimeInSeconds ?? L?.start_ts ?? L?.start ?? L?.begin ?? 0);
-        const end_ts   = Number(L?.endTimeInSeconds   ?? L?.end_ts   ?? L?.end   ?? L?.finish ?? start_ts);
-        const time_s   = Number(L?.totalElapsedTimeInSeconds ?? L?.totalTimerTimeInSeconds ?? L?.time_s ?? (end_ts - start_ts) ?? 0);
-        const dist_m   = Number(L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ?? 0);
+        let start_ts = Number(L?.startTimeInSeconds ?? L?.start_ts ?? L?.start ?? L?.begin ?? 0);
+        if (!start_ts && L?.start_date) {
+          const parsed = Date.parse(L.start_date);
+          if (Number.isFinite(parsed)) start_ts = Math.floor(parsed / 1000);
+        }
+
+        let end_ts = Number(L?.endTimeInSeconds ?? L?.end_ts ?? L?.end ?? L?.finish ?? 0);
+        if ((!end_ts || end_ts <= start_ts) && start_ts > 0) {
+          const elapsed = Number(L?.elapsed_time ?? L?.moving_time ?? 0);
+          if (elapsed > 0) end_ts = start_ts + elapsed;
+        }
+        if (!end_ts) end_ts = start_ts;
+
+        const time_s = Number(
+          L?.totalElapsedTimeInSeconds ?? L?.totalTimerTimeInSeconds ?? L?.time_s ??
+          L?.elapsed_time ?? L?.moving_time ??
+          (end_ts - start_ts) ?? 0
+        );
+        const dist_m = Number(
+          L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ??
+          L?.distance ?? 0
+        );
+
+        const rawStartIdx = Number(L?.start_index ?? L?.startIndex);
+        const rawEndIdx = Number(L?.end_index ?? L?.endIndex);
+
         if (Number.isFinite(start_ts) && Number.isFinite(end_ts) && end_ts > start_ts) {
-          out.push({ start_ts, end_ts, time_s: Math.max(0, time_s), dist_m: Math.max(0, dist_m) });
+          const lap: Lap = { start_ts, end_ts, time_s: Math.max(0, time_s), dist_m: Math.max(0, dist_m) };
+          if (Number.isFinite(rawStartIdx) && rawStartIdx >= 0) lap.start_idx = rawStartIdx;
+          if (Number.isFinite(rawEndIdx) && rawEndIdx >= 0) lap.end_idx = rawEndIdx;
+          out.push(lap);
         }
       }
       return out.sort((a,b)=>a.start_ts - b.start_ts);
@@ -1047,9 +1072,14 @@ Deno.serve(async (req) => {
       while (i < plannedSteps.length && j < laps.length) {
         const st = plannedSteps[i], L = laps[j];
         if (!stepLapWithinTolerance(st, L)) return null;
-        // map lap window to rows indices
-        let sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? rows[sIdx].ts) < L.start_ts) sIdx++;
-        let eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? rows[eIdx].ts) < L.end_ts) eIdx++;
+        let sIdx: number, eIdx: number;
+        if (Number.isFinite(L.start_idx) && Number.isFinite(L.end_idx)) {
+          sIdx = Math.max(0, Math.min(L.start_idx!, rows.length - 1));
+          eIdx = Math.max(sIdx, Math.min(L.end_idx!, rows.length - 1));
+        } else {
+          sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? rows[sIdx].ts) < L.start_ts) sIdx++;
+          eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? rows[eIdx].ts) < L.end_ts) eIdx++;
+        }
         // tighten to moving edges (prefer distance increase; fallback to speed)
         const floor = ALIGN.idle_speed_mps;
         while (sIdx < eIdx) {
@@ -1071,6 +1101,15 @@ Deno.serve(async (req) => {
     }
 
     // Helpers for no-plan fallback (laps or auto-splits)
+    function windowIdxFromLap(rows:any[], L:Lap): [number, number] {
+      if (Number.isFinite(L.start_idx) && Number.isFinite(L.end_idx)) {
+        return [
+          Math.max(0, Math.min(L.start_idx!, rows.length - 1)),
+          Math.max(0, Math.min(L.end_idx!, rows.length - 1))
+        ];
+      }
+      return windowIdxFromT(rows, L.start_ts, L.end_ts);
+    }
     function windowIdxFromT(rows:any[], start_ts:number, end_ts:number): [number, number] {
       let sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? 0) < start_ts) sIdx++;
       let eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? 0) < end_ts) eIdx++;
@@ -1133,7 +1172,7 @@ Deno.serve(async (req) => {
 
       if (laps.length) {
         for (const L of laps) {
-          const [sIdx, eIdx] = windowIdxFromT(rows, L.start_ts, L.end_ts);
+          const [sIdx, eIdx] = windowIdxFromLap(rows, L);
           if (eIdx > sIdx) outIntervals.push(execFromIdx(rows, sIdx, eIdx, 'lap', 'lap'));
         }
       } else {
@@ -1614,7 +1653,7 @@ Deno.serve(async (req) => {
 
       // Preserve raw laps so the client can optionally show "here's what your watch recorded"
       const rawLaps = laps.length > 0 ? laps.map((L, i) => {
-        const [sIdx, eIdx] = windowIdxFromT(rows, L.start_ts, L.end_ts);
+        const [sIdx, eIdx] = windowIdxFromLap(rows, L);
         if (eIdx <= sIdx) return null;
         const lapInterval = execFromIdx(rows, sIdx, eIdx, 'lap', 'lap');
         return { lap_number: i + 1, ...lapInterval };

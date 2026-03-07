@@ -56,7 +56,22 @@ export async function getWorkIntervals(
       step_index: step.planned_index !== undefined ? step.planned_index : idx,
       planned_index: step.planned_index !== undefined ? step.planned_index : idx
     }));
-    intervals = enrichWithExecution(intervals, workout, (planned, exec) => exec.planned_step_id === planned.id);
+    intervals = enrichWithExecution(intervals, workout, (planned, exec) => {
+      const byId = !!planned.id && !!exec.planned_step_id && String(exec.planned_step_id) === String(planned.id);
+      const byIndex =
+        Number.isFinite(Number(planned.planned_index)) &&
+        Number.isFinite(Number(exec.planned_index)) &&
+        Number(exec.planned_index) === Number(planned.planned_index);
+      const byStepIndex =
+        Number.isFinite(Number(planned.planned_index)) &&
+        Number.isFinite(Number(exec.step_index)) &&
+        Number(exec.step_index) === Number(planned.planned_index);
+      const byIntervalNumber =
+        Number.isFinite(Number(planned.planned_index)) &&
+        Number.isFinite(Number(exec.interval_number)) &&
+        (Number(exec.interval_number) - 1) === Number(planned.planned_index);
+      return byId || byIndex || byStepIndex || byIntervalNumber;
+    });
     return intervals;
   }
 
@@ -77,7 +92,22 @@ export async function getWorkIntervals(
       step_index: step.planned_index !== undefined ? step.planned_index : idx,
       planned_index: step.planned_index !== undefined ? step.planned_index : idx
     }));
-    intervals = enrichWithExecution(materializedSteps, workout, (planned, exec) => exec.planned_step_id === planned.id);
+    intervals = enrichWithExecution(materializedSteps, workout, (planned, exec) => {
+      const byId = !!planned.id && !!exec.planned_step_id && String(exec.planned_step_id) === String(planned.id);
+      const byIndex =
+        Number.isFinite(Number(planned.planned_index)) &&
+        Number.isFinite(Number(exec.planned_index)) &&
+        Number(exec.planned_index) === Number(planned.planned_index);
+      const byStepIndex =
+        Number.isFinite(Number(planned.planned_index)) &&
+        Number.isFinite(Number(exec.step_index)) &&
+        Number(exec.step_index) === Number(planned.planned_index);
+      const byIntervalNumber =
+        Number.isFinite(Number(planned.planned_index)) &&
+        Number.isFinite(Number(exec.interval_number)) &&
+        (Number(exec.interval_number) - 1) === Number(planned.planned_index);
+      return byId || byIndex || byStepIndex || byIntervalNumber;
+    });
     return intervals;
   }
 
@@ -142,12 +172,63 @@ function enrichWithExecution(
 ): any[] {
   return plannedList.map(planned => {
     const computedInterval = workout?.computed?.intervals?.find((exec: any) => match(planned, exec));
+    const sIdx = Number(computedInterval?.sample_idx_start);
+    const eIdx = Number(computedInterval?.sample_idx_end);
+    const hasMeasuredWindow = Number.isFinite(sIdx) && Number.isFinite(eIdx) && eIdx > sIdx;
+
+    const execObj = computedInterval?.executed ?? null;
+    const execHasMetrics = !!execObj && (
+      Number(execObj?.duration_s ?? 0) > 0 ||
+      Number(execObj?.distance_m ?? 0) > 0 ||
+      Number(execObj?.avg_pace_s_per_mi ?? 0) > 0 ||
+      Number(execObj?.avg_hr ?? 0) > 0
+    );
+    const execHasProvenance = !!execObj && String(execObj?.provenance ?? '').length > 0;
+    const hasMeasuredExecutedEnvelope = execHasProvenance || (hasMeasuredWindow && execHasMetrics);
+
+    const topDuration = Number(
+      computedInterval?.duration_s ??
+      computedInterval?.actual_duration_s ??
+      0
+    );
+    const topDistance = Number(
+      computedInterval?.distance_m ??
+      computedInterval?.actual_distance_m ??
+      0
+    );
+    const topPace = Number(
+      computedInterval?.avg_pace_s_per_mi ??
+      (Number.isFinite(Number(computedInterval?.actual_pace_min_per_mi))
+        ? Number(computedInterval.actual_pace_min_per_mi) * 60
+        : 0)
+    );
+    const topHr = Number(
+      computedInterval?.avg_hr ??
+      computedInterval?.avg_heart_rate_bpm ??
+      0
+    );
+    const hasMeasuredTopLevel =
+      topDuration > 0 || topDistance > 0 || topPace > 0 || topHr > 0;
+
+    const normalizedExecuted = hasMeasuredExecutedEnvelope
+      ? execObj
+      : (
+          hasMeasuredTopLevel
+            ? {
+                duration_s: topDuration > 0 ? topDuration : null,
+                distance_m: topDistance > 0 ? topDistance : null,
+                avg_pace_s_per_mi: topPace > 0 ? topPace : null,
+                avg_hr: topHr > 0 ? topHr : null,
+                max_hr: Number(computedInterval?.max_hr ?? 0) > 0 ? Number(computedInterval.max_hr) : null,
+              }
+            : null
+        );
     return {
       ...planned,
-      executed: computedInterval?.executed ?? null,
+      executed: normalizedExecuted,
       sample_idx_start: computedInterval?.sample_idx_start,
       sample_idx_end: computedInterval?.sample_idx_end,
-      hasExecuted: !!computedInterval?.executed
+      hasExecuted: !!normalizedExecuted
     };
   });
 }
