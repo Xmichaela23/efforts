@@ -123,12 +123,26 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     }
   } catch {}
 
-  // Fatigue / load flags
+  // Fatigue / load flags — plan-aware: elevated ACWR during build/work phases is expected
   try {
     const tl = packet.derived.training_load;
     if (tl) {
+      const plan = (packet as any)?.facts?.plan;
+      const planPhase = String(plan?.phase || '').toLowerCase();
+      const weekIntent = String(plan?.week_intent || '').toLowerCase();
+      const isRecoveryWeek = plan?.is_recovery_week === true;
+      const isPlanLinked = !!plan;
+      const isBuildPhase = ['build', 'peak', 'specific', 'base', 'general'].some(p => planPhase.includes(p))
+        || ['build', 'work', 'quality', 'key'].some(w => weekIntent.includes(w));
+
       if (tl.acwr_ratio != null && tl.acwr_ratio > 1.3) {
-        push(flags, { type: 'concern', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} (elevated) — higher-than-normal training stress.`, priority: 1 });
+        if (isPlanLinked && isBuildPhase && !isRecoveryWeek && tl.acwr_ratio <= 1.6) {
+          push(flags, { type: 'neutral', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} — expected load increase for ${planPhase || 'build'} phase.`, priority: 3 });
+        } else if (isPlanLinked && isRecoveryWeek) {
+          push(flags, { type: 'concern', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} (elevated) — unusual for a recovery week.`, priority: 1 });
+        } else {
+          push(flags, { type: 'concern', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} (elevated) — higher-than-normal training stress.`, priority: 1 });
+        }
       } else if (tl.acwr_ratio != null && tl.acwr_ratio > 1.1) {
         push(flags, { type: 'neutral', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} — training load is trending up.`, priority: 3 });
       }
