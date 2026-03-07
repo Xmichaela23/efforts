@@ -275,6 +275,32 @@ Deno.serve(async (req: Request) => {
         createdGoalId = existing_goal_id || null;
       }
 
+      // Detect concurrent run plans to avoid stacking duplicate run sessions.
+      // Extract which days of the week the existing run plan places runs on,
+      // then pass those to the tri generator so it defers to that plan's runs.
+      const { data: otherActivePlans } = await supabase
+        .from('plans')
+        .select('id, config, sessions_by_week')
+        .eq('user_id', user_id)
+        .eq('status', 'active');
+
+      const existingRunDaySet = new Set<string>();
+      for (const op of otherActivePlans || []) {
+        const opSport = String(op.config?.sport || op.config?.plan_type || '').toLowerCase();
+        if (!['run', 'running'].includes(opSport)) continue;
+        const sbw = op.sessions_by_week;
+        if (!sbw || typeof sbw !== 'object') continue;
+        for (const weekSessions of Object.values(sbw)) {
+          if (!Array.isArray(weekSessions)) continue;
+          for (const s of weekSessions) {
+            const sType = String(s?.discipline || s?.type || '').toLowerCase();
+            if (sType === 'run' && s?.day) {
+              existingRunDaySet.add(String(s.day));
+            }
+          }
+        }
+      }
+
       // Read athlete baselines for discipline seeding
       const { data: triBaseline } = await supabase.from('user_baselines').select('*').eq('user_id', user_id).maybeSingle();
       const { data: triSnapshots } = await supabase
@@ -299,6 +325,8 @@ Deno.serve(async (req: Request) => {
         // Triathlon plans support 0/1/2 strength days — cap UI value of 3 to 2
         strength_frequency: Math.min(2, Number(resolvedGoal?.training_prefs?.strength_frequency ?? 0)),
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
+        // Days already covered by a concurrent run plan — tri generator defers to those sessions
+        ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),
       };
 
       // Seed current discipline volumes from snapshot

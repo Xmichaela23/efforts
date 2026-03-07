@@ -39,6 +39,14 @@ export interface GenerateTriPlanRequest {
   strength_frequency?: 0 | 1 | 2;
 
   units?: 'imperial' | 'metric';
+
+  /**
+   * Days of the week that already have run sessions in another active plan
+   * (e.g. ['Monday','Wednesday','Thursday','Sunday'] from a concurrent run plan).
+   * The triathlon generator uses this to avoid stacking its own run sessions on
+   * the same days — treating the run plan's sessions as satisfying that volume.
+   */
+  existing_run_days?: string[];
 }
 
 export type TriDistance = 'sprint' | 'olympic' | '70.3' | 'ironman';
@@ -88,6 +96,9 @@ export interface TriGeneratorParams {
   transition_mode?: string;
 
   strength_frequency?: number;
+
+  /** Days already occupied by run sessions in a concurrent run plan */
+  existing_run_days?: string[];
 }
 
 export interface TriSession {

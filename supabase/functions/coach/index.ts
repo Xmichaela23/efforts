@@ -119,16 +119,24 @@ type ActivePlanLite = {
   duration_weeks: number | null;
 };
 
-async function loadActivePlan(supabase: any, userId: string): Promise<ActivePlanLite | null> {
+async function loadAllActivePlans(supabase: any, userId: string): Promise<ActivePlanLite[]> {
   const { data } = await supabase
     .from('plans')
     .select('id,name,config,duration_weeks,athlete_context_by_week')
     .eq('user_id', userId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
-    .limit(1);
-  if (!data || !Array.isArray(data) || data.length === 0) return null;
-  return data[0] as any;
+    .limit(5);
+  return Array.isArray(data) ? (data as any[]) : [];
+}
+
+// Primary plan = soonest upcoming race date; falls back to most recently created.
+function pickPrimaryPlan(plans: ActivePlanLite[]): ActivePlanLite | null {
+  if (!plans.length) return null;
+  const withRace = plans
+    .filter(p => p.config?.race_date)
+    .sort((a, b) => new Date(a.config.race_date).getTime() - new Date(b.config.race_date).getTime());
+  return (withRace[0] ?? plans[0]) as ActivePlanLite;
 }
 
 function inferMethodologyId(planConfig: any): MethodologyId {
@@ -340,7 +348,9 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: req.headers.get('Authorization')! } },
     });
 
-    const activePlan = await loadActivePlan(supabase, userId);
+    const allActivePlans = await loadAllActivePlans(supabase, userId);
+    const activePlan = pickPrimaryPlan(allActivePlans);
+    const secondaryPlans = allActivePlans.filter(p => p.id !== activePlan?.id);
     const planConfig = activePlan?.config || null;
     const methodologyId: MethodologyId = inferMethodologyId(planConfig);
     const weekStartDow: WeekStartDow = resolveWeekStartDow(planConfig);
@@ -358,16 +368,16 @@ Deno.serve(async (req) => {
     const weekFocusLabel = weekIntentInfo.focus_label as string | null;
     const methodologyCtx: MethodologyContext = { week_intent: weekIntent as any, week_start_dow: weekStartDow };
 
-    // Planned rows within the week window — scoped to the active plan so
-    // rows from old ended plans in the same date range are excluded.
+    // Planned rows within the week window — scoped to all active plans so
+    // rows from ended plans in the same date range are excluded.
     let plannedWeekQuery = supabase
       .from('planned_workouts')
-      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note')
+      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
-    if (activePlan?.id) {
-      plannedWeekQuery = plannedWeekQuery.eq('training_plan_id', activePlan.id);
+    if (allActivePlans.length > 0) {
+      plannedWeekQuery = plannedWeekQuery.in('training_plan_id', allActivePlans.map(p => p.id));
     }
     const { data: plannedWeek, error: pErr } = await plannedWeekQuery;
     if (pErr) throw pErr;
@@ -1446,6 +1456,28 @@ Deno.serve(async (req) => {
           if (intentStr) planLine += ` which is a ${intentStr} week`;
           planLine += '.';
           narrativeFacts.push(planLine);
+
+          // Multi-event: surface each secondary active plan with its own race date + phase
+          if (secondaryPlans.length > 0) {
+            narrativeFacts.push(`MULTI-EVENT ATHLETE: training for ${allActivePlans.length} events simultaneously.`);
+            for (const sp of secondaryPlans) {
+              const spName = sp.config?.race_name || sp.name || 'event';
+              const spSport = sp.config?.sport || sp.config?.plan_type || 'sport';
+              const spDist  = sp.config?.distance || sp.config?.race_distance || null;
+              const spRace  = sp.config?.race_date ? new Date(sp.config.race_date).toDateString() : null;
+              const spWeeks = sp.duration_weeks ?? null;
+              const spWkIdx = computeWeekIndex(sp.config, asOfDate, 'Monday' as any, spWeeks);
+              const spPhase = weekIntentFromContract(sp.config, spWkIdx)?.intent ?? 'unknown';
+              let spLine = `ALSO TRAINING FOR: "${spName}"`;
+              if (spDist) spLine += ` (${spDist} ${spSport})`;
+              if (spRace) spLine += ` on ${spRace}`;
+              if (spWkIdx != null) spLine += ` — week ${spWkIdx} of ${spWeeks ?? '?'}`;
+              if (spPhase !== 'unknown') spLine += ` (${spPhase} phase)`;
+              narrativeFacts.push(spLine + '.');
+            }
+            narrativeFacts.push('When coaching, address how this week serves BOTH events. Flag any sessions this week that build toward the secondary event. Do not suggest adding extra sessions — all sessions from all plans are already included in the session list.');
+          }
+
           narrativeFacts.push('IMPORTANT: There is an active training plan. Do NOT suggest adding extra sessions. If sessions were missed, suggest hitting the planned sessions next week. If suggesting changes, frame them as adjustments within the existing plan.');
           if (isPlanTransitionPeriod) {
             narrativeFacts.push(`NOTE: This is an early week of a new plan (within the first 2 weeks). The 7-day load ratio and 28-day baseline both overlap with the previous training cycle, so any "overreaching" or elevated load signals are unreliable artifacts of the plan transition — do NOT flag load as elevated or suggest recovery based on the load ratio. Focus exclusively on execution quality of the planned sessions and whether the athlete feels good.`);
@@ -1800,6 +1832,17 @@ ${narrativeFacts.join('\n')}`;
         week_focus_label: weekFocusLabel,
         week_start_dow: weekStartDow,
         athlete_context_for_week: athleteContextStr || null,
+        // All concurrent active plans (multi-event support)
+        active_plans: allActivePlans.map(p => ({
+          plan_id: p.id,
+          plan_name: p.name,
+          sport: p.config?.sport ?? null,
+          distance: p.config?.distance ?? p.config?.race_distance ?? null,
+          race_date: p.config?.race_date ?? null,
+          race_name: p.config?.race_name ?? null,
+          duration_weeks: p.duration_weeks,
+          is_primary: p.id === activePlan?.id,
+        })),
       },
       metrics,
       week: {

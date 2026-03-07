@@ -232,12 +232,22 @@ export class TriathlonGenerator {
 
     const sessions: TriSession[] = [];
 
+    // Days occupied by run sessions in a concurrent run plan — we treat those
+    // sessions as satisfying the triathlon plan's run volume for that day rather
+    // than stacking a second run on the same day.
+    const existingRunDays = new Set<string>(
+      (this.params.existing_run_days ?? []).map(d => String(d))
+    );
+
     // ── Sunday: Long Run ────────────────────────────────────────────────────
-    if (longRunMi > 0) {
+    // Skip if run plan already covers Sunday (its long run IS this plan's long run).
+    if (longRunMi > 0 && !existingRunDays.has('Sunday')) {
       sessions.push(this.longRunSession(longRunMi, 'Sunday'));
     }
 
     // ── Saturday: Long Ride (or Brick in Build/Race-Specific) ───────────────
+    // Brick run leg is very short (≤20 min off-the-bike) — keep even if Saturday
+    // is a run day, since brick specificity is critical for race prep.
     if (longRideHr > 0) {
       if (bricksThisWeek >= 1 && phase.name !== 'Base') {
         sessions.push(...this.brickSession(longRideHr, Math.min(20, Math.round(longRunMi * 0.20)), 'Saturday'));
@@ -250,13 +260,16 @@ export class TriathlonGenerator {
     if (!isTaper || isRecovery) {
       sessions.push(this.bikeQualitySession(phase, isRecovery, 'Tuesday'));
     } else {
-      // Taper: short openers ride
       sessions.push(this.bikeOpenersSession('Tuesday'));
     }
 
-    // ── Wednesday: Run Quality + Swim (can be same day) ─────────────────────
+    // ── Wednesday: Run Quality + Swim ───────────────────────────────────────
+    // If run plan already has a Wednesday run (e.g. tempo), skip the tri run quality
+    // session — the run plan's hard effort counts toward triathlon run fitness.
     const runQualMi = this.runQualityMiles(phase, isRecovery, week);
-    sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
+    if (!existingRunDays.has('Wednesday')) {
+      sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
+    }
     sessions.push(this.swimQualitySession(weekSwimYd, phase, isRecovery, 'Wednesday'));
 
     // ── Thursday: Second Brick (Race-Specific) or Endurance Ride ─────────────
@@ -273,8 +286,9 @@ export class TriathlonGenerator {
     const recSwimYd = Math.max(1500, Math.round(weekSwimYd * 0.35));
     sessions.push(this.easySwimSession(recSwimYd, 'Monday'));
 
-    // ── Friday: Easy Run (if support run mileage remains) ────────────────────
-    if (supportRunMi >= 3 && !isTaper) {
+    // ── Friday: Easy Run ─────────────────────────────────────────────────────
+    // Skip if run plan already has a Friday run — no point doubling up easy miles.
+    if (supportRunMi >= 3 && !isTaper && !existingRunDays.has('Friday')) {
       const easyRunMi = Math.max(3, Math.round(supportRunMi * 0.6));
       sessions.push(this.easyRunSession(easyRunMi, 'Friday'));
     }

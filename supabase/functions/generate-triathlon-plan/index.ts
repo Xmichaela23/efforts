@@ -71,6 +71,7 @@ Deno.serve(async (req: Request) => {
       volume_trend:                request.volume_trend,
       transition_mode:             request.transition_mode,
       strength_frequency:          request.strength_frequency ?? 0,
+      existing_run_days:           request.existing_run_days,
     });
 
     const plan = generator.generatePlan();
