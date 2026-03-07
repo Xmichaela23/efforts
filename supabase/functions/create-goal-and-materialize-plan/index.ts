@@ -296,7 +296,8 @@ Deno.serve(async (req: Request) => {
         ftp:              triBaseline?.performance_numbers?.ftp ?? undefined,
         swim_pace_per_100_sec: triBaseline?.performance_numbers?.swimPacePer100 ?? triBaseline?.swim_pace_per_100_sec ?? undefined,
         days_per_week:    resolvedGoal?.training_prefs?.days_per_week ?? undefined,
-        strength_frequency: resolvedGoal?.training_prefs?.strength_frequency ?? 0,
+        // Triathlon plans support 0/1/2 strength days — cap UI value of 3 to 2
+        strength_frequency: Math.min(2, Number(resolvedGoal?.training_prefs?.strength_frequency ?? 0)),
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
       };
 
@@ -317,10 +318,33 @@ Deno.serve(async (req: Request) => {
       await supabase.from('plans').update({ goal_id: createdGoalId, plan_mode: 'rolling' }).eq('id', triPlanId).eq('user_id', user_id);
       await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: triPlanId });
 
+      // End a specific replaced plan if caller passed replace_plan_id
       if (replace_plan_id) {
         const weekStart = currentWeekMondayISO();
         await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', weekStart);
         await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
+      }
+
+      // Cancel the replaced triathlon goal and end its linked plans (mirrors run-path replace logic)
+      if (mode === 'create' && action === 'replace' && replace_goal_id) {
+        await supabase
+          .from('goals')
+          .update({ status: 'cancelled' })
+          .eq('id', replace_goal_id)
+          .eq('user_id', user_id);
+
+        const { data: linkedPlans } = await supabase
+          .from('plans')
+          .select('id, status')
+          .eq('user_id', user_id)
+          .eq('goal_id', replace_goal_id)
+          .eq('status', 'active');
+
+        for (const lp of linkedPlans || []) {
+          const weekStart = currentWeekMondayISO();
+          await supabase.from('planned_workouts').delete().eq('training_plan_id', lp.id).gte('date', weekStart);
+          await supabase.from('plans').update({ status: 'ended' }).eq('id', lp.id).eq('user_id', user_id);
+        }
       }
 
       return new Response(
