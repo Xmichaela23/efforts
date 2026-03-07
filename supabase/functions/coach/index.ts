@@ -1549,11 +1549,13 @@ Deno.serve(async (req) => {
             ? 'in plan transition (includes prior training cycle — ignore this ratio)'
             : acwrStatus === 'undertrained'
               ? 'under-reached'
-              : acwrRisk === 'overreaching'
-                ? 'overreaching'
-                : acwrRisk === 'fast'
-                  ? 'ramping fast'
-                  : (acwrStatus === 'optimal_recovery' ? 'planned recovery zone' : 'in the optimal zone');
+              : acwrStatus === 'optimal' || acwrStatus === 'optimal_recovery'
+                ? (acwrStatus === 'optimal_recovery' ? 'planned recovery zone' : 'in the optimal zone')
+                : acwrRisk === 'overreaching'
+                  ? 'overreaching'
+                  : acwrRisk === 'fast'
+                    ? 'ramping fast'
+                    : 'in the optimal zone';
           narrativeFacts.push(`Training volume ratio (this week vs last 4 weeks): ${metrics.acwr.toFixed(2)} — ${acwrLabel}.`);
         }
 
