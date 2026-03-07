@@ -335,6 +335,26 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
             segment_matches: coerceNumber(derived.terrain_context.segment_matches) ?? 0,
             segment_insight_eligible: !!derived.terrain_context.segment_insight_eligible,
             segment_trend_eligible: !!derived.terrain_context.segment_trend_eligible,
+            segment_comparisons: Array.isArray(derived.terrain_context.segment_comparisons)
+              ? derived.terrain_context.segment_comparisons.slice(0, 5).map((c: any) => ({
+                  type: c.segment_type,
+                  distance_m: c.distance_m,
+                  grade_pct: c.avg_grade_pct,
+                  times_seen: c.times_seen,
+                  today_pace: secondsToPaceString(c.today_pace_s_per_mi),
+                  avg_pace: secondsToPaceString(c.avg_pace_s_per_mi),
+                  pace_delta: c.pace_delta_s,
+                  today_hr: c.today_hr ? `${c.today_hr} bpm` : null,
+                  avg_hr: c.avg_hr ? `${c.avg_hr} bpm` : null,
+                  hr_delta: c.hr_delta,
+                }))
+              : [],
+            route: derived.terrain_context.route_runs
+              ? {
+                  name: derived.terrain_context.route_runs.name,
+                  times_run: derived.terrain_context.route_runs.times_run,
+                }
+              : null,
           }
         : null,
     },
@@ -375,6 +395,11 @@ RULES:
   - You MAY include segment-level terrain insight only when DISPLAY PACKET signals.terrain.segment_insight_eligible is true.
   - You MAY mention segment-level improvement/decline trends only when DISPLAY PACKET signals.terrain.segment_trend_eligible is true.
   - If segment_trend_eligible is false, do NOT claim segment-specific improvement or decline.
+  - When signals.terrain.segment_comparisons contains data, use the ACTUAL pace_delta and hr_delta values. These are pre-calculated comparisons of this workout's performance on familiar terrain segments vs historical averages. Reference them naturally (e.g. "X seconds faster on the climb segment compared to your average").
+  - When signals.terrain.route is present, acknowledge route familiarity briefly (e.g. "on your regular route" or "Xth time on this route").
+- Interval execution rule:
+  - When signals.interval_execution is present, reference execution_score and completed_steps in context (e.g. "98% execution, all 7 steps completed").
+  - Do not repeat raw field names. Translate into coaching language.
 - Never show raw field names (no snake_case).
 
 TOP FLAGS (lead with these):

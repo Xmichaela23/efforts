@@ -434,19 +434,21 @@ export async function buildWorkoutFactPacketV1(args: {
   const terrain_context = await (async () => {
     try {
       const workoutId = String(workout?.id || '').trim();
-      if (!workoutId) return null;
+      const userId = String(workout?.user_id || '').trim();
+      if (!workoutId || !userId) return null;
 
-      const { data: profileData } = await supabase
-        .from('workout_terrain_profile')
-        .select('terrain_class')
-        .eq('workout_id', workoutId)
-        .maybeSingle();
-
-      const { data: matchData } = await supabase
-        .from('workout_segment_match')
-        .select('segment_id')
-        .eq('workout_id', workoutId)
-        .limit(200);
+      const [{ data: profileData }, { data: matchData }] = await Promise.all([
+        supabase
+          .from('workout_terrain_profile')
+          .select('terrain_class')
+          .eq('workout_id', workoutId)
+          .maybeSingle(),
+        supabase
+          .from('workout_segment_match')
+          .select('segment_id')
+          .eq('workout_id', workoutId)
+          .limit(200),
+      ]);
 
       const segmentIds = Array.from(
         new Set(
@@ -456,30 +458,112 @@ export async function buildWorkoutFactPacketV1(args: {
         )
       );
 
-      let segmentRows: any[] = [];
-      if (segmentIds.length > 0) {
-        const { data: segData } = await supabase
-          .from('terrain_segments')
-          .select('id, sample_count')
-          .in('id', segmentIds);
-        segmentRows = Array.isArray(segData) ? segData : [];
+      if (segmentIds.length === 0) {
+        return {
+          terrain_class: typeof profileData?.terrain_class === 'string' ? profileData.terrain_class : (terrain_type || null),
+          segment_matches: 0,
+          segment_insight_eligible: false,
+          segment_trend_eligible: false,
+          segment_comparisons: [],
+          route_runs: null,
+        };
       }
 
-      const insightEligibleCount = segmentRows.filter(
-        (s: any) => Number(s?.sample_count || 0) >= 3
-      ).length;
-      const trendEligibleCount = segmentRows.filter(
-        (s: any) => Number(s?.sample_count || 0) >= 6
-      ).length;
+      const [{ data: segData }, { data: progressData }, { data: routeData }] = await Promise.all([
+        supabase
+          .from('terrain_segments')
+          .select('id, sample_count, distance_m, elev_gain_m, avg_grade_pct, metadata')
+          .in('id', segmentIds),
+        supabase
+          .from('segment_progress_metrics')
+          .select('segment_id, workout_id, avg_pace_s_per_km, avg_hr_bpm, grade_adjusted_pace_s_per_km, duration_s, effort_started_at')
+          .eq('user_id', userId)
+          .in('segment_id', segmentIds)
+          .order('effort_started_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('route_clusters')
+          .select('id, name, sample_count, first_seen_at, last_seen_at')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .order('sample_count', { ascending: false })
+          .limit(5),
+      ]);
+
+      const segmentRows = Array.isArray(segData) ? segData : [];
+      const progressRows = Array.isArray(progressData) ? progressData : [];
+      const segMap = new Map(segmentRows.map((s: any) => [String(s.id), s]));
+
+      const insightEligibleCount = segmentRows.filter((s: any) => Number(s?.sample_count || 0) >= 3).length;
+      const trendEligibleCount = segmentRows.filter((s: any) => Number(s?.sample_count || 0) >= 6).length;
+
+      const comparisons: any[] = [];
+      const grouped = new Map<string, any[]>();
+      for (const row of progressRows) {
+        const sid = String(row.segment_id);
+        if (!grouped.has(sid)) grouped.set(sid, []);
+        grouped.get(sid)!.push(row);
+      }
+
+      for (const [segId, efforts] of grouped) {
+        const seg = segMap.get(segId);
+        if (!seg || efforts.length < 2) continue;
+        const thisEffort = efforts.find((e: any) => String(e.workout_id) === workoutId);
+        const pastEfforts = efforts.filter((e: any) => String(e.workout_id) !== workoutId);
+        if (!thisEffort || pastEfforts.length === 0) continue;
+
+        const avgPastPace = pastEfforts.reduce((s: number, e: any) => s + Number(e.avg_pace_s_per_km || 0), 0) / pastEfforts.length;
+        const avgPastHr = pastEfforts.reduce((s: number, e: any) => s + Number(e.avg_hr_bpm || 0), 0) / pastEfforts.length;
+        const avgPastGap = pastEfforts.reduce((s: number, e: any) => s + Number(e.grade_adjusted_pace_s_per_km || 0), 0) / pastEfforts.length;
+
+        const todayPace = Number(thisEffort.avg_pace_s_per_km || 0);
+        const todayHr = Number(thisEffort.avg_hr_bpm || 0);
+        const todayGap = Number(thisEffort.grade_adjusted_pace_s_per_km || 0);
+
+        if (!(todayPace > 0) || !(avgPastPace > 0)) continue;
+
+        const segType = seg.metadata?.segment_type || (Number(seg.avg_grade_pct) >= 2 ? 'climb' : 'rolling');
+        const paceDeltaS = Math.round(todayPace - avgPastPace);
+        const hrDelta = (todayHr > 0 && avgPastHr > 0) ? Math.round(todayHr - avgPastHr) : null;
+        const pacePerMiToday = Math.round(todayPace * 1.60934);
+        const pacePerMiAvg = Math.round(avgPastPace * 1.60934);
+
+        comparisons.push({
+          segment_type: segType,
+          distance_m: Math.round(Number(seg.distance_m || 0)),
+          avg_grade_pct: Number(Number(seg.avg_grade_pct || 0).toFixed(1)),
+          times_seen: Number(seg.sample_count || 0),
+          today_pace_s_per_mi: pacePerMiToday,
+          avg_pace_s_per_mi: pacePerMiAvg,
+          pace_delta_s: paceDeltaS > 0 ? `+${paceDeltaS}s/km slower` : `${Math.abs(paceDeltaS)}s/km faster`,
+          today_hr: todayHr > 0 ? Math.round(todayHr) : null,
+          avg_hr: avgPastHr > 0 ? Math.round(avgPastHr) : null,
+          hr_delta: hrDelta != null ? (hrDelta > 0 ? `+${hrDelta} bpm` : `${hrDelta} bpm`) : null,
+        });
+      }
+
+      comparisons.sort((a, b) => (b.times_seen - a.times_seen) || (Math.abs(Number(b.pace_delta_s?.replace(/[^\d.-]/g, '') || 0)) - Math.abs(Number(a.pace_delta_s?.replace(/[^\d.-]/g, '') || 0))));
+
+      let routeRuns: { name: string; times_run: number; first_seen: string; last_seen: string } | null = null;
+      if (Array.isArray(routeData) && routeData.length > 0) {
+        const best = routeData[0];
+        if (Number(best.sample_count || 0) >= 2) {
+          routeRuns = {
+            name: String(best.name || 'Regular route'),
+            times_run: Number(best.sample_count),
+            first_seen: String(best.first_seen_at || '').slice(0, 10),
+            last_seen: String(best.last_seen_at || '').slice(0, 10),
+          };
+        }
+      }
 
       return {
-        terrain_class:
-          typeof profileData?.terrain_class === 'string'
-            ? profileData.terrain_class
-            : (terrain_type || null),
+        terrain_class: typeof profileData?.terrain_class === 'string' ? profileData.terrain_class : (terrain_type || null),
         segment_matches: segmentIds.length,
         segment_insight_eligible: insightEligibleCount > 0,
         segment_trend_eligible: trendEligibleCount > 0,
+        segment_comparisons: comparisons.slice(0, 5),
+        route_runs: routeRuns,
       };
     } catch (e) {
       console.warn('[fact-packet] terrain_context derivation failed (non-fatal):', e);
