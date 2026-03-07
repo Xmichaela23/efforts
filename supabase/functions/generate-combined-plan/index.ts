@@ -68,11 +68,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Validate ───────────────────────────────────────────────────────────
+    const hasTriGoal = goals.some(g => ['triathlon', 'tri'].includes((g.sport ?? '').toLowerCase()));
     const validation = validatePlan(
       generatedWeeks, blocks,
       athlete_state.current_ctl,
       athlete_state.weekly_hours_available,
       loadingPattern,
+      hasTriGoal,
     );
     const failures = failedChecks(validation);
     if (failures.length > 0) {

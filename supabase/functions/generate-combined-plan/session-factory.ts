@@ -77,14 +77,16 @@ export function easyRun(day: string, miles: number, goalId: string): PlannedSess
 export function tempoRun(day: string, miles: number, warmupMiles: number, goalId: string): PlannedSession {
   const totalMiles = warmupMiles * 2 + miles;
   const dur = Math.round(totalMiles * 8.5);
+  // Sustained tempo/threshold running is Zone 3-4 — MODERATE by spec §4.2
+  // (not interval-based, so not classified HARD despite being quality work)
   return session(
     day, 'run',
     `Tempo Run — ${miles} mi at threshold`,
     `Warm up ${warmupMiles} mi easy, then ${miles} mi at lactate threshold (comfortably hard — 7–8 RPE, can say a few words). Cool down ${warmupMiles} mi easy.`,
-    dur, 'HARD',
+    dur, 'MODERATE',
     [`warmup_run_${Math.round(warmupMiles * 10)}_easy`, `tempo_${miles}mi_threshold`, `cooldown_run_${Math.round(warmupMiles * 10)}_easy`],
     ['quality', 'threshold', 'run'],
-    'Z4 threshold', goalId,
+    'Z3–Z4 threshold', goalId,
   );
 }
 
@@ -105,14 +107,16 @@ export function intervalRun(day: string, reps: number, phase: Phase, goalId: str
 
 export function marathonPaceRun(day: string, mpMiles: number, goalId: string): PlannedSession {
   const dur = Math.round((mpMiles + 3) * 9.0);
+  // Marathon pace is ~80-90% of threshold pace = Zone 3 (MODERATE).
+  // It's a sustained aerobic effort, not a supra-threshold interval session.
   return session(
     day, 'run',
     `Marathon Pace Run — ${mpMiles} mi`,
     `1.5 mi warm-up, ${mpMiles} mi at marathon goal pace (Z3–Z4, controlled), 1.5 mi cool-down. This teaches your body to run marathon pace on accumulating fatigue.`,
-    dur, 'HARD',
+    dur, 'MODERATE',
     ['warmup_run_15min_easy', `run_marathon_pace_${mpMiles}mi`, 'cooldown_run_10min_easy'],
     ['race_specific', 'marathon_pace', 'run'],
-    'Z3–Z4 marathon pace', goalId,
+    'Z3 marathon pace', goalId,
   );
 }
 

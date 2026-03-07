@@ -104,16 +104,17 @@ function checkTapersPresent(weeks: GeneratedWeek[], blocks: PhaseBlock[]): boole
 
 // ── Check 7: Maintenance floors met ──────────────────────────────────────────
 // §2.2 — Non-recovery weeks must not drop below minimum sessions per sport.
-function checkMaintenanceFloors(weeks: GeneratedWeek[]): boolean {
+function checkMaintenanceFloors(weeks: GeneratedWeek[], hasTriGoal: boolean): boolean {
   const nonRecovery = weeks.filter(w => !w.isRecovery && w.phase !== 'recovery' && w.phase !== 'taper');
   for (const w of nonRecovery) {
     for (const [sport, floor] of Object.entries(MAINTENANCE_FLOORS)) {
       if (!floor) continue;
       const count = w.sessions.filter(s => s.type === sport).length;
       if (count < floor.sessions) {
-        // Swim floor may not apply for run-only plans (if no swim TSS budgeted)
-        if (sport === 'swim' && w.sport_raw_tss.swim === 0) continue;
-        if (sport === 'bike' && w.sport_raw_tss.bike === 0) continue;
+        // Swim floor only applies to triathlon/multi-sport athletes.
+        // Bike floor only applies when bike is in the plan at all.
+        if (sport === 'swim' && !hasTriGoal) continue;
+        if (sport === 'bike' && w.sport_raw_tss.bike === 0 && !hasTriGoal) continue;
         return false;
       }
     }
@@ -235,6 +236,7 @@ export function validatePlan(
   initialCTL: number,
   weeklyHours: number,
   loadingPattern: '3:1' | '2:1',
+  hasTriGoal: boolean,
 ): PlanValidation {
   return {
     no_consecutive_hard_days:     checkNoConsecutiveHardDays(weeks),
@@ -243,7 +245,7 @@ export function validatePlan(
     ramp_rate_safe:               checkRampRate(weeks, initialCTL),
     recovery_weeks_present:       checkRecoveryWeeks(weeks, loadingPattern),
     tapers_present:               checkTapersPresent(weeks, blocks),
-    maintenance_floors_met:       checkMaintenanceFloors(weeks),
+    maintenance_floors_met:       checkMaintenanceFloors(weeks, hasTriGoal),
     post_race_recovery_inserted:  checkPostRaceRecovery(blocks),
     brick_placement_valid:        checkBrickPlacement(weeks),
     run_impact_multiplier_applied: checkRunMultiplierApplied(weeks),

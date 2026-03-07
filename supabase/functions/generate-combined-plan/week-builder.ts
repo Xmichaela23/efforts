@@ -83,27 +83,59 @@ function enforceHardEasy(grid: WeekGrid): void {
 }
 
 // ── Step 5: 80/20 compliance ─────────────────────────────────────────────────
-// §3.4 — If Zone 3+ time > 25% of total, downgrade a MODERATE session to EASY.
+// §3.4 — 80% of total training TIME must be at Zone 1–2.
+//
+// Key nuance: a threshold session is NOT 100% hard. Warm-ups and cool-downs
+// are Zone 1–2. We use 0.65 as the "high-intensity fraction" for HARD sessions
+// (the interval block) and 0.50 for MODERATE (tempo portions).
+// This matches real-world intensity distribution within structured workouts.
+//
+// Downgrade priority when ratio is still failing:
+//   swim threshold → bike quality → run quality  (ascending systemic impact)
+// Protected sessions (never downgraded): bricks, long_run, long_ride.
+
+const HARD_INTENSITY_FRACTION     = 0.65; // fraction of HARD session that is actually Z4-5
+const MODERATE_INTENSITY_FRACTION = 0.50; // fraction of MODERATE session that is Z3
+
+function effectiveHardMin(s: PlannedSession): number {
+  if (s.intensity_class === 'HARD')     return s.duration * HARD_INTENSITY_FRACTION;
+  if (s.intensity_class === 'MODERATE') return s.duration * MODERATE_INTENSITY_FRACTION;
+  return 0;
+}
 
 function enforce8020(grid: WeekGrid, phase: Phase): void {
-  const target = PHASE_ZONE_DIST[phase];
+  const target   = PHASE_ZONE_DIST[phase];
   const sessions = gridSessions(grid);
   const totalMin = sessions.reduce((s, x) => s + x.duration, 0);
   if (totalMin === 0) return;
 
-  let hardModeMin = sessions.filter(s => s.intensity_class !== 'EASY').reduce((s, x) => s + x.duration, 0);
-  const maxAllowed = totalMin * (1 - target.low);
+  let hardMin    = sessions.reduce((s, x) => s + effectiveHardMin(x), 0);
+  const maxAllowed = totalMin * (1 - target.low); // e.g. 0.80 target → 20% of total
 
-  if (hardModeMin > maxAllowed) {
-    // Find a MODERATE session on a non-rest day and downgrade to EASY
+  if (hardMin <= maxAllowed) return;
+
+  // Downgrade in sport priority order (lowest systemic impact first).
+  // Each non-protected HARD/MODERATE session is a candidate. We downgrade
+  // directly to EASY in a single step (not HARD→MODERATE→EASY across two passes)
+  // because each sport is only iterated once in this loop.
+  // Protected sessions (bricks, long_run, long_ride) are never touched.
+  const downgradeSports: Sport[] = ['swim', 'bike', 'run'];
+  for (const sport of downgradeSports) {
+    if (hardMin <= maxAllowed) break;
     for (const slot of grid.values()) {
       for (const s of slot.sessions) {
-        if (s.intensity_class === 'MODERATE' && hardModeMin > maxAllowed) {
-          s.intensity_class = 'EASY';
-          s.zone_targets = 'Z2';
-          s.description = '[Downgraded to Easy — 80/20 compliance] ' + s.description;
-          hardModeMin -= s.duration;
-        }
+        if (hardMin <= maxAllowed) break;
+        const isProtected = s.tags?.some(t => ['brick','long_run','long_ride'].includes(t));
+        if (s.type !== sport || s.intensity_class === 'EASY' || isProtected) continue;
+
+        const before = effectiveHardMin(s);
+        // Downgrade directly to EASY — the hard/easy day enforcement (Step 4)
+        // already handled HARD→MODERATE transitions for consecutive-day violations.
+        // This step is purely about the weekly time-in-zone budget.
+        s.intensity_class = 'EASY';
+        s.zone_targets = 'Z2';
+        s.description = `[Adjusted to EASY — 80/20 budget] ` + s.description;
+        hardMin -= before; // effectiveHardMin of EASY = 0
       }
     }
   }
@@ -119,8 +151,11 @@ function computeWeekMetrics(sessions: PlannedSession[], weekNum: number, phase: 
     sport_raw_tss[s.type] = (sport_raw_tss[s.type] ?? 0) + s.tss;
     total_raw += s.tss;
     total_weighted += s.weighted_tss;
-    if (s.intensity_class === 'EASY') z12min += s.duration;
-    else z3min += s.duration;
+    // Use effective intensity fractions: threshold sessions are only 65% high-intensity
+    // (the rest is warm-up/cool-down at Z1-2). MODERATE sessions are 50% Z3.
+    const hardFrac = effectiveHardMin(s) / Math.max(1, s.duration);
+    z3min   += s.duration * hardFrac;
+    z12min  += s.duration * (1 - hardFrac);
   }
 
   const totalMin = z12min + z3min;
@@ -291,19 +326,28 @@ export function buildWeek(
     }
   }
 
-  // ── THURSDAY: Swim quality + second brick (Race-Specific) ─────────────────
+  // ── THURSDAY: Swim quality ────────────────────────────────────────────────
+  // §6.2: "Retain swim volume longest" — spec explicitly keeps swim even in taper.
+  // For marathon-primary blocks (swimPct ≈ 0), add a maintenance easy swim to
+  // prevent detraining (§2.2 floor: min 1 swim/week for triathlon athletes).
+  //
+  // Note: The 2nd brick (race_specific) was removed from Thursday. Spec says
+  // "1-2 bricks/week" — we use 1 brick for recreational athletes to keep the
+  // 80/20 hard budget achievable (two protected HARD bricks would exceed it).
+  let thursdayHasSwim = false;
   const thursdaySlot = grid.get('Thursday');
   if (!thursdaySlot?.isRest) {
     if (hasTri) {
-      // Second brick in Race-Specific phase
-      if (bricksThisWeek >= 2 && phase === 'race_specific') {
-        const brickBikeHr = Math.max(0.75, longRideHours * 0.50);
-        const [bk2Bike, bk2Run] = brick('Thursday', brickBikeHr, 20, phase, servedGoal);
-        thursdaySlot!.sessions.push(bk2Bike, bk2Run);
-      } else if (phase !== 'taper') {
-        // Mid-week quality swim
+      if (!isRecovery) {
+        // Quality swim in build/race_specific, easy swim in taper (§6.2)
         const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
-        thursdaySlot!.sessions.push(thresholdSwim('Thursday', tSwimYd, servedGoal));
+        const maintYd  = Math.max(1200, Math.round(swimYards * 0.40));
+        thursdaySlot!.sessions.push(
+          phase === 'taper' || swimPct === 0
+            ? easySwim('Thursday', maintYd, servedGoal)   // maintenance in taper/marathon blocks
+            : thresholdSwim('Thursday', tSwimYd, servedGoal)
+        );
+        thursdayHasSwim = true;
       }
     } else if (!isRecovery) {
       // Run-only plan: easy run or second easy session
@@ -313,6 +357,7 @@ export function buildWeek(
   }
 
   // ── MONDAY: Easy recovery swim ────────────────────────────────────────────
+  // Skip if Monday is rest day — Thursday swim is the maintenance session.
   const mondaySlot = grid.get('Monday');
   if (!mondaySlot?.isRest && hasTri && !isRecovery) {
     const recSwimYd = Math.max(1200, Math.round(swimYards * 0.40));
