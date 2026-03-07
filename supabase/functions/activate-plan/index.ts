@@ -411,39 +411,10 @@ Deno.serve(async (req) => {
 
     let inserted = 0
     if (rows.length) {
-      const { data: insertedRows, error } = await supabase.from('planned_workouts').insert(rows as any).select('id, type, duration, steps_preset, strength_exercises, mobility_exercises')
+      const { error } = await supabase.from('planned_workouts').insert(rows as any)
       if (error) throw error
       inserted = rows.length
-      
-      // Calculate workload for all inserted planned workouts in parallel (batches of 20
-      // to avoid overwhelming the function concurrency limit on large triathlon plans).
-      const insertedWorkouts = Array.isArray(insertedRows) ? insertedRows : []
-      console.log(`🔧 Calculating workload for ${insertedWorkouts.length} planned workouts in parallel`);
-      const BATCH = 20;
-      for (let i = 0; i < insertedWorkouts.length; i += BATCH) {
-        const batch = insertedWorkouts.slice(i, i + BATCH);
-        await Promise.all(batch.map(async (workout) => {
-          try {
-            const { error } = await supabase.functions.invoke('calculate-workload', {
-              body: {
-                workout_id: workout.id,
-                workout_data: {
-                  type: workout.type,
-                  duration: workout.duration,
-                  steps_preset: workout.steps_preset,
-                  strength_exercises: workout.strength_exercises,
-                  mobility_exercises: workout.mobility_exercises,
-                  workout_status: 'planned'
-                }
-              }
-            });
-            if (error) console.error('❌ Workload calc error for planned workout:', workout.id, error);
-          } catch (err) {
-            console.error('❌ Failed to calculate workload for planned workout:', workout.id, err);
-          }
-        }));
-      }
-      console.log(`✅ Workload calculations complete for ${insertedWorkouts.length} workouts`);
+      console.log(`✅ Inserted ${inserted} planned workouts — workload will compute lazily on first view`)
     }
 
     // Materialize steps for the whole plan (server-side expansion)
