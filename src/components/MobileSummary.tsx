@@ -587,8 +587,15 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
     ? sessionState.details.interval_rows
     : [];
   const hasCanonicalIntervalRows = !!planned && sessionIntervalRows.length > 0;
-  const waitingForCanonicalRows = !!planned && (intervalDisplayMode === 'awaiting_recompute' || !hasCanonicalIntervalRows);
-  const needsCanonicalHydration = !!planned && !hasCanonicalIntervalRows;
+  const isStructuredIntervalSession = (() => {
+    if (intervalDisplayMode === 'interval_compare_ready') return true;
+    if (intervalDisplayMode === 'overall_only') return false;
+    const pSteps: any[] = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
+    const workSteps = pSteps.filter((s: any) => s?.kind === 'work' || s?.type === 'work' || s?.kind === 'interval');
+    return workSteps.length >= 2;
+  })();
+  const waitingForCanonicalRows = !!planned && isStructuredIntervalSession && (intervalDisplayMode === 'awaiting_recompute' || !hasCanonicalIntervalRows);
+  const needsCanonicalHydration = !!planned && isStructuredIntervalSession && !hasCanonicalIntervalRows;
   const completedComputed = (completedSrc as any)?.computed;
   const overallForDisplay = (completedSrc as any)?.computed?.overall ?? {};
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
@@ -1658,8 +1665,8 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                        performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
                   {chip('Duration', finalDurationPct, 
                        'Time adherence', 'duration')}
-                  {chip('Pace', finalPacePct, 
-                       'Interval adherence', 'pace')}
+                  {chip('Pace', finalPacePct,
+                       isStructuredIntervalSession ? 'Interval adherence' : 'Pace adherence', 'pace')}
                 </div>
               </div>
               
