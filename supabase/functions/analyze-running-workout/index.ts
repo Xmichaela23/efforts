@@ -1210,7 +1210,7 @@ Deno.serve(async (req) => {
           console.log(`🔍 [LINKED PLAN TYPE] single-work-step intent: ${isEasyOrLongRun ? 'easy/recovery' : 'work'}`);
           
           const intervalType: IntervalType = isEasyOrLongRun ? 'easy' : 'work';
-          console.log(`🔍 [INTERVAL TYPE] Detected as '${intervalType}' - token: ${workoutToken}, name: ${workoutName}, stepKind: ${stepKind}`);
+          console.log(`🔍 [INTERVAL TYPE] Detected as '${intervalType}' - stepKind: ${stepKind}`);
           
           granularPaceAdherence = Math.round(calculatePaceRangeAdherence(avgPaceSecondsForAdherence, targetPaceLower, targetPaceUpper, intervalType));
           console.log(`🔍 [PACE ADHERENCE] Using AVERAGE pace adherence (${intervalType}): ${granularPaceAdherence}%`);

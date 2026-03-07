@@ -590,11 +590,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
   const isStructuredIntervalSession = (() => {
     if (intervalDisplayMode === 'interval_compare_ready') return true;
     if (intervalDisplayMode === 'overall_only') return false;
+    if (intervalDisplayMode === 'awaiting_recompute') return true;
+    if (!intervalDisplayMode) return false;
     const pSteps: any[] = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
     const workSteps = pSteps.filter((s: any) => s?.kind === 'work' || s?.type === 'work' || s?.kind === 'interval');
     return workSteps.length >= 2;
   })();
-  const waitingForCanonicalRows = !!planned && isStructuredIntervalSession && (intervalDisplayMode === 'awaiting_recompute' || !hasCanonicalIntervalRows);
+  const waitingForCanonicalRows = !!planned && isStructuredIntervalSession && intervalDisplayMode === 'awaiting_recompute';
   const needsCanonicalHydration = !!planned && isStructuredIntervalSession && !hasCanonicalIntervalRows;
   const completedComputed = (completedSrc as any)?.computed;
   const overallForDisplay = (completedSrc as any)?.computed?.overall ?? {};

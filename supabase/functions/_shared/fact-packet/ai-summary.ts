@@ -411,26 +411,28 @@ ${JSON.stringify(displayPacket, null, 2)}
 Write the summary now.`;
 
   try {
-    // Attempt 1: normal generation
     const s1 = await callOpenAIParagraph(openaiKey, prompt, 0.2);
-    if (!s1) return null;
+    if (!s1) { console.warn('[ai-summary] attempt 1 returned empty'); return null; }
     const v1 = validateNoNewNumbers(s1, displayPacket);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
     const len1 = validateAdaptiveLength(s1, displayPacket);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
     if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok) return s1;
+    console.warn(`[ai-summary] attempt 1 rejected: num=${v1.ok}(${v1.bad?.join(',')}) zone=${z1.ok}(${z1.why}) len=${len1.ok}(${len1.why}) td=${td1.ok}(${td1.why}) filler=${g1.ok}(${g1.why})`);
 
-    // Attempt 2: corrective retry with explicit violations + temp=0
     const corrective = `${prompt}\n\nYou violated constraints.\n- Bad numeric tokens not present in DISPLAY PACKET: ${v1.bad.join(', ') || '(none)'}\n- Zone/time claim violation: ${z1.why || '(none)'}\n- Length violation: ${len1.why || '(none)'}\n- Terrain/drift connection violation: ${td1.why || '(none)'}\n- Coach voice violation: ${g1.why || '(none)'}\nRewrite the paragraph and REMOVE any unsupported claims and any token not present verbatim in DISPLAY PACKET. Do not mention time-in-zone or \"% of time\" unless explicitly provided. Keep it short when there is nothing concerning.`;
     const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
-    if (!s2) return null;
+    if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
     const v2 = validateNoNewNumbers(s2, displayPacket);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);
     const len2 = validateAdaptiveLength(s2, displayPacket);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
-    return (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) ? s2 : null;
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) return s2;
+    console.warn(`[ai-summary] attempt 2 also rejected: num=${v2.ok}(${v2.bad?.join(',')}) zone=${z2.ok}(${z2.why}) len=${len2.ok}(${len2.why}) td=${td2.ok}(${td2.why}) filler=${g2.ok}(${g2.why})`);
+    console.warn(`[ai-summary] returning attempt 2 anyway to avoid empty narrative`);
+    return s2;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);
     return null;
