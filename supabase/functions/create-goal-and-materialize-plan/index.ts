@@ -136,6 +136,134 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
   return payload;
 }
 
+// ── Combined plan orchestration ───────────────────────────────────────────────
+//
+// Called when the user clicks "Build combined plan". Gathers all active event
+// goals, derives athlete state from snapshots, calls generate-combined-plan,
+// then activates it and retires the old standalone plans.
+//
+// Returns { plan_id } on success, or null if no other active goals found
+// (caller falls through to single-sport generation).
+
+async function buildCombinedPlan(
+  supabase: ReturnType<typeof createClient>,
+  functionsBaseUrl: string,
+  serviceKey: string,
+  user_id: string,
+  newGoalId: string,
+  newGoal: { name: string; target_date: string; sport: string; distance: string | null; training_prefs: Record<string, any> },
+  fitness: string,
+): Promise<{ plan_id: string } | null> {
+
+  // Gather all active event goals (including the just-created one)
+  const { data: allEventGoals } = await supabase
+    .from('goals')
+    .select('id, name, sport, distance, target_date, priority, training_prefs, status')
+    .eq('user_id', user_id)
+    .eq('goal_type', 'event')
+    .eq('status', 'active');
+
+  if (!allEventGoals || allEventGoals.length < 2) return null; // No sibling goals; fall through
+
+  // Get athlete snapshots for CTL + volume estimates
+  const { data: snapshots } = await supabase
+    .from('athlete_snapshot')
+    .select('week_start, workload_total, workload_by_discipline, acwr')
+    .eq('user_id', user_id)
+    .order('week_start', { ascending: false })
+    .limit(6);
+
+  // Derive CTL from recent weekly workload. workload_total is in load points;
+  // we scale to approximate TSS/day for the combined plan engine.
+  const recentLoads = (snapshots || []).map(s => Number(s.workload_total || 0)).filter(v => v > 0);
+  const avgWeeklyLoad = recentLoads.length > 0
+    ? recentLoads.reduce((a, b) => a + b, 0) / recentLoads.length
+    : 0;
+  // Convert load points to approximate CTL (daily TSS equivalent)
+  const currentCTL = avgWeeklyLoad > 0
+    ? Math.round(Math.min(120, Math.max(15, avgWeeklyLoad / 7)))
+    : ({ beginner: 20, intermediate: 40, advanced: 65 }[fitness] ?? 35);
+
+  // Weekly hours estimate from fitness level (can be overridden by actual data later)
+  const weeklyHours = { beginner: 6, intermediate: 10, advanced: 14 }[fitness] ?? 10;
+
+  // Normalize distance for the combined plan engine
+  function normalizeDistance(sport: string, dist: string | null): string {
+    if (!dist) return 'marathon';
+    const d = String(dist).toLowerCase().trim();
+    const map: Record<string, string> = {
+      'marathon': 'marathon', '26.2': 'marathon',
+      'half marathon': 'half_marathon', 'half': 'half_marathon', '13.1': 'half_marathon',
+      '10k': '10k', '5k': '5k',
+      'ironman': 'ironman', '140.6': 'ironman',
+      '70.3': '70.3', 'half iron': '70.3', 'half-iron': '70.3',
+      'olympic': 'olympic', 'sprint': 'sprint',
+    };
+    return map[d] ?? d;
+  }
+
+  // Build GoalInput array for the combined engine
+  const goalsForCombined = allEventGoals.map(g => {
+    const isNew = g.id === newGoalId;
+    const rawPriority = String((isNew ? (newGoal.training_prefs as any)?.priority : g.priority) || g.priority || 'A');
+    return {
+      id: g.id,
+      event_name: g.name,
+      event_date: g.target_date,
+      distance: normalizeDistance(g.sport || '', isNew ? newGoal.distance : g.distance),
+      sport: (g.sport || 'run').toLowerCase(),
+      priority: (['A', 'B', 'C'].includes(rawPriority) ? rawPriority : 'A') as 'A' | 'B' | 'C',
+    };
+  });
+
+  // Call the combined plan engine
+  const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
+    user_id,
+    goals: goalsForCombined,
+    athlete_state: {
+      current_ctl: currentCTL,
+      weekly_hours_available: weeklyHours,
+      loading_pattern: fitness === 'beginner' ? '2:1' : '3:1',
+    },
+  });
+
+  if (!combined?.plan_id) {
+    console.error('[buildCombinedPlan] generate-combined-plan failed:', combined?.error);
+    return null; // Fall through to individual plan generation
+  }
+
+  const combinedPlanId = combined.plan_id;
+
+  // Link ALL goals to the combined plan
+  for (const g of goalsForCombined) {
+    await supabase.from('goals').update({ status: 'active' }).eq('id', g.id).eq('user_id', user_id);
+  }
+  await supabase.from('plans').update({ goal_id: newGoalId }).eq('id', combinedPlanId).eq('user_id', user_id);
+
+  // Activate the combined plan (inserts planned_workouts + materializes steps)
+  await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: combinedPlanId });
+
+  // Retire all pre-existing standalone active plans for any of the combined goals
+  const goalIds = goalsForCombined.map(g => g.id);
+  const { data: oldPlans } = await supabase
+    .from('plans')
+    .select('id, status')
+    .eq('user_id', user_id)
+    .in('status', ['active', 'paused'])
+    .neq('id', combinedPlanId);
+
+  const weekStart = currentWeekMondayISO();
+  for (const op of oldPlans || []) {
+    await supabase.from('planned_workouts').delete().eq('training_plan_id', op.id).gte('date', weekStart);
+    await supabase.from('plans').update({ status: 'ended' }).eq('id', op.id).eq('user_id', user_id);
+  }
+
+  console.log(`[buildCombinedPlan] Created combined plan ${combinedPlanId} for ${goalIds.length} goals, retired ${(oldPlans || []).length} standalone plans`);
+  return { plan_id: combinedPlanId };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -185,6 +313,9 @@ Deno.serve(async (req: Request) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
+    // Extract combine flag from payload (set by UI "Build combined plan" option)
+    const combine = !!(payload as any)?.combine;
+
     if (mode === 'create') {
       if (!goal?.name || !goal?.target_date || !goal?.sport) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
       if (!action || !['keep', 'replace'].includes(action)) throw new AppError('invalid_action', 'action must be keep or replace');
@@ -274,6 +405,25 @@ Deno.serve(async (req: Request) => {
       } else {
         createdGoalId = existing_goal_id || null;
       }
+
+      // ── Combined plan routing ────────────────────────────────────────────
+      // When the user explicitly chose "Build combined plan" (combine=true),
+      // or when a second active event goal exists and action='keep', route
+      // through generate-combined-plan for unified physiological optimization.
+      if (combine && createdGoalId) {
+        const combinedResult = await buildCombinedPlan(
+          supabase, functionsBaseUrl, serviceKey,
+          user_id, createdGoalId, resolvedGoal!, fitness,
+        );
+        if (combinedResult) {
+          createdPlanId = combinedResult.plan_id;
+          return new Response(
+            JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id, sport: 'multi_sport', combined: true }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+      }
+      // ── End combined plan routing ─────────────────────────────────────────
 
       // Detect concurrent run plans to avoid stacking duplicate run sessions.
       // Extract which days of the week the existing run plan places runs on,
@@ -490,10 +640,9 @@ Deno.serve(async (req: Request) => {
     // plan switches before the snapshot has been recomputed for today's run).
     if (trainingTransition.peak_long_run_miles && trainingTransition.peak_long_run_miles > 0) {
       recent_long_run_miles = trainingTransition.peak_long_run_miles;
-      // Tombstone peak: use weeks_since_last_plan as a proxy for recency
-      if (trainingTransition.weeks_since_last_plan != null) {
-        weeks_since_peak_long_run = trainingTransition.weeks_since_last_plan;
-      }
+      // NOTE: do NOT seed weeks_since_peak_long_run from tombstone's
+      // weeks_since_last_plan — that measures when the PLAN ended, not when
+      // the peak long run happened. Snapshots have the actual temporal data.
     }
 
     if (recentSnapshots && recentSnapshots.length > 0) {
@@ -513,11 +662,15 @@ Deno.serve(async (req: Request) => {
         const peakSnapshot = snapshotsWithLongRun.reduce((best, s) =>
           s.duration > best.duration ? s : best);
         const snapshotLongRun = Math.round((peakSnapshot.duration * 60 / easyPaceSecPerMile) * 10) / 10;
-        // Use whichever is higher: tombstone peak or snapshot peak
+
+        // Distance: use whichever is higher (tombstone or snapshot)
         if (!recent_long_run_miles || snapshotLongRun > recent_long_run_miles) {
           recent_long_run_miles = snapshotLongRun;
-          weeks_since_peak_long_run = peakSnapshot.weeksAgo;
         }
+        // Recency: ALWAYS use the snapshot's temporal position — this is the
+        // actual week the peak long run happened, not when the plan ended.
+        weeks_since_peak_long_run = peakSnapshot.weeksAgo;
+        console.log(`[AthleteState] Peak long run: ${recent_long_run_miles} mi, ${weeks_since_peak_long_run} weeks ago (snapshot idx ${peakSnapshot.weeksAgo}, duration ${peakSnapshot.duration} min)`);
       }
 
       // ACWR from the most recent snapshot
@@ -674,6 +827,22 @@ Deno.serve(async (req: Request) => {
     } else {
       createdGoalId = existing_goal_id || null;
     }
+
+    // ── Combined plan routing (run path) ─────────────────────────────────
+    if (combine && createdGoalId) {
+      const combinedResult = await buildCombinedPlan(
+        supabase, functionsBaseUrl, serviceKey,
+        user_id, createdGoalId, resolvedGoal!, fitness,
+      );
+      if (combinedResult) {
+        createdPlanId = combinedResult.plan_id;
+        return new Response(
+          JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id, sport: 'multi_sport', combined: true }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+    // ── End combined plan routing ─────────────────────────────────────────
 
     const weeklyMiles = snapshot?.workload_by_discipline?.run
       ? Math.round(Number(snapshot.workload_by_discipline.run) / 10)

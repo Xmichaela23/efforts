@@ -434,7 +434,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     await updateGoal(goal.id, { status: goal.status === 'paused' ? 'active' : 'paused' });
   }
 
-  const [existingGoalPrompt, setExistingGoalPrompt] = useState<{ existing: Goal; action?: 'keep' | 'replace' } | null>(null);
+  const [existingGoalPrompt, setExistingGoalPrompt] = useState<{ existing: Goal; action?: 'keep' | 'replace' | 'combine' } | null>(null);
 
   async function handleSaveEvent() {
     if (!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal) return;
@@ -443,8 +443,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const sameSportGoal = activeGoals.find(
       g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
     );
-    if (sameSportGoal && !existingGoalPrompt?.action) {
-      setExistingGoalPrompt({ existing: sameSportGoal });
+    const crossSportGoal = !sameSportGoal
+      ? activeGoals.find(g => g.goal_type === 'event' && g.sport && (g.sport || '').toLowerCase() !== eventSport.toLowerCase())
+      : null;
+
+    const conflictGoal = sameSportGoal ?? crossSportGoal ?? null;
+    if (conflictGoal && !existingGoalPrompt?.action) {
+      setExistingGoalPrompt({ existing: conflictGoal });
       return;
     }
 
@@ -453,10 +458,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
 
-      const action: 'keep' | 'replace' = existingGoalPrompt?.action === 'replace' ? 'replace' : 'keep';
+      const action: 'keep' | 'replace' | 'combine' = existingGoalPrompt?.action ?? 'keep';
       const payload = {
         user_id: user.id,
-        action,
+        action: action === 'combine' ? 'keep' : action,
+        combine: action === 'combine',
+        priority: eventPriority,
         existing_goal_id: existingGoalPrompt?.existing.id || null,
         replace_goal_id: action === 'replace' ? existingGoalPrompt?.existing.id : null,
         ...(planStartDate ? { plan_start_date: planStartDate } : {}),
@@ -465,6 +472,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           target_date: eventDate,
           sport: eventSport,
           distance: eventDistance || null,
+          priority: eventPriority,
           training_prefs: {
             fitness: eventFitness,
             goal_type: eventTrainingGoal,
@@ -667,35 +675,47 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       )}
 
       {/* Existing goal prompt */}
-      {existingGoalPrompt && !existingGoalPrompt.action && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b0b0c]/95 p-5 shadow-2xl">
-            <p className="text-base font-medium text-white/90 mb-2">You already have an active goal</p>
-            <p className="text-sm text-white/50 leading-relaxed mb-5">
-              <span className="text-white/70">{existingGoalPrompt.existing.name}</span>
-              {existingGoalPrompt.existing.target_date && ` · ${format(new Date(existingGoalPrompt.existing.target_date + 'T12:00:00'), 'MMM d')}`}.
-              What would you like to do?
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'keep' }); handleSaveEvent(); }}
-                className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-              >
-                <span className="text-sm font-medium text-white/80">Keep both</span>
-                <span className="block text-xs text-white/35 mt-0.5">Train for both — the new one becomes secondary</span>
-              </button>
-              <button
-                onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'replace' }); handleSaveEvent(); }}
-                className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-              >
-                <span className="text-sm font-medium text-white/80">Replace it</span>
-                <span className="block text-xs text-white/35 mt-0.5">End {existingGoalPrompt.existing.name} and focus on the new one</span>
-              </button>
-              <button onClick={() => setExistingGoalPrompt(null)} className="w-full rounded-xl py-2.5 text-sm text-white/40 hover:text-white/60 transition-all">Cancel</button>
+      {existingGoalPrompt && !existingGoalPrompt.action && (() => {
+        const isCrossSport = (existingGoalPrompt.existing.sport || '').toLowerCase() !== eventSport.toLowerCase();
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+            <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b0b0c]/95 p-5 shadow-2xl">
+              <p className="text-base font-medium text-white/90 mb-2">You already have an active goal</p>
+              <p className="text-sm text-white/50 leading-relaxed mb-5">
+                <span className="text-white/70">{existingGoalPrompt.existing.name}</span>
+                {existingGoalPrompt.existing.target_date && ` · ${format(new Date(existingGoalPrompt.existing.target_date + 'T12:00:00'), 'MMM d')}`}.
+                What would you like to do?
+              </p>
+              <div className="flex flex-col gap-2">
+                {isCrossSport && (
+                  <button
+                    onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'combine' }); handleSaveEvent(); }}
+                    className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/20 bg-white/[0.08] hover:bg-white/[0.12]"
+                  >
+                    <span className="text-sm font-medium text-white/90">Build combined plan</span>
+                    <span className="block text-xs text-white/50 mt-0.5">One unified schedule — shared load budget, hard/easy enforced across both sports</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'keep' }); handleSaveEvent(); }}
+                  className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                >
+                  <span className="text-sm font-medium text-white/80">{isCrossSport ? 'Keep separate plans' : 'Keep both'}</span>
+                  <span className="block text-xs text-white/35 mt-0.5">{isCrossSport ? 'Two independent plans — no load coordination' : 'Train for both — the new one becomes secondary'}</span>
+                </button>
+                <button
+                  onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'replace' }); handleSaveEvent(); }}
+                  className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                >
+                  <span className="text-sm font-medium text-white/80">Replace it</span>
+                  <span className="block text-xs text-white/35 mt-0.5">End {existingGoalPrompt.existing.name} and focus on the new one</span>
+                </button>
+                <button onClick={() => setExistingGoalPrompt(null)} className="w-full rounded-xl py-2.5 text-sm text-white/40 hover:text-white/60 transition-all">Cancel</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Quick Calibration modal */}
       {showCalibration && (
@@ -1033,6 +1053,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </div>
             </>);
           })()}
+          <div>
+            <span className="text-sm text-white/50 mb-1.5 block">Race priority</span>
+            <div className="flex gap-2">
+              {([['A', 'A-Race', 'Full taper, protect at all costs'], ['B', 'B-Race', '3–5 day mini-taper'], ['C', 'C-Race', 'Training race, no taper']] as const).map(([val, label, sub]) => (
+                <button key={val} onClick={() => setEventPriority(val)} className={`flex-1 rounded-xl px-3 py-2.5 text-left transition-all border ${eventPriority === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
+                  <span className={`text-sm font-semibold block ${eventPriority === val ? 'text-white/90' : 'text-white/50'}`}>{label}</span>
+                  <span className={`text-xs mt-0.5 block leading-tight ${eventPriority === val ? 'text-white/45' : 'text-white/25'}`}>{sub}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           {saving ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4 text-center space-y-1.5">
               <div className="flex items-center justify-center gap-2">
