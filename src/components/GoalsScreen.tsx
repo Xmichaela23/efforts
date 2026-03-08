@@ -436,7 +436,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const [existingGoalPrompt, setExistingGoalPrompt] = useState<{ existing: Goal; action?: 'keep' | 'replace' | 'combine' } | null>(null);
 
-  async function handleSaveEvent() {
+  async function handleSaveEvent(directAction?: 'keep' | 'replace' | 'combine') {
     if (!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal) return;
     setGoalFlowError(null);
 
@@ -448,7 +448,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       : null;
 
     const conflictGoal = sameSportGoal ?? crossSportGoal ?? null;
-    if (conflictGoal && !existingGoalPrompt?.action) {
+    // directAction is passed when the user clicks a choice in the conflict dialog, because
+    // React state batching means existingGoalPrompt.action hasn't updated yet at call time.
+    const resolvedAction = directAction ?? existingGoalPrompt?.action;
+    if (conflictGoal && !resolvedAction) {
       setExistingGoalPrompt({ existing: conflictGoal });
       return;
     }
@@ -458,7 +461,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
 
-      const action: 'keep' | 'replace' | 'combine' = existingGoalPrompt?.action ?? 'keep';
+      const action: 'keep' | 'replace' | 'combine' = resolvedAction ?? 'keep';
       const payload = {
         user_id: user.id,
         action: action === 'combine' ? 'keep' : action,
@@ -689,7 +692,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               <div className="flex flex-col gap-2">
                 {isCrossSport && (
                   <button
-                    onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'combine' }); handleSaveEvent(); }}
+                    onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'combine' }); handleSaveEvent('combine'); }}
                     className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/20 bg-white/[0.08] hover:bg-white/[0.12]"
                   >
                     <span className="text-sm font-medium text-white/90">Build combined plan</span>
@@ -697,14 +700,14 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   </button>
                 )}
                 <button
-                  onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'keep' }); handleSaveEvent(); }}
+                  onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'keep' }); handleSaveEvent('keep'); }}
                   className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                 >
                   <span className="text-sm font-medium text-white/80">{isCrossSport ? 'Keep separate plans' : 'Keep both'}</span>
                   <span className="block text-xs text-white/35 mt-0.5">{isCrossSport ? 'Two independent plans — no load coordination' : 'Train for both — the new one becomes secondary'}</span>
                 </button>
                 <button
-                  onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'replace' }); handleSaveEvent(); }}
+                  onClick={() => { setExistingGoalPrompt({ ...existingGoalPrompt, action: 'replace' }); handleSaveEvent('replace'); }}
                   className="w-full rounded-xl px-4 py-3 text-left transition-all border border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
                 >
                   <span className="text-sm font-medium text-white/80">Replace it</span>
