@@ -136,6 +136,22 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
   return payload;
 }
 
+// ── Equipment capability helper ───────────────────────────────────────────────
+//
+// "commercial_gym" in the protocol system means "has barbell access and a rack".
+// A user qualifies if they have a commercial membership OR if their home gym
+// includes a barbell + plates, or a squat rack / power cage.
+// "Barbell + plates" alone covers deadlifts, rows, hip thrusts — still gets
+// the full barbell protocol. Only true bodyweight/band setups get home_gym tier.
+//
+function hasBarbellCapability(strengthEquipment: string[]): boolean {
+  return (
+    strengthEquipment.includes('Commercial gym') ||
+    strengthEquipment.includes('Barbell + plates') ||
+    strengthEquipment.includes('Squat rack / Power cage')
+  );
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -219,7 +235,8 @@ async function buildCombinedPlan(
     };
   });
 
-  const hasCommercialGym = (combinedBaseline?.equipment?.strength ?? []).includes('Commercial gym');
+  const combinedStrengthEquipment: string[] = combinedBaseline?.equipment?.strength ?? [];
+  const hasCommercialGym = hasBarbellCapability(combinedStrengthEquipment);
 
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
@@ -483,8 +500,8 @@ Deno.serve(async (req: Request) => {
         days_per_week:    resolvedGoal?.training_prefs?.days_per_week ?? undefined,
         // Triathlon plans support 0/1/2 strength days — cap UI value of 3 to 2
         strength_frequency: Math.min(2, Number(resolvedGoal?.training_prefs?.strength_frequency ?? 0)),
-        // Equipment: read from user_baselines.equipment.strength — ['Commercial gym'] = commercial, else home
-        equipment_type: (triBaseline?.equipment?.strength ?? []).includes('Commercial gym') ? 'commercial_gym' : 'home_gym',
+        // Equipment: commercial_gym if they have a commercial membership OR barbell+rack at home
+        equipment_type: hasBarbellCapability(triBaseline?.equipment?.strength ?? []) ? 'commercial_gym' : 'home_gym',
         // Limiter sport from training prefs (used to shift strength emphasis)
         limiter_sport: resolvedGoal?.training_prefs?.limiter_sport ?? undefined,
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
@@ -900,7 +917,7 @@ Deno.serve(async (req: Request) => {
       generateBody.strength_frequency = resolvedGoal.training_prefs.strength_frequency || 2;
       // Derive tier from user_baselines equipment — commercial gym gets barbell tier,
       // home gym stays bodyweight. Falls back to 'strength_power' if baseline unavailable.
-      const runEquipmentType = (baseline?.equipment?.strength ?? []).includes('Commercial gym')
+      const runEquipmentType = hasBarbellCapability(baseline?.equipment?.strength ?? [])
         ? 'commercial_gym' : 'home_gym';
       generateBody.strength_tier = runEquipmentType === 'commercial_gym' ? 'strength_power' : 'injury_prevention';
       generateBody.equipment_type = runEquipmentType;
