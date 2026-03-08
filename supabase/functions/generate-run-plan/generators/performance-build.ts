@@ -977,12 +977,24 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const recentLongRun = this.params.recent_long_run_miles;
     if (recentLongRun && recentLongRun > 0) {
       const seed = Math.round(recentLongRun * 0.95 * 10) / 10;
+
+      // Recency decay: fitness from a long run decays ~7% per week of inactivity
+      // at that distance. An 18-miler 1 week ago is near-current; 4 weeks ago
+      // is meaningfully decayed. Floor at 0.65 to avoid absurd reduction.
+      const weeksSincePeak = this.params.weeks_since_peak_long_run ?? 0;
+      const recencyDecay = weeksSincePeak > 0
+        ? Math.max(0.65, 1.0 - weeksSincePeak * 0.07)
+        : 1.0;
+
       // Apply ACWR fatigue guard: back off another 5% if athlete is overreached
       const acwr = this.params.current_acwr;
       const fatigueAdj = acwr != null && acwr > 1.3
         ? Math.max(0.85, 1.0 - (acwr - 1.3) * 0.4)
         : 1.0;
-      return Math.round(seed * fatigueAdj * 10) / 10;
+
+      // Structural governor: back off when heavy lifting is being introduced
+      const governor = this.getStructuralGovernor(1); // Week 1 starting value
+      return Math.round(seed * recencyDecay * fatigueAdj * governor * 10) / 10;
     }
 
     const currentMiles = this.params.current_weekly_miles;
@@ -1156,6 +1168,12 @@ export class PerformanceBuildGenerator extends BaseGenerator {
   /**
    * Calculate state-aware long run distance using 4-state machine
    * Handles: Week 1, Recovery Week, Post-Recovery Resume, Standard Build
+   *
+   * Routes to one of three arcs:
+   *   1. Peak-bridge (maintenance → taper): athlete is at current peak, short plan
+   *   2. Re-entry build (ascending → peak → taper): athlete was near peak recently
+   *      but has been tapering/resting — needs to rebuild before peaking
+   *   3. Standard build (linear progression): default path
    */
   private calculateStateAwareLongRun(
     weekNumber: number,
@@ -1165,16 +1183,36 @@ export class PerformanceBuildGenerator extends BaseGenerator {
     const weekIdx = weekNumber - 1; // 0-based index
     const totalWeeks = this.params.duration_weeks;
 
-    // Peak bridge pivot: athlete is already at or near their peak long-run
-    // fitness and this is a short plan. Use a phase-aware arc that:
-    //   • Keeps long runs near-peak during build/speed weeks
-    //   • Drops to ~55% for recovery weeks (avoids double-reduction in resolveLongRun)
-    //   • Steps down progressively through taper weeks
-    // NOTE: this returns the TARGET miles for the week. resolveLongRun will pass
-    // these straight to createVDOTLongRun for recovery weeks (no extra 75% cut).
     const recentLongRun = this.params.recent_long_run_miles;
     const progression = LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness];
+    const weeksSincePeak = this.params.weeks_since_peak_long_run ?? 0;
+    const transitionMode = this.params.transition_mode;
+
     if (recentLongRun && progression && this.isAtPeakFitness(progression) && totalWeeks <= 10) {
+      // Athlete has peak-level long-run history. Which arc to use depends on
+      // how recently that peak happened and what training state they're in.
+      const peakIsCurrent = weeksSincePeak <= 2;
+      const isPostTaperPivot = transitionMode === 'peak_bridge' && weeksSincePeak > 2;
+      const isRecoveryRebuild = transitionMode === 'recovery_rebuild';
+
+      if (peakIsCurrent && !isRecoveryRebuild) {
+        // True peak-bridge: athlete ran near-peak within the last 2 weeks.
+        // Maintain near-peak and taper. Original descending arc is correct.
+        return this.calculatePeakBridgeLongRun(weekNumber, isRecovery, phaseStructure, recentLongRun);
+      }
+
+      if (isPostTaperPivot || isRecoveryRebuild) {
+        // Re-entry: athlete was near peak but has been tapering or resting.
+        // Use an ascending arc that rebuilds to peak before tapering.
+        return this.calculateReEntryLongRun(weekNumber, isRecovery, phaseStructure, recentLongRun, weeksSincePeak);
+      }
+
+      // Fallback for short plans where peak is stale but no transition signal:
+      // use re-entry arc (safer than assuming current peak fitness).
+      if (weeksSincePeak > 2) {
+        return this.calculateReEntryLongRun(weekNumber, isRecovery, phaseStructure, recentLongRun, weeksSincePeak);
+      }
+
       return this.calculatePeakBridgeLongRun(weekNumber, isRecovery, phaseStructure, recentLongRun);
     }
 
@@ -1398,11 +1436,81 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       const highMark = Math.round(recentLongRun * 0.90);
       const dropMark = Math.round(recentLongRun * 0.78);
       const dropPerWeek = preBuildWeeks > 1 ? (highMark - dropMark) / (preBuildWeeks - 1) : 0;
-      return Math.max(dropMark, Math.round(highMark - weekIdx * dropPerWeek));
+      const governor = this.getStructuralGovernor(weekNumber);
+      return Math.max(dropMark, Math.round((highMark - weekIdx * dropPerWeek) * governor));
     }
 
     // After recovery week, before taper: re-engagement run
     return Math.round(recentLongRun * 0.76);
+  }
+
+  /**
+   * Ascending re-entry arc for athletes who were near peak but have been
+   * tapering or resting. Builds back up to ~90% of historical peak before
+   * tapering, instead of starting at 90% and descending.
+   *
+   * Arc shape (7-week example with recovery at week 4, taper at week 6):
+   *   Week 1: ~65% of peak (re-entry)     e.g. 12 mi for 18-mi peak
+   *   Week 2: ~73%                         e.g. 13 mi
+   *   Week 3: ~82% (approaching peak)      e.g. 15 mi
+   *   Week 4: ~55% (recovery)              e.g. 10 mi
+   *   Week 5: ~88% (post-recovery peak)    e.g. 16 mi
+   *   Week 6+: taper step-down             e.g. 13 → 8
+   *
+   * The longer the gap since the peak long run, the lower the starting
+   * percentage (more conservative re-entry).
+   */
+  private calculateReEntryLongRun(
+    weekNumber: number,
+    isRecovery: boolean,
+    phaseStructure: PhaseStructure,
+    recentLongRun: number,
+    weeksSincePeak: number
+  ): number {
+    const totalWeeks = this.params.duration_weeks;
+    const taperPhase = phaseStructure.phases.find(p => p.name === 'Taper');
+    const taperStartWeek = taperPhase?.start_week ?? Math.max(totalWeeks - 1, 1);
+    const raceWeekMiles = Math.max(6, Math.round(recentLongRun * 0.30));
+
+    // Recovery week: same drop as peak-bridge
+    if (isRecovery) {
+      return Math.max(8, Math.round(recentLongRun * 0.55));
+    }
+
+    // Taper weeks: same step-down logic as peak-bridge
+    if (weekNumber >= taperStartWeek) {
+      const taperWeeksTotal = totalWeeks - taperStartWeek + 1;
+      const taperWeekIdx = weekNumber - taperStartWeek;
+      const taperEntryMiles = Math.round(recentLongRun * 0.70);
+      const dropPerWeek = (taperEntryMiles - raceWeekMiles) / Math.max(1, taperWeeksTotal);
+      return Math.max(raceWeekMiles, Math.round(taperEntryMiles - taperWeekIdx * dropPerWeek));
+    }
+
+    // Build weeks: ascending from re-entry floor toward ~90% of peak.
+    // Start lower when the gap is bigger (more deconditioning).
+    const startPct = Math.max(0.55, 0.75 - (weeksSincePeak - 2) * 0.05);
+    const targetPct = 0.90;
+    const buildWeeks = taperStartWeek - 1; // non-taper weeks available
+    const weekIdx = weekNumber - 1;
+
+    // Skip over recovery weeks when computing the build step size so the
+    // ascending ramp isn't diluted by recovery drops.
+    const recoveryWeeksInBuild = phaseStructure.recovery_weeks
+      .filter(w => w < taperStartWeek).length;
+    const effectiveBuildWeeks = Math.max(1, buildWeeks - recoveryWeeksInBuild);
+    const stepPerWeek = (targetPct - startPct) / effectiveBuildWeeks;
+
+    // Count non-recovery weeks elapsed (for smooth ascending step)
+    let buildStep = 0;
+    for (let w = 1; w < weekNumber; w++) {
+      if (!phaseStructure.recovery_weeks.includes(w)) {
+        buildStep++;
+      }
+    }
+
+    const pct = Math.min(targetPct, startPct + buildStep * stepPerWeek);
+    const governor = this.getStructuralGovernor(weekNumber);
+    return Math.max(8, Math.round(recentLongRun * pct * governor));
   }
 
   private getLongRunMilesForWeek(weekNumber: number, isRecovery: boolean, phaseStructure: PhaseStructure): number {
@@ -1448,15 +1556,15 @@ export class PerformanceBuildGenerator extends BaseGenerator {
 
     // PRIORITY 2: Recovery week → reduced easy long run
     if (weekType === 'RECOVERY') {
-      // When in peak-bridge mode, calculatePeakBridgeLongRun already returns a
-      // recovery-appropriate value (~55% of peak) — skip the second 75% cut.
-      const isPeakBridge = !!(
+      // Both peak-bridge and re-entry arcs already return recovery-appropriate
+      // values (~55% of peak) — skip the second 75% cut to avoid double-reduction.
+      const usesPreComputedRecovery = !!(
         this.params.recent_long_run_miles &&
         this.isAtPeakFitness(LONG_RUN_PROGRESSION[this.params.distance]?.[this.params.fitness] ?? []) &&
         this.params.duration_weeks <= 10
       );
-      const recoveryMiles = isPeakBridge
-        ? longRunMiles // already reduced by calculatePeakBridgeLongRun
+      const recoveryMiles = usesPreComputedRecovery
+        ? longRunMiles // already reduced by calculatePeakBridgeLongRun or calculateReEntryLongRun
         : Math.max(8, Math.floor(longRunMiles * 0.75));
       return this.createVDOTLongRun(recoveryMiles, 0);
     }

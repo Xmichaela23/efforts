@@ -154,6 +154,22 @@ export abstract class BaseGenerator {
   }
 
   /**
+   * Neuromuscular governor: when heavy lower-body strength work is being
+   * introduced alongside the running plan, reduce early-week long-run volume
+   * to prevent CNS overload from concurrent new stressors.
+   *
+   * Returns a multiplier (0.85–1.0). Only active in the first 2 weeks —
+   * after that the body has adapted to the concurrent load pattern.
+   */
+  protected getStructuralGovernor(weekNumber: number): number {
+    const hint = this.params.structural_load_hint;
+    if (!hint || hint === 'none' || weekNumber > 2) return 1.0;
+    if (hint === 'heavy_lower') return 0.90;
+    if (hint === 'moderate' && weekNumber === 1) return 0.95;
+    return 1.0;
+  }
+
+  /**
    * Returns true when the athlete is already at or near their peak long-run
    * fitness for this progression. Used to switch short plans into taper mode
    * rather than continuing a build arc.

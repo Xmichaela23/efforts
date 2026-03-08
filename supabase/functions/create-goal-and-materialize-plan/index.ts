@@ -482,6 +482,7 @@ Deno.serve(async (req: Request) => {
     // Derive athlete state signals from recent snapshots so generators can find
     // the right starting point rather than always using week-1 table defaults.
     let recent_long_run_miles: number | undefined;
+    let weeks_since_peak_long_run: number | undefined;
     let current_acwr: number | undefined;
     let volume_trend: 'building' | 'holding' | 'declining' | undefined;
 
@@ -489,21 +490,33 @@ Deno.serve(async (req: Request) => {
     // plan switches before the snapshot has been recomputed for today's run).
     if (trainingTransition.peak_long_run_miles && trainingTransition.peak_long_run_miles > 0) {
       recent_long_run_miles = trainingTransition.peak_long_run_miles;
+      // Tombstone peak: use weeks_since_last_plan as a proxy for recency
+      if (trainingTransition.weeks_since_last_plan != null) {
+        weeks_since_peak_long_run = trainingTransition.weeks_since_last_plan;
+      }
     }
 
     if (recentSnapshots && recentSnapshots.length > 0) {
       // Recent long run: peak from last 8 weeks (extended window, use max to avoid
-      // diluting with recovery weeks that artificially lower the average)
+      // diluting with recovery weeks that artificially lower the average).
+      // Also track WHICH snapshot index held the peak so we know recency.
       const easyPaceSecPerMile: number = baseline?.effort_paces?.base ?? 600; // 10 min/mile default
-      const longRunDurations = recentSnapshots
-        .map((s: any) => s.run_long_run_duration as number | null)
-        .filter((d): d is number => d != null && d > 0);
-      if (longRunDurations.length > 0) {
-        const maxDurationMin = Math.max(...longRunDurations);
-        const snapshotLongRun = Math.round((maxDurationMin * 60 / easyPaceSecPerMile) * 10) / 10;
+      const snapshotsWithLongRun = recentSnapshots
+        .map((s: any, idx: number) => ({
+          duration: s.run_long_run_duration as number | null,
+          weeksAgo: idx, // snapshots ordered newest-first, so index = weeks ago
+        }))
+        .filter((s): s is { duration: number; weeksAgo: number } =>
+          s.duration != null && s.duration > 0);
+
+      if (snapshotsWithLongRun.length > 0) {
+        const peakSnapshot = snapshotsWithLongRun.reduce((best, s) =>
+          s.duration > best.duration ? s : best);
+        const snapshotLongRun = Math.round((peakSnapshot.duration * 60 / easyPaceSecPerMile) * 10) / 10;
         // Use whichever is higher: tombstone peak or snapshot peak
         if (!recent_long_run_miles || snapshotLongRun > recent_long_run_miles) {
           recent_long_run_miles = snapshotLongRun;
+          weeks_since_peak_long_run = peakSnapshot.weeksAgo;
         }
       }
 
@@ -680,6 +693,7 @@ Deno.serve(async (req: Request) => {
       race_name: resolvedGoal?.name,
       current_weekly_miles: weeklyMiles,
       ...(recent_long_run_miles != null ? { recent_long_run_miles } : {}),
+      ...(weeks_since_peak_long_run != null ? { weeks_since_peak_long_run } : {}),
       ...(current_acwr != null ? { current_acwr } : {}),
       ...(volume_trend ? { volume_trend } : {}),
       transition_mode: trainingTransition.mode,
@@ -703,6 +717,18 @@ Deno.serve(async (req: Request) => {
       generateBody.strength_protocol = resolvedGoal.training_prefs.strength_protocol;
       generateBody.strength_frequency = resolvedGoal.training_prefs.strength_frequency || 2;
       generateBody.strength_tier = 'strength_power';
+    }
+
+    // Structural load hint: tell the generator whether heavy lower-body
+    // lifting will be overlaid so it can govern long-run volume in early weeks.
+    // "heavy_lower" = neural_speed protocol with ≥2 sessions (85%+ 1RM squats/DLs).
+    // "moderate"    = durability or any strength_power tier with ≥2 sessions.
+    // "none"        = no strength, or bodyweight-only / upper-only protocols.
+    const strengthFreq = Number(generateBody.strength_frequency ?? 0);
+    const strengthProto = String(generateBody.strength_protocol ?? '');
+    const strengthTier = String(generateBody.strength_tier ?? '');
+    if (strengthFreq >= 2 && (strengthProto === 'neural_speed' || strengthTier === 'strength_power')) {
+      generateBody.structural_load_hint = strengthProto === 'neural_speed' ? 'heavy_lower' : 'moderate';
     }
 
     const generated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', generateBody);

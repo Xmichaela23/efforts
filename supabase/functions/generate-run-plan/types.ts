@@ -23,9 +23,15 @@ export interface GeneratePlanRequest {
   // User's current weekly mileage (for scaling starting volume)
   current_weekly_miles?: number;
   // Athlete current state — derived from recent snapshots & workout facts
-  recent_long_run_miles?: number;              // peak long run from last 4 weeks
+  recent_long_run_miles?: number;              // peak long run from last 8 weeks
+  weeks_since_peak_long_run?: number;          // how many weeks ago the peak long run occurred
   current_acwr?: number;                       // acute:chronic workload ratio
   volume_trend?: 'building' | 'holding' | 'declining';
+  transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
+  // Structural load hint: tells the generator that heavy lower-body strength
+  // work will be overlaid, so long-run volume should be governed down in early
+  // weeks to avoid CNS overload from concurrent introduction of new stressors.
+  structural_load_hint?: 'heavy_lower' | 'moderate' | 'none';
   // Effort Score (for Performance Build / speed goal)
   effort_score?: number;
   effort_source_distance?: number; // meters
@@ -86,8 +92,11 @@ export interface GeneratorParams {
   current_weekly_miles?: number;
   // Athlete current state — from recent snapshots
   recent_long_run_miles?: number;
+  weeks_since_peak_long_run?: number;
   current_acwr?: number;
   volume_trend?: 'building' | 'holding' | 'declining';
+  transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
+  structural_load_hint?: 'heavy_lower' | 'moderate' | 'none';
   // Effort Score for pace calculations (Balanced Build only)
   effort_score?: number;
   effort_paces?: {
