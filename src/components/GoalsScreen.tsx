@@ -1053,17 +1053,84 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </div>
             </>);
           })()}
-          <div>
-            <span className="text-sm text-white/50 mb-1.5 block">Race priority</span>
-            <div className="flex gap-2">
-              {([['A', 'A-Race', 'Full taper, protect at all costs'], ['B', 'B-Race', '3–5 day mini-taper'], ['C', 'C-Race', 'Training race, no taper']] as const).map(([val, label, sub]) => (
-                <button key={val} onClick={() => setEventPriority(val)} className={`flex-1 rounded-xl px-3 py-2.5 text-left transition-all border ${eventPriority === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
-                  <span className={`text-sm font-semibold block ${eventPriority === val ? 'text-white/90' : 'text-white/50'}`}>{label}</span>
-                  <span className={`text-xs mt-0.5 block leading-tight ${eventPriority === val ? 'text-white/45' : 'text-white/25'}`}>{sub}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          {(() => {
+            // Only ask about priority when there's already an active event goal.
+            // For a first/only race the answer is always A — don't make the athlete
+            // solve a problem that doesn't exist yet.
+            const activeEventGoals = activeGoals.filter(g => g.goal_type === 'event');
+            if (activeEventGoals.length === 0) return null;
+
+            // Pick the most important existing event to name in the copy.
+            const existingPrimary = activeEventGoals.find(g => g.priority === 'A') ?? activeEventGoals[0];
+            const existingName = existingPrimary?.name || 'your current race';
+            const newName = eventName.trim() || 'this race';
+
+            // Determine whether dates make the priority obvious so we can simplify
+            // the copy. If the new race is more than 8 weeks after the existing one
+            // the user is probably asking to train sequentially, not competitively.
+            const existingDate = existingPrimary?.target_date ? new Date(existingPrimary.target_date) : null;
+            const newDate = eventDate ? new Date(eventDate) : null;
+            const gapWeeks = existingDate && newDate
+              ? Math.round((newDate.getTime() - existingDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+              : null;
+            const newRaceIsFirst = gapWeeks != null && gapWeeks < 0;
+            const sequentialGap = gapWeeks != null && Math.abs(gapWeeks) > 16;
+
+            type PriorityOption = {
+              val: 'A' | 'B' | 'C';
+              headline: string;
+              detail: string;
+            };
+
+            const options: PriorityOption[] = newRaceIsFirst
+              ? [
+                  { val: 'A', headline: `Peak for ${newName}`, detail: `The plan peaks here — bike and swim volume holds, other sports adjust around your race week.` },
+                  { val: 'B', headline: `${newName} is a milestone, not the peak`, detail: `A few days of rest beforehand, but training keeps building toward ${existingName}.` },
+                  { val: 'C', headline: `Just a training race`, detail: `No rest — you'll race ${newName} at effort and train straight through.` },
+                ]
+              : [
+                  { val: 'A', headline: `Keep ${existingName} as my main focus`, detail: `Training stays on course — ${newName} gets a short taper but your peak is still ${existingName}.` },
+                  { val: 'B', headline: `${newName} is my new priority`, detail: `The plan shifts its peak to ${newName}. ${existingName} becomes the tune-up race.` },
+                  { val: 'C', headline: `${newName} is just for fun`, detail: `No rest before it — train straight through and race on feel.` },
+                ];
+
+            // When the gap is sequential (> 16 weeks apart), the engine already handles
+            // each event as its own cycle. Surface a lighter single-question UI.
+            if (sequentialGap) {
+              return (
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                  <p className="text-xs text-white/50 leading-relaxed">
+                    These races are far enough apart that the plan will build a full cycle for each — first toward{' '}
+                    <span className="text-white/70">{newRaceIsFirst ? newName : existingName}</span>, then recover and rebuild toward{' '}
+                    <span className="text-white/70">{newRaceIsFirst ? existingName : newName}</span>.
+                    No priority decision needed.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div>
+                <span className="text-sm text-white/50 mb-1.5 block">Which race matters more to you?</span>
+                <div className="flex flex-col gap-2">
+                  {options.map(({ val, headline, detail }) => (
+                    <button
+                      key={val}
+                      onClick={() => setEventPriority(val)}
+                      className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${
+                        eventPriority === val
+                          ? 'border-white/25 bg-white/[0.12]'
+                          : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <span className={`text-sm font-medium block ${eventPriority === val ? 'text-white/90' : 'text-white/55'}`}>{headline}</span>
+                      <span className={`text-xs mt-0.5 block leading-snug ${eventPriority === val ? 'text-white/45' : 'text-white/25'}`}>{detail}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {saving ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4 text-center space-y-1.5">
               <div className="flex items-center justify-center gap-2">
