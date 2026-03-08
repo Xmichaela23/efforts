@@ -243,13 +243,16 @@ async function buildCombinedPlan(
   // Activate the combined plan (inserts planned_workouts + materializes steps)
   await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: combinedPlanId });
 
-  // Retire all pre-existing standalone active plans for any of the combined goals
+  // Retire only standalone plans that are linked to the goals now handled by
+  // the combined plan. Plans with no goal_id (catalog, strength, habit) are
+  // left untouched — they are not event plans and belong to a separate rhythm.
   const goalIds = goalsForCombined.map(g => g.id);
   const { data: oldPlans } = await supabase
     .from('plans')
-    .select('id, status')
+    .select('id, status, goal_id')
     .eq('user_id', user_id)
     .in('status', ['active', 'paused'])
+    .in('goal_id', goalIds)       // only plans tied to the goals we merged
     .neq('id', combinedPlanId);
 
   const weekStart = currentWeekMondayISO();
