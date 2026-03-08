@@ -4,12 +4,29 @@
 // REQUEST / RESPONSE
 // ============================================================================
 
+/**
+ * Training methodology split for triathlon plans.
+ *
+ * base_first  (Completion) — Extended aerobic base, Z3 tempo quality, Z2 bricks.
+ *             Phase ratio: 40% base / 35% build / 15% RS. Loading: 2:1.
+ *             The 20% non-easy time favours Zone 3 (comfortably hard).
+ *
+ * race_peak   (Performance) — Standard 8/8 split, threshold + VO2 quality,
+ *             race-pace bricks from mid-build. Loading: 3:1.
+ *             The 20% non-easy time mixes Zone 4 threshold + strategic Zone 5.
+ *
+ * Derived from `goal` when not supplied: complete → base_first, performance → race_peak.
+ */
+export type TriApproach = 'base_first' | 'race_peak';
+
 export interface GenerateTriPlanRequest {
   user_id: string;
   /** sprint | olympic | 70.3 | ironman */
   distance: TriDistance;
   fitness: 'beginner' | 'intermediate' | 'advanced';
   goal: 'complete' | 'performance';
+  /** Training methodology. Derived from goal when absent. */
+  approach?: TriApproach;
   duration_weeks: number;
   start_date?: string;
   race_date?: string;
@@ -81,6 +98,7 @@ export interface TriGeneratorParams {
   distance: TriDistance;
   fitness: 'beginner' | 'intermediate' | 'advanced';
   goal: 'complete' | 'performance';
+  approach: TriApproach;  // always resolved before generator receives it
   duration_weeks: number;
   start_date?: string;
   race_date?: string;

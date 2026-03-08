@@ -33,6 +33,14 @@ export interface AthleteState {
   long_ride_day?: number;
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
+  /**
+   * Training methodology for triathlon goals. Derived from the primary goal's
+   * `goal` field when absent: 'complete' → 'base_first', 'performance' → 'race_peak'.
+   *
+   * base_first  — Extended base phase, Z3 tempo quality, Z2 bricks, 2:1 loading.
+   * race_peak   — Standard 8/8 split, threshold+VO2 quality, race-pace bricks, 3:1.
+   */
+  tri_approach?: 'base_first' | 'race_peak';
 }
 
 export interface AthleteMemory {

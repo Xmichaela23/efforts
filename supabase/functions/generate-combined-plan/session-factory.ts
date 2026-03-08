@@ -178,6 +178,24 @@ export function sweetSpotBike(day: string, intervals: number, minEach: number, g
   );
 }
 
+/**
+ * base_first approach — Z3 tempo blocks.
+ * The "20% non-easy" bucket favours comfortably hard (Z3) over threshold (Z4).
+ * Builds muscular endurance without the cortisol spike of FTP work.
+ */
+export function tempoBike(day: string, intervals: number, minEach: number, goalId: string): PlannedSession {
+  const dur = 15 + intervals * minEach + (intervals - 1) * 5 + 10;
+  return session(
+    day, 'bike',
+    `Bike Tempo — ${intervals}×${minEach} min`,
+    `Warm up 15 min. ${intervals}×${minEach} min at tempo effort (82–88% FTP — comfortably hard, you can say a few words). ${5} min easy between. Cool down 10 min. Builds aerobic power without deep fatigue.`,
+    dur, 'MODERATE',
+    ['warmup_bike_quality_15min_fastpedal', `bike_tempo_${intervals}x${minEach}min_r5min`, 'cooldown_bike_10min_easy'],
+    ['quality', 'tempo', 'bike'],
+    'Z3 tempo', goalId,
+  );
+}
+
 export function easyBike(day: string, hours: number, goalId: string): PlannedSession {
   const min = Math.round(hours * 60);
   return session(
@@ -220,6 +238,28 @@ export function thresholdSwim(day: string, totalYards: number, goalId: string): 
     [`swim_warmup_${wu}yd_easy`, `swim_threshold_${threshReps}x100yd_r15`, `swim_aerobic_${aeroReps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
     ['quality', 'threshold', 'swim'],
     'Z4 threshold swim', goalId,
+  );
+}
+
+/**
+ * base_first approach — comfortable CSS aerobic pace (Z3).
+ * Not maximal CSS threshold — just sustainable race pace.
+ * Develops comfort at finish-line speed without lactate stress.
+ */
+export function cssAerobicSwim(day: string, totalYards: number, goalId: string): PlannedSession {
+  const wu = 300;
+  const cd = 200;
+  const main = totalYards - wu - cd;
+  const reps = Math.max(5, Math.round(main / 100));
+  const dur  = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
+  return session(
+    day, 'swim',
+    `CSS Aerobic Swim — ${totalYards} yd`,
+    `Warm up ${wu} yd. ${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits. Cool down ${cd} yd.`,
+    dur, 'MODERATE',
+    [`swim_warmup_${wu}yd_easy`, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
+    ['quality', 'css_aerobic', 'swim'],
+    'Z3 CSS aerobic', goalId,
   );
 }
 

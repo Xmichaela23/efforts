@@ -51,10 +51,14 @@ Deno.serve(async (req: Request) => {
     const startDate = request.start_date ?? calculateStartDate(request.duration_weeks, request.race_date);
 
     // ── Generate plan ───────────────────────────────────────────────────────
+    // Resolve approach: caller may supply it directly, or it is derived from `goal`.
+    const approach = request.approach ?? (request.goal === 'performance' ? 'race_peak' : 'base_first');
+
     const generator = new TriathlonGenerator({
       distance:                    request.distance,
       fitness:                     request.fitness,
       goal:                        request.goal,
+      approach,
       duration_weeks:              request.duration_weeks,
       start_date:                  startDate,
       race_date:                   request.race_date,
@@ -71,6 +75,8 @@ Deno.serve(async (req: Request) => {
       volume_trend:                request.volume_trend,
       transition_mode:             request.transition_mode,
       strength_frequency:          request.strength_frequency ?? 0,
+      equipment_type:              request.equipment_type,
+      limiter_sport:               request.limiter_sport,
       existing_run_days:           request.existing_run_days,
     });
 

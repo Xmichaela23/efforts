@@ -238,6 +238,21 @@ async function buildCombinedPlan(
   const combinedStrengthEquipment: string[] = combinedBaseline?.equipment?.strength ?? [];
   const hasCommercialGym = hasBarbellCapability(combinedStrengthEquipment);
 
+  // Resolve approach for the combined plan.
+  // The primary event goal drives the approach; defaults to the same logic as standalone.
+  const primaryGoal = goalsForCombined.find(g => g.priority === 'A') ?? goalsForCombined[0];
+  const primaryGoalPrefs = (allEventGoals.find(g => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+  const primaryGoalType  = String(primaryGoalPrefs?.goal_type || '').toLowerCase();
+  const triApproach = (newGoal.training_prefs?.tri_approach as string | undefined)
+    ?? primaryGoalPrefs?.tri_approach
+    ?? (primaryGoalType === 'speed' ? 'race_peak' : 'base_first');
+
+  // base_first always defaults to 2:1 loading (completion-focused, slower recovery).
+  // race_peak defers to fitness level (beginner→2:1, intermediate/advanced→3:1).
+  const loadingPattern = triApproach === 'base_first'
+    ? '2:1'
+    : (fitness === 'beginner' ? '2:1' : '3:1');
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -245,8 +260,9 @@ async function buildCombinedPlan(
     athlete_state: {
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,
-      loading_pattern: fitness === 'beginner' ? '2:1' : '3:1',
+      loading_pattern: loadingPattern,
       equipment_type: hasCommercialGym ? 'commercial_gym' : 'home_gym',
+      tri_approach: triApproach,
     },
   });
 
@@ -504,6 +520,10 @@ Deno.serve(async (req: Request) => {
         equipment_type: hasBarbellCapability(triBaseline?.equipment?.strength ?? []) ? 'commercial_gym' : 'home_gym',
         // Limiter sport from training prefs (used to shift strength emphasis)
         limiter_sport: resolvedGoal?.training_prefs?.limiter_sport ?? undefined,
+        // Approach: 'base_first' for completion athletes, 'race_peak' for performance.
+        // Derived from goal type if not explicitly set in training_prefs.
+        approach: resolvedGoal?.training_prefs?.tri_approach
+          ?? (goalType === 'speed' ? 'race_peak' : 'base_first'),
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
         // Days already covered by a concurrent run plan — tri generator defers to those sessions
         ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),

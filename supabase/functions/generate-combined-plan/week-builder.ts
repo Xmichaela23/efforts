@@ -16,8 +16,8 @@ import {
 } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, marathonPaceRun,
-  longRide, thresholdBike, vo2Bike, sweetSpotBike, easyBike, bikeOpeners,
-  thresholdSwim, easySwim,
+  longRide, thresholdBike, vo2Bike, sweetSpotBike, tempoBike, easyBike, bikeOpeners,
+  thresholdSwim, cssAerobicSwim, easySwim,
   brick, triathlonStrength, runStrength,
 } from './session-factory.ts';
 
@@ -265,11 +265,24 @@ export function buildWeek(
   const swimYards = Math.max(1200, Math.round(swimTotalMin * 80 / (hasTri ? 1 : 2)));
 
   // ── BRICK / LONG RIDE ─────────────────────────────────────────────────────
+  // Brick escalation by approach:
+  //   base_first  — Z2 bricks throughout; race-simulation only in the final 2 RS weeks.
+  //   race_peak   — race-pace bricks activate in Race-Specific (existing `brick` fn behaviour).
+  const brickWeekInPhase = Math.max(1, weekNum - block.startWeek + 1);
+  const brickPhaseWeeks  = block.endWeek - block.startWeek + 1;
+  // For base_first: keep bricks at build intensity until final 2 weeks of Race-Specific
+  const effectiveBrickPhase: Phase = (
+    triApproach === 'base_first' &&
+    phase === 'race_specific' &&
+    brickWeekInPhase < Math.max(1, brickPhaseWeeks - 1)
+  ) ? 'build'   // Z2 run leg (brick fn uses build → easy Z2 run)
+    : phase;
+
   const longRideSlot = grid.get(longRideDay);
   if (!longRideSlot?.isRest && hasTri) {
     if (bricksThisWeek >= 1 && phase !== 'base') {
       const brickRunMin = Math.max(15, Math.round(longRunMiles * 0.20) * 10);
-      const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMin, phase, servedGoal);
+      const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMin, effectiveBrickPhase, servedGoal);
       longRideSlot!.sessions.push(bkBike, bkRun);
     } else {
       longRideSlot!.sessions.push(longRide(longRideDay, longRideHours, servedGoal));
@@ -293,18 +306,33 @@ export function buildWeek(
   }
 
   // ── TUESDAY: Bike quality ─────────────────────────────────────────────────
+  const triApproach  = athleteState.tri_approach ?? 'race_peak';
   const tuesdaySlot = grid.get('Tuesday');
   if (!tuesdaySlot?.isRest && hasTri) {
     if (phase === 'taper') {
       tuesdaySlot!.sessions.push(bikeOpeners('Tuesday', servedGoal));
-    } else if (phase === 'race_specific') {
-      tuesdaySlot!.sessions.push(vo2Bike('Tuesday', Math.max(4, Math.min(6, Math.round(bikeTotalMin / 40))), servedGoal));
-    } else if (phase === 'build') {
-      const intervals = Math.max(2, Math.min(4, Math.floor(bikeTotalMin / 60)));
-      tuesdaySlot!.sessions.push(thresholdBike('Tuesday', intervals, 20, servedGoal));
+    } else if (triApproach === 'base_first') {
+      // base_first: quality time stays in Z3. No threshold or VO2 work.
+      if (phase === 'race_specific') {
+        tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 3, 12, servedGoal)); // 3×12 SS
+      } else if (phase === 'build') {
+        const intervals = Math.max(2, Math.min(3, Math.floor(bikeTotalMin / 60)));
+        tuesdaySlot!.sessions.push(tempoBike('Tuesday', intervals, 20, servedGoal));
+      } else {
+        // Base: easy aerobic with gentle sweet spot introduction
+        tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 2, 12, servedGoal));
+      }
     } else {
-      // Base: sweet spot to introduce intensity gently
-      tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 2, 15, servedGoal));
+      // race_peak: push the ceiling with threshold and VO2 work
+      if (phase === 'race_specific') {
+        tuesdaySlot!.sessions.push(vo2Bike('Tuesday', Math.max(4, Math.min(6, Math.round(bikeTotalMin / 40))), servedGoal));
+      } else if (phase === 'build') {
+        const intervals = Math.max(2, Math.min(4, Math.floor(bikeTotalMin / 60)));
+        tuesdaySlot!.sessions.push(thresholdBike('Tuesday', intervals, 20, servedGoal));
+      } else {
+        // Base: sweet spot to introduce intensity gently
+        tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 2, 15, servedGoal));
+      }
     }
   }
 
@@ -314,15 +342,28 @@ export function buildWeek(
     if (phase === 'taper') {
       const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
       wednesdaySlot!.sessions.push(easyRun('Wednesday', taperRunMi, servedGoal));
-    } else if (phase === 'race_specific') {
-      const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
-      wednesdaySlot!.sessions.push(marathonPaceRun('Wednesday', mpMiles, servedGoal));
-    } else if (phase === 'build') {
-      const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
-      wednesdaySlot!.sessions.push(tempoRun('Wednesday', tempoMi, 1.5, servedGoal));
+    } else if (triApproach === 'base_first') {
+      // base_first: Z3 tempo throughout — no intervals until Race-Specific.
+      if (phase === 'race_specific') {
+        const rpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
+        wednesdaySlot!.sessions.push(marathonPaceRun('Wednesday', rpMiles, servedGoal)); // race-pace comfort
+      } else {
+        // Build and Base: tempo (Z3) — builds muscular endurance safely
+        const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
+        wednesdaySlot!.sessions.push(tempoRun('Wednesday', tempoMi, 1.5, servedGoal));
+      }
     } else {
-      // Base: easy intervals to introduce neuromuscular load
-      wednesdaySlot!.sessions.push(intervalRun('Wednesday', 6, phase, servedGoal));
+      // race_peak: VO2 intervals in build, marathon pace in RS
+      if (phase === 'race_specific') {
+        const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
+        wednesdaySlot!.sessions.push(marathonPaceRun('Wednesday', mpMiles, servedGoal));
+      } else if (phase === 'build') {
+        const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
+        wednesdaySlot!.sessions.push(tempoRun('Wednesday', tempoMi, 1.5, servedGoal));
+      } else {
+        // Base: easy intervals to introduce neuromuscular load
+        wednesdaySlot!.sessions.push(intervalRun('Wednesday', 6, phase, servedGoal));
+      }
     }
   }
 
@@ -342,10 +383,15 @@ export function buildWeek(
         // Quality swim in build/race_specific, easy swim in taper (§6.2)
         const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
         const maintYd  = Math.max(1200, Math.round(swimYards * 0.40));
+        // base_first: CSS aerobic pace (comfortable race speed, not maximal threshold)
+        // race_peak:  CSS threshold pace (lactate challenge, 10s rest intervals)
+        const qualitySwim = triApproach === 'base_first'
+          ? cssAerobicSwim('Thursday', tSwimYd, servedGoal)
+          : thresholdSwim('Thursday', tSwimYd, servedGoal);
         thursdaySlot!.sessions.push(
           phase === 'taper' || swimPct === 0
             ? easySwim('Thursday', maintYd, servedGoal)   // maintenance in taper/marathon blocks
-            : thresholdSwim('Thursday', tSwimYd, servedGoal)
+            : qualitySwim
         );
         thursdayHasSwim = true;
       }

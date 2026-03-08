@@ -123,11 +123,18 @@ function buildSingleEventBlocks(
   blocks: PhaseBlock[],
   as: AthleteState,
 ) {
-  const taperWks = TAPER_WEEKS[goal.distance] ?? 2;
-  const dist = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
+  const taperWks  = TAPER_WEEKS[goal.distance] ?? 2;
+  const approach  = as.tri_approach ?? 'race_peak';
+  const dist      = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
+
+  // Phase ratio constants — mirror the standalone triathlon generator's approach logic.
+  // base_first: 15% RS (finish-line durability) — more time in base, shorter sharpening.
+  // race_peak:  25% RS (standard) — robust race-specific block to move the ceiling.
+  const rsPct   = approach === 'base_first' ? 0.15 : 0.25;
+  const buildPct = 0.30; // build is the same; extra time flows into base for base_first
 
   if (totalWeeks < 4) {
-    // Just taper + brief race-specific
+    // Just taper + brief race-specific (too short to apply approach ratios)
     pushBlock(blocks, { phase: 'race_specific', startWeek, endWeek: Math.max(startWeek, startWeek + totalWeeks - taperWks - 1), goal, dist, as });
     pushBlock(blocks, { phase: 'taper', startWeek: startWeek + totalWeeks - taperWks, endWeek: startWeek + totalWeeks - 1, goal, dist, as });
     return;
@@ -135,9 +142,9 @@ function buildSingleEventBlocks(
 
   // Work backwards from race: taper → race-specific → build → base
   const taperStart = startWeek + totalWeeks - taperWks;
-  const rsWeeks    = Math.min(6, Math.max(3, Math.floor(totalWeeks * 0.25)));
+  const rsWeeks    = Math.min(6, Math.max(3, Math.floor(totalWeeks * rsPct)));
   const rsStart    = taperStart - rsWeeks;
-  const buildWeeks = Math.min(8, Math.max(4, Math.floor(totalWeeks * 0.30)));
+  const buildWeeks = Math.min(8, Math.max(4, Math.floor(totalWeeks * buildPct)));
   const buildStart = rsStart - buildWeeks;
   const baseStart  = startWeek;
 

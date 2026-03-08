@@ -135,53 +135,64 @@ export class TriathlonGenerator {
   // ============================================================================
 
   determinePhaseStructure(): TriPhaseStructure {
-    const d = this.params.duration_weeks;
-    const vol = TRI_VOLUME[this.params.distance]?.[this.params.fitness];
-    const taperW = vol?.taperWeeks ?? 2;
+    const d        = this.params.duration_weeks;
+    const vol      = TRI_VOLUME[this.params.distance]?.[this.params.fitness];
+    const taperW   = vol?.taperWeeks ?? 2;
+    const approach = this.params.approach;
+
+    // ── Phase ratio constants by approach ─────────────────────────────────────
+    // base_first: 40% base / ~35% build / 15% RS — longer aerobic foundation,
+    //             shorter race-specific (athlete needs durability, not peaking)
+    // race_peak:  28% base / ~30% build / 20% RS — standard polarized structure,
+    //             more race-specific time to sharpen the performance ceiling
+    const basePct = approach === 'base_first' ? 0.40 : 0.28;
+    const rsPct   = approach === 'base_first' ? 0.15 : 0.20;
 
     let phases: TriPhase[];
 
     if (d <= 10) {
-      // Short: Base + Build + Taper
-      const base  = Math.max(2, Math.round(d * 0.40));
+      // Short: Base + Build + Taper (no RS block — too short)
+      const base  = Math.max(2, Math.round(d * (approach === 'base_first' ? 0.45 : 0.40)));
       const build = Math.max(2, d - base - taperW);
       phases = [
-        { name: 'Base',  start_week: 1,          end_week: base,           weeks_in_phase: base,  focus: 'Aerobic foundation across all three disciplines', quality_density: 'low',  volume_multiplier: 0.70, bricks_per_week: 0 },
-        { name: 'Build', start_week: base + 1,    end_week: base + build,   weeks_in_phase: build, focus: 'Discipline-specific quality + first bricks',       quality_density: 'high', volume_multiplier: 1.00, bricks_per_week: 1 },
+        { name: 'Base',  start_week: 1,          end_week: base,           weeks_in_phase: base,  focus: approach === 'base_first' ? 'Aerobic foundation — technique and endurance before any intensity' : 'Aerobic foundation across all three disciplines', quality_density: 'low',  volume_multiplier: 0.70, bricks_per_week: 0 },
+        { name: 'Build', start_week: base + 1,    end_week: base + build,   weeks_in_phase: build, focus: approach === 'base_first' ? 'Tempo quality + transition practice at Z2–Z3' : 'Discipline-specific quality + first bricks', quality_density: 'high', volume_multiplier: 1.00, bricks_per_week: 1 },
         { name: 'Taper', start_week: base+build+1,end_week: d,              weeks_in_phase: taperW,focus: 'Race sharpening and recovery',                       quality_density: 'low',  volume_multiplier: 0.55, bricks_per_week: 0 },
       ];
     } else if (d <= 16) {
-      // Medium: Base + Build + Race-Specific + Taper
-      const base  = Math.max(3, Math.round(d * 0.30));
-      const rs    = Math.max(2, Math.round(d * 0.18));
+      const base  = Math.max(3, Math.round(d * basePct));
+      const rs    = Math.max(2, Math.round(d * rsPct));
       const build = Math.max(3, d - base - rs - taperW);
-      const bStart = base + 1;
+      const bStart  = base + 1;
       const rsStart = bStart + build;
       phases = [
-        { name: 'Base',          start_week: 1,       end_week: base,          weeks_in_phase: base,  focus: 'Multi-sport aerobic base',                              quality_density: 'low',    volume_multiplier: 0.70, bricks_per_week: 0 },
-        { name: 'Build',         start_week: bStart,  end_week: bStart+build-1, weeks_in_phase: build, focus: 'Threshold work + weekly bricks',                        quality_density: 'high',   volume_multiplier: 1.00, bricks_per_week: 1 },
-        { name: 'Race-Specific', start_week: rsStart, end_week: rsStart+rs-1,   weeks_in_phase: rs,    focus: 'Race-pace rehearsal + back-to-back long sessions',      quality_density: 'medium', volume_multiplier: 0.95, bricks_per_week: 2 },
+        { name: 'Base',          start_week: 1,       end_week: base,           weeks_in_phase: base,  focus: approach === 'base_first' ? 'Extended aerobic base — build the engine before adding intensity' : 'Multi-sport aerobic base',                 quality_density: 'low',    volume_multiplier: 0.70, bricks_per_week: 0 },
+        { name: 'Build',         start_week: bStart,  end_week: bStart+build-1, weeks_in_phase: build, focus: approach === 'base_first' ? 'Introduce Z3 tempo + Z2 brick transitions'                       : 'Threshold work + weekly bricks',              quality_density: 'high',   volume_multiplier: 1.00, bricks_per_week: 1 },
+        { name: 'Race-Specific', start_week: rsStart, end_week: rsStart+rs-1,   weeks_in_phase: rs,    focus: approach === 'base_first' ? 'Race-pace rehearsal at comfortable effort'                        : 'Race-pace simulation + back-to-back long sessions', quality_density: 'medium', volume_multiplier: 0.95, bricks_per_week: 2 },
         { name: 'Taper',         start_week: rsStart+rs, end_week: d,           weeks_in_phase: taperW,focus: 'Race sharpening',                                       quality_density: 'low',    volume_multiplier: 0.55, bricks_per_week: 0 },
       ];
     } else {
-      // Long (Ironman / 70.3): Base + Build + Race-Specific + Taper
-      const base  = Math.max(4, Math.round(d * 0.28));
-      const rs    = Math.max(3, Math.round(d * 0.18));
+      // Long (Ironman / 70.3)
+      const base  = Math.max(4, Math.round(d * basePct));
+      const rs    = Math.max(3, Math.round(d * rsPct));
       const build = Math.max(4, d - base - rs - taperW);
       const bStart  = base + 1;
       const rsStart = bStart + build;
       phases = [
-        { name: 'Base',          start_week: 1,        end_week: base,           weeks_in_phase: base,  focus: 'Aerobic base + technique across disciplines',           quality_density: 'low',    volume_multiplier: 0.68, bricks_per_week: 0 },
-        { name: 'Build',         start_week: bStart,   end_week: bStart+build-1, weeks_in_phase: build, focus: 'Volume + quality: threshold + brick integration',       quality_density: 'high',   volume_multiplier: 1.00, bricks_per_week: 1 },
-        { name: 'Race-Specific', start_week: rsStart,  end_week: rsStart+rs-1,   weeks_in_phase: rs,    focus: 'Race-pace simulation + back-to-back long days',         quality_density: 'medium', volume_multiplier: 0.90, bricks_per_week: 2 },
-        { name: 'Taper',         start_week: rsStart+rs,end_week: d,             weeks_in_phase: taperW,focus: 'Race sharpening and full recovery',                      quality_density: 'low',    volume_multiplier: 0.50, bricks_per_week: 0 },
+        { name: 'Base',          start_week: 1,         end_week: base,           weeks_in_phase: base,  focus: approach === 'base_first' ? 'Extended aerobic base — 12+ weeks to build the durability engine' : 'Aerobic base + technique across disciplines',  quality_density: 'low',    volume_multiplier: 0.68, bricks_per_week: 0 },
+        { name: 'Build',         start_week: bStart,    end_week: bStart+build-1, weeks_in_phase: build, focus: approach === 'base_first' ? 'Z3 tempo quality + Z2 brick transitions'                          : 'Volume + quality: threshold + brick integration', quality_density: 'high',   volume_multiplier: 1.00, bricks_per_week: 1 },
+        { name: 'Race-Specific', start_week: rsStart,   end_week: rsStart+rs-1,   weeks_in_phase: rs,    focus: approach === 'base_first' ? 'Race-pace comfort — settle into finish-line pace'                  : 'Race-pace simulation + back-to-back long days',   quality_density: 'medium', volume_multiplier: 0.90, bricks_per_week: 2 },
+        { name: 'Taper',         start_week: rsStart+rs,end_week: d,              weeks_in_phase: taperW,focus: 'Race sharpening and full recovery',                      quality_density: 'low',    volume_multiplier: 0.50, bricks_per_week: 0 },
       ];
     }
 
-    // Recovery weeks every 4th week (not in taper)
+    // Recovery week interval:
+    //   base_first → 2:1 (every 3rd week) — slower-recovering completion athletes
+    //   race_peak  → 3:1 (every 4th week) — progressive overload for performance
+    const recoveryInterval = approach === 'base_first' ? 3 : 4;
     const taperStart = phases.find(p => p.name === 'Taper')?.start_week ?? d;
     const recovery_weeks: number[] = [];
-    for (let w = 4; w < taperStart; w += 4) {
+    for (let w = recoveryInterval; w < taperStart; w += recoveryInterval) {
       recovery_weeks.push(w);
     }
 
@@ -230,8 +241,9 @@ export class TriathlonGenerator {
     const startSwimYd = this.resolveStartSwimYards(SWIM_YARDS_START[this.params.distance]?.[this.params.fitness] ?? 5000);
     const weekSwimYd  = Math.round(this.lerp(startSwimYd, peakSwimYd, week, this.params.duration_weeks) * vm);
 
-    const isTaper = phase.name === 'Taper';
+    const isTaper      = phase.name === 'Taper';
     const bricksThisWeek = isRecovery || isTaper ? 0 : phase.bricks_per_week;
+    const weekInPhase  = Math.max(1, week - (phase.start_week ?? 1) + 1);
 
     const sessions: TriSession[] = [];
 
@@ -253,7 +265,7 @@ export class TriathlonGenerator {
     // is a run day, since brick specificity is critical for race prep.
     if (longRideHr > 0) {
       if (bricksThisWeek >= 1 && phase.name !== 'Base') {
-        sessions.push(...this.brickSession(longRideHr, Math.min(20, Math.round(longRunMi * 0.20)), 'Saturday'));
+        sessions.push(...this.brickSession(longRideHr, Math.min(20, Math.round(longRunMi * 0.20)), 'Saturday', phase, weekInPhase));
       } else {
         sessions.push(this.longRideSession(longRideHr, 'Saturday'));
       }
@@ -279,7 +291,7 @@ export class TriathlonGenerator {
     if (bricksThisWeek >= 2) {
       const brickBikeHr = Math.max(0.75, longRideHr * 0.5);
       const brickRunMin = 20;
-      sessions.push(...this.brickSession(brickBikeHr, brickRunMin, 'Thursday'));
+      sessions.push(...this.brickSession(brickBikeHr, brickRunMin, 'Thursday', phase, weekInPhase));
     } else {
       const midRideHr = isRecovery ? longRideHr * 0.5 : longRideHr * 0.6;
       sessions.push(this.midRideSession(midRideHr, 'Thursday'));
@@ -437,10 +449,11 @@ export class TriathlonGenerator {
   }
 
   protected runQualitySession(miles: number, phase: TriPhase, day: string): TriSession {
-    const isTaper = phase.name === 'Taper';
-    if (isTaper) {
-      return this.easyRunSession(miles, day);
-    }
+    const approach = this.params.approach;
+    const isTaper  = phase.name === 'Taper';
+
+    if (isTaper) return this.easyRunSession(miles, day);
+
     if (phase.name === 'Base') {
       return {
         day, type: 'run', name: 'Easy Run + Strides',
@@ -450,7 +463,33 @@ export class TriathlonGenerator {
         tags: ['easy_run', 'strides'],
       };
     }
-    // Build / Race-Specific: tempo or intervals
+
+    if (approach === 'base_first') {
+      // base_first: quality time favours Z3 tempo — muscular endurance without
+      // spiking the stress load. No track intervals until the final 2 weeks of RS.
+      if (phase.name === 'Race-Specific') {
+        const racePaceMi = Math.max(2, Math.round(miles * 0.50));
+        return {
+          day, type: 'run', name: 'Race Pace Run',
+          description: `Warm-up 1 mi easy, ${racePaceMi} mi at goal race pace (Z3 — comfortably hard, sustainable), cool-down 1 mi. Getting comfortable at finish-line effort.`,
+          duration: Math.round((miles + 2) * this.easyPaceMinPerMile()) + 5,
+          steps_preset: ['warmup_run_easy_1mi', `run_race_pace_${racePaceMi}mi`, 'cooldown_easy_1mi'],
+          tags: ['race_pace', 'tempo', 'hard_run'],
+        };
+      }
+      // Build: tempo (Z3) — not intervals — to stay within completion-athlete load
+      const tempoMi = Math.max(2, Math.round(miles * 0.50));
+      return {
+        day, type: 'run', name: 'Tempo Run',
+        description: `Warm-up 1 mi easy, ${tempoMi} mi at tempo/Z3 (comfortably hard — you can say a few words), cool-down 1 mi. Builds muscular endurance without deep fatigue.`,
+        duration: Math.round((miles + 2) * this.easyPaceMinPerMile()),
+        steps_preset: ['warmup_run_easy_1mi', `tempo_${tempoMi}mi_z3`, 'cooldown_easy_1mi'],
+        tags: ['tempo', 'hard_run', 'z3'],
+      };
+    }
+
+    // race_peak: quality time mixes Z4 threshold and strategic Z5.
+    // Build → VO2 intervals to raise the ceiling; RS → threshold tempo.
     if (phase.name === 'Race-Specific') {
       const tempoMi = Math.max(2, Math.round(miles * 0.55));
       return {
@@ -461,14 +500,14 @@ export class TriathlonGenerator {
         tags: ['tempo', 'hard_run', 'threshold'],
       };
     }
-    // Build: intervals
+    // Build: 5K-pace intervals — elevates VO2max ceiling for performance
     const reps = this.params.distance === 'sprint' ? 4 : this.params.distance === 'olympic' ? 5 : 6;
     return {
       day, type: 'run', name: 'Run Intervals',
-      description: `Warm-up 1 mi, ${reps}×800m at 5K effort (90s jog recovery), cool-down 1 mi.`,
+      description: `Warm-up 1 mi, ${reps}×1 km at 5K effort (90s jog recovery), cool-down 1 mi. VO2max stimulus — controlled aggression.`,
       duration: Math.round(miles * this.easyPaceMinPerMile()) + 10,
-      steps_preset: ['warmup_run_easy_1mi', `interval_${reps}x800m_5kpace_r90s`, 'cooldown_easy_1mi'],
-      tags: ['intervals', 'hard_run'],
+      steps_preset: ['warmup_run_easy_1mi', `interval_${reps}x1km_5kpace_r90s`, 'cooldown_easy_1mi'],
+      tags: ['intervals', 'hard_run', 'vo2max'],
     };
   }
 
@@ -495,6 +534,8 @@ export class TriathlonGenerator {
   }
 
   protected bikeQualitySession(phase: TriPhase, isRecovery: boolean, day: string): TriSession {
+    const approach = this.params.approach;
+
     if (isRecovery || phase.name === 'Base') {
       return {
         day, type: 'bike', name: 'Aerobic Ride',
@@ -507,6 +548,30 @@ export class TriathlonGenerator {
     if (phase.name === 'Taper') {
       return this.bikeOpenersSession(day);
     }
+
+    if (approach === 'base_first') {
+      // base_first: the 20% quality time favours Zone 3 (comfortably hard).
+      // Build → tempo over-unders; Race-Specific → sweet spot near race pace.
+      if (phase.name === 'Race-Specific') {
+        return {
+          day, type: 'bike', name: 'Sweet Spot Intervals',
+          description: `Warm-up 10 min, 3×12 min at sweet spot (88–93% FTP) with 5 min recovery, cool-down 10 min. Steady, sustainable — race-pace comfort over max power.`,
+          duration: 71,
+          steps_preset: ['warmup_bike_quality_10min_fastpedal', 'bike_ss_3x12min_r5min', 'cooldown_easy_10min'],
+          tags: ['sweet_spot', 'hard_ride', 'tempo'],
+        };
+      }
+      // Build: tempo blocks (Z3) — not threshold, to stay within 20% non-easy budget
+      return {
+        day, type: 'bike', name: 'Tempo Ride',
+        description: `Warm-up 10 min, 2×20 min at tempo (82–88% FTP) with 5 min recovery, cool-down 10 min. Comfortably hard — you should be able to speak a few words.`,
+        duration: 75,
+        steps_preset: ['warmup_bike_quality_10min_fastpedal', 'bike_tempo_2x20min_r5min', 'cooldown_easy_10min'],
+        tags: ['tempo', 'aerobic_power', 'hard_ride'],
+      };
+    }
+
+    // race_peak: the 20% quality time mixes Zone 4 threshold + strategic Zone 5.
     if (phase.name === 'Race-Specific') {
       return {
         day, type: 'bike', name: 'Sweet Spot Intervals',
@@ -516,7 +581,7 @@ export class TriathlonGenerator {
         tags: ['sweet_spot', 'hard_ride', 'threshold'],
       };
     }
-    // Build: threshold intervals
+    // Build: threshold intervals (95–105% FTP)
     return {
       day, type: 'bike', name: 'Threshold Intervals',
       description: `Warm-up 10 min, 4×8 min at threshold (95–105% FTP) with 5 min recovery, cool-down 10 min.`,
@@ -537,14 +602,65 @@ export class TriathlonGenerator {
   }
 
   /** Returns TWO sessions: the bike leg and the run leg, both on the same day.
-   *  Swim timing mirrors run+strength doubles: bike = AM, run = PM. */
-  protected brickSession(bikeHours: number, runMinutes: number, day: string): TriSession[] {
-    const bikeMins = Math.round(bikeHours * 60);
-    const runMi    = Math.max(2, Math.round(runMinutes / this.easyPaceMinPerMile()));
+   *
+   * Brick escalation by approach:
+   *   base_first  — Z2 throughout. Pure neuromuscular transition practice.
+   *                 Run leg stays easy; race-pace bricks only appear in the
+   *                 final 2 weeks of Race-Specific.
+   *   race_peak   — Z3/Z4 race-simulation bricks from mid-Build onward.
+   *                 Bike finishes at race effort; run leg at goal pace.
+   *
+   * weekInPhase and phase are used to determine escalation timing.
+   */
+  protected brickSession(
+    bikeHours: number,
+    runMinutes: number,
+    day: string,
+    phase?: TriPhase,
+    weekInPhase?: number,
+  ): TriSession[] {
+    const approach  = this.params.approach;
+    const bikeMins  = Math.round(bikeHours * 60);
+    const runMi     = Math.max(2, Math.round(runMinutes / this.easyPaceMinPerMile()));
+
+    // Determine whether this brick is race-intensity:
+    //   base_first  → only in final 2 weeks of Race-Specific
+    //   race_peak   → from mid-Build (week 3+) onward
+    const isRSPhase     = phase?.name === 'Race-Specific';
+    const isBuildPhase  = phase?.name === 'Build';
+    const wip           = weekInPhase ?? 1;
+    const totalWip      = phase?.weeks_in_phase ?? 4;
+
+    const useRacePace = approach === 'race_peak'
+      ? (isBuildPhase && wip >= Math.ceil(totalWip / 2)) || isRSPhase
+      : isRSPhase && wip >= totalWip - 1;  // base_first: only last 2 weeks of RS
+
+    if (useRacePace) {
+      return [
+        {
+          day, type: 'bike', name: 'Race-Simulation Brick — Bike',
+          description: `${bikeHours.toFixed(2).replace(/\.?0+$/, '')}h. First 60% aerobic Z2, final 40% building to race effort (Z3–Z4). Simulate race-day fueling. Transition immediately to run.`,
+          duration: bikeMins,
+          steps_preset: [`bike_race_sim_${bikeMins}min_z2_to_z4`],
+          tags: ['brick', 'race_simulation', 'long_ride'],
+          timing: 'AM',
+        },
+        {
+          day, type: 'run', name: 'Race-Simulation Brick — Run',
+          description: `${runMi} miles at goal race pace (Z3–Z4). First half mile to shake out the legs, then settle into target effort. This teaches race-day metabolic switching.`,
+          duration: Math.round(runMi * this.easyPaceMinPerMile()),
+          steps_preset: [`run_race_pace_${runMi}mi`],
+          tags: ['brick', 'race_pace', 'race_simulation'],
+          timing: 'PM (immediately after bike)',
+        },
+      ];
+    }
+
+    // Default: Z2 transition brick (neuromuscular adaptation, not metabolic stress)
     return [
       {
         day, type: 'bike', name: 'Brick — Bike Leg',
-        description: `${bikeHours.toFixed(2).replace(/\.?0+$/, '')}h at aerobic/race effort. Finish strong last 10 min. Transition directly to run.`,
+        description: `${bikeHours.toFixed(2).replace(/\.?0+$/, '')}h at aerobic Z2 effort. Finish strong last 10 min. Transition directly to run.`,
         duration: bikeMins,
         steps_preset: [`bike_endurance_${bikeMins}min_Z2`],
         tags: ['brick', 'long_ride'],
@@ -552,7 +668,7 @@ export class TriathlonGenerator {
       },
       {
         day, type: 'run', name: 'Brick — Run Leg',
-        description: `${runMi} miles off the bike. First mile feels awkward — this is normal. Settle into race effort.`,
+        description: `${runMi} miles off the bike at easy Z2. First mile feels awkward — this is normal. No pushing pace; the goal is the transition itself.`,
         duration: Math.round(runMi * this.easyPaceMinPerMile()),
         steps_preset: [`run_easy_${runMi}mi`],
         tags: ['brick', 'easy_run'],
@@ -563,33 +679,62 @@ export class TriathlonGenerator {
 
   protected swimQualitySession(weekYards: number, phase: TriPhase, isRecovery: boolean, day: string): TriSession {
     // Main swim session is ~40% of weekly yardage
-    const yd = Math.max(1500, Math.round(weekYards * 0.40 / 50) * 50);
+    const yd       = Math.max(1500, Math.round(weekYards * 0.40 / 50) * 50);
+    const approach = this.params.approach;
 
     if (isRecovery || phase.name === 'Base') {
+      // Both approaches: aerobic technique work during base — same physiological goal
       const mainYd = Math.max(800, yd - 600);
       return {
         day, type: 'swim', name: 'Aerobic Swim',
-        description: `${yd} yards. Warm-up 300, ${mainYd} yards aerobic, cool-down 200. Focus on technique.`,
+        description: `${yd} yards. Warm-up 300, ${mainYd} yards aerobic, cool-down 200. Focus on technique — catch, pull, rotation.`,
         duration: Math.round(yd / 50),
         steps_preset: ['swim_warmup_300yd_easy', `swim_aerobic_${Math.floor(mainYd/100)}x100yd_easy_r15`, 'swim_cooldown_200yd'],
         tags: ['aerobic_swim'],
       };
     }
-    if (phase.name === 'Race-Specific') {
-      const sets = Math.max(4, Math.round((yd - 500) / 100));
+
+    if (approach === 'base_first') {
+      // base_first: CSS-aerobic pace (comfortable 2:10–2:20/100 for avg athlete).
+      // No threshold. The goal is comfort at race pace, not lactate stimulation.
+      if (phase.name === 'Race-Specific') {
+        const sets = Math.max(5, Math.round((yd - 500) / 100));
+        return {
+          day, type: 'swim', name: 'Race Pace CSS',
+          description: `${yd} yards. Warm-up 300, ${sets}×100 at comfortable race-pace CSS (15s rest) — sustainable, not maximal. Practice sighting between sets. Cool-down 200.`,
+          duration: Math.round(yd / 46),
+          steps_preset: ['swim_warmup_300yd_easy', `swim_aerobic_css_${sets}x100yd_r15`, 'swim_cooldown_200yd'],
+          tags: ['css_aerobic', 'swim_intervals', 'race_specific'],
+        };
+      }
+      // Build: continuous + drill combo — volume + technique
+      const contYd = Math.max(600, yd - 700);
       return {
-        day, type: 'swim', name: 'CSS Intervals',
-        description: `${yd} yards. Warm-up 300, ${sets}×100 at CSS pace (10s rest), cool-down 200.`,
-        duration: Math.round(yd / 45),
-        steps_preset: ['swim_warmup_300yd_easy', `swim_threshold_${sets}x100yd_r10`, 'swim_cooldown_200yd'],
-        tags: ['swim_intervals', 'hard_swim', 'threshold'],
+        day, type: 'swim', name: 'Continuous Swim + Drills',
+        description: `${yd} yards. Warm-up 300, ${contYd} yards continuous aerobic (build effort in final 200), 4×100 drill work, cool-down 200. Endurance and stroke refinement.`,
+        duration: Math.round(yd / 47),
+        steps_preset: ['swim_warmup_300yd_easy', `swim_continuous_${Math.floor(contYd/100)}x100yd_aerobic`, 'swim_drills_4x100yd', 'swim_cooldown_200yd'],
+        tags: ['aerobic_swim', 'swim_drills', 'endurance'],
       };
     }
-    // Build: aerobic sets with some pace work
+
+    // race_peak: CSS threshold pace — raises lactate threshold in water.
+    // 10×100 at CSS is the gold standard for time-constrained threshold work.
+    if (phase.name === 'Race-Specific') {
+      const sets = Math.max(6, Math.round((yd - 500) / 100));
+      return {
+        day, type: 'swim', name: 'CSS Threshold Intervals',
+        description: `${yd} yards. Warm-up 300, ${sets}×100 at CSS pace (10s rest — barely enough), cool-down 200. These should be sustainably hard — if splits blow up, slow down 2 sec/100.`,
+        duration: Math.round(yd / 44),
+        steps_preset: ['swim_warmup_300yd_easy', `swim_threshold_${sets}x100yd_r10`, 'swim_cooldown_200yd'],
+        tags: ['css_threshold', 'swim_intervals', 'hard_swim', 'threshold'],
+      };
+    }
+    // Build: aerobic sets with pace progression
     const sets = Math.max(4, Math.round((yd - 500) / 150));
     return {
       day, type: 'swim', name: 'Swim Build',
-      description: `${yd} yards. Warm-up 300, ${sets}×150 aerobic (20s rest), cool-down 200.`,
+      description: `${yd} yards. Warm-up 300, ${sets}×150 aerobic building to CSS effort (20s rest), cool-down 200.`,
       duration: Math.round(yd / 48),
       steps_preset: ['swim_warmup_300yd_easy', `swim_aerobic_${sets}x150yd_r20`, 'swim_cooldown_200yd'],
       tags: ['aerobic_swim', 'swim_build'],
