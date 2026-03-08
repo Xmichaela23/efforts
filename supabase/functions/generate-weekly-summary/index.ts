@@ -166,6 +166,12 @@ Deno.serve(async (req) => {
     // Get next week preview from plan
     const nextWeekPreview = getNextWeekPreview(planData, weekStart);
 
+    // Extract plan context for sport-aware coaching
+    const planConfig = planData?.config || null;
+    const planApproach = String(planConfig?.approach || planConfig?.plan_contract_v1?.tri_approach || '').toLowerCase();
+    const planSport = String(planConfig?.sport || planConfig?.plan_contract_v1?.sport || planConfig?.plan_type || '').toLowerCase();
+    const isTri = planSport.includes('tri') || planSport === 'multi_sport' || planApproach === 'base_first' || planApproach === 'race_peak';
+
     // Generate GPT analysis
     const analysis = await generateWeeklyAnalysis(
       weekSummary,
@@ -173,7 +179,8 @@ Deno.serve(async (req) => {
       changes,
       nextWeekPreview,
       weekStart,
-      weekEnd
+      weekEnd,
+      { isTri, planApproach },
     );
 
     return new Response(JSON.stringify(analysis), {
@@ -229,15 +236,35 @@ function analyzeWeekWithSamples(workouts: any[], plannedWorkouts: any[], userBas
       runs: { count: 0, hard_count: 0, avg_pace: null, hard_avg_pace: null, best_pace: null, avg_hr: null },
       bikes: { count: 0, hard_count: 0, avg_power: null, hard_avg_power: null, best_power: null, avg_hr: null },
       swims: { count: 0, hard_count: 0, avg_pace: null, hard_avg_pace: null, best_pace: null, avg_hr: null },
-      strength: { count: 0, lifts: [] }
+      strength: { count: 0, lifts: [] },
+      bricks: { count: 0 },
     }
   };
 
-  // Group workouts by discipline
-  const runs = workouts.filter(w => w.type === 'run' || w.type === 'running');
-  const bikes = workouts.filter(w => w.type === 'ride' || w.type === 'cycling' || w.type === 'bike');
-  const swims = workouts.filter(w => w.type === 'swim' || w.type === 'swimming');
-  const strength = workouts.filter(w => w.type === 'strength');
+  // Group workouts by discipline.
+  // Brick sessions are counted separately — they are multi-sport composites
+  // (bike + immediate run) and represent a distinct triathlon training stimulus.
+  // They are also counted within runs/bikes so discipline totals remain accurate.
+  const bricks = workouts.filter(w => {
+    const t = String(w.type || '').toLowerCase();
+    return t === 'brick' || t.startsWith('brick_') || t.endsWith('_brick');
+  });
+  const runs = workouts.filter(w => {
+    const t = String(w.type || '').toLowerCase();
+    return t === 'run' || t === 'running' || t === 'brick_run';
+  });
+  const bikes = workouts.filter(w => {
+    const t = String(w.type || '').toLowerCase();
+    return t === 'ride' || t === 'cycling' || t === 'bike' || t === 'brick_bike';
+  });
+  const swims = workouts.filter(w => {
+    const t = String(w.type || '').toLowerCase();
+    return t === 'swim' || t === 'swimming';
+  });
+  const strength = workouts.filter(w => {
+    const t = String(w.type || '').toLowerCase();
+    return t === 'strength';
+  });
 
   // Analyze runs using sample data
   if (runs.length > 0) {
@@ -291,6 +318,12 @@ function analyzeWeekWithSamples(workouts: any[], plannedWorkouts: any[], userBas
       count: strength.length,
       lifts: strengthAnalysis.lifts
     };
+  }
+
+  // Track brick sessions (already counted in runs/bikes above for load totals,
+  // but surfaced separately so the LLM can acknowledge transition work)
+  if (bricks.length > 0) {
+    (summary.disciplines as any).bricks = { count: bricks.length };
   }
 
   return summary;
@@ -799,11 +832,26 @@ async function generateWeeklyAnalysis(
   changes: any,
   nextWeekPreview: any,
   weekStart: Date,
-  weekEnd: Date
+  weekEnd: Date,
+  planCtx?: { isTri?: boolean; planApproach?: string },
 ): Promise<any> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured');
+  }
+
+  const isTri = planCtx?.isTri ?? false;
+  const planApproach = planCtx?.planApproach ?? '';
+  const brickCount = (weekSummary.disciplines as any).bricks?.count ?? 0;
+
+  // Methodology coaching instruction block — ensures the AI's feedback is approach-appropriate
+  let methodologyBlock = '';
+  if (planApproach === 'base_first') {
+    methodologyBlock = `\nTRAINING METHODOLOGY: Aerobic Foundation (Completion-Focus). Quality sessions are in Zone 3 tempo by design. Do NOT suggest adding threshold intervals or more intensity. Praise consistency, aerobic comfort, and disciplined easy effort.`;
+  } else if (planApproach === 'race_peak') {
+    methodologyBlock = `\nTRAINING METHODOLOGY: Race-Peak (Performance-Focus). Quality sessions target Zone 4 threshold and Zone 5. Praise power output, FTP-% adherence, and CSS swim completion. Flag missed threshold sessions as a gap.`;
+  } else if (isTri) {
+    methodologyBlock = `\nSPORT CONTEXT: Multi-sport triathlon athlete. Consider total systemic load across swim, bike, run, and strength. Brick sessions are key triathlon-specific workouts.`;
   }
 
   try {
@@ -814,6 +862,7 @@ Date: ${weekStart.toLocaleDateString()} to ${weekEnd.toLocaleDateString()}
 Completion: ${weekSummary.completed}/${weekSummary.planned} sessions (${weekSummary.completion_rate}%)
 Total TSS: ${weekSummary.total_tss}
 Intensity: ${weekSummary.intensity_distribution.easy}% easy / ${weekSummary.intensity_distribution.hard}% hard
+${methodologyBlock}
 
 PERFORMANCE BY DISCIPLINE:
 Runs (${weekSummary.disciplines.runs.count} completed):
@@ -829,10 +878,11 @@ Bikes (${weekSummary.disciplines.bikes.count} completed):
 Swims (${weekSummary.disciplines.swims.count} completed):
 - Avg pace: ${weekSummary.disciplines.swims.avg_pace || 'N/A'}
 - Hard workouts: ${weekSummary.disciplines.swims.hard_count}
+${brickCount > 0 ? `\nBrick Sessions (${brickCount} completed):\n- These are bike-to-run transitions — a key triathlon-specific stimulus. Acknowledge them specifically.` : ''}
 
 Strength (${weekSummary.disciplines.strength.count} completed):
 ${weekSummary.disciplines.strength.lifts.length > 0 ? 
-  weekSummary.disciplines.strength.lifts.map(l => `- ${l.name}: ${l.weight}lb x ${l.reps}`).join('\n') : 
+  weekSummary.disciplines.strength.lifts.map((l: any) => `- ${l.name}: ${l.weight}lb x ${l.reps}`).join('\n') : 
   'No strength data'}
 
 COMPARISON TO LAST WEEK:
@@ -852,6 +902,7 @@ Generate analysis with:
    - Highlight standout performances
    - Note week-over-week changes
    - Specific numbers (pace, power, lifts)
+   ${brickCount > 0 ? '- Acknowledge brick session(s) and what they build toward' : ''}
 
 3. Key Insights (3-4 bullets):
    - What went well
@@ -885,7 +936,9 @@ Return ONLY valid JSON:
         messages: [
           {
             role: 'system',
-            content: 'Generate weekly training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers.'
+            content: isTri
+              ? 'Generate weekly multi-sport triathlon training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers. Speak fluently about swim (pace/100yd), bike (watts/FTP%), and run (pace/mi). Treat brick sessions as key workouts, not just "extra runs".'
+              : 'Generate weekly training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers.',
           },
           {
             role: 'user',

@@ -113,6 +113,7 @@ Deno.serve(async (req: Request) => {
       plan_type: 'multi_sport',
       discipline: 'multi',
       approach: 'combined_80_20',
+      tri_approach: athlete_state.tri_approach ?? null,  // 'base_first' | 'race_peak' — read by coach narrative
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
       sport: 'multi_sport',

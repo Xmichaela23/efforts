@@ -143,7 +143,52 @@ function inferMethodologyId(planConfig: any): MethodologyId {
   const approach = String(planConfig?.approach || '').toLowerCase();
   if (approach === 'performance_build') return 'run:performance_build';
   if (approach === 'sustainable') return 'run:sustainable';
+  // Triathlon approaches: map to the closest run methodology for threshold/verdict math.
+  // The distinct coaching identity is injected into narrativeFacts separately.
+  if (approach === 'race_peak') return 'run:performance_build';
+  if (approach === 'base_first') return 'run:sustainable';
   return 'unknown';
+}
+
+/** Returns human-readable methodology description for the LLM, or null for run plans. */
+function triMethodologyFact(planConfig: any, allActivePlans: any[]): string | null {
+  // approach may be at the top-level config (standalone tri plan) OR inside plan_contract_v1 (combined plan)
+  const approach = String(
+    planConfig?.approach ||
+    planConfig?.plan_contract_v1?.tri_approach ||
+    '',
+  ).toLowerCase();
+  const sport = String(planConfig?.sport || planConfig?.plan_type || planConfig?.plan_contract_v1?.sport || '').toLowerCase();
+  const isTri = sport.includes('tri') || sport === 'multi_sport' ||
+    allActivePlans.some(p =>
+      String(p.config?.sport || '').toLowerCase().includes('tri') ||
+      String(p.config?.plan_type || '').toLowerCase().includes('tri') ||
+      String(p.config?.plan_contract_v1?.sport || '').toLowerCase().includes('tri'),
+    );
+  if (!isTri && approach !== 'base_first' && approach !== 'race_peak') return null;
+
+  if (approach === 'base_first') {
+    return [
+      `TRAINING METHODOLOGY: Triathlon — Aerobic Foundation (Completion-Focus).`,
+      `Quality sessions are deliberately in Zone 3 tempo, NOT threshold intervals — this is by design.`,
+      `Brick sessions are neuromuscular transition practice at Zone 2, not metabolic stress tests.`,
+      `Praise consistency, low HR drift, and aerobic comfort. Do NOT suggest adding intervals or pushing harder — durability is the goal.`,
+      `Loading is 2:1 (every 3rd week is recovery); flag it positively if the athlete held steady through load weeks.`,
+    ].join(' ');
+  }
+  if (approach === 'race_peak') {
+    return [
+      `TRAINING METHODOLOGY: Triathlon — Race-Peak (Performance-Focus).`,
+      `Quality sessions target Zone 4 threshold and Zone 5 VO2max to raise the aerobic ceiling.`,
+      `Race-pace bricks in Build/Race-Specific phases simulate metabolic switching under fatigue — these are key sessions.`,
+      `Praise power output, FTP-percentage work, CSS swim adherence, and threshold session completion.`,
+      `Loading is 3:1 (every 4th week is recovery); monitor accumulated fatigue across all three disciplines.`,
+    ].join(' ');
+  }
+  if (sport === 'multi_sport' || sport.includes('tri')) {
+    return `TRAINING METHODOLOGY: Multi-Sport Combined (80/20 Unified Plan). Training load is budgeted across swim, bike, run, and strength as a single TSS pool. When coaching, consider total systemic load — a hard swim day counts toward the weekly hard quota just like a hard run.`;
+  }
+  return null;
 }
 
 function resolveWeekStartDow(planConfig: any): WeekStartDow {
@@ -1084,6 +1129,10 @@ Deno.serve(async (req) => {
     const normalizeType = (t: any): string => {
       const s = String(t || '').toLowerCase();
       if (!s) return 'other';
+      // Brick must be checked first — a brick session often contains 'run' or 'bike'
+      // in its sub-type (e.g. 'brick_run', 'brick_bike', 'brick'). Identifying it as
+      // 'brick' preserves the transition context for the LLM.
+      if (s === 'brick' || s.startsWith('brick_') || s.endsWith('_brick')) return 'brick';
       if (s.includes('run')) return 'run';
       if (s.includes('bike') || s.includes('ride') || s.includes('cycl')) return 'bike';
       if (s.includes('swim')) return 'swim';
@@ -1478,6 +1527,12 @@ Deno.serve(async (req) => {
             narrativeFacts.push('When coaching, address how this week serves BOTH events. Flag any sessions this week that build toward the secondary event. Do not suggest adding extra sessions — all sessions from all plans are already included in the session list.');
           }
 
+          // Triathlon / multi-sport methodology context
+          // This is critical: without it, the LLM gives generic "push harder" advice
+          // to a completion athlete who is intentionally staying in Zone 3.
+          const triMethodFact = triMethodologyFact(planConfig, allActivePlans);
+          if (triMethodFact) narrativeFacts.push(triMethodFact);
+
           narrativeFacts.push('IMPORTANT: There is an active training plan. Do NOT suggest adding extra sessions. If sessions were missed, suggest hitting the planned sessions next week. If suggesting changes, frame them as adjustments within the existing plan.');
           if (isPlanTransitionPeriod) {
             narrativeFacts.push(`NOTE: This is an early week of a new plan (within the first 2 weeks). The 7-day load ratio and 28-day baseline both overlap with the previous training cycle, so any "overreaching" or elevated load signals are unreliable artifacts of the plan transition — do NOT flag load as elevated or suggest recovery based on the load ratio. Focus exclusively on execution quality of the planned sessions and whether the athlete feels good.`);
@@ -1568,6 +1623,31 @@ Deno.serve(async (req) => {
         });
         if (loadLines.length) narrativeFacts.push(`Training load by discipline this week: ${loadLines.join('; ')}.`);
 
+        // ── Athlete performance baselines ─────────────────────────────────────
+        // Without these, the LLM guesses whether a 200W ride is hard or easy.
+        // With them it can say "your 210W average was 88% of your FTP — solid tempo."
+        const perfNums = (ub as any)?.performance_numbers || {};
+        const effortPaces = (ub as any)?.effort_paces || {};
+        const baselineLines: string[] = [];
+        const ftpVal = perfNums?.ftp || perfNums?.bike_ftp || null;
+        if (ftpVal) baselineLines.push(`Bike FTP: ${Math.round(ftpVal)}W`);
+        const swimCssSec = perfNums?.swim_pace_per_100_sec || perfNums?.swimPacePer100 || null;
+        if (swimCssSec) {
+          const cssMins = Math.floor(Number(swimCssSec) / 60);
+          const cssSecs = Math.round(Number(swimCssSec) % 60);
+          baselineLines.push(`Swim CSS: ${cssMins}:${String(cssSecs).padStart(2, '0')}/100yd`);
+        }
+        const threshPace = effortPaces?.threshold || effortPaces?.z4 || perfNums?.threshold_pace_min_per_mi || null;
+        if (threshPace) baselineLines.push(`Run threshold pace: ${threshPace} min/${isImperial ? 'mi' : 'km'}`);
+        const fiveKPace = effortPaces?.five_k || perfNums?.five_k_pace_min_per_mi || null;
+        if (fiveKPace) baselineLines.push(`5K pace: ${fiveKPace} min/${isImperial ? 'mi' : 'km'}`);
+        if (baselineLines.length > 0) {
+          narrativeFacts.push(
+            `ATHLETE PERFORMANCE BASELINES: ${baselineLines.join('. ')}. ` +
+            `Use these when commenting on workout intensity (e.g. "your 210W average was 88% of your FTP — solid tempo work").`
+          );
+        }
+
         // ACWR
         if (metrics.acwr != null) {
           const acwrStatus = getAcwrStatus(metrics.acwr, activePlan ? {
@@ -1634,7 +1714,19 @@ Deno.serve(async (req) => {
           try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }
           catch { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(asOfDate + 'T12:00:00Z').getUTCDay()]; }
         })();
-        const narrativePrompt = `You are a personal coach writing a weekly check-in for your athlete. Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-4 sentences in second person. Be specific and practical. Use day names instead of raw dates.
+        // Dynamic coach persona based on active sport(s).
+        // A triathlete deserves a coach who speaks swim/bike/run fluently — not a
+        // running coach who "also sees some cross-training."
+        const hasTri = allActivePlans.some(p =>
+          String(p.config?.sport || '').toLowerCase().includes('tri') ||
+          String(p.config?.plan_type || '').toLowerCase().includes('tri') ||
+          String(p.config?.plan_contract_v1?.sport || '').toLowerCase() === 'multi_sport',
+        );
+        const coachPersona = hasTri
+          ? `You are a multi-sport triathlon coach writing a weekly check-in for your athlete.`
+          : `You are a personal coach writing a weekly check-in for your athlete.`;
+
+        const narrativePrompt = `${coachPersona} Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-4 sentences in second person. Be specific and practical. Use day names instead of raw dates.
 
 STYLE (Training Status): sentence 1 = status + why in plain language. sentence 2 = what happened this week (completed vs missed, only past sessions). sentence 3 = one clear next action.
 
@@ -1664,7 +1756,9 @@ ${narrativeFacts.join('\n')}`;
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: 'You are an expert endurance and strength coach. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable.' },
+              { role: 'system', content: hasTri
+                  ? 'You are an expert multi-sport triathlon coach fluent in swim, bike, run, and strength. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. When referencing workouts, use the sport-specific context (e.g., power for bike, pace per 100 for swim, pace per mile for run). For brick sessions, acknowledge the transition component.'
+                  : 'You are an expert endurance and strength coach. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable.' },
               { role: 'user', content: narrativePrompt },
             ],
             temperature: 0,

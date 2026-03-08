@@ -116,6 +116,7 @@ Deno.serve(async (req: Request) => {
           distance:                 request.distance,
           fitness:                  request.fitness,
           goal:                     request.goal,
+          approach,                 // 'base_first' | 'race_peak' — read by coach narrative
           days_per_week:            request.days_per_week ?? null,
           strength_frequency:       request.strength_frequency ?? 0,
           user_selected_start_date: startDate,
