@@ -1195,6 +1195,10 @@ export class PerformanceBuildGenerator extends BaseGenerator {
       const isPostTaperPivot = transitionMode === 'peak_bridge' && weeksSincePeak > 2;
       const isRecoveryRebuild = transitionMode === 'recovery_rebuild';
 
+      if (weekNumber === 1) {
+        console.log(`[LongRunArc] recentLongRun=${recentLongRun}, weeksSincePeak=${weeksSincePeak}, transitionMode=${transitionMode}, structural=${this.params.structural_load_hint}, peakIsCurrent=${peakIsCurrent}, isPostTaperPivot=${isPostTaperPivot}, isRecoveryRebuild=${isRecoveryRebuild}`);
+      }
+
       if (peakIsCurrent && !isRecoveryRebuild) {
         // True peak-bridge: athlete ran near-peak within the last 2 weeks.
         // Maintain near-peak and taper. Original descending arc is correct.

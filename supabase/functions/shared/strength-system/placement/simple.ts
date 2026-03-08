@@ -45,11 +45,13 @@ function assignSessions(
   primarySchedule: { longSessionDays: string[]; qualitySessionDays: string[]; easySessionDays: string[] },
   guardrails: GuardrailResult[],
   placementContext?: {
-    methodology?: 'hal_higdon_complete' | 'jack_daniels_performance';
+    methodology?: 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
     protocol?: string;
     strengthFrequency?: number;
     noDoubles?: boolean;
     injuryHotspots?: string[];
+    brickDays?: string[];
+    hardEnduranceDays?: string[];
   }
 ): PlacedSession[] {
   const placed: PlacedSession[] = [];
@@ -82,11 +84,13 @@ function assignSessionsWithStrategy(
   primarySchedule: { longSessionDays: string[]; qualitySessionDays: string[]; easySessionDays: string[] },
   guardrails: GuardrailResult[],
   placementContext: {
-    methodology: 'hal_higdon_complete' | 'jack_daniels_performance';
+    methodology: 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
     protocol?: string;
     strengthFrequency?: number;
     noDoubles?: boolean;
     injuryHotspots?: string[];
+    brickDays?: string[];
+    hardEnduranceDays?: string[];
   }
 ): PlacedSession[] {
   const placed: PlacedSession[] = [];
@@ -99,12 +103,14 @@ function assignSessionsWithStrategy(
   
   const ctx: PlacementContext = {
     methodology: placementContext.methodology,
-    protocol: (placementContext.protocol || 'durability') as 'durability' | 'neural_speed' | 'upper_aesthetics',
+    protocol: (placementContext.protocol || 'durability') as 'durability' | 'neural_speed' | 'upper_aesthetics' | 'triathlon',
     strengthFrequency: (placementContext.strengthFrequency || 2) as 0 | 1 | 2 | 3,
     noDoubles: placementContext.noDoubles || false,
     qualityDays,
     longRunDay,
     injuryHotspots: placementContext.injuryHotspots ?? [],
+    brickDays: (placementContext.brickDays ?? []).map(normalizeWeekday),
+    hardEnduranceDays: (placementContext.hardEnduranceDays ?? []).map(normalizeWeekday),
   };
   
   // Get strategy

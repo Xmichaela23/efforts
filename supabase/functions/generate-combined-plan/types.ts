@@ -62,6 +62,7 @@ export interface PhaseBlock {
   isRecovery: boolean;
   tssMultiplier: number;  // 1.0 normal, 0.65 recovery, declining for taper
   sportDistribution: Partial<Record<Sport, number>>; // fractions summing ≤ 1
+  weekInPhase?: number;  // current week within this phase (1-based), set by week-builder
 }
 
 export interface EventRelationship {

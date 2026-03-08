@@ -107,7 +107,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['unilateral_stability', 'calf_eccentric', 'adductor_isometric'],
     repRange: [8, 20],
     intensityRange: [40, 75],
-    allowedProtocols: ['durability', 'upper_aesthetics'],
+    allowedProtocols: ['durability', 'upper_aesthetics', 'triathlon'],
   },
   
   LOWER_POWER: {
@@ -178,7 +178,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['rear_delt', 'upper_back'], // Face Pulls, Band Pulls, YTW Raises
     repRange: [12, 20],
     intensityRange: [40, 60], // Light bands or 50-60% 1RM
-    allowedProtocols: ['upper_aesthetics', 'durability'], // Upper priority and foundation include posture work
+    allowedProtocols: ['upper_aesthetics', 'durability', 'triathlon'],
   },
   
   UPPER_MAINTENANCE: {
@@ -194,7 +194,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['light_compound'], // Bench 2x8 @ 50%, Rows 2x8 @ 50%
     repRange: [8, 12],
     intensityRange: [50, 60],
-    allowedProtocols: ['neural_speed', 'minimum_dose'], // Performance can use in taper, minimum dose uses it
+    allowedProtocols: ['neural_speed', 'minimum_dose', 'triathlon'],
   },
   
   // ============================================================================
@@ -214,7 +214,7 @@ export const INTENT_DEFS: Record<StrengthIntent, IntentMetadata> = {
     exerciseFamilies: ['minimal_compound'], // One squat, one bench, one row
     repRange: [5, 8],
     intensityRange: [65, 75],
-    allowedProtocols: ['minimum_dose', 'durability', 'neural_speed'], // Minimum dose uses full body; foundation/performance use it for taper optional
+    allowedProtocols: ['minimum_dose', 'durability', 'neural_speed', 'triathlon'],
   },
 };
 

@@ -17,6 +17,9 @@ import {
  * Get placement strategy based on methodology and constraints
  */
 export function getPlacementStrategy(ctx: PlacementContext): PlacementStrategy {
+  if (ctx.methodology === 'triathlon') {
+    return getTriathlonStrategy(ctx);
+  }
   if (ctx.methodology === 'hal_higdon_complete') {
     return getHigdonStrategy(ctx);
   } else {
@@ -171,6 +174,89 @@ function getDanielsFallbackStrategy(ctx: PlacementContext): PlacementStrategy {
     name: 'Jack Daniels (Performance) - Upper Aesthetics Fallback',
     slotsByDay: slots,
     notes: 'Upper-dominant protocol. Lower work is optional on Saturday or omitted.',
+  };
+}
+
+/**
+ * Triathlon Placement Strategy
+ *
+ * Hard rules:
+ *   1. NEVER place on a brick day (neuromuscular fatigue + injury risk).
+ *   2. NEVER place on Sunday (long run).
+ *   3. NEVER place on Saturday when it carries a brick or long ride.
+ *   4. If the candidate day has a HARD endurance session, append a 6-h
+ *      interference warning to the session description (cannot rearrange at
+ *      this layer — coaches should AM/PM split).
+ *
+ * Preferred slot order:
+ *   Slot 1 (lower/posterior): Monday (easy swim day) → Tuesday if Mon blocked.
+ *   Slot 2 (upper/swim, base phase only): Wednesday → Thursday if Wed blocked.
+ *   Optional slot: Tuesday if frequency ≥ 3 and Mon/Wed are the primary slots.
+ *
+ * This mirrors how elite tri coaches place strength — on the lightest aerobic
+ * days, well away from the long brick and the long run.
+ */
+function getTriathlonStrategy(ctx: PlacementContext): PlacementStrategy {
+  const brickSet = new Set<Weekday>(ctx.brickDays ?? []);
+  const hardSet  = new Set<Weekday>(ctx.hardEnduranceDays ?? []);
+
+  // Days that can never receive strength
+  const blocked = new Set<Weekday>(['sat', 'sun', ...brickSet]);
+
+  // Helper: find first available weekday from an ordered preference list
+  function firstAvailable(preferences: Weekday[]): Weekday | null {
+    return preferences.find(d => !blocked.has(d)) ?? null;
+  }
+
+  const slots: Partial<Record<Weekday, Slot>> = {};
+
+  // Slot 1 — lower/posterior chain
+  const lowerDay = firstAvailable(['mon', 'tue', 'wed']);
+  if (lowerDay) {
+    slots[lowerDay] = 'lower_primary';
+    // Interference warning: if this is also a HARD day, note it
+    if (hardSet.has(lowerDay)) {
+      // Can't modify the slot type but caller reads hardEnduranceDays to inject warning
+    }
+  }
+
+  // Slot 2 — upper/swim (only when frequency ≥ 2)
+  if (ctx.strengthFrequency >= 2 && lowerDay) {
+    // Prefer a day that isn't the same as lowerDay and isn't hard endurance
+    const upperPrefs: Weekday[] = (['mon', 'tue', 'wed', 'thu', 'fri'] as Weekday[]).filter(
+      d => d !== lowerDay && !blocked.has(d)
+    );
+    // Prefer days that don't have HARD endurance (interference avoidance)
+    const softPrefs = upperPrefs.filter(d => !hardSet.has(d));
+    const upperDay  = softPrefs[0] ?? upperPrefs[0] ?? null;
+    if (upperDay) slots[upperDay] = 'upper_primary';
+  }
+
+  // Optional slot (frequency ≥ 3)
+  if (ctx.strengthFrequency >= 3) {
+    const usedDays = new Set(Object.keys(slots) as Weekday[]);
+    const optPrefs: Weekday[] = (['tue', 'wed', 'thu', 'fri'] as Weekday[]).filter(
+      d => !usedDays.has(d) && !blocked.has(d) && !hardSet.has(d)
+    );
+    if (optPrefs[0]) slots[optPrefs[0]] = 'mobility_optional';
+  }
+
+  // Explicitly block brick days and long-session days
+  for (const d of blocked) {
+    if (!slots[d]) slots[d] = 'none';
+  }
+
+  const blockedNote = brickSet.size > 0
+    ? ` Brick day(s) (${[...brickSet].join(', ')}) are hard-blocked.`
+    : '';
+  const hardNote = hardSet.size > 0
+    ? ` 6-h separation recommended on ${[...hardSet].join(', ')} (HARD endurance day).`
+    : '';
+
+  return {
+    name: 'Triathlon Multi-Sport',
+    slotsByDay: slots,
+    notes: `Strength placed on lightest aerobic days only.${blockedNote}${hardNote}`,
   };
 }
 

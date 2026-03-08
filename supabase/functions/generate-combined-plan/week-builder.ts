@@ -373,23 +373,59 @@ export function buildWeek(
 
   // ── STRENGTH ──────────────────────────────────────────────────────────────
   const strFreq = phase === 'base' ? 2 : phase === 'taper' || phase === 'recovery' ? 0 : 1;
-  const strFn = hasTri ? triathlonStrength : runStrength;
 
   if (strFreq >= 1) {
-    const strDay = ['Monday'].find(d => {
-      const sl = grid.get(d);
-      return sl && !sl.isRest && sl.sessions.length === 0;
-    }) ?? 'Monday';
-    const strSlot = grid.get(strDay);
-    if (strSlot) strSlot.sessions.push(strFn(strDay, phase, servedGoal));
-  }
-  if (strFreq >= 2) {
-    const strDay2 = ['Friday'].find(d => {
-      const sl = grid.get(d);
-      return sl && !sl.isRest && sl.sessions.length <= 1;
-    }) ?? 'Friday';
-    const strSlot2 = grid.get(strDay2);
-    if (strSlot2) strSlot2.sessions.push(strFn(strDay2, phase, servedGoal));
+    // Identify brick days in the current grid to pass to the protocol placement
+    const brickDaysInGrid = [...grid.values()]
+      .filter(s => s.sessions.some(w => w.tags?.includes('brick')))
+      .map(s => s.day);
+
+    // Identify HARD endurance days (for AMPK/mTOR 6-h interference warning)
+    const hardEnduranceDaysInGrid = [...grid.values()]
+      .filter(s => s.sessions.some(w => w.intensity_class === 'HARD' && w.type !== 'strength'))
+      .map(s => s.day);
+
+    // Determine limiter sport from goals (the goal with limiter flag, or lowest-priority goal)
+    const limiterGoal = goals.find(g => (g as any).limiter === true)
+      ?? goals.sort((a, b) => (a.priority === 'A' ? -1 : b.priority === 'A' ? 1 : 0)).slice(-1)[0];
+    const limiterSport: 'swim' | 'bike' | 'run' =
+      (['swim', 'bike', 'run'].includes(limiterGoal?.sport ?? '') ? limiterGoal!.sport : 'run') as 'swim' | 'bike' | 'run';
+
+    // Blocked days: rest days + brick days + Sunday (long run)
+    const blocked = new Set([...brickDaysInGrid, longRideDay, longRunDay, ...restDayNames]);
+
+    // weekInPhase: how many weeks into this phase are we?
+    const weekInPhase = Math.max(1, weekNum - block.startWeek + 1);
+
+    // Slot 1: first non-blocked day starting Monday
+    const candidates1 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d));
+    const strDay = candidates1[0];
+    if (strDay) {
+      const strSlot = grid.get(strDay);
+      if (strSlot) {
+        if (hasTri) {
+          strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 0 }));
+        } else {
+          strSlot.sessions.push(runStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery }));
+        }
+      }
+    }
+
+    // Slot 2 (base phase only): second non-blocked day
+    if (strFreq >= 2 && strDay) {
+      const candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d) && d !== strDay);
+      const strDay2 = candidates2[0];
+      if (strDay2) {
+        const strSlot2 = grid.get(strDay2);
+        if (strSlot2) {
+          if (hasTri) {
+            strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 1 }));
+          } else {
+            strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery }));
+          }
+        }
+      }
+    }
   }
 
   // ── Step 3: Secondary sessions — fill remaining TSS budget with easy work ──

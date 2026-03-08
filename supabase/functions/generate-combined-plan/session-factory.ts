@@ -7,6 +7,10 @@
 import type { PlannedSession, Phase, Intensity } from './types.ts';
 import type { Sport } from './types.ts';
 import { estimateSessionTSS, weightedTSS } from './science.ts';
+import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
+import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
+import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
+import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -284,51 +288,176 @@ export function brick(
 }
 
 // ── Strength sessions ─────────────────────────────────────────────────────────
+//
+// triathlonStrength and runStrength now route through the shared protocol
+// system rather than using hardcoded exercise lists. This gives them:
+//   - Phase-aware volume/intensity progression
+//   - Limiter-sport exercise branching (swim/bike/run)
+//   - Brick-day awareness (caller passes brickDays; protocol placement avoids them)
+//   - Taper sensitivity (taper phase → neural priming only)
 
-export function triathlonStrength(day: string, phase: Phase, goalId: string): PlannedSession {
-  const isBase = phase === 'base';
-  const dur = isBase ? 55 : 40;
-  const sets = isBase ? '4' : '3';
-  return session(
-    day, 'strength',
-    `Triathlon Strength${isBase ? ' — Foundation' : ' — Maintenance'}`,
-    isBase
-      ? 'Foundation phase strength: single-leg stability, hip extension power, shoulder endurance. Higher volume now reduces injury risk later.'
-      : 'Maintenance strength: preserve the adaptations built in Base. Lower volume, same intensity.',
-    dur, isBase ? 'MODERATE' : 'EASY',
-    [
-      `st_main_squat_${sets}x6`,
-      `st_acc_step_ups_${sets}x8`,
-      `st_acc_single_leg_rdl_${sets}x8`,
-      `st_acc_hip_thrusts_${sets}x12`,
-      'st_acc_cable_row_3x10',
-    ],
-    ['strength', isBase ? 'base' : 'maintenance'],
-    isBase ? 'Z3 strength' : 'Z2 strength',
-    goalId,
-  );
+// Maps combined-plan phase names to the StrengthPhase format
+function toStrengthPhase(phase: Phase): { name: string; start_week: number; end_week: number; weeks_in_phase: number } {
+  const nameMap: Record<Phase, string> = {
+    base: 'Base', build: 'Build', race_specific: 'Race Prep', taper: 'Taper', recovery: 'Taper',
+  };
+  return { name: nameMap[phase] ?? 'Base', start_week: 1, end_week: 4, weeks_in_phase: 4 };
 }
 
-export function runStrength(day: string, phase: Phase, goalId: string): PlannedSession {
-  const isBase = phase === 'base';
-  const dur = isBase ? 50 : 40;
-  const sets = isBase ? '4' : '3';
-  return session(
-    day, 'strength',
-    `Run Strength${isBase ? ' — Foundation' : ' — Maintenance'}`,
-    isBase
-      ? 'Force-production and hip stability work for running economy. Heavier loads now build the muscular base that carries you through the build.'
-      : 'Maintain the neuromuscular adaptations from Base. Short and sharp.',
-    dur, isBase ? 'MODERATE' : 'EASY',
-    [
-      `st_main_squat_${sets}x5`,
-      `st_main_deadlift_${sets}x5`,
-      `st_acc_walking_lunges_${sets}x10`,
-      `st_acc_hip_thrusts_${sets}x12`,
-      `st_acc_single_leg_rdl_${sets}x8`,
-    ],
-    ['strength', isBase ? 'base' : 'maintenance'],
-    isBase ? 'Z3 strength' : 'Z2 strength',
-    goalId,
-  );
+// Converts a protocol IntentSession to a PlannedSession for the combined plan
+function intentToPlanned(
+  intent: IntentSession,
+  day: string,
+  _phase: Phase,
+  goalId: string,
+): PlannedSession {
+  const intensityMap: Record<string, Intensity> = {
+    hypertrophy: 'MODERATE',
+    strength: 'MODERATE',
+    maintenance: 'EASY',
+  };
+  const intensity: Intensity = intentMap(intent) ?? intensityMap[intent.repProfile ?? 'maintenance'] ?? 'EASY';
+  const tss = estimateSessionTSS('strength', intensity, intent.duration);
+  const wtss = weightedTSS('strength', tss);
+
+  const steps: string[] = buildStrengthSteps(intent);
+
+  return {
+    day,
+    type: 'strength',
+    name: intent.name,
+    description: intent.description,
+    duration: intent.duration,
+    tss,
+    weighted_tss: wtss,
+    intensity_class: intensity,
+    zone_targets: intensity === 'MODERATE' ? 'Z3 strength' : 'Z2 strength',
+    steps_preset: steps.length > 0 ? steps : ['st_main_squat_3x8', 'st_acc_hip_thrusts_3x10', 'st_acc_step_ups_3x10'],
+    tags: intent.tags,
+    serves_goal: goalId,
+  };
+}
+
+function intentMap(intent: IntentSession): Intensity | null {
+  if (intent.tags.includes('neural_priming')) return 'EASY';
+  if (intent.tags.includes('explosive')) return 'MODERATE';
+  if (intent.tags.includes('recovery')) return 'EASY';
+  return null;
+}
+
+// Map protocol exercise names to token vocabulary where possible;
+// fall back to generic st_acc tokens for exercises not in the token vocab.
+function buildStrengthSteps(intent: IntentSession): string[] {
+  const steps: string[] = [];
+  const nameToToken: Record<string, string> = {
+    'trap bar deadlift': 'st_main_deadlift_3x6',
+    'romanian deadlift': 'st_main_deadlift_3x8',
+    'single-leg rdl': 'st_acc_single_leg_rdl_3x8',
+    'single-leg rdl (supported)': 'st_acc_single_leg_rdl_3x8',
+    'hip thrusts': 'st_acc_hip_thrusts_3x12',
+    'hip thrusts (fast concentric)': 'st_acc_hip_thrusts_4x6',
+    'step-ups': 'st_acc_step_ups_3x10',
+    'explosive step-ups': 'st_acc_step_ups_4x5',
+    'box jumps': 'st_main_box_jumps_3x5',
+    'jump squats': 'st_main_squat_3x5',
+    'lat pull-down': 'st_acc_lat_pulldown_3x10',
+    'explosive lat pull-down': 'st_acc_lat_pulldown_4x6',
+    'seated cable row': 'st_acc_cable_row_3x10',
+    'face pulls': 'st_acc_face_pulls_3x15',
+    'band pull-aparts': 'st_acc_band_pull_aparts_3x20',
+    'pull-ups / assisted pull-ups': 'st_acc_pullups_3x6',
+    'pull-ups (explosive)': 'st_acc_pullups_4x4',
+    'inverted rows': 'st_acc_inverted_rows_3x10',
+    'dead bug': 'st_acc_dead_bug_3x8',
+    'plank with shoulder tap': 'st_acc_plank_3x45s',
+    'side plank': 'st_acc_side_plank_2x30s',
+    'single-leg calf raises': 'st_acc_single_leg_calf_3x12',
+    'weighted single-leg calf raises': 'st_acc_single_leg_calf_3x8',
+    'calf raises (bilateral)': 'st_acc_calf_raises_3x15',
+    'bulgarian split squat': 'st_acc_split_squat_4x6',
+    'rear-foot elevated split squat': 'st_acc_split_squat_4x6',
+  };
+
+  for (const ex of (intent.exercises ?? [])) {
+    const key = (ex.name ?? '').toLowerCase().trim();
+    const token = nameToToken[key];
+    if (token) steps.push(token);
+    // unlisted exercises are described in the intent.description — no token needed
+  }
+
+  // Always include at least one token so materialize-plan has something to work with
+  if (steps.length === 0) {
+    steps.push('st_main_squat_3x8', 'st_acc_hip_thrusts_3x12');
+  }
+  return steps;
+}
+
+export function triathlonStrength(
+  day: string,
+  phase: Phase,
+  goalId: string,
+  options?: {
+    weekInPhase?: number;
+    isRecovery?: boolean;
+    limiterSport?: 'swim' | 'bike' | 'run';
+    sessionIndex?: number; // 0 = lower/posterior, 1 = upper/swim
+  },
+): PlannedSession {
+  const ctx: ProtocolContext = {
+    weekIndex: 1,
+    weekInPhase: options?.weekInPhase ?? 1,
+    phase: toStrengthPhase(phase),
+    totalWeeks: 20,
+    isRecovery: options?.isRecovery ?? false,
+    primarySchedule: { longSessionDays: ['Saturday', 'Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
+    userBaselines: { equipment: 'commercial_gym' },
+    strengthFrequency: 2,
+    constraints: {},
+    triathlonContext: { limiterSport: options?.limiterSport ?? 'run' },
+  };
+
+  const sessions = triathlonProtocol.createWeekSessions(ctx);
+  // sessionIndex 0 = lower/posterior chain, 1 = upper/swim
+  const idx = options?.sessionIndex ?? 0;
+  const chosen = sessions[Math.min(idx, sessions.length - 1)] ?? sessions[0];
+  if (!chosen) {
+    const fallbackTSS = estimateSessionTSS('strength', 'EASY', 15);
+    return {
+      day, type: 'strength', name: 'Strength — Taper Rest',
+      description: 'No strength this phase.', duration: 0, tss: 0, weighted_tss: 0,
+      intensity_class: 'EASY', zone_targets: 'rest',
+      steps_preset: [], tags: ['strength', 'taper'], serves_goal: goalId,
+    };
+  }
+  return intentToPlanned(chosen, day, phase, goalId);
+}
+
+export function runStrength(day: string, phase: Phase, goalId: string, options?: { weekInPhase?: number; isRecovery?: boolean }): PlannedSession {
+  const protocol = getProtocol('durability');
+  const ctx: ProtocolContext = {
+    weekIndex: 1,
+    weekInPhase: options?.weekInPhase ?? 1,
+    phase: toStrengthPhase(phase),
+    totalWeeks: 20,
+    isRecovery: options?.isRecovery ?? false,
+    primarySchedule: { longSessionDays: ['Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
+    userBaselines: { equipment: 'commercial_gym' },
+    strengthFrequency: 2,
+    constraints: {},
+  };
+
+  const sessions = protocol.createWeekSessions(ctx);
+  const chosen = sessions[0];
+  if (!chosen) {
+    const fallbackTSS = estimateSessionTSS('strength', 'EASY', 30);
+    return {
+      day, type: 'strength', name: 'Strength — Maintenance',
+      description: 'Light maintenance strength.', duration: 30, tss: fallbackTSS,
+      weighted_tss: weightedTSS('strength', fallbackTSS),
+      intensity_class: 'EASY', zone_targets: 'Z2 strength',
+      steps_preset: ['st_main_squat_3x8', 'st_acc_hip_thrusts_3x12', 'st_acc_single_leg_rdl_3x8'],
+      tags: ['strength', 'run'], serves_goal: goalId,
+    };
+  }
+  return intentToPlanned(chosen, day, phase, goalId);
 }

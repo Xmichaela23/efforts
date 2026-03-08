@@ -4,8 +4,8 @@
 // Types for methodology-aware strength placement strategies
 // ============================================================================
 
-export type MethodologyId = 'hal_higdon_complete' | 'jack_daniels_performance';
-export type StrengthProtocolId = 'durability' | 'neural_speed' | 'upper_aesthetics';
+export type MethodologyId = 'hal_higdon_complete' | 'jack_daniels_performance' | 'triathlon';
+export type StrengthProtocolId = 'durability' | 'neural_speed' | 'upper_aesthetics' | 'triathlon';
 
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 export type Slot =
@@ -25,6 +25,10 @@ export interface PlacementContext {
   longRunDay: Weekday; // e.g. 'sun'
   /** Flagged injury-prone areas from athlete_memory (e.g. ['achilles','it_band']). Used to protect the day before the long run from heavy lower-body sessions. */
   injuryHotspots?: string[];
+  /** Days with brick sessions — strength must never be placed here (triathlon only). */
+  brickDays?: Weekday[];
+  /** Days carrying a HARD endurance session — trigger 6-h interference note (triathlon only). */
+  hardEnduranceDays?: Weekday[];
 }
 
 export interface PlacementStrategy {

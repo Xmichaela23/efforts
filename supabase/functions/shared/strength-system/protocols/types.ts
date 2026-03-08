@@ -73,6 +73,19 @@ export interface ProtocolContext {
     lastWeekCompletedSessions?: string[]; // Intent IDs that were completed
     skippedSessions?: string[]; // Intent IDs that were skipped
   };
+
+  // Optional triathlon-specific context (read only by the triathlon protocol;
+  // all other protocols ignore this field entirely)
+  triathlonContext?: {
+    /** Athlete's weakest discipline — shifts exercise emphasis each session. */
+    limiterSport?: 'swim' | 'bike' | 'run';
+    /** Which sport dominates TSS this week — used for emphasis decisions. */
+    disciplineEmphasis?: 'swim' | 'bike' | 'run' | 'balanced';
+    /** Days with brick sessions — strength must NEVER be placed here. */
+    brickDays?: string[];
+    /** Days carrying a HARD endurance session — apply 6-h interference gate. */
+    hardEnduranceDays?: string[];
+  };
 }
 
 // ============================================================================
