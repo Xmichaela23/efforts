@@ -401,6 +401,7 @@ export function triathlonStrength(
     isRecovery?: boolean;
     limiterSport?: 'swim' | 'bike' | 'run';
     sessionIndex?: number; // 0 = lower/posterior, 1 = upper/swim
+    equipmentType?: 'home_gym' | 'commercial_gym';
   },
 ): PlannedSession {
   const ctx: ProtocolContext = {
@@ -410,7 +411,7 @@ export function triathlonStrength(
     totalWeeks: 20,
     isRecovery: options?.isRecovery ?? false,
     primarySchedule: { longSessionDays: ['Saturday', 'Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
-    userBaselines: { equipment: 'commercial_gym' },
+    userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },
     strengthFrequency: 2,
     constraints: {},
     triathlonContext: { limiterSport: options?.limiterSport ?? 'run' },
@@ -432,7 +433,7 @@ export function triathlonStrength(
   return intentToPlanned(chosen, day, phase, goalId);
 }
 
-export function runStrength(day: string, phase: Phase, goalId: string, options?: { weekInPhase?: number; isRecovery?: boolean }): PlannedSession {
+export function runStrength(day: string, phase: Phase, goalId: string, options?: { weekInPhase?: number; isRecovery?: boolean; equipmentType?: 'home_gym' | 'commercial_gym' }): PlannedSession {
   const protocol = getProtocol('durability');
   const ctx: ProtocolContext = {
     weekIndex: 1,
@@ -441,7 +442,7 @@ export function runStrength(day: string, phase: Phase, goalId: string, options?:
     totalWeeks: 20,
     isRecovery: options?.isRecovery ?? false,
     primarySchedule: { longSessionDays: ['Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
-    userBaselines: { equipment: 'commercial_gym' },
+    userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },
     strengthFrequency: 2,
     constraints: {},
   };

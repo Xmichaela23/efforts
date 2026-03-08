@@ -403,10 +403,11 @@ export function buildWeek(
     if (strDay) {
       const strSlot = grid.get(strDay);
       if (strSlot) {
+        const equipmentType = athleteState.equipment_type ?? 'commercial_gym';
         if (hasTri) {
-          strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 0 }));
+          strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 0, equipmentType }));
         } else {
-          strSlot.sessions.push(runStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery }));
+          strSlot.sessions.push(runStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, equipmentType }));
         }
       }
     }
@@ -418,10 +419,11 @@ export function buildWeek(
       if (strDay2) {
         const strSlot2 = grid.get(strDay2);
         if (strSlot2) {
+          const equipmentType2 = athleteState.equipment_type ?? 'commercial_gym';
           if (hasTri) {
-            strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 1 }));
+            strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 1, equipmentType: equipmentType2 }));
           } else {
-            strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery }));
+            strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, equipmentType: equipmentType2 }));
           }
         }
       }

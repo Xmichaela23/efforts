@@ -628,7 +628,8 @@ export class TriathlonGenerator {
       base: 'Base', build: 'Build', race_specific: 'Race Prep', taper: 'Taper',
     };
 
-    const limiter = (this.params as any).limiter_sport as 'swim' | 'bike' | 'run' | undefined ?? 'run';
+    const limiter = this.params.limiter_sport ?? 'run';
+    const equipmentType = this.params.equipment_type ?? 'commercial_gym';
 
     const ctx: ProtocolContext = {
       weekIndex: weekInPhase,
@@ -641,7 +642,7 @@ export class TriathlonGenerator {
         qualitySessionDays: ['Tuesday', 'Thursday'],
         easySessionDays: ['Monday', 'Wednesday', 'Friday'],
       },
-      userBaselines: { equipment: 'commercial_gym' },
+      userBaselines: { equipment: equipmentType },
       strengthFrequency: (this.params.strength_frequency ?? 1) as 1 | 2,
       constraints: {},
       triathlonContext: {

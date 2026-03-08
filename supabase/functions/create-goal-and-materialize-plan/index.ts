@@ -165,13 +165,16 @@ async function buildCombinedPlan(
 
   if (!allEventGoals || allEventGoals.length < 2) return null; // No sibling goals; fall through
 
-  // Get athlete snapshots for CTL + volume estimates
-  const { data: snapshots } = await supabase
-    .from('athlete_snapshot')
-    .select('week_start, workload_total, workload_by_discipline, acwr')
-    .eq('user_id', user_id)
-    .order('week_start', { ascending: false })
-    .limit(6);
+  // Get athlete snapshots for CTL + volume estimates, and baselines for equipment
+  const [{ data: snapshots }, { data: combinedBaseline }] = await Promise.all([
+    supabase
+      .from('athlete_snapshot')
+      .select('week_start, workload_total, workload_by_discipline, acwr')
+      .eq('user_id', user_id)
+      .order('week_start', { ascending: false })
+      .limit(6),
+    supabase.from('user_baselines').select('equipment').eq('user_id', user_id).maybeSingle(),
+  ]);
 
   // Derive CTL from recent weekly workload. workload_total is in load points;
   // we scale to approximate TSS/day for the combined plan engine.
@@ -216,6 +219,8 @@ async function buildCombinedPlan(
     };
   });
 
+  const hasCommercialGym = (combinedBaseline?.equipment?.strength ?? []).includes('Commercial gym');
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -224,6 +229,7 @@ async function buildCombinedPlan(
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,
       loading_pattern: fitness === 'beginner' ? '2:1' : '3:1',
+      equipment_type: hasCommercialGym ? 'commercial_gym' : 'home_gym',
     },
   });
 
@@ -477,6 +483,10 @@ Deno.serve(async (req: Request) => {
         days_per_week:    resolvedGoal?.training_prefs?.days_per_week ?? undefined,
         // Triathlon plans support 0/1/2 strength days — cap UI value of 3 to 2
         strength_frequency: Math.min(2, Number(resolvedGoal?.training_prefs?.strength_frequency ?? 0)),
+        // Equipment: read from user_baselines.equipment.strength — ['Commercial gym'] = commercial, else home
+        equipment_type: (triBaseline?.equipment?.strength ?? []).includes('Commercial gym') ? 'commercial_gym' : 'home_gym',
+        // Limiter sport from training prefs (used to shift strength emphasis)
+        limiter_sport: resolvedGoal?.training_prefs?.limiter_sport ?? undefined,
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
         // Days already covered by a concurrent run plan — tri generator defers to those sessions
         ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),
@@ -888,7 +898,12 @@ Deno.serve(async (req: Request) => {
     if (resolvedGoal?.training_prefs?.strength_protocol && resolvedGoal.training_prefs.strength_protocol !== 'none') {
       generateBody.strength_protocol = resolvedGoal.training_prefs.strength_protocol;
       generateBody.strength_frequency = resolvedGoal.training_prefs.strength_frequency || 2;
-      generateBody.strength_tier = 'strength_power';
+      // Derive tier from user_baselines equipment — commercial gym gets barbell tier,
+      // home gym stays bodyweight. Falls back to 'strength_power' if baseline unavailable.
+      const runEquipmentType = (baseline?.equipment?.strength ?? []).includes('Commercial gym')
+        ? 'commercial_gym' : 'home_gym';
+      generateBody.strength_tier = runEquipmentType === 'commercial_gym' ? 'strength_power' : 'injury_prevention';
+      generateBody.equipment_type = runEquipmentType;
     }
 
     // Structural load hint: tell the generator whether heavy lower-body

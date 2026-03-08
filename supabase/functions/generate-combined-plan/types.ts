@@ -31,6 +31,8 @@ export interface AthleteState {
   rest_days: number[];
   long_run_day?: number;
   long_ride_day?: number;
+  /** Whether the athlete has commercial gym access — drives strength exercise selection. */
+  equipment_type?: 'home_gym' | 'commercial_gym';
 }
 
 export interface AthleteMemory {

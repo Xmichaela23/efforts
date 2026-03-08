@@ -37,6 +37,10 @@ export interface GenerateTriPlanRequest {
 
   // Strength
   strength_frequency?: 0 | 1 | 2;
+  /** Whether the athlete has access to a commercial gym or is limited to home/bodyweight equipment. */
+  equipment_type?: 'home_gym' | 'commercial_gym';
+  /** Athlete's weakest triathlon discipline — shifts strength exercise emphasis. */
+  limiter_sport?: 'swim' | 'bike' | 'run';
 
   units?: 'imperial' | 'metric';
 
