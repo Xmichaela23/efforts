@@ -462,30 +462,39 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       if (!user) throw new Error('Not signed in');
 
       const action: 'keep' | 'replace' | 'combine' = resolvedAction ?? 'keep';
-      const payload = {
-        user_id: user.id,
+
+      // Build payload using only explicit primitives. Avoid `condition && object`
+      // spread (which evaluates to `false` when condition is falsy and can leak
+      // non-serializable references in some bundler/engine combos on iOS).
+      const trainingPrefs: Record<string, string | number> = {
+        fitness: String(eventFitness),
+        goal_type: String(eventTrainingGoal),
+      };
+      if (eventStrength !== 'none') {
+        trainingPrefs.strength_protocol = String(eventStrength);
+        trainingPrefs.strength_frequency = Number(eventStrengthFreq);
+      }
+
+      const payload: Record<string, unknown> = {
+        user_id: String(user.id),
         action: action === 'combine' ? 'keep' : action,
         combine: action === 'combine',
         priority: eventPriority,
-        existing_goal_id: existingGoalPrompt?.existing.id || null,
-        replace_goal_id: action === 'replace' ? existingGoalPrompt?.existing.id : null,
-        ...(planStartDate ? { plan_start_date: planStartDate } : {}),
+        existing_goal_id: existingGoalPrompt?.existing.id ? String(existingGoalPrompt.existing.id) : null,
+        replace_goal_id: action === 'replace' && existingGoalPrompt?.existing.id ? String(existingGoalPrompt.existing.id) : null,
         goal: {
           name: eventName.trim(),
-          target_date: eventDate,
-          sport: eventSport,
-          distance: eventDistance || null,
+          target_date: String(eventDate),
+          sport: String(eventSport),
+          distance: eventDistance ? String(eventDistance) : null,
           priority: eventPriority,
-          training_prefs: {
-            fitness: eventFitness,
-            goal_type: eventTrainingGoal,
-            ...(eventStrength !== 'none' && { strength_protocol: eventStrength, strength_frequency: eventStrengthFreq }),
-          },
+          training_prefs: trainingPrefs,
           notes: null,
         },
       };
+      if (planStartDate) payload.plan_start_date = String(planStartDate);
 
-      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', { body: JSON.parse(JSON.stringify(payload)) });
+      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', { body: payload });
       if (error || !data?.success) {
         const parsed = await parseFunctionError(error, data, 'Unable to create goal and build plan');
         if (parsed.code === 'missing_pace_benchmark') setShowCalibration(true);
