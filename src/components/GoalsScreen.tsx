@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Target, Calendar, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
-import { supabase } from '@/lib/supabase';
+import { supabase, invokeFunction } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface GoalsScreenProps {
@@ -366,13 +366,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
-      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', {
-        body: JSON.parse(JSON.stringify({
-          user_id: user.id,
-          mode: 'build_existing',
-          existing_goal_id: goal.id,
-          replace_plan_id: _conflictPlanId || null,
-        })),
+      const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
+        user_id: String(user.id),
+        mode: 'build_existing',
+        existing_goal_id: String(goal.id),
+        replace_plan_id: _conflictPlanId ? String(_conflictPlanId) : null,
       });
       if (error || !data?.success) {
         const parsed = await parseFunctionError(error, data, 'Unable to build and materialize plan');
@@ -401,13 +399,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not signed in');
 
-      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', {
-        body: JSON.parse(JSON.stringify({
-          user_id: user.id,
-          mode: 'link_existing',
-          existing_goal_id: goalId,
-          plan_id: planId,
-        })),
+      const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
+        user_id: String(user.id),
+        mode: 'link_existing',
+        existing_goal_id: String(goalId),
+        plan_id: String(planId),
       });
       if (error || !data?.success) {
         const parsed = await parseFunctionError(error, data, 'Unable to link plan');
@@ -494,7 +490,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       };
       if (planStartDate) payload.plan_start_date = String(planStartDate);
 
-      const { data, error } = await supabase.functions.invoke('create-goal-and-materialize-plan', { body: payload });
+      const { data, error } = await invokeFunction('create-goal-and-materialize-plan', payload);
       if (error || !data?.success) {
         const parsed = await parseFunctionError(error, data, 'Unable to create goal and build plan');
         if (parsed.code === 'missing_pace_benchmark') setShowCalibration(true);
