@@ -364,10 +364,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setBuildError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in');
+      const { data: { session: buildSession } } = await supabase.auth.getSession();
+      if (!buildSession?.user?.id) throw new Error('Not signed in');
       const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
-        user_id: String(user.id),
+        user_id: buildSession.user.id,
         mode: 'build_existing',
         existing_goal_id: String(goal.id),
         replace_plan_id: _conflictPlanId ? String(_conflictPlanId) : null,
@@ -396,11 +396,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   async function handleLinkPlan(planId: string, goalId: string) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in');
+      const { data: { session: linkSession } } = await supabase.auth.getSession();
+      if (!linkSession?.user?.id) throw new Error('Not signed in');
 
       const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
-        user_id: String(user.id),
+        user_id: linkSession.user.id,
         mode: 'link_existing',
         existing_goal_id: String(goalId),
         plan_id: String(planId),
@@ -454,8 +454,14 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in');
+      // Use getSession() instead of getUser() — getUser() makes a network
+      // round-trip and calls JSON.stringify(session) internally when it saves
+      // the refreshed token, which can hit a cyclic-structure error on iOS if
+      // the auth module has attached any non-plain references to the session.
+      // getSession() reads directly from storage with no serialization side-effect.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) throw new Error('Not signed in');
+      const userId = session.user.id;
 
       const action: 'keep' | 'replace' | 'combine' = resolvedAction ?? 'keep';
 
@@ -472,7 +478,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       }
 
       const payload: Record<string, unknown> = {
-        user_id: String(user.id),
+        user_id: userId,
         action: action === 'combine' ? 'keep' : action,
         combine: action === 'combine',
         priority: eventPriority,

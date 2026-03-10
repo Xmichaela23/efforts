@@ -9,31 +9,62 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Call a Supabase Edge Function using raw fetch, bypassing the Supabase JS
- * client's internal JSON.stringify wrapper.  On iOS (JavaScriptCore / WKWebView)
- * the client's serialization pipeline can hit a cyclic-structure error when the
- * Capacitor layer attaches internal properties to the options object before the
- * body is stringified.  Calling fetch directly avoids the entire client layer and
- * lets us control serialization explicitly.
+ * client's internal serialization pipeline which can hit cyclic-structure errors
+ * on iOS/WKWebView when the Capacitor layer attaches internal window-referencing
+ * properties before the body reaches JSON.stringify.
+ *
+ * Each step is isolated in its own try/catch so the error message tells us
+ * exactly which stage failed.  The body is serialized with a WeakSet-based
+ * replacer so a stray cyclic ref never hard-crashes the request.
  */
 export async function invokeFunction<T = unknown>(
   fnName: string,
   body: Record<string, unknown>,
 ): Promise<{ data: T | null; error: { message: string; code?: string } | null }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token ?? supabaseKey;
+  // ── 1. Auth ──────────────────────────────────────────────────────────────
+  let token: string;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    token = session?.access_token ?? supabaseKey;
+  } catch (authErr: any) {
+    return { data: null, error: { message: `[auth] ${authErr?.message ?? 'session unavailable'}` } };
+  }
 
-  const jsonBody = JSON.stringify(body);
+  // ── 2. Serialise ─────────────────────────────────────────────────────────
+  // Primary: plain JSON.stringify — works for all-primitive payloads.
+  // Fallback: WeakSet replacer strips any cyclic / non-serialisable values
+  // rather than throwing, so the request always reaches the edge function.
+  let jsonBody: string;
+  try {
+    jsonBody = JSON.stringify(body);
+  } catch {
+    const seen = new WeakSet<object>();
+    jsonBody = JSON.stringify(body, function (_key, value) {
+      if (value !== null && typeof value === 'object') {
+        if (seen.has(value)) return undefined;
+        seen.add(value);
+      }
+      return value;
+    }) ?? '{}';
+  }
 
-  const res = await fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'apikey': supabaseKey,
-    },
-    body: jsonBody,
-  });
+  // ── 3. Fetch ─────────────────────────────────────────────────────────────
+  let res: Response;
+  try {
+    res = await fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseKey,
+      },
+      body: jsonBody,
+    });
+  } catch (fetchErr: any) {
+    return { data: null, error: { message: `[fetch] ${fetchErr?.message ?? 'network error'}` } };
+  }
 
+  // ── 4. Parse response ────────────────────────────────────────────────────
   const json = await res.json().catch(() => null);
 
   if (!res.ok) {
