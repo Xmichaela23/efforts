@@ -6,6 +6,22 @@ import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 
+/** Read the authenticated user's ID directly from localStorage.
+ *  Avoids all Supabase auth module calls (getUser/getSession) which can
+ *  trigger XHR-based token refreshes that fail on iOS WKWebView. */
+function readStoredUserId(): string | null {
+  try {
+    const supabaseUrl = 'https://yyriamwvtvzlkumqrvpm.supabase.co';
+    const projectRef = supabaseUrl.split('//')[1].split('.')[0];
+    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { user?: { id?: string } };
+    return parsed?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 interface GoalsScreenProps {
   onClose: () => void;
   onSelectPlan?: (planId: string) => void;
@@ -364,10 +380,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setBuildError(null);
 
     try {
-      const { data: { session: buildSession } } = await supabase.auth.getSession();
-      if (!buildSession?.user?.id) throw new Error('Not signed in');
+      const buildUserId = readStoredUserId();
+      if (!buildUserId) throw new Error('Not signed in');
       const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
-        user_id: buildSession.user.id,
+        user_id: buildUserId,
         mode: 'build_existing',
         existing_goal_id: String(goal.id),
         replace_plan_id: _conflictPlanId ? String(_conflictPlanId) : null,
@@ -396,11 +412,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   async function handleLinkPlan(planId: string, goalId: string) {
     try {
-      const { data: { session: linkSession } } = await supabase.auth.getSession();
-      if (!linkSession?.user?.id) throw new Error('Not signed in');
+      const linkUserId = readStoredUserId();
+      if (!linkUserId) throw new Error('Not signed in');
 
       const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
-        user_id: linkSession.user.id,
+        user_id: linkUserId,
         mode: 'link_existing',
         existing_goal_id: String(goalId),
         plan_id: String(planId),
@@ -454,14 +470,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
     setSaving(true);
     try {
-      // Use getSession() instead of getUser() — getUser() makes a network
-      // round-trip and calls JSON.stringify(session) internally when it saves
-      // the refreshed token, which can hit a cyclic-structure error on iOS if
-      // the auth module has attached any non-plain references to the session.
-      // getSession() reads directly from storage with no serialization side-effect.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) throw new Error('Not signed in');
-      const userId = session.user.id;
+      const userId = readStoredUserId();
+      if (!userId) throw new Error('Not signed in');
 
       const action: 'keep' | 'replace' | 'combine' = resolvedAction ?? 'keep';
 

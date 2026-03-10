@@ -22,13 +22,21 @@ export async function invokeFunction<T = unknown>(
   body: Record<string, unknown>,
 ): Promise<{ data: T | null; error: { message: string; code?: string } | null }> {
   // ── 1. Auth ──────────────────────────────────────────────────────────────
-  let token: string;
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    token = session?.access_token ?? supabaseKey;
-  } catch (authErr: any) {
-    return { data: null, error: { message: `[auth] ${authErr?.message ?? 'session unavailable'}` } };
-  }
+  // Read the token directly from localStorage — avoids supabase.auth.getSession()
+  // which can trigger an XHR-based token refresh that fails in WKWebView on iOS
+  // ("XMLHttpRequest.onreadystatechange getter can only be called on instances
+  // of XMLHttpRequest") due to the auth module running in the wrong JS context.
+  const token = (() => {
+    try {
+      const projectRef = supabaseUrl.split('//')[1].split('.')[0];
+      const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { access_token?: string };
+        if (parsed?.access_token) return parsed.access_token;
+      }
+    } catch { /* fall through to anon key */ }
+    return supabaseKey;
+  })();
 
   // ── 2. Serialise ─────────────────────────────────────────────────────────
   // Primary: plain JSON.stringify — works for all-primitive payloads.
