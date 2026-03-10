@@ -8,6 +8,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Redirect @supabase/node-fetch to the native browser fetch so Vite
+      // never bundles its XHR polyfill.  On iOS/WKWebView that polyfill
+      // throws "XMLHttpRequest.onreadystatechange getter can only be called
+      // on instances of XMLHttpRequest" because it runs in the wrong context.
+      "@supabase/node-fetch": path.resolve(__dirname, "src/lib/native-fetch-shim.ts"),
     },
   },
   server: {
