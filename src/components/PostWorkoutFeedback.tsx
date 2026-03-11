@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Activity, Bike, Plus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
@@ -130,14 +130,14 @@ export default function PostWorkoutFeedback({
 
   const loadWorkoutData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const userId = getStoredUserId();
       if (!user || !workoutId) return;
 
       const { data, error } = await supabase
         .from('workouts')
         .select('distance, gps_track, computed, date')
         .eq('id', workoutId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (error) {
@@ -155,13 +155,13 @@ export default function PostWorkoutFeedback({
   const loadGear = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = getStoredUserId();
+      if (!userId) return;
 
       const { data, error } = await supabase
         .from('gear')
         .select('id, type, name, brand, model, is_default')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('type', gearType)
         .eq('retired', false)
         .order('is_default', { ascending: false })

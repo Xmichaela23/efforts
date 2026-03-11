@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses, getDisciplineBgClassVariant, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';
@@ -449,13 +449,13 @@ export default function PlanWizard() {
   useEffect(() => {
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = getStoredUserId();
+        if (!userId) return;
         
         const { data } = await supabase
           .from('user_baselines')
           .select('performance_numbers, effort_paces, effort_score, equipment')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .maybeSingle();
         
         if (data) {
@@ -707,8 +707,8 @@ export default function PlanWizard() {
     }, 500);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         setError('Please sign in to generate a plan');
         setIsGenerating(false);
         clearInterval(progressInterval);
@@ -727,7 +727,7 @@ export default function PlanWizard() {
         const { data: existing } = await supabase
           .from('user_baselines')
           .select('equipment')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .maybeSingle();
         
         // Merge with existing equipment data
@@ -740,7 +740,7 @@ export default function PlanWizard() {
         await supabase
           .from('user_baselines')
           .upsert({
-            user_id: user.id,
+            user_id: userId,
             equipment: mergedEquipment,
             updated_at: new Date().toISOString()
           }, { 
@@ -751,7 +751,7 @@ export default function PlanWizard() {
 
       // Build request body
       const requestBody: Record<string, unknown> = {
-        user_id: user.id,
+        user_id: userId,
         distance: state.distance,
         fitness: state.fitness,
         goal: state.goal,

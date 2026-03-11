@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 // Simple in-memory cache keyed by ver|user|from|to
 const memoryCache = new Map<string, { ts: number; rows: any[] }>();
@@ -40,13 +40,13 @@ export function usePlannedRange(fromISO: string, toISO: string) {
     let mounted = true;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const userId = getStoredUserId();
         if (!mounted) return;
-        setUserId(user ? user.id : null);
+        setUserId(user ? userId : null);
       } catch {}
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const nextId = session?.user?.id || null;
+      const nextId = userId || null;
       setUserId(nextId);
       // Invalidate all plannedRange queries on auth changes so they refetch with new user context
       queryClient.invalidateQueries({ queryKey: ['plannedRange'] });

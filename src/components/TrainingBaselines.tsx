@@ -6,7 +6,7 @@ import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS } from '@/lib/context-utils';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface TrainingBaselinesProps {
@@ -74,13 +74,13 @@ const [checkingFtpTest, setCheckingFtpTest] = useState(false);
 const checkScheduledFtpTest = async () => {
   try {
     setCheckingFtpTest(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const userId = getStoredUserId();
+    if (!userId) return;
     
     const { data } = await supabase
       .from('planned_workouts')
       .select('id, date, name')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('workout_status', 'planned')
       .ilike('name', '%FTP Test%')
       .gte('date', new Date().toISOString().split('T')[0])
@@ -302,13 +302,13 @@ const loadBaselines = async () => {
 const refreshLearnedProfile = async () => {
   try {
     setLearningProfile(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = getStoredUserId();
+    if (!userId) {
       return;
     }
 
     const { data: result, error } = await supabase.functions.invoke('learn-fitness-profile', {
-      body: { user_id: user.id }
+      body: { user_id: userId }
     });
 
     if (error) {
@@ -468,8 +468,8 @@ const handleGarminOAuthSuccess = async (code: string) => {
       'https://yyriamwvtvzlkumqrvpm.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
     );
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const userId = getStoredUserId();
+    if (!userId) {
       throw new Error('User must be logged in');
     }
 

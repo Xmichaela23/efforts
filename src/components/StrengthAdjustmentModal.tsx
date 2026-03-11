@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 
 interface StrengthAdjustmentModalProps {
   exerciseName: string;
@@ -55,8 +55,8 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       setStatus('saving');
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         setError('You must be logged in');
         setStatus('idle');
         return;
@@ -68,7 +68,7 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       await supabase
         .from('plan_adjustments')
         .update({ status: 'reverted' })
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('exercise_name', exerciseName)
         .eq('status', 'active');
 
@@ -80,7 +80,7 @@ const StrengthAdjustmentModal: React.FC<StrengthAdjustmentModalProps> = ({
       
       // Insert new adjustment (applies_until = null = forever until changed)
       const { error: insertError } = await supabase.from('plan_adjustments').insert({
-        user_id: user.id,
+        user_id: userId,
         plan_id: planId || null,
         exercise_name: exerciseName,
         adjustment_factor: adjustmentFactor, // Factor scales plan proportionally

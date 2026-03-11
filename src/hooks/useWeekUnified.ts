@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export type UnifiedItem = {
   id: string;
@@ -28,19 +28,19 @@ export function useWeekUnified(fromISO: string, toISO: string) {
     (async () => {
       try {
         // Prefer getSession for immediate restoration from persisted auth
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted && session?.user?.id) {
-          setUserId(session.user.id);
+        const userId = getStoredUserId();
+        if (mounted && userId) {
+          setUserId(session.userId);
         }
       } catch {}
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const userId = getStoredUserId();
         if (!mounted) return;
-        setUserId(user ? user.id : null);
+        setUserId(user ? userId : null);
       } catch {}
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
-      setUserId(session?.user?.id || null);
+      setUserId(userId || null);
       queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
     });
     return () => { mounted = false; subscription.unsubscribe(); };

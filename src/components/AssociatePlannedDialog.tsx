@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 
 type Props = {
@@ -30,8 +30,8 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
       try {
         setLoading(true);
         setError(null);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setCandidates([]); setLoading(false); return; }
+        const userId = getStoredUserId();
+        if (!userId) { setCandidates([]); setLoading(false); return; }
 
         const type = normalizeSportType(workout?.type);
         const d = String(workout?.date || '').slice(0,10);
@@ -50,7 +50,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         const { data } = await supabase
           .from('planned_workouts')
           .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('type', type)
           .in('workout_status', ['planned','in_progress','completed'])
           .gte('date', from)
@@ -75,7 +75,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         const { data: linked } = plannedIds.length ? await supabase
           .from('workouts')
           .select('id,planned_id')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .in('planned_id', plannedIds)
           : { data: [] as any[] } as any;
         const usedBy = new Map<string,string>();
@@ -127,8 +127,8 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
     try {
       setLoading(true);
       setError(null);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not signed in');
+      const userId = getStoredUserId();
+      if (!userId) throw new Error('Not signed in');
 
       // Ensure we have a persisted workouts row. If this is a provider-only item (e.g., garmin_*, strava_*),
       // create a workouts row first so we can link both sides.
@@ -146,7 +146,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           workout_status: 'completed',
           intervals: JSON.stringify([]),
           strength_exercises: JSON.stringify([]),
-          user_id: user.id,
+          user_id: userId,
           avg_heart_rate: workout?.avg_heart_rate ?? null,
           max_heart_rate: workout?.max_heart_rate ?? null,
           avg_power: workout?.avg_power ?? null,

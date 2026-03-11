@@ -7,7 +7,7 @@ import {
 import { Button } from './ui/button';
 import { MobileHeader } from './MobileHeader';
 import { SPORT_COLORS } from '@/lib/context-utils';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 
 // Icons for gear types
 const RunningShoeIcon = () => (
@@ -108,8 +108,8 @@ export default function Gear({ onClose }: GearProps) {
     let channel: any = null;
     
     const setupSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = getStoredUserId();
+      if (!userId) return;
 
       channel = supabase
         .channel('gear-updates')
@@ -119,7 +119,7 @@ export default function Gear({ onClose }: GearProps) {
             event: 'UPDATE',
             schema: 'public',
             table: 'gear',
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
             // Reload gear when total_distance is updated (trigger fires)
@@ -142,13 +142,13 @@ export default function Gear({ onClose }: GearProps) {
   const loadGear = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = getStoredUserId();
+      if (!userId) return;
 
       const { data, error } = await supabase
         .from('gear')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('is_default', { ascending: false })
         .order('name');
 
@@ -175,8 +175,8 @@ export default function Gear({ onClose }: GearProps) {
     
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = getStoredUserId();
+      if (!userId) return;
 
       const gearType = activeTab === 'shoes' ? 'shoe' : 'bike';
       const existingItems = activeTab === 'shoes' ? shoes : bikes;
@@ -196,7 +196,7 @@ export default function Gear({ onClose }: GearProps) {
 
       const { data, error } = await supabase
         .from('gear')
-        .insert({ ...newItem, user_id: user.id })
+        .insert({ ...newItem, user_id: userId })
         .select()
         .single();
 
@@ -223,8 +223,8 @@ export default function Gear({ onClose }: GearProps) {
 
   const setAsDefault = async (id: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = getStoredUserId();
+      if (!userId) return;
 
       const gearType = activeTab === 'shoes' ? 'shoe' : 'bike';
       
@@ -232,7 +232,7 @@ export default function Gear({ onClose }: GearProps) {
       await supabase
         .from('gear')
         .update({ is_default: false })
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('type', gearType);
       
       // Set new default

@@ -16,7 +16,7 @@ import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
-import { supabase } from '../lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
 import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
@@ -172,8 +172,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   const loadGear = async () => {
     try {
       setGearLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         console.log('🔧 [Gear] No user, skipping load');
         return;
       }
@@ -183,7 +183,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
       const { data, error } = await supabase
         .from('gear')
         .select('id, type, name, brand, model, is_default, total_distance')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('type', gearType)
         .eq('retired', false)
         .order('is_default', { ascending: false })

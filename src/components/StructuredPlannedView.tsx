@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 
@@ -519,8 +519,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const handleGarminExport = async () => {
     try {
       // Call the Garmin export function
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         alert('Please log in to export to Garmin');
         return;
       }
@@ -528,7 +528,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const { data: result, error } = await supabase.functions.invoke('send-workout-to-garmin', {
         body: {
           workoutId: workout.id,
-          userId: user.id
+          userId: userId
         }
       });
 

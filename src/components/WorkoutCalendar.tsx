@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -1588,8 +1588,8 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
         setLoading(true);
         
         // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const userId = getStoredUserId();
+        if (!userId) {
           setCompletedWorkload(0);
           setPlannedWorkload(0);
           setLoading(false);
@@ -1598,7 +1598,7 @@ function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
         
         const { data, error } = await supabase.functions.invoke('weekly-workload', {
           body: {
-            user_id: user.id,
+            user_id: userId,
             week_start_date: weekStart
           }
         });

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -657,8 +657,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const saveBaselineResults = async () => {
     try {
       setSavingBaseline(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         alert('You must be logged in to save baselines');
         return;
       }
@@ -667,7 +667,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const { data: currentBaselines, error: fetchError } = await supabase
         .from('user_baselines')
         .select('performance_numbers')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
@@ -687,14 +687,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const { error } = await supabase
           .from('user_baselines')
           .update({ performance_numbers: updatedPerf })
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
         
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('user_baselines')
           .insert([{
-            user_id: user.id,
+            user_id: userId,
             performance_numbers: updatedPerf
           }]);
         
@@ -1249,8 +1249,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     (async () => {
       try {
         const date = targetDate || getStrengthLoggerDateString();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = getStoredUserId();
+        if (!userId) return;
         // Unified feed → computed-like
         try {
           const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
@@ -1271,7 +1271,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const { data } = await supabase
           .from('planned_workouts')
           .select('computed')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('date', date)
           .eq('type', 'strength')
           .order('created_at', { ascending: false })
@@ -1307,9 +1307,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Load user 1RMs for weight computation
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const pnResp = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
+        const userId = getStoredUserId();
+        if (!userId) return;
+        const pnResp = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).single();
         const pn = (pnResp as any)?.data?.performance_numbers || null;
         if (pn) setPerformanceNumbers(pn);
       } catch {}
@@ -1573,8 +1573,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     (async () => {
       try {
         const date = targetDate || getStrengthLoggerDateString();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = getStoredUserId();
+        if (!userId) return;
         // 1) Unified server feed provides planned.steps even if DB row lacks computed
         try {
           const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
@@ -1677,7 +1677,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const { data } = await supabase
           .from('planned_workouts')
           .select('computed, steps_preset, rendered_description, description, strength_exercises')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .eq('date', date)
           .eq('type', 'strength')
           .order('updated_at', { ascending: false })

@@ -30,7 +30,7 @@ import Gear from './Gear';
 import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { MobileHeader } from './MobileHeader';
 
 interface AppLayoutProps {
@@ -376,8 +376,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       // Always check database for authoritative state (local state may be stale)
       const checkSpecificWorkout = async () => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
+          const userId = getStoredUserId();
+          if (!userId) {
             return;
           }
 
@@ -387,7 +387,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             .from('workouts')
             .select('id, type, name, gear_id, rpe, feedback_dismissed_at, date, workout_metadata')
             .eq('id', workoutId)
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .single();
 
           if (error) {
@@ -447,8 +447,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     let channel: any = null;
     
     const setupRealtimeSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = getStoredUserId();
+      if (!userId) return;
       
       channel = supabase
         .channel('new-workouts-feedback')
@@ -458,7 +458,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             event: 'INSERT',
             schema: 'public',
             table: 'workouts',
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           (payload: any) => {
             const newWorkout = payload.new;
@@ -491,7 +491,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             event: 'UPDATE',
             schema: 'public',
             table: 'workouts',
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           (payload: any) => {
             const updatedWorkout = payload.new;

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
 
 type LinkExtrasDialogProps = {
@@ -655,10 +655,10 @@ export default function CoachWeekTab() {
         <BaselineDriftCard
           suggestions={ws.coach.baseline_drift_suggestions}
           onAccept={async (lift, learned) => {
-            const { data: u } = await supabase.auth.getUser();
-            if (!u?.user?.id) return;
+            const uId = getStoredUserId();
+            if (!uId) return;
             const key = lift === 'overhead_press' ? 'overheadPress1RM' : lift === 'bench_press' ? 'bench' : lift;
-            const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, dismissed_suggestions').eq('user_id', uId).maybeSingle();
             const perf = { ...((ub?.performance_numbers as Record<string, unknown>) || {}), [key]: learned };
             const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
             const drift = { ...(dismissed.baseline_drift || {}) };
@@ -667,21 +667,21 @@ export default function CoachWeekTab() {
               performance_numbers: perf,
               dismissed_suggestions: { ...dismissed, baseline_drift: drift },
               updated_at: new Date().toISOString(),
-            }).eq('user_id', u.user.id);
+            }).eq('user_id', uId);
             window.dispatchEvent(new CustomEvent('planned:invalidate'));
             await refresh();
           }}
           onDismiss={async (lift) => {
-            const { data: u } = await supabase.auth.getUser();
-            if (!u?.user?.id) return;
+            const uId = getStoredUserId();
+            if (!uId) return;
             const today = new Date().toISOString().slice(0, 10);
-            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', uId).maybeSingle();
             const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
             const drift = { ...(dismissed.baseline_drift || {}), [lift]: today };
             await supabase.from('user_baselines').update({
               dismissed_suggestions: { ...dismissed, baseline_drift: drift },
               updated_at: new Date().toISOString(),
-            }).eq('user_id', u.user.id);
+            }).eq('user_id', uId);
             await refresh();
           }}
         />
@@ -692,29 +692,29 @@ export default function CoachWeekTab() {
         <PlanAdaptationCard
           suggestions={planAdaptationSuggestions}
           onAccept={async (code) => {
-            const { data: u } = await supabase.auth.getUser();
-            if (!u?.user?.id) return;
+            const uId = getStoredUserId();
+            if (!uId) return;
             const today = new Date().toISOString().slice(0, 10);
-            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', uId).maybeSingle();
             const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
             const pa = { ...(dismissed.plan_adaptation || {}), [code]: today };
             await supabase.from('user_baselines').update({
               dismissed_suggestions: { ...dismissed, plan_adaptation: pa },
               updated_at: new Date().toISOString(),
-            }).eq('user_id', u.user.id);
+            }).eq('user_id', uId);
             await refresh();
           }}
           onDismiss={async (code) => {
-            const { data: u } = await supabase.auth.getUser();
-            if (!u?.user?.id) return;
+            const uId = getStoredUserId();
+            if (!uId) return;
             const today = new Date().toISOString().slice(0, 10);
-            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', u.user.id).maybeSingle();
+            const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', uId).maybeSingle();
             const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
             const pa = { ...(dismissed.plan_adaptation || {}), [code]: today };
             await supabase.from('user_baselines').update({
               dismissed_suggestions: { ...dismissed, plan_adaptation: pa },
               updated_at: new Date().toISOString(),
-            }).eq('user_id', u.user.id);
+            }).eq('user_id', uId);
             await refresh();
           }}
         />

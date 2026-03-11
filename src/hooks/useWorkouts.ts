@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getStoredUserId } from "@/lib/supabase";
 import { analyzeWorkoutWithRetry } from "../services/workoutAnalysisService";
 import { safeParseJSONB } from "@/utils/jsonb";
 
@@ -174,7 +174,7 @@ export const useWorkouts = () => {
 
   const getCurrentUser = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const userId = getStoredUserId();
 
       if (user) {
         return user;
@@ -203,7 +203,7 @@ export const useWorkouts = () => {
         }
       }
 
-      if (!user) { setWorkouts([]); setLoading(false); return; }
+      if (!userId) { setWorkouts([]); setLoading(false); return; }
 
       // Step 1: Fetch manual/planned workouts from workouts table (bounded window, lightweight columns only)
       const todayIso = new Date().toLocaleDateString('en-CA');
@@ -231,7 +231,7 @@ export const useWorkouts = () => {
           'achievements',
           'created_at','updated_at'
         ].join(','))
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("date", lookbackIso)
         .lte("date", todayIso)
         .order("date", { ascending: false })
@@ -252,7 +252,7 @@ export const useWorkouts = () => {
           const { data: dc } = await supabase
             .from("device_connections")
             .select("connection_data")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .filter("provider", "eq", "garmin")
             .single();
           garminUserId = dc?.connection_data?.user_id || null;
@@ -261,7 +261,7 @@ export const useWorkouts = () => {
           const { data: uc } = await supabase
             .from("user_connections")
             .select("connection_data")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .filter("provider", "eq", "garmin")
             .single();
           garminUserId = uc?.connection_data?.user_id || null;
@@ -272,7 +272,7 @@ export const useWorkouts = () => {
           const { data: garminActivities, error: garminError } = await supabase
             .from("garmin_activities")
             .select("garmin_activity_id,start_time,activity_type,distance_in_meters,duration_in_seconds,average_heart_rate_in_beats_per_minute,max_heart_rate_in_beats_per_minute,average_speed_in_meters_per_second,calories,user_id,garmin_user_id")
-            .or(`user_id.eq.${user.id},garmin_user_id.eq.${garminUserId}`)
+            .or(`user_id.eq.${userId},garmin_user_id.eq.${garminUserId}`)
             .order("start_time", { ascending: false })
             .limit(50);
 
@@ -503,7 +503,7 @@ export const useWorkouts = () => {
         const { data: stravaRows, error: stravaErr } = await supabase
           .from('strava_activities')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .is('deleted_at', null)
           .gte('updated_at', lookbackIso)
           .order('updated_at', { ascending: false })
@@ -835,10 +835,10 @@ export const useWorkouts = () => {
 
     const initializeAuth = async () => {
       // Check initial session
-      const { data: { session } } = await supabase.auth.getSession();
+      const userId = getStoredUserId();
       
       if (mounted) {
-        if (session?.user) {
+        if (userId) {
           setAuthReady(true);
         } else {
           setLoading(false);
@@ -853,7 +853,7 @@ export const useWorkouts = () => {
       async (event, session) => {
         if (!mounted) return;
 
-        if (session?.user) {
+        if (userId) {
           setAuthReady(true);
         } else {
           setAuthReady(false);
@@ -899,19 +899,19 @@ export const useWorkouts = () => {
     let cancelled = false;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const userId = getStoredUserId();
+        if (!userId) return;
         const { data: conn } = await supabase
           .from('device_connections')
           .select('connection_data, access_token, refresh_token')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .filter('provider', 'eq', 'strava')
           .single();
         const accessToken = (conn?.connection_data?.access_token || conn?.access_token) as string | undefined;
         const refreshToken = (conn?.connection_data?.refresh_token || conn?.refresh_token) as string | undefined;
         if (!accessToken) return;
         await supabase.functions.invoke('import-strava-history', {
-          body: { userId: user.id, accessToken, refreshToken, importType: 'recent' }
+          body: { userId: userId, accessToken, refreshToken, importType: 'recent' }
         });
         if (!cancelled) await fetchWorkouts();
       } catch {}
@@ -924,18 +924,18 @@ export const useWorkouts = () => {
     let channel: any;
     let mounted = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const userId = getStoredUserId();
       if (!mounted || !user) return;
       channel = supabase
         .channel('workout-realtime')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'strava_activities', filter: `user_id=eq.${user.id}` }, () => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'strava_activities', filter: `user_id=eq.${userId}` }, () => {
           fetchWorkouts();
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'garmin_activities', filter: `garmin_user_id=is.not.null` }, () => {
           // Garmin ingestion is server-owned. Frontend should only refresh canonical workouts.
           fetchWorkouts();
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${userId}` }, () => {
           // Listen for INSERT, UPDATE, DELETE - server handles all changes via realtime
           fetchWorkouts();
           // Dispatch invalidation event so components can refresh (e.g., UnifiedWorkoutView, AppLayout)
@@ -969,13 +969,13 @@ export const useWorkouts = () => {
 
   // Backfill: attach completed workouts in last N days
   const backfillRecentAttachments = async (days: number = 14) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { processed: 0 };
+    const userId = getStoredUserId();
+    if (!userId) return { processed: 0 };
     const sinceIso = new Date(Date.now() - days*24*60*60*1000).toISOString().slice(0,10);
     const { data: recents, error } = await supabase
       .from('workouts')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('workout_status', 'completed')
       .gte('date', sinceIso)
       .order('date', { ascending: false })
@@ -997,7 +997,7 @@ export const useWorkouts = () => {
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error("User must be authenticated to save workouts");
       }
 
@@ -1015,7 +1015,7 @@ export const useWorkouts = () => {
         intervals: workoutData.intervals || [],
         strength_exercises: workoutData.strength_exercises || [],
         mobility_exercises: (workoutData as any).mobility_exercises || [],
-        user_id: user.id,
+        user_id: userId,
         avg_heart_rate: workoutData.avg_heart_rate,
         max_heart_rate: workoutData.max_heart_rate,
         avg_power: workoutData.avg_power,
@@ -1289,7 +1289,7 @@ export const useWorkouts = () => {
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error("User must be authenticated to update workouts");
       }
 
@@ -1367,7 +1367,7 @@ export const useWorkouts = () => {
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .select('id,user_id,name,type,provider_sport,date,workout_status,duration,distance,avg_heart_rate,max_heart_rate,avg_power,max_power,normalized_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,moving_time,elapsed_time,timestamp,start_position_lat,start_position_long,computed,metrics,strength_exercises,mobility_exercises,workout_metadata,planned_id,rpe,gear_id,created_at,updated_at')
         .single();
 
@@ -1541,7 +1541,7 @@ export const useWorkouts = () => {
   const deleteWorkout = async (id: string) => {
     try {
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error("User must be authenticated to delete workouts");
       }
 
@@ -1552,7 +1552,7 @@ export const useWorkouts = () => {
         .from("workouts")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
@@ -1567,7 +1567,7 @@ export const useWorkouts = () => {
           const { data: movedPlanned } = await supabase
             .from('planned_workouts')
             .select('id,training_plan_id,week_number,day_number,date,type,workout_status')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .eq('date', date)
             .eq('type', type)
             .limit(5);
@@ -1607,14 +1607,14 @@ export const useWorkouts = () => {
               // Revert status and date (if we found a canonical date)
               const updates: any = { workout_status: 'planned' };
               if (canonical) updates.date = canonical;
-              await supabase.from('planned_workouts').update(updates).eq('id', row.id).eq('user_id', user.id);
+              await supabase.from('planned_workouts').update(updates).eq('id', row.id).eq('user_id', userId);
             }
           } else {
             // Fallback: flip any same-day planned rows back to planned
             await supabase
               .from('planned_workouts')
               .update({ workout_status: 'planned' })
-              .eq('user_id', user.id)
+              .eq('user_id', userId)
               .eq('date', date)
               .eq('type', type)
               .in('workout_status', ['completed','in_progress']);
@@ -1635,13 +1635,13 @@ export const useWorkouts = () => {
   const fixExistingWorkoutDate = async () => {
     try {
       const user = await getCurrentUser();
-      if (!user) return;
+      if (!userId) return;
 
       // Find the workout with the wrong date
       const { data: workouts, error } = await supabase
         .from("workouts")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("name", "Strength - 8/9/2025")
         .eq("type", "strength");
 

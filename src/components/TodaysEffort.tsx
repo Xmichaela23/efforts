@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
@@ -232,14 +232,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     
     try {
       setSendingToGarmin(workout.id);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         toast({ title: 'Error', description: 'Please log in to send to Garmin', variant: 'destructive' });
         return;
       }
       
       const { data: result, error } = await supabase.functions.invoke('send-workout-to-garmin', {
-        body: { workoutId: workout.id, userId: user.id }
+        body: { workoutId: workout.id, userId: userId }
       });
       
       if (error) {
@@ -366,8 +366,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const handleMarkComplete = async (workout: any) => {
     try {
       setMarkingComplete(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         toast({ title: 'Error', description: 'Please log in to mark workout as complete', variant: 'destructive' });
         return;
       }
@@ -385,7 +385,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         
         // Create workout record in workouts table (like imported/hooked workouts)
         const workoutData: any = {
-          user_id: user.id,
+          user_id: userId,
           type: workoutType,
           date: workout.date || activeDate,
           workout_status: 'completed',
@@ -425,7 +425,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           .from('planned_workouts')
           .update({ workout_status: 'completed' })
           .eq('id', workout.id)
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
         
         if (updateError) {
           console.error('Error updating planned workout:', updateError);
@@ -445,7 +445,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           .from('planned_workouts')
           .update({ workout_status: 'completed' })
           .eq('id', workout.id)
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
         
         if (error) {
           toast({ title: 'Error', description: `Failed to mark as complete: ${error.message}`, variant: 'destructive' });

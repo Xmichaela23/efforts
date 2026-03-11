@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 type PlannedWorkout = any;
 
@@ -16,7 +16,7 @@ export const usePlannedWorkouts = () => {
 
   // Get current user
   const getCurrentUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const userId = getStoredUserId();
     return user;
   };
 
@@ -27,7 +27,7 @@ export const usePlannedWorkouts = () => {
       setError(null);
 
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error('User must be authenticated to fetch planned workouts');
       }
 
@@ -74,11 +74,11 @@ export const usePlannedWorkouts = () => {
       setError(null);
 
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error('User must be authenticated to save planned workouts');
       }
 
-      console.log('🔧 Adding planned workout for user:', user.id);
+      console.log('🔧 Adding planned workout for user:', userId);
       console.log('🔍 DEBUG - Planned workout data to save:', workoutData);
 
       const toSave = {
@@ -96,7 +96,7 @@ export const usePlannedWorkouts = () => {
         training_plan_id: workoutData.training_plan_id,
         week_number: workoutData.week_number,
         day_number: workoutData.day_number,
-        user_id: user.id,
+        user_id: userId,
         // Pass-through swim pool fields if provided by UI
         pool_unit: (workoutData as any).pool_unit ?? null,
         pool_length_m: (workoutData as any).pool_length_m ?? null
@@ -174,7 +174,7 @@ export const usePlannedWorkouts = () => {
       setError(null);
 
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error('User must be authenticated to update planned workouts');
       }
 
@@ -182,7 +182,7 @@ export const usePlannedWorkouts = () => {
         .from('planned_workouts')
         .update(updates)
         .eq('id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .select('id,name,type,date,description,duration,intervals,strength_exercises,mobility_exercises,workout_status,source,training_plan_id,week_number,day_number')
         .single();
 
@@ -230,7 +230,7 @@ export const usePlannedWorkouts = () => {
       setError(null);
 
       const user = await getCurrentUser();
-      if (!user) {
+      if (!userId) {
         throw new Error('User must be authenticated to delete planned workouts');
       }
 
@@ -238,7 +238,7 @@ export const usePlannedWorkouts = () => {
         .from('planned_workouts')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       if (error) {
         throw error;
@@ -318,8 +318,8 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
       try {
         setLoading(true);
         setError(null);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setRows([]); return; }
+        const userId = getStoredUserId();
+        if (!userId) { setRows([]); return; }
         // Use unified server feed to guarantee identical shape as weekly
         const { data, error } = await (supabase.functions.invoke as any)('get-week', { body: { from: dateIso, to: dateIso } });
         if (error) throw error;

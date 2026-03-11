@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '../../lib/supabase';
 import { analyzeWorkoutWithRetry, isWorkoutTypeSupported } from '../../services/workoutAnalysisService';
 
 interface TodaysWorkoutsTabProps {
@@ -315,8 +315,8 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       setLoading(true);
       
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         setLoading(false);
         return;
       }
@@ -331,7 +331,7 @@ const TodaysWorkoutsTab: React.FC<TodaysWorkoutsTabProps> = ({ focusWorkoutId })
       const { data: recentData, error: loadError } = await supabase
         .from('workouts')
         .select('*, workout_analysis, analysis_status, analysis_error')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('workout_status', 'completed') // ONLY completed workouts
         .gte('date', fourteenDaysAgoLocal)
         .order('date', { ascending: false })

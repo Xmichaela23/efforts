@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Calculator, History, BarChart3, Zap, Link2, RefreshCw, Activity } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { 
   calculateWorkloadForWorkout, 
   sweepUserHistory, 
@@ -62,7 +62,7 @@ export default function WorkloadAdmin() {
   useEffect(() => {
     const getUser = async () => {
       setPlansLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const userId = getStoredUserId();
       setUser(user);
       console.log('👤 Admin user:', user?.id);
       
@@ -71,7 +71,7 @@ export default function WorkloadAdmin() {
         const { data: userPlans, error } = await supabase
           .from('plans')
           .select('id, name, config, status')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', { ascending: false });
         
         console.log('📋 Plans loaded:', userPlans?.length, 'plans:', userPlans, 'error:', error);
@@ -302,7 +302,7 @@ export default function WorkloadAdmin() {
     setLoading(true);
     try {
       const result = await sweepUserHistory({
-        user_id: user.id,
+        user_id: userId,
         batch_size: batchSize,
         dry_run: dryRun
       });
@@ -320,7 +320,7 @@ export default function WorkloadAdmin() {
     
     setLoading(true);
     try {
-      const stats = await getWorkloadStats(user.id);
+      const stats = await getWorkloadStats(userId);
       setResults(stats);
     } catch (error) {
       console.error('Stats failed:', error);
@@ -339,7 +339,7 @@ export default function WorkloadAdmin() {
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekStartStr = weekStart.toISOString().split('T')[0];
       
-      const summary = await getWeeklyWorkloadSummary(user.id, weekStartStr);
+      const summary = await getWeeklyWorkloadSummary(userId, weekStartStr);
       setResults(summary);
     } catch (error) {
       console.error('Weekly summary failed:', error);
@@ -405,7 +405,7 @@ export default function WorkloadAdmin() {
       const { data: recentWorkouts, error: recentErr } = await supabase
         .from('workouts')
         .select('id, date, type, workout_status, computed, sensor_data, gps_track')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('workout_status', 'completed')
         .in('type', processableTypes)
         .order('date', { ascending: false })

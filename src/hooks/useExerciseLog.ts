@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export interface ExerciseLogRow {
   id: string;
@@ -42,8 +42,8 @@ export function useExerciseLog(weeksBack: number = 12) {
       setLoading(true);
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError('Not authenticated'); return; }
+      const userId = getStoredUserId();
+      if (!userId) { setError('Not authenticated'); return; }
 
       const since = new Date();
       since.setDate(since.getDate() - weeksBack * 7);
@@ -51,7 +51,7 @@ export function useExerciseLog(weeksBack: number = 12) {
       const { data, error: qErr } = await supabase
         .from('exercise_log')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .gte('date', since.toISOString().slice(0, 10))
         .order('date', { ascending: true });
 

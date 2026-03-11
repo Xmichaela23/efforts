@@ -181,16 +181,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = readStoredUserId();
+      if (!userId) return;
       const [{ data: bl }, { data: snaps }, { data: mem }] = await Promise.all([
-        supabase.from('user_baselines').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('user_baselines').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('athlete_snapshot')
           .select('week_start,workload_by_discipline,strength_volume_total,run_long_run_duration,workload_total')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('week_start', { ascending: false })
           .limit(4),
-        supabase.from('athlete_memory').select('derived_rules,provenance').eq('user_id', user.id).maybeSingle(),
+        supabase.from('athlete_memory').select('derived_rules,provenance').eq('user_id', userId).maybeSingle(),
       ]);
       setCurrentBaselines(bl);
       setCurrentSnapshot(snaps?.[0] ?? null);
@@ -324,11 +324,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       const vdot = vdotFrom5KTime(fiveKTimeSec);
       const paces = pacesFromVdot(vdot);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const userId = readStoredUserId();
+      if (!userId) return;
 
       await supabase.from('user_baselines').upsert({
-        user_id: user.id,
+        user_id: userId,
         effort_score: vdot,
         effort_source_distance: 5000,
         effort_source_time: fiveKTimeSec,
@@ -338,7 +338,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         effort_updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
 
-      const { data: bl } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).maybeSingle();
+      const { data: bl } = await supabase.from('user_baselines').select('*').eq('user_id', userId).maybeSingle();
       setCurrentBaselines(bl);
       setShowCalibration(false);
       setCalEasyPace('');

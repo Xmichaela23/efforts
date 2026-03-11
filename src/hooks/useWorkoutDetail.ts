@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 
 export type WorkoutDetailOptions = {
@@ -21,7 +21,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const userId = getStoredUserId();
       if (mounted) setHasSession(!!session);
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
@@ -73,8 +73,8 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
       // Smart server, dumb client: server handles analysis computation
       // Get current session for auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Session expired - please log in again');
+      const userId = getStoredUserId();
+      if (!userId) throw new Error('Session expired - please log in again');
       
       const body = { id, ...normalized } as any;
       console.log('[useWorkoutDetail] Calling workout-detail for:', id, 'with options:', normalized);

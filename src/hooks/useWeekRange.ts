@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export function useWeekRange(fromISO: string, toISO: string) {
   const queryClient = useQueryClient();
@@ -11,13 +11,13 @@ export function useWeekRange(fromISO: string, toISO: string) {
     let mounted = true;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const userId = getStoredUserId();
         if (!mounted) return;
-        setUserId(user ? user.id : null);
+        setUserId(user ? userId : null);
       } catch {}
     })();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
-      setUserId(session?.user?.id || null);
+      setUserId(userId || null);
       queryClient.invalidateQueries({ queryKey: ['weekRange'] });
     });
     return () => { mounted = false; subscription.unsubscribe(); };

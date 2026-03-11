@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export interface AthleteSnapshotRow {
   week_start: string;
@@ -42,8 +42,8 @@ export function useAthleteSnapshot(weeksBack: number = 5) {
       setLoading(true);
       setError(null);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError('Not authenticated'); return; }
+      const userId = getStoredUserId();
+      if (!userId) { setError('Not authenticated'); return; }
 
       const now = new Date();
       const day = now.getDay();
@@ -55,7 +55,7 @@ export function useAthleteSnapshot(weeksBack: number = 5) {
       const { data, error: qErr } = await supabase
         .from('athlete_snapshot')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .gte('week_start', startMonday.toISOString().slice(0, 10))
         .order('week_start', { ascending: true });
 

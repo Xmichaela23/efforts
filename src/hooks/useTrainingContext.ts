@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -418,8 +418,8 @@ export function useTrainingContext(date: string): UseTrainingContextResult {
       }
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         throw new Error('User not authenticated');
       }
 
@@ -430,7 +430,7 @@ export function useTrainingContext(date: string): UseTrainingContextResult {
         'generate-training-context',
         {
           body: {
-            user_id: user.id,
+            user_id: userId,
             date: date,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           }

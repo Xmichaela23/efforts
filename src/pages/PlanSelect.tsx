@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
@@ -339,9 +339,9 @@ export default function PlanSelect() {
       (async () => {
         try {
           const { supabase } = await import('@/lib/supabase');
-          const { data: { user } } = await supabase.auth.getUser();
+          const userId = getStoredUserId();
           if (user) {
-            const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+            const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', userId).single();
             if (data) {
               setBaselines(data);
             }
@@ -356,9 +356,9 @@ export default function PlanSelect() {
       try {
         // Check auth status first
         const { supabase } = await import('@/lib/supabase');
-        const { data: { user } } = await supabase.auth.getUser();
+        const userId = getStoredUserId();
         
-        if (!user) {
+        if (!userId) {
           setBaselines(null);
           return;
         }
@@ -372,7 +372,7 @@ export default function PlanSelect() {
           
           // Fallback: direct database call
           try {
-            const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+            const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', userId).single();
             if (data) {
               setBaselines(data);
             } else {
@@ -1096,8 +1096,8 @@ export default function PlanSelect() {
       } as any;
 
       // Direct insert to ensure reliability
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('You must be signed in to save a plan.');
+      const userId = getStoredUserId();
+      if (!userId) throw new Error('You must be signed in to save a plan.');
       
       // Calculate current_week based on start date
       const chosenStart = (startDate && startDate.trim().length>0) ? startDate : (payload?.config?.user_selected_start_date || '');
@@ -1109,7 +1109,7 @@ export default function PlanSelect() {
         currentWeek = Math.max(1, Math.min(payload.duration_weeks, weeksDiff + 1));
       }
       
-      const insertPayload: any = { ...payload, user_id: user.id, current_week: currentWeek };
+      const insertPayload: any = { ...payload, user_id: userId, current_week: currentWeek };
       delete insertPayload.export_hints;
       
       setMaterializationStatus('Saving plan...');

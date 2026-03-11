@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export type CoachWeekContextV1 = {
   version: 1;
@@ -308,13 +308,13 @@ export function useCoachWeekContext(date?: string) {
       setLoading(true);
       setError(null);
 
-      const { data: auth } = await supabase.auth.getUser();
+      const userId = getStoredUserId();
       const user = auth?.user;
-      if (!user) throw new Error('User not authenticated');
+      if (!userId) throw new Error('User not authenticated');
 
       const { data: resp, error: apiError } = await supabase.functions.invoke('coach', {
         body: {
-          user_id: user.id,
+          user_id: userId,
           date: focusDate,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import type { BlockAdaptation } from '@/types/fitness';
 import type { GoalPredictionResult } from '@/lib/analysis/goal-predictor';
 
@@ -71,15 +71,15 @@ export function useOverallContext(weeksBack: number = 4) {
       }
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         throw new Error('User not authenticated');
       }
 
       // Call edge function
       const { data: response, error: apiError } = await supabase.functions.invoke('generate-overall-context', {
         body: {
-          user_id: user.id,
+          user_id: userId,
           weeks_back: weeksBack
         }
       });

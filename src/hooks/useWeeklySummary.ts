@@ -22,7 +22,7 @@
  * - TypeScript support with proper interfaces
  */
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 interface WeeklySummaryData {
   week_overview: {
@@ -75,15 +75,15 @@ export function useWeeklySummary(weekStartDate: string) {
       }
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         throw new Error('User not authenticated');
       }
 
       // Call edge function
       const { data: response, error: apiError } = await supabase.functions.invoke('generate-weekly-summary', {
         body: {
-          user_id: user.id,
+          user_id: userId,
           week_start_date: weekStartDate
         }
       });
