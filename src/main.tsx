@@ -113,5 +113,41 @@ window.addEventListener('load', () => {
 window.addEventListener('resize', () => setTimeout(fitAndAlign, 0));
 window.addEventListener('orientationchange', () => setTimeout(fitAndAlign, 120));
 
+// ── Debug overlay: capture every unhandled JS error / rejection ──────────────
+// Writes to a floating div so errors are visible on-device without a Mac
+// attached.  Shows only when there IS an error; tap it to dismiss.
+(function installDebugOverlay() {
+  const MAX = 6;
+  const lines: string[] = [];
+  let div: HTMLElement | null = null;
+
+  function show(msg: string) {
+    lines.unshift(msg.slice(0, 200));
+    if (lines.length > MAX) lines.length = MAX;
+    if (!div) {
+      div = document.createElement('div');
+      Object.assign(div.style, {
+        position: 'fixed', bottom: '80px', left: '8px', right: '8px', zIndex: '99999',
+        background: 'rgba(200,0,0,0.92)', color: '#fff', fontSize: '10px',
+        padding: '6px 8px', borderRadius: '8px', fontFamily: 'monospace',
+        maxHeight: '140px', overflow: 'auto', whiteSpace: 'pre-wrap',
+        wordBreak: 'break-all',
+      });
+      div.onclick = () => { lines.length = 0; div?.remove(); div = null; };
+      document.body.appendChild(div);
+    }
+    div.textContent = lines.join('\n---\n');
+  }
+
+  window.addEventListener('error', (e) => {
+    show(`ERR ${e.filename?.split('/').pop()}:${e.lineno}\n${e.message}`);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    const msg = r instanceof Error ? `${r.message}\n${r.stack?.split('\n').slice(0,4).join('\n')}` : String(r);
+    show(`UNHANDLED REJECTION\n${msg}`);
+  });
+})();
+
 // Remove dark mode class addition
 createRoot(document.getElementById("root")!).render(<App />);

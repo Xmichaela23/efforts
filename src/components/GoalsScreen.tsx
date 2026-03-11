@@ -83,6 +83,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [calSaving, setCalSaving] = useState(false);
   const [goalFlowError, setGoalFlowError] = useState<string | null>(null);
 
+  // Clear stale error whenever the event form opens so a previous failed attempt
+  // doesn't show error text before the user has done anything.
+  useEffect(() => {
+    if (showEventForm) setGoalFlowError(null);
+  }, [showEventForm]);
+
   const [eventName, setEventName] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventSport, setEventSport] = useState('run');
