@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export interface Goal {
   id: string;
@@ -30,15 +30,15 @@ export function useGoals() {
   const refreshGoals = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         setGoals([]);
         return;
       }
       const { data, error } = await supabase
         .from('goals')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setGoals((data ?? []) as Goal[]);
@@ -56,11 +56,11 @@ export function useGoals() {
 
   const addGoal = useCallback(async (goal: GoalInsert): Promise<Goal | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const userId = getStoredUserId();
+      if (!userId) return null;
       const toInsert = {
         ...goal,
-        user_id: user.id,
+        user_id: userId,
         course_profile: goal.course_profile ?? {},
         training_prefs: goal.training_prefs ?? {},
       };
@@ -81,13 +81,13 @@ export function useGoals() {
 
   const updateGoal = useCallback(async (id: string, updates: Partial<Goal>): Promise<Goal | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const userId = getStoredUserId();
+      if (!userId) return null;
       const { data, error } = await supabase
         .from('goals')
         .update(updates)
         .eq('id', id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .select()
         .single();
       if (error) throw error;
@@ -102,13 +102,13 @@ export function useGoals() {
 
   const deleteGoal = useCallback(async (id: string): Promise<boolean> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return false;
+      const userId = getStoredUserId();
+      if (!userId) return false;
       const { error } = await supabase
         .from('goals')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
       if (error) throw error;
       setGoals((prev) => prev.filter((g) => g.id !== id));
       return true;

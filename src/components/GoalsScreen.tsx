@@ -3,24 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { X, Target, Calendar, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
-import { supabase, invokeFunction } from '@/lib/supabase';
+import { supabase, invokeFunction, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 
-/** Read the authenticated user's ID directly from localStorage.
- *  Avoids all Supabase auth module calls (getUser/getSession) which can
- *  trigger XHR-based token refreshes that fail on iOS WKWebView. */
-function readStoredUserId(): string | null {
-  try {
-    const supabaseUrl = 'https://yyriamwvtvzlkumqrvpm.supabase.co';
-    const projectRef = supabaseUrl.split('//')[1].split('.')[0];
-    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { user?: { id?: string } };
-    return parsed?.user?.id ?? null;
-  } catch {
-    return null;
-  }
-}
+// Local alias so existing call-sites inside this file don't need renaming
+const readStoredUserId = getStoredUserId;
 
 interface GoalsScreenProps {
   onClose: () => void;

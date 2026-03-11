@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { loadPlansBundle } from '@/services/plans/BundleLoader';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
@@ -251,10 +251,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let mounted = true;
 
     const initializePlansAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const userId = getStoredUserId();
       if (mounted) {
-        if (session?.user) {
+        if (userId) {
           setPlansAuthReady(true);
         } else {
           setPlansLoading(false);
@@ -291,8 +290,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       try {
         if (!plansAuthReady) return;
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!getStoredUserId()) return;
         const today = new Date();
         const day = today.getDay();
         const diff = (day + 6) % 7; // Monday start
@@ -326,8 +324,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveUserBaselines = async (data: BaselineData) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User must be authenticated to save baselines');
+      const userId = getStoredUserId();
+      if (!userId) throw new Error('User must be authenticated to save baselines');
       // Ensure performance_numbers contains explicit fiveK_pace if only 5K race time was entered
       const perf = { ...(data.performanceNumbers || {}) } as any;
       const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';
@@ -354,7 +352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const baselineRecord = {
-        user_id: user.id,
+        user_id: userId,
         // Enhanced user details
         birthday: data.birthday,
         height: data.height,
@@ -378,9 +376,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         training_background: data.trainingBackground,
         equipment: data.equipment,
       };
-      const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', user.id).single();
+      const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', userId).single();
       if (existingData) {
-        const { error } = await supabase.from('user_baselines').update(baselineRecord).eq('user_id', user.id);
+        const { error } = await supabase.from('user_baselines').update(baselineRecord).eq('user_id', userId);
         if (error) throw error;
       } else {
         const { error } = await supabase.from('user_baselines').insert([baselineRecord]);
@@ -394,9 +392,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loadUserBaselines = async (): Promise<BaselineData | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+      const userId = getStoredUserId();
+      if (!userId) return null;
+      const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', userId).single();
       if (error && error.code !== 'PGRST116') throw error;
       if (!data) return null;
       
@@ -479,9 +477,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const hasUserBaselines = async (): Promise<boolean> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return false;
-      const { data, error } = await supabase.from('user_baselines').select('id').eq('user_id', user.id).single();
+      const userId = getStoredUserId();
+      if (!userId) return false;
+      const { data, error } = await supabase.from('user_baselines').select('id').eq('user_id', userId).single();
       if (error && error.code !== 'PGRST116') throw error;
       return !!data;
     } catch (error) {
@@ -508,13 +506,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const next = !prev;
       (async () => {
         try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
+          const userId = getStoredUserId();
+          if (userId) {
             const units = next ? 'imperial' : 'metric';
-            // Upsert minimal record with new units
             await supabase
               .from('user_baselines')
-              .upsert({ user_id: user.id, units }, { onConflict: 'user_id' });
+              .upsert({ user_id: userId, units }, { onConflict: 'user_id' });
           }
         } catch {}
       })();
@@ -550,14 +547,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadPlans = async () => {
     try {
       setPlansLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const userId = getStoredUserId();
+      if (!userId) {
         setCurrentPlans([]);
         setCompletedPlans([]);
         setDetailedPlans({});
         return;
       }
-      const { data: plans, error } = await supabase.from('plans').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      const { data: plans, error } = await supabase.from('plans').select('*').eq('user_id', userId).order('created_at', { ascending: false });
       if (error) return;
       
       // Calculate dynamic current week for each plan based on start date
@@ -586,13 +583,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addPlan = async (planData: any) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('You must be signed in to save a plan.');
+      const userId = getStoredUserId();
+      if (!userId) throw new Error('You must be signed in to save a plan.');
       // Load baselines for normalization (pace/power derivations)
       const userBaselines = await loadUserBaselines();
       const unitsPref = (userBaselines?.units === 'metric' || userBaselines?.units === 'imperial') ? userBaselines.units : 'imperial';
       // Do not send non-column fields in insert (e.g., start_date)
-      const insertPayload: any = { ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: user?.id };
+      const insertPayload: any = { ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: userId };
       if ('start_date' in insertPayload) delete insertPayload.start_date;
       // Remove fields that are not columns on plans table (they are used only for materialization)
       if ('export_hints' in insertPayload) delete insertPayload.export_hints;
@@ -652,8 +649,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deletePlan = async (planId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User must be authenticated to delete plans');
+      if (!getStoredUserId()) throw new Error('User must be authenticated to delete plans');
       // Server function: delete planned rows and the plan atomically
       const { error } = await supabase.functions.invoke('delete-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
@@ -668,8 +664,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const endPlan = async (planId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User must be authenticated to end plans');
+      if (!getStoredUserId()) throw new Error('User must be authenticated to end plans');
       // Server function: end plan and delete future planned workouts
       const { data, error } = await supabase.functions.invoke('end-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
@@ -686,8 +681,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resumePlan = async (planId: string, resumeFromWeek?: number) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User must be authenticated to resume plans');
+      if (!getStoredUserId()) throw new Error('User must be authenticated to resume plans');
       const { data, error } = await supabase.functions.invoke('resume-plan', {
         body: { plan_id: String(planId), ...(resumeFromWeek ? { resume_from_week: resumeFromWeek } : {}) }
       }) as any;
@@ -705,8 +699,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const pausePlan = async (planId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User must be authenticated to pause plans');
+      if (!getStoredUserId()) throw new Error('User must be authenticated to pause plans');
       // Server function: pause plan and delete future planned workouts
       const { data, error } = await supabase.functions.invoke('pause-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
@@ -758,8 +751,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Repair a plan's planned_workouts: revert orphaned completions and restore authored dates
   const repairPlan = async (planId: string): Promise<{ repaired: number }> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not signed in');
+    const userId = getStoredUserId();
+    if (!userId) throw new Error('Not signed in');
     let repaired = 0;
     // Find Week 1 anchor to compute canonical dates
     const { data: w1 } = await supabase
@@ -783,7 +776,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data: rows } = await supabase
       .from('planned_workouts')
       .select('id,date,type,week_number,day_number,workout_status')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('training_plan_id', planId);
     const list = Array.isArray(rows) ? rows : [];
 
@@ -793,7 +786,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data: completed } = await supabase
       .from('workouts')
       .select('date,type')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('workout_status','completed')
       .gte('date', minDate || '1900-01-01')
       .lte('date', maxDate || '2999-12-31');

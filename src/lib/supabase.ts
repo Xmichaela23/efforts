@@ -8,6 +8,29 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
+ * Read the authenticated user's ID directly from localStorage.
+ *
+ * NEVER use supabase.auth.getUser() or supabase.auth.getSession() in components
+ * or hooks that run on iOS — those calls trigger an XHR-based token refresh which
+ * fails in WKWebView with:
+ *   "The XMLHttpRequest.onreadystatechange getter can only be called on instances
+ *    of XMLHttpRequest"
+ *
+ * This helper is safe for all environments: it reads the JWT payload that the
+ * Supabase auth module already stores in localStorage after sign-in.
+ */
+export function getStoredUserId(): string | null {
+  try {
+    const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { user?: { id?: string } };
+    return parsed?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Call a Supabase Edge Function using raw fetch, bypassing the Supabase JS
  * client's internal serialization pipeline which can hit cyclic-structure errors
  * on iOS/WKWebView when the Capacitor layer attaches internal window-referencing
