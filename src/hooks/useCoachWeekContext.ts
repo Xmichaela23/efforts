@@ -309,7 +309,6 @@ export function useCoachWeekContext(date?: string) {
       setError(null);
 
       const userId = getStoredUserId();
-      const user = auth?.user;
       if (!userId) throw new Error('User not authenticated');
 
       const { data: resp, error: apiError } = await supabase.functions.invoke('coach', {
