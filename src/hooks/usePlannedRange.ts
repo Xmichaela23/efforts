@@ -34,24 +34,15 @@ export function usePlannedRange(fromISO: string, toISO: string) {
   const queryClient = useQueryClient();
 
   // Track authenticated user id and respond to auth changes deterministically
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const userId = getStoredUserId();
-        if (!mounted) return;
-        setUserId(user ? userId : null);
-      } catch {}
-    })();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const nextId = userId || null;
-      setUserId(nextId);
-      // Invalidate all plannedRange queries on auth changes so they refetch with new user context
+    setUserId(getStoredUserId());
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setUserId(getStoredUserId());
       queryClient.invalidateQueries({ queryKey: ['plannedRange'] });
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => subscription.unsubscribe();
   }, []);
 
   const queryKeyBase = ['plannedRange', 'me', userId, fromISO, toISO] as const;

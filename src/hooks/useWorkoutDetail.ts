@@ -21,11 +21,11 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const userId = getStoredUserId();
-      if (mounted) setHasSession(!!session);
+      const uid = getStoredUserId();
+      if (mounted) setHasSession(!!uid);
     })();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
-      if (mounted) setHasSession(!!session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, s) => {
+      if (mounted) setHasSession(!!s);
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
@@ -75,13 +75,19 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       // Get current session for auth
       const userId = getStoredUserId();
       if (!userId) throw new Error('Session expired - please log in again');
+      const accessToken = (() => {
+        try {
+          const raw = localStorage.getItem('sb-yyriamwvtvzlkumqrvpm-auth-token');
+          return raw ? (JSON.parse(raw) as any)?.access_token ?? '' : '';
+        } catch { return ''; }
+      })();
       
       const body = { id, ...normalized } as any;
       console.log('[useWorkoutDetail] Calling workout-detail for:', id, 'with options:', normalized);
       const { data, error } = await supabase.functions.invoke('workout-detail', {
         body,
         headers: {
-          Authorization: `Bearer ${session.access_token}`
+          Authorization: `Bearer ${accessToken}`
         }
       });
       if (error) throw error;

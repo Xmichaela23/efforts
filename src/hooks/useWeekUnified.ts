@@ -22,28 +22,14 @@ export type UnifiedItem = {
 
 export function useWeekUnified(fromISO: string, toISO: string) {
   const queryClient = useQueryClient();
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        // Prefer getSession for immediate restoration from persisted auth
-        const userId = getStoredUserId();
-        if (mounted && userId) {
-          setUserId(session.userId);
-        }
-      } catch {}
-      try {
-        const userId = getStoredUserId();
-        if (!mounted) return;
-        setUserId(user ? userId : null);
-      } catch {}
-    })();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
-      setUserId(userId || null);
+    setUserId(getStoredUserId());
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setUserId(getStoredUserId());
       queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => subscription.unsubscribe();
   }, []);
 
   const queryKeyBase = ['weekUnified', 'me', userId, fromISO, toISO] as const;

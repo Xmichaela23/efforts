@@ -6,21 +6,14 @@ export function useWeekRange(fromISO: string, toISO: string) {
   const queryClient = useQueryClient();
 
   // Track user id (auth-gated)
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(() => getStoredUserId());
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const userId = getStoredUserId();
-        if (!mounted) return;
-        setUserId(user ? userId : null);
-      } catch {}
-    })();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, session) => {
-      setUserId(userId || null);
+    setUserId(getStoredUserId());
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setUserId(getStoredUserId());
       queryClient.invalidateQueries({ queryKey: ['weekRange'] });
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => subscription.unsubscribe();
   }, []);
 
   const queryKeyBase = ['weekRange', 'me', userId, fromISO, toISO] as const;
