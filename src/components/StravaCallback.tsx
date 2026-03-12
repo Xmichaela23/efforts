@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 
 const StravaCallback: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -28,12 +28,12 @@ const StravaCallback: React.FC = () => {
         }
 
         // Exchange code via Edge Function so tokens are persisted for the user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
+        const userId = getStoredUserId();
+        if (!userId) throw new Error('Not authenticated');
 
         const redirectUri = `${window.location.origin}/strava/callback`;
         const { data, error: fxErr } = await supabase.functions.invoke('strava-token-exchange', {
-          body: { code, userId: user.id, redirectUri },
+          body: { code, userId, redirectUri },
         });
         if (fxErr) throw new Error(`Token exchange failed: ${fxErr.message || 'invoke error'}`);
         const tokenData = data;

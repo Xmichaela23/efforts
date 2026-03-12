@@ -174,13 +174,8 @@ export const useWorkouts = () => {
 
   const getCurrentUser = async () => {
     try {
-      const userId = getStoredUserId();
-
-      if (user) {
-        return user;
-      } else {
-        return null;
-      }
+      const uid = getStoredUserId();
+      return uid ? { id: uid } : null;
     } catch {
       return null;
     }
@@ -197,12 +192,13 @@ export const useWorkouts = () => {
       let user = null;
       for (let i = 0; i < 5 && !user; i++) {
         user = await getCurrentUser();
-        if (!user && i < 4) {
+        if (!user && i < 4) { // eslint-disable-line @typescript-eslint/no-unnecessary-condition
           const delay = Math.min(100 * Math.pow(2, i), 1000); // Exponential backoff, max 1s
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
+      const userId = user?.id;
       if (!userId) { setWorkouts([]); setLoading(false); return; }
 
       // Step 1: Fetch manual/planned workouts from workouts table (bounded window, lightweight columns only)
@@ -850,10 +846,10 @@ export const useWorkouts = () => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async () => {
         if (!mounted) return;
-
-        if (userId) {
+        const uid = getStoredUserId();
+        if (uid) {
           setAuthReady(true);
         } else {
           setAuthReady(false);
@@ -925,7 +921,7 @@ export const useWorkouts = () => {
     let mounted = true;
     (async () => {
       const userId = getStoredUserId();
-      if (!mounted || !user) return;
+      if (!mounted || !userId) return;
       channel = supabase
         .channel('workout-realtime')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'strava_activities', filter: `user_id=eq.${userId}` }, () => {

@@ -131,7 +131,7 @@ export default function PostWorkoutFeedback({
   const loadWorkoutData = async () => {
     try {
       const userId = getStoredUserId();
-      if (!user || !workoutId) return;
+      if (!userId || !workoutId) return;
 
       const { data, error } = await supabase
         .from('workouts')
