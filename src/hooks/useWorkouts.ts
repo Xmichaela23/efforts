@@ -993,6 +993,7 @@ export const useWorkouts = () => {
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
+      const userId = user?.id;
       if (!userId) {
         throw new Error("User must be authenticated to save workouts");
       }
@@ -1285,6 +1286,7 @@ export const useWorkouts = () => {
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
       const user = await getCurrentUser();
+      const userId = user?.id;
       if (!userId) {
         throw new Error("User must be authenticated to update workouts");
       }
@@ -1537,6 +1539,7 @@ export const useWorkouts = () => {
   const deleteWorkout = async (id: string) => {
     try {
       const user = await getCurrentUser();
+      const userId = user?.id;
       if (!userId) {
         throw new Error("User must be authenticated to delete workouts");
       }
@@ -1631,6 +1634,7 @@ export const useWorkouts = () => {
   const fixExistingWorkoutDate = async () => {
     try {
       const user = await getCurrentUser();
+      const userId = user?.id;
       if (!userId) return;
 
       // Find the workout with the wrong date
