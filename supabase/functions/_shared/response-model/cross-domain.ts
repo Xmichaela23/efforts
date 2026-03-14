@@ -36,7 +36,7 @@ export function computeCrossDomain(pairs: CrossDomainPair[]): CrossDomainRespons
     if (avgHrDelta >= HR_ELEVATION_THRESHOLD) {
       patterns.push({
         code: 'post_strength_hr_elevated',
-        description: `Runs after strength sessions show +${Math.round(avgHrDelta)} bpm avg HR vs your baseline.`,
+        description: `Your heart works harder on runs after lifting — ${Math.round(avgHrDelta)} bpm above normal.`,
         magnitude: avgHrDelta >= 7 ? 'notable' : 'slight',
         data: { avg_delta: Math.round(avgHrDelta * 10) / 10, sample_pairs: hrPairs.length },
       });
@@ -56,7 +56,7 @@ export function computeCrossDomain(pairs: CrossDomainPair[]): CrossDomainRespons
     if (avgExecDelta <= -EXECUTION_DROP_THRESHOLD) {
       patterns.push({
         code: 'post_strength_pace_reduced',
-        description: `Execution score drops ${Math.abs(Math.round(avgExecDelta))}% on average after strength days.`,
+        description: `Your runs suffer the day after lifting — quality drops ${Math.abs(Math.round(avgExecDelta))}%.`,
         magnitude: avgExecDelta <= -10 ? 'notable' : 'slight',
         data: { avg_delta: Math.round(avgExecDelta * 10) / 10, sample_pairs: execPairs.length },
       });
@@ -73,7 +73,7 @@ export function computeCrossDomain(pairs: CrossDomainPair[]): CrossDomainRespons
     if (noHrIssue && noExecIssue) {
       patterns.push({
         code: 'concurrent_gains',
-        description: 'Endurance sessions after strength days show no measurable interference.',
+        description: 'Strength and endurance are working well together — no interference detected.',
         magnitude: 'slight',
         data: { avg_delta: 0, sample_pairs: pairs.length },
       });

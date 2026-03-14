@@ -486,21 +486,6 @@ export default function CoachWeekTab() {
     }
   })();
 
-  const efficiencyLabel = (decouple: number | null) => {
-    if (decouple == null) return null;
-    if (decouple <= 3) return 'Excellent';
-    if (decouple <= 5) return 'Good';
-    if (decouple <= 8) return 'Moderate';
-    return 'Fatigued';
-  };
-
-  const efficiencyColor = (decouple: number | null) => {
-    if (decouple == null) return 'text-white/50';
-    if (decouple <= 5) return 'text-emerald-400';
-    if (decouple <= 8) return 'text-amber-400';
-    return 'text-red-400';
-  };
-
   return (
     <div className="space-y-3 pb-6">
       <LinkExtrasDialog
@@ -953,7 +938,7 @@ export default function CoachWeekTab() {
                       <div className="text-xs text-white/60">{s.label}</div>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs font-medium ${TREND_TONE_COLORS[s.trend_tone] ?? 'text-white/40'}`}>{s.trend_icon} {s.detail}</span>
-                        <span className="text-[10px] text-white/25">n={s.samples}</span>
+                        <span className="text-[10px] text-white/25">{s.samples_label || `${s.samples}`}</span>
                       </div>
                     </div>
                   ))}
@@ -980,7 +965,7 @@ export default function CoachWeekTab() {
 
             {crossDomain?.interference_detected && crossDomain.patterns?.length > 0 && (
               <div>
-                <div className="text-[10px] text-amber-400/70 uppercase tracking-wide mb-1">Cross-training interference</div>
+                <div className="text-[10px] text-amber-400/70 uppercase tracking-wide mb-1">Strength + endurance</div>
                 {crossDomain.patterns.filter((p: any) => p.code !== 'concurrent_gains').map((p: any, i: number) => (
                   <div key={i} className="text-xs text-white/55">{p.description}</div>
                 ))}
@@ -988,7 +973,7 @@ export default function CoachWeekTab() {
             )}
             {crossDomain?.patterns?.some((p: any) => p.code === 'concurrent_gains') && (
               <div className="text-[10px] text-emerald-400/60">
-                No strength-endurance interference detected — concurrent training is working well.
+                Strength and endurance are working well together.
               </div>
             )}
 
@@ -1005,20 +990,12 @@ export default function CoachWeekTab() {
           <div className="text-sm text-white/80 mb-2">Run sessions this week</div>
           <div className="grid grid-cols-2 gap-2">
             {runSessionTypes.slice(0, 6).map((s: any) => {
-              const label =
-                s.type === 'z2' ? 'Zone 2' : s.type === 'long' ? 'Long Run' : s.type === 'tempo' ? 'Tempo'
-                : s.type === 'progressive' ? 'Progressive' : s.type === 'fartlek' ? 'Fartlek'
-                : s.type === 'intervals' ? 'Intervals' : s.type === 'hills' ? 'Hills'
-                : s.type === 'easy' ? 'Easy' : 'Other';
-
-              const decouple = s.avg_decoupling_pct;
-              const effLbl = efficiencyLabel(decouple);
-              const effClr = efficiencyColor(decouple);
-
-              const metric =
-                s.type === 'intervals' || s.type === 'hills'
-                  ? (s.avg_execution_score != null ? `${s.avg_execution_score}% execution` : '\u2014')
-                  : (effLbl ? `${effLbl} efficiency` : '\u2014');
+              const TONE_COLORS: Record<string, string> = {
+                positive: 'text-emerald-400', warning: 'text-amber-400', danger: 'text-red-400', neutral: 'text-white/50',
+              };
+              const label = s.type_label || s.type;
+              const metric = s.efficiency_label || '\u2014';
+              const clr = TONE_COLORS[s.efficiency_tone] || 'text-white/50';
 
               return (
                 <div key={`${s.type}-${s.sample_size}`} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -1026,7 +1003,7 @@ export default function CoachWeekTab() {
                     <div className="text-xs text-white/85 font-medium">{label}</div>
                     <div className="text-[10px] text-white/35">&times;{s.sample_size}</div>
                   </div>
-                  <div className={`mt-0.5 text-xs ${effClr}`}>{metric}</div>
+                  <div className={`mt-0.5 text-xs ${clr}`}>{metric}</div>
                 </div>
               );
             })}

@@ -832,17 +832,40 @@ Deno.serve(async (req) => {
       return Math.round(v * m) / m;
     };
 
+    const RUN_TYPE_LABELS: Record<string, string> = {
+      easy: 'Easy', z2: 'Zone 2', long: 'Long Run', tempo: 'Tempo',
+      progressive: 'Progressive', fartlek: 'Fartlek', intervals: 'Intervals', hills: 'Hills', unknown: 'Other',
+    };
+    const runEfficiency = (decouple: number | null): { label: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } => {
+      if (decouple == null) return { label: null, tone: 'neutral' };
+      if (decouple <= 3) return { label: 'Ran efficiently', tone: 'positive' };
+      if (decouple <= 5) return { label: 'Solid effort', tone: 'positive' };
+      if (decouple <= 8) return { label: 'HR climbed more than usual', tone: 'warning' };
+      return { label: 'HR was elevated — possible fatigue', tone: 'danger' };
+    };
+
     const runSessionTypes7d: NonNullable<CoachWeekContextResponseV1['run_session_types_7d']> = (Object.keys(runAgg) as RunSessionType[])
       .filter((k) => runAgg[k].n > 0)
-      .map((k) => ({
-        type: k,
-        sample_size: runAgg[k].n,
-        avg_execution_score: avgArr(runAgg[k].exec, 0),
-        avg_hr_drift_bpm: avgArr(runAgg[k].drift, 1),
-        avg_z2_percent: avgArr(runAgg[k].z2pct, 0),
-        avg_interval_hr_creep_bpm: avgArr(runAgg[k].creep, 1),
-        avg_decoupling_pct: avgArr(runAgg[k].decouple, 1),
-      }))
+      .map((k) => {
+        const decouple = avgArr(runAgg[k].decouple, 1);
+        const execScore = avgArr(runAgg[k].exec, 0);
+        const isIntervalType = k === 'intervals' || k === 'hills';
+        const eff = isIntervalType
+          ? { label: execScore != null ? `${execScore}% execution` : null, tone: (execScore != null && execScore >= 85 ? 'positive' : execScore != null && execScore >= 70 ? 'warning' : 'neutral') as any }
+          : runEfficiency(decouple);
+        return {
+          type: k,
+          type_label: RUN_TYPE_LABELS[k] || k,
+          sample_size: runAgg[k].n,
+          avg_execution_score: execScore,
+          avg_hr_drift_bpm: avgArr(runAgg[k].drift, 1),
+          avg_z2_percent: avgArr(runAgg[k].z2pct, 0),
+          avg_interval_hr_creep_bpm: avgArr(runAgg[k].creep, 1),
+          avg_decoupling_pct: decouple,
+          efficiency_label: eff.label,
+          efficiency_tone: eff.tone,
+        };
+      })
       .sort((a, b) => b.sample_size - a.sample_size);
 
     const linkingConfidence: CoachWeekContextResponseV1['reaction']['linking_confidence'] = (() => {

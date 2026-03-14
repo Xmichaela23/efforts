@@ -36,12 +36,15 @@ export type KeySessionCategory =
 
 export type RunSessionType7d = {
   type: 'easy' | 'z2' | 'long' | 'tempo' | 'progressive' | 'fartlek' | 'intervals' | 'hills' | 'unknown';
+  type_label: string;
   sample_size: number;
   avg_execution_score: number | null;
   avg_hr_drift_bpm: number | null;
   avg_z2_percent: number | null;
   avg_interval_hr_creep_bpm: number | null;
   avg_decoupling_pct: number | null;
+  efficiency_label: string | null;
+  efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
 };
 
 export type EvidenceItem = {

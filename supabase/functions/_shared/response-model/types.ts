@@ -140,7 +140,8 @@ export type VisibleSignal = {
   trend_tone: 'positive' | 'warning' | 'danger' | 'neutral';
   detail: string;
   samples: number;
-  value_display?: string; // e.g. "195 lbs"
+  samples_label: string; // "3 runs", "4 sessions", "2 weeks"
+  value_display?: string;
 };
 
 export type ContextPrompt = {

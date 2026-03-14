@@ -290,31 +290,45 @@ function sigTrendTone(t: TrendDirection): VisibleSignal['trend_tone'] {
   return t === 'improving' ? 'positive' : t === 'declining' ? 'danger' : 'neutral';
 }
 
+function blockSamplesLabel(n: number, category: 'endurance' | 'strength'): string {
+  if (category === 'strength') return n === 1 ? '1 session' : `${n} sessions`;
+  return n === 1 ? '1 session' : `${n} sessions`;
+}
+
 function blockVisibleSignals(endurance: BlockResponseState['endurance'], strength: BlockResponseState['strength']): VisibleSignal[] {
   const out: VisibleSignal[] = [];
 
   if (endurance.cardiac_efficiency.sufficient) {
+    const d = endurance.cardiac_efficiency.delta;
+    const detail = d != null && Math.abs(d) >= 1 ? `${d > 0 ? '+' : ''}${d.toFixed(1)}% this block` : 'stable';
     out.push({
-      label: 'Aerobic efficiency', category: 'endurance',
+      label: 'Aerobic fitness', category: 'endurance',
       trend: endurance.cardiac_efficiency.trend, trend_icon: sigTrendIcon(endurance.cardiac_efficiency.trend), trend_tone: sigTrendTone(endurance.cardiac_efficiency.trend),
-      detail: endurance.cardiac_efficiency.delta_display, samples: endurance.cardiac_efficiency.samples,
+      detail, samples: endurance.cardiac_efficiency.samples,
+      samples_label: blockSamplesLabel(endurance.cardiac_efficiency.samples, 'endurance'),
     });
   }
   if (endurance.execution.sufficient) {
+    const d = endurance.execution.delta;
+    const detail = d != null && Math.abs(d) >= 1 ? `${d > 0 ? '+' : ''}${d.toFixed(1)}% this block` : 'stable';
     out.push({
       label: 'Long run endurance', category: 'endurance',
       trend: endurance.execution.trend, trend_icon: sigTrendIcon(endurance.execution.trend), trend_tone: sigTrendTone(endurance.execution.trend),
-      detail: endurance.execution.delta_display, samples: endurance.execution.samples,
+      detail, samples: endurance.execution.samples,
+      samples_label: blockSamplesLabel(endurance.execution.samples, 'endurance'),
     });
   }
 
   for (const l of strength.per_lift) {
     if (!l.sufficient) continue;
+    const liftDetail = l.e1rm_delta_pct != null
+      ? (Math.abs(l.e1rm_delta_pct) < 2 ? 'holding steady' : `${l.e1rm_delta_pct > 0 ? '+' : ''}${l.e1rm_delta_pct}%`)
+      : 'too early to track';
     out.push({
       label: l.display_name, category: 'strength',
       trend: l.e1rm_trend, trend_icon: sigTrendIcon(l.e1rm_trend), trend_tone: sigTrendTone(l.e1rm_trend),
-      detail: l.e1rm_delta_pct != null ? `${l.e1rm_delta_pct > 0 ? '+' : ''}${l.e1rm_delta_pct}%` : '—',
-      samples: l.samples,
+      detail: liftDetail, samples: l.samples,
+      samples_label: blockSamplesLabel(l.samples, 'strength'),
       value_display: l.e1rm_current != null ? `${l.e1rm_current} lbs` : undefined,
     });
   }

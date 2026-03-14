@@ -319,45 +319,84 @@ function trendTone(t: TrendDirection): VisibleSignal['trend_tone'] {
   return t === 'improving' ? 'positive' : t === 'declining' ? 'danger' : 'neutral';
 }
 
+function humanDetail(delta: number | null, unit: string, improving: string, declining: string, stable: string): string {
+  if (delta == null) return stable;
+  const abs = Math.abs(delta);
+  if (unit === '%') {
+    if (abs < 2) return stable;
+    return `${delta > 0 ? '+' : ''}${Math.round(delta)}% vs baseline`;
+  }
+  if (unit === 'bpm') {
+    if (abs < 1) return stable;
+    return `${delta > 0 ? '+' : ''}${delta.toFixed(1)} bpm vs baseline`;
+  }
+  if (unit === 'RPE') {
+    if (abs < 0.4) return 'steady';
+    return delta > 0 ? `feels ${delta.toFixed(1)} harder` : `feels ${abs.toFixed(1)} easier`;
+  }
+  if (unit === 'sec/mi') {
+    if (abs < 0.2) return stable;
+    return delta > 0 ? `${delta.toFixed(1)}s/mi faster per bpm` : `${abs.toFixed(1)}s/mi slower per bpm`;
+  }
+  return stable;
+}
+
+function samplesLabel(n: number, category: 'endurance' | 'strength'): string {
+  if (category === 'strength') return n === 1 ? '1 session' : `${n} sessions`;
+  return n === 1 ? '1 run' : `${n} sessions`;
+}
+
 function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthResponse): VisibleSignal[] {
   const out: VisibleSignal[] = [];
 
   if (endurance.execution.sufficient) {
     out.push({
-      label: 'Execution quality', category: 'endurance',
+      label: 'Run quality', category: 'endurance',
       trend: endurance.execution.trend, trend_icon: trendIcon(endurance.execution.trend), trend_tone: trendTone(endurance.execution.trend),
-      detail: endurance.execution.delta_display, samples: endurance.execution.samples,
+      detail: humanDetail(endurance.execution.delta, '%', 'sharper', 'slipping', 'on track'),
+      samples: endurance.execution.samples,
+      samples_label: samplesLabel(endurance.execution.samples, 'endurance'),
     });
   }
   if (endurance.hr_drift.sufficient) {
     out.push({
-      label: 'Cardiac drift', category: 'endurance',
+      label: 'Heart rate drift', category: 'endurance',
       trend: endurance.hr_drift.trend, trend_icon: trendIcon(endurance.hr_drift.trend), trend_tone: trendTone(endurance.hr_drift.trend),
-      detail: endurance.hr_drift.delta_display, samples: endurance.hr_drift.samples,
+      detail: humanDetail(endurance.hr_drift.delta, 'bpm', 'less drift', 'more drift', 'normal'),
+      samples: endurance.hr_drift.samples,
+      samples_label: samplesLabel(endurance.hr_drift.samples, 'endurance'),
     });
   }
   if (endurance.rpe.sufficient) {
     out.push({
-      label: 'Effort level (RPE)', category: 'endurance',
+      label: 'How hard it feels', category: 'endurance',
       trend: endurance.rpe.trend, trend_icon: trendIcon(endurance.rpe.trend), trend_tone: trendTone(endurance.rpe.trend),
-      detail: endurance.rpe.delta_display, samples: endurance.rpe.samples,
+      detail: humanDetail(endurance.rpe.delta, 'RPE', 'feels easier', 'feels harder', 'steady'),
+      samples: endurance.rpe.samples,
+      samples_label: samplesLabel(endurance.rpe.samples, 'endurance'),
     });
   }
   if (endurance.cardiac_efficiency.sufficient) {
     out.push({
-      label: 'Cardiac efficiency', category: 'endurance',
+      label: 'Aerobic fitness', category: 'endurance',
       trend: endurance.cardiac_efficiency.trend, trend_icon: trendIcon(endurance.cardiac_efficiency.trend), trend_tone: trendTone(endurance.cardiac_efficiency.trend),
-      detail: endurance.cardiac_efficiency.delta_display, samples: endurance.cardiac_efficiency.samples,
+      detail: humanDetail(endurance.cardiac_efficiency.delta, 'sec/mi', 'improving', 'declining', 'stable'),
+      samples: endurance.cardiac_efficiency.samples,
+      samples_label: samplesLabel(endurance.cardiac_efficiency.samples, 'endurance'),
     });
   }
 
   for (const l of strength.per_lift) {
     if (!l.sufficient) continue;
+    const liftDetail = l.e1rm_delta_pct != null
+      ? (Math.abs(l.e1rm_delta_pct) < 2 ? 'holding steady' : `${l.e1rm_delta_pct > 0 ? '+' : ''}${l.e1rm_delta_pct}%`)
+      : 'too early to track';
     out.push({
       label: l.display_name, category: 'strength',
       trend: l.e1rm_trend, trend_icon: trendIcon(l.e1rm_trend), trend_tone: trendTone(l.e1rm_trend),
-      detail: l.e1rm_delta_pct != null ? `${l.e1rm_delta_pct > 0 ? '+' : ''}${l.e1rm_delta_pct}%` : '—',
+      detail: liftDetail,
       samples: l.samples,
+      samples_label: samplesLabel(l.samples, 'strength'),
       value_display: l.e1rm_current != null ? `${l.e1rm_current} lbs` : undefined,
     });
   }
