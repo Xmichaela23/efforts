@@ -1537,8 +1537,9 @@ Deno.serve(async (req) => {
     // =========================================================================
     let week_narrative: string | null = null;
     try {
+      const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
       const openaiKey = Deno.env.get('OPENAI_API_KEY');
-      if (openaiKey) {
+      if (anthropicKey || openaiKey) {
         const narrativeFacts: string[] = [];
         let routeInsightLine: string | null = null;
 
@@ -1897,29 +1898,58 @@ ${isPlanTransitionPeriod ? `TRANSITION MODE (first 2 weeks of a new plan): Do NO
 FACTS:
 ${narrativeFacts.join('\n')}`;
 
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: hasTri
-                  ? 'You are an expert multi-sport triathlon coach fluent in swim, bike, run, and strength. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. When referencing workouts, use the sport-specific context (e.g., power for bike, pace per 100 for swim, pace per mile for run). For brick sessions, acknowledge the transition component.'
-                  : 'You are an expert endurance and strength coach. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable.' },
-              { role: 'user', content: narrativePrompt },
-            ],
-            temperature: 0,
-            seed: 42,
-            max_tokens: 300,
-          }),
-        });
-        if (resp.ok) {
-          const aiData = await resp.json();
-          const raw = String(aiData?.choices?.[0]?.message?.content || '').trim();
-          week_narrative = raw || null;
-        } else {
-          const errBody = await resp.text().catch(() => '');
-          console.warn(`[coach] narrative OpenAI non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
+        // Use Anthropic Sonnet for the athlete-facing narrative (best prose quality)
+        const systemPrompt = hasTri
+          ? 'You are an expert multi-sport triathlon coach fluent in swim, bike, run, and strength. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable. When referencing workouts, use the sport-specific context (e.g., power for bike, pace per 100 for swim, pace per mile for run). For brick sessions, acknowledge the transition component.'
+          : 'You are an expert endurance and strength coach. Write a single paragraph (3-5 sentences). No bullets, no headers, no jargon. Second person. Conversational but knowledgeable.';
+
+        if (anthropicKey) {
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': anthropicKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-3-5-sonnet-20241022',
+              system: systemPrompt,
+              messages: [{ role: 'user', content: narrativePrompt }],
+              max_tokens: 300,
+              temperature: 0,
+            }),
+          });
+          if (resp.ok) {
+            const aiData = await resp.json();
+            const raw = String(aiData?.content?.[0]?.text || '').trim();
+            week_narrative = raw || null;
+          } else {
+            const errBody = await resp.text().catch(() => '');
+            console.warn(`[coach] narrative Anthropic non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
+          }
+        } else if (openaiKey) {
+          // OpenAI fallback
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: narrativePrompt },
+              ],
+              temperature: 0,
+              max_tokens: 300,
+            }),
+          });
+          if (resp.ok) {
+            const aiData = await resp.json();
+            const raw = String(aiData?.choices?.[0]?.message?.content || '').trim();
+            week_narrative = raw || null;
+          } else {
+            const errBody = await resp.text().catch(() => '');
+            console.warn(`[coach] narrative OpenAI non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
+          }
         }
       }
     } catch (narErr: any) {

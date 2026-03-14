@@ -1,11 +1,6 @@
 import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
-
-type OpenAIChatResponse = {
-  choices?: Array<{
-    message?: { content?: string | null };
-  }>;
-};
+import { callLLM } from '../llm.ts';
 
 function normalizeParagraph(text: string): string {
   return String(text || '')
@@ -125,36 +120,14 @@ function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok
   return { ok: true, why: null };
 }
 
-async function callOpenAIParagraph(openaiKey: string, prompt: string, temperature: number): Promise<string | null> {
-  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are an expert endurance coach. Output must be a single paragraph (2-5 sentences). No bullets. No headers. No generic advice.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature,
-      max_tokens: 300,
-    }),
+async function callOpenAIParagraph(_openaiKey: string, prompt: string, temperature: number): Promise<string | null> {
+  const text = await callLLM({
+    system: 'You are an expert endurance coach. Output must be a single paragraph (2-5 sentences). No bullets. No headers. No generic advice.',
+    user: prompt,
+    temperature,
+    maxTokens: 300,
   });
-
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`OpenAI API error: ${resp.status} - ${txt}`);
-  }
-  const data = (await resp.json()) as OpenAIChatResponse;
-  const content = String(data?.choices?.[0]?.message?.content || '').trim();
-  const normalized = normalizeParagraph(content);
-  return normalized || null;
+  return text ? normalizeParagraph(text) : null;
 }
 
 function pickTopFlags(flags: FlagV1[]): FlagV1[] {
@@ -360,7 +333,7 @@ export async function generateAISummaryV1(
   flags: FlagV1[],
   coachingContext?: string | null,
 ): Promise<string | null> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) return null;
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);

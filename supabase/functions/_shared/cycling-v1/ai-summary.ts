@@ -1,4 +1,5 @@
 import type { CyclingFactPacketV1, CyclingFlagV1 } from './types.ts';
+import { callLLM } from '../llm.ts';
 
 function normalizeParagraph(s: string): string {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
@@ -80,9 +81,6 @@ export async function generateCyclingAISummaryV1(
   flags: CyclingFlagV1[],
   coachingContext?: string | null,
 ): Promise<string | null> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) return null;
-
   const display = toDisplayPacket(factPacket, flags);
   const packetStr = JSON.stringify(display, null, 2);
 
@@ -103,27 +101,13 @@ ${packetStr}
 `;
 
   const attempt = async (extraSystem: string | null): Promise<string | null> => {
-    const messages = [
-      { role: 'system', content: extraSystem ? extraSystem : 'You are a precise endurance coach. Follow the rules exactly.' },
-      { role: 'user', content: prompt },
-    ];
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages,
-        temperature: 0.2,
-        max_tokens: 220,
-      }),
+    const text = await callLLM({
+      system: extraSystem ?? 'You are a precise endurance coach. Follow the rules exactly.',
+      user: prompt,
+      temperature: 0.2,
+      maxTokens: 220,
     });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const text = data?.choices?.[0]?.message?.content;
-    return typeof text === 'string' ? normalizeParagraph(text) : null;
+    return text ? normalizeParagraph(text) : null;
   };
 
   // 2 attempts with numeric-token validation.

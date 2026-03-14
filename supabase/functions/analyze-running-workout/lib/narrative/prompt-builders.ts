@@ -824,38 +824,16 @@ function buildRequiredObservations(plannedWorkout: any, adherenceContext: any, p
 /**
  * Call OpenAI API with the prompt
  */
-export async function callOpenAI(openaiKey: string, prompt: string): Promise<string[]> {
+import { callLLM } from '../../../../_shared/llm.ts';
+
+export async function callOpenAI(_openaiKey: string, prompt: string): Promise<string[]> {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a coach interpreting workout data. Write interpretative observations only. FORBIDDEN: "Duration: X of Y minutes", "Overall execution: X%", "The workout was programmed as part of", "average heart rate was X bpm, maximum Y bpm", "performance met/exceeded plan expectations". Explain relationships (internal vs external load), physiological meaning (HR drift, recovery), and plan consequences. Never use motivational language or subjective judgments.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 500
-      })
+    const content = await callLLM({
+      system: 'You are a coach interpreting workout data. Write interpretative observations only. FORBIDDEN: "Duration: X of Y minutes", "Overall execution: X%", "The workout was programmed as part of", "average heart rate was X bpm, maximum Y bpm", "performance met/exceeded plan expectations". Explain relationships (internal vs external load), physiological meaning (HR drift, recovery), and plan consequences. Never use motivational language or subjective judgments.',
+      user: prompt,
+      temperature: 0.3,
+      maxTokens: 500,
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content?.trim();
     
     console.log('🤖 [DEBUG] Raw AI response:', content);
     

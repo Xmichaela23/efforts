@@ -928,10 +928,9 @@ Deno.serve(async (req) => {
     // ==========================================================================
     // TREND EXPLANATION (LLM translation only; metrics remain deterministic)
     // ==========================================================================
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
     const buildTrendExplanation = async (): Promise<string | null> => {
       try {
-        if (!openaiKey) return null;
+        if (!Deno.env.get('ANTHROPIC_API_KEY') && !Deno.env.get('OPENAI_API_KEY')) return null;
         const evidence = ((weekly_readiness as any)?.__trend_evidence as any[]) ?? [];
         if (!Array.isArray(evidence) || evidence.length === 0) return null;
 
@@ -979,32 +978,14 @@ Deno.serve(async (req) => {
           .filter(Boolean)
           .join('\n');
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            temperature: 0,
-            max_tokens: 90,
-            messages: [
-              { role: 'system', content: 'You are precise, grounded, and coach-like. No fluff.' },
-              { role: 'user', content: prompt },
-            ],
-          }),
+        const { callLLM } = await import('../_shared/llm.ts');
+        const content = await callLLM({
+          system: 'You are precise, grounded, and coach-like. No fluff.',
+          user: prompt,
+          temperature: 0,
+          maxTokens: 90,
         });
-
-        if (!response.ok) {
-          const txt = await response.text().catch(() => '');
-          console.warn('⚠️ [TREND EXPLANATION] OpenAI non-OK:', response.status, txt?.slice?.(0, 200));
-          return null;
-        }
-
-        const json = await response.json();
-        const content = json?.choices?.[0]?.message?.content;
-        if (typeof content !== 'string') return null;
+        if (typeof content !== 'string' || !content) return null;
         const cleaned = content.trim().replace(/\s+/g, ' ');
         // Enforce exactly 2 sentences in case the model ignores instructions
         const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);

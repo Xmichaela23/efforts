@@ -346,7 +346,7 @@ Deno.serve(async (req) => {
 
     // Generate AI insights if OpenAI key is available
     let narrativeInsights: string[] = [];
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
     
     if (openaiKey) {
       try {
@@ -452,32 +452,16 @@ ${intervalAnalysis.slice(0, 10).map((i: any) =>
 
 Generate 3-4 observations about this swim workout:`;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openaiKey}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4-turbo-preview',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a swimming coach analyzing workout data. Provide concise, factual observations.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            max_tokens: 500,
-            temperature: 0.7
-          })
+        const { callLLM } = await import('../_shared/llm.ts');
+        const swContent = await callLLM({
+          system: 'You are a swimming coach analyzing workout data. Provide concise, factual observations.',
+          user: prompt,
+          maxTokens: 500,
+          temperature: 0.3,
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content || '';
+        if (swContent) {
+          const content = swContent;
           // Split into individual insights (assuming they're separated by newlines or periods)
           narrativeInsights = content.split('\n')
             .map((line: string) => line.trim())

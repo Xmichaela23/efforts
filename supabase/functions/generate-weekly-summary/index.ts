@@ -835,9 +835,8 @@ async function generateWeeklyAnalysis(
   weekEnd: Date,
   planCtx?: { isTri?: boolean; planApproach?: string },
 ): Promise<any> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+  if (!Deno.env.get('ANTHROPIC_API_KEY') && !Deno.env.get('OPENAI_API_KEY')) {
+    throw new Error('LLM API key not configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)');
   }
 
   const isTri = planCtx?.isTri ?? false;
@@ -925,37 +924,17 @@ Return ONLY valid JSON:
   "next_week_preview": "your preview"
 }`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: isTri
-              ? 'Generate weekly multi-sport triathlon training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers. Speak fluently about swim (pace/100yd), bike (watts/FTP%), and run (pace/mi). Treat brick sessions as key workouts, not just "extra runs".'
-              : 'Generate weekly training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers.',
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: 500,
-        temperature: 0.3
-      })
+    const { callLLM } = await import('../_shared/llm.ts');
+    const raw = await callLLM({
+      system: isTri
+        ? 'Generate weekly multi-sport triathlon training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers. Speak fluently about swim (pace/100yd), bike (watts/FTP%), and run (pace/mi). Treat brick sessions as key workouts, not just "extra runs".'
+        : 'Generate weekly training analysis. Factual. No emojis. Be concise. Direct language only. Use specific numbers.',
+      user: prompt,
+      maxTokens: 500,
+      temperature: 0.3,
     });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content.trim();
+    if (!raw) throw new Error('LLM returned empty response');
+    const content = raw.trim();
     const analysis = JSON.parse(content);
 
     return {

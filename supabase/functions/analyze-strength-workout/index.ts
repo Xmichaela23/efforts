@@ -1611,9 +1611,9 @@ async function generateEnhancedStrengthInsights(
   dataQuality: any,
   coachingContextText?: string | null,
 ): Promise<string[]> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) {
-    return ['AI analysis not available - please set up OpenAI API key'];
+    return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
   }
   
   // Build enhanced context for GPT-4
@@ -2210,24 +2210,12 @@ COACHING INSIGHT
     context += `\n\n${coachingContextText}`;
   }
 
-  // Add timeout protection for OpenAI API call (60 seconds)
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  const timeoutId = setTimeout(() => {}, 0); // kept for cleanup symmetry below
   
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: 'gpt-4-turbo-preview', // Faster than gpt-4
-        messages: [
-          {
-            role: 'system',
-            content: `You are a strength training analysis expert. Generate COMPREHENSIVE, STRUCTURED analysis with detailed sections. DO NOT provide a simple summary paragraph - provide full structured analysis.
+    const { callLLM } = await import('../_shared/llm.ts');
+    const content = await callLLM({
+      system: `You are a strength training analysis expert. Generate COMPREHENSIVE, STRUCTURED analysis with detailed sections. DO NOT provide a simple summary paragraph - provide full structured analysis.
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Generate ALL sections below in structured format with clear headings
@@ -2285,31 +2273,15 @@ REQUIRED SECTIONS (generate ALL of these):
    - Data quality improvement suggestions
    - Note Session RPE if it significantly differs from objective metrics (RIR, load)
    - CRITICAL: If RIR pattern shows 0-0-0 (failure), provide immediate safety recommendations
-   - CRITICAL: Contextualize ALL recommendations with readiness data AND plan phase - same performance means different things based on energy/soreness/sleep AND phase expectations
-   - CRITICAL: Reference what's coming next week in plan - explain how current performance sets up that progression
+   - CRITICAL: Contextualize ALL recommendations with readiness data AND plan phase
+   - CRITICAL: Reference what's coming next week in plan
 
-CRITICAL: Avoid contradictory statements. If exercise completion is high but set completion is 0%, focus on other available metrics (weight progression, RIR data, etc.) rather than creating confusing statements.
-
-Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progression)" not "stable". Use historical progression data to identify plateaus and recommend load increases when RIR indicates capacity.`
-          },
-          {
-            role: 'user',
-            content: context
-          }
-        ],
-        max_tokens: 2000, // Reduced for faster generation while maintaining quality
-        temperature: 0.3
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-    
-    clearTimeout(timeoutId);
-    
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || '';
+CRITICAL: Avoid contradictory statements. Be extremely specific with numbers.`,
+      user: context,
+      maxTokens: 2000,
+      temperature: 0.3,
+      model: 'sonnet',
+    }) ?? '';
     
     // Return the full structured analysis as a single string
     // Don't split it - the UI should display it as formatted text
@@ -2322,12 +2294,6 @@ Be extremely specific with numbers: "85 lbs → 85 lbs → 85 lbs (0% progressio
     
   } catch (error) {
     clearTimeout(timeoutId);
-    
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.error('❌ OpenAI API call timed out after 60 seconds');
-      return ['AI analysis timed out. The analysis took too long to generate. Please try again.'];
-    }
-    
     console.log('Error generating strength insights:', error);
     return ['AI analysis temporarily unavailable'];
   }
