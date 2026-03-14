@@ -560,20 +560,26 @@ export default function CoachWeekTab() {
             {prompt?.show && !contextValue.trim() ? (
               <div className="px-3 py-3">
                 <div className="text-xs text-white/70 mb-2">{prompt.question}</div>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {tags.map((tag: any) => (
-                    <button
-                      key={tag.id}
-                      onClick={() => {
-                        setContextValue(tag.id);
-                        saveAthleteContext(tag.id);
-                      }}
-                      className="px-2.5 py-1 rounded-full text-[11px] bg-white/[0.06] border border-white/10 text-white/60 hover:bg-white/[0.12] hover:text-white/80 transition-colors"
-                    >
-                      {tag.emoji} {tag.label}
-                    </button>
-                  ))}
-                </div>
+                {tags.length > 0 && (
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      setContextValue(val);
+                      saveAthleteContext(val);
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-white/[0.06] border border-white/10 text-white/70 focus:outline-none focus:border-white/20 appearance-none mb-2"
+                    style={{ colorScheme: 'dark' }}
+                  >
+                    <option value="" disabled className="bg-neutral-900">Select a reason…</option>
+                    {tags.map((tag: any) => (
+                      <option key={tag.id} value={tag.id} className="bg-neutral-900">
+                        {tag.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   onClick={() => setContextExpanded(true)}
                   className="text-[10px] text-white/35 hover:text-white/55"
@@ -847,21 +853,22 @@ export default function CoachWeekTab() {
                   <div className="text-xs text-white/70 mb-1.5">
                     {g.date} · {g.type}{g.name ? ` (${g.name})` : ''}
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {(['sick', 'travel', 'rest', 'life', 'swapped'] as const).map((tag) => (
-                      <button
-                        key={tag}
-                        onClick={() => updateSkipReason(g.planned_id, effectiveReason === tag ? null : tag)}
-                        className={`px-2 py-0.5 rounded text-[10px] capitalize transition-colors ${
-                          effectiveReason === tag
-                            ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40'
-                            : 'bg-white/[0.06] text-white/50 border border-white/10 hover:bg-white/[0.1] hover:text-white/70'
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
+                  <select
+                    value={effectiveReason ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateSkipReason(g.planned_id, val || null);
+                    }}
+                    className="w-full px-2 py-1 rounded text-[10px] bg-white/[0.06] border border-white/10 text-white/70 focus:outline-none focus:border-white/20 appearance-none"
+                    style={{ colorScheme: 'dark' }}
+                  >
+                    <option value="" className="bg-neutral-900">Select reason…</option>
+                    <option value="sick" className="bg-neutral-900">Sick</option>
+                    <option value="travel" className="bg-neutral-900">Travel</option>
+                    <option value="rest" className="bg-neutral-900">Rest</option>
+                    <option value="life" className="bg-neutral-900">Life</option>
+                    <option value="swapped" className="bg-neutral-900">Swapped</option>
+                  </select>
                   <input
                     type="text"
                     placeholder="Add note (optional)"
