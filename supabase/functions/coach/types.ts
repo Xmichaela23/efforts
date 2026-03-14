@@ -34,6 +34,16 @@ export type KeySessionCategory =
   | 'strength'
   | 'other';
 
+export type RunSessionType7d = {
+  type: 'easy' | 'z2' | 'long' | 'tempo' | 'progressive' | 'fartlek' | 'intervals' | 'hills' | 'unknown';
+  sample_size: number;
+  avg_execution_score: number | null;
+  avg_hr_drift_bpm: number | null;
+  avg_z2_percent: number | null;
+  avg_interval_hr_creep_bpm: number | null;
+  avg_decoupling_pct: number | null;
+};
+
 export type EvidenceItem = {
   code: string;
   label: string;
@@ -149,54 +159,10 @@ export type CoachWeekContextResponseV1 = {
       execution_score_sample_size: number;
     };
   };
-  response: {
-    // Baseline-relative interpretation (what's valuable to know)
-    aerobic: {
-      label: 'efficient' | 'stable' | 'stressed' | 'unknown';
-      drift_avg_bpm: number | null;
-      drift_norm_28d_bpm: number | null;
-      drift_delta_bpm: number | null; // current - norm (positive = more drift)
-      sample_size: number;
-    };
-    structural: {
-      label: 'fresh' | 'stable' | 'fatigued' | 'unknown';
-      strength_rir_7d: number | null;
-      strength_rir_norm_28d: number | null;
-      rir_delta: number | null; // current - norm (negative = more fatigue)
-      sample_size: number;
-    };
-    subjective: {
-      label: 'good' | 'stable' | 'strained' | 'unknown';
-      rpe_7d: number | null;
-      rpe_norm_28d: number | null;
-      rpe_delta: number | null; // current - norm (positive = more strain)
-      sample_size: number;
-    };
-    absorption: {
-      label: 'good' | 'stable' | 'slipping' | 'unknown';
-      execution_score: number | null;
-      execution_norm_28d: number | null;
-      execution_delta: number | null; // current - norm (negative = worse)
-      sample_size: number;
-    };
-    overall: {
-      label: 'absorbing_well' | 'mixed_signals' | 'fatigue_signs' | 'need_more_data';
-      confidence: number; // 0..1
-      drivers: string[]; // deterministic codes
-    };
-    run_session_types_7d: Array<{
-      type: 'easy' | 'z2' | 'long' | 'tempo' | 'progressive' | 'fartlek' | 'intervals' | 'hills' | 'unknown';
-      sample_size: number;
-      // Common signals (when available)
-      avg_execution_score: number | null; // 0..100
-      avg_hr_drift_bpm: number | null;
-      avg_z2_percent: number | null; // 0..100
-      // Interval-specific
-      avg_interval_hr_creep_bpm: number | null;
-      // Steady-specific
-      avg_decoupling_pct: number | null;
-    }>;
-  };
+  run_session_types_7d?: RunSessionType7d[];
+  response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
+  goal_context?: import('../_shared/goal-context.ts').GoalContext;
+  goal_prediction?: import('../_shared/goal-predictor/index.ts').GoalPredictionResult;
   training_state: {
     // Deterministic, plan-aware topline (frontend should render this verbatim)
     code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';
@@ -340,11 +306,12 @@ export type CoachWeekContextResponseV1 = {
     details: {
       evidence: EvidenceItem[];
       reaction: CoachWeekContextResponseV1['reaction'];
-      response: CoachWeekContextResponseV1['response'];
       training_state: CoachWeekContextResponseV1['training_state'];
       marathon_readiness?: CoachWeekContextResponseV1['marathon_readiness'];
       interference: CoachWeekContextResponseV1['interference'];
     };
+    run_session_types_7d?: RunSessionType7d[];
+    response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
   };
 };
 

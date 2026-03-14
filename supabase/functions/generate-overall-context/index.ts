@@ -27,6 +27,8 @@ import {
 import { getBlockAdaptation, type BlockFocus } from '../_shared/block-adaptation/index.ts';
 import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
 import { getLatestAthleteMemory } from '../_shared/athlete-memory.ts';
+import { computeBlockResponse, type BlockResponseState } from '../_shared/response-model/index.ts';
+import { loadGoalContext } from '../_shared/goal-context.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,17 +76,19 @@ Deno.serve(async (req) => {
 
     console.log(`📊 Generating block analysis for user ${user_id}, ${weeks_back} weeks`);
 
-    // First, get the active plan to filter planned_workouts
-    const { data: activePlan } = await supabase
+    const { data: allActivePlans } = await supabase
       .from('plans')
-      .select('id, name, status, config, current_week')
+      .select('id, name, status, config, current_week, duration_weeks')
       .eq('user_id', user_id)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-    
+      .limit(5);
+
+    const activePlansList = Array.isArray(allActivePlans) ? allActivePlans : [];
+    const activePlan = activePlansList[0] ?? null;
     const activePlanId = activePlan?.id;
+
+    const goalContext = await loadGoalContext(supabase, user_id, endDateISO, activePlansList.map((p: any) => p.id));
     console.log(`📊 Active plan: ${activePlan?.name || 'none'} (${activePlanId || 'no id'})`);
 
     // Fetch remaining data in parallel
@@ -214,6 +218,28 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================================================
+    // UNIFIED RESPONSE MODEL (block-level)
+    // ==========================================================================
+    let blockResponseModel: BlockResponseState | null = null;
+    if (fitnessAdaptationStructured) {
+      try {
+        blockResponseModel = computeBlockResponse({
+          blockStartDate: startDateISO,
+          blockEndDate: endDateISO,
+          adaptation: fitnessAdaptationStructured,
+          crossDomainPairs: [],
+          planContext: activePlan ? {
+            weeks_in_block: weeks_back,
+            intents: [],
+            plan_name: activePlan.name || null,
+          } : null,
+        });
+      } catch (e) {
+        console.error('[generate-overall-context] computeBlockResponse failed:', e);
+      }
+    }
+
+    // ==========================================================================
     // GOAL PREDICTOR (server-side; no client-side math)
     // ==========================================================================
     const block =
@@ -231,9 +257,12 @@ Deno.serve(async (req) => {
         : planConfig.marathon_target_seconds != null && Number.isFinite(Number(planConfig.marathon_target_seconds))
           ? Number(planConfig.marathon_target_seconds)
           : null;
+    const raceName = activePlan?.name ?? goalContext.primary_event?.name ?? null;
+    const goalTargetTime = goalContext.primary_event?.target_time ?? null;
+    const effectiveTargetSeconds = targetSeconds ?? goalTargetTime;
     const plan =
-      activePlan?.name != null
-        ? { target_finish_time_seconds: targetSeconds, race_name: activePlan.name }
+      raceName != null
+        ? { target_finish_time_seconds: effectiveTargetSeconds, race_name: raceName }
         : null;
     const goal_prediction = runGoalPredictor({ block, plan });
 
@@ -263,6 +292,7 @@ Deno.serve(async (req) => {
       goal,
       goal_prediction,
       athlete_memory: athleteMemory,
+      response_model: blockResponseModel,
     };
 
     // Return BOTH canonical and legacy fields during migration
@@ -278,8 +308,9 @@ Deno.serve(async (req) => {
       focus_areas: focusAreas,
       data_quality: dataQuality,
       fitness_adaptation_structured: fitnessAdaptationStructured,
-      goal: goal, // Include goal so frontend knows context
-      goal_prediction, // Server-computed verdicts (block_verdict, race_day_forecast, durability_risk, interference)
+      goal: goal,
+      goal_context: goalContext,
+      goal_prediction,
       athlete_memory: athleteMemory,
       generated_at: blockStateV1.glance.generated_at,
       

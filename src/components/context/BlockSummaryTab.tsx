@@ -325,6 +325,55 @@ const BlockSummaryTab: React.FC = () => {
 
       <div aria-hidden="true" className="instrument-divider" />
 
+      {/* Block Response Assessment (renders server-computed response_model verbatim) */}
+      {(() => {
+        const rm = (bs as any)?.response_model;
+        if (!rm?.assessment) return null;
+        const assessment = rm.assessment;
+        const headline = rm.headline;
+        const signals: any[] = rm.visible_signals ?? [];
+        const crossDomain = rm.cross_domain;
+
+        const TONE_STYLES: Record<string, { text: string; bg: string }> = {
+          positive: { text: 'text-emerald-400', bg: 'border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 to-emerald-900/5' },
+          warning: { text: 'text-amber-400', bg: 'border-amber-500/25 bg-gradient-to-br from-amber-500/10 to-amber-900/5' },
+          danger: { text: 'text-red-400', bg: 'border-red-500/25 bg-gradient-to-br from-red-500/10 to-red-900/5' },
+          neutral: { text: 'text-white/50', bg: 'border-white/10 bg-white/[0.03]' },
+        };
+        const TREND_TONE_COLORS: Record<string, string> = {
+          positive: 'text-emerald-400', warning: 'text-amber-400', danger: 'text-red-400', neutral: 'text-white/40',
+        };
+        const tone = TONE_STYLES[assessment.tone] ?? TONE_STYLES.neutral;
+
+        return (
+          <div className={`rounded-xl border p-4 ${tone.bg}`}>
+            {headline && (
+              <div className="mb-2">
+                <div className="text-sm text-white/85 font-medium">{headline.text}</div>
+                <div className="text-[10px] text-white/40 mt-0.5">{headline.subtext}</div>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-xs font-semibold ${tone.text}`}>{assessment.title}</span>
+              <span className="text-[10px] text-white/30">{assessment.confidence} confidence</span>
+            </div>
+            <div className="text-xs text-white/65 mb-3">{assessment.explain}</div>
+            {signals.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {signals.map((s: any) => (
+                  <div key={s.label} className="text-[10px] text-white/50">
+                    {s.label}: <span className={TREND_TONE_COLORS[s.trend_tone] ?? 'text-white/40'}>{s.trend_icon} {s.detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {crossDomain?.interference_detected && (
+              <div className="text-[10px] text-amber-400/70 mt-2">Strength-endurance interference detected</div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Performance Trends - canonical */}
       <PerformanceTrendsSection trends={bs.performance_trends} quality={bs.data_quality} />
 

@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X } from 'lucide-react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
 
 type LinkExtrasDialogProps = {
@@ -370,23 +370,14 @@ export default function CoachWeekTab() {
   // Keep derived memoized slices above any early returns.
   const ts = ws?.details?.training_state;
   const reaction = ws?.details?.reaction;
-  const responseSignals = ws?.details?.response;
+  const runSessionTypes = (ws as any)?.run_session_types_7d ?? [];
   const readiness = ws?.details?.marathon_readiness;
   const narrativeText = ws?.coach?.narrative ?? null;
   const planAdaptationSuggestions = ws?.coach?.plan_adaptation_suggestions ?? [];
   const keySessionsPlanned = ws?.glance?.key_sessions_planned ?? 0;
   const keySessionsLinked = ws?.glance?.key_sessions_linked ?? 0;
   const verdictCode = ws?.glance?.verdict_code ?? 'on_track';
-  const showTrends = ws?.guards?.show_trends ?? false;
   const showReadiness = ws?.guards?.show_readiness ?? false;
-  const suppressBaselineDeltas = ws?.guards?.suppress_baseline_deltas ?? false;
-  const trendDeltas = {
-    aerobic: responseSignals?.aerobic?.drift_delta_bpm ?? null,
-    structural: responseSignals?.structural?.rir_delta ?? null,
-    subjective: responseSignals?.subjective?.rpe_delta ?? null,
-    absorption: responseSignals?.absorption?.execution_delta ?? null,
-  };
-  const hasAnyTrendDelta = Object.values(trendDeltas).some((v) => v != null);
 
   const loadDriverRows = useMemo(() => {
     const ownerRows = (ws && Array.isArray(ws?.load?.by_discipline))
@@ -495,23 +486,6 @@ export default function CoachWeekTab() {
     }
   })();
 
-  const rpeLabel = (rpe: number | null) => {
-    if (rpe == null) return null;
-    if (rpe <= 3) return 'Light';
-    if (rpe <= 5) return 'Moderate';
-    if (rpe <= 7) return 'Hard';
-    return 'Very hard';
-  };
-
-  const rirLabel = (rir: number | null) => {
-    if (rir == null) return null;
-    if (rir >= 4) return 'Very fresh';
-    if (rir >= 3) return 'Fresh';
-    if (rir >= 2) return 'Moderate';
-    if (rir >= 1) return 'Pushing limits';
-    return 'At failure';
-  };
-
   const efficiencyLabel = (decouple: number | null) => {
     if (decouple == null) return null;
     if (decouple <= 3) return 'Excellent';
@@ -591,64 +565,93 @@ export default function CoachWeekTab() {
         </div>
       ) : null}
 
-      {/* ── Week Context Note (athlete-provided) ── */}
-      {ws.plan.has_active_plan && ws.plan.plan_id && ws.week.index != null && (
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
-          {contextExpanded ? (
-            <>
-              <textarea
-                value={contextValue}
-                onChange={(e) => setContextValue(e.target.value)}
-                onBlur={() => {
-                  saveAthleteContext(contextValue);
-                  if (!contextValue.trim()) setContextExpanded(false);
-                }}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    saveAthleteContext(contextValue);
-                    if (!contextValue.trim()) setContextExpanded(false);
-                    (e.target as HTMLTextAreaElement).blur();
-                  }
-                }}
-                placeholder="e.g. had the flu, travel, increased weights on purpose..."
-                className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
-                autoFocus
-              />
-              <div className="px-3 pb-3 flex items-center justify-end gap-2">
+      {/* ── Structured Context (server-driven prompts) ── */}
+      {ws.plan.has_active_plan && ws.plan.plan_id && ws.week.index != null && (() => {
+        const prompt = (ws as any)?.response_model?.context_prompt;
+        const tags = prompt?.tags ?? [];
+
+        return (
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
+            {prompt?.show && !contextValue.trim() ? (
+              <div className="px-3 py-3">
+                <div className="text-xs text-white/70 mb-2">{prompt.question}</div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {tags.map((tag: any) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        setContextValue(tag.id);
+                        saveAthleteContext(tag.id);
+                      }}
+                      className="px-2.5 py-1 rounded-full text-[11px] bg-white/[0.06] border border-white/10 text-white/60 hover:bg-white/[0.12] hover:text-white/80 transition-colors"
+                    >
+                      {tag.emoji} {tag.label}
+                    </button>
+                  ))}
+                </div>
                 <button
-                  type="button"
-                  onClick={() => {
+                  onClick={() => setContextExpanded(true)}
+                  className="text-[10px] text-white/35 hover:text-white/55"
+                >
+                  Or add your own note...
+                </button>
+              </div>
+            ) : contextExpanded ? (
+              <>
+                <textarea
+                  value={contextValue}
+                  onChange={(e) => setContextValue(e.target.value)}
+                  onBlur={() => {
                     saveAthleteContext(contextValue);
                     if (!contextValue.trim()) setContextExpanded(false);
                   }}
-                  disabled={contextSaving}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/80 text-white hover:bg-emerald-500 disabled:opacity-60"
-                >
-                  {contextSaving ? 'Saving…' : 'Save'}
-                </button>
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      saveAthleteContext(contextValue);
+                      if (!contextValue.trim()) setContextExpanded(false);
+                      (e.target as HTMLTextAreaElement).blur();
+                    }
+                  }}
+                  placeholder="e.g. had the flu, travel, increased weights on purpose..."
+                  className="w-full min-h-[72px] px-3 py-2.5 bg-transparent text-sm text-white/90 placeholder:text-white/40 resize-none focus:outline-none focus:ring-0 border-0"
+                  autoFocus
+                />
+                <div className="px-3 pb-3 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      saveAthleteContext(contextValue);
+                      if (!contextValue.trim()) setContextExpanded(false);
+                    }}
+                    disabled={contextSaving}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/80 text-white hover:bg-emerald-500 disabled:opacity-60"
+                  >
+                    {contextSaving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={() => setContextExpanded(true)}
+                className="w-full text-left px-3 py-2.5 text-xs text-white/45 hover:text-white/65 hover:bg-white/[0.04] transition-colors"
+              >
+                {contextValue.trim() ? (
+                  <span className="italic text-white/55">&quot;{contextValue.length > 40 ? contextValue.slice(0, 40) + '…' : contextValue}&quot;</span>
+                ) : (
+                  'Add context for this week (sick, travel, etc.)'
+                )}
+              </button>
+            )}
+            {contextSaving && (
+              <div className="px-3 py-1 text-[10px] text-white/40 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Saving…
               </div>
-            </>
-          ) : (
-            <button
-              onClick={() => setContextExpanded(true)}
-              className="w-full text-left px-3 py-2.5 text-xs text-white/45 hover:text-white/65 hover:bg-white/[0.04] transition-colors"
-            >
-              {contextValue.trim() ? (
-                <span className="italic">&quot;{contextValue.length > 50 ? contextValue.slice(0, 50) + '…' : contextValue}&quot;</span>
-              ) : (
-                'Add context for this week (sick, travel, etc.) — helps the AI get it right'
-              )}
-            </button>
-          )}
-          {contextSaving && (
-            <div className="px-3 py-1 text-[10px] text-white/40 flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Saving…
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Baseline drift suggestion (Phase 3) ── */}
       {Array.isArray(ws.coach.baseline_drift_suggestions) && ws.coach.baseline_drift_suggestions.length > 0 && (
@@ -687,13 +690,36 @@ export default function CoachWeekTab() {
         />
       )}
 
-      {/* ── Plan adaptation suggestion (Phase 3) ── */}
+      {/* ── Plan adaptation suggestions ── */}
       {Array.isArray(planAdaptationSuggestions) && planAdaptationSuggestions.length > 0 && (
         <PlanAdaptationCard
           suggestions={planAdaptationSuggestions}
           onAccept={async (code) => {
             const uId = getStoredUserId();
             if (!uId) return;
+            // Strength progression/deload: call adapt-plan to apply weight changes
+            if (code.startsWith('str_prog_') || code.startsWith('str_deload_')) {
+              try {
+                await supabase.functions.invoke('adapt-plan', {
+                  body: { user_id: uId, action: 'accept', suggestion_id: code },
+                });
+                window.dispatchEvent(new CustomEvent('planned:invalidate'));
+              } catch (e) {
+                console.error('[adapt-plan] accept failed:', e);
+              }
+            }
+            // Endurance pace/FTP: call adapt-plan
+            if (code.startsWith('end_')) {
+              try {
+                await supabase.functions.invoke('adapt-plan', {
+                  body: { user_id: uId, action: 'accept', suggestion_id: code },
+                });
+                window.dispatchEvent(new CustomEvent('planned:invalidate'));
+              } catch (e) {
+                console.error('[adapt-plan] accept failed:', e);
+              }
+            }
+            // Dismiss from future suggestions
             const today = new Date().toISOString().slice(0, 10);
             const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', uId).maybeSingle();
             const dismissed = (ub?.dismissed_suggestions as Record<string, Record<string, string>>) || {};
@@ -869,101 +895,116 @@ export default function CoachWeekTab() {
         </div>
       )}
 
-      {/* ── Body Response ── */}
-      <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-        <div className="text-sm text-white/80 mb-0.5">Body response</div>
-        <div className="text-[10px] text-white/40 mb-3">How your body is responding this week vs your baseline.</div>
-        <div className="space-y-3">
-          {reaction?.avg_execution_score != null && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">Plan execution</div>
-              <div className="text-sm text-white/90 font-medium">{reaction.avg_execution_score}%</div>
-            </div>
-          )}
-          {reaction?.avg_session_rpe_7d != null && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">Effort level <span className="text-white/30">(RPE)</span></div>
-              <div className="text-sm text-white/90">
-                <span className="font-medium">{rpeLabel(reaction.avg_session_rpe_7d)}</span>
-                <span className="text-xs text-white/40 ml-1.5">{reaction.avg_session_rpe_7d}/10</span>
-              </div>
-            </div>
-          )}
-          {reaction?.avg_strength_rir_7d != null && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">Strength reserve <span className="text-white/30">(RIR)</span></div>
-              <div className="text-sm text-white/90">
-                <span className="font-medium">{rirLabel(reaction.avg_strength_rir_7d)}</span>
-                <span className="text-xs text-white/40 ml-1.5">{reaction.avg_strength_rir_7d} reps in tank</span>
-              </div>
-            </div>
-          )}
-          {reaction?.hr_drift_avg_bpm != null && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-white/60">Cardiac drift</div>
-              <div className="text-sm text-white/90">
-                {reaction.hr_drift_avg_bpm <= 5 ? (
-                  <span className="text-emerald-400 font-medium">Minimal</span>
-                ) : reaction.hr_drift_avg_bpm <= 10 ? (
-                  <span className="text-white/80 font-medium">Normal</span>
-                ) : (
-                  <span className="text-amber-400 font-medium">Elevated</span>
-                )}
-                <span className="text-xs text-white/40 ml-1.5">{reaction.hr_drift_avg_bpm} bpm</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Body Response (renders server-computed response_model verbatim) ── */}
+      {(() => {
+        const rm = (ws as any)?.response_model;
+        if (!rm) return null;
+        const assessment = rm.assessment;
+        const headline = rm.headline;
+        const signals: any[] = rm.visible_signals ?? [];
+        const crossDomain = rm.cross_domain;
 
-      {/* ── 4-week trend ── */}
-      <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
-        <div className="text-sm text-white/80 mb-0.5">4-week trend</div>
-        {showTrends ? (
-          <>
-            <div className="text-[10px] text-white/40 mb-3">
-              Change vs your personal norm over the last 4 weeks.
-            </div>
-            {suppressBaselineDeltas ? (
-              <div className="text-xs text-white/55">
-                Trend deltas are hidden during early plan transition to avoid misleading comparisons with your prior cycle.
-              </div>
-            ) : hasAnyTrendDelta ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-white/60">Aerobic fitness</div>
-                  <DeltaIndicator value={trendDeltas.aerobic} unit=" bpm" invertPositive={true} size="sm" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-white/60">Strength capacity</div>
-                  <DeltaIndicator value={trendDeltas.structural} invertPositive={false} size="sm" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-white/60">Perceived effort</div>
-                  <DeltaIndicator value={trendDeltas.subjective} invertPositive={true} size="sm" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-white/60">Execution quality</div>
-                  <DeltaIndicator value={trendDeltas.absorption} unit="%" invertPositive={false} size="sm" />
-                </div>
-              </div>
-            ) : (
-              <div className="text-xs text-white/55">
-                Trend deltas are not available yet. Keep logging sessions this week to establish a reliable baseline comparison.
+        const TONE_STYLES: Record<string, { text: string; bg: string }> = {
+          positive: { text: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5' },
+          warning: { text: 'text-amber-400', bg: 'border-amber-500/20 bg-amber-500/5' },
+          danger: { text: 'text-red-400', bg: 'border-red-500/20 bg-red-500/5' },
+          neutral: { text: 'text-white/50', bg: 'border-white/10 bg-white/[0.03]' },
+        };
+        const TREND_TONE_COLORS: Record<string, string> = {
+          positive: 'text-emerald-400',
+          warning: 'text-amber-400',
+          danger: 'text-red-400',
+          neutral: 'text-white/40',
+        };
+        const tone = TONE_STYLES[assessment?.tone] ?? TONE_STYLES.neutral;
+
+        const enduranceSignals = signals.filter((s: any) => s.category === 'endurance');
+        const strengthSignals = signals.filter((s: any) => s.category === 'strength');
+
+        return (
+          <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4 space-y-4">
+            {headline && (
+              <div>
+                <div className="text-sm text-white/85 font-medium">{headline.text}</div>
+                <div className="text-[10px] text-white/40 mt-0.5">{headline.subtext}</div>
               </div>
             )}
-          </>
-        ) : (
-          <div className="text-xs text-white/45 mt-2">Building baseline... trends will appear after more consistent data.</div>
-        )}
-      </div>
+
+            {assessment && assessment.label !== 'insufficient_data' && (
+              <div className={`rounded-lg border px-3 py-2 ${tone.bg}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium ${tone.text}`}>{assessment.title}</span>
+                  <span className="text-[10px] text-white/30">·</span>
+                  <span className="text-[10px] text-white/40">{assessment.confidence} confidence</span>
+                </div>
+                <div className="text-xs text-white/60 mt-1">{assessment.explain}</div>
+              </div>
+            )}
+            {assessment?.label === 'insufficient_data' && (
+              <div className="text-xs text-white/50">{assessment.explain}</div>
+            )}
+
+            {enduranceSignals.length > 0 && (
+              <div>
+                <div className="text-[10px] text-white/40 uppercase tracking-wide mb-2">Endurance</div>
+                <div className="space-y-2">
+                  {enduranceSignals.map((s: any) => (
+                    <div key={s.label} className="flex items-center justify-between">
+                      <div className="text-xs text-white/60">{s.label}</div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${TREND_TONE_COLORS[s.trend_tone] ?? 'text-white/40'}`}>{s.trend_icon} {s.detail}</span>
+                        <span className="text-[10px] text-white/25">n={s.samples}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {strengthSignals.length > 0 && (
+              <div>
+                <div className="text-[10px] text-white/40 uppercase tracking-wide mb-2">Strength</div>
+                <div className="space-y-2">
+                  {strengthSignals.map((s: any) => (
+                    <div key={s.label} className="flex items-center justify-between">
+                      <div className="text-xs text-white/60">{s.label}</div>
+                      <div className="flex items-center gap-2">
+                        {s.value_display && <span className="text-xs text-white/70">{s.value_display}</span>}
+                        <span className={`text-xs font-medium ${TREND_TONE_COLORS[s.trend_tone] ?? 'text-white/40'}`}>{s.trend_icon} {s.detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {crossDomain?.interference_detected && crossDomain.patterns?.length > 0 && (
+              <div>
+                <div className="text-[10px] text-amber-400/70 uppercase tracking-wide mb-1">Cross-training interference</div>
+                {crossDomain.patterns.filter((p: any) => p.code !== 'concurrent_gains').map((p: any, i: number) => (
+                  <div key={i} className="text-xs text-white/55">{p.description}</div>
+                ))}
+              </div>
+            )}
+            {crossDomain?.patterns?.some((p: any) => p.code === 'concurrent_gains') && (
+              <div className="text-[10px] text-emerald-400/60">
+                No strength-endurance interference detected — concurrent training is working well.
+              </div>
+            )}
+
+            {signals.length === 0 && assessment?.label !== 'insufficient_data' && (
+              <div className="text-xs text-white/45">No signal data available for this week yet.</div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Run sessions ── */}
-      {Array.isArray(responseSignals?.run_session_types_7d) && responseSignals.run_session_types_7d.length ? (
+      {runSessionTypes.length > 0 ? (
         <div className="rounded-xl border border-white/15 bg-white/[0.06] p-4">
           <div className="text-sm text-white/80 mb-2">Run sessions this week</div>
           <div className="grid grid-cols-2 gap-2">
-            {responseSignals.run_session_types_7d.slice(0, 6).map((s: any) => {
+            {runSessionTypes.slice(0, 6).map((s: any) => {
               const label =
                 s.type === 'z2' ? 'Zone 2' : s.type === 'long' ? 'Long Run' : s.type === 'tempo' ? 'Tempo'
                 : s.type === 'progressive' ? 'Progressive' : s.type === 'fartlek' ? 'Fartlek'

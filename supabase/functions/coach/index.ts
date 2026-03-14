@@ -28,6 +28,16 @@ import {
 } from '../_shared/acwr-state.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import {
+  computeWeeklyResponse,
+  type WeeklyResponseState,
+  type WeeklySignalInputs,
+  type BaselineNorms,
+  type StrengthLiftSnapshot,
+  type CrossDomainPair,
+} from '../_shared/response-model/index.ts';
+import { loadGoalContext, type GoalContext } from '../_shared/goal-context.ts';
+import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
+import {
   isPlanTransitionWindowByWeekIndex,
   resolvePlanWeekIndex,
   resolveWeekStartDowFromPlanConfig,
@@ -397,6 +407,8 @@ Deno.serve(async (req) => {
     const activePlan = pickPrimaryPlan(allActivePlans);
     const secondaryPlans = allActivePlans.filter(p => p.id !== activePlan?.id);
     const planConfig = activePlan?.config || null;
+
+    const goalContext = await loadGoalContext(supabase, userId, asOfDate, allActivePlans.map(p => p.id));
     const methodologyId: MethodologyId = inferMethodologyId(planConfig);
     const weekStartDow: WeekStartDow = resolveWeekStartDow(planConfig);
 
@@ -811,7 +823,7 @@ Deno.serve(async (req) => {
       return Math.round(v * m) / m;
     };
 
-    const runSessionTypes7d: CoachWeekContextResponseV1['response']['run_session_types_7d'] = (Object.keys(runAgg) as RunSessionType[])
+    const runSessionTypes7d: NonNullable<CoachWeekContextResponseV1['run_session_types_7d']> = (Object.keys(runAgg) as RunSessionType[])
       .filter((k) => runAgg[k].n > 0)
       .map((k) => ({
         type: k,
@@ -1027,88 +1039,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // =========================================================================
-    // Baseline-relative response interpretation (what a coach would show)
-    // =========================================================================
-    const driftDelta = (reaction.hr_drift_avg_bpm != null && norms28d.hr_drift_avg_bpm != null)
-      ? Math.round((reaction.hr_drift_avg_bpm - norms28d.hr_drift_avg_bpm) * 10) / 10
-      : null;
-    const rirDelta = (reaction.avg_strength_rir_7d != null && norms28d.strength_rir_avg != null)
-      ? Math.round((reaction.avg_strength_rir_7d - norms28d.strength_rir_avg) * 10) / 10
-      : null;
-    const rpeDelta = (reaction.avg_session_rpe_7d != null && norms28d.session_rpe_avg != null)
-      ? Math.round((reaction.avg_session_rpe_7d - norms28d.session_rpe_avg) * 10) / 10
-      : null;
-    const execDelta = (reaction.avg_execution_score != null && norms28d.execution_score_avg != null)
-      ? Math.round((reaction.avg_execution_score - norms28d.execution_score_avg) * 1) / 1
-      : null;
-
-    const aerobicLabel: CoachWeekContextResponseV1['response']['aerobic']['label'] =
-      driftDelta == null ? 'unknown' : driftDelta >= 3 ? 'stressed' : driftDelta <= -2 ? 'efficient' : 'stable';
-    const structuralLabel: CoachWeekContextResponseV1['response']['structural']['label'] =
-      rirDelta == null ? 'unknown' : rirDelta <= -0.5 ? 'fatigued' : rirDelta >= 0.5 ? 'fresh' : 'stable';
-    const subjectiveLabel: CoachWeekContextResponseV1['response']['subjective']['label'] =
-      rpeDelta == null ? 'unknown' : rpeDelta >= 0.7 ? 'strained' : rpeDelta <= -0.7 ? 'good' : 'stable';
-    const absorptionLabel: CoachWeekContextResponseV1['response']['absorption']['label'] =
-      execDelta == null ? 'unknown' : execDelta <= -5 ? 'slipping' : execDelta >= 3 ? 'good' : 'stable';
-
-    const drivers: string[] = [];
-    if (aerobicLabel === 'stressed') drivers.push('aerobic_drift_up');
-    if (structuralLabel === 'fatigued') drivers.push('structural_rir_down');
-    if (subjectiveLabel === 'strained') drivers.push('subjective_rpe_up');
-    if (absorptionLabel === 'slipping') drivers.push('absorption_exec_down');
-
-    const sampleSignals =
-      (reaction.hr_drift_sample_size > 0 ? 1 : 0) +
-      (reaction.rpe_sample_size_7d > 0 ? 1 : 0) +
-      (reaction.rir_sample_size_7d > 0 ? 1 : 0) +
-      (reaction.execution_sample_size > 0 ? 1 : 0);
-
-    let overallLabel: CoachWeekContextResponseV1['response']['overall']['label'] = 'need_more_data';
-    if (sampleSignals >= 2) {
-      if (drivers.length >= 2) overallLabel = 'fatigue_signs';
-      else if (drivers.length === 1) overallLabel = 'mixed_signals';
-      else overallLabel = 'absorbing_well';
-    }
-    const overallConfidence = Math.max(0.35, Math.min(0.9, 0.35 + 0.15 * sampleSignals + 0.1 * Math.min(2, reaction.execution_sample_size)));
-
-    const responseInterp: CoachWeekContextResponseV1['response'] = {
-      aerobic: {
-        label: aerobicLabel,
-        drift_avg_bpm: reaction.hr_drift_avg_bpm,
-        drift_norm_28d_bpm: norms28d.hr_drift_avg_bpm,
-        drift_delta_bpm: driftDelta,
-        sample_size: reaction.hr_drift_sample_size,
-      },
-      structural: {
-        label: structuralLabel,
-        strength_rir_7d: reaction.avg_strength_rir_7d,
-        strength_rir_norm_28d: norms28d.strength_rir_avg,
-        rir_delta: rirDelta,
-        sample_size: reaction.rir_sample_size_7d,
-      },
-      subjective: {
-        label: subjectiveLabel,
-        rpe_7d: reaction.avg_session_rpe_7d,
-        rpe_norm_28d: norms28d.session_rpe_avg,
-        rpe_delta: rpeDelta,
-        sample_size: reaction.rpe_sample_size_7d,
-      },
-      absorption: {
-        label: absorptionLabel,
-        execution_score: reaction.avg_execution_score,
-        execution_norm_28d: norms28d.execution_score_avg,
-        execution_delta: execDelta,
-        sample_size: reaction.execution_sample_size,
-      },
-      overall: {
-        label: overallLabel,
-        confidence: Number(overallConfidence.toFixed(2)),
-        drivers,
-      },
-      run_session_types_7d: runSessionTypes7d,
-    };
-
     // Rolling windows (residual context)
     const acuteStart = addDaysISO(asOfDate, -6);
     const chronicStart = addDaysISO(asOfDate, -27);
@@ -1125,6 +1055,177 @@ Deno.serve(async (req) => {
     const acute7Rows = completedRolling.filter((r: any) => String(r?.date) >= acuteStart);
     const acute7Load = acute7Rows.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
     const chronic28Load = completedRolling.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
+
+    // =========================================================================
+    // Unified Response Model (new: shared with block view)
+    // =========================================================================
+    const responseModelSignals: WeeklySignalInputs = {
+      hr_drift_avg_bpm: reaction.hr_drift_avg_bpm,
+      hr_drift_sample_size: reaction.hr_drift_sample_size,
+      avg_execution_score: reaction.avg_execution_score,
+      execution_sample_size: reaction.execution_sample_size,
+      avg_session_rpe_7d: reaction.avg_session_rpe_7d,
+      rpe_sample_size_7d: reaction.rpe_sample_size_7d,
+      avg_strength_rir_7d: reaction.avg_strength_rir_7d,
+      rir_sample_size_7d: reaction.rir_sample_size_7d,
+      cardiac_efficiency_current: null,
+      cardiac_efficiency_sample_size: 0,
+    };
+
+    const responseModelNorms: BaselineNorms = {
+      hr_drift_avg_bpm: norms28d.hr_drift_avg_bpm,
+      hr_drift_sample_size: norms28d.hr_drift_sample_size,
+      session_rpe_avg: norms28d.session_rpe_avg,
+      session_rpe_sample_size: norms28d.session_rpe_sample_size,
+      strength_rir_avg: norms28d.strength_rir_avg,
+      strength_rir_sample_size: norms28d.strength_rir_sample_size,
+      execution_score_avg: norms28d.execution_score_avg,
+      execution_score_sample_size: norms28d.execution_score_sample_size,
+      cardiac_efficiency_avg: null,
+      cardiac_efficiency_sample_size: 0,
+    };
+
+    const liftSnapshots: StrengthLiftSnapshot[] = (() => {
+      try {
+        const s1rms = learnedFitness?.strength_1rms;
+        if (!s1rms || typeof s1rms !== 'object') return [];
+        const LIFT_DISPLAY: Record<string, string> = {
+          squat: 'Squat', bench_press: 'Bench Press', deadlift: 'Deadlift',
+          overhead_press: 'Overhead Press', hip_thrust: 'Hip Thrust',
+          trap_bar_deadlift: 'Trap Bar Deadlift', barbell_row: 'Barbell Row',
+        };
+        return Object.entries(s1rms)
+          .filter(([_, v]: [string, any]) => v && typeof v === 'object' && v.value > 0)
+          .map(([key, v]: [string, any]) => ({
+            canonical_name: key,
+            display_name: LIFT_DISPLAY[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+            current_e1rm: Number(v.value) || null,
+            previous_e1rm: null,
+            current_avg_rir: reaction.avg_strength_rir_7d,
+            baseline_avg_rir: norms28d.strength_rir_avg,
+            sessions_in_window: Number(v.sample_count ?? 0),
+          }));
+      } catch { return []; }
+    })();
+
+    const crossDomainPairs: CrossDomainPair[] = (() => {
+      try {
+        const completed = (Array.isArray(normWorkouts) ? normWorkouts : [])
+          .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+          .sort((a: any, b: any) => String(a?.date || '').localeCompare(String(b?.date || '')));
+        const pairs: CrossDomainPair[] = [];
+        for (let i = 0; i < completed.length; i++) {
+          const w = completed[i] as any;
+          if (String(w?.type || '').toLowerCase() !== 'strength') continue;
+          const strengthDate = String(w?.date || '');
+          const strengthWorkload = Number(w?.workload_actual || 0);
+          for (let j = i + 1; j < completed.length; j++) {
+            const next = completed[j] as any;
+            const nextType = String(next?.type || '').toLowerCase();
+            if (nextType !== 'run' && nextType !== 'running' && nextType !== 'cycling' && nextType !== 'ride') continue;
+            const nextDate = String(next?.date || '');
+            const daysDiff = (new Date(nextDate).getTime() - new Date(strengthDate).getTime()) / 86400000;
+            if (daysDiff > 2) break;
+            if (daysDiff <= 0) continue;
+            pairs.push({
+              strength_date: strengthDate,
+              strength_workload: strengthWorkload,
+              next_endurance_date: nextDate,
+              next_endurance_hr_at_pace: null,
+              next_endurance_execution: executionScoreFromWorkout(next) ?? null,
+              baseline_hr_at_pace: null,
+              baseline_execution: norms28d.execution_score_avg,
+            });
+            break;
+          }
+        }
+        return pairs;
+      } catch { return []; }
+    })();
+
+    const athleteContextByWeek = activePlan?.athlete_context_by_week;
+    const athleteContextStr = (() => {
+      if (!activePlan || weekIndex == null || !athleteContextByWeek || typeof athleteContextByWeek !== 'object') return null;
+      const ctx = athleteContextByWeek[String(weekIndex)] ?? athleteContextByWeek[weekIndex];
+      return (typeof ctx === 'string' && ctx.trim()) ? ctx.trim() : null;
+    })();
+    const athleteContextSuggestsIllness = athleteContextStr && /sick|flu|covid|illness|ill\b|not feeling|under the weather/i.test(athleteContextStr);
+
+    const weeklyResponseModel: WeeklyResponseState = computeWeeklyResponse({
+      asOfDate,
+      signals: responseModelSignals,
+      norms: responseModelNorms,
+      lifts: liftSnapshots,
+      crossDomainPairs,
+      acwr: metrics.acwr,
+      weekVsPlanPct: metrics.wtd_completion_ratio != null ? Math.round(metrics.wtd_completion_ratio * 100) : null,
+      consecutiveTrainingDays: (() => {
+        try {
+          const allCompleted = (Array.isArray(normWorkouts) ? normWorkouts : [])
+            .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed');
+          const dates = [...new Set(allCompleted.map((w: any) => String(w?.date || '')))].sort().reverse();
+          let streak = 0;
+          const today = new Date(asOfDate);
+          for (let d = 0; d < 14; d++) {
+            const check = new Date(today);
+            check.setDate(check.getDate() - d);
+            const iso = check.toISOString().slice(0, 10);
+            if (dates.includes(iso)) streak++;
+            else if (d > 0) break;
+          }
+          return streak;
+        } catch { return 0; }
+      })(),
+      acute7Load: Math.round(acute7Load),
+      chronic28Load: Math.round(chronic28Load),
+      planContext: activePlan ? {
+        week_index: weekIndex,
+        week_intent: weekIntent,
+        total_weeks: activePlan.duration_weeks || null,
+        plan_name: activePlan.name || null,
+        is_transition_period: isPlanTransitionPeriod,
+      } : null,
+      goalSummary: goalContext.primary_event ? {
+        primary_race: {
+          name: goalContext.primary_event.name,
+          date: goalContext.primary_event.target_date!,
+          weeks_out: goalContext.upcoming_races.find(r => r.name === goalContext.primary_event!.name)?.weeks_out ?? 0,
+          distance: goalContext.primary_event.distance || 'unknown',
+          sport: goalContext.primary_event.sport || 'unknown',
+        },
+        race_count: goalContext.upcoming_races.length,
+        has_plan: goalContext.primary_event.plan_id != null,
+      } : null,
+      keySessionsGaps: reaction.key_sessions_gaps,
+      completionPct: metrics.wtd_completion_ratio != null ? Math.round(metrics.wtd_completion_ratio * 100) : null,
+      existingAthleteContext: athleteContextStr,
+    });
+
+    const goalPrediction = (() => {
+      const weeklyInput = responseModelToWeeklyInput(weeklyResponseModel);
+      const raceName = goalContext.primary_event?.name ?? activePlan?.name ?? null;
+      const targetSeconds = (() => {
+        if (goalContext.primary_event?.target_time) return goalContext.primary_event.target_time;
+        const pc = activePlan?.config;
+        if (pc?.target_time) return Number(pc.target_time);
+        if (pc?.marathon_target_seconds) return Number(pc.marathon_target_seconds);
+        return null;
+      })();
+      return runGoalPredictor({
+        weekly: weeklyInput,
+        plan: raceName ? { target_finish_time_seconds: targetSeconds, race_name: raceName } : null,
+        weekly_plan_context: activePlan ? {
+          week_intent: weekIntent as any,
+          is_recovery_week: weekIntent === 'recovery',
+          is_taper_week: weekIntent === 'taper',
+          next_week_intent: null,
+          weeks_remaining: (() => {
+            if (!activePlan.duration_weeks || weekIndex == null) return null;
+            return Math.max(0, activePlan.duration_weeks - weekIndex);
+          })(),
+        } : null,
+      });
+    })();
 
     const normalizeType = (t: any): string => {
       const s = String(t || '').toLowerCase();
@@ -1208,44 +1309,21 @@ Deno.serve(async (req) => {
       : weekIntent === 'taper' ? 'Taper week'
       : weekIntent === 'recovery' ? 'Recovery week'
       : weekIntent === 'baseline' ? 'Baseline week'
-      : 'Plan';
-
-    const athleteContextByWeek = activePlan?.athlete_context_by_week;
-    const athleteContextStr = (() => {
-      if (!activePlan || weekIndex == null || !athleteContextByWeek || typeof athleteContextByWeek !== 'object') return null;
-      const ctx = athleteContextByWeek[String(weekIndex)] ?? athleteContextByWeek[weekIndex];
-      return (typeof ctx === 'string' && ctx.trim()) ? ctx.trim() : null;
-    })();
-    const athleteContextSuggestsIllness = athleteContextStr && /sick|flu|covid|illness|ill\b|not feeling|under the weather/i.test(athleteContextStr);
+      : !activePlan && goalContext.primary_event
+        ? `${goalContext.primary_event.name} — ${goalContext.upcoming_races[0]?.weeks_out ?? '?'} weeks out`
+        : !activePlan ? 'No plan' : 'Plan';
 
     const primaryDeltaLine = (() => {
-      const d = responseInterp.overall.drivers || [];
-      if (d.includes('absorption_exec_down')) {
-        const delta = responseInterp.absorption.execution_delta;
-        const n = reaction.execution_sample_size || 0;
-        return delta != null ? `Execution: ${delta}% vs baseline (n=${n})` : `Execution: below baseline (n=${n})`;
-      }
-      if (d.includes('aerobic_drift_up')) {
-        const delta = responseInterp.aerobic.drift_delta_bpm;
-        const n = reaction.hr_drift_sample_size || 0;
-        return delta != null ? `Aerobic strain: +${Math.abs(delta)} bpm drift vs baseline (n=${n})` : `Aerobic strain: elevated drift vs baseline (n=${n})`;
-      }
-      if (d.includes('structural_rir_down')) {
-        const delta = responseInterp.structural.rir_delta;
-        const n = reaction.rir_sample_size_7d || 0;
-        return delta != null ? `Strength fatigue: ${delta} RIR vs baseline (n=${n})` : `Strength fatigue: lower RIR vs baseline (n=${n})`;
-      }
-      if (d.includes('subjective_rpe_up')) {
-        const delta = responseInterp.subjective.rpe_delta;
-        const n = reaction.rpe_sample_size_7d || 0;
-        return delta != null ? `Perceived strain: +${Math.abs(delta)} RPE vs baseline (n=${n})` : `Perceived strain: higher RPE vs baseline (n=${n})`;
-      }
-      return null;
+      const declining = weeklyResponseModel.visible_signals.filter(s => s.trend === 'declining');
+      if (declining.length === 0) return null;
+      const s = declining[0];
+      return `${s.label}: ${s.detail} (n=${s.samples})`;
     })();
 
     const training_state: CoachWeekContextResponseV1['training_state'] = (() => {
+      const rm = weeklyResponseModel;
       const kicker = `${intentLabel} • Response vs baseline`;
-      const conf = responseInterp.overall.confidence || 0;
+      const conf = rm.assessment.confidence === 'high' ? 0.85 : rm.assessment.confidence === 'medium' ? 0.65 : 0.4;
       const baseline_days = 28;
       const load_ramp_acwr = metrics.acwr;
       const load_ramp = {
@@ -1255,37 +1333,43 @@ Deno.serve(async (req) => {
         chronic28_by_type: byType(completedRolling),
         top_sessions_acute7: topSessionsAcute7,
       };
-      if (responseInterp.overall.label === 'need_more_data') {
+
+      if (rm.assessment.label === 'insufficient_data') {
         return {
-          code: 'need_more_data',
+          code: 'need_more_data' as const,
           kicker,
-          title: 'Not enough data',
-          subtitle: 'We need a few more logged sessions to compare against your baseline.',
+          title: rm.assessment.title,
+          subtitle: rm.assessment.explain,
           confidence: conf,
           baseline_days,
           load_ramp_acwr,
           load_ramp,
         };
       }
-      if (v.code === 'recover_overreaching' || (responseInterp.overall.drivers.length >= 2 && responseInterp.overall.label === 'fatigue_signs')) {
+
+      if (rm.assessment.label === 'overreaching' || v.code === 'recover_overreaching') {
         return {
-          code: 'overstrained',
+          code: 'overstrained' as const,
           kicker,
-          title: 'High fatigue',
-          subtitle: primaryDeltaLine || 'Multiple response markers are worse than your normal.',
+          title: rm.assessment.title,
+          subtitle: primaryDeltaLine || rm.assessment.explain,
           confidence: conf,
           baseline_days,
           load_ramp_acwr,
           load_ramp,
         };
       }
-      if (v.code === 'caution_ramping_fast' || (responseInterp.overall.drivers.length === 1 && !isPlanTransitionPeriod)) {
+
+      if (rm.assessment.label === 'stagnating' || v.code === 'caution_ramping_fast' ||
+          (rm.assessment.signals_concerning === 1 && !isPlanTransitionPeriod)) {
         if (athleteContextSuggestsIllness && (v.code === 'undertraining' || recoverySignaledExtrasCount > 0)) {
           return {
-            code: 'strained',
+            code: 'strained' as const,
             kicker,
             title: 'Recovery',
-            subtitle: primaryDeltaLine ? `Response markers may reflect illness rather than training load. ${primaryDeltaLine}` : 'Take the time you need. Response markers can be skewed when sick.',
+            subtitle: primaryDeltaLine
+              ? `Response markers may reflect illness rather than training load. ${primaryDeltaLine}`
+              : 'Take the time you need. Response markers can be skewed when sick.',
             confidence: conf,
             baseline_days,
             load_ramp_acwr,
@@ -1293,24 +1377,23 @@ Deno.serve(async (req) => {
           };
         }
         return {
-          code: 'strained',
+          code: 'strained' as const,
           kicker,
-          title: 'Elevated fatigue',
-          subtitle: primaryDeltaLine || 'One response marker is worse than your normal.',
+          title: rm.assessment.title,
+          subtitle: primaryDeltaLine || rm.assessment.explain,
           confidence: conf,
           baseline_days,
           load_ramp_acwr,
           load_ramp,
         };
       }
+
       const okTitle = (weekIntent === 'recovery' || weekIntent === 'taper') ? 'Recovery' : 'Normal';
       return {
-        code: 'strain_ok',
+        code: 'strain_ok' as const,
         kicker,
         title: okTitle,
-        subtitle: (weekIntent === 'recovery' || weekIntent === 'taper')
-          ? 'Your response markers look appropriate for a down week vs your baseline.'
-          : 'Your response markers are within your normal range vs your baseline.',
+        subtitle: rm.headline.subtext,
         confidence: conf,
         baseline_days,
         load_ramp_acwr,
@@ -1334,35 +1417,29 @@ Deno.serve(async (req) => {
       latestSnapshot = snapRows?.[0] ?? null;
     } catch {}
 
-    // Fitness direction: combine aerobic + structural trends
     const fitnessDirection = (() => {
-      const aerobic = responseInterp.aerobic;
-      const structural = responseInterp.structural;
+      const rm = weeklyResponseModel;
+      const aeroImproving = rm.endurance.cardiac_efficiency.sufficient && rm.endurance.cardiac_efficiency.trend === 'improving';
+      const aeroDecl = rm.endurance.cardiac_efficiency.sufficient && rm.endurance.cardiac_efficiency.trend === 'declining';
+      const driftDecl = rm.endurance.hr_drift.sufficient && rm.endurance.hr_drift.trend === 'declining';
+      const strengthGaining = rm.strength.overall.trend === 'gaining';
+      const strengthDecl = rm.strength.overall.trend === 'declining';
 
-      const aerobicGood = aerobic.label === 'efficient';
-      const aerobicBad = aerobic.label === 'stressed';
-      const structGood = structural.label === 'fresh';
-      const structBad = structural.label === 'fatigued';
-
-      if (aerobicGood && (structGood || structural.label === 'stable')) return 'improving';
-      if (aerobicBad && structBad) return 'declining';
-      if (aerobicBad || structBad) return 'mixed';
-      if (aerobicGood || structGood) return 'improving';
+      if (aeroImproving && (strengthGaining || rm.strength.overall.trend === 'maintaining')) return 'improving';
+      if ((aeroDecl || driftDecl) && strengthDecl) return 'declining';
+      if ((aeroDecl || driftDecl) || strengthDecl) return 'mixed';
+      if (aeroImproving || strengthGaining) return 'improving';
       return 'stable';
     })() as 'improving' | 'stable' | 'declining' | 'mixed';
 
-    // Readiness state: combine RPE trend, ACWR, and response
     const readinessState = (() => {
-      const acwrVal = metrics.acwr;
-      const overallLabel = responseInterp.overall.label;
-      const verdictCode = v.code;
-
-      if (verdictCode === 'recover_overreaching') return 'overreached';
-      if (verdictCode === 'caution_ramping_fast') return 'fatigued';
-      if (overallLabel === 'fatigue_signs' && !isPlanTransitionPeriod) return 'fatigued';
-      if (isAcwrFatiguedSignal(acwrVal, isPlanTransitionPeriod)) return 'fatigued';
-      if (isAcwrDetrainedSignal(acwrVal)) return 'detrained';
-      if (overallLabel === 'absorbing_well') return 'fresh';
+      const rm = weeklyResponseModel;
+      if (v.code === 'recover_overreaching') return 'overreached';
+      if (v.code === 'caution_ramping_fast') return 'fatigued';
+      if (rm.assessment.label === 'overreaching' && !isPlanTransitionPeriod) return 'fatigued';
+      if (isAcwrFatiguedSignal(metrics.acwr, isPlanTransitionPeriod)) return 'fatigued';
+      if (isAcwrDetrainedSignal(metrics.acwr)) return 'detrained';
+      if (rm.assessment.label === 'responding' && rm.assessment.signals_concerning === 0) return 'fresh';
       return 'normal';
     })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
 
@@ -1394,6 +1471,28 @@ Deno.serve(async (req) => {
           'Consider adding recovery',
           'Fatigue is elevated. Swap a quality session for easy or add a rest day this week.',
         );
+      }
+
+      // Strength auto-progression suggestions from response model
+      for (const lift of weeklyResponseModel.strength.per_lift) {
+        if (!lift.sufficient) continue;
+        if (lift.e1rm_trend === 'improving' && lift.e1rm_delta_pct != null && lift.e1rm_delta_pct >= 5) {
+          const rirOk = lift.rir_current == null || lift.rir_current >= 2;
+          if (rirOk) {
+            addSuggestion(
+              `str_prog_${lift.canonical_name}`,
+              `Increase ${lift.display_name} weight`,
+              `Your est. 1RM is up ${lift.e1rm_delta_pct.toFixed(0)}%${lift.e1rm_current ? ` (${lift.e1rm_current} ${wUnit})` : ''}. Working weight can increase.`,
+            );
+          }
+        }
+        if (lift.rir_trend === 'declining' && lift.rir_current != null && lift.rir_current < 1) {
+          addSuggestion(
+            `str_deload_${lift.canonical_name}`,
+            `Reduce ${lift.display_name} weight`,
+            `RIR has dropped to ${lift.rir_current.toFixed(1)} — you're grinding. A small deload helps.`,
+          );
+        }
       }
     }
 
@@ -1538,7 +1637,22 @@ Deno.serve(async (req) => {
             narrativeFacts.push(`NOTE: This is an early week of a new plan (within the first 2 weeks). The 7-day load ratio and 28-day baseline both overlap with the previous training cycle, so any "overreaching" or elevated load signals are unreliable artifacts of the plan transition — do NOT flag load as elevated or suggest recovery based on the load ratio. Focus exclusively on execution quality of the planned sessions and whether the athlete feels good.`);
           }
         } else {
-          narrativeFacts.push('The athlete is NOT on a structured plan. Suggestions for adding or adjusting sessions are appropriate.');
+          if (goalContext.upcoming_races.length > 0) {
+            const raceLines = goalContext.upcoming_races.map(r =>
+              `"${r.name}" (${r.distance} ${r.sport}) on ${r.date} — ${r.weeks_out} weeks away${r.has_plan ? '' : ' (NO plan generated yet)'}`,
+            );
+            narrativeFacts.push(`The athlete is NOT on a structured plan but has upcoming goals:\n${raceLines.join('\n')}`);
+            narrativeFacts.push('Since there is no plan, suggest creating one for their nearest event. In the meantime, provide general training guidance based on their goal timeline and current fitness.');
+          } else {
+            narrativeFacts.push('The athlete is NOT on a structured plan and has no active goals. Suggestions for adding or adjusting sessions are appropriate.');
+          }
+        }
+
+        if (goalContext.upcoming_races.length > 0 && activePlan) {
+          const unplannedRaces = goalContext.upcoming_races.filter(r => !r.has_plan);
+          if (unplannedRaces.length > 0) {
+            narrativeFacts.push(`UNPLANNED EVENTS: ${unplannedRaces.map(r => `"${r.name}" (${r.weeks_out} weeks out)`).join(', ')} — no training plan exists for these yet.`);
+          }
         }
 
         // Session completion
@@ -1691,13 +1805,12 @@ Deno.serve(async (req) => {
         });
         if (execLines.length > 1) narrativeFacts.push(`Execution by discipline: ${execLines.join(', ')}.`);
 
-        // 4-week deltas
         const deltas: string[] = [];
-        if (responseInterp.aerobic.drift_delta_bpm != null) deltas.push(`aerobic efficiency ${responseInterp.aerobic.drift_delta_bpm < 0 ? 'improving' : 'worsening'} (${responseInterp.aerobic.drift_delta_bpm > 0 ? '+' : ''}${responseInterp.aerobic.drift_delta_bpm} bpm drift)`);
-        if (responseInterp.structural.rir_delta != null) deltas.push(`strength fatigue ${responseInterp.structural.rir_delta < 0 ? 'increasing' : 'decreasing'} (${responseInterp.structural.rir_delta > 0 ? '+' : ''}${responseInterp.structural.rir_delta} reps in reserve)`);
-        if (responseInterp.subjective.rpe_delta != null) deltas.push(`perceived effort ${responseInterp.subjective.rpe_delta > 0 ? 'increasing' : 'decreasing'} (${responseInterp.subjective.rpe_delta > 0 ? '+' : ''}${responseInterp.subjective.rpe_delta})`);
-        if (responseInterp.absorption.execution_delta != null) deltas.push(`execution quality ${responseInterp.absorption.execution_delta > 0 ? 'improving' : 'declining'} (${responseInterp.absorption.execution_delta > 0 ? '+' : ''}${responseInterp.absorption.execution_delta}%)`);
-        if (deltas.length) narrativeFacts.push(`4-week trends: ${deltas.join(', ')}.`);
+        for (const s of weeklyResponseModel.visible_signals) {
+          if (s.trend === 'stable') continue;
+          deltas.push(`${s.label} ${s.trend === 'improving' ? 'improving' : 'declining'} (${s.detail})`);
+        }
+        if (deltas.length) narrativeFacts.push(`Response trends: ${deltas.join(', ')}.`);
 
         // Deterministic verdict
         narrativeFacts.push(`Overall status: ${training_state.title}.`);
@@ -1803,40 +1916,19 @@ ${narrativeFacts.join('\n')}`;
       { code: 'remaining_plan_load', label: 'Remaining planned load', value: Math.round(plannedRemainingLoad), unit: 'pts' },
     ];
 
-    const trendSignals: NonNullable<NonNullable<CoachWeekContextResponseV1['weekly_state_v1']>['trends']>['signals'] = [
-      {
-        metric: 'aerobic_efficiency',
-        direction: responseInterp.aerobic.drift_delta_bpm == null
-          ? 'stable'
-          : responseInterp.aerobic.drift_delta_bpm <= -2 ? 'improving' : responseInterp.aerobic.drift_delta_bpm >= 3 ? 'declining' : 'stable',
-        magnitude: responseInterp.aerobic.drift_delta_bpm != null && Math.abs(responseInterp.aerobic.drift_delta_bpm) >= 3 ? 'notable' : 'slight',
-        delta: responseInterp.aerobic.drift_delta_bpm,
-      },
-      {
-        metric: 'strength_reserve',
-        direction: responseInterp.structural.rir_delta == null
-          ? 'stable'
-          : responseInterp.structural.rir_delta >= 0.5 ? 'improving' : responseInterp.structural.rir_delta <= -0.5 ? 'declining' : 'stable',
-        magnitude: responseInterp.structural.rir_delta != null && Math.abs(responseInterp.structural.rir_delta) >= 0.5 ? 'notable' : 'slight',
-        delta: responseInterp.structural.rir_delta,
-      },
-      {
-        metric: 'effort_level',
-        direction: responseInterp.subjective.rpe_delta == null
-          ? 'stable'
-          : responseInterp.subjective.rpe_delta <= -0.7 ? 'improving' : responseInterp.subjective.rpe_delta >= 0.7 ? 'declining' : 'stable',
-        magnitude: responseInterp.subjective.rpe_delta != null && Math.abs(responseInterp.subjective.rpe_delta) >= 0.7 ? 'notable' : 'slight',
-        delta: responseInterp.subjective.rpe_delta,
-      },
-      {
-        metric: 'execution_quality',
-        direction: responseInterp.absorption.execution_delta == null
-          ? 'stable'
-          : responseInterp.absorption.execution_delta >= 3 ? 'improving' : responseInterp.absorption.execution_delta <= -5 ? 'declining' : 'stable',
-        magnitude: responseInterp.absorption.execution_delta != null && Math.abs(responseInterp.absorption.execution_delta) >= 5 ? 'notable' : 'slight',
-        delta: responseInterp.absorption.execution_delta,
-      },
-    ];
+    const SIGNAL_METRIC_MAP: Record<string, string> = {
+      'Cardiac drift': 'aerobic_efficiency',
+      'Cardiac efficiency': 'aerobic_efficiency',
+      'Effort level (RPE)': 'effort_level',
+      'Execution quality': 'execution_quality',
+    };
+    const trendSignals: NonNullable<NonNullable<CoachWeekContextResponseV1['weekly_state_v1']>['trends']>['signals'] =
+      weeklyResponseModel.visible_signals.map(s => ({
+        metric: SIGNAL_METRIC_MAP[s.label] ?? (s.category === 'strength' ? 'strength_reserve' : s.label.toLowerCase().replace(/\s+/g, '_')),
+        direction: s.trend,
+        magnitude: (s.trend !== 'stable' ? 'notable' : 'slight') as 'notable' | 'slight',
+        delta: null,
+      }));
 
     const weekly_state_v1: NonNullable<CoachWeekContextResponseV1['weekly_state_v1']> = {
       version: 1,
@@ -1904,11 +1996,12 @@ ${narrativeFacts.join('\n')}`;
       details: {
         evidence,
         reaction,
-        response: responseInterp,
         training_state,
         marathon_readiness,
         interference,
       },
+      run_session_types_7d: runSessionTypes7d,
+      response_model: weeklyResponseModel,
     };
 
     const response: CoachWeekContextResponseV1 = {
@@ -1947,7 +2040,7 @@ ${narrativeFacts.join('\n')}`;
       reaction,
       baselines,
       baseline_drift_suggestions: baseline_drift_suggestions.length ? baseline_drift_suggestions : undefined,
-      response: responseInterp,
+      run_session_types_7d: runSessionTypes7d,
       training_state,
       verdict: {
         code: v.code,
@@ -1964,6 +2057,9 @@ ${narrativeFacts.join('\n')}`;
       plan_adaptation_suggestions: plan_adaptation_suggestions.length ? plan_adaptation_suggestions : undefined,
       marathon_readiness,
       weekly_state_v1,
+      response_model: weeklyResponseModel,
+      goal_context: goalContext,
+      goal_prediction: goalPrediction,
     };
 
     return new Response(JSON.stringify(response), {

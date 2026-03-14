@@ -1,0 +1,115 @@
+// =============================================================================
+// GOAL CONTEXT — shared loader for active goals across all server functions
+// =============================================================================
+
+export type GoalLite = {
+  id: string;
+  name: string;
+  goal_type: 'event' | 'capacity' | 'maintenance';
+  target_date: string | null;
+  sport: string | null;
+  distance: string | null;
+  priority: 'A' | 'B' | 'C';
+  target_metric: string | null;
+  target_value: number | null;
+  current_value: number | null;
+  target_time: number | null;
+  training_prefs: Record<string, any> | null;
+  plan_id: string | null;
+};
+
+export type GoalContext = {
+  goals: GoalLite[];
+  primary_event: GoalLite | null;
+  upcoming_races: Array<{
+    name: string;
+    date: string;
+    sport: string;
+    distance: string;
+    weeks_out: number;
+    has_plan: boolean;
+    priority: 'A' | 'B' | 'C';
+  }>;
+  has_goals: boolean;
+  has_plan_for_all_events: boolean;
+};
+
+export async function loadGoalContext(
+  supabase: any,
+  userId: string,
+  asOfDate: string,
+  activePlanIds: string[],
+): Promise<GoalContext> {
+  const { data: rows } = await supabase
+    .from('goals')
+    .select('id, name, goal_type, target_date, sport, distance, priority, target_metric, target_value, current_value, target_time, training_prefs')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('target_date', { ascending: true, nullsFirst: false });
+
+  const goals: GoalLite[] = (Array.isArray(rows) ? rows : []).map((r: any) => ({
+    id: r.id,
+    name: r.name || 'Untitled',
+    goal_type: r.goal_type || 'event',
+    target_date: r.target_date ? String(r.target_date).slice(0, 10) : null,
+    sport: r.sport || null,
+    distance: r.distance || null,
+    priority: r.priority || 'A',
+    target_metric: r.target_metric || null,
+    target_value: r.target_value != null ? Number(r.target_value) : null,
+    current_value: r.current_value != null ? Number(r.current_value) : null,
+    target_time: r.target_time != null ? Number(r.target_time) : null,
+    training_prefs: r.training_prefs || null,
+    plan_id: null,
+  }));
+
+  // Link goals to plans via the plans.goal_id column
+  if (activePlanIds.length > 0) {
+    try {
+      const { data: planGoalLinks } = await supabase
+        .from('plans')
+        .select('id, goal_id')
+        .in('id', activePlanIds);
+      if (Array.isArray(planGoalLinks)) {
+        for (const link of planGoalLinks) {
+          const goal = goals.find(g => g.id === link.goal_id);
+          if (goal) goal.plan_id = link.id;
+        }
+      }
+    } catch {}
+  }
+
+  const todayMs = new Date(asOfDate + 'T12:00:00Z').getTime();
+
+  const upcoming_races = goals
+    .filter(g => g.goal_type === 'event' && g.target_date)
+    .filter(g => new Date(g.target_date! + 'T12:00:00Z').getTime() >= todayMs)
+    .map(g => {
+      const raceMs = new Date(g.target_date! + 'T12:00:00Z').getTime();
+      const weeksOut = Math.max(0, Math.round((raceMs - todayMs) / (7 * 86400000)));
+      return {
+        name: g.name,
+        date: g.target_date!,
+        sport: g.sport || 'unknown',
+        distance: g.distance || 'unknown',
+        weeks_out: weeksOut,
+        has_plan: g.plan_id != null,
+        priority: g.priority,
+      };
+    });
+
+  const eventGoals = goals.filter(g => g.goal_type === 'event' && g.target_date);
+  const futureEvents = eventGoals.filter(g => new Date(g.target_date! + 'T12:00:00Z').getTime() >= todayMs);
+
+  const primary_event = futureEvents.find(g => g.priority === 'A')
+    ?? futureEvents[0]
+    ?? null;
+
+  return {
+    goals,
+    primary_event,
+    upcoming_races,
+    has_goals: goals.length > 0,
+    has_plan_for_all_events: futureEvents.length > 0 && futureEvents.every(g => g.plan_id != null),
+  };
+}

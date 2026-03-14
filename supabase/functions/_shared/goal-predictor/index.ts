@@ -559,3 +559,43 @@ export function runGoalPredictor(input: GoalPredictorInput): GoalPredictionResul
     coach_message_block,
   };
 }
+
+// -----------------------------------------------------------------------------
+// Bridge: Response Model → Goal Predictor Input
+// Allows callers to feed the unified response model directly instead of
+// assembling WeeklyReadinessInput / BlockTrajectoryInput by hand.
+// -----------------------------------------------------------------------------
+
+export interface ResponseModelBridge {
+  endurance?: {
+    hr_drift?: { value: number | null; sufficient: boolean };
+    pace_adherence?: { value: number | null; sufficient: boolean };
+    rpe?: { value: number | null; trend: string; sufficient: boolean };
+    cardiac_efficiency?: { trend: string; sufficient: boolean };
+  };
+  strength?: {
+    overall?: { trend: string; avg_rir: number | null };
+  };
+  load?: {
+    acute_7d: number | null;
+    chronic_28d: number | null;
+  };
+  assessment?: {
+    label: string;
+    confidence: string;
+  };
+}
+
+export function responseModelToWeeklyInput(rm: ResponseModelBridge | null | undefined): WeeklyReadinessInput | null {
+  if (!rm?.endurance) return null;
+  const e = rm.endurance;
+  return {
+    hr_drift_bpm: e.hr_drift?.sufficient ? e.hr_drift.value : null,
+    pace_adherence_pct: e.pace_adherence?.sufficient ? (e.pace_adherence.value != null ? Math.round(e.pace_adherence.value * 100) : null) : null,
+    structural_load_acute: rm.load?.acute_7d ?? null,
+    avg_rir_acute: rm.strength?.overall?.avg_rir ?? null,
+    recent_form_trend: e.cardiac_efficiency?.sufficient
+      ? (e.cardiac_efficiency.trend === 'improving' ? 'improving' : e.cardiac_efficiency.trend === 'declining' ? 'worsening' : 'stable')
+      : null,
+  };
+}

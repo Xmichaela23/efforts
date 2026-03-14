@@ -51,6 +51,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
+import { loadGoalContext } from '../_shared/goal-context.ts';
 import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
   ACWR_RATIO_THRESHOLDS,
@@ -85,6 +86,7 @@ const corsHeaders = {
 interface PlanContext {
   hasActivePlan: boolean;
   planId: string | null;
+  allPlanIds?: string[];
   weekIndex: number | null; // 1-based week number
   phaseKey: string | null;
   phaseName: string | null;
@@ -573,6 +575,15 @@ Deno.serve(async (req) => {
     // ==========================================================================
 
     const planContext = await fetchPlanContext(supabase, user_id, focusDateISO, focusDate);
+
+    // Load goals — available regardless of whether a plan exists
+    let goalContext: Awaited<ReturnType<typeof loadGoalContext>> | null = null;
+    try {
+      const planIds = planContext?.allPlanIds?.length ? planContext.allPlanIds : planContext?.planId ? [planContext.planId] : [];
+      goalContext = await loadGoalContext(supabase, user_id, focusDateISO, planIds);
+    } catch (e) {
+      console.warn('[generate-training-context] loadGoalContext failed (non-fatal):', e);
+    }
 
     // ==========================================================================
     // CALCULATE SMART DATE RANGES (plan-aligned when plan is active)
@@ -2370,6 +2381,7 @@ Deno.serve(async (req) => {
       personalization_gaps: personalization_gaps && personalization_gaps.length > 0 ? personalization_gaps : undefined,
       gaps_summary: gaps_summary && gaps_summary.length > 0 ? gaps_summary : undefined,
       marathon_readiness: marathonReadiness,
+      goal_context: goalContext,
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);
@@ -2618,14 +2630,13 @@ async function fetchPlanContext(
   };
 
   try {
-    // Find active plan - check plans table first (new system)
     const { data: activePlans } = await supabase
       .from('plans')
       .select('id, name, config, current_week, duration_weeks, sessions_by_week')
       .eq('user_id', userId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(5);
 
     if (!activePlans || activePlans.length === 0) {
       return null; // No active plan
@@ -2728,6 +2739,7 @@ async function fetchPlanContext(
     return {
       hasActivePlan: true,
       planId: plan.id,
+      allPlanIds: (activePlans || []).map((p: any) => p.id),
       weekIndex,
       phaseKey,
       phaseName,
