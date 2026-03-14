@@ -1151,14 +1151,16 @@ Deno.serve(async (req) => {
     })();
     const athleteContextSuggestsIllness = athleteContextStr && /sick|flu|covid|illness|ill\b|not feeling|under the weather/i.test(athleteContextStr);
 
+    const acwrEarly = chronic28Load > 0 ? (acute7Load / 7) / (chronic28Load / 28) : null;
+
     const weeklyResponseModel: WeeklyResponseState = computeWeeklyResponse({
       asOfDate,
       signals: responseModelSignals,
       norms: responseModelNorms,
       lifts: liftSnapshots,
       crossDomainPairs,
-      acwr: metrics.acwr,
-      weekVsPlanPct: metrics.wtd_completion_ratio != null ? Math.round(metrics.wtd_completion_ratio * 100) : null,
+      acwr: acwrEarly,
+      weekVsPlanPct: wtdCompletionRatio != null ? Math.round(wtdCompletionRatio * 100) : null,
       consecutiveTrainingDays: (() => {
         try {
           const allCompleted = (Array.isArray(normWorkouts) ? normWorkouts : [])
@@ -1197,7 +1199,7 @@ Deno.serve(async (req) => {
         has_plan: goalContext.primary_event.plan_id != null,
       } : null,
       keySessionsGaps: reaction.key_sessions_gaps,
-      completionPct: metrics.wtd_completion_ratio != null ? Math.round(metrics.wtd_completion_ratio * 100) : null,
+      completionPct: wtdCompletionRatio != null ? Math.round(wtdCompletionRatio * 100) : null,
       existingAthleteContext: athleteContextStr,
     });
 

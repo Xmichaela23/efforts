@@ -42,7 +42,7 @@ export async function loadGoalContext(
 ): Promise<GoalContext> {
   const { data: rows } = await supabase
     .from('goals')
-    .select('id, name, goal_type, target_date, sport, distance, priority, target_metric, target_value, current_value, target_time, training_prefs')
+    .select('id, name, goal_type, target_date, sport, distance, priority, target_metric, target_value, current_value, training_prefs')
     .eq('user_id', userId)
     .eq('status', 'active')
     .order('target_date', { ascending: true, nullsFirst: false });
@@ -58,7 +58,7 @@ export async function loadGoalContext(
     target_metric: r.target_metric || null,
     target_value: r.target_value != null ? Number(r.target_value) : null,
     current_value: r.current_value != null ? Number(r.current_value) : null,
-    target_time: r.target_time != null ? Number(r.target_time) : null,
+    target_time: r.target_time != null ? Number(r.target_time) : null, // column added by 20260312 migration
     training_prefs: r.training_prefs || null,
     plan_id: null,
   }));
