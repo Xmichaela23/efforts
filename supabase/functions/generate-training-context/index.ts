@@ -930,7 +930,7 @@ Deno.serve(async (req) => {
     // ==========================================================================
     const buildTrendExplanation = async (): Promise<string | null> => {
       try {
-        if (!Deno.env.get('ANTHROPIC_API_KEY') && !Deno.env.get('OPENAI_API_KEY')) return null;
+        if (!Deno.env.get('ANTHROPIC_API_KEY')) return null;
         const evidence = ((weekly_readiness as any)?.__trend_evidence as any[]) ?? [];
         if (!Array.isArray(evidence) || evidence.length === 0) return null;
 

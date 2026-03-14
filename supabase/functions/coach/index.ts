@@ -1538,8 +1538,7 @@ Deno.serve(async (req) => {
     let week_narrative: string | null = null;
     try {
       const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-      const openaiKey = Deno.env.get('OPENAI_API_KEY');
-      if (anthropicKey || openaiKey) {
+      if (anthropicKey) {
         const narrativeFacts: string[] = [];
         let routeInsightLine: string | null = null;
 
@@ -1926,29 +1925,6 @@ ${narrativeFacts.join('\n')}`;
           } else {
             const errBody = await resp.text().catch(() => '');
             console.warn(`[coach] narrative Anthropic non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
-          }
-        } else if (openaiKey) {
-          // OpenAI fallback
-          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: narrativePrompt },
-              ],
-              temperature: 0,
-              max_tokens: 300,
-            }),
-          });
-          if (resp.ok) {
-            const aiData = await resp.json();
-            const raw = String(aiData?.choices?.[0]?.message?.content || '').trim();
-            week_narrative = raw || null;
-          } else {
-            const errBody = await resp.text().catch(() => '');
-            console.warn(`[coach] narrative OpenAI non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
           }
         }
       }

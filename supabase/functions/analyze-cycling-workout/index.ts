@@ -1097,10 +1097,8 @@ async function generateAINarrativeInsights(
   userUnits: 'metric' | 'imperial' = 'imperial',
   supabase: any = null
 ): Promise<string[]> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  
-  if (!openaiKey) {
-    console.warn('⚠️ OPENAI_API_KEY not set, skipping AI narrative generation');
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) {
+    console.warn('⚠️ ANTHROPIC_API_KEY not set, skipping AI narrative generation');
     return [];
   }
 
@@ -1250,40 +1248,16 @@ Generate 3-4 observations comparing actual vs. planned performance (if planned) 
 Return ONLY a JSON array of strings: ["observation 1", "observation 2", ...]`;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a data analyst converting workout metrics into factual observations. Never use motivational language.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 500
-      })
+    const { callLLM } = await import('../_shared/llm.ts');
+    const raw = await callLLM({
+      system: 'You are a data analyst converting workout metrics into factual observations. Never use motivational language.',
+      user: prompt,
+      temperature: 0.3,
+      maxTokens: 500,
     });
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content?.trim();
-    
-    if (!content) {
-      throw new Error('Empty response from OpenAI');
-    }
-
+    if (!raw) throw new Error('Empty response from LLM');
+    const content = raw.trim();
     const insights = JSON.parse(content);
     
     if (!Array.isArray(insights)) {

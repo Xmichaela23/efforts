@@ -333,8 +333,7 @@ export async function generateAISummaryV1(
   flags: FlagV1[],
   coachingContext?: string | null,
 ): Promise<string | null> {
-  const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) return null;
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) return null;
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
 

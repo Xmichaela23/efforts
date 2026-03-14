@@ -835,8 +835,8 @@ async function generateWeeklyAnalysis(
   weekEnd: Date,
   planCtx?: { isTri?: boolean; planApproach?: string },
 ): Promise<any> {
-  if (!Deno.env.get('ANTHROPIC_API_KEY') && !Deno.env.get('OPENAI_API_KEY')) {
-    throw new Error('LLM API key not configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)');
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) {
+    throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
   const isTri = planCtx?.isTri ?? false;

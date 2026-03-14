@@ -346,9 +346,7 @@ Deno.serve(async (req) => {
 
     // Generate AI insights if OpenAI key is available
     let narrativeInsights: string[] = [];
-    const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
-    
-    if (openaiKey) {
+    if (Deno.env.get('ANTHROPIC_API_KEY')) {
       try {
         const workoutContext = {
           type: workout.type,

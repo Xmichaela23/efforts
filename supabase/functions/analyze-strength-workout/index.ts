@@ -1611,8 +1611,7 @@ async function generateEnhancedStrengthInsights(
   dataQuality: any,
   coachingContextText?: string | null,
 ): Promise<string[]> {
-  const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
   }
   

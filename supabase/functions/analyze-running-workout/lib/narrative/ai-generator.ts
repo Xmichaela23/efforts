@@ -20,9 +20,7 @@ export async function generateAINarrativeInsights(
   userUnits: 'metric' | 'imperial' = 'imperial',
   supabase: any = null
 ): Promise<string[]> {
-  const openaiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('OPENAI_API_KEY');
-  
-  if (!openaiKey) {
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('⚠️ ANTHROPIC_API_KEY not set, skipping AI narrative generation');
     return null;
   }
