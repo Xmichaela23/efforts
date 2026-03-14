@@ -802,7 +802,7 @@ export default function WorkoutCalendar({
   // VERTICAL TIMELINE PREVIEW - Replace grid with timeline list
   return (
     <div
-      className="w-full flex-1 flex flex-col touch-pan-y bg-transparent relative min-h-0"
+      className="w-full flex-1 flex flex-col touch-pan-y bg-transparent relative min-h-0 overflow-y-auto"
       style={{ position: 'relative' }}
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
@@ -1306,7 +1306,7 @@ export default function WorkoutCalendar({
       </div>
         
       {/* Total Workload - Flex sibling that fills remaining space */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flexShrink: 0 }}>
         {(() => {
           // Collect all metrics
           const metrics: Array<{ label: string; value: string }> = [];
@@ -1444,10 +1444,7 @@ export default function WorkoutCalendar({
           return (
             // Let the footer absorb extra height so swim/bike lines can fit,
             // while keeping day row sizing unchanged.
-            <div className="pt-3 pb-4 border-t border-white/10 flex flex-col justify-end" style={{ height: '100%' }}>
-              {/* Spacer to push content down */}
-              <div className="flex-1" />
-              
+            <div className="pt-3 pb-4 border-t border-white/10">
               <div className="space-y-3" style={{ fontSize: '0.875rem' }}>
                 {/* Total Workload header */}
                 <div 
