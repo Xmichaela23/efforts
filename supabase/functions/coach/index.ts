@@ -1710,15 +1710,51 @@ Deno.serve(async (req) => {
           narrativeFacts.push(`ATHLETE SIGNALED RECOVERY: ${recoverySignaledExtrasCount} unplanned session(s) with low RPE or positive feeling (easy/recovery intent).`);
         }
 
-        // Missed session reasons (athlete-provided — use these, do not guess)
-        const gapsWithReasons = (reaction.key_session_gaps_details || []).filter((g: any) => g.skip_reason || g.skip_note);
+        // ── Temporal anchor: sessions still upcoming this week (not yet due) ──
+        // Injected BEFORE missed-session facts so Claude knows what to exclude from
+        // "missed" language. Without this, Claude treats future sessions as gaps.
+        if (keySessionsRemaining.length > 0) {
+          const upcomingLines = keySessionsRemaining.map((s: any) => {
+            const dayLabel = (() => {
+              try {
+                const d = new Date(String(s.date) + 'T12:00:00Z');
+                return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
+              } catch { return String(s.date); }
+            })();
+            return `${dayLabel} ${s.type}`;
+          });
+          narrativeFacts.push(`STILL UPCOMING THIS WEEK (do NOT describe as missed): ${upcomingLines.join(', ')}.`);
+        }
+
+        // Missed session reasons — convert ISO dates to day names so Claude never
+        // has to infer day-of-week from a raw date string (error-prone near DST).
+        const allGaps = reaction.key_session_gaps_details || [];
+        const gapsWithReasons = allGaps.filter((g: any) => g.skip_reason || g.skip_note);
         if (gapsWithReasons.length > 0) {
           const lines = gapsWithReasons.map((g: any) => {
-            const parts = [`${g.date} ${g.type}: ${g.skip_reason || 'no tag'}`];
+            const dayLabel = (() => {
+              try {
+                const d = new Date(String(g.date) + 'T12:00:00Z');
+                return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
+              } catch { return String(g.date); }
+            })();
+            const parts = [`${dayLabel} ${g.type}: ${g.skip_reason || 'no tag'}`];
             if (g.skip_note) parts.push(`(${g.skip_note})`);
             return parts.join(' ');
           });
-          narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided): ${lines.join('; ')}.`);
+          narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided — these are the ONLY days to reference as missed): ${lines.join('; ')}.`);
+        } else if (allGaps.length > 0) {
+          // Gaps without reasons — still provide day names so Claude doesn't invent them
+          const lines = allGaps.map((g: any) => {
+            const dayLabel = (() => {
+              try {
+                const d = new Date(String(g.date) + 'T12:00:00Z');
+                return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
+              } catch { return String(g.date); }
+            })();
+            return `${dayLabel} ${g.type}`;
+          });
+          narrativeFacts.push(`MISSED SESSIONS (no reason provided — state these as missed without guessing why): ${lines.join('; ')}.`);
         }
 
         // ── Per-workout detail from canonical weekly workouts only ──
@@ -1887,19 +1923,21 @@ Deno.serve(async (req) => {
           ? `You are a multi-sport triathlon coach writing a weekly check-in for your athlete.`
           : `You are a personal coach writing a weekly check-in for your athlete.`;
 
-        const narrativePrompt = `${coachPersona} Today is ${todayDay}, ${asOfDate}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-4 sentences in second person. Be specific and practical. Use day names instead of raw dates.
+        const narrativePrompt = `${coachPersona} Today is ${todayDay}, ${asOfDate}${userTz ? ` (${userTz})` : ''}. You have detailed facts about every session they did this week, including exactly what was planned vs what they actually did. Write 3-4 sentences in second person. Be specific and practical. Use day names instead of raw dates.
 
 STYLE (Training Status): sentence 1 = status + why in plain language. sentence 2 = what happened this week (completed vs missed, only past sessions). sentence 3 = one clear next action.
 
 NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reasons. Otherwise, state what happened without speculation. Only explain causes when the athlete explicitly provided them.
 
-TIME ANCHORING IS STRICT: For each SESSION fact, use the provided local day/time label exactly as the source of truth. Do not rename the day or infer a different day from dates.
+TEMPORAL RULES (strict):
+- "STILL UPCOMING" sessions have NOT happened yet — never describe them as missed, skipped, or incomplete.
+- "MISSED SESSION REASONS" lists every session that was genuinely missed before today, with the exact day name already resolved. Use these day names verbatim — do NOT recompute day-of-week from dates.
+- "MISSED SESSIONS" (no reason) are also already resolved to day names — use them verbatim.
+- Never infer a day name from an ISO date. If a day name isn't provided in the facts, omit the reference.
 
 Connect the dots when you have athlete context: if they said they had the flu, that explains missed sessions. If they said they went heavier on purpose, that explains the weight deviation. If their running efficiency improved, say so. If there is an INTERFERENCE ALERT, explain it in plain language.
 
 CRITICAL: If the athlete has an active training plan, NEVER suggest adding extra sessions or workouts. If sessions were missed, tell them to prioritize the planned sessions next week. Frame adjustments only as intensity changes within existing planned sessions.
-
-DAY PRECISION RULE: Never mention a specific day unless that exact day appears in SESSION or key-session facts for this week. If unsure, use generic wording about the next planned session.
 
 End with one concrete, actionable suggestion. Do NOT use jargon like ACWR, RIR, RPE, TRIMP, or sample sizes. Speak like a real coach talking to their athlete.
 
