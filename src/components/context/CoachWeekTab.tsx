@@ -557,7 +557,7 @@ export default function CoachWeekTab() {
 
         return (
           <div className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
-            {prompt?.show && !contextValue.trim() ? (
+            {prompt?.show && !contextValue.trim() && !(reaction?.key_session_gaps_details?.length > 0) ? (
               <div className="px-3 py-3">
                 <div className="text-xs text-white/70 mb-2">{prompt.question}</div>
                 {tags.length > 0 && (
