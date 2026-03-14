@@ -433,7 +433,7 @@ const CONTEXT_TAGS: ContextPrompt['tags'] = [
 ];
 
 function computeContextPrompt(
-  keySessionsGaps: number,
+  totalSessionsGaps: number,
   completionPct: number | null,
   rpeDecline: boolean,
   existingContext: string | null,
@@ -442,10 +442,10 @@ function computeContextPrompt(
     return { show: false, question: null, tags: CONTEXT_TAGS };
   }
 
-  if (keySessionsGaps >= 2) {
+  if (totalSessionsGaps >= 2) {
     return {
       show: true,
-      question: `You missed ${keySessionsGaps} key sessions this week. What happened?`,
+      question: `You missed ${totalSessionsGaps} planned sessions this week. What happened?`,
       tags: CONTEXT_TAGS,
     };
   }
@@ -486,7 +486,7 @@ export function computeWeeklyResponse(opts: {
   chronic28Load: number | null;
   planContext?: WeeklyResponseState['plan_context'] | null;
   goalSummary?: GoalSummary | null;
-  keySessionsGaps?: number;
+  totalSessionsGaps?: number;
   completionPct?: number | null;
   existingAthleteContext?: string | null;
 }): WeeklyResponseState {
@@ -502,7 +502,7 @@ export function computeWeeklyResponse(opts: {
 
   const rpeDecline = endurance.rpe.sufficient && endurance.rpe.trend === 'declining';
   const context_prompt = computeContextPrompt(
-    opts.keySessionsGaps ?? 0,
+    opts.totalSessionsGaps ?? 0,
     opts.completionPct ?? null,
     rpeDecline,
     opts.existingAthleteContext ?? null,

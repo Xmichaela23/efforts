@@ -528,6 +528,15 @@ Deno.serve(async (req) => {
     const keySessionsCompleted = keySessionsPlannedEffective.filter((x: any) => isPlannedCompleted(x?.r));
     const keySessionsCompletionRatio = keySessionsPlannedEffective.length > 0 ? keySessionsCompleted.length / keySessionsPlannedEffective.length : null;
 
+    // Total planned sessions WTD (all types, not just key) — for honest "missed" counts
+    const allPlannedWtdEffective = plannedWtdArr.filter((r: any) => {
+      const d = String(r?.date || '').slice(0, 10);
+      if (d !== asOfDate) return true;
+      return isPlannedCompleted(r);
+    });
+    const allPlannedMissed = allPlannedWtdEffective.filter((r: any) => !isPlannedCompleted(r));
+    const totalSessionsGaps = allPlannedMissed.length;
+
     // Linking breakdown (WTD): linked vs gaps vs extras
     const keySessionGapsDetails = keySessionsPlannedEffective
       .filter((x: any) => !isPlannedCompleted(x?.r))
@@ -1198,7 +1207,7 @@ Deno.serve(async (req) => {
         race_count: goalContext.upcoming_races.length,
         has_plan: goalContext.primary_event.plan_id != null,
       } : null,
-      keySessionsGaps: reaction.key_sessions_gaps,
+      totalSessionsGaps,
       completionPct: wtdCompletionRatio != null ? Math.round(wtdCompletionRatio * 100) : null,
       existingAthleteContext: athleteContextStr,
     });
