@@ -360,8 +360,8 @@ export default function CoachWeekTab() {
   // Derived slices — kept above early returns so hooks are unconditional
   const ts = ws?.details?.training_state;
   const reaction = ws?.details?.reaction;
-  // Correct path: ws.details.response.run_session_types_7d
-  const runSessionTypes = ws?.details?.response?.run_session_types_7d ?? [];
+  // run_session_types_7d is at the root of weekly_state_v1, not under details
+  const runSessionTypes = (ws as any)?.run_session_types_7d ?? [];
   const readiness = ws?.details?.marathon_readiness;
   const narrativeText = ws?.coach?.narrative ?? null;
   const planAdaptationSuggestions = ws?.coach?.plan_adaptation_suggestions ?? [];
@@ -592,7 +592,15 @@ export default function CoachWeekTab() {
 
             {narrativeText ? (
               <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
-            ) : null}
+            ) : (
+              // Fallback to structured server data when LLM narrative is unavailable
+              <div className="mt-2 space-y-1">
+                {ts?.kicker && <div className="text-sm text-white/65">{ts.kicker}</div>}
+                {ws?.glance?.next_action_details && (
+                  <div className="text-xs text-white/45">{ws.glance.next_action_details}</div>
+                )}
+              </div>
+            )}
 
             {ts?.load_ramp_acwr != null && (
               <div className="mt-3">

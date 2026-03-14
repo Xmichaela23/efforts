@@ -1917,6 +1917,9 @@ ${narrativeFacts.join('\n')}`;
           const aiData = await resp.json();
           const raw = String(aiData?.choices?.[0]?.message?.content || '').trim();
           week_narrative = raw || null;
+        } else {
+          const errBody = await resp.text().catch(() => '');
+          console.warn(`[coach] narrative OpenAI non-ok: ${resp.status} ${resp.statusText} — ${errBody.slice(0, 200)}`);
         }
       }
     } catch (narErr: any) {
