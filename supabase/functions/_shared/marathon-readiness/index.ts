@@ -6,13 +6,6 @@
  * Checklist-based assessment for marathon readiness.
  * Uses 6–8 week lookback against workout_facts.
  * No suggestion flow — assessment only.
- *
- * Checklist:
- * - Long run ≥ 18 mi in last 6 weeks
- * - Weekly volume trending ≥ 40 mpw (avg over last 4 weeks)
- * - Long run or M-pace work in last 4 weeks (proxy: run ≥ 90 min)
- * - ACWR in safe range (0.8–1.5 optimal, 1.5–1.7 elevated, >1.7 high risk)
- * - Durability risk (when block data available)
  */
 
 const MILES_18_M = 18 * 1609.34;
@@ -35,6 +28,9 @@ export interface MarathonReadinessResult {
   items: MarathonReadinessItem[];
   /** Summary: all pass, some pass, or none */
   summary: 'on_track' | 'needs_work' | 'insufficient_data';
+  /** Specific, actionable one-liner shown below the checklist */
+  summary_line?: string;
+  context_note?: string;
 }
 
 interface WorkoutFactRow {
@@ -92,13 +88,12 @@ export async function computeMarathonReadiness(
   const avgMpw = totalRunM4w > 0 ? (totalRunM4w / 1609.34) / 4 : 0;
   const volumePass = avgMpw >= MIN_MPW_TARGET;
 
-  // 3. Long run or M-pace proxy (run ≥ 90 min) in last 4 weeks
+  // 3. Long run or marathon-pace proxy (run ≥ 90 min) in last 4 weeks
   let hasLongOrMpace = false;
   for (const r of rows) {
     if (r.date < fourWeeksAgoIso) continue;
     const dur = r.duration_minutes ?? 0;
     const distM = r.run_facts?.distance_m ?? 0;
-    // Long run: ≥ 90 min or ≥ 18 mi
     if (dur >= LONG_RUN_MIN_MINUTES || distM >= MILES_18_M) {
       hasLongOrMpace = true;
       break;
@@ -111,8 +106,7 @@ export async function computeMarathonReadiness(
   const acwrElevated = acwr != null && acwr > 1.5 && acwr <= 1.7;
   const acwrHighRisk = acwr != null && acwr > 1.7;
 
-  // 5. Durability risk — from goal predictor when block data available.
-  // Coach doesn't have block data; use ACWR as proxy: high ACWR = elevated durability concern.
+  // 5. Durability — ACWR proxy (no block data available in coach context)
   const durabilityLabel: 'low' | 'medium' | 'high' | null =
     acwrHighRisk ? 'high' : acwrElevated ? 'medium' : acwr != null && acwr >= 0.8 && acwr <= 1.5 ? 'low' : null;
   const durabilityPass = durabilityLabel === 'low' || durabilityLabel === null;
@@ -120,52 +114,58 @@ export async function computeMarathonReadiness(
   const items: MarathonReadinessItem[] = [
     {
       id: 'long_run',
-      label: 'Long run ≥ 18 mi in last 6 weeks',
+      label: 'Long run distance',
       pass: longRunPass,
       detail: longRunPass
-        ? `Longest: ${longestRunMi.toFixed(1)} mi`
+        ? `Your longest run in the last 6 weeks is ${longestRunMi.toFixed(1)} mi — you've covered race-relevant distance.`
         : longestRunMi > 0
-          ? `Longest: ${longestRunMi.toFixed(1)} mi (need 18)`
-          : 'No long runs logged',
+          ? `Longest run: ${longestRunMi.toFixed(1)} mi — you need at least one 18-miler before taper.`
+          : 'No long runs logged in the last 6 weeks.',
       value: longestRunMi > 0 ? `${longestRunMi.toFixed(1)} mi` : undefined,
     },
     {
       id: 'volume',
-      label: `Weekly volume trending ≥ ${MIN_MPW_TARGET} mpw`,
+      label: 'Weekly mileage',
       pass: volumePass,
-      detail: avgMpw > 0 ? `Avg: ${avgMpw.toFixed(1)} mpw (last 4 weeks)` : 'No run volume in last 4 weeks',
-      value: avgMpw > 0 ? `${avgMpw.toFixed(1)} mpw` : undefined,
+      detail: avgMpw > 0
+        ? volumePass
+          ? `Averaging ${avgMpw.toFixed(1)} miles/week — enough volume to support the race.`
+          : `Averaging ${avgMpw.toFixed(1)} miles/week over the last 4 weeks — building toward ${MIN_MPW_TARGET}.`
+        : 'No run volume logged in the last 4 weeks.',
+      value: avgMpw > 0 ? `${avgMpw.toFixed(1)} mi/wk` : undefined,
     },
     {
       id: 'mpace',
-      label: 'Long run or M-pace work in last 4 weeks',
+      label: 'Race-pace quality work',
       pass: mpacePass,
-      detail: mpacePass ? 'Yes' : 'No runs ≥ 90 min',
+      detail: mpacePass
+        ? 'You have a long run or hard effort in the last 4 weeks.'
+        : 'No runs over 90 minutes in the last 4 weeks — a long run soon would help.',
     },
     {
       id: 'acwr',
-      label: 'ACWR in safe range',
+      label: 'Training load balance',
       pass: acwrPass,
       detail: acwr != null
         ? acwr < 0.8
-          ? `ACWR ${acwr.toFixed(2)} — low (undertraining; target 0.8–1.5)`
+          ? `Load is below target (${acwr.toFixed(2)}) — you have room to build volume safely.`
           : acwr > 1.5
-            ? `ACWR ${acwr.toFixed(2)} — high (ramping too fast; target 0.8–1.5)`
-            : `ACWR ${acwr.toFixed(2)} (0.8–1.5 optimal)`
-        : 'No ACWR data',
+            ? `Load is elevated (${acwr.toFixed(2)}) — back off slightly to avoid injury risk before race day.`
+            : `Load is balanced at ${acwr.toFixed(2)} — in the optimal range.`
+        : 'Not enough data to assess training load.',
       value: acwr != null ? acwr.toFixed(2) : undefined,
     },
     {
       id: 'durability',
-      label: 'Durability risk',
+      label: 'Injury risk',
       pass: durabilityPass,
-      detail: durabilityLabel != null
-        ? durabilityLabel === 'low'
-          ? 'Low — load is sustainable'
-          : durabilityLabel === 'high'
-            ? 'High — legs may fade late in race'
-            : 'Medium — watch recovery'
-        : '— (no block data)',
+      detail: durabilityLabel === 'high'
+        ? 'Load is high enough that legs may accumulate fatigue late in the race.'
+        : durabilityLabel === 'medium'
+          ? 'Load is elevated — build in a recovery day before race week.'
+          : durabilityLabel === 'low'
+            ? 'Load is sustainable — injury risk looks low.'
+            : 'Load is too low to assess injury risk meaningfully.',
       value: durabilityLabel ?? '—',
     },
   ];
@@ -175,9 +175,40 @@ export async function computeMarathonReadiness(
   if (passCount >= 4) summary = 'on_track';
   else if (passCount >= 1 || rows.length > 0) summary = 'needs_work';
 
+  // Build a specific, actionable summary line
+  const summary_line = (() => {
+    if (summary === 'on_track') {
+      return 'Training base looks solid — stay consistent and trust the taper.';
+    }
+    if (summary === 'insufficient_data') {
+      return 'Log more runs to get a reliable readiness picture.';
+    }
+    // needs_work — identify the most impactful gap
+    const failingIds = items.filter((i) => !i.pass).map((i) => i.id);
+    const parts: string[] = [];
+    if (failingIds.includes('volume')) {
+      const gap = (MIN_MPW_TARGET - avgMpw).toFixed(0);
+      parts.push(`Weekly mileage is the main gap — averaging ${avgMpw.toFixed(1)} mi/wk, need to build toward ${MIN_MPW_TARGET}.`);
+    }
+    if (failingIds.includes('long_run')) {
+      parts.push(`Get a run of at least 18 miles in before taper.`);
+    }
+    if (failingIds.includes('mpace')) {
+      parts.push(`Add a long run or marathon-pace effort this week.`);
+    }
+    if (failingIds.includes('acwr') && acwr != null && acwr < 0.8) {
+      parts.push(`Your load is low — you have room to add volume without injury risk.`);
+    }
+    if (failingIds.includes('acwr') && acwr != null && acwr > 1.5) {
+      parts.push(`Ease back on volume this week — load is elevated.`);
+    }
+    return parts.length > 0 ? parts.join(' ') : 'Address the flagged items above before taper week.';
+  })();
+
   return {
     applicable: true,
     items,
     summary,
+    summary_line,
   };
 }
