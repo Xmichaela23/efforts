@@ -21,8 +21,8 @@ export type LLMOptions = {
 
 // Model aliases — update here to roll all functions forward at once
 const MODELS = {
-  haiku: 'claude-3-5-haiku-20241022',
-  sonnet: 'claude-3-5-sonnet-20241022',
+  haiku: 'claude-haiku-4-5-20251001',
+  sonnet: 'claude-sonnet-4-5-20250929',
 } as const;
 
 const DEFAULT_MODEL: keyof typeof MODELS = 'haiku';
