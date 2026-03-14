@@ -1422,10 +1422,24 @@ Deno.serve(async (req) => {
         };
       }
 
-      const okTitle = (weekIntent === 'recovery' || weekIntent === 'taper') ? 'Recovery' : 'Normal';
+      // Title and kicker must match the bar — both derived from the same ACWR value
+      const okTitle = (() => {
+        if (weekIntent === 'recovery' || weekIntent === 'taper') return 'Recovery week';
+        if (load_ramp_acwr == null) return 'On Track';
+        if (load_ramp_acwr < 0.8) return 'Light week';
+        if (load_ramp_acwr <= 1.3) return 'On Track';
+        return 'High load'; // >1.3 but not caught by overreaching branch
+      })();
+      const okKicker = (() => {
+        if (weekIntent === 'recovery' || weekIntent === 'taper') return `Recovery • ${intentLabel}`;
+        if (load_ramp_acwr == null) return kicker;
+        if (load_ramp_acwr < 0.8) return 'Light week — room to push';
+        if (load_ramp_acwr <= 1.3) return 'Building well — stay the course';
+        return 'Load is high — protect recovery';
+      })();
       return {
         code: 'strain_ok' as const,
-        kicker,
+        kicker: okKicker,
         title: okTitle,
         subtitle: rm.headline.subtext,
         confidence: conf,
