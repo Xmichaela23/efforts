@@ -445,7 +445,7 @@ function computeContextPrompt(
   if (keySessionsGaps >= 2) {
     return {
       show: true,
-      question: `You missed ${keySessionsGaps} planned sessions this week. What happened?`,
+      question: `You missed ${keySessionsGaps} key sessions this week. What happened?`,
       tags: CONTEXT_TAGS,
     };
   }
