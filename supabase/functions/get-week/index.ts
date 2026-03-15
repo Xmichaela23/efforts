@@ -29,64 +29,6 @@ function isISO(dateStr) {
 }
 
 // ============================================================================
-// SHARED WORKLOAD CALCULATION (single source of truth from _shared/workload.ts)
-// ============================================================================
-import {
-  getStepsIntensity,
-  calculateStrengthWorkload,
-  calculateMobilityWorkload,
-  calculatePilatesYogaWorkload,
-  calculateDurationWorkload,
-} from '../_shared/workload.ts';
-
-function calculateWorkloadForItem(item: any): number {
-  try {
-    const type = String(item?.type || '').toLowerCase();
-    const status = String(item?.status || '').toLowerCase();
-    const isCompleted = status === 'completed';
-
-    if (type === 'strength') {
-      const exercises = isCompleted
-        ? (item?.executed?.strength_exercises || [])
-        : (item?.planned?.strength_exercises || []);
-      const sessionRPE = item?.executed?.workout_metadata?.session_rpe
-        || item?.planned?.workout_metadata?.session_rpe;
-      return calculateStrengthWorkload(exercises, sessionRPE);
-    }
-
-    if (type === 'mobility') {
-      const exercises = isCompleted
-        ? (item?.executed?.mobility_exercises || [])
-        : (item?.planned?.mobility_exercises || []);
-      return calculateMobilityWorkload(exercises);
-    }
-
-    if (type === 'pilates_yoga') {
-      const durationSec = item?.planned?.total_duration_seconds
-        || item?.executed?.overall?.duration_s_moving || 0;
-      const durationMin = durationSec / 60;
-      const sessionRPE = item?.executed?.workout_metadata?.session_rpe
-        || item?.planned?.workout_metadata?.session_rpe;
-      return calculatePilatesYogaWorkload(durationMin, sessionRPE);
-    }
-
-    let durationSec = 0;
-    if (isCompleted && item?.executed?.overall) {
-      durationSec = item.executed.overall.duration_s_moving || item.executed.overall.duration_s || 0;
-    } else if (item?.planned?.total_duration_seconds) {
-      durationSec = item.planned.total_duration_seconds;
-    }
-    if (durationSec <= 0) return 0;
-
-    const durationMin = durationSec / 60;
-    const stepsPreset = item?.planned?.steps_preset || [];
-    const intensity = getStepsIntensity(stepsPreset, type);
-    return calculateDurationWorkload(durationMin, intensity);
-  } catch {
-    return 0;
-  }
-}
-// ============================================================================
 
 Deno.serve(async (req)=>{
   // CORS preflight
@@ -1315,7 +1257,6 @@ Deno.serve(async (req)=>{
     let workloadCompleted = 0;
     let sessionsPlanned = 0;
     let sessionsCompleted = 0;
-    const workloadBackfillUpdates = []; // Track items needing database backfill
 
     try {
       for (const item of itemsWithAI) {
@@ -1324,100 +1265,19 @@ Deno.serve(async (req)=>{
         const isPlanned = status === 'planned';
         if (isCompleted) sessionsCompleted++;
         if (isPlanned) sessionsPlanned++;
-        
+
         if (isCompleted) {
-          // PRIORITY 1: Use database value (calculated by calculate-workload edge function)
           const dbWorkload = item?.workload_actual;
-          if (typeof dbWorkload === 'number' && dbWorkload > 0) {
-            workloadCompleted += dbWorkload;
-          } else {
-            // PRIORITY 2: Calculate on-the-fly if DB value missing or zero (self-healing)
-            const calculatedWorkload = calculateWorkloadForItem(item);
-            workloadCompleted += calculatedWorkload;
-            // Queue backfill to DB (update if null or zero)
-            if (item?.id && calculatedWorkload > 0 && (!dbWorkload || dbWorkload === 0)) {
-              workloadBackfillUpdates.push({ 
-                table: 'workouts', 
-                id: item.id, 
-                workload_actual: calculatedWorkload 
-              });
-            }
-          }
+          if (typeof dbWorkload === 'number' && dbWorkload > 0) workloadCompleted += dbWorkload;
         } else if (isPlanned) {
-          // PRIORITY 1: Use database value
           const dbWorkload = item?.workload_planned;
-          if (typeof dbWorkload === 'number' && dbWorkload > 0) {
-            workloadPlanned += dbWorkload;
-          } else {
-            // PRIORITY 2: Calculate on-the-fly if DB value missing (self-healing)
-            const calculatedWorkload = calculateWorkloadForItem(item);
-            workloadPlanned += calculatedWorkload;
-            // Queue backfill for planned workouts
-            if (item?.planned?.id && calculatedWorkload > 0) {
-              workloadBackfillUpdates.push({ 
-                table: 'planned_workouts', 
-                id: item.planned.id, 
-                workload_planned: calculatedWorkload 
-              });
-            }
-          }
+          if (typeof dbWorkload === 'number' && dbWorkload > 0) workloadPlanned += dbWorkload;
         }
       }
-      
-      // Fire-and-forget backfill updates to database (don't await, don't block response)
-      if (workloadBackfillUpdates.length > 0) {
-        (async () => {
-          try {
-            for (const update of workloadBackfillUpdates) {
-              if (update.table === 'workouts') {
-                await supabase.from('workouts')
-                  .update({ workload_actual: update.workload_actual })
-                  .eq('id', update.id)
-                  .or('workload_actual.is.null,workload_actual.eq.0'); // Update if null or zero
-              } else if (update.table === 'planned_workouts') {
-                await supabase.from('planned_workouts')
-                  .update({ workload_planned: update.workload_planned })
-                  .eq('id', update.id)
-                  .is('workload_planned', null); // Only update if currently null
-              }
-            }
-            console.log(`[get-week] Backfilled workload for ${workloadBackfillUpdates.length} items`);
-          } catch (e) {
-            console.error('[get-week] Workload backfill error:', e);
-          }
-        })();
-      }
-      
-      console.log(`[get-week] Workload totals: planned=${workloadPlanned}, completed=${workloadCompleted} (${workloadBackfillUpdates.length} backfills queued)`);
+
+      console.log(`[get-week] Workload totals: planned=${workloadPlanned}, completed=${workloadCompleted}`);
     } catch (error) {
       console.error('Failed to calculate workload totals:', error);
-      // Fallback: try database query as last resort
-      try {
-        const { data: completedWorkouts } = await supabase
-          .from('workouts')
-          .select('workload_actual')
-          .eq('user_id', userId)
-          .gte('date', fromISO)
-          .lte('date', toISO)
-          .not('workload_actual', 'is', null);
-        
-        const { data: plannedWorkoutsDb } = await supabase
-          .from('planned_workouts')
-          .select('workload_planned')
-          .eq('user_id', userId)
-          .gte('date', fromISO)
-          .lte('date', toISO)
-          .not('workload_planned', 'is', null);
-        
-        if (completedWorkouts) {
-          workloadCompleted = completedWorkouts.reduce((sum, w) => sum + (w.workload_actual || 0), 0);
-        }
-        if (plannedWorkoutsDb) {
-          workloadPlanned = plannedWorkoutsDb.reduce((sum, w) => sum + (w.workload_planned || 0), 0);
-        }
-      } catch (e2) {
-        console.error('[get-week] Fallback workload query failed:', e2);
-      }
     }
 
     // Calculate distance totals for completed workouts
