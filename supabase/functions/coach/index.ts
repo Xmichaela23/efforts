@@ -1703,9 +1703,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Session completion — use counts only, NOT workload ratios (planned load uses
-        // duration-estimates while actual load uses TRIMP from real HR — comparing them
-        // produces misleading percentages like "278% of planned load").
+        // Session completion counts
         const totalDue = reaction.key_sessions_planned;
         const linked = reaction.key_sessions_linked;
         const missed = reaction.key_sessions_gaps;
@@ -1718,6 +1716,22 @@ Deno.serve(async (req) => {
           (extra > 0 ? `, ${extra} extra unplanned sessions` : '') +
           '.'
         );
+
+        // Load delta — only when both sides are TRIMP-based (plannedWtdLoad > 0 means
+        // the plan was activated after the TRIMP fix; zero means old duration-estimate
+        // data which cannot be compared to actual TRIMP load).
+        if (plannedWtdLoad > 0 && actualWtdLoad >= 0) {
+          const loadDeltaPct = Math.round(((actualWtdLoad - plannedWtdLoad) / plannedWtdLoad) * 100);
+          const loadLabel = loadDeltaPct > 15
+            ? 'running hot — push recovery emphasis'
+            : loadDeltaPct < -15
+              ? 'running light — room to add stress if feeling good'
+              : 'on target';
+          narrativeFacts.push(
+            `Weekly load (TRIMP): planned ${Math.round(plannedWtdLoad)} pts, actual ${Math.round(actualWtdLoad)} pts` +
+            ` (${loadDeltaPct > 0 ? '+' : ''}${loadDeltaPct}% vs plan) — ${loadLabel}.`
+          );
+        }
         if (routeInsightLine) narrativeFacts.push(routeInsightLine);
         if (recoverySignaledExtrasCount > 0) {
           narrativeFacts.push(`ATHLETE SIGNALED RECOVERY: ${recoverySignaledExtrasCount} unplanned session(s) with low RPE or positive feeling (easy/recovery intent).`);
