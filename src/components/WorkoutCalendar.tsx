@@ -1498,16 +1498,34 @@ export default function WorkoutCalendar({
                       </div>
                     </PopoverContent>
                   </Popover>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
-                    <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Planned</span>
-                    <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.planned}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
-                    <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Done</span>
-                    <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.completed}</span>
-                  </div>
+                  {(() => {
+                    const sp = (weeklyStats as any).sessions_planned ?? 0;
+                    const sc = (weeklyStats as any).sessions_completed ?? 0;
+                    const total = sp + sc;
+                    const pct = total > 0 ? Math.round((sc / total) * 100) : null;
+                    return (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
+                          <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Planned</span>
+                          <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.planned}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
+                          <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Done</span>
+                          <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.completed}</span>
+                        </div>
+                        {total > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Sessions</span>
+                            <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>
+                              {sc}/{total}{pct !== null ? ` · ${pct}%` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 
                 {/* Discipline metrics in 2-col grid to use horizontal space */}

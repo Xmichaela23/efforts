@@ -1703,8 +1703,21 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Session completion
-        narrativeFacts.push(`Planned key sessions: ${reaction.key_sessions_planned}. Completed and linked: ${reaction.key_sessions_linked}. Missed: ${reaction.key_sessions_gaps}. Extra unplanned sessions: ${reaction.extra_sessions}.`);
+        // Session completion — use counts only, NOT workload ratios (planned load uses
+        // duration-estimates while actual load uses TRIMP from real HR — comparing them
+        // produces misleading percentages like "278% of planned load").
+        const totalDue = reaction.key_sessions_planned;
+        const linked = reaction.key_sessions_linked;
+        const missed = reaction.key_sessions_gaps;
+        const extra = reaction.extra_sessions;
+        const completionPct = totalDue > 0 ? Math.round((linked / totalDue) * 100) : null;
+        narrativeFacts.push(
+          `Session completion: ${linked} of ${totalDue} planned sessions done` +
+          (completionPct !== null ? ` (${completionPct}%)` : '') +
+          (missed > 0 ? `, ${missed} missed` : '') +
+          (extra > 0 ? `, ${extra} extra unplanned sessions` : '') +
+          '.'
+        );
         if (routeInsightLine) narrativeFacts.push(routeInsightLine);
         if (recoverySignaledExtrasCount > 0) {
           narrativeFacts.push(`ATHLETE SIGNALED RECOVERY: ${recoverySignaledExtrasCount} unplanned session(s) with low RPE or positive feeling (easy/recovery intent).`);

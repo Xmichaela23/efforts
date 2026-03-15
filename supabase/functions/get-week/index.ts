@@ -1313,13 +1313,17 @@ Deno.serve(async (req)=>{
     // Falls back to on-the-fly calculation only if DB value is null (self-healing)
     let workloadPlanned = 0;
     let workloadCompleted = 0;
+    let sessionsPlanned = 0;
+    let sessionsCompleted = 0;
     const workloadBackfillUpdates = []; // Track items needing database backfill
-    
+
     try {
       for (const item of itemsWithAI) {
         const status = String(item?.status || '').toLowerCase();
         const isCompleted = status === 'completed';
         const isPlanned = status === 'planned';
+        if (isCompleted) sessionsCompleted++;
+        if (isPlanned) sessionsPlanned++;
         
         if (isCompleted) {
           // PRIORITY 1: Use database value (calculated by calculate-workload edge function)
@@ -1530,6 +1534,8 @@ Deno.serve(async (req)=>{
       weekly_stats: {
         planned: workloadPlanned,
         completed: workloadCompleted,
+        sessions_planned: sessionsPlanned,
+        sessions_completed: sessionsCompleted,
         distances: {
           run_meters: runMeters,
           swim_meters: swimMeters,
