@@ -4,6 +4,37 @@
 //           (persists steps_preset, strength_exercises, description, tags)
 //           and then calls materialize-plan to compute computed.steps.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import {
+  getStepsIntensity,
+  calculateTRIMPWorkload,
+  calculateDurationWorkload,
+  getDefaultIntensityForType,
+} from '../_shared/workload.ts'
+
+/**
+ * Estimate planned workload for a session using the same TRIMP formula
+ * as actual workouts. Without this, planned loads are duration-based
+ * estimates that can't be compared to HR-based actual loads.
+ */
+function estimatePlannedWorkload(
+  type: string,
+  durationMinutes: number,
+  stepsTokens: string[],
+  maxHR: number | null,
+  restingHR: number | null,
+): number {
+  if (!durationMinutes || durationMinutes <= 0) return 0;
+  const intensity = getStepsIntensity(stepsTokens, type) || getDefaultIntensityForType(type) || 0.70;
+  if (maxHR && maxHR > 0) {
+    const rhr = restingHR && restingHR > 0 ? restingHR : 55;
+    const hrReserve = maxHR - rhr;
+    const avgHR = Math.round(rhr + intensity * hrReserve);
+    const trimp = calculateTRIMPWorkload({ avgHR, maxHR, restingHR: rhr, durationMinutes });
+    if (trimp !== null && trimp > 0) return Math.round(trimp);
+  }
+  // Fallback: duration × intensity (same as get-week fallback)
+  return Math.round(calculateDurationWorkload(durationMinutes, intensity));
+}
 
 type SessionsByWeek = Record<string, Array<any>>
 
@@ -218,6 +249,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, inserted: 0, reason: 'no_sessions' }), { headers: { ...corsHeaders, 'Content-Type':'application/json' } })
     }
 
+    // Fetch athlete HR baselines for TRIMP-based planned workload estimation.
+    // This makes workload_planned use the same formula as workload_actual so
+    // planned vs actual comparisons are meaningful.
+    let athleteMaxHR: number | null = null;
+    let athleteRestingHR: number | null = null;
+    try {
+      const { data: ub } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers,learned_baselines')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const perf = (ub as any)?.performance_numbers || {};
+      const learned = (ub as any)?.learned_baselines || {};
+      athleteMaxHR = Number(learned?.run_max_hr_observed?.value || perf?.maxHeartRate || perf?.max_heart_rate || 0) || null;
+      athleteRestingHR = Number(perf?.restingHeartRate || perf?.resting_heart_rate || 0) || null;
+    } catch { /* non-fatal — workload will fall back to duration-based */ }
+
     // Start date: explicit override (import flow) → plan config (generation flow) → next Monday
     let startDate: string = startDateOverride
       || (plan.config?.user_selected_start_date ? String(plan.config.user_selected_start_date).slice(0,10) : '')
@@ -300,6 +348,7 @@ Deno.serve(async (req) => {
         if (isBrick) {
           const bikeTokens = stepsTokens.filter(t => /^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)))
           const runTokens = stepsTokens.filter(t => !/^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)))
+          const halfDur = durationVal > 0 ? durationVal / 2 : 0
           if (bikeTokens.length) {
             const bikeKey = `${weekNum}-${dow}-${date}-ride`
             if (!insertedKeys.has(bikeKey)) {
@@ -314,7 +363,7 @@ Deno.serve(async (req) => {
                 type: 'ride',
                 name: s.name ? `${s.name} — Bike` : 'Ride',
                 description: s.description || '',
-                duration: durationVal,
+                duration: halfDur,
                 workout_status: 'planned',
                 source: 'training_plan',
                 steps_preset: bikeTokens,
@@ -322,6 +371,7 @@ Deno.serve(async (req) => {
                 computed: null,
                 units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
                 tags: Array.isArray(s?.tags) ? s.tags : [],
+                workload_planned: halfDur > 0 ? estimatePlannedWorkload('ride', halfDur, bikeTokens, athleteMaxHR, athleteRestingHR) : null,
               })
             }
           }
@@ -339,7 +389,7 @@ Deno.serve(async (req) => {
                 type: 'run',
                 name: s.name ? `${s.name} — Run` : 'Run',
                 description: s.description || '',
-                duration: durationVal,
+                duration: halfDur,
                 workout_status: 'planned',
                 source: 'training_plan',
                 steps_preset: runTokens,
@@ -347,11 +397,16 @@ Deno.serve(async (req) => {
                 computed: null,
                 units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
                 tags: Array.isArray(s?.tags) ? s.tags : [],
+                workload_planned: halfDur > 0 ? estimatePlannedWorkload('run', halfDur, runTokens, athleteMaxHR, athleteRestingHR) : null,
               })
             }
           }
           continue
         }
+
+        const estimatedWorkload = durationVal > 0
+          ? estimatePlannedWorkload(mapped || 'run', durationVal, stepsTokens, athleteMaxHR, athleteRestingHR)
+          : null;
 
         const baseRow: any = {
           user_id: userId,
@@ -371,6 +426,7 @@ Deno.serve(async (req) => {
           computed: null,
           units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
           tags: Array.isArray(s?.tags) ? s.tags : (Array.isArray(s?.optional) && s.optional ? ['optional'] : []),
+          workload_planned: estimatedWorkload && estimatedWorkload > 0 ? estimatedWorkload : null,
           // Include authored structured workout when present so server materializer can expand it
           workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
         }
@@ -414,7 +470,7 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from('planned_workouts').insert(rows as any)
       if (error) throw error
       inserted = rows.length
-      console.log(`✅ Inserted ${inserted} planned workouts — workload will compute lazily on first view`)
+      console.log(`✅ Inserted ${inserted} planned workouts with TRIMP-based workload_planned (maxHR=${athleteMaxHR}, restHR=${athleteRestingHR})`)
     }
 
     // Materialize steps for the whole plan (server-side expansion)
