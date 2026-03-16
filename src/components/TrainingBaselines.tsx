@@ -1514,63 +1514,6 @@ return (
 
                       return (
                         <div className="space-y-5">
-                          {/* Resting HR */}
-                          <TooltipProvider>
-                            <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${
-                              restingInfo.value ? 'bg-white/[0.06] border-white/15' : 'bg-yellow-500/5 border-yellow-500/20'
-                            }`}>
-                              <div className="flex items-center gap-2">
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs text-white/50">Resting HR</span>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Info className="h-3 w-3 text-white/30 hover:text-white/50 cursor-help" />
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" className="max-w-[250px] text-xs">
-                                        <p className="font-medium mb-1">Used for Karvonen zone calculation and TRIMP</p>
-                                        <p className="text-white/70">
-                                          {restingInfo.source === 'manual'
-                                            ? 'Using your value.'
-                                            : restingInfo.source === 'garmin'
-                                              ? 'From your Garmin device profile. Override if you prefer.'
-                                              : 'Enter your morning resting heart rate for accurate zones and workload.'}
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <input
-                                      type="number"
-                                      value={restingInfo.value ?? ''}
-                                      onChange={(e) => {
-                                        const val = parseInt(e.target.value);
-                                        if (val >= 35 && val <= 100) {
-                                          setCustomRestingHR(val);
-                                          setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, restingHeartRate: val } }));
-                                        } else if (e.target.value === '') {
-                                          setCustomRestingHR(null);
-                                          const { restingHeartRate, ...rest } = data.performanceNumbers as any;
-                                          setData(prev => ({ ...prev, performanceNumbers: rest }));
-                                        }
-                                      }}
-                                      placeholder="—"
-                                      className="w-16 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
-                                      min={35} max={100}
-                                    />
-                                    <span className="text-sm text-white/60">bpm</span>
-                                  </div>
-                                  {!restingInfo.value && (
-                                    <p className="text-[10px] text-yellow-400/70 mt-1">Check your watch for morning resting HR</p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-[10px] text-white/40">
-                                {restingInfo.source === 'manual' ? 'manual' : restingInfo.source === 'garmin' ? 'garmin' : ''}
-                              </div>
-                            </div>
-                          </TooltipProvider>
-
                           {/* Per-sport: anchor inputs + zone table */}
                           {sportSections.map((sport) => {
                             const effectiveMaxHR = sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates ? ageEstimates.maxHR : null);
@@ -1680,6 +1623,37 @@ return (
                               </div>
                             );
                           })}
+
+                          {/* Resting HR — optional, de-emphasized */}
+                          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-white/40">Resting HR</span>
+                              <input
+                                type="number"
+                                value={restingInfo.value ?? ''}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  if (val >= 35 && val <= 100) {
+                                    setCustomRestingHR(val);
+                                    setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, restingHeartRate: val } }));
+                                  } else if (e.target.value === '') {
+                                    setCustomRestingHR(null);
+                                    const { restingHeartRate, ...rest } = data.performanceNumbers as any;
+                                    setData(prev => ({ ...prev, performanceNumbers: rest }));
+                                  }
+                                }}
+                                placeholder="optional"
+                                className="w-16 text-xs text-white/60 bg-transparent border-b border-white/10 focus:border-white/30 outline-none text-center"
+                                min={35} max={100}
+                              />
+                              <span className="text-xs text-white/30">bpm</span>
+                            </div>
+                            {restingInfo.value && (
+                              <span className="text-[10px] text-white/30">
+                                {restingInfo.source === 'manual' ? 'manual' : restingInfo.source === 'garmin' ? 'garmin' : ''}
+                              </span>
+                            )}
+                          </div>
 
                           {/* Status footer */}
                           {learnedFitness && learnedFitness.learning_status !== 'insufficient_data' && (
