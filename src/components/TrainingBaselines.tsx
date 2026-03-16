@@ -181,8 +181,17 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Resting HR override (optional - user can set their own)
   const [customRestingHR, setCustomRestingHR] = useState<number | null>(null);
 
-  // Check if data has changed from original
-  const hasChanges = JSON.stringify(data) !== originalData;
+  // Manual HR anchor overrides (per sport)
+  const [manualRunMaxHR, setManualRunMaxHR] = useState<number | null>(null);
+  const [manualRunLTHR, setManualRunLTHR] = useState<number | null>(null);
+  const [manualRideMaxHR, setManualRideMaxHR] = useState<number | null>(null);
+  const [manualRideLTHR, setManualRideLTHR] = useState<number | null>(null);
+  const [configuredZonesSource, setConfiguredZonesSource] = useState<string | null>(null);
+
+  // Track initial manual HR state for change detection
+  const [initialManualHR, setInitialManualHR] = useState('');
+  const currentManualHR = JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR });
+  const hasChanges = JSON.stringify(data) !== originalData || currentManualHR !== initialManualHR;
 
   // Strava connection state
 const [stravaConnected, setStravaConnected] = useState(false);
@@ -292,6 +301,35 @@ const loadBaselines = async () => {
       // No saved data yet - set original to current defaults
       setOriginalData(JSON.stringify(data));
     }
+    // Load configured_hr_zones (manual overrides / Strava / FIT)
+    try {
+      const userId = getStoredUserId();
+      if (userId) {
+        const { data: row } = await supabase
+          .from('user_baselines')
+          .select('configured_hr_zones')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (row?.configured_hr_zones) {
+          const cfg = typeof row.configured_hr_zones === 'string'
+            ? JSON.parse(row.configured_hr_zones)
+            : row.configured_hr_zones;
+          setConfiguredZonesSource(cfg.source || null);
+          const rmx = cfg.manual_run_max_hr || null;
+          const rlt = cfg.manual_run_lthr || null;
+          const cmx = cfg.manual_ride_max_hr || null;
+          const clt = cfg.manual_ride_lthr || null;
+          if (rmx) setManualRunMaxHR(rmx);
+          if (rlt) setManualRunLTHR(rlt);
+          if (cmx) setManualRideMaxHR(cmx);
+          if (clt) setManualRideLTHR(clt);
+          setInitialManualHR(JSON.stringify({ manualRunMaxHR: rmx, manualRunLTHR: rlt, manualRideMaxHR: cmx, manualRideLTHR: clt }));
+        }
+      }
+    } catch (_e) { /* non-critical */ }
+    if (!initialManualHR) {
+      setInitialManualHR(JSON.stringify({ manualRunMaxHR: null, manualRunLTHR: null, manualRideMaxHR: null, manualRideLTHR: null }));
+    }
     setLoading(false);
   } catch (error) {
     setLoading(false);
@@ -361,14 +399,57 @@ const getAgeBasedHREstimates = (birthday: string | undefined) => {
   
   const maxHR = 220 - age;
   const thresholdHR = Math.round(maxHR * 0.88);
-  const easyHR = Math.round(maxHR * 0.70);
   
   return {
     maxHR,
     thresholdHR,
-    easyHR,
     age
   };
+};
+
+interface HRZone {
+  name: string;
+  label: string;
+  min: number;
+  max: number | null;
+  color: string;
+}
+
+const ZONE_COLORS = ['#10b981', '#84cc16', '#f59e0b', '#ef4444', '#991b1b'];
+
+// Friel 5-zone model from LTHR (used by Garmin, TrainingPeaks)
+const getFrielZones = (lthr: number): HRZone[] => [
+  { name: 'Z1', label: 'Recovery',  min: 0,                        max: Math.round(lthr * 0.85), color: ZONE_COLORS[0] },
+  { name: 'Z2', label: 'Aerobic',   min: Math.round(lthr * 0.85),  max: Math.round(lthr * 0.90), color: ZONE_COLORS[1] },
+  { name: 'Z3', label: 'Tempo',     min: Math.round(lthr * 0.90),  max: Math.round(lthr * 0.95), color: ZONE_COLORS[2] },
+  { name: 'Z4', label: 'Threshold', min: Math.round(lthr * 0.95),  max: Math.round(lthr * 1.05), color: ZONE_COLORS[3] },
+  { name: 'Z5', label: 'VO2max',    min: Math.round(lthr * 1.05),  max: null,                    color: ZONE_COLORS[4] },
+];
+
+// Karvonen %HRR model (uses Max HR + Resting HR)
+const getKarvonenZones = (maxHR: number, restingHR: number): HRZone[] => {
+  const hrr = maxHR - restingHR;
+  const z = (pct: number) => Math.round(restingHR + hrr * pct);
+  return [
+    { name: 'Z1', label: 'Recovery',  min: 0,       max: z(0.60), color: ZONE_COLORS[0] },
+    { name: 'Z2', label: 'Aerobic',   min: z(0.60), max: z(0.70), color: ZONE_COLORS[1] },
+    { name: 'Z3', label: 'Tempo',     min: z(0.70), max: z(0.80), color: ZONE_COLORS[2] },
+    { name: 'Z4', label: 'Threshold', min: z(0.80), max: z(0.90), color: ZONE_COLORS[3] },
+    { name: 'Z5', label: 'VO2max',    min: z(0.90), max: maxHR,   color: ZONE_COLORS[4] },
+  ];
+};
+
+// Hybrid: prefer Friel (LTHR) when available, fall back to Karvonen (HRR)
+const getHRZones = (lthr: number | null, maxHR: number | null, restingHR: number): HRZone[] | null => {
+  if (lthr && lthr > 100) return getFrielZones(lthr);
+  if (maxHR && maxHR > 100) return getKarvonenZones(maxHR, restingHR);
+  return null;
+};
+
+const getZoneModel = (lthr: number | null, maxHR: number | null): string => {
+  if (lthr && lthr > 100) return 'Friel %LTHR';
+  if (maxHR && maxHR > 100) return 'Karvonen %HRR';
+  return '';
 };
 
 // Calculate smart resting HR default from threshold HR
@@ -402,7 +483,56 @@ const handleSave = async () => {
     setSaving(true);
     setSaveMessage('');
     await saveUserBaselines(data as any);
-    setOriginalData(JSON.stringify(data)); // Update original after save
+
+    // Persist manual HR zone overrides to configured_hr_zones
+    const hasManualOverrides = manualRunMaxHR || manualRunLTHR || manualRideMaxHR || manualRideLTHR;
+    if (hasManualOverrides) {
+      const userId = getStoredUserId();
+      if (userId) {
+        const restingHR = customRestingHR || getSmartRestingHR(
+          manualRunLTHR || learnedFitness?.run_threshold_hr?.value || null,
+          customRestingHR
+        ).value;
+
+        const effectiveRunLTHR = manualRunLTHR || learnedFitness?.run_threshold_hr?.value || null;
+        const effectiveRunMax = manualRunMaxHR || learnedFitness?.run_max_hr_observed?.value || null;
+        const effectiveRideLTHR = manualRideLTHR || learnedFitness?.ride_threshold_hr?.value || null;
+        const effectiveRideMax = manualRideMaxHR || learnedFitness?.ride_max_hr_observed?.value || null;
+
+        // Compute primary zone boundaries from the best available anchor
+        const primaryLTHR = effectiveRunLTHR || effectiveRideLTHR;
+        const primaryMax = effectiveRunMax || effectiveRideMax;
+
+        let zones: { min: number; max: number | null }[] | undefined;
+        if (primaryLTHR && primaryLTHR > 100) {
+          zones = getFrielZones(primaryLTHR).map(z => ({ min: z.min, max: z.max }));
+        } else if (primaryMax && primaryMax > 100) {
+          zones = getKarvonenZones(primaryMax, restingHR).map(z => ({ min: z.min, max: z.max }));
+        }
+
+        const configuredZones: Record<string, any> = {
+          source: 'manual',
+          custom_zones: true,
+          updated_at: new Date().toISOString(),
+          manual_run_max_hr: manualRunMaxHR,
+          manual_run_lthr: manualRunLTHR,
+          manual_ride_max_hr: manualRideMaxHR,
+          manual_ride_lthr: manualRideLTHR,
+          threshold_heart_rate: primaryLTHR,
+          max_heart_rate: primaryMax,
+          resting_heart_rate: restingHR,
+        };
+        if (zones) configuredZones.zones = zones;
+
+        await supabase
+          .from('user_baselines')
+          .update({ configured_hr_zones: configuredZones })
+          .eq('user_id', userId);
+      }
+    }
+
+    setOriginalData(JSON.stringify(data));
+    setInitialManualHR(JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR }));
     setSaveMessage('Saved!');
     setLastUpdated(new Date().toISOString());
     setTimeout(() => setSaveMessage(''), 2000);
@@ -1321,12 +1451,12 @@ return (
                                     </div>
                                   )}
 
-                  {/* Heart Rate Zones - Auto-learned */}
+                  {/* Heart Rate Zones */}
                   <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] mt-5">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <h2 className="text-sm font-semibold text-white/90 tracking-wide">Heart Rate Zones</h2>
-                        <p className="text-xs text-white/50 mt-0.5">Auto-learned from your training</p>
+                        <p className="text-xs text-white/50 mt-0.5">Two inputs, five zones</p>
                       </div>
                       <button
                         onClick={refreshLearnedProfile}
@@ -1338,60 +1468,231 @@ return (
                       </button>
                     </div>
 
-                    {!learnedFitness || learnedFitness.learning_status === 'insufficient_data' ? (
-                      (() => {
-                        const ageEstimates = getAgeBasedHREstimates(data.birthday);
-                        
-                        if (!ageEstimates) {
-                          return (
-                            <div className="text-center py-6">
-                              <p className="text-sm text-white/60 mb-2">Add your birthday above to see estimated zones</p>
-                              <p className="text-xs text-white/40">
-                                Or keep training with heart rate and we'll learn your zones automatically.
-                              </p>
-                            </div>
-                          );
-                        }
-                        
-                        return (
-                          <div className="space-y-4">
-                            {/* Warning banner about estimates */}
-                            <div className="px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                              <p className="text-xs text-yellow-400/90 font-medium mb-1">
-                                These are rough estimates based on age ({ageEstimates.age})
-                              </p>
-                              <p className="text-xs text-yellow-400/60">
-                                Individual max HR can vary ±15-20 bpm from the 220-age formula. 
-                                Analyze your workouts to get accurate values.
-                              </p>
-                            </div>
-                            
-                            {/* Age-based estimates */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-yellow-500/20">
-                                <div>
-                                  <div className="text-xs text-white/50">Threshold HR</div>
-                                  <div className="text-sm font-medium text-white/70">{ageEstimates.thresholdHR} bpm</div>
-                                </div>
-                                <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">EST</div>
-                              </div>
-                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-yellow-500/20">
-                                <div>
-                                  <div className="text-xs text-white/50">Easy HR</div>
-                                  <div className="text-sm font-medium text-white/70">{ageEstimates.easyHR} bpm</div>
-                                </div>
-                                <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">EST</div>
-                              </div>
-                              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-yellow-500/20">
-                                <div>
-                                  <div className="text-xs text-white/50">Max HR</div>
-                                  <div className="text-sm font-medium text-white/70">{ageEstimates.maxHR} bpm</div>
-                                </div>
-                                <div className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">EST</div>
-                              </div>
-                            </div>
+                    {(() => {
+                      const ageEstimates = getAgeBasedHREstimates(data.birthday);
+                      const learnedThresholdHR = learnedFitness?.run_threshold_hr?.value || learnedFitness?.ride_threshold_hr?.value || null;
+                      const restingInfo = getSmartRestingHR(learnedThresholdHR, customRestingHR);
 
-                            {/* CTA to analyze */}
+                      const sportSections: { key: string; label: string; icon: React.ReactNode; color: string;
+                        learnedMaxHR: number | null; learnedLTHR: number | null; learnedThresholdPace: any;
+                        manualMaxHR: number | null; setManualMaxHR: (v: number | null) => void;
+                        manualLTHR: number | null; setManualLTHR: (v: number | null) => void;
+                      }[] = [];
+
+                      if (data.disciplines.includes('running') || learnedFitness?.run_max_hr_observed || learnedFitness?.run_threshold_hr) {
+                        sportSections.push({
+                          key: 'run', label: 'Running',
+                          icon: <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />,
+                          color: SPORT_COLORS.run,
+                          learnedMaxHR: learnedFitness?.run_max_hr_observed?.value || null,
+                          learnedLTHR: learnedFitness?.run_threshold_hr?.value || null,
+                          learnedThresholdPace: learnedFitness?.run_threshold_pace_sec_per_km || null,
+                          manualMaxHR: manualRunMaxHR, setManualMaxHR: setManualRunMaxHR,
+                          manualLTHR: manualRunLTHR, setManualLTHR: setManualRunLTHR,
+                        });
+                      }
+                      if (data.disciplines.includes('cycling') || learnedFitness?.ride_max_hr_observed || learnedFitness?.ride_threshold_hr) {
+                        sportSections.push({
+                          key: 'ride', label: 'Cycling',
+                          icon: <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />,
+                          color: SPORT_COLORS.cycling,
+                          learnedMaxHR: learnedFitness?.ride_max_hr_observed?.value || null,
+                          learnedLTHR: learnedFitness?.ride_threshold_hr?.value || null,
+                          learnedThresholdPace: null,
+                          manualMaxHR: manualRideMaxHR, setManualMaxHR: setManualRideMaxHR,
+                          manualLTHR: manualRideLTHR, setManualLTHR: setManualRideLTHR,
+                        });
+                      }
+
+                      if (sportSections.length === 0 && !ageEstimates) {
+                        return (
+                          <div className="text-center py-6">
+                            <p className="text-sm text-white/60 mb-2">Add your birthday or select a sport above to see HR zones</p>
+                            <p className="text-xs text-white/40">Or import workouts and we'll detect your values automatically.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-5">
+                          {/* Resting HR */}
+                          <TooltipProvider>
+                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/15">
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs text-white/50">Resting HR</span>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Info className="h-3 w-3 text-white/30 hover:text-white/50 cursor-help" />
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-[250px] text-xs">
+                                        <p className="font-medium mb-1">Used for Karvonen zone calculation and TRIMP</p>
+                                        <p className="text-white/70">
+                                          {restingInfo.source === 'custom'
+                                            ? 'Using your value.'
+                                            : restingInfo.source === 'calculated'
+                                              ? `Estimated from threshold HR. Override if you know yours.`
+                                              : 'Default value. Set your own for better accuracy.'}
+                                        </p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <input
+                                      type="number"
+                                      value={customRestingHR || restingInfo.value}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        if (val >= 35 && val <= 100) {
+                                          setCustomRestingHR(val);
+                                          setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, restingHeartRate: val } }));
+                                        } else if (e.target.value === '') {
+                                          setCustomRestingHR(null);
+                                          const { restingHeartRate, ...rest } = data.performanceNumbers as any;
+                                          setData(prev => ({ ...prev, performanceNumbers: rest }));
+                                        }
+                                      }}
+                                      placeholder={String(restingInfo.value)}
+                                      className="w-16 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
+                                      min={35} max={100}
+                                    />
+                                    <span className="text-sm text-white/60">bpm</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-[10px] text-white/40">
+                                {restingInfo.isCustom ? 'custom' : restingInfo.source === 'calculated' ? 'auto' : 'default'}
+                              </div>
+                            </div>
+                          </TooltipProvider>
+
+                          {/* Per-sport: anchor inputs + zone table */}
+                          {sportSections.map((sport) => {
+                            const effectiveMaxHR = sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates ? ageEstimates.maxHR : null);
+                            const effectiveLTHR = sport.manualLTHR || sport.learnedLTHR || (ageEstimates ? ageEstimates.thresholdHR : null);
+                            const zones = getHRZones(effectiveLTHR, effectiveMaxHR, restingInfo.value);
+                            const model = getZoneModel(effectiveLTHR, effectiveMaxHR);
+
+                            const maxSource = sport.manualMaxHR ? 'manual' : sport.learnedMaxHR ? 'observed' : ageEstimates ? 'age est.' : '';
+                            const lthrSource = sport.manualLTHR ? 'manual' : sport.learnedLTHR ? 'learned' : ageEstimates ? 'age est.' : '';
+
+                            return (
+                              <div key={sport.key} className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  {sport.icon}
+                                  <span className="text-xs font-medium text-white/80">{sport.label}</span>
+                                  {model && <span className="text-[10px] text-white/30 ml-auto">{model}</span>}
+                                </div>
+
+                                {/* Two anchor inputs */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                    <div className="text-xs text-white/50 mb-1">Max HR</div>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        value={sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates?.maxHR ?? '')}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value);
+                                          if (val >= 120 && val <= 230) {
+                                            sport.setManualMaxHR(val);
+                                            setData(prev => ({ ...prev }));
+                                          } else if (e.target.value === '') {
+                                            sport.setManualMaxHR(null);
+                                            setData(prev => ({ ...prev }));
+                                          }
+                                        }}
+                                        className="w-14 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
+                                        min={120} max={230}
+                                      />
+                                      <span className="text-xs text-white/50">bpm</span>
+                                    </div>
+                                    <div className="text-[10px] text-white/30 mt-1">{maxSource}</div>
+                                  </div>
+                                  <div className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                    <div className="text-xs text-white/50 mb-1">LTHR</div>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        value={sport.manualLTHR || sport.learnedLTHR || (ageEstimates?.thresholdHR ?? '')}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value);
+                                          if (val >= 100 && val <= 210) {
+                                            sport.setManualLTHR(val);
+                                            setData(prev => ({ ...prev }));
+                                          } else if (e.target.value === '') {
+                                            sport.setManualLTHR(null);
+                                            setData(prev => ({ ...prev }));
+                                          }
+                                        }}
+                                        className="w-14 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
+                                        min={100} max={210}
+                                      />
+                                      <span className="text-xs text-white/50">bpm</span>
+                                    </div>
+                                    <div className="text-[10px] text-white/30 mt-1">{lthrSource}</div>
+                                  </div>
+                                </div>
+
+                                {/* Threshold Pace (running only, if available) */}
+                                {sport.learnedThresholdPace && (
+                                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
+                                    <div>
+                                      <div className="text-xs text-white/50">Threshold Pace</div>
+                                      <div className="text-sm font-medium text-white">{formatPace(sport.learnedThresholdPace.value)}</div>
+                                    </div>
+                                    <div className="text-xs text-white/40">
+                                      {getConfidenceDots(sport.learnedThresholdPace.confidence)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Derived 5-zone table */}
+                                {zones ? (
+                                  <div className="rounded-lg overflow-hidden border border-white/10">
+                                    {zones.map((zone) => (
+                                      <div
+                                        key={zone.name}
+                                        className="flex items-center justify-between px-3 py-1.5 border-b border-white/[0.05] last:border-b-0"
+                                        style={{ backgroundColor: `${zone.color}08` }}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: zone.color }} />
+                                          <span className="text-xs font-medium text-white/80">{zone.name}</span>
+                                          <span className="text-xs text-white/40">{zone.label}</span>
+                                        </div>
+                                        <span className="text-xs font-mono text-white/60">
+                                          {zone.min}–{zone.max ?? '∞'} bpm
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-white/40 text-center py-2">
+                                    Enter Max HR or LTHR to see zones
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {/* Status footer */}
+                          {learnedFitness && learnedFitness.learning_status !== 'insufficient_data' && (
+                            <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                              <div className="text-xs text-white/40">
+                                {learnedFitness.learning_status === 'confident' ? 'Profile confident' : 'Still learning'}
+                                {' \u2022 '}{learnedFitness.workouts_analyzed} workouts analyzed
+                              </div>
+                              {learnedFitness.last_updated && (
+                                <div className="text-xs text-white/30">
+                                  {new Date(learnedFitness.last_updated).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {(!learnedFitness || learnedFitness.learning_status === 'insufficient_data') && (
                             <div className="pt-3 border-t border-white/10 text-center">
                               <button
                                 onClick={refreshLearnedProfile}
@@ -1401,204 +1702,13 @@ return (
                                 {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
                               </button>
                               <p className="text-xs text-white/50 mt-3">
-                                Get accurate zones based on your actual training data
+                                Auto-detect Max HR and LTHR from your training data
                               </p>
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Resting HR - Universal baseline */}
-                        {(() => {
-                          const thresholdHR = learnedFitness.run_threshold_hr?.value || learnedFitness.ride_threshold_hr?.value || null;
-                          const restingInfo = getSmartRestingHR(thresholdHR, customRestingHR);
-                          return (
-                            <TooltipProvider>
-                              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/15">
-                                <div className="flex items-center gap-2">
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-xs text-white/50">Resting HR</span>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Info className="h-3 w-3 text-white/30 hover:text-white/50 cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top" className="max-w-[250px] text-xs">
-                                          <p className="font-medium mb-1">Used for TRIMP workload calculation</p>
-                                          <p className="text-white/70">
-                                            {restingInfo.source === 'custom' 
-                                              ? 'Using your custom value.' 
-                                              : restingInfo.source === 'calculated'
-                                                ? `Smart estimate: threshold HR (${thresholdHR}) - 90 bpm. Override below if you know your actual resting HR.`
-                                                : 'Default value. Add threshold HR data or set your own.'}
-                                          </p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <input
-                                        type="number"
-                                        value={customRestingHR || restingInfo.value}
-                                        onChange={(e) => {
-                                          const val = parseInt(e.target.value);
-                                          if (val >= 35 && val <= 100) {
-                                            setCustomRestingHR(val);
-                                            setData(prev => ({
-                                              ...prev,
-                                              performanceNumbers: {
-                                                ...prev.performanceNumbers,
-                                                restingHeartRate: val
-                                              }
-                                            }));
-                                          } else if (e.target.value === '') {
-                                            setCustomRestingHR(null);
-                                            const { restingHeartRate, ...rest } = data.performanceNumbers as any;
-                                            setData(prev => ({
-                                              ...prev,
-                                              performanceNumbers: rest
-                                            }));
-                                          }
-                                        }}
-                                        placeholder={String(restingInfo.value)}
-                                        className="w-16 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
-                                        min={35}
-                                        max={100}
-                                      />
-                                      <span className="text-sm text-white/60">bpm</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-[10px] text-white/40">
-                                  {restingInfo.isCustom ? 'custom' : restingInfo.source === 'calculated' ? 'auto' : 'default'}
-                                </div>
-                              </div>
-                            </TooltipProvider>
-                          );
-                        })()}
-
-                        {/* Running HR Zones */}
-                        {(learnedFitness.run_threshold_hr || learnedFitness.run_easy_hr) && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
-                              <span className="text-xs font-medium text-white/80">Running</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              {learnedFitness.run_threshold_hr && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Threshold HR</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.run_threshold_hr.value} bpm</div>
-                                  </div>
-                                  <div className="text-xs text-white/40" title={`${learnedFitness.run_threshold_hr.sample_count} samples`}>
-                                    {getConfidenceDots(learnedFitness.run_threshold_hr.confidence)}
-                                  </div>
-                                </div>
-                              )}
-                              {learnedFitness.run_easy_hr && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Easy HR</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.run_easy_hr.value} bpm</div>
-                                  </div>
-                                  <div className="text-xs text-white/40" title={`${learnedFitness.run_easy_hr.sample_count} samples`}>
-                                    {getConfidenceDots(learnedFitness.run_easy_hr.confidence)}
-                                  </div>
-                                </div>
-                              )}
-                              {learnedFitness.run_threshold_pace_sec_per_km && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Threshold Pace</div>
-                                    <div className="text-sm font-medium text-white">{formatPace(learnedFitness.run_threshold_pace_sec_per_km.value)}</div>
-                                  </div>
-                                  <div className="text-xs text-white/40">
-                                    {getConfidenceDots(learnedFitness.run_threshold_pace_sec_per_km.confidence)}
-                                  </div>
-                                </div>
-                              )}
-                              {learnedFitness.run_max_hr_observed && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Max HR</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.run_max_hr_observed.value} bpm</div>
-                                  </div>
-                                  <div className="text-xs text-white/40">observed</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Cycling HR Zones */}
-                        {(learnedFitness.ride_threshold_hr || learnedFitness.ride_easy_hr || learnedFitness.ride_max_hr_observed) && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />
-                              <span className="text-xs font-medium text-white/80">Cycling</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              {learnedFitness.ride_threshold_hr && (
-                                <div className={`px-3 py-2 rounded-lg border ${
-                                  learnedFitness.ride_threshold_hr.confidence === 'low' 
-                                    ? 'bg-yellow-500/5 border-yellow-500/20' 
-                                    : 'bg-white/[0.04] border-white/10'
-                                }`}>
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <div className="text-xs text-white/50">Threshold HR</div>
-                                      <div className="text-sm font-medium text-white">{learnedFitness.ride_threshold_hr.value} bpm</div>
-                                    </div>
-                                    <div className="text-xs text-white/40">
-                                      {getConfidenceDots(learnedFitness.ride_threshold_hr.confidence)}
-                                    </div>
-                                  </div>
-                                  {learnedFitness.ride_threshold_hr.confidence === 'low' && (
-                                    <div className="mt-1.5 text-[10px] text-yellow-400/80">
-                                      Need more hard rides for accurate threshold
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              {learnedFitness.ride_easy_hr && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Easy HR</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_easy_hr.value} bpm</div>
-                                  </div>
-                                  <div className="text-xs text-white/40">
-                                    {getConfidenceDots(learnedFitness.ride_easy_hr.confidence)}
-                                  </div>
-                                </div>
-                              )}
-                              {learnedFitness.ride_max_hr_observed && (
-                                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                  <div>
-                                    <div className="text-xs text-white/50">Max HR</div>
-                                    <div className="text-sm font-medium text-white">{learnedFitness.ride_max_hr_observed.value} bpm</div>
-                                  </div>
-                                  <div className="text-xs text-white/40">observed</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Status footer */}
-                        <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                          <div className="text-xs text-white/40">
-                            {learnedFitness.learning_status === 'confident' ? 'Profile confident' : 'Still learning'} 
-                            {' • '}{learnedFitness.workouts_analyzed} workouts analyzed
-                          </div>
-                          {learnedFitness.last_updated && (
-                            <div className="text-xs text-white/30">
-                              {new Date(learnedFitness.last_updated).toLocaleDateString()}
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               ) : (
