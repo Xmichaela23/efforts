@@ -350,6 +350,12 @@ interface TrainingContextResponse {
       primary_target: string | null;
       sport?: string | null;
     };
+    intensity_distribution?: {
+      zone1_2_pct: number;
+      zone1_2_minutes: number;
+      zone3_plus_minutes: number;
+      label: string;
+    } | null;
     today_role?: 'recover' | 'easy' | 'key' | 'optional' | 'rest';
     today_role_label?: string | null;
     body_response_line?: string | null;
@@ -622,7 +628,7 @@ Deno.serve(async (req) => {
     const priorWeekMonday = addDaysISO(targetWeekMonday, -7);
     const { data: currentSnap } = await supabase
       .from('athlete_snapshot')
-      .select('workload_total, acwr, workload_by_discipline, adherence_pct, session_count')
+      .select('workload_total, acwr, workload_by_discipline, adherence_pct, session_count, intensity_distribution')
       .eq('user_id', user_id)
       .eq('week_start', targetWeekMonday)
       .maybeSingle();
@@ -2223,6 +2229,16 @@ Deno.serve(async (req) => {
         next_key_session: nextQualityPlanned
           ? { planned_id: nextQualityPlanned.id, date: nextQualityPlanned.date, date_local: dateLocal, title: nextQualityPlanned.name, primary_target: primaryTarget, sport: (nextQualityPlanned.type || 'run').toLowerCase() }
           : undefined,
+        intensity_distribution: currentSnap?.intensity_distribution ? (() => {
+          const id = currentSnap.intensity_distribution;
+          const easyPct = id.zone1_2_pct;
+          let label: string;
+          if (easyPct >= 78) label = 'Well-polarized (80/20)';
+          else if (easyPct >= 65) label = 'Moderately polarized — some zone creep';
+          else if (easyPct >= 50) label = 'Mixed intensity';
+          else label = 'High-intensity dominant';
+          return { zone1_2_pct: easyPct, zone1_2_minutes: id.zone1_2_minutes, zone3_plus_minutes: id.zone3_plus_minutes, label };
+        })() : null,
         today_role,
         today_role_label,
         body_response_line: 'Body response: last 7 days ending today',

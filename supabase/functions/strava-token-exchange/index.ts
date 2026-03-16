@@ -94,6 +94,45 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Best-effort: fetch athlete's HR zones from Strava and store
+    try {
+      const zonesResp = await fetch('https://www.strava.com/api/v3/athlete/zones', {
+        headers: { Authorization: `Bearer ${token.access_token}` },
+      });
+      if (zonesResp.ok) {
+        const zonesData = await zonesResp.json();
+        const hrZones = zonesData?.heart_rate;
+        if (hrZones?.zones && Array.isArray(hrZones.zones) && hrZones.zones.length > 0) {
+          const configuredZones = {
+            source: 'strava',
+            custom_zones: hrZones.custom_zones ?? false,
+            zones: hrZones.zones.map((z: any) => ({
+              min: Number(z.min) || 0,
+              max: z.max === -1 ? null : (Number(z.max) || null),
+            })),
+            max_heart_rate: null as number | null,
+            threshold_heart_rate: null as number | null,
+            resting_heart_rate: null as number | null,
+            updated_at: new Date().toISOString(),
+          };
+          // Infer max HR from the last zone boundary (the one before the open-ended zone)
+          const lastBounded = hrZones.zones.filter((z: any) => z.max > 0);
+          if (lastBounded.length > 0) {
+            configuredZones.max_heart_rate = Math.max(...lastBounded.map((z: any) => Number(z.max)));
+          }
+          await supabase
+            .from('user_baselines')
+            .upsert(
+              { user_id: userId, configured_hr_zones: configuredZones },
+              { onConflict: 'user_id' }
+            );
+          console.log(`[STRAVA ZONES] Stored ${hrZones.zones.length} HR zones for user ${userId} (custom: ${hrZones.custom_zones})`);
+        }
+      }
+    } catch (e) {
+      console.warn('[STRAVA ZONES] Non-fatal error fetching zones:', e);
+    }
+
     return new Response(JSON.stringify({ success: true, stravaUserId, expires_at: token.expires_at }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...cors() },

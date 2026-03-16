@@ -2055,11 +2055,12 @@ const formatMovingTime = () => {
             {/* HR Zones */}
             {hasHRZones && (
               <div className="my-4">
-                <HRZoneChart 
-                  zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)} 
+                <HRZoneChart
+                  zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)}
+                  zones={zonesHr.bins.map((b:any, i:number) => ({ name: `Zone ${i+1}`, min: Number(b.min)||0, max: Number(b.max)||0 }))}
                   avgHr={norm.avg_hr ?? undefined}
                   maxHr={norm.max_hr ?? undefined}
-                  title="Heart Rate Zones" 
+                  title="Heart Rate Zones"
                 />
               </div>
             )}

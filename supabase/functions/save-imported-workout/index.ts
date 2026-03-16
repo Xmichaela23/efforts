@@ -142,9 +142,56 @@ Deno.serve(async (req) => {
 
     if (error) throw error;
 
-    // Invoke compute-workout-summary to add intervals / enhance when sensor_data exists
+    // Persist FIT device profile HR data to user_baselines (best-effort)
     const baseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    try {
+      const fitLthr = toSave.threshold_heart_rate;
+      const fitMaxHr = toSave.default_max_heart_rate;
+      const fitRestHr = toSave.resting_heart_rate;
+      if ((fitLthr || fitMaxHr) && baseUrl && serviceKey) {
+        const svcClient = createClient(baseUrl, serviceKey);
+        const { data: existing } = await svcClient
+          .from('user_baselines')
+          .select('configured_hr_zones')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const currentSource = existing?.configured_hr_zones?.source;
+        // Only overwrite if no zones yet or current source is also fit_file (not strava)
+        if (!currentSource || currentSource === 'fit_file') {
+          const configuredZones: Record<string, any> = {
+            source: 'fit_file',
+            custom_zones: true,
+            threshold_heart_rate: fitLthr ? Number(fitLthr) : null,
+            max_heart_rate: fitMaxHr ? Number(fitMaxHr) : null,
+            resting_heart_rate: fitRestHr ? Number(fitRestHr) : null,
+            updated_at: new Date().toISOString(),
+          };
+          // If we have LTHR, compute Friel 5-zone boundaries
+          if (fitLthr) {
+            const lthr = Number(fitLthr);
+            configuredZones.zones = [
+              { min: 0, max: Math.round(lthr * 0.85) },
+              { min: Math.round(lthr * 0.85), max: Math.round(lthr * 0.90) },
+              { min: Math.round(lthr * 0.90), max: Math.round(lthr * 0.95) },
+              { min: Math.round(lthr * 0.95), max: Math.round(lthr * 1.05) },
+              { min: Math.round(lthr * 1.05), max: null },
+            ];
+          }
+          await svcClient
+            .from('user_baselines')
+            .upsert(
+              { user_id: user.id, configured_hr_zones: configuredZones },
+              { onConflict: 'user_id' }
+            );
+          console.log(`[FIT ZONES] Stored HR config for user ${user.id}: LTHR=${fitLthr}, maxHR=${fitMaxHr}`);
+        }
+      }
+    } catch (e) {
+      console.warn('[FIT ZONES] Non-fatal error persisting FIT HR data:', e);
+    }
+
+    // Invoke compute-workout-summary to add intervals / enhance when sensor_data exists
     if (baseUrl && serviceKey && data?.id) {
       fetch(`${baseUrl}/functions/v1/compute-workout-summary`, {
         method: 'POST',

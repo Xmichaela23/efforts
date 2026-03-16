@@ -94,6 +94,9 @@ function aggregateWeek(facts: FactRow[]) {
   // Strength
   let strengthVolume = 0;
 
+  // Intensity distribution (HR zone time)
+  const zoneSeconds: Record<string, number> = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
+
   for (const f of facts) {
     sessionCount++;
     workloadTotal += f.workload ?? 0;
@@ -117,6 +120,11 @@ function aggregateWeek(facts: FactRow[]) {
         intervalHits.push(rf.intervals_hit);
         intervalTotals.push(rf.intervals_total);
       }
+      if (rf.time_in_zone) {
+        for (const [k, v] of Object.entries(rf.time_in_zone)) {
+          if (typeof v === "number") zoneSeconds[k] = (zoneSeconds[k] ?? 0) + v;
+        }
+      }
     }
 
     // Ride
@@ -126,6 +134,11 @@ function aggregateWeek(facts: FactRow[]) {
       }
       if (typeof f.ride_facts.efficiency_factor === "number" && f.ride_facts.efficiency_factor > 0) {
         rideEFs.push(f.ride_facts.efficiency_factor);
+      }
+      if (f.ride_facts.time_in_zone) {
+        for (const [k, v] of Object.entries(f.ride_facts.time_in_zone)) {
+          if (typeof v === "number") zoneSeconds[k] = (zoneSeconds[k] ?? 0) + v;
+        }
       }
     }
 
@@ -137,6 +150,17 @@ function aggregateWeek(facts: FactRow[]) {
 
   const totalIntervalHits = intervalHits.reduce((a, b) => a + b, 0);
   const totalIntervalTargets = intervalTotals.reduce((a, b) => a + b, 0);
+
+  // Intensity distribution: Z1-2 (easy/aerobic) vs Z3+ (tempo/threshold/VO2)
+  const totalZoneSec = Object.values(zoneSeconds).reduce((a, b) => a + b, 0);
+  const easyZoneSec = (zoneSeconds.z1 ?? 0) + (zoneSeconds.z2 ?? 0);
+  const hardZoneSec = totalZoneSec - easyZoneSec;
+  const intensityDistribution = totalZoneSec > 0 ? {
+    zone1_2_minutes: Math.round(easyZoneSec / 60),
+    zone3_plus_minutes: Math.round(hardZoneSec / 60),
+    zone1_2_pct: Math.round((easyZoneSec / totalZoneSec) * 100),
+    zone_seconds: zoneSeconds,
+  } : null;
 
   return {
     workloadTotal,
@@ -160,6 +184,7 @@ function aggregateWeek(facts: FactRow[]) {
     rideAvgPower: avg(ridePowers),
     rideEF: avg(rideEFs),
     strengthVolume: strengthVolume > 0 ? strengthVolume : null,
+    intensityDistribution,
   };
 }
 
@@ -490,6 +515,7 @@ serve(async (req: Request) => {
       plan_phase: planPhase,
 
       interference: interferenceScore,
+      intensity_distribution: current.intensityDistribution,
 
       computed_at: new Date().toISOString(),
     };

@@ -371,7 +371,7 @@ const Connections: React.FC = () => {
   const connectStrava = () => {
     const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
     const redirectUri = `${window.location.origin}/strava/callback`;
-    const scope = 'read,activity:read_all';
+    const scope = 'read,activity:read_all,profile:read_all';
     
     const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
     

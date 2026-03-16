@@ -144,6 +144,17 @@ export async function buildCoachingContext(
         .join(", ");
       if (lifts) lines.push(`  Top lifts: ${lifts}`);
     }
+    if (currentSnapshot.intensity_distribution) {
+      const id = currentSnapshot.intensity_distribution;
+      lines.push(`  Intensity distribution: ${id.zone1_2_pct}% easy (Z1-2: ${id.zone1_2_minutes} min), ${100 - id.zone1_2_pct}% hard (Z3+: ${id.zone3_plus_minutes} min)`);
+      if (id.zone1_2_pct >= 75) {
+        lines.push(`  → Polarized / 80-20 pattern — mostly easy volume this week.`);
+      } else if (id.zone1_2_pct >= 50) {
+        lines.push(`  → Mixed intensity — significant time above Z2. Check if "easy" sessions are creeping into Zone 3.`);
+      } else {
+        lines.push(`  → High-intensity dominant — more hard than easy. Sustainable only in short race-prep blocks.`);
+      }
+    }
   }
 
   // Prior week for trend context

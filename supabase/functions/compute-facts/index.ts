@@ -1040,9 +1040,16 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null): Record<strin
     elevation_gain_m: w.elevation_gain ?? null,
   };
 
-  if (Array.isArray(analysis.zones?.hr)) {
+  const hrZoneData = analysis.zones?.hr;
+  if (hrZoneData?.bins && Array.isArray(hrZoneData.bins)) {
     const timeInZone: Record<string, number> = {};
-    for (const z of analysis.zones.hr) {
+    for (const b of hrZoneData.bins) {
+      timeInZone[`z${(b.i ?? 0) + 1}`] = Math.round(b.t_s ?? 0);
+    }
+    facts.time_in_zone = timeInZone;
+  } else if (Array.isArray(hrZoneData)) {
+    const timeInZone: Record<string, number> = {};
+    for (const z of hrZoneData) {
       timeInZone[`z${z.zone}`] = Math.round(z.seconds ?? 0);
     }
     facts.time_in_zone = timeInZone;
@@ -1128,9 +1135,16 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
     facts.efficiency_factor = Math.round((facts.normalized_power / facts.avg_hr) * 100) / 100;
   }
 
-  if (Array.isArray(analysis.zones?.hr)) {
+  const rideHrZoneData = analysis.zones?.hr;
+  if (rideHrZoneData?.bins && Array.isArray(rideHrZoneData.bins)) {
     const timeInZone: Record<string, number> = {};
-    for (const z of analysis.zones.hr) {
+    for (const b of rideHrZoneData.bins) {
+      timeInZone[`z${(b.i ?? 0) + 1}`] = Math.round(b.t_s ?? 0);
+    }
+    facts.time_in_zone = timeInZone;
+  } else if (Array.isArray(rideHrZoneData)) {
+    const timeInZone: Record<string, number> = {};
+    for (const z of rideHrZoneData) {
       timeInZone[`z${z.zone}`] = Math.round(z.seconds ?? 0);
     }
     facts.time_in_zone = timeInZone;

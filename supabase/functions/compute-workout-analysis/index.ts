@@ -745,7 +745,7 @@ Deno.serve(async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, planned_id')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, planned_id, threshold_heart_rate, default_max_heart_rate')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -753,13 +753,15 @@ Deno.serve(async (req) => {
 
     const sport = String(w.type || 'run').toLowerCase();
     
-    // Fetch user FTP from performance_numbers JSONB for cycling metrics
+    // Fetch user FTP, learned fitness, and configured HR zones from user_baselines
     let userFtp: number | null = null;
+    let userMaxHR: number | null = null;
+    let configuredHrZones: any = null;
     try {
       if (w.user_id) {
         const { data: baseline } = await supabase
           .from('user_baselines')
-          .select('performance_numbers')
+          .select('performance_numbers, learned_fitness, configured_hr_zones')
           .eq('user_id', w.user_id)
           .maybeSingle();
         console.log('[FTP] Baseline data:', baseline);
@@ -773,9 +775,27 @@ Deno.serve(async (req) => {
             console.log('[FTP] Extracted FTP:', userFtp);
           }
         }
+        if (baseline?.learned_fitness) {
+          const lf = typeof baseline.learned_fitness === 'string'
+            ? JSON.parse(baseline.learned_fitness)
+            : baseline.learned_fitness;
+          const sportMaxHr = (sport.includes('ride') || sport.includes('bike') || sport.includes('cycling'))
+            ? lf?.ride_max_hr_observed
+            : lf?.run_max_hr_observed;
+          if (sportMaxHr?.value && Number.isFinite(Number(sportMaxHr.value))) {
+            userMaxHR = Number(sportMaxHr.value);
+            console.log('[HR ZONES] Max HR from learned_fitness:', userMaxHR);
+          }
+        }
+        if (baseline?.configured_hr_zones) {
+          configuredHrZones = typeof baseline.configured_hr_zones === 'string'
+            ? JSON.parse(baseline.configured_hr_zones)
+            : baseline.configured_hr_zones;
+          console.log('[HR ZONES] Configured zones from', configuredHrZones?.source, ':', JSON.stringify(configuredHrZones?.zones?.length ?? 0), 'zones');
+        }
       }
     } catch (e) {
-      console.error('[FTP] Error fetching FTP:', e);
+      console.error('[FTP/HR] Error fetching baselines:', e);
     }
 
     // Parse JSON columns if stringified
@@ -1231,8 +1251,88 @@ Deno.serve(async (req) => {
       };
     };
     
-    const hrZones = binsFor(hr_bpm, time_s, 5);
-    if (hrZones) analysis.zones.hr = hrZones as any;
+    // HR zones: preference hierarchy
+    //   1. Athlete-configured zone boundaries (Strava or FIT-derived)
+    //   2. LTHR-based Friel zones (from FIT threshold_heart_rate)
+    //   3. Learned max HR from workout history
+    //   4. Observed max in this workout / 0.95
+    //   5. Fallback: 180 bpm
+    let hrZoneBoundaries: number[] | null = null;
+    let hrZoneSchema = 'fallback';
+
+    // Priority 1: Athlete-configured zone boundaries from Strava or FIT
+    if (configuredHrZones?.zones && Array.isArray(configuredHrZones.zones) && configuredHrZones.zones.length >= 3) {
+      const zones = configuredHrZones.zones;
+      // Map variable-length athlete zones to boundaries array: [min0, max0/min1, max1/min2, ..., lastMax]
+      const boundaries: number[] = [zones[0].min ?? 0];
+      for (const z of zones) {
+        const max = z.max;
+        if (max == null || max <= 0) {
+          // Open-ended top zone: cap at a high value
+          const prevMax = boundaries[boundaries.length - 1];
+          boundaries.push(Math.max(prevMax + 20, 220));
+        } else {
+          boundaries.push(Number(max));
+        }
+      }
+      if (boundaries.length >= 4) {
+        hrZoneBoundaries = boundaries;
+        hrZoneSchema = `configured:${configuredHrZones.source ?? 'unknown'}`;
+        console.log('[HR ZONES] Using athlete-configured zones from', configuredHrZones.source, ':', hrZoneBoundaries);
+      }
+    }
+
+    // Priority 2: LTHR from configured_hr_zones or workout (Friel 5-zone model)
+    if (!hrZoneBoundaries) {
+      const lthr = configuredHrZones?.threshold_heart_rate
+        || (Number.isFinite((w as any)?.threshold_heart_rate) ? Number((w as any).threshold_heart_rate) : null);
+      if (lthr && lthr > 100) {
+        hrZoneBoundaries = [
+          0,
+          Math.round(lthr * 0.85),
+          Math.round(lthr * 0.90),
+          Math.round(lthr * 0.95),
+          Math.round(lthr * 1.05),
+          Math.round(lthr * 1.15),
+        ];
+        hrZoneSchema = 'lthr-friel';
+        console.log('[HR ZONES] Using LTHR-based Friel zones, LTHR:', lthr);
+      }
+    }
+
+    // Priority 3-5: Max HR based (%HRmax standard zones)
+    if (!hrZoneBoundaries) {
+      let effectiveMaxHR = configuredHrZones?.max_heart_rate ?? userMaxHR;
+      if (!effectiveMaxHR) {
+        // Check workout's own FIT data
+        const fitMax = Number.isFinite((w as any)?.default_max_heart_rate) ? Number((w as any).default_max_heart_rate) : null;
+        if (fitMax && fitMax > 100) effectiveMaxHR = fitMax;
+      }
+      if (!effectiveMaxHR) {
+        const hrVals: number[] = [];
+        for (const v of hr_bpm) if (typeof v === 'number' && Number.isFinite(v) && v > 0) hrVals.push(v);
+        if (hrVals.length > 0) {
+          effectiveMaxHR = Math.round(Math.max(...hrVals) / 0.95);
+        }
+      }
+      if (!effectiveMaxHR) effectiveMaxHR = 180;
+      hrZoneBoundaries = [
+        0,
+        Math.round(effectiveMaxHR * 0.60),
+        Math.round(effectiveMaxHR * 0.70),
+        Math.round(effectiveMaxHR * 0.80),
+        Math.round(effectiveMaxHR * 0.90),
+        Math.ceil(effectiveMaxHR * 1.01),
+      ];
+      hrZoneSchema = userMaxHR ? 'learned-hrmax' : 'estimated-hrmax';
+      console.log('[HR ZONES] Using %HRmax zones, max HR:', effectiveMaxHR, '(schema:', hrZoneSchema, ')');
+    }
+
+    const hrZones = binsForBoundaries(hr_bpm, time_s, hrZoneBoundaries);
+    if (hrZones) {
+      (hrZones as any).schema = hrZoneSchema;
+      analysis.zones.hr = hrZones as any;
+    }
     
     // Power zones: FTP-based (using userFtp variable extracted earlier)
     const ftpForZones = userFtp || 200;

@@ -1458,7 +1458,7 @@ Deno.serve(async (req) => {
     try {
       const { data: snapRows } = await supabase
         .from('athlete_snapshot')
-        .select('interference, run_easy_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend')
+        .select('interference, run_easy_hr_trend, strength_volume_trend, strength_top_lifts, acwr, rpe_trend, intensity_distribution')
         .eq('user_id', userId)
         .order('week_start', { ascending: false })
         .limit(1);
@@ -1847,6 +1847,19 @@ Deno.serve(async (req) => {
           return `${r.type}: ${Math.round(r.total_load)} pts total (${plannedPct}% planned, ${extraPct}% extra/unplanned)`;
         });
         if (loadLines.length) narrativeFacts.push(`Training load by discipline this week: ${loadLines.join('; ')}.`);
+
+        // Intensity distribution (from athlete_snapshot)
+        if (latestSnapshot?.intensity_distribution) {
+          const id = latestSnapshot.intensity_distribution;
+          const easyPct = id.zone1_2_pct;
+          const hardPct = 100 - easyPct;
+          let intensityLabel: string;
+          if (easyPct >= 78) intensityLabel = 'well-polarized (80/20 pattern)';
+          else if (easyPct >= 65) intensityLabel = 'moderately polarized — some zone creep on easy days';
+          else if (easyPct >= 50) intensityLabel = 'mixed — significant time above Z2, check if easy sessions are actually easy';
+          else intensityLabel = 'high-intensity dominant — sustainable only in short race-prep blocks';
+          narrativeFacts.push(`Weekly intensity distribution: ${easyPct}% easy (Z1-2, ${id.zone1_2_minutes} min) / ${hardPct}% hard (Z3+, ${id.zone3_plus_minutes} min) — ${intensityLabel}.`);
+        }
 
         // ── Athlete performance baselines ─────────────────────────────────────
         // Without these, the LLM guesses whether a 200W ride is hard or easy.
