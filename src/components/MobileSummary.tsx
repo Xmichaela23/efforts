@@ -2724,16 +2724,22 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                             const prev = splits[i - 1];
                             const cur = splits[i];
                             const pickupSec = prev.pace - cur.pace; // + means faster
-                            if (pickupSec > (best?.pickupSec ?? 0)) {
+                            // Cap at 120s/mi — larger deltas are GPS artifacts (stalled GPS, short splits)
+                            if (pickupSec > (best?.pickupSec ?? 0) && pickupSec <= 120) {
                               best = { mile: cur.mile, pickupSec, pace: cur.pace, terrain: cur.terrain };
                             }
                           }
 
                           if (best && Number.isFinite(best.pickupSec) && best.pickupSec >= 10) {
                             const terr = best.terrain ? ` (${best.terrain})` : '';
+                            const deltaMin = Math.floor(best.pickupSec / 60);
+                            const deltaSec = Math.round(best.pickupSec % 60);
+                            const deltaStr = deltaMin > 0
+                              ? `${deltaMin}:${String(deltaSec).padStart(2, '0')}/mi faster`
+                              : `${deltaSec}s/mi faster`;
                             rows.push({
                               label: 'Speed',
-                              value: `Biggest pickup: Mile ${best.mile}${terr} at ${fmtPace(best.pace)} (~${Math.round(best.pickupSec)}s/mi faster than prior mile)`,
+                              value: `Biggest pickup: Mile ${best.mile}${terr} at ${fmtPace(best.pace)} (${deltaStr} than prior mile)`,
                             });
                           } else if (noteFallback && typeof noteFallback === 'string' && noteFallback.trim().length > 0) {
                             rows.push({ label: 'Speed', value: noteFallback.trim() });
