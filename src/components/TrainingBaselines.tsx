@@ -187,6 +187,7 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [manualRideMaxHR, setManualRideMaxHR] = useState<number | null>(null);
   const [manualRideLTHR, setManualRideLTHR] = useState<number | null>(null);
   const [configuredZonesSource, setConfiguredZonesSource] = useState<string | null>(null);
+  const [garminRestingHR, setGarminRestingHR] = useState<number | null>(null);
 
   // Track initial manual HR state for change detection
   const [initialManualHR, setInitialManualHR] = useState('');
@@ -315,6 +316,9 @@ const loadBaselines = async () => {
             ? JSON.parse(row.configured_hr_zones)
             : row.configured_hr_zones;
           setConfiguredZonesSource(cfg.source || null);
+          if (cfg.resting_heart_rate && Number(cfg.resting_heart_rate) > 30) {
+            setGarminRestingHR(Number(cfg.resting_heart_rate));
+          }
           const rmx = cfg.manual_run_max_hr || null;
           const rlt = cfg.manual_run_lthr || null;
           const cmx = cfg.manual_ride_max_hr || null;
@@ -439,30 +443,29 @@ const getKarvonenZones = (maxHR: number, restingHR: number): HRZone[] => {
   ];
 };
 
-// Hybrid: prefer Friel (LTHR) when available, fall back to Karvonen (HRR)
-const getHRZones = (lthr: number | null, maxHR: number | null, restingHR: number): HRZone[] | null => {
+// Hybrid: prefer Friel (LTHR) when available, fall back to Karvonen (HRR) if resting HR known
+const getHRZones = (lthr: number | null, maxHR: number | null, restingHR: number | null): HRZone[] | null => {
   if (lthr && lthr > 100) return getFrielZones(lthr);
-  if (maxHR && maxHR > 100) return getKarvonenZones(maxHR, restingHR);
+  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return getKarvonenZones(maxHR, restingHR);
   return null;
 };
 
-const getZoneModel = (lthr: number | null, maxHR: number | null): string => {
+const getZoneModel = (lthr: number | null, maxHR: number | null, restingHR: number | null): string => {
   if (lthr && lthr > 100) return 'Friel %LTHR';
-  if (maxHR && maxHR > 100) return 'Karvonen %HRR';
+  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return 'Karvonen %HRR';
+  if (maxHR && maxHR > 100) return 'needs Resting HR';
   return '';
 };
 
-// Calculate smart resting HR default from threshold HR
-const getSmartRestingHR = (thresholdHR: number | null, customOverride: number | null): { value: number; isCustom: boolean; source: string } => {
+// Resting HR: only use real values (manual entry or Garmin device), never guess
+const getRestingHR = (customOverride: number | null, garminValue: number | null): { value: number | null; source: string } => {
   if (customOverride && customOverride > 0) {
-    return { value: customOverride, isCustom: true, source: 'custom' };
+    return { value: customOverride, source: 'manual' };
   }
-  if (thresholdHR && thresholdHR > 0) {
-    // Smart default: threshold - 90 (typical spread), floor at 45
-    const smartDefault = Math.max(thresholdHR - 90, 45);
-    return { value: smartDefault, isCustom: false, source: 'calculated' };
+  if (garminValue && garminValue > 0) {
+    return { value: garminValue, source: 'garmin' };
   }
-  return { value: 60, isCustom: false, source: 'default' };
+  return { value: null, source: 'none' };
 };
 
 // Calculate power zones from FTP (Coggan zones)
@@ -489,10 +492,7 @@ const handleSave = async () => {
     if (hasManualOverrides) {
       const userId = getStoredUserId();
       if (userId) {
-        const restingHR = customRestingHR || getSmartRestingHR(
-          manualRunLTHR || learnedFitness?.run_threshold_hr?.value || null,
-          customRestingHR
-        ).value;
+        const restingHR = customRestingHR || garminRestingHR || 60;
 
         const effectiveRunLTHR = manualRunLTHR || learnedFitness?.run_threshold_hr?.value || null;
         const effectiveRunMax = manualRunMaxHR || learnedFitness?.run_max_hr_observed?.value || null;
@@ -1470,8 +1470,7 @@ return (
 
                     {(() => {
                       const ageEstimates = getAgeBasedHREstimates(data.birthday);
-                      const learnedThresholdHR = learnedFitness?.run_threshold_hr?.value || learnedFitness?.ride_threshold_hr?.value || null;
-                      const restingInfo = getSmartRestingHR(learnedThresholdHR, customRestingHR);
+                      const restingInfo = getRestingHR(customRestingHR, garminRestingHR);
 
                       const sportSections: { key: string; label: string; icon: React.ReactNode; color: string;
                         learnedMaxHR: number | null; learnedLTHR: number | null; learnedThresholdPace: any;
@@ -1517,7 +1516,9 @@ return (
                         <div className="space-y-5">
                           {/* Resting HR */}
                           <TooltipProvider>
-                            <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/15">
+                            <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${
+                              restingInfo.value ? 'bg-white/[0.06] border-white/15' : 'bg-yellow-500/5 border-yellow-500/20'
+                            }`}>
                               <div className="flex items-center gap-2">
                                 <div>
                                   <div className="flex items-center gap-1.5">
@@ -1529,11 +1530,11 @@ return (
                                       <TooltipContent side="top" className="max-w-[250px] text-xs">
                                         <p className="font-medium mb-1">Used for Karvonen zone calculation and TRIMP</p>
                                         <p className="text-white/70">
-                                          {restingInfo.source === 'custom'
+                                          {restingInfo.source === 'manual'
                                             ? 'Using your value.'
-                                            : restingInfo.source === 'calculated'
-                                              ? `Estimated from threshold HR. Override if you know yours.`
-                                              : 'Default value. Set your own for better accuracy.'}
+                                            : restingInfo.source === 'garmin'
+                                              ? 'From your Garmin device profile. Override if you prefer.'
+                                              : 'Enter your morning resting heart rate for accurate zones and workload.'}
                                         </p>
                                       </TooltipContent>
                                     </Tooltip>
@@ -1541,7 +1542,7 @@ return (
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <input
                                       type="number"
-                                      value={customRestingHR || restingInfo.value}
+                                      value={restingInfo.value ?? ''}
                                       onChange={(e) => {
                                         const val = parseInt(e.target.value);
                                         if (val >= 35 && val <= 100) {
@@ -1553,16 +1554,19 @@ return (
                                           setData(prev => ({ ...prev, performanceNumbers: rest }));
                                         }
                                       }}
-                                      placeholder={String(restingInfo.value)}
+                                      placeholder="—"
                                       className="w-16 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
                                       min={35} max={100}
                                     />
                                     <span className="text-sm text-white/60">bpm</span>
                                   </div>
+                                  {!restingInfo.value && (
+                                    <p className="text-[10px] text-yellow-400/70 mt-1">Check your watch for morning resting HR</p>
+                                  )}
                                 </div>
                               </div>
                               <div className="text-[10px] text-white/40">
-                                {restingInfo.isCustom ? 'custom' : restingInfo.source === 'calculated' ? 'auto' : 'default'}
+                                {restingInfo.source === 'manual' ? 'manual' : restingInfo.source === 'garmin' ? 'garmin' : ''}
                               </div>
                             </div>
                           </TooltipProvider>
@@ -1572,7 +1576,7 @@ return (
                             const effectiveMaxHR = sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates ? ageEstimates.maxHR : null);
                             const effectiveLTHR = sport.manualLTHR || sport.learnedLTHR || (ageEstimates ? ageEstimates.thresholdHR : null);
                             const zones = getHRZones(effectiveLTHR, effectiveMaxHR, restingInfo.value);
-                            const model = getZoneModel(effectiveLTHR, effectiveMaxHR);
+                            const model = getZoneModel(effectiveLTHR, effectiveMaxHR, restingInfo.value);
 
                             const maxSource = sport.manualMaxHR ? 'manual' : sport.learnedMaxHR ? 'observed' : ageEstimates ? 'age est.' : '';
                             const lthrSource = sport.manualLTHR ? 'manual' : sport.learnedLTHR ? 'learned' : ageEstimates ? 'age est.' : '';
