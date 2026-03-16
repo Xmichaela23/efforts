@@ -148,7 +148,7 @@ function LinkExtrasDialog({ open, onClose, onLinked, extras, gaps }: LinkExtrasD
 // ─── Baseline Drift Card ───────────────────────────────────────────────────
 
 function toIsoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString('en-CA');
 }
 
 type BaselineDriftSuggestion = { lift: string; label: string; baseline: number; learned: number; basis?: string };
