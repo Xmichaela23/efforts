@@ -144,7 +144,7 @@ TONE:
 - Write like a thoughtful coach reviewing a training log. Calm, direct, observational.
 - NO hype language. Never use: crushed, smashed, nailed, killed it, beast mode, solid work, great job, strong session, dialed in. These sound fake.
 - NO percentage comparisons for load or volume ("76% above plan", "151% of planned load", "343% of expected stress"). Instead say "you're well ahead of the plan after one day" or "the run was shorter than planned."
-- NO jargon: ACWR, TRIMP, RPE scores, z-score, sample size, execution score, training points, load points, RIR numbers. A user doesn't know what "1.7 RIR" means. Say "you had a little left in the tank" or "you pushed close to failure."
+- NO jargon: ACWR, TRIMP, RPE scores, z-score, sample size, execution score, training points, load points, RIR numbers, "effort X/10", "X out of 10". A user doesn't know what "1.7 RIR" or "effort 5/10" means. Say "you had a little left in the tank" or "felt tired on the run."
 - State facts. Let the athlete draw their own conclusions about whether it was "good" or "bad."
 
 RULES:
@@ -202,22 +202,34 @@ function parseCoachingResponse(raw: string, snapshot: Omit<AthleteSnapshot, 'coa
 
   if (headlineMatch && narrativeMatch) {
     return {
-      headline: headlineMatch[1].trim().replace(/^["']|["']$/g, ''),
-      narrative: narrativeMatch[1].trim().replace(/^["']|["']$/g, ''),
-      next_session_guidance: guidanceMatch?.[1]?.trim().replace(/^["']|["']$/g, '') || null,
+      headline: stripMarkdown(headlineMatch[1]),
+      narrative: stripMarkdown(narrativeMatch[1]),
+      next_session_guidance: guidanceMatch ? stripMarkdown(guidanceMatch[1]) : null,
     };
   }
 
-  // Fallback: treat the whole thing as narrative, derive headline from load status
+  // Fallback: split by sentences, first is headline, rest is narrative
+  const clean = stripMarkdown(raw);
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
   return {
-    headline: snapshot.body_response.load_status.status === 'high'
-      ? 'High load — protect recovery'
-      : snapshot.body_response.load_status.status === 'elevated'
-        ? 'Load is building'
-        : 'On track',
-    narrative: raw.slice(0, 500),
+    headline: sentences[0]?.slice(0, 60) || 'This week',
+    narrative: sentences.slice(1).join(' ').slice(0, 500) || clean.slice(0, 500),
     next_session_guidance: null,
   };
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/^#+\s*/gm, '')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/HEADLINE[:\s]*/gi, '')
+    .replace(/NARRATIVE[:\s]*/gi, '')
+    .replace(/NEXT SESSION GUIDANCE[:\s]*/gi, '')
+    .replace(/NEXT SESSION[:\s]*/gi, '')
+    .replace(/GUIDANCE[:\s]*/gi, '')
+    .trim();
 }
 
 function fallbackCoaching(snapshot: Omit<AthleteSnapshot, 'coaching'>): Coaching {
