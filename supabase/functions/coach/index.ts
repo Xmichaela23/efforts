@@ -38,6 +38,15 @@ import {
 import { loadGoalContext, type GoalContext } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import {
+  buildDailyLedger,
+  buildIdentity,
+  buildPlanPosition,
+  buildBodyResponse,
+  generateCoaching,
+  snapshotToPrompt,
+  type AthleteSnapshot,
+} from '../_shared/athlete-snapshot/index.ts';
+import {
   isPlanTransitionWindowByWeekIndex,
   resolvePlanWeekIndex,
   resolveWeekStartDowFromPlanConfig,
@@ -1546,10 +1555,131 @@ Deno.serve(async (req) => {
     // Athlete-provided context (athleteContextStr computed earlier for training_state)
 
     // =========================================================================
-    // AI week narrative — coach paragraph from structured facts
+    // ATHLETE SNAPSHOT — single source of truth for this week
     // =========================================================================
+    let athleteSnapshot: AthleteSnapshot | null = null;
     let week_narrative: string | null = null;
     try {
+      const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+
+      // Build the snapshot from data we already have
+      const isImperialForSnapshot = (() => {
+        try { return String(baselines?.performance_numbers?.units || '').toLowerCase() !== 'metric'; } catch { return true; }
+      })();
+
+      const dailyLedger = buildDailyLedger({
+        weekStartDate,
+        weekEndDate,
+        asOfDate,
+        plannedRows: plannedWeekArr,
+        workoutRows: weekWorkouts,
+        imperial: isImperialForSnapshot,
+        userTz,
+      });
+
+      const goalRows = goalContext?.goals || [];
+      const strengthLiftMaxes = (weeklyResponseModel?.strength?.per_lift || [])
+        .filter((l: any) => l.e1rm_current != null)
+        .map((l: any) => ({ name: l.display_name, e1rm: l.e1rm_current }));
+
+      const snapshotIdentity = buildIdentity({
+        goals: goalRows,
+        baselines,
+        strengthLifts: strengthLiftMaxes,
+        imperial: isImperialForSnapshot,
+        asOfDate,
+      });
+
+      const snapshotPlanPosition = buildPlanPosition({
+        activePlan: activePlan,
+        allPlans: allActivePlans,
+        weekStartDate,
+        planContract: activePlan?.config?.plan_contract_v1 || null,
+        weekTotalLoadPlanned: plannedWeekTotalLoad || 0,
+      });
+
+      const snapshotNorms = {
+        easy_hr_at_pace: baselines?.norms_28d?.hr_drift_avg_bpm != null
+          ? 140 + (baselines.norms_28d.hr_drift_avg_bpm || 0) : null,
+        threshold_pace_sec_per_mi: null,
+        avg_execution_score: baselines?.norms_28d?.execution_score_avg ?? null,
+        avg_rpe: baselines?.norms_28d?.session_rpe_avg ?? null,
+        avg_hr_drift_bpm: baselines?.norms_28d?.hr_drift_avg_bpm ?? null,
+        avg_decoupling_pct: null,
+        avg_rir: baselines?.norms_28d?.strength_rir_avg ?? null,
+      };
+
+      const loadPct = (plannedWtdLoad > 0)
+        ? Math.round(((actualWtdLoad - plannedWtdLoad) / plannedWtdLoad) * 100)
+        : null;
+
+      const snapshotBody = buildBodyResponse(
+        dailyLedger,
+        snapshotNorms,
+        isImperialForSnapshot,
+        { actual_vs_planned_pct: loadPct, acwr: acwr ?? null },
+        {
+          interference: weeklyResponseModel?.cross_domain?.interference_detected || false,
+          detail: weeklyResponseModel?.cross_domain?.patterns?.[0]?.description || 'No interference detected.',
+        },
+      );
+
+      // Upcoming sessions with full prescription
+      const upcomingDays = dailyLedger
+        .filter(d => !d.is_past && !(d.is_today && d.actual.length > 0))
+        .filter(d => d.planned.length > 0)
+        .map(d => ({
+          date: d.date,
+          day_name: d.day_name,
+          sessions: d.planned.map(p => ({
+            ...p,
+            is_key_session: keyCategoryForPlanned(
+              plannedWeekArr.find((r: any) => String(r?.id) === p.planned_id) || {},
+              methodologyCtx, methodologyId,
+            ) !== 'other',
+          })),
+        }));
+
+      const partialSnapshot: Omit<AthleteSnapshot, 'coaching'> = {
+        version: 1,
+        generated_at: new Date().toISOString(),
+        user_id: userId,
+        as_of_date: asOfDate,
+        week_start_date: weekStartDate,
+        week_end_date: weekEndDate,
+        identity: snapshotIdentity,
+        plan_position: snapshotPlanPosition,
+        daily_ledger: dailyLedger,
+        body_response: snapshotBody,
+        upcoming: upcomingDays,
+      };
+
+      // Generate coaching narrative from the snapshot
+      let coaching: AthleteSnapshot['coaching'] = {
+        headline: snapshotBody.load_status.status === 'high' ? 'High load — protect recovery'
+          : snapshotBody.load_status.status === 'elevated' ? 'Load is building'
+          : 'On track',
+        narrative: '',
+        next_session_guidance: null,
+      };
+
+      if (anthropicKey) {
+        try {
+          coaching = await generateCoaching(partialSnapshot, anthropicKey);
+        } catch (llmErr: any) {
+          console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
+        }
+      }
+
+      athleteSnapshot = { ...partialSnapshot, coaching };
+      week_narrative = coaching.narrative || null;
+
+    } catch (snapErr: any) {
+      console.warn('[coach] athlete snapshot failed, falling back to legacy:', snapErr?.message || snapErr);
+    }
+
+    // Legacy narrative fallback — only if snapshot failed
+    if (!week_narrative) try {
       const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
       if (anthropicKey) {
         const narrativeFacts: string[] = [];
@@ -2268,6 +2398,7 @@ ${narrativeFacts.join('\n')}`;
       response_model: weeklyResponseModel,
       goal_context: goalContext,
       goal_prediction: goalPrediction,
+      athlete_snapshot: athleteSnapshot,
     };
 
     return new Response(JSON.stringify(response), {
