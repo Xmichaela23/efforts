@@ -429,7 +429,7 @@ Deno.serve(async (req) => {
     // rows from ended plans in the same date range are excluded.
     let plannedWeekQuery = supabase
       .from('planned_workouts')
-      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id,total_duration_seconds,total_distance_meters')
+      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id,total_duration_seconds,computed')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
@@ -1817,7 +1817,8 @@ Deno.serve(async (req) => {
         function planVsActualLine(planned: any, w: any): string | null {
           const pName = planned?.name ? String(planned.name) : null;
           const pDurSec = safeNum(planned?.total_duration_seconds);
-          const pDistM = safeNum(planned?.total_distance_meters);
+          const pComputed = typeof planned?.computed === 'object' ? planned.computed : (typeof planned?.computed === 'string' ? (parseJson(planned.computed) || {}) : {});
+          const pDistM = safeNum(pComputed?.total_distance_meters) ?? safeNum(pComputed?.distance_meters);
           const pLoad = safeNum(planned?.workload_planned);
           const wDurSec = (() => {
             const raw = safeNum((w as any)?.moving_time);
