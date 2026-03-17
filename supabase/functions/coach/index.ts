@@ -429,7 +429,7 @@ Deno.serve(async (req) => {
     // rows from ended plans in the same date range are excluded.
     let plannedWeekQuery = supabase
       .from('planned_workouts')
-      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id')
+      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id,total_duration_seconds,total_distance_meters')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
@@ -458,28 +458,8 @@ Deno.serve(async (req) => {
 
     const plannedWtdArr = plannedWeekArr.filter((r: any) => String(r?.date || '') <= asOfDate);
 
-    const keySessionsRemaining: KeySessionItem[] = plannedWeekArr
-      .filter((r: any) => String(r?.date || '') >= asOfDate && String(r?.workout_status || '').toLowerCase() !== 'completed')
-      .map((r: any) => {
-        const category = keyCategoryForPlanned(r, methodologyCtx, methodologyId);
-        return {
-          date: String(r?.date || '').slice(0, 10),
-          type: String(r?.type || ''),
-          name: r?.name != null ? String(r.name) : null,
-          category,
-          workload_planned: safeNum(r?.workload_planned),
-        } as KeySessionItem;
-      })
-      .filter((x: any) => x.category !== 'other')
-      .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
-
-    // Key session completion + execution quality
-    // IMPORTANT: this is week-to-date (<= asOfDate), otherwise mid-week counts look wrong.
-    const keySessionsPlanned = plannedWtdArr
-      .map((r: any) => ({ r, cat: keyCategoryForPlanned(r, methodologyCtx, methodologyId) }))
-      .filter((x: any) => x.cat !== 'other');
-
     // Pull completed workouts in-week for execution_score sampling (linked workouts usually have planned_id)
+    // IMPORTANT: this must come before keySessionsRemaining so isPlannedCompleted is available.
     const plannedIds = new Set<string>(plannedWeekArr.map((p: any) => String(p?.id || '')).filter(Boolean));
     const workoutQueryFrom = addDaysISO(weekStartDate, -2);
     const workoutQueryTo = addDaysISO(asOfDate, 2);
@@ -491,8 +471,6 @@ Deno.serve(async (req) => {
       .lte('date', workoutQueryTo);
     if (wwErr) throw wwErr;
 
-    // Date truth for weekly rollups should be user-local timestamp when present,
-    // not stored UTC-sliced date strings that can drift across midnight.
     const weekWorkouts = (Array.isArray(weekWorkoutsRows) ? weekWorkoutsRows : [])
       .map((w: any) => {
         const localDate = workoutLocalDate(w, String(w?.date || '').slice(0, 10), userTz);
@@ -516,6 +494,27 @@ Deno.serve(async (req) => {
       const viaWorkoutRef = r?.id != null && completedPlannedIdsFromWorkouts.has(String(r.id));
       return Boolean(statusDone || hardLinked || viaWorkoutRef);
     };
+
+    const keySessionsRemaining: KeySessionItem[] = plannedWeekArr
+      .filter((r: any) => String(r?.date || '') > asOfDate || (String(r?.date || '') === asOfDate && !isPlannedCompleted(r)))
+      .map((r: any) => {
+        const category = keyCategoryForPlanned(r, methodologyCtx, methodologyId);
+        return {
+          date: String(r?.date || '').slice(0, 10),
+          type: String(r?.type || ''),
+          name: r?.name != null ? String(r.name) : null,
+          category,
+          workload_planned: safeNum(r?.workload_planned),
+        } as KeySessionItem;
+      })
+      .filter((x: any) => x.category !== 'other')
+      .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+
+    // Key session completion + execution quality
+    // IMPORTANT: this is week-to-date (<= asOfDate), otherwise mid-week counts look wrong.
+    const keySessionsPlanned = plannedWtdArr
+      .map((r: any) => ({ r, cat: keyCategoryForPlanned(r, methodologyCtx, methodologyId) }))
+      .filter((x: any) => x.cat !== 'other');
 
     // Do not mark same-day sessions as "missed" unless they are already completed.
     // This prevents morning/midday check-ins from prematurely counting today's
@@ -1784,6 +1783,71 @@ Deno.serve(async (req) => {
           narrativeFacts.push(`MISSED SESSIONS (no reason provided — state these as missed without guessing why): ${lines.join('; ')}.`);
         }
 
+        // ── Soft-match: pair every completed workout with its planned session ──
+        // Uses hard link (planned_id) first, then falls back to date+type match.
+        const plannedByDateType = new Map<string, any[]>();
+        for (const p of plannedWtdArr) {
+          const key = `${String(p?.date || '').slice(0, 10)}::${normalizeType(p?.type)}`;
+          if (!plannedByDateType.has(key)) plannedByDateType.set(key, []);
+          plannedByDateType.get(key)!.push(p);
+        }
+        const usedPlannedIds = new Set<string>();
+
+        function softMatchPlanned(w: any): any | null {
+          const pid = w?.planned_id != null ? String(w.planned_id) : null;
+          if (pid) {
+            const found = plannedWtdArr.find((p: any) => String(p?.id) === pid);
+            if (found) { usedPlannedIds.add(String(found.id)); return found; }
+          }
+          const localDate = String(w?.__local_date || w?.date || '').slice(0, 10);
+          const discipline = normalizeType(w?.type);
+          const key = `${localDate}::${discipline}`;
+          const candidates = (plannedByDateType.get(key) || []).filter((p: any) => !usedPlannedIds.has(String(p.id)));
+          if (candidates.length === 1) {
+            usedPlannedIds.add(String(candidates[0].id));
+            return candidates[0];
+          }
+          if (candidates.length > 1) {
+            usedPlannedIds.add(String(candidates[0].id));
+            return candidates[0];
+          }
+          return null;
+        }
+
+        function planVsActualLine(planned: any, w: any): string | null {
+          const pName = planned?.name ? String(planned.name) : null;
+          const pDurSec = safeNum(planned?.total_duration_seconds);
+          const pDistM = safeNum(planned?.total_distance_meters);
+          const pLoad = safeNum(planned?.workload_planned);
+          const wDurSec = (() => {
+            const raw = safeNum((w as any)?.moving_time);
+            if (raw == null) return null;
+            return raw < 1000 ? Math.round(raw * 60) : Math.round(raw);
+          })();
+          const wDistM = safeNum((w as any)?.distance) != null ? Math.round(safeNum((w as any)?.distance)! * 1000) : null;
+          const wLoad = safeNum((w as any)?.workload_actual);
+
+          const parts: string[] = [];
+          if (pName) parts.push(`planned: "${pName}"`);
+          if (pDurSec != null && pDurSec > 0 && wDurSec != null && wDurSec > 0) {
+            const pMin = Math.round(pDurSec / 60);
+            const wMin = Math.round(wDurSec / 60);
+            const pct = Math.round((wDurSec / pDurSec) * 100);
+            parts.push(`duration: ${wMin} of ${pMin} min planned (${pct}%)`);
+          }
+          if (pDistM != null && pDistM > 0 && wDistM != null && wDistM > 0) {
+            const pMi = (pDistM / 1609.34).toFixed(1);
+            const wMi = (wDistM / 1609.34).toFixed(1);
+            const pct = Math.round((wDistM / pDistM) * 100);
+            parts.push(`distance: ${wMi} of ${pMi} mi planned (${pct}%)`);
+          }
+          if (pLoad != null && pLoad > 0 && wLoad != null) {
+            const pct = Math.round((wLoad / pLoad) * 100);
+            parts.push(`load: ${Math.round(wLoad)} of ${Math.round(pLoad)} pts planned (${pct}%)`);
+          }
+          return parts.length > 0 ? parts.join(' | ') : null;
+        }
+
         // ── Per-workout detail from canonical weekly workouts only ──
         for (const w of completedNarrativeWorkouts) {
           const discipline = normalizeType((w as any)?.type);
@@ -1798,6 +1862,10 @@ Deno.serve(async (req) => {
           if (feeling) parts.push(`feeling: ${feeling}`);
           const ex = executionScoreFromWorkout(w);
           if (ex != null) parts.push(`execution ${Math.round(ex)}%`);
+          const matched = softMatchPlanned(w);
+          const pvA = matched ? planVsActualLine(matched, w) : null;
+          if (pvA) parts.push(pvA);
+          else if (!matched && activePlan) parts.push('unplanned (not in the training plan)');
           narrativeFacts.push(`SESSION: ${parts.join(' | ')}`);
         }
 
@@ -1967,12 +2035,16 @@ Deno.serve(async (req) => {
 
 STYLE (Training Status): sentence 1 = status + why in plain language. sentence 2 = what happened this week (completed vs missed, only past sessions). sentence 3 = one clear next action.
 
+PLAN VS ACTUAL: Each SESSION may include plan-vs-actual data (duration, distance, load percentages). USE this to give specific feedback: "you cut Monday's easy run short — 3 miles of 4.5 planned" or "you went 20% longer than planned on your tempo." This is the most valuable insight — the gap between what was planned and what actually happened.
+
 NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reasons. Otherwise, state what happened without speculation. Only explain causes when the athlete explicitly provided them.
 
 TEMPORAL RULES (strict):
+- "SESSION:" entries are COMPLETED workouts — these DEFINITELY happened. Never contradict them.
 - "STILL UPCOMING" sessions have NOT happened yet — never describe them as missed, skipped, or incomplete.
 - "MISSED SESSION REASONS" lists every session that was genuinely missed before today, with the exact day name already resolved. Use these day names verbatim — do NOT recompute day-of-week from dates.
 - "MISSED SESSIONS" (no reason) are also already resolved to day names — use them verbatim.
+- If a SESSION entry exists for a day, that session happened — even if other facts seem to imply otherwise.
 - Never infer a day name from an ISO date. If a day name isn't provided in the facts, omit the reference.
 
 Connect the dots when you have athlete context: if they said they had the flu, that explains missed sessions. If they said they went heavier on purpose, that explains the weight deviation. If their running efficiency improved, say so. If there is an INTERFERENCE ALERT, explain it in plain language.

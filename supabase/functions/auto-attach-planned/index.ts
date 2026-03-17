@@ -581,7 +581,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_exact_date_type_match_or_no_planned_seconds' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     const ratio = (bestTotals.seconds && wSec>0) ? (wSec / (bestTotals.seconds as number)) : null;
-    if (!(ratio!=null && ratio >= 0.85 && ratio <= 1.15)) {
+    if (!(ratio!=null && ratio >= 0.50 && ratio <= 1.50)) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'duration_out_of_range', ratio }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
