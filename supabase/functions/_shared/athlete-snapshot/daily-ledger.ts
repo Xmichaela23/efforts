@@ -60,13 +60,20 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
   const computed = typeof row?.computed === 'object' ? row.computed : {};
   const distM = Number(computed?.total_distance_meters) || Number(computed?.distance_meters) || null;
 
+  const isStrength = normType(row?.type) === 'strength';
+
   const prescriptionParts: string[] = [];
   if (row?.name) prescriptionParts.push(String(row.name));
   if (durSec) prescriptionParts.push(`${secToMin(durSec)} min`);
   if (distM && distM > 0) {
     prescriptionParts.push(imperial ? `${metersToMi(distM).toFixed(1)} mi` : `${(distM / 1000).toFixed(1)} km`);
   }
-  if (row?.rendered_description) {
+
+  // For strength: include the full plan description (has sets, reps, weights, RIR)
+  if (isStrength && row?.description) {
+    const desc = String(row.description).slice(0, 300);
+    if (desc) prescriptionParts.push(desc);
+  } else if (row?.rendered_description) {
     const desc = String(row.rendered_description).slice(0, 120);
     if (desc && !prescriptionParts.some(p => desc.includes(p))) {
       prescriptionParts.push(desc);
@@ -74,13 +81,20 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
   }
 
   let strengthRx: PlannedSession['strength_prescription'] = null;
-  if (normType(row?.type) === 'strength' && row?.description) {
+  if (isStrength && row?.description) {
     try {
       const lines = String(row.description).split('\n').filter(Boolean);
-      strengthRx = lines.slice(0, 8).map(line => ({
-        exercise: line.replace(/^\d+[\.\)]\s*/, '').split(':')[0]?.trim() || line.trim(),
-        sets: 0, reps: '', notes: null,
-      }));
+      strengthRx = lines.slice(0, 8).map(line => {
+        const name = line.replace(/^\d+[\.\)]\s*/, '').split(':')[0]?.trim() || line.trim();
+        const setsMatch = line.match(/(\d+)\s*x\s*(\d+)/i);
+        const weightMatch = line.match(/(\d+%?\s*1?RM|[\d.]+\s*(?:lbs?|kg)|bodyweight|light|heavy)/i);
+        return {
+          exercise: name,
+          sets: setsMatch ? parseInt(setsMatch[1]) : 0,
+          reps: setsMatch ? setsMatch[2] : '',
+          notes: weightMatch ? weightMatch[0] : null,
+        };
+      });
     } catch { /* non-critical */ }
   }
 
@@ -224,10 +238,21 @@ function matchSummary(
   const type = normType(planned.type);
 
   if (type === 'strength') {
-    if (sQ === 'pushed_hard') return 'completed — pushing hard (low RIR)';
-    if (sQ === 'dialed_back') return 'completed — dialed back (high RIR)';
-    if (sQ === 'modified') return 'completed — modified from plan';
-    return 'completed';
+    const parts: string[] = ['completed'];
+    if (sQ === 'pushed_hard') parts.push('pushing hard (low RIR)');
+    else if (sQ === 'dialed_back') parts.push('dialed back (high RIR)');
+    else if (sQ === 'modified') parts.push('modified from plan');
+
+    // Summarize actual lifts for the LLM to compare against planned prescription
+    const lifts = actual.strength_actual;
+    if (lifts && lifts.length > 0) {
+      const liftSummary = lifts.slice(0, 4).map(l => {
+        const rirNote = l.avg_rir != null ? ` @ ~${l.avg_rir.toFixed(1)} RIR` : '';
+        return `${l.name}: ${l.best_weight}${l.unit} x${l.best_reps}${rirNote}`;
+      }).join(', ');
+      parts.push(liftSummary);
+    }
+    return parts.join(' — ');
   }
 
   // Endurance: show distance or duration comparison
