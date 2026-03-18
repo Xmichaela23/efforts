@@ -271,13 +271,13 @@ export function buildBodyResponse(
   let loadStatusLabel: BodyResponse['load_status']['status'] = 'on_target';
   let loadInterp = 'on target';
   if (pct != null) {
-    if (pct > 50) { loadStatusLabel = 'high'; loadInterp = `${pct}% above plan`; }
-    else if (pct > 15) { loadStatusLabel = 'elevated'; loadInterp = `${pct}% above plan`; }
-    else if (pct < -20) { loadStatusLabel = 'under'; loadInterp = `${Math.abs(pct)}% below plan`; }
+    if (pct > 50) { loadStatusLabel = 'high'; loadInterp = 'well ahead of plan for the week'; }
+    else if (pct > 15) { loadStatusLabel = 'elevated'; loadInterp = 'a bit ahead of plan'; }
+    else if (pct < -20) { loadStatusLabel = 'under'; loadInterp = 'behind the plan so far'; }
   } else if (acwr != null) {
-    if (acwr > 1.3) { loadStatusLabel = 'high'; loadInterp = `ACWR ${acwr.toFixed(2)} — ramping fast`; }
-    else if (acwr > 1.1) { loadStatusLabel = 'elevated'; loadInterp = `ACWR ${acwr.toFixed(2)} — building`; }
-    else if (acwr < 0.7) { loadStatusLabel = 'under'; loadInterp = `ACWR ${acwr.toFixed(2)} — detraining risk`; }
+    if (acwr > 1.3) { loadStatusLabel = 'high'; loadInterp = 'training load ramping quickly'; }
+    else if (acwr > 1.1) { loadStatusLabel = 'elevated'; loadInterp = 'training load building gradually'; }
+    else if (acwr < 0.7) { loadStatusLabel = 'under'; loadInterp = 'training volume is lower than recent weeks'; }
   }
 
   return {

@@ -272,6 +272,7 @@ export type StrengthLiftSnapshot = {
 export type CrossDomainPair = {
   strength_date: string;
   strength_workload: number;
+  strength_focus: 'upper' | 'lower' | 'full' | 'unknown';
   next_endurance_date: string;
   next_endurance_hr_at_pace: number | null;
   next_endurance_execution: number | null;

@@ -290,9 +290,14 @@ function computeAssessment(
         : `Multiple signals declining (${decliningSignals.join(', ')}). Your body may need more recovery.`);
   }
 
-  if (concerning === 1 && improving === 0) {
+  if (concerning === 1 && improving === 0 && available >= 3) {
     return make('stagnating', decliningSignals[0] || null, 'medium',
       `${decliningSignals[0]} is trending down while other signals are flat. Watch for further decline.`);
+  }
+
+  if (concerning === 1 && improving === 0 && available < 3) {
+    return make('responding', null, 'low',
+      `Limited signals this week. One metric is slightly off but not enough data to draw conclusions.`);
   }
 
   if (improving >= 2) {

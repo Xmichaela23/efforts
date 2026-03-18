@@ -3,7 +3,7 @@ import { AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshC
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { StackedHBar, DeltaIndicator, TrainingStateBar } from '@/components/ui/charts';
+import { StackedHBar } from '@/components/ui/charts';
 
 // ─── Link Extras Dialog ────────────────────────────────────────────────────
 
@@ -357,30 +357,47 @@ export default function CoachWeekTab() {
     }
   };
 
-  // Derived slices — kept above early returns so hooks are unconditional
-  const ts = ws?.details?.training_state;
+  // ── Snapshot is the single source of truth ──
+  const snap = (data as any)?.athlete_snapshot ?? null;
+  const coaching = snap?.coaching ?? null;
+  const bodyResponse = snap?.body_response ?? null;
+
   const reaction = ws?.details?.reaction;
-  // run_session_types_7d is at the root of weekly_state_v1, not under details
-  const runSessionTypes = (ws as any)?.run_session_types_7d ?? [];
   const readiness = ws?.details?.marathon_readiness;
-  const narrativeText = ws?.coach?.narrative ?? null;
+  const runSessionTypes = (ws as any)?.run_session_types_7d ?? [];
   const planAdaptationSuggestions = ws?.coach?.plan_adaptation_suggestions ?? [];
   const keySessionsPlanned = ws?.glance?.key_sessions_planned ?? 0;
   const keySessionsLinked = ws?.glance?.key_sessions_linked ?? 0;
-  const verdictCode = ws?.glance?.verdict_code ?? 'on_track';
   const showReadiness = ws?.guards?.show_readiness ?? false;
 
-  // Active goals — today derived from training_state.subtitle ("5 weeks to Ojai.")
-  // When backend sends a goals[] array, replace this derivation with ws.goals
+  // Headline + narrative from snapshot; fallback to old system if snapshot missing
+  const headline = coaching?.headline ?? ws?.details?.training_state?.title ?? null;
+  const narrativeText = coaching?.narrative ?? ws?.coach?.narrative ?? null;
+  const nextSessionGuidance = coaching?.next_session_guidance ?? null;
+
+  // Load status from snapshot
+  const loadStatus = bodyResponse?.load_status ?? null;
+  const loadStatusCode = loadStatus?.status ?? 'on_target';
+
+  // Verdict coloring derived from snapshot load status
+  const verdictCode = loadStatusCode === 'high' ? 'recover_overreaching'
+    : loadStatusCode === 'elevated' ? 'caution_ramping_fast'
+    : loadStatusCode === 'under' ? 'undertraining'
+    : ws?.glance?.verdict_code ?? 'on_track';
+
+  // Goals from snapshot identity
   const activeGoals = useMemo(() => {
-    const wsCast = ws as any;
-    if (Array.isArray(wsCast?.goals) && wsCast.goals.length > 0) {
-      return wsCast.goals as Array<{ id: string; subtitle: string; name?: string; weeks_out?: number }>;
+    const ev = snap?.identity?.primary_event;
+    if (ev) {
+      const parts = [ev.name];
+      if (ev.weeks_out != null) parts.push(`${ev.weeks_out} weeks out`);
+      return [{ id: 'primary', subtitle: parts.join(' · ') }];
     }
+    const ts = ws?.details?.training_state;
     const subtitle = ts?.subtitle;
     if (!subtitle || subtitle === '—' || !subtitle.trim()) return [];
     return [{ id: 'primary', subtitle }];
-  }, [ws, ts?.subtitle]);
+  }, [snap?.identity?.primary_event, ws?.details?.training_state]);
 
   const loadDriverRows = useMemo(() => {
     const rows = Array.isArray(ws?.load?.by_discipline) ? ws.load.by_discipline : [];
@@ -540,17 +557,18 @@ export default function CoachWeekTab() {
       {/* ── No-plan state ── */}
       {!hasActivePlan ? (
         <div className="space-y-3">
-          {/* Still show narrative/training state if available */}
-          {ts?.title && (
+          {headline && (
             <div className={`rounded-xl border p-4 ${verdictTone}`}>
               <div className={`text-lg font-semibold ${titleGlow}`} style={{ textShadow: '0 0 12px currentColor' }}>
-                {ts.title}
+                {headline}
               </div>
               {narrativeText && (
                 <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
               )}
-              {ts.load_ramp_acwr != null && (
-                <div className="mt-3"><TrainingStateBar acwr={ts.load_ramp_acwr} /></div>
+              {loadStatus && (
+                <div className="mt-3">
+                  <SnapshotLoadBar status={loadStatus.status} interpretation={loadStatus.interpretation} acwr={loadStatus.acwr} />
+                </div>
               )}
             </div>
           )}
@@ -568,7 +586,6 @@ export default function CoachWeekTab() {
 
           {/* ── 1. Coach narrative + race countdown ── */}
           <div className={`rounded-xl border p-4 ${verdictTone}`}>
-            {/* Race countdown rows — multi-goal stub; maps over activeGoals array */}
             {activeGoals.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {activeGoals.map((goal) => (
@@ -583,28 +600,28 @@ export default function CoachWeekTab() {
               </div>
             )}
 
-            <div
-              className={`text-lg font-semibold ${titleGlow}`}
-              style={{ textShadow: '0 0 12px currentColor' }}
-            >
-              {ts?.title || '—'}
-            </div>
-
-            {narrativeText ? (
-              <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
-            ) : (
-              // Fallback to structured server data when LLM narrative is unavailable
-              <div className="mt-2 space-y-1">
-                {ts?.kicker && <div className="text-sm text-white/65">{ts.kicker}</div>}
-                {ws?.glance?.next_action_details && (
-                  <div className="text-xs text-white/45">{ws.glance.next_action_details}</div>
-                )}
+            {headline && (
+              <div
+                className={`text-lg font-semibold ${titleGlow}`}
+                style={{ textShadow: '0 0 12px currentColor' }}
+              >
+                {headline}
               </div>
             )}
 
-            {ts?.load_ramp_acwr != null && (
+            {narrativeText && (
+              <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
+            )}
+
+            {nextSessionGuidance && (
+              <div className="mt-3 text-xs text-white/55 leading-relaxed border-t border-white/10 pt-2">
+                {nextSessionGuidance}
+              </div>
+            )}
+
+            {loadStatus && (
               <div className="mt-3">
-                <TrainingStateBar acwr={ts.load_ramp_acwr} />
+                <SnapshotLoadBar status={loadStatus.status} interpretation={loadStatus.interpretation} acwr={loadStatus.acwr} />
               </div>
             )}
           </div>
@@ -949,112 +966,34 @@ export default function CoachWeekTab() {
             />
           )}
 
-          {/* ── 8. Training signals — collapsed by default ── */}
-          {(() => {
-            const rm = (ws as any)?.response_model;
-            if (!rm) return null;
-            const assessment = rm.assessment;
-            const headline = rm.headline;
-            const signals: any[] = rm.visible_signals ?? [];
-            const crossDomain = rm.cross_domain;
+          {/* ── 8. Body response trends — from snapshot ── */}
+          {bodyResponse && (
+            <details className="rounded-xl border border-white/15 bg-white/[0.06] overflow-hidden group">
+              <summary className="px-4 py-3 text-xs text-white/55 cursor-pointer hover:text-white/75 hover:bg-white/[0.03] transition-colors list-none flex items-center justify-between">
+                <span>Body response</span>
+                <span className="text-white/25 group-open:rotate-180 transition-transform inline-block">▾</span>
+              </summary>
+              <div className="px-4 pb-4 space-y-4">
+                <SnapshotTrends trends={bodyResponse.weekly_trends} />
 
-            const TONE_STYLES: Record<string, { text: string; bg: string }> = {
-              positive: { text: 'text-emerald-400', bg: 'border-emerald-500/20 bg-emerald-500/5' },
-              warning: { text: 'text-amber-400', bg: 'border-amber-500/20 bg-amber-500/5' },
-              danger: { text: 'text-red-400', bg: 'border-red-500/20 bg-red-500/5' },
-              neutral: { text: 'text-white/50', bg: 'border-white/10 bg-white/[0.03]' },
-            };
-            const TREND_TONE_COLORS: Record<string, string> = {
-              positive: 'text-emerald-400',
-              warning: 'text-amber-400',
-              danger: 'text-red-400',
-              neutral: 'text-white/40',
-            };
-            const tone = TONE_STYLES[assessment?.tone] ?? TONE_STYLES.neutral;
-            const enduranceSignals = signals.filter((s: any) => s.category === 'endurance');
-            const strengthSignals = signals.filter((s: any) => s.category === 'strength');
-
-            return (
-              <details className="rounded-xl border border-white/15 bg-white/[0.06] overflow-hidden group">
-                <summary className="px-4 py-3 text-xs text-white/55 cursor-pointer hover:text-white/75 hover:bg-white/[0.03] transition-colors list-none flex items-center justify-between">
-                  <span>Training data</span>
-                  <span className="text-white/25 group-open:rotate-180 transition-transform inline-block">▾</span>
-                </summary>
-                <div className="px-4 pb-4 space-y-4">
-                  {headline && (
-                    <div>
-                      <div className="text-sm text-white/85 font-medium">{headline.text}</div>
-                      <div className="text-[10px] text-white/40 mt-0.5">{headline.subtext}</div>
-                    </div>
-                  )}
-
-                  {assessment && assessment.label !== 'insufficient_data' && (
-                    <div className={`rounded-lg border px-3 py-2 ${tone.bg}`}>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium ${tone.text}`}>{assessment.title}</span>
-                      </div>
-                      <div className="text-xs text-white/60 mt-1">{assessment.explain}</div>
-                    </div>
-                  )}
-                  {assessment?.label === 'insufficient_data' && (
-                    <div className="text-xs text-white/50">{assessment.explain}</div>
-                  )}
-
-                  {enduranceSignals.length > 0 && (
-                    <div>
-                      <div className="text-[10px] text-white/40 uppercase tracking-wide mb-2">Endurance</div>
-                      <div className="space-y-2">
-                        {enduranceSignals.map((s: any) => (
-                          <div key={s.label} className="flex items-center justify-between">
-                            <div className="text-xs text-white/60">{s.label}</div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs font-medium ${TREND_TONE_COLORS[s.trend_tone] ?? 'text-white/40'}`}>{s.trend_icon} {s.detail}</span>
-                              <span className="text-[10px] text-white/25">{s.samples_label || `${s.samples}`}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {strengthSignals.length > 0 && (
-                    <div>
-                      <div className="text-[10px] text-white/40 uppercase tracking-wide mb-2">Strength</div>
-                      <div className="space-y-2">
-                        {strengthSignals.map((s: any) => (
-                          <div key={s.label} className="flex items-center justify-between">
-                            <div className="text-xs text-white/60">{s.label}</div>
-                            <div className="flex items-center gap-2">
-                              {s.value_display && <span className="text-xs text-white/70">{s.value_display}</span>}
-                              <span className={`text-xs font-medium ${TREND_TONE_COLORS[s.trend_tone] ?? 'text-white/40'}`}>{s.trend_icon} {s.detail}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {crossDomain?.interference_detected && crossDomain.patterns?.length > 0 && (
-                    <div>
-                      <div className="text-[10px] text-amber-400/70 uppercase tracking-wide mb-1">Strength + endurance</div>
-                      {crossDomain.patterns.filter((p: any) => p.code !== 'concurrent_gains').map((p: any, i: number) => (
-                        <div key={i} className="text-xs text-white/55">{p.description}</div>
+                {bodyResponse.session_signals?.length > 0 && (
+                  <div>
+                    <div className="text-[10px] text-white/40 uppercase tracking-wide mb-2">Session observations</div>
+                    <div className="space-y-2">
+                      {bodyResponse.session_signals.map((s: any, i: number) => (
+                        <div key={i} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+                          <div className="text-[10px] text-white/45 mb-1">{s.date} · {s.type}</div>
+                          {s.observations.map((obs: string, j: number) => (
+                            <div key={j} className="text-xs text-white/60 leading-relaxed">{obs}</div>
+                          ))}
+                        </div>
                       ))}
                     </div>
-                  )}
-                  {crossDomain?.patterns?.some((p: any) => p.code === 'concurrent_gains') && (
-                    <div className="text-[10px] text-emerald-400/60">
-                      Strength and endurance are working well together.
-                    </div>
-                  )}
-
-                  {signals.length === 0 && assessment?.label !== 'insufficient_data' && (
-                    <div className="text-xs text-white/45">No signal data available for this week yet.</div>
-                  )}
-                </div>
-              </details>
-            );
-          })()}
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
 
           {/* ── 9. Session breakdown (all disciplines — run only for now, Tier 2 generalizes) ── */}
           {runSessionTypes.length > 0 && (
@@ -1083,6 +1022,98 @@ export default function CoachWeekTab() {
           )}
 
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Snapshot Load Bar ─────────────────────────────────────────────────────
+
+function SnapshotLoadBar({ status, interpretation, acwr }: { status: string; interpretation: string; acwr: number | null }) {
+  const positions: Record<string, number> = {
+    under: 15, on_target: 50, elevated: 72, high: 90,
+  };
+  const pct = positions[status] ?? 50;
+  const dotColor = status === 'high' ? 'bg-red-400' : status === 'elevated' ? 'bg-amber-400' : status === 'under' ? 'bg-sky-400' : 'bg-emerald-400';
+
+  return (
+    <div>
+      <div className="relative h-2 rounded-full overflow-hidden">
+        <div className="absolute inset-0 flex">
+          <div className="flex-1 bg-sky-500/30" />
+          <div className="flex-[2] bg-emerald-500/30" />
+          <div className="flex-1 bg-amber-500/30" />
+          <div className="flex-1 bg-red-500/30" />
+        </div>
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-black/60 ${dotColor}`}
+          style={{ left: `${pct}%`, transform: 'translate(-50%, -50%)' }}
+        />
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="text-[9px] text-white/25">Under</span>
+        <span className="text-[9px] text-white/25">Optimal</span>
+        <span className="text-[9px] text-white/25">Over</span>
+      </div>
+      {interpretation && (
+        <div className="text-[10px] text-white/45 mt-1">{interpretation}</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Snapshot Trends ───────────────────────────────────────────────────────
+
+function SnapshotTrends({ trends }: { trends: any }) {
+  if (!trends) return null;
+
+  const TREND_ICON: Record<string, string> = { improving: '↑', declining: '↓', stable: '→', insufficient: '—' };
+  const TREND_COLOR: Record<string, string> = {
+    improving: 'text-emerald-400', declining: 'text-amber-400', stable: 'text-white/50', insufficient: 'text-white/30',
+  };
+
+  const rows = [
+    { label: 'Run quality', data: trends.run_quality },
+    { label: 'Perceived effort', data: trends.effort_perception },
+    { label: 'Cardiac drift', data: trends.cardiac },
+    { label: 'Strength', data: trends.strength },
+  ].filter(r => r.data && r.data.trend !== 'insufficient');
+
+  return (
+    <div className="space-y-3">
+      {rows.length > 0 && (
+        <div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wide mb-2">Weekly trends</div>
+          <div className="space-y-2">
+            {rows.map(r => (
+              <div key={r.label} className="flex items-center justify-between">
+                <div className="text-xs text-white/60">{r.label}</div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium ${TREND_COLOR[r.data.trend] ?? 'text-white/40'}`}>
+                    {TREND_ICON[r.data.trend] ?? '—'} {r.data.detail}
+                  </span>
+                  <span className="text-[10px] text-white/25">{r.data.based_on_sessions} sessions</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {trends.cross_training?.interference && (
+        <div>
+          <div className="text-[10px] text-amber-400/70 uppercase tracking-wide mb-1">Strength + endurance</div>
+          <div className="text-xs text-white/55">{trends.cross_training.detail}</div>
+        </div>
+      )}
+      {trends.cross_training && !trends.cross_training.interference && rows.length > 0 && (
+        <div className="text-[10px] text-emerald-400/60">
+          Strength and endurance are working well together.
+        </div>
+      )}
+
+      {rows.length === 0 && (
+        <div className="text-xs text-white/45">Not enough data for body response trends yet.</div>
       )}
     </div>
   );

@@ -638,6 +638,28 @@ Deno.serve(async (req) => {
       }
     };
 
+    const strengthFocusFromWorkout = (wAny: any): 'upper' | 'lower' | 'full' | 'unknown' => {
+      try {
+        const exRaw = (wAny as any)?.strength_exercises;
+        const exercises = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (parseJson(exRaw) || []) : []);
+        if (!Array.isArray(exercises) || exercises.length === 0) {
+          const name = String((wAny as any)?.name || '').toLowerCase();
+          if (/upper|push|pull|chest|back|shoulder|arm|bench|row|press(?!.*leg)/i.test(name)) return 'upper';
+          if (/lower|leg|squat|deadlift|lunge|hip|glute|calf/i.test(name)) return 'lower';
+          if (/full|total/i.test(name)) return 'full';
+          return 'unknown';
+        }
+        const LOWER = /squat|deadlift|lunge|leg\s*press|leg\s*curl|leg\s*ext|hip\s*thrust|calf|glute|rdl|romanian|step.?up|hack\s*squat|good\s*morning|hamstring/i;
+        const names = exercises.map((e: any) => String(e?.name || '').toLowerCase());
+        let lower = 0, total = names.length;
+        for (const n of names) { if (LOWER.test(n)) lower++; }
+        if (total === 0) return 'unknown';
+        const ratio = lower / total;
+        if (ratio >= 0.5) return ratio >= 0.8 ? 'lower' : 'full';
+        return 'upper';
+      } catch { return 'unknown'; }
+    };
+
     const hrWorkoutTypeFromWorkout = (wAny: any): string | null => {
       try {
         const wa = parseJson((wAny as any)?.workout_analysis) || {};
@@ -1159,6 +1181,7 @@ Deno.serve(async (req) => {
           if (String(w?.type || '').toLowerCase() !== 'strength') continue;
           const strengthDate = String(w?.date || '');
           const strengthWorkload = Number(w?.workload_actual || 0);
+          const strengthFocus = strengthFocusFromWorkout(w);
           for (let j = i + 1; j < completed.length; j++) {
             const next = completed[j] as any;
             const nextType = String(next?.type || '').toLowerCase();
@@ -1170,6 +1193,7 @@ Deno.serve(async (req) => {
             pairs.push({
               strength_date: strengthDate,
               strength_workload: strengthWorkload,
+              strength_focus: strengthFocus,
               next_endurance_date: nextDate,
               next_endurance_hr_at_pace: null,
               next_endurance_execution: executionScoreFromWorkout(next) ?? null,

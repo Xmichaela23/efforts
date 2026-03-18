@@ -42,7 +42,7 @@ export function snapshotToPrompt(snapshot: Omit<AthleteSnapshot, 'coaching'>): s
     if (pp.phase) lines.push(`Phase: ${pp.phase}.`);
     if (pp.methodology) lines.push(`Focus: ${pp.methodology}.`);
     if (pp.week_intent) lines.push(`This week's intent: ${pp.week_intent}.`);
-    lines.push(`Planned total load: ${pp.week_total_load_planned} pts.`);
+    if (pp.week_total_load_planned) lines.push(`Planned weekly training load: ${pp.week_total_load_planned}.`);
   } else {
     lines.push('No active training plan.');
   }
@@ -99,7 +99,7 @@ export function snapshotToPrompt(snapshot: Omit<AthleteSnapshot, 'coaching'>): s
   if (br.weekly_trends.cross_training.interference) {
     lines.push(`Cross-training: ${br.weekly_trends.cross_training.detail}`);
   }
-  lines.push(`Load: ${br.load_status.interpretation} (status: ${br.load_status.status}).`);
+  lines.push(`Load: ${br.load_status.interpretation}.`);
 
   // --- UPCOMING ---
   if (upcoming.length > 0) {
@@ -122,7 +122,11 @@ function formatActual(a: { duration_seconds: number | null; distance_meters: num
   if (a.duration_seconds) parts.push(`${Math.round(a.duration_seconds / 60)} min`);
   if (a.pace) parts.push(a.pace);
   if (a.avg_hr) parts.push(`${a.avg_hr} bpm`);
-  if (a.rpe) parts.push(`RPE ${a.rpe}/10`);
+  if (a.rpe) {
+    if (a.rpe >= 8) parts.push('felt hard');
+    else if (a.rpe >= 6) parts.push('moderate effort');
+    else parts.push('felt easy');
+  }
   return parts.join(', ') || 'completed';
 }
 
@@ -152,7 +156,9 @@ RULES:
 - "upcoming" sessions haven't happened — never call them missed.
 - If load is high, suggest dialing back remaining sessions — don't add recovery sessions.
 - For strength, describe the actual lifts and weights, not load numbers.
-- If a race is coming up, anchor advice to that timeline.`;
+- If a race is coming up, anchor advice to that timeline.
+- Upper body lifting (bench, rows, overhead press, curls, etc.) does NOT interfere with running. Only lower body or full body lifting can affect run quality. Never claim upper body work hurt a run.
+- Don't call "progress stalling" or similar after 1-2 sessions early in the week. You need at least a full week's pattern to judge progress.`;
 
 // ---------------------------------------------------------------------------
 // Call the LLM and parse the response
