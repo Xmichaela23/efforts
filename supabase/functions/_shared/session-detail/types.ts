@@ -75,10 +75,48 @@ export type SessionDetailV1 = {
     has_measured_execution: boolean;
   };
 
-  /** Strength only: server-computed weight deviation (replaces client-side hasWeightDeviation) */
+  /** Strength only: server-computed deviations. Weight = actual vs planned weight. Volume = sets/reps. */
   strength_weight_deviation?: {
     direction: 'heavier' | 'lighter' | 'on_target';
     message: string;
     show_prompt: boolean;
   } | null;
+  /** Strength only: volume deviation (more/fewer sets or reps than planned). Shown when weight matched. */
+  strength_volume_deviation?: {
+    direction: 'over' | 'under' | 'on_target';
+    message: string;
+    show_prompt: boolean;
+  } | null;
+
+  /** Structured assessment for all screens. Deterministic, no LLM. */
+  session_interpretation?: SessionInterpretation | null;
+}
+
+// -----------------------------------------------------------------------------
+// SESSION_INTERPRETATION — One authoritative read per workout
+// -----------------------------------------------------------------------------
+// Every screen renders from this. Coach LLM consumes it instead of inferring.
+// -----------------------------------------------------------------------------
+
+export type DeviationDimension = 'weight' | 'volume' | 'intensity' | 'duration' | 'pace';
+export type DeviationDirection = 'over' | 'under' | 'matched';
+
+export type SessionInterpretation = {
+  plan_adherence: {
+    overall: 'followed' | 'modified' | 'deviated';
+    deviations: Array<{
+      dimension: DeviationDimension;
+      direction: DeviationDirection;
+      detail: string;
+    }>;
+  };
+  training_effect: {
+    intended_stimulus: string;
+    actual_stimulus: string;
+    alignment: 'on_target' | 'partial' | 'missed' | 'exceeded';
+  };
+  weekly_impact: {
+    load_status: 'under' | 'on_track' | 'over';
+    note: string;
+  };
 }

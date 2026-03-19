@@ -6,7 +6,10 @@ import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/wor
 interface StrengthCompletedViewProps {
   workoutData: any;
   plannedWorkout?: any; // Optional planned workout data for comparison
-  session_detail_v1?: { strength_weight_deviation?: { direction: string; message: string; show_prompt: boolean } | null } | null;
+  session_detail_v1?: {
+    strength_weight_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
+    strength_volume_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
+  } | null;
 }
 
 interface CompletedExercise {
@@ -199,12 +202,15 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
 
-  // Weight deviation: prefer server (session_detail_v1), fallback to client for backward compat
-  const weightDeviation = useMemo(() => {
-    const server = session_detail_v1?.strength_weight_deviation;
-    if (server?.show_prompt) return { show: true, message: server.message };
-    if (session_detail_v1 != null) return { show: false, message: '' }; // Server said no prompt
-    // Fallback: client-side (when session_detail_v1 not yet available)
+  // Deviation prompt: prefer server (session_detail_v1). Volume deviation takes precedence over weight.
+  const deviationPrompt = useMemo(() => {
+    const sd = session_detail_v1;
+    const vol = sd?.strength_volume_deviation;
+    const wt = sd?.strength_weight_deviation;
+    if (vol?.show_prompt) return { show: true, message: vol.message };
+    if (wt?.show_prompt) return { show: true, message: wt.message };
+    if (sd != null) return { show: false, message: '' }; // Server said no prompt
+    // Fallback: client-side (when session_detail_v1 not yet available) — weight only
     if (isMobility || !plannedWorkout) return { show: false, message: '' };
     const plannedExs = (plannedWorkout as any).strength_exercises || [];
     for (const compEx of completedExercises) {
@@ -251,10 +257,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           )}
         </div>
 
-        {/* Weight deviation prompt — server-computed (session_detail_v1) or client fallback */}
-        {weightDeviation.show && (
+        {/* Deviation prompt — server-computed (session_detail_v1) or client fallback. Volume or weight. */}
+        {deviationPrompt.show && (
           <div className="mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-            <div className="text-xs text-amber-200/90 mb-2">{weightDeviation.message}</div>
+            <div className="text-xs text-amber-200/90 mb-2">{deviationPrompt.message}</div>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => saveWeightDeviation(true)}

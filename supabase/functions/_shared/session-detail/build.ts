@@ -2,7 +2,7 @@
 // SESSION_DETAIL_V1 — Build from snapshot slice + workout_analysis
 // =============================================================================
 
-import type { SessionDetailV1 } from './types.ts';
+import type { SessionDetailV1, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 
 function normType(t: string | null | undefined): string {
@@ -31,6 +31,8 @@ export type SessionDetailInput = {
   observations: string[];
   workoutAnalysis: Record<string, unknown> | null;
   narrativeText: string | null;
+  /** Optional: from body_response.load_status for weekly_impact */
+  loadStatus?: { status: 'on_target' | 'high' | 'elevated' | 'under'; interpretation?: string } | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -48,6 +50,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     observations,
     workoutAnalysis,
     narrativeText,
+    loadStatus,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -87,6 +90,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const intervalDisplayReason = intervalDisplay?.reason ?? null;
   const hasMeasuredExecution =
     executionScore != null || paceAdherence != null || powerAdherence != null || durationAdherence != null;
+
+  const weightDev = computeStrengthWeightDeviation(type, plannedRowRaw, completedStrengthExercises);
+  const volumeDev = computeStrengthVolumeDeviation(type, plannedRowRaw, completedStrengthExercises);
 
   const intervals: SessionDetailV1['intervals'] = [];
   if (ib?.available && Array.isArray(ib.intervals)) {
@@ -170,12 +176,155 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       has_measured_execution: hasMeasuredExecution,
     },
 
-    strength_weight_deviation: computeStrengthWeightDeviation(
+    strength_weight_deviation: weightDev,
+    strength_volume_deviation: volumeDev,
+    session_interpretation: buildSessionInterpretation({
       type,
-      plannedRowRaw,
-      completedStrengthExercises,
-    ),
+      match,
+      plannedSession,
+      executionScore,
+      paceAdherence,
+      powerAdherence,
+      durationAdherence,
+      weightDeviation: weightDev,
+      volumeDeviation: volumeDev,
+      loadStatus,
+      planContextSummary: match?.summary ?? null,
+    }),
   };
+}
+
+function buildSessionInterpretation(params: {
+  type: string;
+  match: SessionMatch | null;
+  plannedSession: PlannedSession | null;
+  executionScore: number | null;
+  paceAdherence: number | null;
+  powerAdherence: number | null;
+  durationAdherence: number | null;
+  weightDeviation: SessionDetailV1['strength_weight_deviation'];
+  volumeDeviation: SessionDetailV1['strength_volume_deviation'];
+  loadStatus?: { status: string; interpretation?: string } | null;
+  planContextSummary: string | null;
+}): SessionInterpretation {
+  const {
+    type,
+    match,
+    plannedSession,
+    executionScore,
+    paceAdherence,
+    powerAdherence,
+    durationAdherence,
+    weightDeviation,
+    volumeDeviation,
+    loadStatus,
+    planContextSummary,
+  } = params;
+
+  const deviations: Array<{ dimension: DeviationDimension; direction: DeviationDirection; detail: string }> = [];
+  let overall: 'followed' | 'modified' | 'deviated' = 'followed';
+
+  // Strength: weight and volume deviations
+  if (type === 'strength' || type === 'mobility') {
+    if (weightDeviation?.direction === 'heavier') {
+      deviations.push({ dimension: 'weight', direction: 'over', detail: 'Went heavier than planned' });
+      overall = 'deviated';
+    } else if (weightDeviation?.direction === 'lighter') {
+      deviations.push({ dimension: 'weight', direction: 'under', detail: 'Went lighter than planned' });
+      overall = 'deviated';
+    } else if (weightDeviation?.direction === 'on_target' && (weightDeviation as any)?.message?.includes('heavier') && (weightDeviation as any)?.message?.includes('lighter')) {
+      deviations.push({ dimension: 'weight', direction: 'matched', detail: 'Some heavier, some lighter' });
+      overall = 'modified';
+    }
+    if (volumeDeviation?.direction === 'over') {
+      const m = volumeDeviation.message.match(/\(([^)]+)\)/);
+      const detail = m ? m[1] : 'More sets/reps than planned';
+      deviations.push({ dimension: 'volume', direction: 'over', detail });
+      overall = 'deviated';
+    } else if (volumeDeviation?.direction === 'under') {
+      const m = volumeDeviation.message.match(/\(([^)]+)\)/);
+      const detail = m ? m[1] : 'Fewer sets/reps than planned';
+      deviations.push({ dimension: 'volume', direction: 'under', detail });
+      overall = 'deviated';
+    }
+  }
+
+  // Endurance: pace, duration
+  if (type === 'run' || type === 'ride' || type === 'swim') {
+    const hasPace = paceAdherence != null || powerAdherence != null;
+    const hasDuration = durationAdherence != null;
+    if (hasPace) {
+      const pct = paceAdherence ?? powerAdherence ?? 0;
+      if (pct > 105) deviations.push({ dimension: 'pace', direction: 'over', detail: `Pace/power ${Math.round(pct)}% of plan` });
+      else if (pct < 95 && pct > 0) deviations.push({ dimension: 'pace', direction: 'under', detail: `Pace/power ${Math.round(pct)}% of plan` });
+      else if (pct >= 95 && pct <= 105) deviations.push({ dimension: 'pace', direction: 'matched', detail: 'Pace on target' });
+      if (pct > 105 || (pct < 95 && pct > 0)) overall = overall === 'followed' ? 'modified' : overall;
+    }
+    if (hasDuration) {
+      const pct = durationAdherence ?? 0;
+      if (pct > 105) deviations.push({ dimension: 'duration', direction: 'over', detail: `Duration ${Math.round(pct)}% of plan` });
+      else if (pct < 95 && pct > 0) deviations.push({ dimension: 'duration', direction: 'under', detail: `Duration ${Math.round(pct)}% of plan` });
+      else if (pct >= 95 && pct <= 105) deviations.push({ dimension: 'duration', direction: 'matched', detail: 'Duration on target' });
+      if (pct > 105 || (pct < 95 && pct > 0)) overall = overall === 'followed' ? 'modified' : overall;
+    }
+  }
+
+  // Match quality override
+  const eq = match?.endurance_quality;
+  const sq = match?.strength_quality;
+  if (eq === 'harder' || eq === 'easier' || eq === 'longer' || eq === 'shorter' || sq === 'pushed_hard' || sq === 'dialed_back') {
+    overall = 'modified';
+  }
+  if (eq === 'modified' || eq === 'skipped' || sq === 'modified' || sq === 'skipped') {
+    overall = 'deviated';
+  }
+
+  const intendedStimulus = plannedSession?.prescription ?? planContextSummary ?? 'Complete the planned session';
+  const execPct = executionScore ?? paceAdherence ?? powerAdherence ?? durationAdherence;
+  let actualStimulus: string;
+  let alignment: 'on_target' | 'partial' | 'missed' | 'exceeded' = 'on_target';
+  if (execPct != null) {
+    if (execPct >= 95) {
+      actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
+      alignment = execPct >= 105 ? 'exceeded' : 'on_target';
+    } else if (execPct >= 80) {
+      actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
+      alignment = 'partial';
+    } else {
+      actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
+      alignment = 'missed';
+    }
+  } else {
+    actualStimulus = planContextSummary ?? 'Session completed';
+  }
+
+  const loadStatusMap = loadStatus?.status === 'high' || loadStatus?.status === 'elevated' ? 'over' as const
+    : loadStatus?.status === 'under' ? 'under' as const
+    : 'on_track' as const;
+  const weeklyNote = loadStatus?.interpretation ?? '';
+
+  return {
+    plan_adherence: { overall, deviations },
+    training_effect: {
+      intended_stimulus: intendedStimulus,
+      actual_stimulus: actualStimulus,
+      alignment,
+    },
+    weekly_impact: {
+      load_status: loadStatusMap,
+      note: weeklyNote,
+    },
+  };
+}
+
+function normExName(s: string): string {
+  return String(s || '').toLowerCase().trim();
+}
+
+function matchPlannedToCompleted(plannedExs: any[], compEx: any): any | null {
+  return plannedExs.find(
+    (p: any) => normExName(p?.name) === normExName(compEx?.name),
+  ) ?? null;
 }
 
 function computeStrengthWeightDeviation(
@@ -191,11 +340,10 @@ function computeStrengthWeightDeviation(
   let anyHeavier = false;
   let anyLighter = false;
   for (const compEx of compExs) {
-    const plannedEx = plannedExs.find(
-      (p: any) => String(p?.name || '').toLowerCase() === String(compEx?.name || '').toLowerCase(),
-    );
-    if (!plannedEx?.weight || plannedEx.weight <= 0) continue;
-    const plannedW = Number(plannedEx.weight) || 0;
+    const plannedEx = matchPlannedToCompleted(plannedExs, compEx);
+    if (!plannedEx) continue;
+    const plannedW = Number(plannedEx.weight) || (Array.isArray(plannedEx.sets)?.[0] ? Number(plannedEx.sets[0]?.weight) || 0 : 0);
+    if (plannedW <= 0) continue;
     const sets = Array.isArray(compEx?.sets) ? compEx.sets : [];
     const bestActual = Math.max(0, ...sets.map((s: any) => Number(s?.weight) || 0));
     if (bestActual <= 0) continue;
@@ -221,6 +369,77 @@ function computeStrengthWeightDeviation(
     return {
       direction: 'on_target',
       message: 'Some exercises heavier, some lighter than planned.',
+      show_prompt: false,
+    };
+  }
+  return null;
+}
+
+function getPlannedSetsAndReps(plannedEx: any): { sets: number; totalReps: number } {
+  const sets = typeof plannedEx?.sets === 'number' ? plannedEx.sets : (Array.isArray(plannedEx?.sets) ? plannedEx.sets.length : 0);
+  const repsPerSet = typeof plannedEx?.reps === 'number' ? plannedEx.reps : (parseInt(String(plannedEx?.reps || '0'), 10) || 0);
+  return { sets, totalReps: sets * repsPerSet };
+}
+
+function getActualSetsAndReps(compEx: any): { sets: number; totalReps: number } {
+  const setsArr = Array.isArray(compEx?.sets) ? compEx.sets : [];
+  const totalReps = setsArr.reduce((sum, s) => sum + (Number(s?.reps) || 0), 0);
+  return { sets: setsArr.length, totalReps };
+}
+
+function computeStrengthVolumeDeviation(
+  type: string,
+  plannedRowRaw: { strength_exercises?: any[] } | null | undefined,
+  completedStrengthExercises: any[] | null | undefined,
+): SessionDetailV1['strength_volume_deviation'] {
+  if (type !== 'strength' && type !== 'mobility') return null;
+  const plannedExs = Array.isArray(plannedRowRaw?.strength_exercises) ? plannedRowRaw.strength_exercises : [];
+  const compExs = Array.isArray(completedStrengthExercises) ? completedStrengthExercises : [];
+  if (plannedExs.length === 0 || compExs.length === 0) return null;
+
+  const overDetails: string[] = [];
+  const underDetails: string[] = [];
+  for (const compEx of compExs) {
+    const plannedEx = matchPlannedToCompleted(plannedExs, compEx);
+    if (!plannedEx) continue;
+    const planned = getPlannedSetsAndReps(plannedEx);
+    const actual = getActualSetsAndReps(compEx);
+    const name = String(compEx?.name || plannedEx?.name || 'exercise').trim();
+    if (planned.sets === 0 && planned.totalReps === 0) continue;
+
+    if (actual.sets > planned.sets || (planned.totalReps > 0 && actual.totalReps > planned.totalReps)) {
+      const parts: string[] = [];
+      if (actual.sets > planned.sets) parts.push(`${actual.sets} sets instead of ${planned.sets}`);
+      if (planned.totalReps > 0 && actual.totalReps > planned.totalReps) parts.push(`${actual.totalReps} reps instead of ${planned.totalReps}`);
+      overDetails.push(parts.length ? `${parts.join(', ')} on ${name}` : name);
+    } else if (actual.sets < planned.sets || (planned.totalReps > 0 && actual.totalReps < planned.totalReps * 0.9)) {
+      const parts: string[] = [];
+      if (actual.sets < planned.sets) parts.push(`${actual.sets} sets instead of ${planned.sets}`);
+      if (actual.totalReps < planned.totalReps && planned.totalReps > 0) parts.push(`${actual.totalReps} reps instead of ${planned.totalReps}`);
+      underDetails.push(parts.length ? `${parts.join(', ')} on ${name}` : name);
+    }
+  }
+
+  if (overDetails.length > 0 && underDetails.length === 0) {
+    const detail = overDetails.length === 1 ? overDetails[0] : `${overDetails.length} exercises over plan`;
+    return {
+      direction: 'over',
+      message: `You did more volume than planned${detail ? ` (${detail})` : ''} — intentional?`,
+      show_prompt: true,
+    };
+  }
+  if (underDetails.length > 0 && overDetails.length === 0) {
+    const detail = underDetails.length === 1 ? underDetails[0] : `${underDetails.length} exercises under plan`;
+    return {
+      direction: 'under',
+      message: `You did less volume than planned${detail ? ` (${detail})` : ''} — intentional?`,
+      show_prompt: true,
+    };
+  }
+  if (overDetails.length > 0 && underDetails.length > 0) {
+    return {
+      direction: 'on_target',
+      message: 'Some exercises over plan, some under.',
       show_prompt: false,
     };
   }
