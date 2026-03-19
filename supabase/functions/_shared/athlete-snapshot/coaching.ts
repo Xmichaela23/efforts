@@ -9,12 +9,32 @@
 import type { AthleteSnapshot, LedgerDay, PlannedSession, Coaching } from './types.ts';
 
 // ---------------------------------------------------------------------------
+// Session interpretations: what the athlete already saw (from session_detail_v1)
+// ---------------------------------------------------------------------------
+
+export type SessionInterpretationForPrompt = {
+  date: string;
+  day_name?: string;
+  name: string;
+  type: string;
+  narrative_text: string | null;
+  session_interpretation?: {
+    plan_adherence?: { overall?: string; deviations?: Array<{ dimension?: string; direction?: string; detail?: string }> };
+    training_effect?: { intended_stimulus?: string; actual_stimulus?: string; alignment?: string };
+  } | null;
+};
+
+// ---------------------------------------------------------------------------
 // Serialize snapshot sections into a clean prompt for the LLM
 // ---------------------------------------------------------------------------
 
-export function snapshotToPrompt(snapshot: Omit<AthleteSnapshot, 'coaching'>): string {
+export function snapshotToPrompt(
+  snapshot: Omit<AthleteSnapshot, 'coaching'>,
+  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[] },
+): string {
   const lines: string[] = [];
   const { identity: id, plan_position: pp, daily_ledger: ledger, body_response: br, upcoming } = snapshot;
+  const sessionInterpretations = opts?.sessionInterpretations ?? [];
 
   // --- WHO ---
   lines.push('=== WHO YOU ARE ===');
@@ -45,6 +65,35 @@ export function snapshotToPrompt(snapshot: Omit<AthleteSnapshot, 'coaching'>): s
     if (pp.week_total_load_planned) lines.push(`Planned weekly training load: ${pp.week_total_load_planned}.`);
   } else {
     lines.push('No active training plan.');
+  }
+
+  // --- SESSION INTERPRETATIONS (what the athlete already saw) ---
+  // Chronological order so the LLM can build a coherent arc. Include narrative + structured.
+  if (sessionInterpretations.length > 0) {
+    lines.push('');
+    lines.push('=== SESSION INTERPRETATIONS (what the athlete already saw — do not contradict) ===');
+    for (const s of sessionInterpretations) {
+      const label = `${s.day_name || s.date} ${s.date} — ${s.name}`;
+      lines.push(label);
+      if (s.narrative_text && s.narrative_text.trim()) {
+        lines.push(`  Narrative they read: "${s.narrative_text.trim()}"`);
+      }
+      const si = s.session_interpretation;
+      if (si?.plan_adherence) {
+        const overall = si.plan_adherence.overall ?? 'unknown';
+        const devs = si.plan_adherence.deviations ?? [];
+        const devStr = devs.length > 0 ? devs.map((d) => d.detail || `${d.dimension} ${d.direction}`).join('; ') : 'none';
+        lines.push(`  Plan adherence: ${overall}${devStr !== 'none' ? ` (${devStr})` : ''}`);
+      }
+      if (si?.training_effect) {
+        const te = si.training_effect;
+        lines.push(`  Intended: ${te.intended_stimulus ?? '—'}`);
+        lines.push(`  Actual: ${te.actual_stimulus ?? '—'} (${te.alignment ?? '—'})`);
+      }
+      lines.push('');
+    }
+    lines.push('TASK: Synthesize these pre-interpreted sessions into a coherent weekly narrative. Do NOT contradict what the athlete saw above.');
+    lines.push('');
   }
 
   // --- DAILY LEDGER ---
@@ -162,6 +211,7 @@ TONE:
 
 RULES:
 - The ledger is truth. If ACTUAL exists, it happened. Never contradict it.
+- If SESSION INTERPRETATIONS are provided, those are what the athlete already saw. Your job is to SYNTHESIZE them into a weekly arc — connect the dots across sessions, spot the weekly pattern, frame guidance. Do NOT re-interpret or contradict the session-level narrative or plan_adherence. Build on top of it.
 - "upcoming" sessions haven't happened — never call them missed.
 - If load is high, suggest dialing back remaining sessions.
 - If a race is coming up, anchor advice to that timeline.
@@ -181,8 +231,9 @@ CRITICAL — ACCURACY:
 export async function generateCoaching(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
   anthropicKey: string,
+  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[] },
 ): Promise<Coaching> {
-  const prompt = snapshotToPrompt(snapshot);
+  const prompt = snapshotToPrompt(snapshot, opts);
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',

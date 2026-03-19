@@ -45,6 +45,7 @@ import {
   generateCoaching,
   snapshotToPrompt,
   type AthleteSnapshot,
+  type SessionInterpretationForPrompt,
 } from '../_shared/athlete-snapshot/index.ts';
 import {
   isPlanTransitionWindowByWeekIndex,
@@ -1689,7 +1690,47 @@ Deno.serve(async (req) => {
 
       if (anthropicKey) {
         try {
-          coaching = await generateCoaching(partialSnapshot, anthropicKey);
+          // Build session interpretations from persisted session_detail_v1 (chronological).
+          // Include ALL completed workouts: full interpretation when available, minimal stub when not (avoids LLM gap).
+          const completedWorkouts = (Array.isArray(weekWorkouts) ? weekWorkouts : [])
+            .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+            .map((w: any) => {
+              const wa = typeof w?.workout_analysis === 'object' ? w.workout_analysis : (() => { try { return w?.workout_analysis ? JSON.parse(w.workout_analysis) : null; } catch { return null; } })();
+              const sd = wa?.session_detail_v1;
+              const date = String(w?.__local_date || w?.date || '').slice(0, 10);
+              const dayEntry = dailyLedger.find((d: any) => d.date === date);
+              const dur = w?.moving_time ?? w?.duration ?? null;
+              const durMin = typeof dur === 'number' ? (dur < 1000 ? Math.round(dur) : Math.round(dur / 60)) : null;
+              const type = String(w?.type || sd?.type || 'workout');
+              const name = String(w?.name || sd?.name || type);
+              if (sd) {
+                return {
+                  date,
+                  day_name: dayEntry?.day_name ?? null,
+                  name,
+                  type,
+                  narrative_text: sd?.narrative_text ?? null,
+                  session_interpretation: sd?.session_interpretation ?? null,
+                  has_interpretation: true,
+                  __sort: `${date} ${String(w?.timestamp || '')}`,
+                } as SessionInterpretationForPrompt & { has_interpretation: boolean; __sort: string };
+              }
+              // Stub for workouts without stored interpretation — LLM knows something happened
+              return {
+                date,
+                day_name: dayEntry?.day_name ?? null,
+                name,
+                type,
+                narrative_text: `No session interpretation available — ${type}${durMin != null ? `, ${durMin} min` : ''}. See raw signals in the ledger above.`,
+                session_interpretation: null,
+                has_interpretation: false,
+                __sort: `${date} ${String(w?.timestamp || '')}`,
+              } as SessionInterpretationForPrompt & { has_interpretation: boolean; __sort: string };
+            })
+            .sort((a, b) => (a as any).__sort.localeCompare((b as any).__sort));
+          const sessionInterpretations: SessionInterpretationForPrompt[] = completedWorkouts.map(({ __sort, has_interpretation, ...rest }) => rest);
+
+          coaching = await generateCoaching(partialSnapshot, anthropicKey, { sessionInterpretations });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
         }

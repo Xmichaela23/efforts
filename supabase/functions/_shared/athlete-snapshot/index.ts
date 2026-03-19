@@ -14,3 +14,4 @@ export { buildIdentity, buildPlanPosition } from './identity.ts';
 export { buildBodyResponse, buildSessionObservations } from './body-response.ts';
 export type { BaselineNorms } from './body-response.ts';
 export { snapshotToPrompt, generateCoaching, COACHING_SYSTEM_PROMPT } from './coaching.ts';
+export type { SessionInterpretationForPrompt } from './coaching.ts';

@@ -640,6 +640,18 @@ Deno.serve(async (req) => {
       if (snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
         console.warn(`[workout-detail] session_detail snapshot build took ${snapshot_latency_ms}ms (>= ${SNAPSHOT_LATENCY_WARN_MS}ms)`);
       }
+
+      // Write-through: persist session_detail_v1 into workout_analysis (atomic merge, no read-modify-write race)
+      if (sessionDetailV1) {
+        try {
+          await supabase.rpc('merge_session_detail_v1_into_workout_analysis', {
+            p_workout_id: id,
+            p_session_detail_v1: sessionDetailV1,
+          });
+        } catch (persistErr: any) {
+          console.warn('[workout-detail] session_detail_v1 persist failed (non-fatal):', persistErr?.message || persistErr);
+        }
+      }
     }
 
     const responsePayload: Record<string, unknown> = {
