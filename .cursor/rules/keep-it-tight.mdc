@@ -1,0 +1,18 @@
+---
+description: Prevent codebase bloat — enforce cleanup on replace, dependency discipline, and file size limits
+alwaysApply: true
+---
+
+# Keep It Tight
+
+## Replace = delete the old
+
+When creating a new file that replaces an existing one, delete the replaced file and update all imports in the same change. Never leave both versions in the codebase.
+
+## No speculative dependencies
+
+When adding an npm package, confirm it is needed for the current task and not already covered by an existing dependency. Do not install packages "just in case" or for future use.
+
+## Extract over inline
+
+When adding functionality to a file over 400 lines, propose extracting a new file (component, hook, or utility) instead of inlining. Explain the split before making it.

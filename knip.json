@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "capacitor.config.ts",
+    "vite.config.ts",
+    "scripts/*.mjs"
+  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": [
+    "archive/**",
+    "supabase/**",
+    "ios/**",
+    "docs/**",
+    "public/**"
+  ],
+  "ignoreDependencies": [
+    "@capacitor/ios",
+    "autoprefixer",
+    "postcss",
+    "tailwindcss",
+    "tailwindcss-animate",
+    "@tailwindcss/typography"
+  ]
+}
