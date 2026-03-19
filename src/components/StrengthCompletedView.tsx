@@ -6,6 +6,7 @@ import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/wor
 interface StrengthCompletedViewProps {
   workoutData: any;
   plannedWorkout?: any; // Optional planned workout data for comparison
+  session_detail_v1?: { strength_weight_deviation?: { direction: string; message: string; show_prompt: boolean } | null } | null;
 }
 
 interface CompletedExercise {
@@ -22,7 +23,7 @@ interface CompletedExercise {
   weight?: number;
 }
 
-const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
+const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout, session_detail_v1 }) => {
   const { workouts, updateWorkout, useImperial } = useAppContext();
   const weightUnit = useImperial ? 'lbs' : 'kg';
   const [showComparison, setShowComparison] = useState(false);
@@ -198,19 +199,23 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
 
-  // Detect weight deviation: any exercise where actual best weight > planned * 1.05
-  const hasWeightDeviation = useMemo(() => {
-    if (isMobility || !plannedWorkout) return false;
+  // Weight deviation: prefer server (session_detail_v1), fallback to client for backward compat
+  const weightDeviation = useMemo(() => {
+    const server = session_detail_v1?.strength_weight_deviation;
+    if (server?.show_prompt) return { show: true, message: server.message };
+    if (session_detail_v1 != null) return { show: false, message: '' }; // Server said no prompt
+    // Fallback: client-side (when session_detail_v1 not yet available)
+    if (isMobility || !plannedWorkout) return { show: false, message: '' };
     const plannedExs = (plannedWorkout as any).strength_exercises || [];
     for (const compEx of completedExercises) {
       const plannedEx = plannedExs.find((p: any) => String(p?.name || '').toLowerCase() === String(compEx?.name || '').toLowerCase());
       if (!plannedEx?.weight || plannedEx.weight <= 0) continue;
       const plannedW = Number(plannedEx.weight) || 0;
       const bestActual = Math.max(0, ...(compEx.sets || []).map((s: any) => Number(s?.weight) || 0));
-      if (bestActual > plannedW * 1.05) return true;
+      if (bestActual > plannedW * 1.05) return { show: true, message: 'You went heavier than planned — intentional?' };
     }
-    return false;
-  }, [isMobility, plannedWorkout, completedExercises]);
+    return { show: false, message: '' };
+  }, [isMobility, plannedWorkout, completedExercises, session_detail_v1]);
 
   const currentMeta = (workoutData as any)?.workout_metadata;
   const deviationIntentional = typeof currentMeta?.weight_deviation_intentional === 'boolean' ? currentMeta.weight_deviation_intentional : null;
@@ -246,10 +251,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           )}
         </div>
 
-        {/* Weight deviation prompt — only when went heavier than planned */}
-        {hasWeightDeviation && (
+        {/* Weight deviation prompt — server-computed (session_detail_v1) or client fallback */}
+        {weightDeviation.show && (
           <div className="mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
-            <div className="text-xs text-amber-200/90 mb-2">You went heavier than planned — intentional?</div>
+            <div className="text-xs text-amber-200/90 mb-2">{weightDeviation.message}</div>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => saveWeightDeviation(true)}

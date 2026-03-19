@@ -8,6 +8,14 @@ import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
 type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
+  session_detail_v1?: {
+    execution?: { execution_score?: number | null; pace_adherence?: number | null; power_adherence?: number | null; duration_adherence?: number | null; performance_assessment?: string | null; assessed_against?: string | null; status_label?: string | null };
+    observations?: string[];
+    narrative_text?: string | null;
+    intervals?: Array<{ id: string; interval_type: string; planned_label: string; planned_duration_s: number | null; executed: { duration_s: number | null; distance_m: number | null; avg_hr: number | null; actual_pace_sec_per_mi?: number | null }; pace_adherence_pct?: number | null; duration_adherence_pct?: number | null }>;
+    display?: { show_adherence_chips?: boolean; interval_display_reason?: string | null; has_measured_execution?: boolean };
+    plan_context?: { match?: { summary?: string } | null };
+  } | null;
   onNavigateToContext?: (workoutId: string) => void;
 };
 
@@ -284,16 +292,12 @@ function getWeeklyIntentLabel(completedSrc: any): string | null {
   } catch { return null; }
 }
 
-export default function MobileSummary({ planned, completed, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
+export default function MobileSummary({ planned, completed, session_detail_v1, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
-  
-  // Debug logging for data changes
-  console.log('🔍 [MobileSummary] Render with:', {
-    hasCompleted: !!completed,
-    hasPlanned: !!planned,
-    hideTopAdherence,
-    workoutAnalysis: (completed as any)?.workout_analysis ? 'present' : 'missing'
-  });
+
+  // Prefer session_detail_v1 (server contract) over workout_analysis (raw) when available
+  const sd = session_detail_v1;
+  const hasSessionDetail = !!sd;
   // Prefer server snapshot from completed.computed when available
   const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
   const hasServerPlanned = serverPlannedLight.length > 0;
@@ -1537,85 +1541,37 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             return Number.isFinite(v) && v > 0 ? v : null;
           })();
 
-          // Use unified data source from workout_analysis
+          // Prefer session_detail_v1 (server contract); fallback to workout_analysis
           const workoutAnalysis = completedSrc?.workout_analysis;
           const granularAnalysis = workoutAnalysis?.granular_analysis;
-          
-          console.log('🔍 [DATA STRUCTURE DEBUG] workoutAnalysis:', workoutAnalysis);
-          console.log('🔍 [DATA STRUCTURE DEBUG] granularAnalysis:', granularAnalysis);
-          
-          // Server-owned execution/adherence values (single source of truth)
-          const performance = completedSrc?.workout_analysis?.performance;
-          const executionAdherence = performance?.execution_adherence;
-          const paceAdherence = performance?.pace_adherence;
-          const durationAdherence = performance?.duration_adherence;
+          const ex = sd?.execution;
+          const perf = completedSrc?.workout_analysis?.performance;
           const sessionState = completedSrc?.workout_analysis?.session_state_v1;
-          const executionFromSessionState = Number.isFinite(sessionState?.glance?.execution_score)
-            ? Math.round(sessionState.glance.execution_score)
-            : null;
-          
-          const performanceAssessment = granularAnalysis?.performance_assessment;
-          
-          // Strict server-only execution score: performance first, then canonical session_state.
-          const finalExecutionScore = Number.isFinite(executionAdherence)
-            ? Math.round(executionAdherence)
-            : executionFromSessionState;
-          const finalPacePct = Number.isFinite(paceAdherence) ? Math.round(paceAdherence) : null;
-          const finalDurationPct = Number.isFinite(durationAdherence) ? Math.round(durationAdherence) : null;
-          const finalDistPct = null;  // Not used in Garmin formula
-          
-          console.log('🔍 [UNIFIED DEBUG] Using workout_analysis data:', {
-            executionAdherence,
-            paceAdherence,
-            durationAdherence,
-            performanceAssessment,
-            finalExecutionScore,
-            finalPacePct,
-            finalDurationPct,
-            'paceAdherence type': typeof paceAdherence,
-            'durationAdherence type': typeof durationAdherence,
-            'paceAdherence isFinite': Number.isFinite(paceAdherence),
-            'durationAdherence isFinite': Number.isFinite(durationAdherence)
-          });
-          
-          // ✅ DEBUG: Log why chips might not render
-          console.log('🔍 [CHIP DEBUG] Will render chips:', {
-            'Execution chip': finalExecutionScore != null,
-            'Pace chip': finalPacePct != null,
-            'Duration chip': finalDurationPct != null,
-            finalExecutionScore,
-            finalPacePct,
-            finalDurationPct
-          });
-          
-          // ✅ FIX: Check for any valid values (including 0, but not null)
-          const anyVal = (finalPacePct != null && finalPacePct >= 0) || 
-                        (finalDurationPct != null && finalDurationPct >= 0) || 
-                        (finalDistPct != null) || 
-                        (finalExecutionScore != null && finalExecutionScore >= 0);
-          const allZeroAdherence =
-            finalExecutionScore === 0 &&
-            finalPacePct === 0 &&
-            finalDurationPct === 0;
-          console.log('🔍 [ADHERENCE DEBUG] anyVal:', anyVal, 'hideTopAdherence:', hideTopAdherence);
-          // Adherence requires a planned target (or server-planned snapshot). Without a comparator it's misleading.
+
+          const finalExecutionScore = hasSessionDetail && ex?.execution_score != null
+            ? Math.round(ex.execution_score)
+            : (Number.isFinite(perf?.execution_adherence) ? Math.round(perf.execution_adherence) : (Number.isFinite(sessionState?.glance?.execution_score) ? Math.round(sessionState.glance.execution_score) : null));
+          const finalPacePct = hasSessionDetail && ex?.pace_adherence != null ? Math.round(ex.pace_adherence) : (Number.isFinite(perf?.pace_adherence) ? Math.round(perf.pace_adherence) : null);
+          const finalDurationPct = hasSessionDetail && ex?.duration_adherence != null ? Math.round(ex.duration_adherence) : (Number.isFinite(perf?.duration_adherence) ? Math.round(perf.duration_adherence) : null);
+          const finalDistPct = null;
+          const performanceAssessment = hasSessionDetail ? (ex?.performance_assessment ?? null) : (granularAnalysis?.performance_assessment ?? null);
+
+          const anyVal = (finalPacePct != null && finalPacePct >= 0) || (finalDurationPct != null && finalDurationPct >= 0) || (finalDistPct != null) || (finalExecutionScore != null && finalExecutionScore >= 0);
+          const allZeroAdherence = finalExecutionScore === 0 && finalPacePct === 0 && finalDurationPct === 0;
+
           if (noPlannedCompare) return null;
 
-          // If the athlete intentionally modified the session volume (e.g., +30% distance),
-          // showing 0% "execution" is misleading. In that case, pivot to assessing the actual workout
-          // and suppress adherence chips.
-          const planModified = (() => {
+          const planModified = hasSessionDetail ? (ex?.assessed_against === 'actual') : (() => {
             try {
               const wa = completedSrc?.workout_analysis;
               const raw = (wa as any)?.fact_packet_v1 ?? (wa as any)?.factPacketV1 ?? null;
               const fp = typeof raw === 'string' ? JSON.parse(raw) : raw;
-              const against = String(fp?.derived?.execution?.assessed_against || '').toLowerCase();
-              return against === 'actual';
+              return String(fp?.derived?.execution?.assessed_against || '').toLowerCase() === 'actual';
             } catch { return false; }
           })();
           if (planModified) return null;
 
-          // Guard against invalid placeholder values (0/0/0) for completed planned sessions.
+          if (hasSessionDetail && sd?.display?.show_adherence_chips === false) return null;
           if (allZeroAdherence) return null;
           if (!anyVal || hideTopAdherence) return null;
 
@@ -1837,22 +1793,17 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           // ------------ BIKE/RIDE (smart server, dumb client - same as running) ------------
           if (isRide) {
             if (noPlannedCompare) return null;
-            // ✅ SMART SERVER, DUMB CLIENT: Read all adherence values from workout_analysis.performance
-            const performance = completedSrc?.workout_analysis?.performance;
-            console.log('🚴 [CYCLING DEBUG] Reading from workout_analysis.performance:', performance);
-            
-            // Use server-computed values (same pattern as running)
-            const executionAdherence = Number.isFinite(performance?.execution_adherence) 
-              ? Math.round(performance.execution_adherence) 
-              : null;
-            const powerAdherence = Number.isFinite(performance?.power_adherence)
-              ? Math.round(performance.power_adherence)
-              : null;
-            const durationAdherence = Number.isFinite(performance?.duration_adherence)
-              ? Math.round(performance.duration_adherence)
-              : null;
-            
-            console.log('🚴 [CYCLING DEBUG] Server values - Execution:', executionAdherence, 'Power:', powerAdherence, 'Duration:', durationAdherence);
+            const perfRide = completedSrc?.workout_analysis?.performance;
+            const exRide = sd?.execution;
+            const executionAdherence = hasSessionDetail && exRide?.execution_score != null
+              ? Math.round(exRide.execution_score)
+              : (Number.isFinite(perfRide?.execution_adherence) ? Math.round(perfRide.execution_adherence) : null);
+            const powerAdherence = hasSessionDetail && exRide?.power_adherence != null
+              ? Math.round(exRide.power_adherence)
+              : (Number.isFinite(perfRide?.power_adherence) ? Math.round(perfRide.power_adherence) : null);
+            const durationAdherence = hasSessionDetail && exRide?.duration_adherence != null
+              ? Math.round(exRide.duration_adherence)
+              : (Number.isFinite(perfRide?.duration_adherence) ? Math.round(perfRide.duration_adherence) : null);
             
             // Calculate deltas for display only (not for adherence %)
             const plannedSecondsTotal = (() => {
@@ -2507,10 +2458,13 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
           const sessionState = workoutAnalysis?.session_state_v1;
           const hasSessionState = !!(sessionState && sessionState.version === 1);
           const summaryTitle = String(sessionState?.summary?.title || 'Insights');
-          const summaryBullets = Array.isArray(sessionState?.summary?.bullets)
-            ? sessionState.summary.bullets.filter((b: any) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
-            : [];
-          const narrativeText = typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '';
+          const summaryBullets = (hasSessionDetail && Array.isArray(sd?.observations) && sd.observations.length > 0)
+            ? sd.observations.filter((b: string) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
+            : (Array.isArray(sessionState?.summary?.bullets)
+              ? sessionState.summary.bullets.filter((b: any) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
+              : []);
+          const narrativeText = (hasSessionDetail && typeof sd?.narrative_text === 'string' ? sd.narrative_text.trim() : '')
+            || (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '');
           const hasNarrative = narrativeText.length > 0;
           const hasSummaryBullets = summaryBullets.length > 0;
           const factPacketV1 = sessionState?.details?.fact_packet_v1 ?? null;
@@ -2543,12 +2497,14 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
             ? technicalInsightsAll.filter((t: { label: string }) => !SUMMARY_LABELS.has(String(t?.label || '').trim()))
             : technicalInsightsAll;
 
-          const hasPlanImpactForRender =
-            !!(adherenceSummary?.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.');
+          const planContextText = (hasSessionDetail && typeof sd?.plan_context?.match?.summary === 'string' && sd.plan_context.match.summary.trim().length > 0)
+            ? sd.plan_context.match.summary.trim()
+            : (adherenceSummary?.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.' ? adherenceSummary.plan_impact.outlook : '');
+          const hasPlanImpactForRender = planContextText.length > 0;
           const hasTechnicalForRender = technicalInsightsForRender.length > 0;
-          const hasStructuredForRender = !!adherenceSummary && (hasTechnicalForRender || hasPlanImpactForRender);
+          const hasStructuredForRender = (!!adherenceSummary && hasTechnicalForRender) || hasPlanImpactForRender;
           const hasNothing = !hasNarrative && !hasSummaryBullets && !hasStructuredForRender && !hasFactPacketV1;
-          if (!hasSessionState || hasNothing) {
+          if ((!hasSessionState && !hasSessionDetail) || hasNothing) {
             return (
               <div className="mt-4 px-3 pb-4">
                 {noPlannedCompare && (
@@ -2806,7 +2762,7 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                   )}
                 </div>
               )}
-              {!hasNarrative && hasStructuredForRender && adherenceSummary && (
+              {!hasNarrative && hasStructuredForRender && (
                 <>
                   {technicalInsightsForRender.length > 0 && (
                     <div className="space-y-2">
@@ -2818,10 +2774,12 @@ export default function MobileSummary({ planned, completed, hideTopAdherence, on
                       ))}
                     </div>
                   )}
-                  {adherenceSummary.plan_impact?.outlook && adherenceSummary.plan_impact.outlook !== 'No plan context.' && (
+                  {hasPlanImpactForRender && (
                     <div>
-                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(adherenceSummary.plan_impact.focus || 'Weekly outlook').replace(/coach/ig, 'training')}</span>
-                      <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{adherenceSummary.plan_impact.outlook}</p>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        {hasSessionDetail ? 'Plan context' : String(adherenceSummary?.plan_impact?.focus || 'Weekly outlook').replace(/coach/ig, 'training')}
+                      </span>
+                      <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{planContextText}</p>
                     </div>
                   )}
                 </>

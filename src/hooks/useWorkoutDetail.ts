@@ -92,32 +92,27 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       });
       if (error) throw error;
       const remote = (data as any)?.workout || null;
+      const sessionDetailV1 = (data as any)?.session_detail_v1 || null;
 
       if (!remote) throw new Error('Workout not found');
-      
-      console.log('[useWorkoutDetail] Received workout data:', {
-        id: remote.id,
-        hasGpsTrack: !!remote.gps_track,
-        gpsTrackLength: Array.isArray(remote.gps_track) ? remote.gps_track.length : 0,
-        hasGpsTrackpoints: !!remote.gps_trackpoints
-      });
 
       // Merge with base row from context to preserve scalars
-      // BUT: prioritize remote GPS track if it exists (server may have fetched/decoded it)
+      let merged: any;
       try {
         const base = Array.isArray(workouts) ? (workouts as any[]).find((x:any)=> String(x?.id||'') === String(id)) : null;
         if (base && remote) {
-          const merged = { ...base, ...remote };
-          // If server returned GPS track, use it (even if base has null/empty)
+          merged = { ...base, ...remote };
           if (remote.gps_track && (Array.isArray(remote.gps_track) && remote.gps_track.length > 0)) {
             merged.gps_track = remote.gps_track;
           }
-          return merged;
+        } else {
+          merged = remote;
         }
-        return remote;
       } catch {
-        return remote;
+        merged = remote;
       }
+
+      return { workout: merged, session_detail_v1: sessionDetailV1 };
     },
     staleTime: 0, // Always refetch to get latest GPS track (especially if polyline was decoded)
     gcTime: 6 * 60 * 60 * 1000, // 6 hours
@@ -148,15 +143,19 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     };
   }, [queryClient]);
 
-  // Stable reference: memoize the returned object by workout id
   const stableWorkout = useMemo(() => {
-    const w = (fromContext as any) || (query.data as any) || null;
+    const w = (fromContext as any) || (query.data as any)?.workout || null;
     return w ? { ...w } : null;
-    // Note: returning a new object only when the source w changes
   }, [id, fromContext, query.data]);
+
+  const sessionDetailV1 = useMemo(() => {
+    if (fromContext) return null;
+    return (query.data as any)?.session_detail_v1 ?? null;
+  }, [fromContext, query.data]);
 
   return {
     workout: stableWorkout,
+    session_detail_v1: sessionDetailV1,
     loading: query.isFetching || query.isPending,
     error: (query.error as any)?.message || null,
   };

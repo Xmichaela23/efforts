@@ -24,6 +24,10 @@ export type SessionDetailInput = {
   actualSession: ActualSession | null;
   match: SessionMatch | null;
   plannedSession: PlannedSession | null;
+  /** Raw planned_workouts row with strength_exercises (for strength weight deviation) */
+  plannedRowRaw?: { strength_exercises?: any[] } | null;
+  /** Completed workout strength_exercises (for strength weight deviation) */
+  completedStrengthExercises?: any[] | null;
   observations: string[];
   workoutAnalysis: Record<string, unknown> | null;
   narrativeText: string | null;
@@ -39,6 +43,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     actualSession,
     match,
     plannedSession,
+    plannedRowRaw,
+    completedStrengthExercises,
     observations,
     workoutAnalysis,
     narrativeText,
@@ -163,5 +169,60 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       interval_display_reason: intervalDisplayReason,
       has_measured_execution: hasMeasuredExecution,
     },
+
+    strength_weight_deviation: computeStrengthWeightDeviation(
+      type,
+      plannedRowRaw,
+      completedStrengthExercises,
+    ),
   };
+}
+
+function computeStrengthWeightDeviation(
+  type: string,
+  plannedRowRaw: { strength_exercises?: any[] } | null | undefined,
+  completedStrengthExercises: any[] | null | undefined,
+): SessionDetailV1['strength_weight_deviation'] {
+  if (type !== 'strength' && type !== 'mobility') return null;
+  const plannedExs = Array.isArray(plannedRowRaw?.strength_exercises) ? plannedRowRaw.strength_exercises : [];
+  const compExs = Array.isArray(completedStrengthExercises) ? completedStrengthExercises : [];
+  if (plannedExs.length === 0 || compExs.length === 0) return null;
+
+  let anyHeavier = false;
+  let anyLighter = false;
+  for (const compEx of compExs) {
+    const plannedEx = plannedExs.find(
+      (p: any) => String(p?.name || '').toLowerCase() === String(compEx?.name || '').toLowerCase(),
+    );
+    if (!plannedEx?.weight || plannedEx.weight <= 0) continue;
+    const plannedW = Number(plannedEx.weight) || 0;
+    const sets = Array.isArray(compEx?.sets) ? compEx.sets : [];
+    const bestActual = Math.max(0, ...sets.map((s: any) => Number(s?.weight) || 0));
+    if (bestActual <= 0) continue;
+    if (bestActual > plannedW * 1.05) anyHeavier = true;
+    else if (bestActual < plannedW * 0.95) anyLighter = true;
+  }
+
+  if (anyHeavier && !anyLighter) {
+    return {
+      direction: 'heavier',
+      message: 'You went heavier than planned — intentional?',
+      show_prompt: true,
+    };
+  }
+  if (anyLighter && !anyHeavier) {
+    return {
+      direction: 'lighter',
+      message: 'You went lighter than planned — intentional?',
+      show_prompt: true,
+    };
+  }
+  if (anyHeavier && anyLighter) {
+    return {
+      direction: 'on_target',
+      message: 'Some exercises heavier, some lighter than planned.',
+      show_prompt: false,
+    };
+  }
+  return null;
 }

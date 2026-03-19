@@ -531,7 +531,7 @@ Deno.serve(async (req) => {
         const [plannedRes, weekWorkoutsRes] = await Promise.all([
           supabase
             .from('planned_workouts')
-            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed')
+            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises')
             .eq('user_id', userId)
             .gte('date', weekStartDate)
             .lte('date', weekEndDate),
@@ -603,6 +603,20 @@ Deno.serve(async (req) => {
         const narrativeText =
           wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null;
 
+        const plannedId = match?.planned_id ?? null;
+        let plannedRowRaw: any = null;
+        if (plannedId) {
+          const raw = plannedRows.find((r: any) => String(r?.id) === String(plannedId));
+          if (raw) {
+            let se = raw?.strength_exercises;
+            if (typeof se === 'string') try { se = JSON.parse(se); } catch { se = null; }
+            plannedRowRaw = { ...raw, strength_exercises: se };
+          }
+        }
+
+        const compStrength = (detail as any).strength_exercises ?? row?.strength_exercises;
+        const compStrengthArr = Array.isArray(compStrength) ? compStrength : (typeof compStrength === 'string' ? (() => { try { return JSON.parse(compStrength); } catch { return null; } })() : null);
+
         sessionDetailV1 = buildSessionDetailV1({
           workoutId: id,
           workoutDate,
@@ -612,6 +626,8 @@ Deno.serve(async (req) => {
           actualSession,
           match,
           plannedSession,
+          plannedRowRaw,
+          completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
           observations,
           workoutAnalysis: wa,
           narrativeText,

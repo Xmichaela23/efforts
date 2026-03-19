@@ -74,4 +74,11 @@ export type SessionDetailV1 = {
     interval_display_reason: string | null;
     has_measured_execution: boolean;
   };
-};
+
+  /** Strength only: server-computed weight deviation (replaces client-side hasWeightDeviation) */
+  strength_weight_deviation?: {
+    direction: 'heavier' | 'lighter' | 'on_target';
+    message: string;
+    show_prompt: boolean;
+  } | null;
+}

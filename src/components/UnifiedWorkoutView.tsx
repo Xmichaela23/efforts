@@ -180,7 +180,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
-  const { workout: hydratedCompleted, loading: detailLoading } = useWorkoutDetail(isCompleted ? wid : undefined, {
+  const { workout: hydratedCompleted, session_detail_v1: sessionDetailV1, loading: detailLoading } = useWorkoutDetail(isCompleted ? wid : undefined, {
     include_gps: true,
     include_sensors: true,
     include_swim: true,
@@ -1243,9 +1243,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     />
                   </div>
                 )}
-                <MobileSummary 
-                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
+                <MobileSummary
+                  planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)}
                   completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+                  session_detail_v1={sessionDetailV1}
                   onNavigateToContext={onNavigateToContext}
                 />
               </div>
@@ -1287,6 +1288,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           <StrengthCompletedView 
                             workoutData={completedData}
                             plannedWorkout={linkedPlanned}
+                            session_detail_v1={sessionDetailV1}
                           />
                           {assocOpen && (
                             <AssociatePlannedDialog
