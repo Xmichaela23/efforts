@@ -3,6 +3,10 @@
 // Behavior: Return canonical completed workout details by id with optional heavy fields
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { weekStartOf } from '../_shared/plan-week.ts';
+import { buildDailyLedger } from '../_shared/athlete-snapshot/daily-ledger.ts';
+import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
+import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
 
 type DetailOptions = {
   include_gps?: boolean;
@@ -21,6 +25,13 @@ const corsHeaders: Record<string, string> = {
 };
 
 function isUuid(v?: string | null): boolean { return !!v && /[0-9a-fA-F-]{36}/.test(v); }
+
+function addDaysISO(iso: string, deltaDays: number): string {
+  const [y, m, d] = String(iso).split('-').map((x) => parseInt(x, 10));
+  const base = new Date(y, (m || 1) - 1, d || 1);
+  base.setDate(base.getDate() + deltaDays);
+  return base.toISOString().slice(0, 10);
+}
 
 // Decode Google/Strava encoded polylines (precision 1e5)
 function decodePolyline(encoded: string, precision = 5): [number, number][] {
@@ -504,11 +515,126 @@ Deno.serve(async (req) => {
     const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
     (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport: (d?.type || null), series: d?.computed?.analysis?.series || null };
 
-    // Return workout data immediately (processing happens in background for old workouts)
-    return new Response(JSON.stringify({ 
+    // session_detail_v1: server-computed from AthleteSnapshot (smart server, dumb client)
+    let sessionDetailV1: any = null;
+    let snapshot_latency_ms: number | null = null;
+    const SNAPSHOT_LATENCY_WARN_MS = 200;
+
+    if (userId && String(row?.workout_status || '').toLowerCase() === 'completed') {
+      const t0 = performance.now();
+      try {
+        const workoutDate = String(row?.date || '').slice(0, 10);
+        const weekStartDate = weekStartOf(workoutDate, 'mon');
+        const weekEndDate = addDaysISO(weekStartDate, 6);
+        const asOfDate = workoutDate;
+
+        const [plannedRes, weekWorkoutsRes] = await Promise.all([
+          supabase
+            .from('planned_workouts')
+            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed')
+            .eq('user_id', userId)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate),
+          supabase
+            .from('workouts')
+            .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,moving_time,duration,distance,avg_heart_rate,strength_exercises')
+            .eq('user_id', userId)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate),
+        ]);
+
+        const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
+        const weekWorkoutsRaw = Array.isArray(weekWorkoutsRes?.data) ? weekWorkoutsRes.data : [];
+        const weekWorkouts = weekWorkoutsRaw
+          .map((w: any) => {
+            let wa = w?.workout_analysis;
+            if (typeof wa === 'string') try { wa = JSON.parse(wa); } catch { wa = null; }
+            return {
+              ...w,
+              workout_analysis: wa,
+              __local_date: String(w?.date || '').slice(0, 10),
+              avg_hr: w?.avg_hr ?? w?.avg_heart_rate,
+              average_heartrate: w?.average_heartrate ?? w?.avg_heart_rate,
+            };
+          })
+          .filter((w: any) => {
+            const d = String(w?.__local_date || '');
+            return d >= weekStartDate && d <= asOfDate && String(w?.workout_status || '').toLowerCase() === 'completed';
+          });
+
+        const isImperial = true;
+        const dailyLedger = buildDailyLedger({
+          weekStartDate,
+          weekEndDate,
+          asOfDate,
+          plannedRows,
+          workoutRows: weekWorkouts,
+          imperial: isImperial,
+        });
+
+        const snapshotNorms = {
+          easy_hr_at_pace: null,
+          threshold_pace_sec_per_mi: null,
+          avg_execution_score: null,
+          avg_rpe: null,
+          avg_hr_drift_bpm: null,
+          avg_decoupling_pct: null,
+          avg_rir: null,
+        };
+
+        const bodyResponse = buildBodyResponse(
+          dailyLedger,
+          snapshotNorms,
+          isImperial,
+          { actual_vs_planned_pct: null, acwr: null },
+          { interference: false, detail: 'No interference detected.' },
+        );
+
+        const ledgerDay = dailyLedger.find((d) => d.date === workoutDate) ?? null;
+        const actualSession = ledgerDay?.actual.find((a) => a.workout_id === id) ?? null;
+        const match = ledgerDay?.matches.find((m) => m.workout_id === id) ?? null;
+        const plannedSession = match?.planned_id
+          ? ledgerDay?.planned.find((p) => p.planned_id === match.planned_id) ?? null
+          : null;
+        const sessionObs = bodyResponse.session_signals.find((o) => o.workout_id === id);
+        const observations = sessionObs?.observations ?? [];
+
+        const wa = (detail as any).workout_analysis || {};
+        const narrativeText =
+          wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null;
+
+        sessionDetailV1 = buildSessionDetailV1({
+          workoutId: id,
+          workoutDate,
+          workoutType: row?.type ?? 'other',
+          workoutName: row?.name ?? null,
+          ledgerDay,
+          actualSession,
+          match,
+          plannedSession,
+          observations,
+          workoutAnalysis: wa,
+          narrativeText,
+        });
+      } catch (snapErr: any) {
+        console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);
+      }
+      snapshot_latency_ms = Math.round(performance.now() - t0);
+      if (snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
+        console.warn(`[workout-detail] session_detail snapshot build took ${snapshot_latency_ms}ms (>= ${SNAPSHOT_LATENCY_WARN_MS}ms)`);
+      }
+    }
+
+    const responsePayload: Record<string, unknown> = {
       workout: detail,
-      processing_complete: processingComplete
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      processing_complete: processingComplete,
+    };
+    if (sessionDetailV1) responsePayload.session_detail_v1 = sessionDetailV1;
+    if (snapshot_latency_ms != null && snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
+      responsePayload.snapshot_latency_ms = snapshot_latency_ms;
+    }
+
+    return new Response(JSON.stringify(responsePayload), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : String(e);
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
