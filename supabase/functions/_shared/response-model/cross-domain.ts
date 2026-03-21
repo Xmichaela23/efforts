@@ -71,9 +71,11 @@ export function computeCrossDomain(pairs: CrossDomainPair[]): CrossDomainRespons
     const avgExecDelta = execDeltas.reduce((s, d) => s + d, 0) / execDeltas.length;
 
     if (avgExecDelta <= -EXECUTION_DROP_THRESHOLD) {
+      const pts = Math.abs(Math.round(avgExecDelta));
       patterns.push({
         code: 'post_strength_pace_reduced',
-        description: `Your runs suffer the day after leg day — quality drops ${Math.abs(Math.round(avgExecDelta))}%.`,
+        // execution scores are 0–100 quality metrics, not pace % or distance — avoid "runs suffer X%"
+        description: `The day after lower-body strength, run execution scores average about ${pts} points lower than on your other runs in this window (0–100 quality score from logs; not the same as pace or mileage). Based on ${execPairs.length} strength→run pairs.`,
         magnitude: avgExecDelta <= -10 ? 'notable' : 'slight',
         data: { avg_delta: Math.round(avgExecDelta * 10) / 10, sample_pairs: execPairs.length },
       });

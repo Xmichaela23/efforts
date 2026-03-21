@@ -1942,7 +1942,8 @@ Deno.serve(async (req) => {
                 return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
               } catch { return String(s.date); }
             })();
-            return `${dayLabel} ${s.type}`;
+            const n = s.name && String(s.name).trim();
+            return n ? `${dayLabel}: "${n}" (${s.type})` : `${dayLabel}: ${s.type}`;
           });
           narrativeFacts.push(`STILL UPCOMING THIS WEEK (do NOT describe as missed): ${upcomingLines.join(', ')}.`);
         }
@@ -1951,30 +1952,28 @@ Deno.serve(async (req) => {
         // has to infer day-of-week from a raw date string (error-prone near DST).
         const allGaps = reaction.key_session_gaps_details || [];
         const gapsWithReasons = allGaps.filter((g: any) => g.skip_reason || g.skip_note);
+        const missedSessionLabel = (g: any) => {
+          const dayLabel = (() => {
+            try {
+              const d = new Date(String(g.date) + 'T12:00:00Z');
+              return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
+            } catch { return String(g.date); }
+          })();
+          const name = g.name && String(g.name).trim();
+          // Include planned name so the model does not invent labels like "strides" / "tempo"
+          if (name) return `${dayLabel}: "${name}" (${g.type})`;
+          return `${dayLabel}: ${g.type}`;
+        };
         if (gapsWithReasons.length > 0) {
           const lines = gapsWithReasons.map((g: any) => {
-            const dayLabel = (() => {
-              try {
-                const d = new Date(String(g.date) + 'T12:00:00Z');
-                return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
-              } catch { return String(g.date); }
-            })();
-            const parts = [`${dayLabel} ${g.type}: ${g.skip_reason || 'no tag'}`];
+            const parts = [`${missedSessionLabel(g)}: ${g.skip_reason || 'no tag'}`];
             if (g.skip_note) parts.push(`(${g.skip_note})`);
             return parts.join(' ');
           });
           narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided — these are the ONLY days to reference as missed): ${lines.join('; ')}.`);
         } else if (allGaps.length > 0) {
           // Gaps without reasons — still provide day names so Claude doesn't invent them
-          const lines = allGaps.map((g: any) => {
-            const dayLabel = (() => {
-              try {
-                const d = new Date(String(g.date) + 'T12:00:00Z');
-                return d.toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) });
-              } catch { return String(g.date); }
-            })();
-            return `${dayLabel} ${g.type}`;
-          });
+          const lines = allGaps.map((g: any) => missedSessionLabel(g));
           narrativeFacts.push(`MISSED SESSIONS (no reason provided — state these as missed without guessing why): ${lines.join('; ')}.`);
         }
 
@@ -2204,12 +2203,26 @@ Deno.serve(async (req) => {
         narrativeFacts.push(`Overall status: ${training_state.title}.`);
         narrativeFacts.push(`Fitness direction: ${fitnessDirection}. Readiness: ${readinessState}.`);
 
-        // Interference signal
+        // Interference signal (aerobic vs structural balance from stored snapshot)
         if (interference && interference.status === 'interference_detected') {
           narrativeFacts.push(`INTERFERENCE ALERT: ${interference.detail}`);
         } else if (interference && interference.aerobic && interference.structural) {
           narrativeFacts.push(`System balance: aerobic is ${interference.aerobic}, structural is ${interference.structural}. No interference detected.`);
         }
+
+        // Cross-domain strength→run pattern (deterministic — was missing from FACTS, so the LLM invented numbers)
+        try {
+          const cd = weeklyResponseModel?.cross_domain;
+          const cdPatterns = Array.isArray(cd?.patterns) ? cd.patterns : [];
+          const heavy = cdPatterns.filter(
+            (p: any) => p?.code === 'post_strength_hr_elevated' || p?.code === 'post_strength_pace_reduced',
+          );
+          if (heavy.length > 0) {
+            narrativeFacts.push(
+              `STRENGTH→RUN CROSS-DOMAIN (from logs — use this wording/numbers verbatim; do not invent different %): ${heavy.map((p: any) => String(p?.description || '').trim()).filter(Boolean).join(' ')}`,
+            );
+          }
+        } catch { /* non-fatal */ }
 
         const todayDay = (() => {
           try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }
@@ -2234,6 +2247,12 @@ STYLE (Training Status): sentence 1 = status + why in plain language. sentence 2
 PLAN VS ACTUAL: Each SESSION may include plan-vs-actual data (duration, distance, load percentages). USE this to give specific feedback: "you cut Monday's easy run short — 3 miles of 4.5 planned" or "you went 20% longer than planned on your tempo." This is the most valuable insight — the gap between what was planned and what actually happened.
 
 NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reasons. Otherwise, state what happened without speculation. Only explain causes when the athlete explicitly provided them.
+
+SUBJECTIVE / "FELT" LANGUAGE: Do not say a run "felt tired", "felt heavy", "felt off", etc. unless a SESSION line includes a feeling: field, session RPE, or MISSED SESSIONS include an athlete note. Stick to plan vs actual and scores the facts actually list.
+
+SESSION NAMES: For missed or upcoming key sessions, use the exact strings under MISSED SESSIONS or STILL UPCOMING (including quoted planned names). Do not substitute colloquial labels (e.g. "strides", "tempo") unless that exact word appears there or in the prescription text.
+
+NUMBERS: Do not invent percentages. Percent signs in your answer must trace to explicit FACTS (weekly load vs plan, SESSION execution %, intensity split, route progress, or STRENGTH→RUN CROSS-DOMAIN). For leg-day effects on runs, only cite STRENGTH→RUN CROSS-DOMAIN when present; otherwise describe the week without a numeric interference claim.
 
 TEMPORAL RULES (strict):
 - "SESSION:" entries are COMPLETED workouts — these DEFINITELY happened. Never contradict them.

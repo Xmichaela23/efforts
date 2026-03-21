@@ -11,18 +11,14 @@ let package = Package(
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.0.0"),
-        .package(name: "CapacitorBrowser", path: "../../../node_modules/@capacitor/browser"),
-        .package(name: "CapacitorInappbrowser", path: "../../../node_modules/@capacitor/inappbrowser")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.0.0")
     ],
     targets: [
         .target(
             name: "CapApp-SPM",
             dependencies: [
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
-                .product(name: "Cordova", package: "capacitor-swift-pm"),
-                .product(name: "CapacitorBrowser", package: "CapacitorBrowser"),
-                .product(name: "CapacitorInappbrowser", package: "CapacitorInappbrowser")
+                .product(name: "Cordova", package: "capacitor-swift-pm")
             ]
         )
     ]
