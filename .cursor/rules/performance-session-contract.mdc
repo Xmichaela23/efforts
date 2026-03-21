@@ -1,0 +1,40 @@
+---
+description: Single server contract for Performance UI; attach triggers full analysis; dumb client
+alwaysApply: true
+---
+
+# Performance & session contract (smart server, dumb client)
+
+## Single source of truth
+
+- **`session_detail_v1`** (from `workout-detail` / shared `session-detail` builder) is the **only** authoritative payload for **Performance** UI: chips, narrative, execution score, plan context, deviations.
+- The client **renders** that response; it does **not** re-decide planned vs unplanned, adherence, or execution by mixing `session_detail_v1` with local logic or raw `workout_analysis` fragments.
+
+## Fallbacks
+
+- If `session_detail_v1` is missing (error, auth, old client), fallbacks are allowed **only** when clearly labeled as legacy; do not add **new** client-side interpretation that duplicates server fields.
+
+## Attach / `planned_id` is a mutation, not a metadata patch
+
+- **`attach(activity_id, planned_id)`** must: persist link → **invalidate analysis** → **re-enqueue the same analysis pipeline** as initial ingest (not `UPDATE planned_id` alone).
+- **`session_detail_v1` / workout-detail** must not serve **stale** analysis after attach: either wait for / require recompute, or return an explicit **`stale: true`** (or equivalent) so the client can show loading — **no** silent disagreement between chips and narrative.
+
+## Adherence shape (when extending contract)
+
+- **`execution_score`** = quality vs prescription only.
+- **Timing** = sibling fields (e.g. `timing_offset_days`, `timing_label`), **not** folded into execution score — late completion must not tank a good execution score.
+
+## Environment inputs
+
+- **Terrain / elevation:** may **adjust the comparison** used for execution (e.g. GAP) where data exists.
+- **Weather:** **interpretation / narrative context** only — do not bake squishy heat coefficients into the score without an explicit product decision.
+
+## Physiology cross-check
+
+- **RPE** (and feeling if present) belong in the same story as execution — surface server-side; do not invent client-only “effort” stories.
+
+## Coach / weekly vs Performance
+
+- Weekly coach may consume persisted **`session_detail_v1`** / interpretations; it does not replace the Performance contract for per-workout screens.
+
+When changing Performance or attach flows, update **`docs/adr`** if the decision record needs to change.
