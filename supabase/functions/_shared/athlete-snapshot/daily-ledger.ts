@@ -401,6 +401,62 @@ function softMatch(
 }
 
 // ---------------------------------------------------------------------------
+// Actual pool for a calendar day (planned_id-aware cross-day attach)
+// ---------------------------------------------------------------------------
+// If a completed workout has planned_id pointing to a planned row on another
+// date (e.g. Tuesday intervals done Friday), it must match on the PLANNED
+// day, not only on the activity date — otherwise coach/snapshot shows "skipped"
+// and Friday can double-count runs.
+
+function workoutLocalDate(w: any): string {
+  return String(w?.__local_date || w?.date || '').slice(0, 10);
+}
+
+function isWorkoutCompleted(w: any): boolean {
+  return String(w?.workout_status || '').toLowerCase() === 'completed';
+}
+
+function buildActualPoolForDay(
+  cursor: string,
+  rawPlannedOnDay: any[],
+  workoutRows: any[],
+  plannedDateById: Map<string, string>,
+  weekStartDate: string,
+  weekEndDate: string,
+): any[] {
+  const pool = new Map<string, any>();
+
+  // 1) Hard-linked: any completed workout in week whose planned_id matches a plan ON this day
+  for (const p of rawPlannedOnDay) {
+    const pid = String(p?.id || '');
+    if (!pid) continue;
+    for (const w of workoutRows) {
+      if (!isWorkoutCompleted(w)) continue;
+      const wd = workoutLocalDate(w);
+      if (wd < weekStartDate || wd > weekEndDate) continue;
+      if (String(w?.planned_id || '') === pid) {
+        pool.set(String(w.id), w);
+        break;
+      }
+    }
+  }
+
+  // 2) Same calendar day: include only if not "claimed" by a plan on a different day
+  for (const w of workoutRows) {
+    if (!isWorkoutCompleted(w)) continue;
+    if (workoutLocalDate(w) !== cursor) continue;
+    const linkPid = w?.planned_id != null ? String(w.planned_id) : '';
+    if (linkPid) {
+      const planDay = plannedDateById.get(linkPid);
+      if (planDay && planDay !== cursor) continue;
+    }
+    pool.set(String(w.id), w);
+  }
+
+  return [...pool.values()];
+}
+
+// ---------------------------------------------------------------------------
 // Public: Build the full daily ledger for a week
 // ---------------------------------------------------------------------------
 
@@ -417,6 +473,13 @@ export type LedgerInput = {
 export function buildDailyLedger(input: LedgerInput): LedgerDay[] {
   const { weekStartDate, weekEndDate, asOfDate, plannedRows, workoutRows, imperial, userTz } = input;
 
+  const plannedDateById = new Map<string, string>();
+  for (const r of plannedRows) {
+    const id = String(r?.id || '');
+    const d = String(r?.date || '').slice(0, 10);
+    if (id) plannedDateById.set(id, d);
+  }
+
   // Group planned + actual by date
   const plannedByDate = new Map<string, any[]>();
   for (const r of plannedRows) {
@@ -427,7 +490,7 @@ export function buildDailyLedger(input: LedgerInput): LedgerDay[] {
 
   const actualByDate = new Map<string, any[]>();
   for (const w of workoutRows) {
-    const d = String(w?.__local_date || w?.date || '').slice(0, 10);
+    const d = workoutLocalDate(w);
     if (d < weekStartDate || d > weekEndDate) continue;
     if (!actualByDate.has(d)) actualByDate.set(d, []);
     actualByDate.get(d)!.push(w);
@@ -441,8 +504,7 @@ export function buildDailyLedger(input: LedgerInput): LedgerDay[] {
     const isPast = cursor < asOfDate;
 
     const rawPlanned = (plannedByDate.get(cursor) || []);
-    const rawActual = (actualByDate.get(cursor) || [])
-      .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed');
+    const rawActual = buildActualPoolForDay(cursor, rawPlanned, workoutRows, plannedDateById, weekStartDate, weekEndDate);
 
     const planned = rawPlanned.map((r: any) => buildPlannedSession(r, imperial));
     const actual = rawActual.map((w: any) => buildActualSession(w, imperial));
