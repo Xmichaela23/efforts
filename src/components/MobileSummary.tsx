@@ -937,7 +937,19 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
 
     if (paceText && plannedSec && plannedSec>0) return `${fmtTime(plannedSec)} @ ${paceText}`;
     if (paceText) return paceText;
-    if (plannedSec && plannedSec>0) return fmtTime(plannedSec);
+    if (plannedSec && plannedSec > 0) {
+      const kind = String((st as any)?.kind || (st as any)?.type || '').toLowerCase();
+      // Never show raw mm:ss as the only segment title (reads like a mistaken column / ghost row).
+      if (kind === 'work' || kind === 'interval') return `Work · ${fmtTime(plannedSec)}`;
+      if (kind === 'warmup') return 'warmup';
+      if (kind === 'cooldown') return 'cooldown';
+      if (kind === 'recovery') return 'recovery';
+      if (kind === 'overall' || kind === 'steady') return fmtTime(plannedSec);
+      if (typeof (st as any)?.label === 'string' && String((st as any).label).trim()) {
+        return String((st as any).label).trim();
+      }
+      return `Segment · ${fmtTime(plannedSec)}`;
+    }
     return '—';
   };
 
@@ -975,15 +987,20 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
   };
 
   const getDisplayPace = (workout: any, interval: any, step: any, stepsDisplay?: any[], stepIdx?: number): number | null => {
-    // Debug logging
-    console.log('🔍 [getDisplayPace] Called with:', {
-      stepId: (step as any)?.id,
-      stepKind: (step as any)?.kind || (step as any)?.type,
-      hasWorkoutAnalysis: !!workout?.workout_analysis,
-      hasDetailedAnalysis: !!workout?.workout_analysis?.detailed_analysis,
-      hasIntervalBreakdown: !!workout?.workout_analysis?.detailed_analysis?.interval_breakdown
-    });
-    // ✅ SINGLE SOURCE OF TRUTH: Use workout_analysis.detailed_analysis.interval_breakdown.intervals (same as Context)
+    // Prefer executed pace on the row (incl. session_detail_v1 shape) before breakdown matching
+    try {
+      const exec0 = interval?.executed || interval || null;
+      const direct0 = Number(
+        exec0?.actual_pace_sec_per_mi ??
+        exec0?.avg_pace_s_per_mi ??
+        exec0?.avgPaceSPerMi ??
+        exec0?.avg_pace_sec_per_mi ??
+        (interval as any)?.actual_pace_sec_per_mi,
+      );
+      if (Number.isFinite(direct0) && direct0 > 0) return Math.round(direct0);
+    } catch { /* ignore */ }
+
+    // ✅ PRIMARY: workout_analysis.detailed_analysis.interval_breakdown.intervals (same order as analysis)
     // NO FALLBACKS - if analysis not available, return null (show "—")
     const workoutAnalysis = workout?.workout_analysis;
     const intervalBreakdownObj = workoutAnalysis?.detailed_analysis?.interval_breakdown;
@@ -997,13 +1014,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
     const stepKind = String((step as any)?.kind || (step as any)?.type || '').toLowerCase();
     
     // Find matching interval by interval_type (warmup/cooldown/recovery/work) or planned_step_id
-    console.log('🔍 [getDisplayPace] Intervals available:', intervals.length, intervals.map((iv: any) => ({
-      interval_type: iv.interval_type,
-      interval_id: iv.interval_id,
-      interval_number: iv.interval_number,
-      has_pace: !!iv.actual_pace_min_per_mi
-    })));
-    
     let matchingInterval = intervals.find((iv: any) => {
       const ivId = String(iv?.interval_id || '');
       const ivKind = String(iv?.interval_type || iv?.kind || '').toLowerCase();
@@ -1046,13 +1056,20 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
       // Match by interval_id if available
       return ivId === stepId;
     });
-    
-    console.log('🔍 [getDisplayPace] Matching interval:', matchingInterval ? {
-      interval_type: matchingInterval.interval_type,
-      interval_id: matchingInterval.interval_id,
-      actual_pace_min_per_mi: matchingInterval.actual_pace_min_per_mi
-    } : 'NOT FOUND (will use row fallback when available)');
-    
+
+    // When kind/id matching fails (common on unplanned / Strava), same-length tables are usually aligned by index
+    if (
+      !matchingInterval &&
+      Number.isFinite(stepIdx) &&
+      stepIdx != null &&
+      stepIdx >= 0 &&
+      Array.isArray(stepsDisplay) &&
+      intervals.length === stepsDisplay.length &&
+      stepIdx < intervals.length
+    ) {
+      matchingInterval = intervals[stepIdx];
+    }
+
     // Field is actual_pace_min_per_mi (minutes per mile), convert to seconds per mile
     if (matchingInterval?.actual_pace_min_per_mi) {
       const paceMinPerMi = Number(matchingInterval.actual_pace_min_per_mi);
@@ -1069,8 +1086,10 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
         exec?.avg_pace_s_per_mi ??
         exec?.avgPaceSPerMi ??
         exec?.avg_pace_sec_per_mi ??
+        exec?.actual_pace_sec_per_mi ??
         interval?.avg_pace_s_per_mi ??
-        interval?.avg_pace_sec_per_mi
+        interval?.avg_pace_sec_per_mi ??
+        (interval as any)?.actual_pace_sec_per_mi,
       );
       if (Number.isFinite(direct) && direct > 0) return Math.round(direct);
     } catch {}
@@ -2200,19 +2219,31 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
               }
             }
             if (row && !row?.executed) {
-              const paceS = Number(
-                (row as any)?.pace_s_per_mi ??
-                (((row as any)?.actual_pace_min_per_mi != null)
-                  ? Number((row as any).actual_pace_min_per_mi) * 60
-                  : 0)
-              );
+              const r0 = row as any;
+              let paceS = NaN;
+              const ps = Number(r0?.pace_s_per_mi);
+              if (Number.isFinite(ps) && ps > 0) paceS = ps;
+              else {
+                const aps = Number(r0?.actual_pace_sec_per_mi);
+                if (Number.isFinite(aps) && aps > 0) paceS = aps;
+                else if (r0?.actual_pace_min_per_mi != null) {
+                  const apm = Number(r0.actual_pace_min_per_mi);
+                  if (Number.isFinite(apm) && apm > 0) paceS = apm * 60;
+                }
+              }
               row = {
                 ...row,
                 executed: {
-                  duration_s: Number((row as any)?.actual_duration_s ?? 0) || undefined,
-                  distance_m: Number((row as any)?.actual_distance_m ?? 0) || undefined,
-                  avg_hr: Number((row as any)?.avg_heart_rate_bpm ?? 0) || undefined,
+                  duration_s: Number(r0?.actual_duration_s ?? 0) || undefined,
+                  distance_m: Number(r0?.actual_distance_m ?? 0) || undefined,
+                  avg_hr: Number(r0?.avg_heart_rate_bpm ?? 0) || undefined,
                   avg_pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : undefined,
+                  actual_pace_sec_per_mi:
+                    Number.isFinite(Number(r0?.actual_pace_sec_per_mi)) && Number(r0.actual_pace_sec_per_mi) > 0
+                      ? Math.round(Number(r0.actual_pace_sec_per_mi))
+                      : Number.isFinite(paceS) && paceS > 0
+                        ? Math.round(paceS)
+                        : undefined,
                 },
               };
             }
@@ -2281,6 +2312,18 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
               const isRunOrWalk = /run|walk/i.test(sportType);
               if (isRunOrWalk) {
                 const workout = hydratedCompleted || completed;
+                // session_detail_v1.intervals uses executed.actual_pace_sec_per_mi (often populated when breakdown matching fails)
+                if (hasSessionDetail && Array.isArray(sd?.intervals) && sd.intervals.length > 0) {
+                  const sid = String((st as any)?.id || '');
+                  const sdi =
+                    (sid ? sd.intervals.find((iv: any) => String(iv?.id || '') === sid) : null) ??
+                    (idx >= 0 && idx < sd.intervals.length ? sd.intervals[idx] : null);
+                  const pContract = Number(sdi?.executed?.actual_pace_sec_per_mi);
+                  if (Number.isFinite(pContract) && pContract > 0) {
+                    const s = Math.round(pContract);
+                    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/mi`;
+                  }
+                }
                 const secPerMi = getDisplayPace(workout, row, st, stepsDisplay, idx);
                 if (Number.isFinite(secPerMi) && secPerMi > 0) {
                   return `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi`;
