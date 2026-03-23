@@ -3131,10 +3131,7 @@ function generateAdherenceSummary(
   // -------------------------------------------------------------------------
   // HEAT-ADJUSTED TOLERANCE + HR TIE-BREAKER FOR STIMULUS DETERMINATION
   // -------------------------------------------------------------------------
-  // Get temperature from granular analysis
-  const tempF: number | null = granularAnalysis?.weather?.temperatureF ?? 
-                               granularAnalysis?.heart_rate_analysis?.temperature_factor?.temperatureF ?? 
-                               null;
+  const tempF: number | null = (hrAnalysisContext as any)?.weather?.temperatureF ?? null;
   
   // Calculate effective slow floor with heat adjustment
   // Base: 15% slower = under-stimulated, but heat adds tolerance (+3% for 65-75°F, +7% for 75-85°F, +12% for >85°F)
