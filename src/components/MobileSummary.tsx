@@ -237,13 +237,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
       {/* Source line removed per UI request */}
 
       <AdherenceChips
-        planned={planned}
-        completedSrc={completedSrc}
         sessionDetail={sd}
         hasSessionDetail={hasSessionDetail}
-        sportType={sportType}
-        isPoolSwim={isPoolSwim}
-        isStructuredIntervalSession={isStructuredIntervalSession}
         noPlannedCompare={noPlannedCompare}
         hideTopAdherence={hideTopAdherence}
         onNavigateToContext={onNavigateToContext}

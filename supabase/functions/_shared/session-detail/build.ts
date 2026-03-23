@@ -35,6 +35,8 @@ export type SessionDetailInput = {
   loadStatus?: { status: 'on_target' | 'high' | 'elevated' | 'under'; interpretation?: string } | null;
   /** Completed workout's `computed` field (from compute-workout-analysis). */
   completedComputed?: Record<string, unknown> | null;
+  /** Completed workout's refined_type (e.g. 'pool_swim', 'open_water_swim'). */
+  completedRefinedType?: string | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -54,6 +56,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     narrativeText,
     loadStatus,
     completedComputed,
+    completedRefinedType,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -175,16 +178,28 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
 
   // ── Completed totals ───────────────────────────────────────────────────────
+  const completedDurS = fin(compOverall?.duration_s_moving);
+  const completedDistM = fin(compOverall?.distance_m);
+  const swimUnit = plannedTotals.swim_unit || 'yd';
+  const completedSwimPer100 = (() => {
+    if (type !== 'swim') return null;
+    if (completedDurS != null && completedDurS > 0 && completedDistM != null && completedDistM > 0) {
+      const per100count = swimUnit === 'yd' ? (completedDistM / 0.9144) / 100 : completedDistM / 100;
+      if (per100count > 0) return Math.round(completedDurS / per100count);
+    }
+    return null;
+  })();
   const completedTotals: SessionDetailV1['completed_totals'] = {
-    duration_s: fin(compOverall?.duration_s_moving),
-    distance_m: fin(compOverall?.distance_m),
+    duration_s: completedDurS,
+    distance_m: completedDistM,
     avg_pace_s_per_mi: fin(compOverall?.avg_pace_s_per_mi),
     avg_gap_s_per_mi: fin(compOverall?.avg_gap_s_per_mi),
     avg_hr: fin(compOverall?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
+    swim_pace_per_100_s: completedSwimPer100,
   };
 
   // ── Planned totals ─────────────────────────────────────────────────────────
-  const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession);
+  const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
 
   // ── Week label ─────────────────────────────────────────────────────────────
   const weekLabel = buildWeekLabel(factPacket);
@@ -225,6 +240,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     return rw || /easy|recovery|long\s?run|base|endurance/i.test(wt) || /recovery|easy/i.test(wi);
   })();
   const isAutoLapOrSplit = !!(detailed?.interval_breakdown?.is_auto_lap_or_split);
+  const isPoolSwim = type === 'swim' && (
+    String(completedRefinedType || '').toLowerCase() === 'pool_swim' ||
+    (String(completedRefinedType || '').toLowerCase() !== 'open_water_swim')
+  );
 
   // ── Splits ─────────────────────────────────────────────────────────────────
   const rawSplitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi)
@@ -310,6 +329,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       is_structured_interval: isStructuredInterval,
       is_easy_like: isEasyLike,
       is_auto_lap_or_split: isAutoLapOrSplit,
+      is_pool_swim: isPoolSwim,
     },
 
     splits_mi: splitsMi,
@@ -395,7 +415,9 @@ function buildWeekLabel(factPacket: any): string | null {
   } catch { return null; }
 }
 
-function buildPlannedTotals(plannedComp: any, plannedSession: PlannedSession | null): SessionDetailV1['planned_totals'] {
+function buildPlannedTotals(
+  plannedComp: any, plannedSession: PlannedSession | null, plannedRowRaw: any,
+): SessionDetailV1['planned_totals'] {
   const steps: any[] = Array.isArray(plannedComp?.steps) ? plannedComp.steps : [];
   const durS = (() => {
     const t = fin(plannedComp?.total_duration_seconds);
@@ -421,7 +443,24 @@ function buildPlannedTotals(plannedComp: any, plannedSession: PlannedSession | n
     }
     return null;
   })();
-  return { duration_s: durS, distance_m: distM, avg_pace_s_per_mi: avgPace };
+  const swimUnit = (() => {
+    const u = String(plannedRowRaw?.swim_unit || '').toLowerCase();
+    if (u === 'yd' || u === 'yards') return 'yd' as const;
+    if (u === 'm' || u === 'meters' || u === 'metres') return 'm' as const;
+    return null;
+  })();
+  const swimPer100 = (() => {
+    const baseline = fin(plannedRowRaw?.baselines_template?.swim_pace_per_100_sec)
+      ?? fin(plannedRowRaw?.baselines?.swim_pace_per_100_sec);
+    if (baseline != null && baseline > 0) return Math.round(baseline);
+    if (durS != null && durS > 0 && distM != null && distM > 0) {
+      const unit = swimUnit || 'yd';
+      const per100count = unit === 'yd' ? (distM / 0.9144) / 100 : distM / 100;
+      if (per100count > 0) return Math.round(durS / per100count);
+    }
+    return null;
+  })();
+  return { duration_s: durS, distance_m: distM, avg_pace_s_per_mi: avgPace, swim_pace_per_100_s: swimPer100, swim_unit: swimUnit };
 }
 
 function buildAnalysisDetailRows(

@@ -70,11 +70,15 @@ export type SessionDetailV1 = {
     avg_pace_s_per_mi: number | null;
     avg_gap_s_per_mi: number | null;
     avg_hr: number | null;
+    /** Swim: seconds per 100 (yd or m depending on swim_unit). */
+    swim_pace_per_100_s: number | null;
   };
   planned_totals: {
     duration_s: number | null;
     distance_m: number | null;
     avg_pace_s_per_mi: number | null;
+    swim_pace_per_100_s: number | null;
+    swim_unit: 'yd' | 'm' | null;
   };
 
   // ── Analysis details (SessionNarrative "Analysis Details" panel) ──────────
@@ -103,6 +107,7 @@ export type SessionDetailV1 = {
     is_structured_interval: boolean;
     is_easy_like: boolean;
     is_auto_lap_or_split: boolean;
+    is_pool_swim: boolean;
   };
 
   // ── Splits (SessionNarrative Speed insight) ───────────────────────────────

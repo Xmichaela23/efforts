@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
       'avg_speed','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
       'start_position_lat','start_position_long','timestamp',
-      'strength_exercises','mobility_exercises',
+      'strength_exercises','mobility_exercises','refined_type',
       // Source tracking for display
       'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
       // Achievements (PRs, segments)
@@ -531,7 +531,7 @@ Deno.serve(async (req) => {
         const [plannedRes, weekWorkoutsRes] = await Promise.all([
           supabase
             .from('planned_workouts')
-            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises')
+            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines')
             .eq('user_id', userId)
             .gte('date', weekStartDate)
             .lte('date', weekEndDate),
@@ -616,7 +616,7 @@ Deno.serve(async (req) => {
             const { data: pr } = await supabase
               .from('planned_workouts')
               .select(
-                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises',
+                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines',
               )
               .eq('user_id', userId)
               .eq('id', effectivePlannedId)
@@ -655,7 +655,7 @@ Deno.serve(async (req) => {
             const { data: pr } = await supabase
               .from('planned_workouts')
               .select(
-                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises',
+                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines',
               )
               .eq('user_id', userId)
               .eq('id', plannedId)
@@ -688,6 +688,7 @@ Deno.serve(async (req) => {
           narrativeText,
           loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
           completedComputed: (detail as any).computed ?? null,
+          completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
         });
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);
