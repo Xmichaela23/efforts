@@ -1153,12 +1153,13 @@ Deno.serve(async (req) => {
     // 🎯 GARMIN-STYLE PERFORMANCE CALCULATION
     // Penalty-based execution scoring (honest assessment of workout compliance)
     
-    let performance = {
-      execution_adherence: 0,  // Overall score (100 - penalties)
-      pace_adherence: 0,       // Same as overall (pace is main factor)
-      duration_adherence: 0,   // Total time adherence (capped at 100%)
+    let performance: Record<string, any> = {
+      execution_adherence: 0,
+      pace_adherence: 0,
+      duration_adherence: 0,
       completed_steps: 0,
-      total_steps: computedIntervals.length
+      total_steps: computedIntervals.length,
+      gap_adjusted: false,
     };
 
     if (computedIntervals.length > 0) {
@@ -1355,9 +1356,9 @@ Deno.serve(async (req) => {
       console.log(`🔍 [GRANULAR CHECK] granularPaceAdherence calculated: ${granularPaceAdherence}`);
       console.log(`🔍 [GRANULAR CHECK] granularDurationAdherence calculated: ${granularDurationAdherence}`);
       
-      // Use granular values directly - we have all the data
       performance.pace_adherence = granularPaceAdherence;
       performance.duration_adherence = granularDurationAdherence;
+      performance.gap_adjusted = !!(analysis as any).gap_adjusted;
       
       // Execution adherence = combination of pace + duration (equal weight: 50% pace, 50% duration)
       // Will be recalculated after plannedPaceInfo is extracted to include average pace adherence
@@ -1910,6 +1911,7 @@ Deno.serve(async (req) => {
           duration_adherence: performance.duration_adherence ?? null,
           completed_steps: performance.completed_steps ?? null,
           total_steps: performance.total_steps ?? null,
+          gap_adjusted: !!performance.gap_adjusted,
         };
       }
     } catch (e) {

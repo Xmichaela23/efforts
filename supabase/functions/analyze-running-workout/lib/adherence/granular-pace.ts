@@ -5,8 +5,7 @@
 
 import { getPaceToleranceForSegment } from './garmin-execution.ts';
 import { calculatePaceRangeAdherence, getIntervalType, type IntervalType } from './pace-adherence.ts';
-// NOTE: HR drift is now calculated by the consolidated HR analysis module in index.ts
-// Do NOT import or call calculateHeartRateDrift here - it creates competing calculations
+import { paceToGAP, computeSampleGrades, hasUsableElevation } from '../../../_shared/gap.ts';
 
 // -----------------------------------------------------------------------------
 // Exported types
@@ -868,6 +867,23 @@ export function calculatePrescribedRangeAdherenceGranular(
 ): PrescribedRangeAdherence {
   console.log(`📊 Starting granular prescribed range analysis for ${intervals.length} intervals`);
 
+  // GAP enrichment: when usable elevation data exists, replace pace_s_per_mi
+  // with grade-adjusted pace so adherence is scored on effort, not raw speed.
+  const useGAP = hasUsableElevation(sensorData);
+  let effectiveSensorData = sensorData;
+  if (useGAP) {
+    const grades = computeSampleGrades(sensorData);
+    effectiveSensorData = sensorData.map((s, i) => ({
+      ...s,
+      raw_pace_s_per_mi: s.pace_s_per_mi,
+      pace_s_per_mi: (s.pace_s_per_mi && s.pace_s_per_mi > 0)
+        ? paceToGAP(s.pace_s_per_mi, grades[i])
+        : s.pace_s_per_mi,
+      grade_percent: grades[i],
+    }));
+    console.log(`🏔️ GAP enabled: ${sensorData.length} samples enriched with grade-adjusted pace`);
+  }
+
   const intervalsWithPaceTargets = intervals.filter(interval => {
     const hasPaceTarget = interval.target_pace?.lower ||
       interval.pace_range?.lower ||
@@ -885,8 +901,13 @@ export function calculatePrescribedRangeAdherenceGranular(
   const isIntervalWorkout = intervalsWithPaceTargets.length > 0;
   console.log(`🔍 Workout type: ${isIntervalWorkout ? 'Intervals' : 'Steady-state'} (${intervalsWithPaceTargets.length} intervals with pace targets, ${workIntervals.length} work segments)`);
 
-  if (isIntervalWorkout) {
-    return calculateIntervalPaceAdherence(sensorData, intervals, workout, plannedWorkout, historicalDrift, planContext);
+  const result = isIntervalWorkout
+    ? calculateIntervalPaceAdherence(effectiveSensorData, intervals, workout, plannedWorkout, historicalDrift, planContext)
+    : calculateSteadyStatePaceAdherence(effectiveSensorData, intervals, workout, plannedWorkout, historicalDrift, planContext);
+
+  if (useGAP) {
+    (result as any).gap_adjusted = true;
   }
-  return calculateSteadyStatePaceAdherence(sensorData, intervals, workout, plannedWorkout, historicalDrift, planContext);
+
+  return result;
 }

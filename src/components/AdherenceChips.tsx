@@ -28,7 +28,7 @@ interface AdherenceChipsProps {
   planned: any | null;
   completedSrc: any;
   sessionDetail: {
-    execution?: { execution_score?: number | null; pace_adherence?: number | null; power_adherence?: number | null; duration_adherence?: number | null; performance_assessment?: string | null; assessed_against?: string | null; status_label?: string | null };
+    execution?: { execution_score?: number | null; pace_adherence?: number | null; power_adherence?: number | null; duration_adherence?: number | null; performance_assessment?: string | null; assessed_against?: string | null; status_label?: string | null; gap_adjusted?: boolean };
     observations?: string[];
     narrative_text?: string | null;
     display?: { show_adherence_chips?: boolean; interval_display_reason?: string | null; has_measured_execution?: boolean };
@@ -167,6 +167,8 @@ export default function AdherenceChips({
       }
     }
     const finalDistPct = null;
+    const isGapAdjusted = !!(ex?.gap_adjusted || perf?.gap_adjusted);
+    const paceChipLabel = isGapAdjusted ? 'GAP' : 'Pace';
     const performanceAssessment = hasSessionDetail ? (ex?.performance_assessment ?? null) : (granularAnalysis?.performance_assessment ?? null);
 
     const anyVal = (finalPacePct != null && finalPacePct >= 0) || (finalDurationPct != null && finalDurationPct >= 0) || (finalDistPct != null) || (finalExecutionScore != null && finalExecutionScore >= 0);
@@ -232,8 +234,10 @@ export default function AdherenceChips({
                  performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence', 'pace')}
             {chip('Duration', finalDurationPct, 
                  'Time adherence', 'duration')}
-            {chip('Pace', finalPacePct,
-                 isStructuredIntervalSession ? 'Blended interval pace' : 'Pace adherence', 'pace')}
+            {chip(paceChipLabel, finalPacePct,
+                 isStructuredIntervalSession
+                   ? (isGapAdjusted ? 'Blended interval GAP' : 'Blended interval pace')
+                   : (isGapAdjusted ? 'Grade-adjusted pace' : 'Pace adherence'), 'pace')}
           </div>
         </div>
 
