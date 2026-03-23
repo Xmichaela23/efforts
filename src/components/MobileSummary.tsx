@@ -449,7 +449,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
         .maybeSingle();
       if (wErr) throw wErr;
       if (refreshed) {
-        // JSONB may arrive as string depending on transport; normalize for rendering
         const normalized: any = { ...(refreshed as any) };
         try {
           if (typeof normalized.workout_analysis === 'string') {
@@ -458,6 +457,10 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
         } catch {}
         setHydratedCompleted((prev: any) => ({ ...(prev || {}), ...(normalized as any) }));
       }
+
+      // Invalidate workout-detail cache so session_detail_v1 is rebuilt from
+      // the fresh workout_analysis (useWorkoutDetail listens for both events)
+      try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
     } catch (e: any) {
       setRecomputeError(e?.message || String(e));
@@ -1597,11 +1600,22 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
           const perf = completedSrc?.workout_analysis?.performance;
           const sessionState = completedSrc?.workout_analysis?.session_state_v1;
 
-          const finalExecutionScore = hasSessionDetail && ex?.execution_score != null
+          let finalExecutionScore = hasSessionDetail && ex?.execution_score != null
             ? Math.round(ex.execution_score)
             : (Number.isFinite(perf?.execution_adherence) ? Math.round(perf.execution_adherence) : (Number.isFinite(sessionState?.glance?.execution_score) ? Math.round(sessionState.glance.execution_score) : null));
           const finalPacePct = hasSessionDetail && ex?.pace_adherence != null ? Math.round(ex.pace_adherence) : (Number.isFinite(perf?.pace_adherence) ? Math.round(perf.pace_adherence) : null);
           const finalDurationPct = hasSessionDetail && ex?.duration_adherence != null ? Math.round(ex.duration_adherence) : (Number.isFinite(perf?.duration_adherence) ? Math.round(perf.duration_adherence) : null);
+          // Stale session_detail_v1: execution 0 while pace/duration are non-zero (ledger used to use `||` on execution_score)
+          if (finalExecutionScore === 0) {
+            const fromPerf = Number.isFinite(perf?.execution_adherence) ? Math.round(perf.execution_adherence) : null;
+            if (fromPerf != null && fromPerf > 0) finalExecutionScore = fromPerf;
+            else {
+              const parts = [finalPacePct, finalDurationPct].filter((x): x is number => x != null && x > 0);
+              if (parts.length > 0) {
+                finalExecutionScore = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+              }
+            }
+          }
           const finalDistPct = null;
           const performanceAssessment = hasSessionDetail ? (ex?.performance_assessment ?? null) : (granularAnalysis?.performance_assessment ?? null);
 
@@ -1794,7 +1808,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
             // Use server-computed metrics only (no local execution fallback)
             const performance = completedSrc?.workout_analysis?.performance;
             const sessionState = completedSrc?.workout_analysis?.session_state_v1;
-            const executionScore = Number.isFinite(performance?.execution_adherence) 
+            let executionScore = Number.isFinite(performance?.execution_adherence)
               ? Math.round(performance.execution_adherence)
               : (Number.isFinite(sessionState?.glance?.execution_score) ? Math.round(sessionState.glance.execution_score) : null);
             // ✅ FIX: Only use server-side granular analysis, no fallback to client calculations
@@ -1804,6 +1818,16 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
             const durationAdherence = Number.isFinite(performance?.duration_adherence)
               ? Math.round(performance.duration_adherence)
               : null;
+            if (executionScore === 0) {
+              const fromPerf = Number.isFinite(performance?.execution_adherence) ? Math.round(performance.execution_adherence) : null;
+              if (fromPerf != null && fromPerf > 0) executionScore = fromPerf;
+              else {
+                const parts = [paceAdherence, durationAdherence].filter((x): x is number => x != null && x > 0);
+                if (parts.length > 0) {
+                  executionScore = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+                }
+              }
+            }
             
             // ✅ FIX: Check for any valid values (including 0, but not null)
             const anyVal = (paceAdherence != null && paceAdherence >= 0) || 
@@ -1859,7 +1883,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
             if (noPlannedCompare) return null;
             const perfRide = completedSrc?.workout_analysis?.performance;
             const exRide = sd?.execution;
-            const executionAdherence = hasSessionDetail && exRide?.execution_score != null
+            let executionAdherence = hasSessionDetail && exRide?.execution_score != null
               ? Math.round(exRide.execution_score)
               : (Number.isFinite(perfRide?.execution_adherence) ? Math.round(perfRide.execution_adherence) : null);
             const powerAdherence = hasSessionDetail && exRide?.power_adherence != null
@@ -1868,6 +1892,16 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
             const durationAdherence = hasSessionDetail && exRide?.duration_adherence != null
               ? Math.round(exRide.duration_adherence)
               : (Number.isFinite(perfRide?.duration_adherence) ? Math.round(perfRide.duration_adherence) : null);
+            if (executionAdherence === 0) {
+              const fromPerf = Number.isFinite(perfRide?.execution_adherence) ? Math.round(perfRide.execution_adherence) : null;
+              if (fromPerf != null && fromPerf > 0) executionAdherence = fromPerf;
+              else {
+                const parts = [powerAdherence, durationAdherence].filter((x): x is number => x != null && x > 0);
+                if (parts.length > 0) {
+                  executionAdherence = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+                }
+              }
+            }
             
             // Calculate deltas for display only (not for adherence %)
             const plannedSecondsTotal = (() => {
@@ -2707,12 +2741,12 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
 
                       try {
                         const siStim = hasSessionDetail ? sd?.session_interpretation : null;
-                        const hasPlanLinked =
-                          !!(sd as any)?.plan_context?.planned ||
-                          !!(sd as any)?.plan_context?.planned_id ||
-                          !!planned;
-                        if (siStim?.training_effect?.actual_stimulus && hasPlanLinked) {
-                          const te = siStim.training_effect;
+                        const hasSiStimulus =
+                          typeof siStim?.training_effect?.actual_stimulus === 'string' &&
+                          siStim.training_effect.actual_stimulus.trim().length > 0;
+                        // Prefer plan-based interpretation whenever present (avoids HR-only "Possibly missed" vs good pace/duration)
+                        if (hasSiStimulus) {
+                          const te = siStim!.training_effect!;
                           const alignLabel =
                             te.alignment === 'on_target'
                               ? 'Mostly matched plan'
