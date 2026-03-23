@@ -5,35 +5,20 @@ import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative from './SessionNarrative';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
-import type { SessionInterpretationV1 } from '@/utils/performance-format';
 
 type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
-  session_detail_v1?: {
-    execution?: { execution_score?: number | null; pace_adherence?: number | null; power_adherence?: number | null; duration_adherence?: number | null; performance_assessment?: string | null; assessed_against?: string | null; status_label?: string | null };
-    observations?: string[];
-    narrative_text?: string | null;
-    intervals?: Array<{ id: string; interval_type: string; planned_label: string; planned_duration_s: number | null; executed: { duration_s: number | null; distance_m: number | null; avg_hr: number | null; actual_pace_sec_per_mi?: number | null }; pace_adherence_pct?: number | null; duration_adherence_pct?: number | null }>;
-    display?: { show_adherence_chips?: boolean; interval_display_reason?: string | null; has_measured_execution?: boolean };
-    plan_context?: { planned_id?: string | null; planned?: unknown | null; match?: { summary?: string } | null };
-    session_interpretation?: SessionInterpretationV1;
-  } | null;
+  session_detail_v1?: Record<string, any> | null;
   onNavigateToContext?: (workoutId: string) => void;
 };
 
 export default function MobileSummary({ planned, completed, session_detail_v1, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
 
-  // Prefer session_detail_v1 (server contract) over workout_analysis (raw) when available
   const sd = session_detail_v1;
   const hasSessionDetail = !!sd;
-  // Prefer server snapshot from completed.computed when available
-  const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
-  const hasServerPlanned = serverPlannedLight.length > 0;
-  // When there is no planned session attached, still allow an "analysis-only" view for supported disciplines.
-  // This is required for unplanned rides/runs: we should still be able to generate and display analysis.
-  const noPlannedCompare = !planned && !hasServerPlanned;
+  const noPlannedCompare = !planned && !sd?.plan_context?.planned_id;
   if (noPlannedCompare) {
     const typeMaybe = String((completed as any)?.type || '').toLowerCase();
     const allowCompletedOnly = (
@@ -47,23 +32,16 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
     }
   }
 
-  const type = String((planned as any)?.type || (completed as any)?.type || '').toLowerCase();
-  const isRidePlanned = /ride|bike|cycling/.test(type);
-  const refinedType = String((completed as any)?.refined_type || '').toLowerCase();
-  const isPoolSwim = refinedType === 'pool_swim' || (type === 'swim' && refinedType !== 'open_water_swim');
-  // Completed data used for computations (assumed present in development/clean data)
-  const [hydratedCompleted, setHydratedCompleted] = useState<any>(completed);
+  const type = String(sd?.type || (planned as any)?.type || (completed as any)?.type || '').toLowerCase();
   const [recomputing, setRecomputing] = useState(false);
   const [recomputeError, setRecomputeError] = useState<string | null>(null);
   useEffect(() => {
-    setHydratedCompleted(completed);
     setRecomputeError(null);
     setRecomputing(false);
   }, [completed]);
 
   const recomputeAnalysis = async () => {
-    const src = hydratedCompleted || completed;
-    const workoutId = String((src as any)?.id || '');
+    const workoutId = String(sd?.workout_id || (completed as any)?.id || '');
     if (!workoutId) return;
     try {
       setRecomputing(true);
@@ -97,24 +75,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
       }
       console.log('[recompute]', fnName, 'ok, data:', typeof analyzeRes.data === 'object' ? JSON.stringify(analyzeRes.data).slice(0, 200) : analyzeRes.data);
 
-      const { data: refreshed, error: wErr } = await supabase
-        .from('workouts')
-        .select('id,computed,workout_analysis,analysis_status,analyzed_at')
-        .eq('id', workoutId)
-        .maybeSingle();
-      if (wErr) throw wErr;
-      if (refreshed) {
-        const normalized: any = { ...(refreshed as any) };
-        try {
-          if (typeof normalized.workout_analysis === 'string') {
-            normalized.workout_analysis = JSON.parse(normalized.workout_analysis);
-          }
-        } catch {}
-        setHydratedCompleted((prev: any) => ({ ...(prev || {}), ...(normalized as any) }));
-      }
-
-      // Invalidate workout-detail cache so session_detail_v1 is rebuilt from
-      // the fresh workout_analysis (useWorkoutDetail listens for both events)
+      // Invalidate workout-detail cache so session_detail_v1 is rebuilt
       try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
     } catch (e: any) {
@@ -131,106 +92,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
     return <StrengthPerformanceSummary planned={planned} completed={completed} type={type as 'strength' | 'mobility'} />;
   }
 
-  // Endurance (run/ride/swim)
-  // Read intervals from computed.intervals (single source of truth)
-  // These intervals include both executed data AND granular_metrics from analyze-{discipline}-workout
-  const completedSrc: any = hydratedCompleted || completed;
-  const sessionState: any = (completedSrc as any)?.workout_analysis?.session_state_v1 ?? null;
-  const intervalDisplay: any = sessionState?.details?.interval_display ?? null;
-  const intervalDisplayMode: string | null = typeof intervalDisplay?.mode === 'string' ? intervalDisplay.mode : null;
-  const sessionIntervalRows: any[] = Array.isArray(sessionState?.details?.interval_rows)
-    ? sessionState.details.interval_rows
-    : [];
-  const hasCanonicalIntervalRows = !!planned && sessionIntervalRows.length > 0;
-  const isStructuredIntervalSession = (() => {
-    if (intervalDisplayMode === 'interval_compare_ready') return true;
-    if (intervalDisplayMode === 'overall_only') return false;
-    if (intervalDisplayMode === 'awaiting_recompute') return true;
-    if (!intervalDisplayMode) return false;
-    const pSteps: any[] = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps : [];
-    const workSteps = pSteps.filter((s: any) => s?.kind === 'work' || s?.type === 'work' || s?.kind === 'interval');
-    return workSteps.length >= 2;
-  })();
-  const needsCanonicalHydration = !!planned && isStructuredIntervalSession && !hasCanonicalIntervalRows;
-  const completedComputed = (completedSrc as any)?.computed;
-  const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) 
-    ? completedComputed.intervals 
-    : [];
-  const hasServerComputed = computedIntervals.length > 0;
-
-  const isAttachedToPlan = !!planned && !!(planned as any)?.id;
-
-  // Poll for server-computed after invoke (or when attached without data)
-  useEffect(() => {
-    let cancelled = false;
-    if (!isAttachedToPlan || (!needsCanonicalHydration && hasServerComputed) || !(completed as any)?.id) return;
-    let tries = 0;
-    const maxTries = 10;
-    const tick = async () => {
-      try {
-        const { data } = await supabase
-          .from('workouts')
-          .select('computed,workout_analysis,analysis_status,analyzed_at')
-          .eq('id', (completed as any).id)
-          .maybeSingle();
-        const compd = (data as any)?.computed;
-        const waRaw = (data as any)?.workout_analysis;
-        const wa = typeof waRaw === 'string' ? (() => { try { return JSON.parse(waRaw); } catch { return waRaw; } })() : waRaw;
-        if (!cancelled && compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-          setHydratedCompleted((prev:any) => ({
-            ...(prev || completed),
-            computed: compd,
-            workout_analysis: wa ?? (prev as any)?.workout_analysis,
-            analysis_status: (data as any)?.analysis_status ?? (prev as any)?.analysis_status,
-            analyzed_at: (data as any)?.analyzed_at ?? (prev as any)?.analyzed_at,
-          }));
-          return; // stop polling
-        }
-      } catch {}
-      tries += 1;
-      if (!cancelled && tries < maxTries) setTimeout(tick, 1500);
-    };
-    setTimeout(tick, 1200);
-    return () => { cancelled = true; };
-  }, [isAttachedToPlan, hasServerComputed, completed, needsCanonicalHydration]);
-
-  // Poll path when only planned has a completed_workout_id
-  useEffect(() => {
-    let cancelled = false;
-    const cid = (planned as any)?.completed_workout_id ? String((planned as any).completed_workout_id) : null;
-    if (!isAttachedToPlan || (!needsCanonicalHydration && hasServerComputed) || !cid) return;
-    let tries = 0;
-    const maxTries = 10;
-    const tick = async () => {
-      try {
-        const { data } = await supabase
-          .from('workouts')
-          .select('computed,workout_analysis,analysis_status,analyzed_at')
-          .eq('id', cid)
-          .maybeSingle();
-        const compd = (data as any)?.computed;
-        const waRaw = (data as any)?.workout_analysis;
-        const wa = typeof waRaw === 'string' ? (() => { try { return JSON.parse(waRaw); } catch { return waRaw; } })() : waRaw;
-        if (!cancelled && compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-          setHydratedCompleted((prev:any) => ({
-            ...(prev || {}),
-            id: cid,
-            computed: compd,
-            workout_analysis: wa ?? (prev as any)?.workout_analysis,
-            analysis_status: (data as any)?.analysis_status ?? (prev as any)?.analysis_status,
-            analyzed_at: (data as any)?.analyzed_at ?? (prev as any)?.analyzed_at,
-          }));
-          return;
-        }
-      } catch {}
-      tries += 1;
-      if (!cancelled && tries < maxTries) setTimeout(tick, 1500);
-    };
-    setTimeout(tick, 1200);
-    return () => { cancelled = true; };
-  }, [isAttachedToPlan, hasServerComputed, planned, needsCanonicalHydration]);
-
-  const sportType = String((completed?.type || planned?.type || '')).toLowerCase();
+  // Endurance (run/ride/swim) — all data comes from sd (session_detail_v1)
 
   return (
     <div className="w-full">
@@ -248,20 +110,13 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       
       <EnduranceIntervalTable
-        planned={planned}
-        completedSrc={completedSrc}
         sessionDetail={sd}
         hasSessionDetail={hasSessionDetail}
-        type={type}
-        isPoolSwim={isPoolSwim}
-        isRidePlanned={isRidePlanned}
         useImperial={useImperial}
         noPlannedCompare={noPlannedCompare}
-        serverPlannedLight={serverPlannedLight}
-        hasServerPlanned={hasServerPlanned}
         onNavigateToContext={onNavigateToContext}
       />
-      {!isPoolSwim && (
+      {!sd?.classification?.is_pool_swim && (
         <SessionNarrative
           sessionDetail={sd}
           hasSessionDetail={hasSessionDetail}
