@@ -7,6 +7,7 @@
 // =============================================================================
 
 import type { AthleteSnapshot, LedgerDay, PlannedSession, Coaching } from './types.ts';
+import { callLLM } from '../llm.ts';
 
 // ---------------------------------------------------------------------------
 // Session interpretations: what the athlete already saw (from session_detail_v1)
@@ -230,37 +231,22 @@ CRITICAL — ACCURACY:
 
 export async function generateCoaching(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
-  anthropicKey: string,
+  _anthropicKey?: string,
   opts?: { sessionInterpretations?: SessionInterpretationForPrompt[] },
 ): Promise<Coaching> {
   const prompt = snapshotToPrompt(snapshot, opts);
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': anthropicKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 400,
-      system: COACHING_SYSTEM_PROMPT,
-      messages: [{
-        role: 'user',
-        content: `Here is the athlete snapshot for this week. Write the headline, narrative, and next session guidance.\n\n${prompt}`,
-      }],
-    }),
+  const raw = await callLLM({
+    system: COACHING_SYSTEM_PROMPT,
+    user: `Here is the athlete snapshot for this week. Write the headline, narrative, and next session guidance.\n\n${prompt}`,
+    model: 'claude-sonnet-4-20250514',
+    maxTokens: 400,
+    temperature: 1.0,
   });
 
-  if (!resp.ok) {
-    const err = await resp.text().catch(() => '');
-    console.error('[coaching] Anthropic error:', resp.status, err.slice(0, 300));
+  if (!raw) {
     return fallbackCoaching(snapshot);
   }
-
-  const data = await resp.json();
-  const raw = String(data?.content?.[0]?.text || '').trim();
 
   return parseCoachingResponse(raw, snapshot);
 }

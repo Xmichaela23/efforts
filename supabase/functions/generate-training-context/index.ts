@@ -323,11 +323,6 @@ interface TrainingContextResponse {
         value: string;
         severity: 'info' | 'warning';
       }>;
-      /**
-       * LLM-translated explanation of the trend evidence (2-3 sentences).
-       * Must stay grounded in the provided evidence and plan context.
-       */
-      trend_explanation?: string;
     };
     carryover?: {
       level: 'low' | 'moderate' | 'high';
@@ -930,78 +925,6 @@ Deno.serve(async (req) => {
         (weekly_readiness as any).__trend_evidence = evidence;
       }
     }
-
-    // ==========================================================================
-    // TREND EXPLANATION (LLM translation only; metrics remain deterministic)
-    // ==========================================================================
-    const buildTrendExplanation = async (): Promise<string | null> => {
-      try {
-        if (!Deno.env.get('ANTHROPIC_API_KEY')) return null;
-        const evidence = ((weekly_readiness as any)?.__trend_evidence as any[]) ?? [];
-        if (!Array.isArray(evidence) || evidence.length === 0) return null;
-
-        const intent = planContext?.weekIntent ?? 'unknown';
-        const nextIntent = planContext?.next_week_intent ?? null;
-        const weeksRemaining = planContext?.weeks_remaining ?? null;
-        const weekFocus = planContext?.weekFocusLabel ?? null;
-        const weekIndex = planContext?.weekIndex ?? null;
-        const planName = planContext?.planName ?? null;
-
-        // Provide both absolute + delta where available to avoid confusing "0%"
-        const avgDrift = weekly_readiness?.hr_drift_bpm ?? null;
-        const avgPaceAdh = weekly_readiness?.pace_adherence_pct ?? null;
-
-        const prompt = [
-          `You are a running coach. Translate weekly training metrics into clear, human language.`,
-          `Constraints:`,
-          `- Use ONLY the facts provided. Do not invent numbers or symptoms.`,
-          `- Explain what each metric means in plain English. If a change is 0, say it held steady (not \"zero adherence\").`,
-          `- Be concise: exactly 2 sentences. No bullets.`,
-          `- Stay consistent: if pace held but HR cost rose, say \"pace held but cost increased\" (not a contradiction).`,
-          ``,
-          `Plan context:`,
-          `- Plan: ${planName ?? 'unknown'}`,
-          `- Week: ${weekIndex ?? 'unknown'}`,
-          `- Phase: ${String(intent)}`,
-          `- Next week: ${String(nextIntent ?? 'unknown')}`,
-          `- Weeks to race/go: ${weeksRemaining ?? 'unknown'}`,
-          weekFocus ? `- Focus: ${weekFocus}` : null,
-          ``,
-          `Metric meanings (do not contradict these):`,
-          `- HR drift: higher drift usually means more fatigue / heat / pacing cost at steady effort.`,
-          `- Pace adherence: closer to 100% means execution matched the prescribed pace ranges.`,
-          `- Strength RIR: lower RIR means less reserve (strength work feels harder).`,
-          ``,
-          `Weekly readiness (averaged across recent runs):`,
-          `- Avg HR drift: ${avgDrift != null ? `${avgDrift} bpm` : 'unknown'}`,
-          `- Avg pace adherence: ${avgPaceAdh != null ? `${avgPaceAdh}%` : 'unknown'}`,
-          ``,
-          `Trend evidence (labels + values):`,
-          ...evidence.map(e => `- ${e.label}: ${e.value}`),
-          ``,
-          `Write a 2–3 sentence explanation of what this suggests about fatigue/adaptation, and whether it is expected for this phase.`,
-        ]
-          .filter(Boolean)
-          .join('\n');
-
-        const { callLLM } = await import('../_shared/llm.ts');
-        const content = await callLLM({
-          system: 'You are precise, grounded, and coach-like. No fluff.',
-          user: prompt,
-          temperature: 0,
-          maxTokens: 90,
-        });
-        if (typeof content !== 'string' || !content) return null;
-        const cleaned = content.trim().replace(/\s+/g, ' ');
-        // Enforce exactly 2 sentences in case the model ignores instructions
-        const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean);
-        const two = sentences.slice(0, 2).join(' ').trim();
-        return two.length ? two : null;
-      } catch (e) {
-        console.warn('⚠️ [TREND EXPLANATION] Failed:', e);
-        return null;
-      }
-    };
 
     // ==========================================================================
     // WEEKLY VERDICT (Goal Predictor — server-side; no client-side math)
@@ -2190,7 +2113,6 @@ Deno.serve(async (req) => {
         .filter((w: WorkoutRecord) => !matched_pairs.some(p => p.workout_id === w.id))
         .map((w: WorkoutRecord) => w.id);
 
-      const trend_explanation = await buildTrendExplanation();
       week_narrative = {
         week_index: planContext.weekIndex,
         week_day_index: weekDayIndex as 1 | 2 | 3 | 4 | 5 | 6 | 7,
@@ -2217,8 +2139,7 @@ Deno.serve(async (req) => {
           structural_tier: structuralTier,
           limiter,
           trend,
-          trend_evidence: ((weekly_readiness as any)?.__trend_evidence as any) ?? [],
-          trend_explanation: trend_explanation ?? undefined
+          trend_evidence: ((weekly_readiness as any)?.__trend_evidence as any) ?? []
         },
         carryover: dateRanges.previousWeekStartISO
           ? { level: carryover_level, pct_of_baseline: carryover_pct_of_baseline, interpretation: carryover_interpretation }

@@ -120,7 +120,7 @@ function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok
   return { ok: true, why: null };
 }
 
-async function callOpenAIParagraph(_openaiKey: string, prompt: string, temperature: number): Promise<string | null> {
+async function callLLMParagraph(prompt: string, temperature: number): Promise<string | null> {
   const text = await callLLM({
     system: 'You are an expert endurance coach. Output must be a single paragraph (2-5 sentences). No bullets. No headers. No generic advice.',
     user: prompt,
@@ -384,7 +384,7 @@ export async function generateAISummaryV1(
   ].join('\n');
 
   try {
-    const s1 = await callOpenAIParagraph(openaiKey, prompt, 0.2);
+    const s1 = await callLLMParagraph(prompt, 0.2);
     if (!s1) { console.warn('[ai-summary] attempt 1 returned empty'); return null; }
     const v1 = validateNoNewNumbers(s1, displayPacket);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
@@ -399,7 +399,7 @@ export async function generateAISummaryV1(
       z1.why, len1.why, td1.why, g1.why,
     ].filter(Boolean);
     const corrective = prompt + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
-    const s2 = await callOpenAIParagraph(openaiKey, corrective, 0);
+    const s2 = await callLLMParagraph(corrective, 0);
     if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
     const v2 = validateNoNewNumbers(s2, displayPacket);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);

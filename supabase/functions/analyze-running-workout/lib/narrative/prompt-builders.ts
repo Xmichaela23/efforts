@@ -338,9 +338,6 @@ export function extractPlannedPaceInfo(
   }
 }
 
-/**
- * Build the complete prompt for OpenAI
- */
 export function buildPrompt(
   workoutContext: any,
   adherenceContext: any,
@@ -821,12 +818,9 @@ function buildRequiredObservations(plannedWorkout: any, adherenceContext: any, p
   return required ? `\n\nREQUIRED (interpret, do not mirror):\n${required}` : '';
 }
 
-/**
- * Call OpenAI API with the prompt
- */
 import { callLLM } from '../../../../_shared/llm.ts';
 
-export async function callOpenAI(_openaiKey: string, prompt: string): Promise<string[]> {
+export async function callLLMInsights(prompt: string): Promise<string[]> {
   try {
     const content = await callLLM({
       system: 'You are a coach interpreting workout data. Write interpretative observations only. FORBIDDEN: "Duration: X of Y minutes", "Overall execution: X%", "The workout was programmed as part of", "average heart rate was X bpm, maximum Y bpm", "performance met/exceeded plan expectations". Explain relationships (internal vs external load), physiological meaning (HR drift, recovery), and plan consequences. Never use motivational language or subjective judgments.',
@@ -838,7 +832,7 @@ export async function callOpenAI(_openaiKey: string, prompt: string): Promise<st
     console.log('🤖 [DEBUG] Raw AI response:', content);
     
     if (!content) {
-      throw new Error('Empty response from OpenAI');
+      throw new Error('Empty response from LLM');
     }
 
     // Parse JSON array from response
