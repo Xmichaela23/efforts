@@ -1781,6 +1781,15 @@ Deno.serve(async (req) => {
       console.log('⚠️ Failed to read existing workout_analysis for cycling merge:', existingRowErr.message);
     }
     const existingAnalysis = (existingRowForMerge as any)?.workout_analysis || {};
+
+    if (!ai_summary && typeof (existingAnalysis as any)?.ai_summary === 'string') {
+      ai_summary = (existingAnalysis as any).ai_summary;
+      ai_summary_generated_at = typeof (existingAnalysis as any)?.ai_summary_generated_at === 'string'
+        ? (existingAnalysis as any).ai_summary_generated_at
+        : null;
+      console.log('[analyze-cycling-workout] preserved previous ai_summary (LLM did not produce a new one)');
+    }
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',

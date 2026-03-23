@@ -2272,6 +2272,16 @@ Deno.serve(async (req) => {
     }
     const existingAnalysis = existingRowForMerge?.workout_analysis || {};
 
+    // On recompute, preserve the previous narrative when the LLM call fails
+    // rather than overwriting a good summary with null.
+    if (!ai_summary && typeof (existingAnalysis as any)?.ai_summary === 'string') {
+      ai_summary = (existingAnalysis as any).ai_summary;
+      ai_summary_generated_at = typeof (existingAnalysis as any)?.ai_summary_generated_at === 'string'
+        ? (existingAnalysis as any).ai_summary_generated_at
+        : null;
+      console.log('[analyze-running-workout] preserved previous ai_summary (LLM did not produce a new one)');
+    }
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',

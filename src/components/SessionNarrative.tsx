@@ -40,11 +40,21 @@ export default function SessionNarrative({
   const sessionState = workoutAnalysis?.session_state_v1;
   const hasSessionState = !!(sessionState && sessionState.version === 1);
   const summaryTitle = String(sessionState?.summary?.title || 'Insights');
-  const summaryBullets = (hasSessionDetail && Array.isArray(sd?.observations) && sd.observations.length > 0)
-    ? sd.observations.filter((b: string) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
-    : (Array.isArray(sessionState?.summary?.bullets)
+  const summaryBullets = (() => {
+    const obs = (hasSessionDetail && Array.isArray(sd?.observations))
+      ? sd!.observations.filter((b: string) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
+      : [];
+    const bullets = Array.isArray(sessionState?.summary?.bullets)
       ? sessionState.summary.bullets.filter((b: any) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim())
-      : []);
+      : [];
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    for (const b of [...bullets, ...obs]) {
+      const k = b.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); merged.push(b); }
+    }
+    return merged;
+  })();
   const narrativeText = (hasSessionDetail && typeof sd?.narrative_text === 'string' ? sd.narrative_text.trim() : '')
     || (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '');
   const hasNarrative = narrativeText.length > 0;
@@ -271,11 +281,13 @@ export default function SessionNarrative({
               } catch {}
 
               try {
-                const mbt =
-                  (completedSrc as any)?.workout_analysis?.mile_by_mile_terrain ||
-                  (completedSrc as any)?.workout_analysis?.detailed_analysis?.mile_by_mile_terrain;
+                // Use computed mile splits (time/distance) — same source as the Splits table.
+                // Avoids the mile_by_mile_terrain path which uses a different bucketing method.
+                const computedSplitsMi: any[] =
+                  Array.isArray((completedSrc as any)?.computed?.analysis?.events?.splits?.mi)
+                    ? (completedSrc as any).computed.analysis.events.splits.mi
+                    : [];
 
-                const splitsRaw = Array.isArray((mbt as any)?.splits) ? (mbt as any).splits : [];
                 const fmtPace = (sec: number): string => {
                   if (!Number.isFinite(sec) || sec <= 0) return '';
                   const m = Math.floor(sec / 60);
@@ -283,29 +295,30 @@ export default function SessionNarrative({
                   return `${m}:${String(s).padStart(2, '0')}/mi`;
                 };
 
-                const splits = splitsRaw
-                  .map((s: any) => ({
-                    mile: Number(s?.mile),
-                    pace: Number(s?.pace_s_per_mi ?? s?.pace_sec_per_mi ?? s?.pace_sec_per_mile),
-                    terrain: String(s?.terrain_type || '').trim(),
-                  }))
+                const splits = computedSplitsMi
+                  .map((s: any) => {
+                    const pacePerKm = Number(s?.avgPace_s_per_km);
+                    const pacePerMi = Number.isFinite(pacePerKm) && pacePerKm > 0
+                      ? pacePerKm * 1.60934
+                      : NaN;
+                    return { mile: Number(s?.n), pace: pacePerMi };
+                  })
                   .filter((s: any) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
 
                 const noteFallback = (factPacketV1 as any)?.derived?.pacing_pattern?.speedups_note;
 
                 if (splits.length >= 2) {
-                  let best: { mile: number; pickupSec: number; pace: number; terrain?: string } | null = null;
+                  let best: { mile: number; pickupSec: number; pace: number } | null = null;
                   for (let i = 1; i < splits.length; i++) {
                     const prev = splits[i - 1];
                     const cur = splits[i];
                     const pickupSec = prev.pace - cur.pace;
                     if (pickupSec > (best?.pickupSec ?? 0) && pickupSec <= 120) {
-                      best = { mile: cur.mile, pickupSec, pace: cur.pace, terrain: cur.terrain };
+                      best = { mile: cur.mile, pickupSec, pace: cur.pace };
                     }
                   }
 
                   if (best && Number.isFinite(best.pickupSec) && best.pickupSec >= 10) {
-                    const terr = best.terrain ? ` (${best.terrain})` : '';
                     const deltaMin = Math.floor(best.pickupSec / 60);
                     const deltaSec = Math.round(best.pickupSec % 60);
                     const deltaStr = deltaMin > 0
@@ -313,7 +326,7 @@ export default function SessionNarrative({
                       : `${deltaSec}s/mi faster`;
                     rows.push({
                       label: 'Speed',
-                      value: `Biggest pickup: Mile ${best.mile}${terr} at ${fmtPace(best.pace)} (${deltaStr} than prior mile)`,
+                      value: `Biggest pickup: Mile ${best.mile} at ${fmtPace(best.pace)} (${deltaStr} than prior mile)`,
                     });
                   } else if (noteFallback && typeof noteFallback === 'string' && noteFallback.trim().length > 0) {
                     rows.push({ label: 'Speed', value: noteFallback.trim() });
