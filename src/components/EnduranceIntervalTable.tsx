@@ -82,46 +82,19 @@ export default function EnduranceIntervalTable({
 }: EnduranceIntervalTableProps) {
   const [showAllIntervals, setShowAllIntervals] = useState(false);
 
-  if (!hasSessionDetail || !sd) return null;
-
-  const sportType = String(sd.type || '').toLowerCase();
+  const sportType = String(sd?.type || '').toLowerCase();
   const isRide = /ride|bike|cycling/.test(sportType);
   const isSwim = /swim/.test(sportType);
-  const isPoolSwim = !!sd.classification?.is_pool_swim;
-  const isEasyLike = !!sd.classification?.is_easy_like;
-  const isStructured = !!sd.classification?.is_structured_interval;
-  const displayMode = sd.intervals_display?.mode ?? 'none';
-  const displayReason = sd.intervals_display?.reason ?? null;
-  const allIntervals: IntervalRow[] = Array.isArray(sd.intervals) ? sd.intervals : [];
-  const hasPlanned = !!sd.plan_context?.planned_id;
-  const cv = sd.pacing?.coefficient_of_variation ?? null;
+  const isPoolSwim = !!sd?.classification?.is_pool_swim;
+  const isEasyLike = !!sd?.classification?.is_easy_like;
+  const displayMode = sd?.intervals_display?.mode ?? 'none';
+  const displayReason = sd?.intervals_display?.reason ?? null;
+  const allIntervals: IntervalRow[] = Array.isArray(sd?.intervals) ? sd!.intervals as IntervalRow[] : [];
+  const hasPlanned = !!sd?.plan_context?.planned_id;
+  const cv = sd?.pacing?.coefficient_of_variation ?? null;
   const leftColHeader = hasPlanned ? 'Planned' : 'Segments';
 
-  // ── Pool swim: overall comparison ────────────────────────────────────────
-  if (isPoolSwim) {
-    return <PoolSwimOverall sd={sd} useImperial={useImperial} />;
-  }
-
-  // ── Awaiting recompute ───────────────────────────────────────────────────
-  if (displayMode === 'awaiting_recompute') {
-    return (
-      <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
-        <p className="text-sm text-red-200">Session interval contract missing for this planned workout.</p>
-        <p className="text-xs text-red-300/90 mt-1">
-          {displayReason === 'no_measured_execution_and_no_overall'
-            ? 'Measured execution data is not ready yet. Recompute analysis to refresh.'
-            : 'Recompute analysis to generate canonical interval rows.'}
-        </p>
-      </div>
-    );
-  }
-
-  // ── No intervals ─────────────────────────────────────────────────────────
-  if (allIntervals.length === 0 && displayMode === 'none') {
-    return null;
-  }
-
-  // ── Collapse micro-steps for easy runs ───────────────────────────────────
+  // useMemo MUST be called before any early returns (React hooks rules)
   const visibleIntervals = useMemo(() => {
     if (showAllIntervals) return allIntervals;
     if (!isEasyLike || allIntervals.length <= 2) return allIntervals;
@@ -148,6 +121,32 @@ export default function EnduranceIntervalTable({
   }, [allIntervals, isEasyLike, showAllIntervals]);
 
   const canToggleStrides = isEasyLike && allIntervals.length > 2 && visibleIntervals.length < allIntervals.length;
+
+  if (!hasSessionDetail || !sd) return null;
+
+  // ── Pool swim: overall comparison ────────────────────────────────────────
+  if (isPoolSwim) {
+    return <PoolSwimOverall sd={sd} useImperial={useImperial} />;
+  }
+
+  // ── Awaiting recompute ───────────────────────────────────────────────────
+  if (displayMode === 'awaiting_recompute') {
+    return (
+      <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
+        <p className="text-sm text-red-200">Session interval contract missing for this planned workout.</p>
+        <p className="text-xs text-red-300/90 mt-1">
+          {displayReason === 'no_measured_execution_and_no_overall'
+            ? 'Measured execution data is not ready yet. Recompute analysis to refresh.'
+            : 'Recompute analysis to generate canonical interval rows.'}
+        </p>
+      </div>
+    );
+  }
+
+  // ── No intervals ─────────────────────────────────────────────────────────
+  if (allIntervals.length === 0 && displayMode === 'none') {
+    return null;
+  }
 
   // ── Single overall row when no interval breakdown ────────────────────────
   if (allIntervals.length === 0 && displayMode === 'overall_only') {
