@@ -51,6 +51,30 @@ function paceStr(distMeters: number, durSeconds: number, imperial: boolean): str
   return `${min}:${sec.toString().padStart(2, '0')}/${imperial ? 'mi' : 'km'}`;
 }
 
+/**
+ * Execution score for ActualSession — do NOT use `a || b` (0 is valid and must not fall through).
+ * Prefer performance.execution_adherence (running/cycling analysis), then glance, then legacy fields.
+ */
+function pickExecutionScoreFromWorkoutRow(analysis: Record<string, unknown>, computed: Record<string, unknown>): number | null {
+  const perf = (analysis as any).performance;
+  if (Number.isFinite(perf?.execution_adherence)) {
+    return Math.round(Number(perf.execution_adherence));
+  }
+  const glance = (analysis as any).session_state_v1?.glance?.execution_score;
+  if (Number.isFinite(glance)) {
+    return Math.round(Number(glance));
+  }
+  const top = (analysis as any).execution_score;
+  if (top != null && top !== '' && Number.isFinite(Number(top))) {
+    return Math.round(Number(top));
+  }
+  const comp = (computed as any).execution_score;
+  if (comp != null && comp !== '' && Number.isFinite(Number(comp))) {
+    return Math.round(Number(comp));
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Build PlannedSession from a planned_workouts DB row
 // ---------------------------------------------------------------------------
@@ -161,7 +185,7 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
     load_actual: Number(row?.workload_actual) || null,
     rpe: Number(row?.session_rpe) || Number(row?.rpe) || null,
     feeling: row?.feeling ? String(row.feeling) : null,
-    execution_score: Number(analysis?.execution_score) || Number(computed?.execution_score) || null,
+    execution_score: pickExecutionScoreFromWorkoutRow(analysis as Record<string, unknown>, computed as Record<string, unknown>),
     decoupling_pct: Number(analysis?.decoupling_pct) || Number(computed?.decoupling_pct) || null,
     strength_actual: strengthActual,
   };

@@ -62,14 +62,35 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const detailed = (wa as any).detailed_analysis || {};
   const ib = detailed?.interval_breakdown || granular?.interval_breakdown;
 
-  const executionScore =
-    Number(actualSession?.execution_score) ??
-    (Number.isFinite(perf?.execution_adherence) ? perf.execution_adherence : null) ??
-    (Number.isFinite(sessionState?.glance?.execution_score) ? sessionState.glance.execution_score : null);
-
   const paceAdherence = Number.isFinite(perf?.pace_adherence) ? perf.pace_adherence : null;
   const powerAdherence = Number.isFinite(perf?.power_adherence) ? perf.power_adherence : null;
   const durationAdherence = Number.isFinite(perf?.duration_adherence) ? perf.duration_adherence : null;
+
+  // Execution: ledger may still carry 0 from legacy rows while performance.* is correct — never let 0 block better sources.
+  let executionScore: number | null = null;
+  if (actualSession?.execution_score != null && Number.isFinite(Number(actualSession.execution_score))) {
+    executionScore = Number(actualSession.execution_score);
+  }
+  if (executionScore === null && Number.isFinite(perf?.execution_adherence)) {
+    executionScore = perf.execution_adherence;
+  }
+  if (executionScore === null && Number.isFinite(sessionState?.glance?.execution_score)) {
+    executionScore = sessionState.glance.execution_score;
+  }
+  if (executionScore === 0) {
+    const fromPerf = Number.isFinite(perf?.execution_adherence) ? perf.execution_adherence : null;
+    if (fromPerf != null && fromPerf > 0) {
+      executionScore = fromPerf;
+    } else {
+      const parts: number[] = [];
+      if (paceAdherence != null && paceAdherence > 0) parts.push(paceAdherence);
+      if (powerAdherence != null && powerAdherence > 0) parts.push(powerAdherence);
+      if (durationAdherence != null && durationAdherence > 0) parts.push(durationAdherence);
+      if (parts.length > 0) {
+        executionScore = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+      }
+    }
+  }
 
   const assessedAgainst = factPacket?.derived?.execution?.assessed_against ?? null;
   const hasPlanned = !!plannedSession && !!match?.planned_id;
