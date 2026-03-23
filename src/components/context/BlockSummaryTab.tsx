@@ -1168,22 +1168,6 @@ const LegacyPlanAdherence: React.FC<{ data: any }> = ({ data }) => {
   );
 };
 
-const LegacyWeeklySummary: React.FC<{ data: any }> = ({ data }) => {
-  if (!data.weekly_summary) return null;
-  
-  return (
-    <div className="bg-white/[0.05] backdrop-blur-md border border-white/20 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Calendar className="w-4 h-4 text-blue-500" />
-        <h3 className="text-sm font-medium text-white">This Week</h3>
-      </div>
-      <p className="text-sm text-white/80 leading-relaxed whitespace-pre-line">
-        {data.weekly_summary}
-      </p>
-    </div>
-  );
-};
-
 // =============================================================================
 // HELPERS
 // =============================================================================

@@ -44,7 +44,6 @@ export function useWeekUnified(fromISO: string, toISO: string) {
       const items: UnifiedItem[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
       return { 
         items,
-        weekly_ai: (data as any)?.weekly_ai || null,
         weekly_stats: (data as any)?.weekly_stats || { planned: 0, completed: 0 },
         training_plan_context: (data as any)?.training_plan_context || null,
       };
@@ -69,10 +68,9 @@ export function useWeekUnified(fromISO: string, toISO: string) {
   }, [queryClient]);
 
   const items: UnifiedItem[] = (query.data as any)?.items || [];
-  const weeklyAI = (query.data as any)?.weekly_ai || null;
   const weeklyStats = (query.data as any)?.weekly_stats || { planned: 0, completed: 0 };
   const trainingPlanContext = (query.data as any)?.training_plan_context || null;
-  return { items, weeklyAI, weeklyStats, trainingPlanContext, loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
+  return { items, weeklyStats, trainingPlanContext, loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
 }
 
 

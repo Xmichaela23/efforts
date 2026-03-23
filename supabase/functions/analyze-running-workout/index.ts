@@ -2756,11 +2756,6 @@ function analyzeHeartRateRecovery(sensorData: any[], workIntervals: any[], recov
   };
 }
 
-
-
-// AI Narrative generation moved to lib/narrative/ai-generator.ts
-// Plan context moved to _shared/plan-context.ts
-
 /** Structured adherence summary: verdict + technical insights + plan impact (interpret, don't mirror). */
 export interface WorkoutAdherenceSummary {
   verdict: string;
