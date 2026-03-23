@@ -255,7 +255,7 @@ export default function EnduranceIntervalTable({
                 <td className="px-2 py-1.5">
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
-                      <span className="text-[13px] font-medium truncate pr-2">{iv.planned_label}</span>
+                      <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
                       {pct != null && (
                         <div className="flex items-center gap-1">
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${pctColor(pct)}`}>{pct}%</span>
@@ -265,7 +265,7 @@ export default function EnduranceIntervalTable({
                     </div>
                     {showRangeSubtitle && iv.planned_pace_display && (
                       <div className="text-[10px] text-gray-400 mt-0.5">
-                        {iv.planned_pace_display}
+                        {String(iv.planned_pace_display)}
                       </div>
                     )}
                   </div>

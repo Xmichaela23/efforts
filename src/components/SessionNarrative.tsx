@@ -177,7 +177,7 @@ export default function SessionNarrative({
                 return true;
               });
               return out.slice(0, 4).map((b: string, i: number) => (
-                <p key={i} className="text-sm text-gray-300 leading-relaxed">{b}</p>
+                <p key={i} className="text-sm text-gray-300 leading-relaxed">{String(b)}</p>
               ));
             })()}
           </div>
@@ -217,8 +217,8 @@ export default function SessionNarrative({
 
               return rows.slice(0, 8).map((r, i) => (
                 <div key={i}>
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{r.label}</span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{r.value}</p>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(r.label ?? '')}</span>
+                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(r.value ?? '')}</p>
                 </div>
               ));
             })()}
@@ -232,8 +232,8 @@ export default function SessionNarrative({
             <div className="space-y-2">
               {technicalInsightsForRender.map((t, i: number) => (
                 <div key={i}>
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{t.label}</span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{t.value}</p>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(t.label ?? '')}</span>
+                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(t.value ?? '')}</p>
                 </div>
               ))}
             </div>

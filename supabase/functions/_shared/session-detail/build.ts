@@ -142,10 +142,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         interval_type: normIntervalType(iv?.interval_type || iv?.kind),
         interval_number: typeof iv?.interval_number === 'number' ? iv.interval_number : undefined,
         recovery_number: typeof iv?.recovery_number === 'number' ? iv.recovery_number : undefined,
-        planned_label: sr?.planned_label ?? iv?.planned_label ?? String(iv?.interval_type || ''),
+        planned_label: String(sr?.planned_label ?? iv?.planned_label ?? iv?.interval_type ?? ''),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
-        planned_pace_display: sr?.planned_pace_display ?? (hasRange ? fmtPaceRange(Number(lower), Number(upper)) : null),
+        planned_pace_display: typeof sr?.planned_pace_display === 'string' ? sr.planned_pace_display : (hasRange ? fmtPaceRange(Number(lower), Number(upper)) : null),
         executed: {
           duration_s: fin(iv?.actual_duration_s) ?? fin(sr?.executed?.duration_s),
           distance_m: fin(iv?.actual_distance_m) ?? fin(sr?.executed?.distance_m),
@@ -171,6 +171,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const summaryBullets = mergeDedupe(
     arrayOfStrings(sessionState?.summary?.bullets),
     arrayOfStrings(observations),
+    arrayOfStrings(sessionState?.narrative?.observations),
   );
 
   // ── Narrative ──────────────────────────────────────────────────────────────
@@ -209,7 +210,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   // ── Adherence narrative ────────────────────────────────────────────────────
   const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)
-    ? adherenceSummary.technical_insights.filter((t: any) => t?.label && t?.value) : [];
+    ? adherenceSummary.technical_insights
+        .filter((t: any) => t?.label && t?.value)
+        .map((t: any) => ({ label: String(t.label), value: String(t.value) }))
+    : [];
   const planImpactText = (() => {
     const fromMatch = match?.summary;
     if (typeof fromMatch === 'string' && fromMatch.trim()) return fromMatch.trim();
