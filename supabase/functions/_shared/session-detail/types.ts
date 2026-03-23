@@ -36,6 +36,8 @@ export type SessionDetailV1 = {
       strength_quality: StrengthMatchQuality | null;
       summary: string;
     } | null;
+    /** Pre-formatted week label for display, e.g. "Week 3 • Build". */
+    week_label: string | null;
   };
 
   execution: {
@@ -53,23 +55,70 @@ export type SessionDetailV1 = {
   observations: string[];
   narrative_text: string | null;
 
-  intervals: Array<{
-    id: string;
-    interval_type: 'warmup' | 'work' | 'recovery' | 'cooldown';
-    interval_number?: number;
-    recovery_number?: number;
-    planned_label: string;
-    planned_duration_s: number | null;
-    planned_pace_range?: { lower_sec_per_mi: number; upper_sec_per_mi: number };
-    executed: {
-      duration_s: number | null;
-      distance_m: number | null;
-      avg_hr: number | null;
-      actual_pace_sec_per_mi?: number | null;
-    };
-    pace_adherence_pct?: number | null;
-    duration_adherence_pct?: number | null;
+  // ── Summary (SessionNarrative) ────────────────────────────────────────────
+  /** Pre-merged, deduped summary section. */
+  summary: {
+    title: string;
+    /** session_state_v1.summary.bullets + observations, merged & deduped server-side. */
+    bullets: string[];
+  };
+
+  // ── Completed & planned totals (AdherenceChips) ───────────────────────────
+  completed_totals: {
+    duration_s: number | null;
+    distance_m: number | null;
+    avg_pace_s_per_mi: number | null;
+    avg_gap_s_per_mi: number | null;
+    avg_hr: number | null;
+  };
+  planned_totals: {
+    duration_s: number | null;
+    distance_m: number | null;
+    avg_pace_s_per_mi: number | null;
+  };
+
+  // ── Analysis details (SessionNarrative "Analysis Details" panel) ──────────
+  /** Display-ready insight rows. Server picks + formats from fact_packet, flags, adherence_summary. */
+  analysis_details: {
+    rows: Array<{ label: string; value: string }>;
+  };
+
+  // ── Adherence narrative (SessionNarrative technical insights + plan impact) ─
+  adherence: {
+    technical_insights: Array<{ label: string; value: string }>;
+    plan_impact_label: string | null;
+    plan_impact_text: string | null;
+  };
+
+  // ── Interval display (EnduranceIntervalTable + MobileSummary) ─────────────
+  /** Pre-resolved interval rows. Client renders, never resolves across sources. */
+  intervals: IntervalRow[];
+  intervals_display: {
+    mode: 'interval_compare_ready' | 'overall_only' | 'awaiting_recompute' | 'none';
+    reason: string | null;
+  };
+
+  // ── Classification flags (MobileSummary, EnduranceIntervalTable) ──────────
+  classification: {
+    is_structured_interval: boolean;
+    is_easy_like: boolean;
+    is_auto_lap_or_split: boolean;
+  };
+
+  // ── Splits (SessionNarrative Speed insight) ───────────────────────────────
+  /** Computed mile splits for insights. Same source as splits tab. */
+  splits_mi: Array<{
+    n: number;
+    pace_s_per_mi: number | null;
+    gap_s_per_mi: number | null;
+    grade_pct: number | null;
+    hr: number | null;
   }>;
+
+  // ── Pacing (EnduranceIntervalTable CV indicator) ──────────────────────────
+  pacing: {
+    coefficient_of_variation: number | null;
+  };
 
   display: {
     show_adherence_chips: boolean;
@@ -77,13 +126,12 @@ export type SessionDetailV1 = {
     has_measured_execution: boolean;
   };
 
-  /** Strength only: server-computed deviations. Weight = actual vs planned weight. Volume = sets/reps. */
+  /** Strength only: server-computed deviations. */
   strength_weight_deviation?: {
     direction: 'heavier' | 'lighter' | 'on_target';
     message: string;
     show_prompt: boolean;
   } | null;
-  /** Strength only: volume deviation (more/fewer sets or reps than planned). Shown when weight matched. */
   strength_volume_deviation?: {
     direction: 'over' | 'under' | 'on_target';
     message: string;
@@ -92,6 +140,29 @@ export type SessionDetailV1 = {
 
   /** Structured assessment for all screens. Deterministic, no LLM. */
   session_interpretation?: SessionInterpretation | null;
+}
+
+// ── Interval row: fully resolved, ready to render ─────────────────────────
+export type IntervalRow = {
+  id: string;
+  interval_type: 'warmup' | 'work' | 'recovery' | 'cooldown';
+  interval_number?: number;
+  recovery_number?: number;
+  planned_label: string;
+  planned_duration_s: number | null;
+  planned_pace_range?: { lower_sec_per_mi: number; upper_sec_per_mi: number };
+  /** Display-ready planned pace string, e.g. "10:30-11:00/mi". */
+  planned_pace_display: string | null;
+  executed: {
+    duration_s: number | null;
+    distance_m: number | null;
+    avg_hr: number | null;
+    actual_pace_sec_per_mi: number | null;
+    actual_gap_sec_per_mi: number | null;
+    power_watts: number | null;
+  };
+  pace_adherence_pct: number | null;
+  duration_adherence_pct: number | null;
 }
 
 // -----------------------------------------------------------------------------

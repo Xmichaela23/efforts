@@ -2,7 +2,7 @@
 // SESSION_DETAIL_V1 — Build from snapshot slice + workout_analysis
 // =============================================================================
 
-import type { SessionDetailV1, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
+import type { SessionDetailV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 
 function normType(t: string | null | undefined): string {
@@ -25,7 +25,7 @@ export type SessionDetailInput = {
   match: SessionMatch | null;
   plannedSession: PlannedSession | null;
   /** Raw planned_workouts row with strength_exercises (for strength weight deviation) */
-  plannedRowRaw?: { strength_exercises?: any[] } | null;
+  plannedRowRaw?: { strength_exercises?: any[]; computed?: any } | null;
   /** Completed workout strength_exercises (for strength weight deviation) */
   completedStrengthExercises?: any[] | null;
   observations: string[];
@@ -33,6 +33,8 @@ export type SessionDetailInput = {
   narrativeText: string | null;
   /** Optional: from body_response.load_status for weekly_impact */
   loadStatus?: { status: 'on_target' | 'high' | 'elevated' | 'under'; interpretation?: string } | null;
+  /** Completed workout's `computed` field (from compute-workout-analysis). */
+  completedComputed?: Record<string, unknown> | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -51,6 +53,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     workoutAnalysis,
     narrativeText,
     loadStatus,
+    completedComputed,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -60,13 +63,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const factPacket = (wa as any).fact_packet_v1 || (sessionState?.details as any)?.fact_packet_v1;
   const granular = (wa as any).granular_analysis || {};
   const detailed = (wa as any).detailed_analysis || {};
+  const adherenceSummary = (wa as any).adherence_summary ?? sessionState?.details?.adherence_summary ?? null;
+  const flagsV1: any[] = Array.isArray(sessionState?.details?.flags_v1) ? sessionState.details.flags_v1 : [];
   const ib = detailed?.interval_breakdown || granular?.interval_breakdown;
+  const comp = (completedComputed || {}) as any;
+  const compOverall = comp?.overall || {};
+  const plannedComp = (plannedRowRaw as any)?.computed || {};
 
-  const paceAdherence = Number.isFinite(perf?.pace_adherence) ? perf.pace_adherence : null;
-  const powerAdherence = Number.isFinite(perf?.power_adherence) ? perf.power_adherence : null;
-  const durationAdherence = Number.isFinite(perf?.duration_adherence) ? perf.duration_adherence : null;
+  // ── Execution resolution ───────────────────────────────────────────────────
+  const paceAdherence = fin(perf?.pace_adherence);
+  const powerAdherence = fin(perf?.power_adherence);
+  const durationAdherence = fin(perf?.duration_adherence);
 
-  // Execution: ledger may still carry 0 from legacy rows while performance.* is correct — never let 0 block better sources.
   let executionScore: number | null = null;
   if (actualSession?.execution_score != null && Number.isFinite(Number(actualSession.execution_score))) {
     executionScore = Number(actualSession.execution_score);
@@ -78,7 +86,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     executionScore = sessionState.glance.execution_score;
   }
   if (executionScore === 0) {
-    const fromPerf = Number.isFinite(perf?.execution_adherence) ? perf.execution_adherence : null;
+    const fromPerf = fin(perf?.execution_adherence);
     if (fromPerf != null && fromPerf > 0) {
       executionScore = fromPerf;
     } else {
@@ -102,48 +110,136 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     (durationAdherence ?? 0) === 0;
 
   const showAdherenceChips =
-    hasPlanned &&
-    !planModified &&
-    !allZero &&
+    hasPlanned && !planModified && !allZero &&
     (executionScore != null || paceAdherence != null || powerAdherence != null || durationAdherence != null);
 
-  const intervalDisplay = sessionState?.details?.interval_display || {};
-  const intervalDisplayReason = intervalDisplay?.reason ?? null;
   const hasMeasuredExecution =
     executionScore != null || paceAdherence != null || powerAdherence != null || durationAdherence != null;
 
   const weightDev = computeStrengthWeightDeviation(type, plannedRowRaw, completedStrengthExercises);
   const volumeDev = computeStrengthVolumeDeviation(type, plannedRowRaw, completedStrengthExercises);
 
-  const intervals: SessionDetailV1['intervals'] = [];
+  // ── Interval rows (pre-resolved) ──────────────────────────────────────────
+  const intervalDisplay = sessionState?.details?.interval_display || {};
+  const sessionRows: any[] = Array.isArray(sessionState?.details?.interval_rows) ? sessionState.details.interval_rows : [];
+
+  const intervals: IntervalRow[] = [];
   if (ib?.available && Array.isArray(ib.intervals)) {
     for (const iv of ib.intervals) {
       const lower = iv.planned_pace_range_lower ?? iv.planned_pace_range?.lower;
       const upper = iv.planned_pace_range_upper ?? iv.planned_pace_range?.upper;
+      const sr = sessionRows.find((r: any) =>
+        r.planned_step_id === iv.interval_id || r.row_id === iv.interval_id,
+      ) ?? null;
+      const paceRaw = fin(iv?.actual_pace_min_per_mi);
+      const paceSec = paceRaw != null ? Math.round(paceRaw * 60) : (fin(sr?.executed?.actual_pace_sec_per_mi) ?? null);
+      const hasRange = Number.isFinite(lower) && Number.isFinite(upper);
       intervals.push({
         id: String(iv?.interval_id || iv?.interval_number || intervals.length),
-        interval_type: (iv?.interval_type || iv?.kind || 'work') as SessionDetailV1['intervals'][0]['interval_type'],
+        interval_type: normIntervalType(iv?.interval_type || iv?.kind),
         interval_number: typeof iv?.interval_number === 'number' ? iv.interval_number : undefined,
         recovery_number: typeof iv?.recovery_number === 'number' ? iv.recovery_number : undefined,
-        planned_label: iv?.planned_label ?? String(iv?.interval_type || ''),
-        planned_duration_s: Number.isFinite(iv?.planned_duration_s) ? iv.planned_duration_s : null,
-        planned_pace_range:
-          Number.isFinite(lower) && Number.isFinite(upper)
-            ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) }
-            : undefined,
+        planned_label: sr?.planned_label ?? iv?.planned_label ?? String(iv?.interval_type || ''),
+        planned_duration_s: fin(iv?.planned_duration_s),
+        planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
+        planned_pace_display: sr?.planned_pace_display ?? (hasRange ? fmtPaceRange(Number(lower), Number(upper)) : null),
         executed: {
-          duration_s: Number.isFinite(iv?.actual_duration_s) ? iv.actual_duration_s : null,
-          distance_m: Number.isFinite(iv?.actual_distance_m) ? iv.actual_distance_m : null,
-          avg_hr: Number.isFinite(iv?.avg_heart_rate_bpm) ? iv.avg_heart_rate_bpm : null,
-          actual_pace_sec_per_mi: Number.isFinite(iv?.actual_pace_min_per_mi)
-            ? Math.round(iv.actual_pace_min_per_mi * 60)
-            : null,
+          duration_s: fin(iv?.actual_duration_s) ?? fin(sr?.executed?.duration_s),
+          distance_m: fin(iv?.actual_distance_m) ?? fin(sr?.executed?.distance_m),
+          avg_hr: fin(iv?.avg_heart_rate_bpm) ?? fin(sr?.executed?.avg_hr),
+          actual_pace_sec_per_mi: paceSec,
+          actual_gap_sec_per_mi: null,
+          power_watts: fin(iv?.avg_power_watts) ?? null,
         },
-        pace_adherence_pct: Number.isFinite(iv?.pace_adherence_percent) ? iv.pace_adherence_percent : null,
-        duration_adherence_pct: Number.isFinite(iv?.duration_adherence_percent) ? iv.duration_adherence_percent : null,
+        pace_adherence_pct: fin(sr?.adherence_pct) ?? fin(iv?.pace_adherence_percent),
+        duration_adherence_pct: fin(iv?.duration_adherence_percent),
       });
     }
   }
+
+  const intervalDisplayMode = (() => {
+    const m = String(intervalDisplay?.mode || '');
+    if (m === 'interval_compare_ready' || m === 'overall_only' || m === 'awaiting_recompute') return m as any;
+    return 'none' as const;
+  })();
+
+  // ── Summary (pre-merged bullets) ───────────────────────────────────────────
+  const summaryTitle = String(sessionState?.summary?.title || 'Insights');
+  const summaryBullets = mergeDedupe(
+    arrayOfStrings(sessionState?.summary?.bullets),
+    arrayOfStrings(observations),
+  );
+
+  // ── Narrative ──────────────────────────────────────────────────────────────
+  const resolvedNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
+    (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
+
+  // ── Completed totals ───────────────────────────────────────────────────────
+  const completedTotals: SessionDetailV1['completed_totals'] = {
+    duration_s: fin(compOverall?.duration_s_moving),
+    distance_m: fin(compOverall?.distance_m),
+    avg_pace_s_per_mi: fin(compOverall?.avg_pace_s_per_mi),
+    avg_gap_s_per_mi: fin(compOverall?.avg_gap_s_per_mi),
+    avg_hr: fin(compOverall?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
+  };
+
+  // ── Planned totals ─────────────────────────────────────────────────────────
+  const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession);
+
+  // ── Week label ─────────────────────────────────────────────────────────────
+  const weekLabel = buildWeekLabel(factPacket);
+
+  // ── Analysis detail rows ───────────────────────────────────────────────────
+  const analysisDetailRows = buildAnalysisDetailRows(factPacket, flagsV1, summaryBullets.length > 0, comp);
+
+  // ── Adherence narrative ────────────────────────────────────────────────────
+  const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)
+    ? adherenceSummary.technical_insights.filter((t: any) => t?.label && t?.value) : [];
+  const planImpactText = (() => {
+    const fromMatch = match?.summary;
+    if (typeof fromMatch === 'string' && fromMatch.trim()) return fromMatch.trim();
+    const outlook = adherenceSummary?.plan_impact?.outlook;
+    if (typeof outlook === 'string' && outlook.trim() && outlook !== 'No plan context.') return outlook.trim();
+    return null;
+  })();
+  const planImpactLabel = (() => {
+    if (match?.summary) return 'Plan context';
+    const focus = adherenceSummary?.plan_impact?.focus;
+    return typeof focus === 'string' && focus ? String(focus).replace(/coach/ig, 'training') : null;
+  })();
+
+  // ── Classification ─────────────────────────────────────────────────────────
+  const isStructuredInterval = (() => {
+    if (intervalDisplayMode === 'interval_compare_ready') return true;
+    if (intervalDisplayMode === 'overall_only') return false;
+    if (intervalDisplayMode === 'awaiting_recompute') return true;
+    const pSteps: any[] = Array.isArray(plannedComp?.steps) ? plannedComp.steps : [];
+    return pSteps.filter((s: any) => s?.kind === 'work' || s?.type === 'work' || s?.kind === 'interval').length >= 2;
+  })();
+  const isEasyLike = (() => {
+    const fpFacts = factPacket?.facts;
+    if (!fpFacts) return false;
+    const wt = String(fpFacts.workout_type || '').toLowerCase();
+    const wi = String(fpFacts.plan?.week_intent || '').toLowerCase();
+    const rw = !!fpFacts.plan?.is_recovery_week;
+    return rw || /easy|recovery|long\s?run|base|endurance/i.test(wt) || /recovery|easy/i.test(wi);
+  })();
+  const isAutoLapOrSplit = !!(detailed?.interval_breakdown?.is_auto_lap_or_split);
+
+  // ── Splits ─────────────────────────────────────────────────────────────────
+  const rawSplitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi)
+    ? comp.analysis.events.splits.mi : [];
+  const splitsMi: SessionDetailV1['splits_mi'] = rawSplitsMi.map((s: any) => ({
+    n: Number(s?.n) || 0,
+    pace_s_per_mi: fin(s?.avgPace_s_per_km) != null ? Math.round(Number(s.avgPace_s_per_km) * 1.60934) : null,
+    gap_s_per_mi: fin(s?.avgGapPace_s_per_km) != null ? Math.round(Number(s.avgGapPace_s_per_km) * 1.60934) : null,
+    grade_pct: fin(s?.avgGrade_pct),
+    hr: fin(s?.avgHr_bpm),
+  }));
+
+  // ── Pacing CV ──────────────────────────────────────────────────────────────
+  const pacingCV = fin((wa as any)?.analysis?.pacing_analysis?.pacing_variability?.coefficient_of_variation)
+    ?? fin(granular?.pacing_analysis?.pacing_variability?.coefficient_of_variation);
 
   return {
     version: 1,
@@ -174,6 +270,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
             summary: match.summary,
           }
         : null,
+      week_label: weekLabel,
     },
 
     execution: {
@@ -188,13 +285,39 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     },
 
     observations,
-    narrative_text: narrativeText,
+    narrative_text: resolvedNarrative,
+
+    summary: { title: summaryTitle, bullets: summaryBullets },
+
+    completed_totals: completedTotals,
+    planned_totals: plannedTotals,
+
+    analysis_details: { rows: analysisDetailRows },
+
+    adherence: {
+      technical_insights: techInsights,
+      plan_impact_label: planImpactLabel,
+      plan_impact_text: planImpactText,
+    },
 
     intervals,
+    intervals_display: {
+      mode: intervalDisplayMode,
+      reason: intervalDisplay?.reason ?? null,
+    },
+
+    classification: {
+      is_structured_interval: isStructuredInterval,
+      is_easy_like: isEasyLike,
+      is_auto_lap_or_split: isAutoLapOrSplit,
+    },
+
+    splits_mi: splitsMi,
+    pacing: { coefficient_of_variation: pacingCV },
 
     display: {
       show_adherence_chips: showAdherenceChips,
-      interval_display_reason: intervalDisplayReason,
+      interval_display_reason: intervalDisplay?.reason ?? null,
       has_measured_execution: hasMeasuredExecution,
     },
 
@@ -215,6 +338,219 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       intervals,
     }),
   };
+}
+
+// ── Helpers for builder ────────────────────────────────────────────────────
+
+function fin(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function arrayOfStrings(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((b: any) => typeof b === 'string' && b.trim().length > 0).map((b: string) => b.trim());
+}
+
+function mergeDedupe(...lists: string[][]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const list of lists) {
+    for (const b of list) {
+      const k = b.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); out.push(b); }
+    }
+  }
+  return out;
+}
+
+function normIntervalType(t: unknown): IntervalRow['interval_type'] {
+  const s = String(t || 'work').toLowerCase();
+  if (s === 'warmup' || s === 'warm_up' || s === 'warm-up') return 'warmup';
+  if (s === 'cooldown' || s === 'cool_down' || s === 'cool-down') return 'cooldown';
+  if (s === 'recovery' || s === 'rest') return 'recovery';
+  return 'work';
+}
+
+function fmtPaceRange(lowerSec: number, upperSec: number): string {
+  const fmt = (s: number) => {
+    const m = Math.floor(s / 60);
+    const ss = Math.round(s % 60);
+    return `${m}:${String(ss).padStart(2, '0')}`;
+  };
+  return `${fmt(lowerSec)}-${fmt(upperSec)}/mi`;
+}
+
+function buildWeekLabel(factPacket: any): string | null {
+  try {
+    const plan = factPacket?.facts?.plan;
+    if (!plan) return null;
+    const weekNum = typeof plan?.week_number === 'number' ? plan.week_number : null;
+    const focusLabel = typeof plan?.week_focus_label === 'string' && plan.week_focus_label ? plan.week_focus_label : null;
+    const phase = typeof plan?.phase === 'string' && plan.phase ? plan.phase : null;
+    const weekIntent = typeof plan?.week_intent === 'string' && plan.week_intent && plan.week_intent !== 'unknown' ? plan.week_intent : null;
+    const humanLabel = focusLabel || phase || (weekIntent ? weekIntent.charAt(0).toUpperCase() + weekIntent.slice(1) : null);
+    if (!humanLabel) return null;
+    return weekNum != null ? `Week ${weekNum} • ${humanLabel}` : humanLabel;
+  } catch { return null; }
+}
+
+function buildPlannedTotals(plannedComp: any, plannedSession: PlannedSession | null): SessionDetailV1['planned_totals'] {
+  const steps: any[] = Array.isArray(plannedComp?.steps) ? plannedComp.steps : [];
+  const durS = (() => {
+    const t = fin(plannedComp?.total_duration_seconds);
+    if (t != null && t > 0) return t;
+    let sum = 0;
+    for (const st of steps) {
+      sum += Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0;
+    }
+    return sum > 0 ? sum : fin(plannedSession?.duration_seconds);
+  })();
+  const distM = (() => {
+    let m = 0;
+    for (const st of steps) {
+      const dm = Number(st?.distanceMeters || st?.distance_m || st?.m || 0);
+      if (Number.isFinite(dm) && dm > 0) m += dm;
+    }
+    return m > 0 ? Math.round(m) : fin(plannedSession?.distance_meters);
+  })();
+  const avgPace = (() => {
+    if (durS != null && durS > 0 && distM != null && distM > 0) {
+      const miles = distM / 1609.34;
+      if (miles > 0.01) return Math.round(durS / miles);
+    }
+    return null;
+  })();
+  return { duration_s: durS, distance_m: distM, avg_pace_s_per_mi: avgPace };
+}
+
+function buildAnalysisDetailRows(
+  factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any,
+): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+  if (!factPacket) return rows;
+  const derived = factPacket?.derived;
+
+  try {
+    const stim = derived?.stimulus;
+    if (stim && typeof stim.achieved === 'boolean') {
+      rows.push({
+        label: 'Stimulus',
+        value: stim.achieved
+          ? `Achieved (${stim.confidence}). ${Array.isArray(stim.evidence) && stim.evidence[0] ? stim.evidence[0] : ''}`.trim()
+          : `Possibly missed (${stim.confidence}). ${stim.partial_credit || ''}`.trim(),
+      });
+    }
+  } catch { /* */ }
+
+  try {
+    const lim = derived?.primary_limiter;
+    if (lim?.limiter) {
+      const conf = typeof lim.confidence === 'number' ? Math.round(lim.confidence * 100) : null;
+      const ev0 = Array.isArray(lim.evidence) && lim.evidence[0] ? String(lim.evidence[0]) : '';
+      rows.push({
+        label: 'Limiter',
+        value: `${String(lim.limiter)}${conf != null ? ` (${conf}%)` : ''}${ev0 ? ` — ${ev0}` : ''}`.trim(),
+      });
+    }
+  } catch { /* */ }
+
+  try {
+    const vs = derived?.comparisons?.vs_similar;
+    if (vs && typeof vs.sample_size === 'number' && vs.sample_size > 0 && vs.assessment !== 'insufficient_data') {
+      const map: Record<string, string> = {
+        better_than_usual: 'Better than usual',
+        typical: 'Typical',
+        worse_than_usual: 'Worse than usual',
+      };
+      rows.push({
+        label: 'Similar workouts',
+        value: `${map[String(vs.assessment)] || String(vs.assessment)} (n=${vs.sample_size})`,
+      });
+    }
+  } catch { /* */ }
+
+  try {
+    const tr = derived?.comparisons?.trend;
+    if (tr && typeof tr.data_points === 'number' && tr.data_points > 0 && tr.direction !== 'insufficient_data') {
+      rows.push({
+        label: 'Trend',
+        value: `${String(tr.direction)}${tr.magnitude ? ` — ${tr.magnitude}` : ''}`.trim(),
+      });
+    }
+  } catch { /* */ }
+
+  // Speed insight from computed splits
+  try {
+    const splitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi) ? comp.analysis.events.splits.mi : [];
+    const splits = splitsMi.map((s: any) => {
+      const pacePerKm = Number(s?.avgPace_s_per_km);
+      return { mile: Number(s?.n), pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN };
+    }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
+
+    if (splits.length >= 2) {
+      let best: { mile: number; pickupSec: number; pace: number } | null = null;
+      for (let i = 1; i < splits.length; i++) {
+        const pickupSec = splits[i - 1].pace - splits[i].pace;
+        if (pickupSec > (best?.pickupSec ?? 0) && pickupSec <= 120) {
+          best = { mile: splits[i].mile, pickupSec, pace: splits[i].pace };
+        }
+      }
+      if (best && Number.isFinite(best.pickupSec) && best.pickupSec >= 10) {
+        const deltaMin = Math.floor(best.pickupSec / 60);
+        const deltaSec = Math.round(best.pickupSec % 60);
+        const deltaStr = deltaMin > 0
+          ? `${deltaMin}:${String(deltaSec).padStart(2, '0')}/mi faster`
+          : `${deltaSec}s/mi faster`;
+        const m = Math.floor(best.pace / 60);
+        const s = Math.round(best.pace % 60);
+        rows.push({
+          label: 'Speed',
+          value: `Biggest pickup: Mile ${best.mile} at ${m}:${String(s).padStart(2, '0')}/mi (${deltaStr} than prior mile)`,
+        });
+      }
+    }
+  } catch { /* */ }
+
+  try {
+    const wx = factPacket?.facts?.weather;
+    if (wx && typeof wx.dew_point_f === 'number' && wx.heat_stress_level && wx.heat_stress_level !== 'none') {
+      rows.push({
+        label: 'Conditions',
+        value: `Dew point ${Math.round(wx.dew_point_f)}°F (${wx.heat_stress_level})`,
+      });
+    }
+  } catch { /* */ }
+
+  try {
+    const tl = derived?.training_load;
+    if (tl && typeof tl.cumulative_fatigue === 'string') {
+      const evidence = Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
+        ? tl.fatigue_evidence.join(' — ')
+        : tl.cumulative_fatigue.charAt(0).toUpperCase() + tl.cumulative_fatigue.slice(1).toLowerCase() + ' fatigue';
+      rows.push({ label: 'Fatigue', value: evidence.trim() });
+    }
+  } catch { /* */ }
+
+  if (!hasBullets) {
+    try {
+      const top = flagsV1
+        .filter((f: any) => f && typeof f.message === 'string' && f.message.length > 0)
+        .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
+        .slice(0, 3);
+      for (const f of top) {
+        rows.push({ label: 'Flag', value: String(f.message) });
+      }
+    } catch { /* */ }
+  }
+
+  const dedup = new Set<string>();
+  return rows.filter((r) => {
+    const k = `${r.label}::${r.value}`;
+    if (dedup.has(k)) return false;
+    dedup.add(k);
+    return true;
+  }).slice(0, 8);
 }
 
 /** Lowest pace_adherence_pct among work intervals (when present). */

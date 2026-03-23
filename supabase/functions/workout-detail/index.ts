@@ -687,6 +687,7 @@ Deno.serve(async (req) => {
           workoutAnalysis: wa,
           narrativeText,
           loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
+          completedComputed: (detail as any).computed ?? null,
         });
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);
