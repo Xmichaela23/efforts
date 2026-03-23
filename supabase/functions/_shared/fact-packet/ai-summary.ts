@@ -202,6 +202,7 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       distance: fmtMi(coerceNumber(facts?.total_distance_mi)),
       duration: fmtMin(coerceNumber(facts?.total_duration_min)),
       avg_pace: secondsToPaceString(coerceNumber(facts?.avg_pace_sec_per_mi)),
+      avg_gap: facts?.gap_adjusted ? secondsToPaceString(coerceNumber(facts?.avg_gap_sec_per_mi)) : null,
       avg_hr: fmtBpm(coerceNumber(facts?.avg_hr)),
       max_hr: fmtBpm(coerceNumber(facts?.max_hr)),
       elevation_gain: (coerceNumber(facts?.elevation_gain_ft) != null) ? `${Math.round(Number(facts.elevation_gain_ft))} ft` : null,
@@ -283,6 +284,7 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
         ? {
             execution_score: typeof derived.interval_execution.execution_score === 'number' ? `${Math.round(derived.interval_execution.execution_score)}%` : null,
             pace_adherence: typeof derived.interval_execution.pace_adherence === 'number' ? `${Math.round(derived.interval_execution.pace_adherence)}%` : null,
+            pace_adherence_note: derived?.interval_execution?.gap_adjusted ? 'grade-adjusted (GAP)' : null,
             completed_steps: (typeof derived.interval_execution.completed_steps === 'number' && typeof derived.interval_execution.total_steps === 'number')
               ? `${derived.interval_execution.completed_steps}/${derived.interval_execution.total_steps}`
               : null,
@@ -373,6 +375,7 @@ export async function generateAISummaryV1(
     '- If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost.',
     '- If TOP FLAGS mention HR drift consistent with hilly terrain, connect drift to terrain and do not treat it as fatigue.',
     '- Terrain: MAY include segment insight only when segment_insight_eligible is true. MAY mention trends only when segment_trend_eligible is true.',
+    '- GAP: If workout.avg_gap is present, adherence was scored on Grade-Adjusted Pace (effort-adjusted for elevation). Mention both actual pace and GAP when discussing pace (e.g. "averaged 11:04/mi (10:32 GAP)"). Explain hills slowed raw pace but effort was on target when GAP adherence is good.',
     '',
     'TOP FLAGS:',
     (displayPacket as any).top_flags.map((f: any) => '[' + f.type + '] ' + f.message).join('\n'),

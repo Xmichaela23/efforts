@@ -46,6 +46,8 @@ export type SessionDetailV1 = {
     performance_assessment: string | null;
     assessed_against: 'plan' | 'actual' | null;
     status_label: string | null;
+    /** True when pace_adherence was scored on Grade-Adjusted Pace (Minetti model). */
+    gap_adjusted?: boolean;
   };
 
   observations: string[];

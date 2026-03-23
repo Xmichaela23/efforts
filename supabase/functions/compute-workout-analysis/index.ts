@@ -1115,12 +1115,35 @@ Deno.serve(async (req) => {
           const dist_m = Math.max(0, (e.d||0) - (s.d||0));
           const dur_s = Math.max(1, (e.t||0) - (s.t||0));
           const pace = dist_m>0 ? dur_s/(dist_m/1000) : null;
-          // Averages
           let hrVals:number[]=[]; let cadVals:number[]=[];
           for (let k=startIdx;k<=i;k+=1) { const h=rows[k].hr; if (typeof h==='number') hrVals.push(h); const c=rows[k].cad; if (typeof c==='number') cadVals.push(c); }
           const avgHr = hrVals.length? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
           const avgCad = cadVals.length? Math.round(cadVals.reduce((a,b)=>a+b,0)/cadVals.length) : null;
-          out.push({ n: out.length+1, t0: Math.max(0,(s.t||0)-t0), t1: Math.max(0,(e.t||0)-t0), distance_m: Math.round(dist_m), avgPace_s_per_km: pace!=null? Math.round(pace): null, avgHr_bpm: avgHr, avgCadence_spm: avgCad });
+          // Elevation + GAP
+          const sElev = typeof s.elev === 'number' ? s.elev : (typeof elevation_m[startIdx] === 'number' ? elevation_m[startIdx] as number : null);
+          const eElev = typeof e.elev === 'number' ? e.elev : (typeof elevation_m[i] === 'number' ? elevation_m[i] as number : null);
+          const elevGain = sElev != null && eElev != null ? Math.round(Math.max(0, eElev - sElev)) : null;
+          const avgGradePct = sElev != null && eElev != null && dist_m > 0
+            ? Math.round(((eElev - sElev) / dist_m) * 1000) / 10
+            : null;
+          let gapPace: number | null = null;
+          if (pace != null && avgGradePct != null && Math.abs(avgGradePct) >= 0.3) {
+            const g = avgGradePct / 100;
+            const cost = 155.4*g**5 - 30.4*g**4 - 43.3*g**3 + 46.3*g**2 + 19.5*g + 3.6;
+            if (cost > 0.5) gapPace = Math.round(pace * (3.6 / cost));
+          }
+          out.push({
+            n: out.length+1,
+            t0: Math.max(0,(s.t||0)-t0),
+            t1: Math.max(0,(e.t||0)-t0),
+            distance_m: Math.round(dist_m),
+            avgPace_s_per_km: pace!=null? Math.round(pace): null,
+            avgGapPace_s_per_km: gapPace,
+            avgGrade_pct: avgGradePct,
+            elevGain_m: elevGain,
+            avgHr_bpm: avgHr,
+            avgCadence_spm: avgCad,
+          });
           startIdx = i+1; nextTarget += splitMeters;
         }
       }
@@ -1540,8 +1563,24 @@ Deno.serve(async (req) => {
       return prevOverall || {};
     })();
 
-    // Note: avg_pace_s_per_km is calculated from overall.avg_pace_s_per_mi in useWorkoutData hook
-    // No need to duplicate - both Summary and Details use computed.overall.avg_pace_s_per_mi
+    // Compute overall GAP from mile splits (time-weighted)
+    if (sport.includes('run') || sport.includes('walk')) {
+      const miSplits = computeSplits(1609.34);
+      let gapWeightedSum = 0;
+      let gapTimeSum = 0;
+      for (const sp of miSplits) {
+        if (sp.avgGapPace_s_per_km != null && sp.t0 != null && sp.t1 != null) {
+          const dur = sp.t1 - sp.t0;
+          if (dur > 0) { gapWeightedSum += sp.avgGapPace_s_per_km * dur; gapTimeSum += dur; }
+        }
+      }
+      if (gapTimeSum > 0 && overall?.avg_pace_s_per_mi != null) {
+        const avgGapPerKm = gapWeightedSum / gapTimeSum;
+        const avgGapPerMi = Math.round(avgGapPerKm * 1.60934);
+        (overall as any).avg_gap_s_per_mi = avgGapPerMi;
+        (overall as any).has_gap = true;
+      }
+    }
 
     // Add swim pace metrics to analysis (needs overall data)
     if (sport.includes('swim')) {

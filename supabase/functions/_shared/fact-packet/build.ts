@@ -642,6 +642,8 @@ export async function buildWorkoutFactPacketV1(args: {
       total_distance_mi: Math.round(overallDistMi * 100) / 100,
       total_duration_min: Math.round(overallDurMin * 10) / 10,
       avg_pace_sec_per_mi: overallPace != null ? Math.round(overallPace) : null,
+      avg_gap_sec_per_mi: coerceNumber(overall?.avg_gap_s_per_mi) ?? null,
+      gap_adjusted: !!overall?.has_gap,
       avg_hr: avgHr,
       max_hr: maxHr,
       elevation_gain_ft: elevationGainFt,

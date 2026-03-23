@@ -184,6 +184,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       performance_assessment: granular?.performance_assessment ?? null,
       assessed_against: assessedAgainst,
       status_label: sessionState?.glance?.status_label ?? null,
+      gap_adjusted: !!perf?.gap_adjusted,
     },
 
     observations,
