@@ -1030,18 +1030,20 @@ Deno.serve(async (req) => {
         totalElevationGainM: workout?.elevation_gain ?? workout?.metrics?.elevation_gain ?? undefined,
         samples: sensorData
       },
-      // Weather: prioritize device-recorded temp (from Garmin/Strava watch)
-      // Device temp is stored in Celsius, convert to Fahrenheit
-      // Fall back to weather_data (from Open-Meteo or OpenWeatherMap)
-      ...(console.log(`🌡️ [WEATHER DEBUG] avg_temperature=${workout?.avg_temperature}, weather_data.temp=${workout?.weather_data?.temperature}, feels_like=${workout?.weather_data?.feels_like}`), {}),
-      weather: (workout?.avg_temperature != null || workout?.weather_data) ? {
-        temperatureF: workout.avg_temperature != null 
-          ? Math.round(workout.avg_temperature * 9/5 + 32)  // Celsius to Fahrenheit
-          : workout.weather_data?.temperature,
-        feelsLikeF: workout.weather_data?.feels_like,
-        humidity: workout.weather_data?.humidity,
-        source: workout.avg_temperature != null ? 'device' : 'openmeteo'
-      } : undefined,
+      weather: (() => {
+        const avgC = workout?.avg_temperature;
+        const wd = workout?.weather_data;
+        if (avgC == null && !wd) return undefined;
+        const deviceF = avgC != null && avgC !== 0 ? Math.round(avgC * 9/5 + 32) : null;
+        const apiF = wd?.temperature ?? null;
+        const tempF = deviceF ?? apiF ?? (avgC === 0 ? 32 : null);
+        return {
+          temperatureF: tempF,
+          feelsLikeF: wd?.feels_like,
+          humidity: wd?.humidity,
+          source: deviceF != null ? 'device' as const : 'openmeteo' as const,
+        };
+      })(),
       plannedWorkout: plannedWorkout ? {
         description: plannedWorkout.description || plannedWorkout.workout_description,
         workoutToken: plannedWorkout.workout_token,

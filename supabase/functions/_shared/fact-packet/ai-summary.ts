@@ -335,7 +335,10 @@ export async function generateAISummaryV1(
   flags: FlagV1[],
   coachingContext?: string | null,
 ): Promise<string | null> {
-  if (!Deno.env.get('ANTHROPIC_API_KEY')) return null;
+  if (!Deno.env.get('ANTHROPIC_API_KEY')) {
+    console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
+    return null;
+  }
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
 

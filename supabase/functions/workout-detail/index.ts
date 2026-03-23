@@ -609,7 +609,7 @@ Deno.serve(async (req) => {
 
         /** Raw row loaded when ledger omitted match/planned (e.g. manual attach / cross-day) */
         let attachPlannedRaw: any = null;
-        if (effectivePlannedId && (!plannedSession || !match)) {
+        if (effectivePlannedId && (!plannedSession || !match || !match.planned_id)) {
           attachPlannedRaw =
             plannedRows.find((r: any) => String(r?.id) === String(effectivePlannedId)) ?? null;
           if (!attachPlannedRaw) {
@@ -627,7 +627,7 @@ Deno.serve(async (req) => {
             if (!plannedSession) {
               plannedSession = buildPlannedSession(attachPlannedRaw, isImperial);
             }
-            if (!match) {
+            if (!match || !match.planned_id) {
               const t = String(plannedSession?.type || row?.type || '').toLowerCase();
               const isStrength =
                 t.includes('strength') || t === 'weight_training' || t === 'weights';

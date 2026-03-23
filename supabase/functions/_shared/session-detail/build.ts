@@ -175,8 +175,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   );
 
   // ── Narrative ──────────────────────────────────────────────────────────────
-  const resolvedNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
+  const llmNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
+  const resolvedNarrative = llmNarrative || buildFallbackNarrative(
+    factPacket, executionScore, type, !!match?.planned_id, match?.summary ?? null, !!perf?.gap_adjusted,
+  );
 
   // ── Planned totals (must come before completed — swim unit needed for pace calc) ─
   const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
@@ -405,6 +408,110 @@ function fmtPaceRange(lowerSec: number, upperSec: number): string {
   return `${fmt(lowerSec)}-${fmt(upperSec)}/mi`;
 }
 
+function fmtPace(secPerMi: number): string {
+  const m = Math.floor(secPerMi / 60);
+  const s = Math.round(secPerMi % 60);
+  return `${m}:${String(s).padStart(2, '0')}/mi`;
+}
+
+function fmtDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}min` : `${m} min`;
+}
+
+/** Deterministic coaching paragraph built from structured data when LLM is unavailable. */
+function buildFallbackNarrative(
+  factPacket: any, executionScore: number | null, type: string,
+  hasPlanned: boolean, matchSummary: string | null, gapAdjusted: boolean,
+): string | null {
+  if (!factPacket) return null;
+  const facts = factPacket.facts || {};
+  const derived = factPacket.derived || {};
+  const sentences: string[] = [];
+
+  const distMi = typeof facts.total_distance_mi === 'number' ? Math.round(facts.total_distance_mi * 10) / 10 : null;
+  const durMin = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
+  const pace = typeof facts.avg_pace_sec_per_mi === 'number' ? facts.avg_pace_sec_per_mi : null;
+  const gap = typeof facts.avg_gap_sec_per_mi === 'number' ? facts.avg_gap_sec_per_mi : null;
+  const avgHr = typeof facts.avg_hr === 'number' ? facts.avg_hr : null;
+  const terrain = typeof facts.terrain_type === 'string' && facts.terrain_type !== 'flat' ? facts.terrain_type : null;
+  const elevFt = typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
+  const wx = facts.weather;
+  const tempF = typeof wx?.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
+  const driftBpm = typeof derived.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
+  const driftTyp = typeof derived.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
+  const vsSim = derived.comparisons?.vs_similar;
+  const fatigue = derived.training_load;
+
+  // Sentence 1: workout overview
+  const typeLabel = type === 'run' ? 'run' : type === 'ride' ? 'ride' : type === 'swim' ? 'swim' : 'workout';
+  const terrainPhrase = terrain ? ` on ${terrain} terrain` : '';
+  const elevPhrase = terrain && elevFt != null && elevFt > 50 ? ` with ${elevFt} ft of climbing` : '';
+  if (distMi != null && durMin != null && pace != null) {
+    sentences.push(`${distMi} mi ${typeLabel} in ${fmtDuration(durMin * 60)} at ${fmtPace(pace)}${terrainPhrase}${elevPhrase}.`);
+  } else if (distMi != null && durMin != null) {
+    sentences.push(`${distMi} mi ${typeLabel} in ${fmtDuration(durMin * 60)}${terrainPhrase}.`);
+  }
+
+  // Sentence 2: execution + GAP context
+  if (hasPlanned && executionScore != null && executionScore > 0) {
+    let execPhrase = `Execution at ${Math.round(executionScore)}% of plan`;
+    if (gapAdjusted && gap != null && pace != null && Math.abs(pace - gap) > 5) {
+      execPhrase += ` — grade-adjusted effort was ${fmtPace(gap)} vs ${fmtPace(pace)} actual, so hills slowed raw pace but effort stayed on target`;
+    }
+    sentences.push(execPhrase + '.');
+  } else if (gapAdjusted && gap != null && pace != null && Math.abs(pace - gap) > 5) {
+    sentences.push(`Grade-adjusted pace was ${fmtPace(gap)} vs ${fmtPace(pace)} actual — the terrain added real effort beyond what raw pace shows.`);
+  }
+
+  // Sentence 3: HR + drift
+  if (avgHr != null) {
+    let hrPhrase = `HR averaged ${Math.round(avgHr)} bpm`;
+    if (driftBpm != null && Math.abs(driftBpm) >= 3) {
+      const driftDir = driftBpm > 0 ? 'up' : 'down';
+      hrPhrase += `, drifting ${driftDir} ${Math.abs(Math.round(driftBpm))} bpm`;
+      if (driftTyp != null && Math.abs(driftBpm) - Math.abs(driftTyp) <= 3) {
+        hrPhrase += ' (within your normal range)';
+      } else if (terrain && driftBpm > 0) {
+        hrPhrase += ' — consistent with the terrain';
+      }
+    } else {
+      hrPhrase += ' with minimal drift';
+    }
+    sentences.push(hrPhrase + '.');
+  }
+
+  // Sentence 4: conditions
+  if (tempF != null) {
+    const wxParts: string[] = [`${tempF}°F`];
+    if (wx?.heat_stress_level && wx.heat_stress_level !== 'none') wxParts.push(`${wx.heat_stress_level} heat stress`);
+    sentences.push(`Conditions: ${wxParts.join(', ')}.`);
+  }
+
+  // Sentence 5: comparison to similar runs
+  if (vsSim && typeof vsSim.sample_size === 'number' && vsSim.sample_size > 0 && vsSim.assessment !== 'insufficient_data') {
+    const map: Record<string, string> = {
+      better_than_usual: 'faster than usual',
+      typical: 'in line with your typical pace',
+      worse_than_usual: 'slower than usual',
+    };
+    const label = map[vsSim.assessment] || vsSim.assessment;
+    const pDelta = typeof vsSim.pace_delta_sec === 'number' && Math.abs(vsSim.pace_delta_sec) >= 3
+      ? ` by ${Math.abs(Math.round(vsSim.pace_delta_sec))}s/mi` : '';
+    sentences.push(`Compared to ${vsSim.sample_size} similar ${typeLabel}s, this was ${label}${pDelta}.`);
+  }
+
+  // Sentence 6: fatigue / load
+  if (fatigue?.cumulative_fatigue && fatigue.cumulative_fatigue !== 'low') {
+    const weekPct = typeof fatigue.week_load_pct === 'number' ? fatigue.week_load_pct : null;
+    const weekPhrase = weekPct != null && weekPct > 100 ? ` at ${Math.round(weekPct)}% of planned weekly load` : '';
+    sentences.push(`Training load is ${fatigue.cumulative_fatigue}${weekPhrase} — recovery before the next key session matters.`);
+  }
+
+  return sentences.length >= 2 ? sentences.join(' ') : null;
+}
+
 function buildWeekLabel(factPacket: any): string | null {
   try {
     const plan = factPacket?.facts?.plan;
@@ -502,14 +609,26 @@ function buildAnalysisDetailRows(
     const vs = derived?.comparisons?.vs_similar;
     if (vs && typeof vs.sample_size === 'number' && vs.sample_size > 0 && vs.assessment !== 'insufficient_data') {
       const map: Record<string, string> = {
-        better_than_usual: 'Better than usual',
-        typical: 'Typical',
-        worse_than_usual: 'Worse than usual',
+        better_than_usual: 'Faster than usual',
+        typical: 'In line with your typical pace',
+        worse_than_usual: 'Slower than usual',
       };
-      rows.push({
-        label: 'Similar workouts',
-        value: `${map[String(vs.assessment)] || String(vs.assessment)} (n=${vs.sample_size})`,
-      });
+      const label = map[String(vs.assessment)] || String(vs.assessment);
+      const parts: string[] = [label];
+      const paceDelta = typeof vs.pace_delta_sec === 'number' && Math.abs(vs.pace_delta_sec) >= 3
+        ? vs.pace_delta_sec : null;
+      const hrDelta = typeof vs.hr_delta_bpm === 'number' && Math.abs(vs.hr_delta_bpm) >= 2
+        ? vs.hr_delta_bpm : null;
+      if (paceDelta != null) {
+        const abs = Math.abs(Math.round(paceDelta));
+        parts[0] += ` by ${abs}s/mi`;
+      }
+      parts[0] += ` across ${vs.sample_size} similar run${vs.sample_size === 1 ? '' : 's'}`;
+      if (hrDelta != null) {
+        const sign = hrDelta > 0 ? '+' : '';
+        parts.push(`HR ${sign}${Math.round(hrDelta)} bpm vs similar efforts`);
+      }
+      rows.push({ label: 'Similar workouts', value: parts.join('. ') });
     }
   } catch { /* */ }
 
@@ -523,7 +642,6 @@ function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
-  // Speed insight from computed splits
   try {
     const splitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi) ? comp.analysis.events.splits.mi : [];
     const splits = splitsMi.map((s: any) => {
@@ -532,36 +650,74 @@ function buildAnalysisDetailRows(
     }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
 
     if (splits.length >= 2) {
-      let best: { mile: number; pickupSec: number; pace: number } | null = null;
-      for (let i = 1; i < splits.length; i++) {
-        const pickupSec = splits[i - 1].pace - splits[i].pace;
-        if (pickupSec > (best?.pickupSec ?? 0) && pickupSec <= 120) {
-          best = { mile: splits[i].mile, pickupSec, pace: splits[i].pace };
-        }
+      const firstPace = splits[0].pace;
+      const lastPace = splits[splits.length - 1].pace;
+      const diff = firstPace - lastPace;
+      const absDiff = Math.abs(Math.round(diff));
+      let pattern: string;
+      if (absDiff <= 15) {
+        pattern = 'Even pacing';
+      } else if (diff > 0) {
+        pattern = `Negative split — finished ${absDiff}s/mi faster than you started`;
+      } else {
+        pattern = `Positive split — slowed ${absDiff}s/mi over the run`;
       }
-      if (best && Number.isFinite(best.pickupSec) && best.pickupSec >= 10) {
-        const deltaMin = Math.floor(best.pickupSec / 60);
-        const deltaSec = Math.round(best.pickupSec % 60);
-        const deltaStr = deltaMin > 0
-          ? `${deltaMin}:${String(deltaSec).padStart(2, '0')}/mi faster`
-          : `${deltaSec}s/mi faster`;
-        const m = Math.floor(best.pace / 60);
-        const s = Math.round(best.pace % 60);
-        rows.push({
-          label: 'Speed',
-          value: `Biggest pickup: Mile ${best.mile} at ${m}:${String(s).padStart(2, '0')}/mi (${deltaStr} than prior mile)`,
-        });
-      }
+
+      const fastest = splits.reduce((a, b) => a.pace < b.pace ? a : b);
+      const fm = Math.floor(fastest.pace / 60);
+      const fs = Math.round(fastest.pace % 60);
+      const fastestStr = `Fastest: Mile ${fastest.mile} at ${fm}:${String(fs).padStart(2, '0')}/mi`;
+
+      rows.push({ label: 'Pacing', value: `${pattern}. ${fastestStr}` });
     }
   } catch { /* */ }
 
   try {
-    const wx = factPacket?.facts?.weather;
-    if (wx && typeof wx.dew_point_f === 'number' && wx.heat_stress_level && wx.heat_stress_level !== 'none') {
-      rows.push({
-        label: 'Conditions',
-        value: `Dew point ${Math.round(wx.dew_point_f)}°F (${wx.heat_stress_level})`,
-      });
+    const driftBpm = typeof derived?.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
+    const driftTypical = typeof derived?.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
+    if (driftBpm != null && Math.abs(driftBpm) >= 3) {
+      const sign = driftBpm > 0 ? '+' : '';
+      let value = `Drifted ${sign}${Math.round(driftBpm)} bpm over the session`;
+      if (driftTypical != null && Math.abs(driftTypical) >= 1) {
+        const typSign = driftTypical > 0 ? '+' : '';
+        const delta = Math.abs(driftBpm) - Math.abs(driftTypical);
+        if (Math.abs(delta) <= 3) {
+          value += ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
+        } else if (delta > 0) {
+          value += ` — higher than your typical ${typSign}${Math.round(driftTypical)} bpm`;
+        } else {
+          value += ` — lower than your typical ${typSign}${Math.round(driftTypical)} bpm`;
+        }
+      }
+      rows.push({ label: 'Heart rate', value });
+    }
+  } catch { /* */ }
+
+  try {
+    const facts = factPacket?.facts;
+    const wx = facts?.weather;
+    const terrainType = typeof facts?.terrain_type === 'string' && facts.terrain_type !== 'flat'
+      ? facts.terrain_type : null;
+    const elevFt = typeof facts?.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
+    const tempF = typeof wx?.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
+    const humidity = typeof wx?.humidity_pct === 'number' ? Math.round(wx.humidity_pct) : null;
+    const heatLevel = typeof wx?.heat_stress_level === 'string' && wx.heat_stress_level !== 'none'
+      ? wx.heat_stress_level : null;
+
+    const parts: string[] = [];
+    if (terrainType && elevFt != null && elevFt > 0) {
+      parts.push(`${terrainType.charAt(0).toUpperCase() + terrainType.slice(1)} (${elevFt} ft gain)`);
+    } else if (elevFt != null && elevFt > 50) {
+      parts.push(`${elevFt} ft elevation gain`);
+    }
+    if (tempF != null) {
+      let wxStr = `${tempF}°F`;
+      if (humidity != null && humidity >= 50) wxStr += `, ${humidity}% humidity`;
+      if (heatLevel) wxStr += ` (${heatLevel} heat stress)`;
+      parts.push(wxStr);
+    }
+    if (parts.length > 0) {
+      rows.push({ label: 'Conditions', value: parts.join(' · ') });
     }
   } catch { /* */ }
 

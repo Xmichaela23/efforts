@@ -58,7 +58,7 @@ export default function SessionNarrative({
   onRecompute,
   recomputeDisabled,
 }: SessionNarrativeProps) {
-  const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(false);
+  const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(true);
 
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
@@ -196,22 +196,28 @@ export default function SessionNarrative({
           {analysisDetailsOpen && (
           <div className="space-y-1.5">
             {(() => {
-              const rows = [...analysisRows];
+              let rows = [...analysisRows];
 
-              // Stimulus override from session_interpretation when available
+              const hasPlanAssessment = hasSessionDetail && sd?.session_interpretation
+                && sd.display?.show_adherence_chips === false;
+
               if (hasSessionDetail && sd?.session_interpretation) {
                 const te = sd.session_interpretation.training_effect;
                 if (typeof te?.actual_stimulus === 'string' && te.actual_stimulus.trim().length > 0) {
-                  const alignLabel =
-                    te.alignment === 'on_target' ? 'Mostly matched plan'
-                    : te.alignment === 'partial' ? 'Mixed vs plan'
-                    : te.alignment === 'missed' ? 'Below plan'
-                    : te.alignment === 'exceeded' ? 'Above plan'
-                    : String(te.alignment || '');
-                  const stimIdx = rows.findIndex((r) => r.label === 'Stimulus');
-                  const stimRow = { label: 'Stimulus', value: `${alignLabel}: ${te.actual_stimulus}`.trim() };
-                  if (stimIdx >= 0) rows[stimIdx] = stimRow;
-                  else rows.unshift(stimRow);
+                  if (hasPlanAssessment) {
+                    rows = rows.filter((r) => r.label !== 'Stimulus');
+                  } else {
+                    const alignLabel =
+                      te.alignment === 'on_target' ? 'Mostly matched plan'
+                      : te.alignment === 'partial' ? 'Mixed vs plan'
+                      : te.alignment === 'missed' ? 'Below plan'
+                      : te.alignment === 'exceeded' ? 'Above plan'
+                      : String(te.alignment || '');
+                    const stimIdx = rows.findIndex((r) => r.label === 'Stimulus');
+                    const stimRow = { label: 'Stimulus', value: `${alignLabel}: ${te.actual_stimulus}`.trim() };
+                    if (stimIdx >= 0) rows[stimIdx] = stimRow;
+                    else rows.unshift(stimRow);
+                  }
                 }
               }
 

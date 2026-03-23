@@ -141,7 +141,10 @@ function derivePlannedDistanceMi(plannedWorkout: any): number | null {
 function deriveWeather(workout: any): WeatherV1 | null {
   const avgTempC = coerceNumber(workout?.avg_temperature);
   const weatherData = parseJson(workout?.weather_data) || null;
-  const tempF = avgTempC != null ? Math.round(avgTempC * 9 / 5 + 32) : coerceNumber(weatherData?.temperature ?? weatherData?.temp ?? weatherData?.temperature_f);
+  const apiTempF = coerceNumber(weatherData?.temperature ?? weatherData?.temp ?? weatherData?.temperature_f);
+  const deviceTempF = avgTempC != null && avgTempC !== 0 ? Math.round(avgTempC * 9 / 5 + 32) : null;
+  const tempF = deviceTempF ?? apiTempF ?? (avgTempC === 0 ? 32 : null);
+  const source: 'device' | 'openmeteo' = deviceTempF != null ? 'device' : 'openmeteo';
   const humidity = coerceNumber(weatherData?.humidity ?? weatherData?.relative_humidity);
   const wind = coerceNumber(weatherData?.windSpeed ?? weatherData?.wind_speed);
   const condition = typeof weatherData?.condition === 'string' ? weatherData.condition : (typeof weatherData?.weather_description === 'string' ? weatherData.weather_description : null);
@@ -160,7 +163,7 @@ function deriveWeather(workout: any): WeatherV1 | null {
     heat_stress_level: getHeatStressLevel(dew),
     wind_mph: wind != null ? Math.round(wind) : null,
     conditions: condition,
-    source: avgTempC != null ? 'device' : 'openmeteo',
+    source,
   };
 }
 
