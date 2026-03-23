@@ -270,7 +270,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
         <SessionNarrative
           sessionDetail={sd}
           hasSessionDetail={hasSessionDetail}
-          completedSrc={completedSrc}
           noPlannedCompare={noPlannedCompare}
           planLinkNote={!planned ? 'No plan session linked.' : null}
           recomputing={recomputing}
