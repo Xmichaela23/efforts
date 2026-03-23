@@ -2513,8 +2513,6 @@ Deno.serve(async (req) => {
     console.log('Status:', analysis.status);
     console.log('Insights count:', analysis.insights?.length || 0);
     
-    // Transform analysis result to match expected structure (like running workouts)
-    // Client expects: performance (object), detailed_analysis (object), narrative_insights (array)
     const performance = {
       overall_adherence: analysis.overall_adherence?.exercise_completion_rate ?? 0,
       set_completion_rate: analysis.overall_adherence?.set_completion_rate ?? 0,
@@ -2587,8 +2585,6 @@ Deno.serve(async (req) => {
       workout_analysis: {
         performance: performance,
         detailed_analysis: detailedAnalysis,
-        narrative_insights: Array.isArray(analysis.insights) ? analysis.insights : [analysis.insights || 'Analysis completed'], // AI-generated insights
-        insights: analysis.insights || [], // Keep for backward compatibility
         strengths: [], // Extract from progression_data if needed
         session_state_v1: sessionStateV1,
         red_flags: [] // Extract from adherence if needed

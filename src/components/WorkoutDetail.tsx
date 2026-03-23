@@ -22,7 +22,6 @@ import CompletedTab from './CompletedTab';
 import StrengthExerciseBuilder from './StrengthExerciseBuilder';
 import StrengthCompletedView from './StrengthCompletedView';
 import StrengthSummaryView from './StrengthSummaryView';
-import WorkoutAIDisplay from './WorkoutAIDisplay';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface WorkoutDetailProps {
@@ -225,12 +224,6 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         <div>
           {activeTab === 'summary' && (
             <div className="space-y-4">
-              {/* AI Analysis - Show at top */}
-              <WorkoutAIDisplay 
-                aiAnalysis={workout.ai_analysis} 
-                workoutAnalysis={workout.workout_analysis}
-              />
-              
               {workout.type === 'strength' ? (
                 <StrengthSummaryView workoutData={{
                   ...workout,

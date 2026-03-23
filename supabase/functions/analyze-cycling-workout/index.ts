@@ -1760,8 +1760,6 @@ Deno.serve(async (req) => {
       granular_analysis: granularAnalysis,  // Same path as running for client compatibility
       performance: performance,
       detailed_analysis: detailedAnalysis,
-      narrative_insights: null, // deprecated
-      insights: null, // deprecated
       adherence_analysis: {
         power_adherence: powerAdherence,
         duration_adherence: durationAdherenceValue,

@@ -1715,11 +1715,6 @@ Deno.serve(async (req) => {
 
     }
 
-    // 🤖 Legacy AI narrative insights (deprecated)
-    // Contract: AI summary must translate ONLY the deterministic fact packet (no sensor math).
-    // Keep this field for backward compatibility but stop generating it here.
-    const narrativeInsights = null;
-
     // Store enhanced intervals back to computed.intervals (single source of truth)
     // Store summary analysis in workout_analysis
     console.log('💾 [TIMING] Starting database update...');
@@ -2322,7 +2317,6 @@ Deno.serve(async (req) => {
         granular_analysis: enhancedAnalysis,
         performance: performance,
         detailed_analysis: detailedAnalysis,
-        narrative_insights: narrativeInsights,  // deprecated (kept for backward compat)
         score_explanation: scoreExplanation,  // Backward-compat: single verdict line
         adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact
         summary: summaryV1, // Standardized per-workout summary (v1)

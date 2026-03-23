@@ -558,8 +558,6 @@ Generate 3-4 observations about this swim workout:`;
       workout_analysis: {
         performance: analysis.performance,
         detailed_analysis: analysis.detailed_analysis,
-        narrative_insights: analysis.insights,
-        insights: analysis.insights, // Keep for backward compatibility
         session_state_v1: sessionStateV1,
       },
       analysis_status: 'complete',
