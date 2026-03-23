@@ -120,12 +120,120 @@ function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok
   return { ok: true, why: null };
 }
 
-async function callLLMParagraph(prompt: string, temperature: number): Promise<string | null> {
+const COACHING_SYSTEM_PROMPT = `You are an experienced endurance coach reviewing a completed workout. Your athlete can already see their pace, HR, distance, and duration — do not restate those numbers unless you're connecting them to an insight.
+
+Write 2-4 sentences that answer the questions the athlete is actually thinking. Draw from the data provided but speak like a coach, not a dashboard.
+
+RULES:
+- NEVER start with a restatement of distance/time/pace. The athlete already sees those.
+- Connect data across domains: if terrain was hilly AND pace was "slow", say the pace was appropriate for the terrain — don't report them as separate facts.
+- When grade-adjusted pace (GAP) is available, translate it: "Your 11:04 pace was a 10:32 effort on this terrain — the hills cost about 30s/mi."
+- When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
+- When HR drift data exists, interpret it in context: drift on a hilly course means something different than drift on a flat course.
+- When load/fatigue data exists, connect it to what comes next: "Recovery matters before Tuesday's intervals" is actionable. "ACWR is 1.35" is not.
+- When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."
+- Use plain language. Not "positive split of 175s/mi" but "you slowed over the back half — expected on a course that back-loads the climbing."
+- Do not list metrics. Do not use bullet points. Write in connected prose.
+- If nothing interesting happened (easy run, everything on plan, no flags), say so briefly: "Clean easy run, nothing to flag. Good recovery day."
+- CRITICAL: Do not introduce ANY numbers or percentages that are not present in the data provided.
+- CRITICAL: Pace must use display format like "10:16/mi", never raw seconds.
+- FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall".`;
+
+function buildUserMessage(dp: any, coachingContext: string | null): string {
+  const w = dp.workout || {};
+  const sig = dp.signals || {};
+  const sections: string[] = [];
+
+  sections.push('Here is the workout data. Answer the athlete\'s unasked questions — don\'t summarize what they can already see.');
+
+  // Workout
+  const gapNote = w.avg_gap ? `(effort-adjusted: ${w.avg_gap})` : '';
+  const terrainNote = [w.terrain, w.elevation_gain ? `${w.elevation_gain} gain` : null].filter(Boolean).join(', ');
+  sections.push([
+    '\nWORKOUT:',
+    `- Type: ${w.type || 'run'}${dp.plan?.workout_purpose ? ` (${dp.plan.workout_purpose})` : ''}`,
+    w.distance && w.duration ? `- Distance: ${w.distance} in ${w.duration}` : null,
+    w.avg_pace ? `- Pace: ${w.avg_pace} ${gapNote}`.trim() : null,
+    w.avg_hr ? `- HR: ${w.avg_hr}${sig.hr_drift ? ` (drift: ${sig.hr_drift}, typical: ${sig.hr_drift_typical || 'unknown'})` : ''}` : null,
+    terrainNote ? `- Terrain: ${terrainNote}` : null,
+    dp.conditions ? `- Weather: ${dp.conditions.temperature}, ${dp.conditions.humidity} humidity${dp.conditions.heat_stress_level !== 'none' ? ` (${dp.conditions.heat_stress_level} heat stress)` : ''}` : null,
+  ].filter(Boolean).join('\n'));
+
+  // Execution vs plan
+  if (sig.interval_execution || sig.execution) {
+    const ie = sig.interval_execution || {};
+    const ex = sig.execution || {};
+    sections.push([
+      '\nEXECUTION vs PLAN:',
+      ie.execution_score ? `- Execution score: ${ie.execution_score}` : null,
+      ie.pace_adherence ? `- Pace adherence: ${ie.pace_adherence}${ie.pace_adherence_note ? ` (${ie.pace_adherence_note})` : ''}` : null,
+      ie.completed_steps ? `- Completed steps: ${ie.completed_steps}` : null,
+      sig.pace_fade ? `- Pace fade: ${sig.pace_fade}` : null,
+      ex.assessed_against === 'actual' ? '- Note: assessed against actual execution (no plan targets available)' : null,
+      dp.plan?.week_intent ? `- Plan role: ${dp.plan.week_intent}${dp.plan.week_number != null ? `, Week ${dp.plan.week_number}` : ''}${dp.plan.phase ? ` of ${dp.plan.phase} phase` : ''}` : null,
+    ].filter(Boolean).join('\n'));
+  }
+
+  // Similar workouts
+  const comp = sig.comparisons;
+  if (comp?.vs_similar?.sample_size > 0 && comp.vs_similar.assessment !== 'insufficient_data') {
+    sections.push([
+      `\nCOMPARED TO SIMILAR WORKOUTS (n=${comp.vs_similar.sample_size}):`,
+      `- Pace vs similar: ${comp.vs_similar.assessment}${comp.vs_similar.pace_delta ? ` (${comp.vs_similar.pace_delta})` : ''}`,
+      comp.vs_similar.hr_delta ? `- HR vs similar: ${comp.vs_similar.hr_delta}` : null,
+      comp.trend?.direction && comp.trend.direction !== 'insufficient_data'
+        ? `- Trend: ${comp.trend.direction}${comp.trend.magnitude ? ` — ${comp.trend.magnitude}` : ''} (${comp.trend.data_points} data points)`
+        : null,
+    ].filter(Boolean).join('\n'));
+  }
+
+  // Load context
+  const tl = sig.training_load;
+  if (tl) {
+    sections.push([
+      '\nLOAD CONTEXT:',
+      Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
+        ? tl.fatigue_evidence.map((e: string) => `- ${e}`).join('\n')
+        : null,
+      tl.cumulative_fatigue ? `- Cumulative fatigue: ${tl.cumulative_fatigue}` : null,
+    ].filter(Boolean).join('\n'));
+  }
+
+  // Flags
+  const flags = dp.top_flags || [];
+  if (flags.length > 0) {
+    sections.push('\nFLAGS:\n' + flags.map((f: any) => `- [${f.type}] ${f.message}`).join('\n'));
+  }
+
+  // Limiter
+  if (sig.limiter?.limiter) {
+    sections.push(`\nPRIMARY LIMITER: ${sig.limiter.limiter}${sig.limiter.confidence != null ? ` (${sig.limiter.confidence}% confidence)` : ''}`);
+  }
+
+  // Terrain segments
+  if (sig.terrain?.route) {
+    sections.push(`\nROUTE: "${sig.terrain.route.name}" — run ${sig.terrain.route.times_run} times`);
+  }
+  if (sig.terrain?.segment_comparisons?.length > 0 && sig.terrain.segment_insight_eligible) {
+    sections.push('\nFAMILIAR SEGMENTS:\n' + sig.terrain.segment_comparisons.map((c: any) =>
+      `- ${c.type} (${c.times_seen}x): today ${c.today_pace}${c.today_hr ? ` @ ${c.today_hr}` : ''}, avg ${c.avg_pace}${c.avg_hr ? ` @ ${c.avg_hr}` : ''}`
+    ).join('\n'));
+  }
+
+  // Coaching context
+  if (coachingContext) {
+    sections.push('\n' + coachingContext);
+  }
+
+  return sections.join('\n');
+}
+
+async function callLLMParagraph(systemPrompt: string, userMessage: string, temperature: number): Promise<string | null> {
   const text = await callLLM({
-    system: 'You are an expert endurance coach. Output must be a single paragraph (2-5 sentences). No bullets. No headers. No generic advice.',
-    user: prompt,
+    system: systemPrompt,
+    user: userMessage,
     temperature,
-    maxTokens: 300,
+    maxTokens: 350,
   });
   return text ? normalizeParagraph(text) : null;
 }
@@ -219,14 +327,12 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       : null,
     conditions: (() => {
       const wx = facts?.weather;
-      const level = String(wx?.heat_stress_level || '');
-      if (!wx) return null;
-      if (level !== 'moderate' && level !== 'severe') return null;
+      if (!wx || coerceNumber(wx.temperature_f) == null) return null;
       return {
-        dew_point: `${Math.round(Number(wx.dew_point_f))}°F`,
-        heat_stress_level: wx.heat_stress_level,
+        dew_point: coerceNumber(wx.dew_point_f) != null ? `${Math.round(Number(wx.dew_point_f))}°F` : null,
+        heat_stress_level: wx.heat_stress_level || 'none',
         temperature: `${Math.round(Number(wx.temperature_f))}°F`,
-        humidity: `${Math.round(Number(wx.humidity_pct))}%`,
+        humidity: coerceNumber(wx.humidity_pct) != null ? `${Math.round(Number(wx.humidity_pct))}%` : null,
         wind: wx.wind_mph != null ? `${Math.round(Number(wx.wind_mph))} mph` : null,
       };
     })(),
@@ -341,56 +447,10 @@ export async function generateAISummaryV1(
   }
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
-
-  const hasIntervalExecution = !!(displayPacket as any)?.signals?.interval_execution?.execution_score;
-  const hasRoute = !!(displayPacket as any)?.signals?.terrain?.route;
-  const hasSegmentComparisons = ((displayPacket as any)?.signals?.terrain?.segment_comparisons?.length ?? 0) > 0;
-
-  const priorityRules: string[] = [];
-  if (hasIntervalExecution) {
-    priorityRules.push('  1. INTERVAL EXECUTION (MANDATORY LEAD): signals.interval_execution exists. Your FIRST sentence MUST reference the execution score, completed steps, and actual per-rep paces from the summary. This is the headline.');
-  } else {
-    priorityRules.push('  1. Lead with the most important insight from TOP FLAGS.');
-  }
-  if (hasRoute) {
-    priorityRules.push('  2. ROUTE CONTEXT: signals.terrain.route exists. Weave in route familiarity naturally (e.g. "on a familiar route" or reference the run count).');
-  }
-  if (hasSegmentComparisons) {
-    priorityRules.push('  3. SEGMENT COMPARISONS: Use the ACTUAL pace_delta and hr_delta values on familiar terrain segments.');
-  }
-  priorityRules.push(`  ${hasIntervalExecution ? '4' : '2'}. TOP FLAGS: address concerns (ACWR, drift, fatigue) as secondary context, not the headline. One sentence max for load/fatigue.`);
-
-  const prompt = [
-    'You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.',
-    coachingContext ? '\n' + coachingContext + '\n' : '',
-    'RULES:',
-    '- Output ONE paragraph, 2-5 sentences.',
-    '- PRIORITY ORDER for what to lead with:',
-    ...priorityRules,
-    '- Be specific: reference concrete numbers from the DISPLAY PACKET (execution score, per-rep paces, HR, drift, terrain class, plan week/phase).',
-    '- No filler. No generic advice.',
-    '- FORBIDDEN: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "overall", "aligns well", "recovery-integrity cost", "prioritize recovery to support", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts".',
-    '- Never say "I". Never calculate. Never show raw field names.',
-    '- CRITICAL: NEVER output pace as raw seconds. Use display strings like "10:16/mi".',
-    '- CRITICAL: Do not introduce ANY numbers/percentages not present verbatim in DISPLAY PACKET.',
-    '- CRITICAL: Do not introduce ANY proper nouns unless they appear verbatim in DISPLAY PACKET.',
-    '- If execution.assessed_against is "actual", do NOT frame as adherence failure.',
-    '- If plan intent is recovery/easy and TOP FLAGS include a pacing concern, lead with the recovery-integrity cost.',
-    '- If TOP FLAGS mention HR drift consistent with hilly terrain, connect drift to terrain and do not treat it as fatigue.',
-    '- Terrain: MAY include segment insight only when segment_insight_eligible is true. MAY mention trends only when segment_trend_eligible is true.',
-    '- GAP: If workout.avg_gap is present, adherence was scored on Grade-Adjusted Pace (effort-adjusted for elevation). Mention both actual pace and GAP when discussing pace (e.g. "averaged 11:04/mi (10:32 GAP)"). Explain hills slowed raw pace but effort was on target when GAP adherence is good.',
-    '',
-    'TOP FLAGS:',
-    (displayPacket as any).top_flags.map((f: any) => '[' + f.type + '] ' + f.message).join('\n'),
-    '',
-    'DISPLAY PACKET:',
-    JSON.stringify(displayPacket, null, 2),
-    '',
-    'Write the summary now.',
-  ].join('\n');
+  const userMessage = buildUserMessage(displayPacket, coachingContext ?? null);
 
   try {
-    const s1 = await callLLMParagraph(prompt, 0.2);
+    const s1 = await callLLMParagraph(COACHING_SYSTEM_PROMPT, userMessage, 0.2);
     if (!s1) { console.warn('[ai-summary] attempt 1 returned empty'); return null; }
     const v1 = validateNoNewNumbers(s1, displayPacket);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
@@ -404,8 +464,8 @@ export async function generateAISummaryV1(
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
       z1.why, len1.why, td1.why, g1.why,
     ].filter(Boolean);
-    const corrective = prompt + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
-    const s2 = await callLLMParagraph(corrective, 0);
+    const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
+    const s2 = await callLLMParagraph(COACHING_SYSTEM_PROMPT, corrective, 0);
     if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
     const v2 = validateNoNewNumbers(s2, displayPacket);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);
