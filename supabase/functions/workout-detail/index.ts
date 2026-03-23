@@ -4,7 +4,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { weekStartOf } from '../_shared/plan-week.ts';
-import { buildDailyLedger } from '../_shared/athlete-snapshot/daily-ledger.ts';
+import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
 
@@ -592,8 +592,8 @@ Deno.serve(async (req) => {
 
         const ledgerDay = dailyLedger.find((d) => d.date === workoutDate) ?? null;
         const actualSession = ledgerDay?.actual.find((a) => a.workout_id === id) ?? null;
-        const match = ledgerDay?.matches.find((m) => m.workout_id === id) ?? null;
-        const plannedSession = match?.planned_id
+        let match = ledgerDay?.matches.find((m) => m.workout_id === id) ?? null;
+        let plannedSession = match?.planned_id
           ? ledgerDay?.planned.find((p) => p.planned_id === match.planned_id) ?? null
           : null;
         const sessionObs = bodyResponse.session_signals.find((o) => o.workout_id === id);
@@ -603,10 +603,65 @@ Deno.serve(async (req) => {
         const narrativeText =
           wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null;
 
+        const rowPlannedId =
+          row?.planned_id != null && String(row.planned_id).length > 0 ? String(row.planned_id) : '';
+        const effectivePlannedId = (match?.planned_id ? String(match.planned_id) : '') || rowPlannedId;
+
+        /** Raw row loaded when ledger omitted match/planned (e.g. manual attach / cross-day) */
+        let attachPlannedRaw: any = null;
+        if (effectivePlannedId && (!plannedSession || !match)) {
+          attachPlannedRaw =
+            plannedRows.find((r: any) => String(r?.id) === String(effectivePlannedId)) ?? null;
+          if (!attachPlannedRaw) {
+            const { data: pr } = await supabase
+              .from('planned_workouts')
+              .select(
+                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises',
+              )
+              .eq('user_id', userId)
+              .eq('id', effectivePlannedId)
+              .maybeSingle();
+            attachPlannedRaw = pr ?? null;
+          }
+          if (attachPlannedRaw) {
+            if (!plannedSession) {
+              plannedSession = buildPlannedSession(attachPlannedRaw, isImperial);
+            }
+            if (!match) {
+              const t = String(plannedSession?.type || row?.type || '').toLowerCase();
+              const isStrength =
+                t.includes('strength') || t === 'weight_training' || t === 'weights';
+              match = {
+                planned_id: effectivePlannedId,
+                workout_id: id,
+                endurance_quality: isStrength ? null : 'followed',
+                strength_quality: isStrength ? 'followed' : null,
+                summary: plannedSession?.prescription
+                  ? `Linked to plan — ${String(plannedSession.prescription).slice(0, 120)}`
+                  : 'Linked to planned session',
+              };
+            }
+          }
+        }
+
         const plannedId = match?.planned_id ?? null;
         let plannedRowRaw: any = null;
         if (plannedId) {
-          const raw = plannedRows.find((r: any) => String(r?.id) === String(plannedId));
+          let raw =
+            attachPlannedRaw && String(attachPlannedRaw?.id) === String(plannedId)
+              ? attachPlannedRaw
+              : plannedRows.find((r: any) => String(r?.id) === String(plannedId));
+          if (!raw) {
+            const { data: pr } = await supabase
+              .from('planned_workouts')
+              .select(
+                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises',
+              )
+              .eq('user_id', userId)
+              .eq('id', plannedId)
+              .maybeSingle();
+            raw = pr ?? null;
+          }
           if (raw) {
             let se = raw?.strength_exercises;
             if (typeof se === 'string') try { se = JSON.parse(se); } catch { se = null; }

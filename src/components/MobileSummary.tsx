@@ -5,6 +5,35 @@ import { supabase } from '../lib/supabase';
 import StrengthCompareTable from './StrengthCompareTable';
 import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
 
+type SessionInterpretationV1 = {
+  plan_adherence?: { overall?: string; deviations?: Array<{ detail?: string }> };
+  training_effect?: { alignment?: string; actual_stimulus?: string; intended_stimulus?: string };
+};
+
+function planAssessmentLines(si: SessionInterpretationV1 | null | undefined): string[] {
+  const te = si?.training_effect;
+  if (!te?.actual_stimulus || typeof te.actual_stimulus !== 'string') return [];
+  const alignLabel =
+    te.alignment === 'on_target'
+      ? 'Mostly matched plan'
+      : te.alignment === 'partial'
+        ? 'Mixed vs plan'
+        : te.alignment === 'missed'
+          ? 'Below plan'
+          : te.alignment === 'exceeded'
+            ? 'Above plan'
+            : '';
+  const first = alignLabel ? `${alignLabel}: ${te.actual_stimulus}` : te.actual_stimulus;
+  const out = [first];
+  const devs = (si?.plan_adherence?.deviations || [])
+    .map((d) => String(d?.detail || '').trim())
+    .filter(Boolean);
+  if (devs.length > 0 && si?.plan_adherence?.overall && si.plan_adherence.overall !== 'followed') {
+    out.push(devs.slice(0, 3).join(' · '));
+  }
+  return out;
+}
+
 type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
@@ -14,7 +43,8 @@ type MobileSummaryProps = {
     narrative_text?: string | null;
     intervals?: Array<{ id: string; interval_type: string; planned_label: string; planned_duration_s: number | null; executed: { duration_s: number | null; distance_m: number | null; avg_hr: number | null; actual_pace_sec_per_mi?: number | null }; pace_adherence_pct?: number | null; duration_adherence_pct?: number | null }>;
     display?: { show_adherence_chips?: boolean; interval_display_reason?: string | null; has_measured_execution?: boolean };
-    plan_context?: { match?: { summary?: string } | null };
+    plan_context?: { planned_id?: string | null; planned?: unknown | null; match?: { summary?: string } | null };
+    session_interpretation?: SessionInterpretationV1;
   } | null;
   onNavigateToContext?: (workoutId: string) => void;
 };
@@ -1643,9 +1673,24 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
                   {chip('Duration', finalDurationPct, 
                        'Time adherence', 'duration')}
                   {chip('Pace', finalPacePct,
-                       isStructuredIntervalSession ? 'Interval adherence' : 'Pace adherence', 'pace')}
+                       isStructuredIntervalSession ? 'Blended interval pace' : 'Pace adherence', 'pace')}
                 </div>
               </div>
+
+              {hasSessionDetail &&
+                sd?.session_interpretation &&
+                (() => {
+                  const pa = planAssessmentLines(sd.session_interpretation);
+                  if (pa.length === 0) return null;
+                  return (
+                    <div className="px-2 mb-2 max-w-lg mx-auto text-center space-y-1">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Plan assessment</div>
+                      {pa.map((line, i) => (
+                        <p key={i} className="text-sm text-gray-300 leading-snug">{line}</p>
+                      ))}
+                    </div>
+                  );
+                })()}
               
               {/* View in Context link — above table */}
               {onNavigateToContext && completedSrc?.id && (
@@ -2598,6 +2643,21 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
                   {recomputing ? 'Recomputing…' : 'Recompute analysis'}
                 </button>
               </div>
+              {hasSessionDetail &&
+                sd?.session_interpretation &&
+                sd?.display?.show_adherence_chips === false &&
+                (() => {
+                  const pa = planAssessmentLines(sd.session_interpretation);
+                  if (pa.length === 0) return null;
+                  return (
+                    <div className="space-y-1">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Plan assessment</span>
+                      {pa.map((line, i) => (
+                        <p key={i} className="text-sm text-gray-300 leading-relaxed">{line}</p>
+                      ))}
+                    </div>
+                  );
+                })()}
               {hasNarrative && (
                 <div>
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -2646,14 +2706,37 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
                       const rows: Array<{ label: string; value: string }> = [];
 
                       try {
-                        const stim = factPacketV1?.derived?.stimulus;
-                        if (stim && typeof stim.achieved === 'boolean') {
+                        const siStim = hasSessionDetail ? sd?.session_interpretation : null;
+                        const hasPlanLinked =
+                          !!(sd as any)?.plan_context?.planned ||
+                          !!(sd as any)?.plan_context?.planned_id ||
+                          !!planned;
+                        if (siStim?.training_effect?.actual_stimulus && hasPlanLinked) {
+                          const te = siStim.training_effect;
+                          const alignLabel =
+                            te.alignment === 'on_target'
+                              ? 'Mostly matched plan'
+                              : te.alignment === 'partial'
+                                ? 'Mixed vs plan'
+                                : te.alignment === 'missed'
+                                  ? 'Below plan'
+                                  : te.alignment === 'exceeded'
+                                    ? 'Above plan'
+                                    : String(te.alignment || '');
                           rows.push({
                             label: 'Stimulus',
-                            value: stim.achieved
-                              ? `Achieved (${stim.confidence}). ${Array.isArray(stim.evidence) && stim.evidence[0] ? stim.evidence[0] : ''}`.trim()
-                              : `Possibly missed (${stim.confidence}). ${stim.partial_credit || ''}`.trim(),
+                            value: `${alignLabel}: ${te.actual_stimulus}`.trim(),
                           });
+                        } else {
+                          const stim = factPacketV1?.derived?.stimulus;
+                          if (stim && typeof stim.achieved === 'boolean') {
+                            rows.push({
+                              label: 'Stimulus',
+                              value: stim.achieved
+                                ? `Achieved (${stim.confidence}). ${Array.isArray(stim.evidence) && stim.evidence[0] ? stim.evidence[0] : ''}`.trim()
+                                : `Possibly missed (${stim.confidence}). ${stim.partial_credit || ''}`.trim(),
+                            });
+                          }
                         }
                       } catch {}
 

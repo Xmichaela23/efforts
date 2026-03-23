@@ -190,8 +190,22 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       volumeDeviation: volumeDev,
       loadStatus,
       planContextSummary: match?.summary ?? null,
+      intervals,
     }),
   };
+}
+
+/** Lowest pace_adherence_pct among work intervals (when present). */
+function minWorkIntervalPacePct(intervals: SessionDetailV1['intervals']): number | null {
+  let min: number | null = null;
+  for (const iv of intervals) {
+    if (iv.interval_type !== 'work') continue;
+    const p = iv.pace_adherence_pct;
+    if (typeof p === 'number' && Number.isFinite(p)) {
+      min = min == null ? p : Math.min(min, p);
+    }
+  }
+  return min;
 }
 
 function buildSessionInterpretation(params: {
@@ -206,6 +220,7 @@ function buildSessionInterpretation(params: {
   volumeDeviation: SessionDetailV1['strength_volume_deviation'];
   loadStatus?: { status: string; interpretation?: string } | null;
   planContextSummary: string | null;
+  intervals: SessionDetailV1['intervals'];
 }): SessionInterpretation {
   const {
     type,
@@ -219,6 +234,7 @@ function buildSessionInterpretation(params: {
     volumeDeviation,
     loadStatus,
     planContextSummary,
+    intervals,
   } = params;
 
   const deviations: Array<{ dimension: DeviationDimension; direction: DeviationDirection; detail: string }> = [];
@@ -253,12 +269,25 @@ function buildSessionInterpretation(params: {
   if (type === 'run' || type === 'ride' || type === 'swim') {
     const hasPace = paceAdherence != null || powerAdherence != null;
     const hasDuration = durationAdherence != null;
+    const worstWorkPace = minWorkIntervalPacePct(intervals);
     if (hasPace) {
       const pct = paceAdherence ?? powerAdherence ?? 0;
-      if (pct > 105) deviations.push({ dimension: 'pace', direction: 'over', detail: `Pace/power ${Math.round(pct)}% of plan` });
-      else if (pct < 95 && pct > 0) deviations.push({ dimension: 'pace', direction: 'under', detail: `Pace/power ${Math.round(pct)}% of plan` });
-      else if (pct >= 95 && pct <= 105) deviations.push({ dimension: 'pace', direction: 'matched', detail: 'Pace on target' });
-      if (pct > 105 || (pct < 95 && pct > 0)) overall = overall === 'followed' ? 'modified' : overall;
+      if (worstWorkPace != null && worstWorkPace < 88) {
+        deviations.push({
+          dimension: 'pace',
+          direction: 'under',
+          detail: `Weakest work interval ~${Math.round(worstWorkPace)}% vs prescribed pace (headline pace % is duration-weighted across intervals)`,
+        });
+        overall = overall === 'followed' ? 'modified' : overall;
+      } else if (pct > 105) {
+        deviations.push({ dimension: 'pace', direction: 'over', detail: `Pace/power ${Math.round(pct)}% of plan` });
+        overall = overall === 'followed' ? 'modified' : overall;
+      } else if (pct < 95 && pct > 0) {
+        deviations.push({ dimension: 'pace', direction: 'under', detail: `Pace/power ${Math.round(pct)}% of plan` });
+        overall = overall === 'followed' ? 'modified' : overall;
+      } else if (pct >= 95 && pct <= 105) {
+        deviations.push({ dimension: 'pace', direction: 'matched', detail: 'Pace on target (blended across intervals)' });
+      }
     }
     if (hasDuration) {
       const pct = durationAdherence ?? 0;
@@ -279,23 +308,71 @@ function buildSessionInterpretation(params: {
     overall = 'deviated';
   }
 
-  const intendedStimulus = plannedSession?.prescription ?? planContextSummary ?? 'Complete the planned session';
-  const execPct = executionScore ?? paceAdherence ?? powerAdherence ?? durationAdherence;
+  const namePrefix = plannedSession?.name ? `${plannedSession.name}. ` : '';
+  const intendedStimulus =
+    namePrefix + (plannedSession?.prescription ?? planContextSummary ?? 'Complete the planned session');
+
   let actualStimulus: string;
   let alignment: 'on_target' | 'partial' | 'missed' | 'exceeded' = 'on_target';
-  if (execPct != null) {
-    if (execPct >= 95) {
-      actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
-      alignment = execPct >= 105 ? 'exceeded' : 'on_target';
-    } else if (execPct >= 80) {
-      actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
-      alignment = 'partial';
+
+  if (type === 'run' || type === 'ride' || type === 'swim') {
+    const parts: string[] = [];
+    if (executionScore != null) parts.push(`execution ${Math.round(executionScore)}%`);
+    if (durationAdherence != null) parts.push(`duration ${Math.round(durationAdherence)}%`);
+    if (paceAdherence != null) parts.push(`pace ${Math.round(paceAdherence)}%`);
+    else if (powerAdherence != null) parts.push(`power ${Math.round(powerAdherence)}%`);
+
+    const metrics: number[] = [];
+    if (executionScore != null) metrics.push(executionScore);
+    if (paceAdherence != null) metrics.push(paceAdherence);
+    if (powerAdherence != null) metrics.push(powerAdherence);
+    if (durationAdherence != null) metrics.push(durationAdherence);
+
+    const minPct = metrics.length ? Math.min(...metrics) : null;
+    const maxPct = metrics.length ? Math.max(...metrics) : null;
+    const spread = minPct != null && maxPct != null ? maxPct - minPct : 0;
+
+    if (parts.length > 0) {
+      actualStimulus = `Versus plan: ${parts.join(', ')}.`;
+      if (spread >= 12) {
+        actualStimulus += ' Scores diverge — treat the lowest % as the limiting factor, not the highest.';
+      }
+      const wiv = minWorkIntervalPacePct(intervals);
+      if (wiv != null && wiv < 88) {
+        actualStimulus +=
+          ` One work rep was only ~${Math.round(wiv)}% vs its pace window; the headline pace chip blends all intervals.`;
+      }
     } else {
-      actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
-      alignment = 'missed';
+      actualStimulus = planContextSummary ?? 'Session completed';
+    }
+
+    if (minPct != null) {
+      if (minPct >= 105) {
+        alignment = 'exceeded';
+      } else if (minPct >= 92) {
+        alignment = 'on_target';
+      } else if (minPct >= 78) {
+        alignment = 'partial';
+      } else {
+        alignment = 'missed';
+      }
     }
   } else {
-    actualStimulus = planContextSummary ?? 'Session completed';
+    const execPct = executionScore ?? paceAdherence ?? powerAdherence ?? durationAdherence;
+    if (execPct != null) {
+      if (execPct >= 95) {
+        actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
+        alignment = execPct >= 105 ? 'exceeded' : 'on_target';
+      } else if (execPct >= 80) {
+        actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
+        alignment = 'partial';
+      } else {
+        actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
+        alignment = 'missed';
+      }
+    } else {
+      actualStimulus = planContextSummary ?? 'Session completed';
+    }
   }
 
   const loadStatusMap = loadStatus?.status === 'high' || loadStatus?.status === 'elevated' ? 'over' as const
