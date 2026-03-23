@@ -178,6 +178,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const resolvedNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
 
+  // ── Planned totals (must come before completed — swim unit needed for pace calc) ─
+  const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
+
   // ── Completed totals ───────────────────────────────────────────────────────
   const completedDurS = fin(compOverall?.duration_s_moving);
   const completedDistM = fin(compOverall?.distance_m);
@@ -198,9 +201,6 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     avg_hr: fin(compOverall?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
   };
-
-  // ── Planned totals ─────────────────────────────────────────────────────────
-  const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
 
   // ── Week label ─────────────────────────────────────────────────────────────
   const weekLabel = buildWeekLabel(factPacket);
