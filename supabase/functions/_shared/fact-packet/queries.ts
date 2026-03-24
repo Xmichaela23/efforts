@@ -266,6 +266,16 @@ export async function getSimilarWorkoutComparisons(
       return 'typical' as SimilarAssessment;
     })();
 
+    const trend_points = filtered
+      .filter((x) => x.r.date && x.pace != null && x.hr != null)
+      .sort((a, b) => String(a.r.date).localeCompare(String(b.r.date)))
+      .slice(-8)
+      .map((x) => ({
+        date: String(x.r.date),
+        pace_sec_per_mi: Math.round(x.pace!),
+        avg_hr: Math.round(x.hr!),
+      }));
+
     return {
       sample_size,
       pace_delta_sec: pace_delta_sec != null ? Math.round(pace_delta_sec) : null,
@@ -274,6 +284,7 @@ export async function getSimilarWorkoutComparisons(
       assessment: assess,
       avg_pace_at_similar_hr: avgPaceAtSimilarHr != null ? Math.round(avgPaceAtSimilarHr) : null,
       avg_hr_drift: avgDrift != null ? Math.round(avgDrift) : null,
+      trend_points,
     };
   } catch {
     return {
@@ -284,6 +295,7 @@ export async function getSimilarWorkoutComparisons(
       assessment: 'insufficient_data',
       avg_pace_at_similar_hr: null,
       avg_hr_drift: null,
+      trend_points: [],
     };
   }
 }
@@ -618,14 +630,14 @@ export async function getTrainingLoadContext(
     if (consecutive_training_days >= 5) { flagsHigh.push(true); if (streakLabel) fatigue_evidence.push(streakLabel); }
     else if (consecutive_training_days >= 3) { flagsMod.push(true); if (streakLabel) fatigue_evidence.push(streakLabel); }
 
-    if (previous_day_workload > 80) { flagsHigh.push(true); fatigue_evidence.push(`Yesterday workload ${previous_day_workload}`); }
-    else if (previous_day_workload > 50) { flagsMod.push(true); fatigue_evidence.push(`Yesterday workload ${previous_day_workload}`); }
+    if (previous_day_workload > 80) { flagsHigh.push(true); fatigue_evidence.push(`Hard session yesterday`); }
+    else if (previous_day_workload > 50) { flagsMod.push(true); fatigue_evidence.push(`Moderate session yesterday`); }
 
-    if (week_load_pct != null && week_load_pct > 120) { flagsHigh.push(true); fatigue_evidence.push(`Week at ${week_load_pct}% of planned load`); }
-    else if (week_load_pct != null && week_load_pct > 100) { flagsMod.push(true); fatigue_evidence.push(`Week at ${week_load_pct}% of planned load`); }
+    if (week_load_pct != null && week_load_pct > 120) { flagsHigh.push(true); fatigue_evidence.push(`High training load this week (${week_load_pct}% of plan)`); }
+    else if (week_load_pct != null && week_load_pct > 100) { flagsMod.push(true); fatigue_evidence.push(`Above-plan training load this week (${week_load_pct}%)`); }
 
-    if (acwr_ratio != null && acwr_ratio > 1.3) { flagsHigh.push(true); fatigue_evidence.push(`ACWR ${acwr_ratio.toFixed(2)}`); }
-    else if (acwr_ratio != null && acwr_ratio > 1.1) { flagsMod.push(true); fatigue_evidence.push(`ACWR ${acwr_ratio.toFixed(2)}`); }
+    if (acwr_ratio != null && acwr_ratio > 1.3) { flagsHigh.push(true); fatigue_evidence.push(`Training stress elevated — recovery matters`); }
+    else if (acwr_ratio != null && acwr_ratio > 1.1) { flagsMod.push(true); fatigue_evidence.push(`Training stress trending up`); }
 
     const cumulative_fatigue: TrainingLoadV1['cumulative_fatigue'] =
       flagsHigh.length >= 2 ? 'high' :

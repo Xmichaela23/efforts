@@ -671,6 +671,16 @@ export async function buildWorkoutFactPacketV1(args: {
           hr_delta_bpm: vsSimilar.hr_delta_bpm,
           drift_delta_bpm: vsSimilar.drift_delta_bpm,
           assessment: vsSimilar.assessment,
+          trend_points: (() => {
+            const pts = Array.isArray((vsSimilar as any).trend_points) ? (vsSimilar as any).trend_points : [];
+            const curDate = workout?.date ?? null;
+            const curPace = overallPace != null ? Math.round(overallPace) : null;
+            const curHr = avgHr;
+            if (curDate && curPace != null && curHr != null) {
+              pts.push({ date: String(curDate), pace_sec_per_mi: curPace, avg_hr: curHr, is_current: true });
+            }
+            return pts;
+          })(),
         },
         trend,
         achievements,

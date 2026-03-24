@@ -125,6 +125,29 @@ export type SessionDetailV1 = {
     coefficient_of_variation: number | null;
   };
 
+  // ── Trend sparkline (Performance screen "Am I getting fitter?") ──────────
+  trend: {
+    metric_label: string;
+    unit: string;
+    points: Array<{
+      date: string;
+      value: number;
+      avg_hr: number;
+      is_current: boolean;
+      label: string;
+    }>;
+    direction: 'improving' | 'declining' | 'stable';
+    summary: string;
+  } | null;
+
+  // ── Next session (forward-looking context) ────────────────────────────────
+  next_session: {
+    name: string;
+    date: string | null;
+    type: string | null;
+    prescription: string | null;
+  } | null;
+
   display: {
     show_adherence_chips: boolean;
     interval_display_reason: string | null;

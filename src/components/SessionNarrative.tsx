@@ -1,8 +1,28 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import {
-  type SessionInterpretationV1,
-} from '@/utils/performance-format';
+
+type TrendPoint = {
+  date: string;
+  value: number;
+  avg_hr: number;
+  is_current: boolean;
+  label: string;
+};
+
+type TrendData = {
+  metric_label: string;
+  unit: string;
+  points: TrendPoint[];
+  direction: 'improving' | 'declining' | 'stable';
+  summary: string;
+};
+
+type NextSession = {
+  name: string;
+  date: string | null;
+  type: string | null;
+  prescription: string | null;
+};
 
 interface SessionNarrativeProps {
   sessionDetail: {
@@ -36,7 +56,8 @@ interface SessionNarrativeProps {
       planned?: unknown | null;
       match?: { summary?: string } | null;
     };
-    session_interpretation?: SessionInterpretationV1;
+    trend?: TrendData | null;
+    next_session?: NextSession | null;
   } | null;
   hasSessionDetail: boolean;
   noPlannedCompare: boolean;
@@ -45,6 +66,83 @@ interface SessionNarrativeProps {
   recomputeError: string | null;
   onRecompute: () => void;
   recomputeDisabled?: boolean;
+}
+
+function TrendSparkline({ trend }: { trend: TrendData }) {
+  const pts = trend.points;
+  if (pts.length < 3) return null;
+
+  const values = pts.map((p) => p.value);
+  const maxV = Math.max(...values);
+  const minV = Math.min(...values);
+  const range = maxV - minV || 1;
+
+  const W = 200;
+  const H = 48;
+  const PAD = 4;
+  const plotW = W - PAD * 2;
+  const plotH = H - PAD * 2;
+
+  const coords = pts.map((p, i) => ({
+    x: PAD + (i / (pts.length - 1)) * plotW,
+    y: PAD + ((p.value - minV) / range) * plotH,
+    ...p,
+  }));
+
+  const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
+  const arrow = trend.direction === 'improving' ? '↗' : trend.direction === 'declining' ? '↘' : '→';
+  const color = trend.direction === 'improving' ? '#34d399' : trend.direction === 'declining' ? '#f87171' : '#9ca3af';
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Trend</span>
+        <span className="text-xs" style={{ color }}>{arrow} {trend.summary}</span>
+      </div>
+      <div className="mt-1 relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
+          <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+          {coords.map((c, i) => (
+            <circle
+              key={i}
+              cx={c.x}
+              cy={c.y}
+              r={c.is_current ? 3.5 : 2}
+              fill={c.is_current ? color : 'rgba(156,163,175,0.5)'}
+              stroke={c.is_current ? color : 'none'}
+              strokeWidth={c.is_current ? 1 : 0}
+            />
+          ))}
+        </svg>
+        <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
+          <span>{pts[0].label}</span>
+          <span className="font-medium" style={{ color }}>{pts[pts.length - 1].label} ← today</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NextUp({ session }: { session: NextSession }) {
+  const dayName = session.date ? (() => {
+    try {
+      const [y, m, d] = session.date.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' });
+    } catch { return null; }
+  })() : null;
+
+  return (
+    <div className="flex items-start gap-2">
+      <span className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">Next</span>
+      <p className="text-sm text-gray-300">
+        {dayName && <span className="text-gray-400">{dayName} </span>}
+        {session.name}
+        {session.prescription && (
+          <span className="text-gray-500"> — {session.prescription}</span>
+        )}
+      </p>
+    </div>
+  );
 }
 
 export default function SessionNarrative({
@@ -57,13 +155,16 @@ export default function SessionNarrative({
   onRecompute,
   recomputeDisabled,
 }: SessionNarrativeProps) {
-  const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(true);
+  const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(false);
 
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
   const narrativeText = (typeof sd?.narrative_text === 'string' && sd.narrative_text.trim()) || '';
   const hasNarrative = narrativeText.length > 0;
   const hasSummaryBullets = summaryBullets.length > 0;
+
+  const trend = sd?.trend ?? null;
+  const nextSession = sd?.next_session ?? null;
 
   const analysisRows = sd?.analysis_details?.rows ?? [];
   const hasAnalysisDetails = analysisRows.length > 0;
@@ -167,6 +268,8 @@ export default function SessionNarrative({
           </div>
         </div>
       )}
+      {trend && <TrendSparkline trend={trend} />}
+      {nextSession && <NextUp session={nextSession} />}
       {hasAnalysisDetails && (
         <div className="space-y-2">
           <button
@@ -179,32 +282,12 @@ export default function SessionNarrative({
           </button>
           {analysisDetailsOpen && (
           <div className="space-y-1.5">
-            {(() => {
-              let rows = [...analysisRows];
-
-              if (hasSessionDetail && sd?.session_interpretation) {
-                const te = sd.session_interpretation.training_effect;
-                if (typeof te?.actual_stimulus === 'string' && te.actual_stimulus.trim().length > 0) {
-                  const alignLabel =
-                    te.alignment === 'on_target' ? 'Mostly matched plan'
-                    : te.alignment === 'partial' ? 'Mixed vs plan'
-                    : te.alignment === 'missed' ? 'Below plan'
-                    : te.alignment === 'exceeded' ? 'Above plan'
-                    : String(te.alignment || '');
-                  const stimIdx = rows.findIndex((r) => r.label === 'Stimulus');
-                  const stimRow = { label: 'Stimulus', value: `${alignLabel}: ${te.actual_stimulus}`.trim() };
-                  if (stimIdx >= 0) rows[stimIdx] = stimRow;
-                  else rows.unshift(stimRow);
-                }
-              }
-
-              return rows.slice(0, 8).map((r, i) => (
-                <div key={i}>
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(r.label ?? '')}</span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(r.value ?? '')}</p>
-                </div>
-              ));
-            })()}
+            {analysisRows.slice(0, 8).map((r, i) => (
+              <div key={i}>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(r.label ?? '')}</span>
+                <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(r.value ?? '')}</p>
+              </div>
+            ))}
           </div>
           )}
         </div>

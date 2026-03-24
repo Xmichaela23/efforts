@@ -672,6 +672,20 @@ Deno.serve(async (req) => {
         const compStrength = (detail as any).strength_exercises ?? row?.strength_exercises;
         const compStrengthArr = Array.isArray(compStrength) ? compStrength : (typeof compStrength === 'string' ? (() => { try { return JSON.parse(compStrength); } catch { return null; } })() : null);
 
+        const nextPlanned = plannedRows
+          .filter((p: any) => String(p?.date || '') > workoutDate)
+          .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
+        const nextSession = nextPlanned ? {
+          name: String(nextPlanned.name || nextPlanned.type || 'Workout'),
+          date: String(nextPlanned.date || '').slice(0, 10) || null,
+          type: nextPlanned.type ? String(nextPlanned.type) : null,
+          prescription: nextPlanned.description
+            ? String(nextPlanned.description).slice(0, 160)
+            : nextPlanned.rendered_description
+              ? String(nextPlanned.rendered_description).slice(0, 160)
+              : null,
+        } : null;
+
         sessionDetailV1 = buildSessionDetailV1({
           workoutId: id,
           workoutDate,
@@ -689,6 +703,7 @@ Deno.serve(async (req) => {
           loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
           completedComputed: (detail as any).computed ?? null,
           completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
+          nextSession,
         });
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);

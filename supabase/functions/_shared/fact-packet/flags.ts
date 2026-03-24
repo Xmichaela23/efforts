@@ -137,19 +137,19 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
 
       if (tl.acwr_ratio != null && tl.acwr_ratio > 1.3) {
         if (isPlanLinked && isBuildPhase && !isRecoveryWeek && tl.acwr_ratio <= 1.6) {
-          push(flags, { type: 'neutral', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} — expected load increase for ${planPhase || 'build'} phase.`, priority: 3 });
+          push(flags, { type: 'neutral', category: 'fatigue', message: `Training stress is up — expected for ${planPhase || 'build'} phase.`, priority: 3 });
         } else if (isPlanLinked && isRecoveryWeek) {
-          push(flags, { type: 'concern', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} (elevated) — unusual for a recovery week.`, priority: 1 });
+          push(flags, { type: 'concern', category: 'fatigue', message: `Training stress elevated during a recovery week — check if this is intentional.`, priority: 1 });
         } else {
-          push(flags, { type: 'concern', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} (elevated) — higher-than-normal training stress.`, priority: 1 });
+          push(flags, { type: 'concern', category: 'fatigue', message: `Training stress elevated — injury risk increases at this load level.`, priority: 1 });
         }
       } else if (tl.acwr_ratio != null && tl.acwr_ratio > 1.1) {
-        push(flags, { type: 'neutral', category: 'fatigue', message: `ACWR ${tl.acwr_ratio.toFixed(2)} — training load is trending up.`, priority: 3 });
+        push(flags, { type: 'neutral', category: 'fatigue', message: `Training load trending up.`, priority: 3 });
       }
       if (tl.week_load_pct != null && tl.week_load_pct > 120) {
-        push(flags, { type: 'concern', category: 'fatigue', message: `Week at ${Math.round(tl.week_load_pct)}% of planned load — accumulated fatigue likely.`, priority: 1 });
+        push(flags, { type: 'concern', category: 'fatigue', message: `Week at ${Math.round(tl.week_load_pct)}% of planned load — recovery matters.`, priority: 1 });
       } else if (tl.previous_day_workload > 80) {
-        push(flags, { type: 'neutral', category: 'fatigue', message: `Hard session yesterday (workload ${tl.previous_day_workload}).`, priority: 3 });
+        push(flags, { type: 'neutral', category: 'fatigue', message: `Hard session yesterday.`, priority: 3 });
       }
     }
   } catch {}

@@ -37,6 +37,8 @@ export type SessionDetailInput = {
   completedComputed?: Record<string, unknown> | null;
   /** Completed workout's refined_type (e.g. 'pool_swim', 'open_water_swim'). */
   completedRefinedType?: string | null;
+  /** Next planned session from the week (forward-looking context). */
+  nextSession?: { name: string; date: string | null; type: string | null; prescription: string | null } | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -57,6 +59,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     loadStatus,
     completedComputed,
     completedRefinedType,
+    nextSession,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -209,7 +212,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const weekLabel = buildWeekLabel(factPacket);
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
-  const analysisDetailRows = buildAnalysisDetailRows(factPacket, flagsV1, summaryBullets.length > 0, comp);
+  const analysisDetailRows = buildAnalysisDetailRows(factPacket, flagsV1, summaryBullets.length > 0, comp, !!perf?.gap_adjusted);
 
   // ── Adherence narrative ────────────────────────────────────────────────────
   const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)
@@ -341,6 +344,39 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     splits_mi: splitsMi,
     pacing: { coefficient_of_variation: pacingCV },
+
+    trend: (() => {
+      try {
+        const pts = factPacket?.derived?.comparisons?.vs_similar?.trend_points;
+        if (!Array.isArray(pts) || pts.length < 3) return null;
+        const fmtPace = (s: number) => { const m = Math.floor(s / 60); const sec = Math.round(s % 60); return `${m}:${String(sec).padStart(2, '0')}/mi`; };
+        const sorted = [...pts].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+        const points = sorted.map((p: any) => ({
+          date: String(p.date),
+          value: Number(p.pace_sec_per_mi),
+          avg_hr: Number(p.avg_hr),
+          is_current: !!p.is_current,
+          label: fmtPace(Number(p.pace_sec_per_mi)),
+        }));
+        const first = points[0]?.value;
+        const last = points[points.length - 1]?.value;
+        const delta = first != null && last != null ? Math.round(first - last) : 0;
+        const direction = delta > 10 ? 'improving' as const : delta < -10 ? 'declining' as const : 'stable' as const;
+        const absDelta = Math.abs(delta);
+        const summary = direction === 'stable'
+          ? 'Consistent across recent workouts'
+          : `${absDelta}s/mi ${direction === 'improving' ? 'faster' : 'slower'} over ${points.length} workouts`;
+        return {
+          metric_label: 'Pace',
+          unit: '/mi',
+          points,
+          direction,
+          summary,
+        };
+      } catch { return null; }
+    })(),
+
+    next_session: nextSession ?? null,
 
     display: {
       show_adherence_chips: showAdherenceChips,
@@ -566,23 +602,11 @@ function buildPlannedTotals(
 }
 
 function buildAnalysisDetailRows(
-  factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any,
+  factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
   const derived = factPacket?.derived;
-
-  try {
-    const stim = derived?.stimulus;
-    if (stim && typeof stim.achieved === 'boolean') {
-      rows.push({
-        label: 'Stimulus',
-        value: stim.achieved
-          ? `Achieved (${stim.confidence}). ${Array.isArray(stim.evidence) && stim.evidence[0] ? stim.evidence[0] : ''}`.trim()
-          : `Possibly missed (${stim.confidence}). ${stim.partial_credit || ''}`.trim(),
-      });
-    }
-  } catch { /* */ }
 
   try {
     const lim = derived?.primary_limiter;
@@ -596,51 +620,27 @@ function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
-  try {
-    const vs = derived?.comparisons?.vs_similar;
-    if (vs && typeof vs.sample_size === 'number' && vs.sample_size > 0 && vs.assessment !== 'insufficient_data') {
-      const map: Record<string, string> = {
-        better_than_usual: 'Faster than usual',
-        typical: 'In line with your typical pace',
-        worse_than_usual: 'Slower than usual',
-      };
-      const label = map[String(vs.assessment)] || String(vs.assessment);
-      const parts: string[] = [label];
-      const paceDelta = typeof vs.pace_delta_sec === 'number' && Math.abs(vs.pace_delta_sec) >= 3
-        ? vs.pace_delta_sec : null;
-      const hrDelta = typeof vs.hr_delta_bpm === 'number' && Math.abs(vs.hr_delta_bpm) >= 2
-        ? vs.hr_delta_bpm : null;
-      if (paceDelta != null) {
-        const abs = Math.abs(Math.round(paceDelta));
-        parts[0] += ` by ${abs}s/mi`;
-      }
-      parts[0] += ` across ${vs.sample_size} similar run${vs.sample_size === 1 ? '' : 's'}`;
-      if (hrDelta != null) {
-        const sign = hrDelta > 0 ? '+' : '';
-        parts.push(`HR ${sign}${Math.round(hrDelta)} bpm vs similar efforts`);
-      }
-      rows.push({ label: 'Similar workouts', value: parts.join('. ') });
-    }
-  } catch { /* */ }
 
-  try {
-    const tr = derived?.comparisons?.trend;
-    if (tr && typeof tr.data_points === 'number' && tr.data_points > 0 && tr.direction !== 'insufficient_data') {
-      rows.push({
-        label: 'Trend',
-        value: `${String(tr.direction)}${tr.magnitude ? ` — ${tr.magnitude}` : ''}`.trim(),
-      });
-    }
-  } catch { /* */ }
 
   try {
     const splitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi) ? comp.analysis.events.splits.mi : [];
-    const splits = splitsMi.map((s: any) => {
+
+    const rawSplits = splitsMi.map((s: any) => {
       const pacePerKm = Number(s?.avgPace_s_per_km);
-      return { mile: Number(s?.n), pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN };
+      const gapPerKm = Number(s?.avgGapPace_s_per_km);
+      return {
+        mile: Number(s?.n),
+        pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN,
+        gap: Number.isFinite(gapPerKm) && gapPerKm > 0 ? gapPerKm * 1.60934 : NaN,
+      };
     }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
 
-    if (splits.length >= 2) {
+    if (rawSplits.length >= 2) {
+      const hasGap = gapAdjusted && rawSplits.every((s) => Number.isFinite(s.gap) && s.gap > 0);
+      const splits = hasGap
+        ? rawSplits.map((s) => ({ mile: s.mile, pace: s.gap }))
+        : rawSplits.map((s) => ({ mile: s.mile, pace: s.pace }));
+
       const mid = Math.ceil(splits.length / 2);
       const firstHalf = splits.slice(0, mid);
       const secondHalf = splits.slice(mid);
@@ -649,16 +649,17 @@ function buildAnalysisDetailRows(
       const secondAvg = avg(secondHalf);
       const diff = firstAvg - secondAvg;
       const absDiff = Math.abs(Math.round(diff));
+      const effortLabel = hasGap ? 'effort' : 'pacing';
       let pattern: string;
       if (absDiff <= 15) {
-        pattern = 'Even pacing';
+        pattern = hasGap ? 'Even effort (grade-adjusted)' : 'Even pacing';
       } else if (diff > 0) {
-        pattern = `Negative split — finished ${absDiff}s/mi faster than you started`;
+        pattern = `Negative split — ${effortLabel} ${absDiff}s/mi faster in second half`;
       } else {
-        pattern = `Positive split — slowed ${absDiff}s/mi over the run`;
+        pattern = `Positive split — ${effortLabel} slowed ${absDiff}s/mi${hasGap ? ' (grade-adjusted)' : ''}`;
       }
 
-      const fastest = splits.reduce((a, b) => a.pace < b.pace ? a : b);
+      const fastest = rawSplits.reduce((a, b) => a.pace < b.pace ? a : b);
       const fm = Math.floor(fastest.pace / 60);
       const fs = Math.round(fastest.pace % 60);
       const fastestStr = `Fastest: Mile ${fastest.mile} at ${fm}:${String(fs).padStart(2, '0')}/mi`;
@@ -718,25 +719,23 @@ function buildAnalysisDetailRows(
 
   try {
     const tl = derived?.training_load;
-    if (tl && typeof tl.cumulative_fatigue === 'string') {
+    if (tl && typeof tl.cumulative_fatigue === 'string' && tl.cumulative_fatigue !== 'low') {
       const evidence = Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
-        ? tl.fatigue_evidence.join(' — ')
-        : tl.cumulative_fatigue.charAt(0).toUpperCase() + tl.cumulative_fatigue.slice(1).toLowerCase() + ' fatigue';
-      rows.push({ label: 'Fatigue', value: evidence.trim() });
+        ? tl.fatigue_evidence.join(' · ')
+        : `${tl.cumulative_fatigue.charAt(0).toUpperCase()}${tl.cumulative_fatigue.slice(1)} training load`;
+      rows.push({ label: 'Load', value: evidence.trim() });
     }
   } catch { /* */ }
 
-  if (!hasBullets) {
-    try {
-      const top = flagsV1
-        .filter((f: any) => f && typeof f.message === 'string' && f.message.length > 0)
-        .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
-        .slice(0, 3);
-      for (const f of top) {
-        rows.push({ label: 'Flag', value: String(f.message) });
-      }
-    } catch { /* */ }
-  }
+  try {
+    const concerns = flagsV1
+      .filter((f: any) => f && f.type === 'concern' && typeof f.message === 'string' && f.message.length > 0 && Number(f.priority || 99) <= 2)
+      .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
+      .slice(0, 2);
+    for (const f of concerns) {
+      rows.push({ label: 'Flag', value: String(f.message) });
+    }
+  } catch { /* */ }
 
   const dedup = new Set<string>();
   return rows.filter((r) => {
