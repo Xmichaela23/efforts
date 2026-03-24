@@ -94,9 +94,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
 
   // Endurance (run/ride/swim) — all data comes from sd (session_detail_v1)
 
-  console.log('[MobileSummary] sd.trend:', JSON.stringify(sd?.trend ?? null));
-  console.log('[MobileSummary] sd.next_session:', JSON.stringify(sd?.next_session ?? null));
-
   return (
     <div className="w-full">
       {/* Source line removed per UI request */}

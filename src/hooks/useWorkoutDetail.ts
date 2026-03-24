@@ -135,31 +135,24 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
       return { workout: merged, session_detail_v1: sessionDetailV1 };
     },
-    staleTime: 0, // Always refetch to get latest GPS track (especially if polyline was decoded)
+    staleTime: 60_000, // 60s — workout details don't change unless explicitly recomputed
     gcTime: 6 * 60 * 60 * 1000, // 6 hours
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 
-  // Allow external invalidation
+  // Allow external invalidation — only respond to workout-detail-specific events.
+  // NOT workouts:invalidate — that fires on every list change / realtime update
+  // and caused a write-back loop (workout-detail writes session_detail_v1 →
+  // realtime fires workouts:invalidate → refetch → write-back → loop).
   useEffect(() => {
-    const handler = () => { 
-      try { 
-        queryClient.invalidateQueries({ queryKey: ['workout-detail'] }); 
-        // Force immediate refetch by removing stale time
-        queryClient.refetchQueries({ queryKey: ['workout-detail'] });
-      } catch {} 
+    const detailHandler = () => {
+      try {
+        queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
+      } catch {}
     };
-    const detailHandler = () => { 
-      try { 
-        queryClient.invalidateQueries({ queryKey: ['workout-detail'] }); 
-        queryClient.refetchQueries({ queryKey: ['workout-detail'] });
-      } catch {} 
-    };
-    window.addEventListener('workouts:invalidate', handler);
     window.addEventListener('workout-detail:invalidate', detailHandler);
-    return () => { 
-      window.removeEventListener('workouts:invalidate', handler);
+    return () => {
       window.removeEventListener('workout-detail:invalidate', detailHandler);
     };
   }, [queryClient]);

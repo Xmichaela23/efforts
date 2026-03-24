@@ -686,11 +686,6 @@ Deno.serve(async (req) => {
               : null,
         } : null;
 
-        // Diagnostic: check trend_points in fact packet
-        const _fp = wa?.fact_packet_v1 || wa?.session_state_v1?.details?.fact_packet_v1;
-        const _tp = _fp?.derived?.comparisons?.vs_similar?.trend_points;
-        console.log(`[workout-detail] trend_points: ${Array.isArray(_tp) ? _tp.length + ' points' : 'missing'}, vs_similar.sample_size: ${_fp?.derived?.comparisons?.vs_similar?.sample_size ?? 'n/a'}`);
-
         sessionDetailV1 = buildSessionDetailV1({
           workoutId: id,
           workoutDate,
@@ -710,8 +705,6 @@ Deno.serve(async (req) => {
           completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
           nextSession,
         });
-        console.log(`[workout-detail] built session_detail_v1.trend: ${sessionDetailV1?.trend ? JSON.stringify({ direction: sessionDetailV1.trend.direction, points: sessionDetailV1.trend.points?.length, summary: sessionDetailV1.trend.summary }) : 'null'}`);
-        console.log(`[workout-detail] built session_detail_v1.next_session: ${sessionDetailV1?.next_session ? JSON.stringify(sessionDetailV1.next_session) : 'null'}`);
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);
       }
