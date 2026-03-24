@@ -204,10 +204,31 @@ export async function buildCoachingContext(
 
   // Recent workouts (last 48h) for interference detection
   if (recentFacts.length > 0) {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     lines.push("");
-    lines.push("LAST 48 HOURS:");
+    lines.push("RECENT SESSIONS BEFORE THIS WORKOUT:");
     for (const f of recentFacts) {
-      let detail = `  ${f.date} ${f.discipline} — workload: ${f.workload ?? 0}, ${Math.round(f.duration_minutes ?? 0)} min`;
+      const factDate = String(f.date || '').slice(0, 10);
+      const daysAgo = (() => {
+        try {
+          const [fy, fm, fd] = factDate.split('-').map(Number);
+          const [wy, wm, wd] = workoutDate.split('-').map(Number);
+          const fMs = new Date(fy, fm - 1, fd).getTime();
+          const wMs = new Date(wy, wm - 1, wd).getTime();
+          return Math.round((wMs - fMs) / 86400000);
+        } catch { return null; }
+      })();
+      const dayOfWeek = (() => {
+        try {
+          const [y, m, d] = factDate.split('-').map(Number);
+          return dayNames[new Date(y, m - 1, d).getDay()];
+        } catch { return ''; }
+      })();
+      const timeLabel = daysAgo === 1 ? `yesterday (${dayOfWeek})`
+        : daysAgo != null ? `${daysAgo} days before this workout (${dayOfWeek})`
+        : `${factDate} (${dayOfWeek})`;
+
+      let detail = `  ${timeLabel} — ${f.discipline}, workload: ${f.workload ?? 0}, ${Math.round(f.duration_minutes ?? 0)} min`;
       if (f.discipline === "strength" && f.strength_facts) {
         const sf = f.strength_facts;
         detail += ` (vol: ${sf.total_volume_lbs ?? 0} lbs, ${sf.total_sets ?? 0} sets)`;

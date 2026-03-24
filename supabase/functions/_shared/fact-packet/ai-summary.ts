@@ -82,6 +82,12 @@ function countSentences(text: string): number {
   return parts.length;
 }
 
+function countClauses(text: string): number {
+  const s = normalizeParagraph(text);
+  if (!s) return 0;
+  return s.split(/[.!?;]|—/).map((p) => p.trim()).filter((p) => p.length > 15).length;
+}
+
 function countWords(text: string): number {
   const s = normalizeParagraph(text);
   if (!s) return 0;
@@ -99,13 +105,16 @@ function validateAdaptiveLength(summary: string, displayPacket: any): { ok: bool
   const top = getTopFlags(displayPacket);
   const hasConcern = top.some((f) => f.type === 'concern' && f.priority <= 2);
   const sentences = countSentences(summary);
+  const clauses = countClauses(summary);
   const words = countWords(summary);
   if (!hasConcern) {
     if (sentences > 3) return { ok: false, why: `too many sentences (${sentences}) for low-signal workout` };
-    if (words > 60) return { ok: false, why: `too many words (${words}) for low-signal workout` };
+    if (clauses > 4) return { ok: false, why: `too many clauses (${clauses}) for low-signal workout` };
+    if (words > 50) return { ok: false, why: `too many words (${words}) for low-signal workout` };
   }
-  if (sentences > 4) return { ok: false, why: `too many sentences (${sentences})` };
-  if (words > 80) return { ok: false, why: `too many words (${words})` };
+  if (sentences > 3) return { ok: false, why: `too many sentences (${sentences})` };
+  if (clauses > 5) return { ok: false, why: `too many clauses (${clauses})` };
+  if (words > 65) return { ok: false, why: `too many words (${words})` };
   return { ok: true, why: null };
 }
 
@@ -148,7 +157,7 @@ RULES:
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present in the data provided.
 - CRITICAL: Pace must use display format like "10:16/mi", never raw seconds.
 - Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly. Instead of 'The week's accumulated fatigue is real' write 'Accumulated fatigue from 129% weekly load is a factor.' Instead of 'You nailed the pacing' write 'Pacing was well-controlled for the terrain.'
-- TEMPORAL PRECISION: Do not say 'yesterday', 'two days ago', or any relative time unless you can verify the exact date relationship from the workout date and the dates in LAST 48 HOURS. If unsure, omit the time reference entirely.
+- TEMPORAL PRECISION: The RECENT SESSIONS section already labels each session with its exact timing (e.g. "yesterday", "2 days before"). Use those labels verbatim. NEVER invent your own temporal claims — do not say "yesterday" unless the data literally says "yesterday". If timing is not labeled, omit any time reference.
 - CROSS-DISCIPLINE CLAIMS: Only reference prior workouts affecting this one when the mechanism is physiologically plausible. Think about what muscle groups were used and whether they overlap with the current workout. Systemic fatigue (CNS load, sleep debt) is real but distinct from local muscular fatigue — be specific about which mechanism you mean.
 - FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
 
