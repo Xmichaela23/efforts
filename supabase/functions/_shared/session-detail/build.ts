@@ -728,8 +728,10 @@ function buildAnalysisDetailRows(
   } catch { /* */ }
 
   try {
+    const hasLoadRow = rows.some((r) => r.label === 'Load');
     const concerns = flagsV1
       .filter((f: any) => f && f.type === 'concern' && typeof f.message === 'string' && f.message.length > 0 && Number(f.priority || 99) <= 2)
+      .filter((f: any) => !(hasLoadRow && f.category === 'fatigue'))
       .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 2);
     for (const f of concerns) {
