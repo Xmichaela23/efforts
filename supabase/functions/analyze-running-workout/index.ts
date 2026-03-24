@@ -113,8 +113,9 @@ Deno.serve(async (req) => {
         forceWeatherFetch = true;
       }
     }
-    console.log('🆕 NEW VERSION: Checking time_series_data and garmin_data for pace data');
-    console.log('🔍 [MAIN DEBUG] Starting analysis for workout:', workout_id);
+    const _t0 = Date.now();
+    const _mem = () => { try { return `${Math.round((Deno as any).memoryUsage().heapUsed / 1048576)}MB`; } catch { return '?'; } };
+    console.log(`🏁 START heap=${_mem()}`);
 
     // Set analysis status to 'analyzing' at start
     const { error: statusError } = await supabase
@@ -129,17 +130,15 @@ Deno.serve(async (req) => {
       console.warn('⚠️ Failed to set analyzing status:', statusError.message);
     }
 
-    // Get workout data
+    // Phase 1: load metadata + primary sensor sources. Defer garmin_data/time_series_data
+    // to a second query so we don't hold all large blobs in memory simultaneously.
     const { data: workout, error: workoutError } = await supabase
       .from('workouts')
       .select(`
         id,
         type,
         sensor_data,
-        metrics,
         computed,
-        time_series_data,
-        garmin_data,
         planned_id,
         user_id,
         moving_time,
@@ -160,6 +159,7 @@ Deno.serve(async (req) => {
     if (workoutError || !workout) {
       throw new Error(`Workout not found: ${workoutError?.message}`);
     }
+    console.log(`🏁 AFTER_FETCH +${Date.now()-_t0}ms heap=${_mem()}`);
 
     // If force refresh was requested, clear the in-memory weather data
     // (DB was already cleared, but SELECT might have returned stale data)
@@ -169,25 +169,12 @@ Deno.serve(async (req) => {
     }
 
     console.log('🔍 Available data sources:', {
-      time_series_data: !!workout.time_series_data,
-      garmin_data: !!workout.garmin_data,
       computed: !!workout.computed,
       sensor_data: !!workout.sensor_data
-    });
-    
-    console.log('🔍 Workout summary fields:', {
-      distance: workout.distance,
-      moving_time: workout.moving_time,
-      duration: workout.duration,
-      type: workout.type
     });
 
     if (workout.type !== 'run' && workout.type !== 'running') {
       throw new Error(`Workout type ${workout.type} is not supported for running analysis`);
-    }
-
-    if (!workout.sensor_data && !workout.computed) {
-      throw new Error('No sensor data or computed data available. Workout may not have been processed yet.');
     }
 
     // Fetch historical weather if not cached (or force refresh) and we have location data
@@ -331,12 +318,12 @@ Deno.serve(async (req) => {
         .select('id, name, date, moving_time, duration, elevation_gain, workout_analysis')
         .eq('user_id', workout.user_id)
         .eq('type', 'run')
-        .neq('id', workout_id) // Exclude current workout
+        .neq('id', workout_id)
         .gte('date', ninetyDaysAgo.toISOString())
         .gte('moving_time', minDuration)
         .not('workout_analysis', 'is', null)
         .order('date', { ascending: false })
-        .limit(15);
+        .limit(5);
       
       if (histError) {
         console.log(`📊 [HISTORICAL QUERY] Error: ${histError.message}`);
@@ -345,24 +332,15 @@ Deno.serve(async (req) => {
       console.log(`📊 [HISTORICAL QUERY] Found ${similarWorkouts?.length ?? 0} runs with analysis`);
       
       if (similarWorkouts && similarWorkouts.length > 0) {
-        // Log what we found
-        similarWorkouts.forEach((w, i) => {
-          const mtRaw = w.moving_time || w.duration || 0;
-          const durMin = Math.round(mtRaw < 1000 ? mtRaw : mtRaw / 60);
-          const hasDrift1 = w.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm;
-          const hasDrift2 = w.workout_analysis?.heart_rate_summary?.drift_bpm;
-          const hasDrift3 = w.workout_analysis?.detailed_analysis?.workout_summary?.hr_drift;
-          console.log(`📊 [HISTORICAL QUERY] ${i+1}. ${w.name || 'Run'} (${durMin}min): drift1=${hasDrift1}, drift2=${hasDrift2}, drift3=${hasDrift3}`);
-        });
-        
+        // Extract drift values then immediately free the large workout_analysis blobs.
         const workoutsWithDrift = similarWorkouts
-          .map(w => {
-            // Check multiple possible locations for HR drift (different analysis versions)
+          .map((w: any) => {
             const hrDrift = 
               w.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ??
               w.workout_analysis?.heart_rate_summary?.drift_bpm ??
               w.workout_analysis?.detailed_analysis?.workout_summary?.hr_drift ??
               null;
+            w.workout_analysis = null; // free immediately
             if (hrDrift != null && Number.isFinite(hrDrift)) {
               const daysSince = Math.round((Date.now() - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24));
               return {
@@ -375,7 +353,7 @@ Deno.serve(async (req) => {
             }
             return null;
           })
-          .filter((w): w is NonNullable<typeof w> => w !== null);
+          .filter((w: any): w is NonNullable<typeof w> => w !== null);
         
         if (workoutsWithDrift.length >= 1) {
           const avgDrift = workoutsWithDrift.reduce((sum, w) => sum + w.driftBpm, 0) / workoutsWithDrift.length;
@@ -519,38 +497,50 @@ Deno.serve(async (req) => {
     }
 
     // Extract sensor data - try different data sources
-    let sensorData = [];
-    
-    // Try time_series_data first (most likely to have pace data)
-    if (workout.time_series_data) {
-      console.log('🔍 Trying time_series_data first...');
-      sensorData = extractSensorData(workout.time_series_data);
-      console.log(`📊 time_series_data yielded ${sensorData.length} samples`);
-    }
-    
-    // Try garmin_data if time_series_data doesn't work
-    if (sensorData.length === 0 && workout.garmin_data) {
-      console.log('🔍 Trying garmin_data...');
-      sensorData = extractSensorData(workout.garmin_data);
-      console.log(`📊 garmin_data yielded ${sensorData.length} samples`);
-    }
-    
-    // Try computed data
-    if (sensorData.length === 0 && workout.computed) {
-      console.log('🔍 Trying computed data...');
-      sensorData = extractSensorData(workout.computed);
-      console.log(`📊 computed data yielded ${sensorData.length} samples`);
-    }
-    
-    // Try sensor_data as last resort
-    if (sensorData.length === 0 && workout.sensor_data) {
-      console.log('🔍 Trying sensor_data as fallback...');
+    let sensorData: any[] = [];
+
+    // Try primary sources first (already loaded).
+    if (workout.sensor_data) {
       sensorData = extractSensorData(workout.sensor_data);
       console.log(`📊 sensor_data yielded ${sensorData.length} samples`);
     }
-    
+    (workout as any).sensor_data = null; // free immediately
+
+    if (sensorData.length === 0 && workout.computed) {
+      sensorData = extractSensorData(workout.computed);
+      console.log(`📊 computed data yielded ${sensorData.length} samples`);
+    }
+
+    // Phase 2: only load the heavy blobs if primary sources had no data.
+    if (sensorData.length === 0) {
+      console.log('🔍 Primary sources empty — loading time_series_data/garmin_data...');
+      const { data: heavyRow } = await supabase
+        .from('workouts')
+        .select('time_series_data, garmin_data')
+        .eq('id', workout_id)
+        .single();
+      if (heavyRow?.time_series_data) {
+        sensorData = extractSensorData(heavyRow.time_series_data);
+        console.log(`📊 time_series_data yielded ${sensorData.length} samples`);
+      }
+      if (sensorData.length === 0 && heavyRow?.garmin_data) {
+        sensorData = extractSensorData(heavyRow.garmin_data);
+        console.log(`📊 garmin_data yielded ${sensorData.length} samples`);
+      }
+      // heavyRow goes out of scope here — GC can reclaim it.
+    }
+
+    // Strip large computed sub-objects not needed by analysis.
+    if (workout.computed) {
+      (workout as any).computed.analysis = null;
+      (workout as any).computed.raw_laps = null;
+      (workout as any).computed.power_curve = null;
+      (workout as any).computed.best_efforts = null;
+      (workout as any).computed.adaptation = null;
+    }
+    console.log(`🏁 AFTER_EXTRACT +${Date.now()-_t0}ms heap=${_mem()} samples=${sensorData.length}`);
+
     if (!sensorData || sensorData.length === 0) {
-      // Return a meaningful response instead of crashing
       return new Response(JSON.stringify({
         success: true,
         analysis: {
@@ -774,8 +764,8 @@ Deno.serve(async (req) => {
     console.log('🔴🔴🔴 INDEX.TS VERSION 2026-02-02-D: HR DRIFT FIX ACTIVE');
     console.log('🚀 [TIMING] Starting calculatePrescribedRangeAdherenceGranular...');
     const analysis = calculatePrescribedRangeAdherenceGranular(sensorData, intervalsToAnalyze, workout, plannedWorkout, historicalDriftData, planContextForDrift);
-    console.log('✅ [TIMING] Granular analysis completed!');
-    
+    console.log(`🏁 AFTER_GRANULAR +${Date.now()-_t0}ms heap=${_mem()}`);
+
     // 💓 SINGLE SOURCE OF TRUTH: Consolidated HR Analysis
     // All HR metrics (drift, zones, efficiency, intervals) calculated here
     
@@ -1081,8 +1071,7 @@ Deno.serve(async (req) => {
     }
     
     const hrAnalysisResult = analyzeHeartRate(sensorData, hrAnalysisContext);
-    console.log(`💓 [HR ANALYSIS] Complete: type=${hrAnalysisResult.workoutType}, drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'}, confidence=${hrAnalysisResult.confidence}`);
-    console.log(`💓 [HR ANALYSIS] Interpretation length: ${hrAnalysisResult.interpretation?.length ?? 0}`);
+    console.log(`🏁 AFTER_HR +${Date.now()-_t0}ms heap=${_mem()} drift=${hrAnalysisResult.drift?.driftBpm ?? 'N/A'}`);
     
     // Update analysis.heart_rate_analysis with consolidated results
     {
@@ -1140,7 +1129,7 @@ Deno.serve(async (req) => {
 
     // Store analysis in database with correct nested structure
     console.log('💾 Storing analysis in database...');
-    console.log('🔍 Enhanced analysis structure:', JSON.stringify(enhancedAnalysis, null, 2));
+    console.log('🔍 Enhanced analysis keys:', Object.keys(enhancedAnalysis));
     
     // Get existing workout_analysis to preserve other fields
     const { data: existingWorkout } = await supabase
@@ -1543,25 +1532,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 🚀 ENHANCED DETAILED ANALYSIS - Chart-like insights
-    console.log('🚀 Starting detailed analysis generation...');
-    console.log('🔍 Sensor data length:', sensorData.length);
-    console.log('🔍 Computed intervals length:', computedIntervals.length);
-    console.log('🔍 Enhanced analysis keys:', Object.keys(enhancedAnalysis));
-    console.log('🔍 [HR DRIFT DEBUG] enhancedAnalysis.heart_rate_analysis?.hr_drift_bpm:', enhancedAnalysis?.heart_rate_analysis?.hr_drift_bpm);
-    console.log('🔍 [HR DRIFT DEBUG] enhancedAnalysis.heart_rate_analysis exists:', !!enhancedAnalysis?.heart_rate_analysis);
+    console.log(`🏁 BEFORE_DETAILED +${Date.now()-_t0}ms heap=${_mem()} perf=${performance.execution_adherence}%`);
     
     let detailedAnalysis = null;
     try {
       detailedAnalysis = generateDetailedChartAnalysis(sensorData, computedIntervals, enhancedAnalysis, plannedPaceInfo, workout, userUnits, plannedWorkout);
-      console.log('📊 Detailed analysis generated successfully:', JSON.stringify(detailedAnalysis, null, 2));
+      console.log(`🏁 AFTER_DETAILED +${Date.now()-_t0}ms heap=${_mem()}`);
     } catch (error) {
       console.error('❌ Detailed analysis generation failed:', error);
       detailedAnalysis = { error: 'Failed to generate detailed analysis', message: error.message };
     }
 
-    // ✅ RECALCULATE EXECUTION SCORE FROM detailed_analysis.interval_breakdown (same source as segment scores)
-    // ✅ RECALCULATE EXECUTION SCORE FROM detailed_analysis.interval_breakdown (same source as segment scores)
+    // Recalculate execution score from interval_breakdown
     // Weighted average: Warmup 15%, Work intervals 60%, Recoveries 10%, Cooldown 15%
     console.log(`🔍 [EXECUTION SCORE DEBUG] Checking conditions:`);
     console.log(`   - detailedAnalysis exists: ${!!detailedAnalysis}`);
@@ -1748,17 +1730,12 @@ Deno.serve(async (req) => {
       intervals: workoutToUse.computed?.intervals || workout.computed?.intervals || [],
       planned_steps_light: workoutToUse.computed?.planned_steps_light || workout.computed?.planned_steps_light || null
     };
-    // Only include overall/analysis if they exist (preserve from compute-workout-analysis)
+    // Only include overall if it exists (preserve from compute-workout-analysis)
     if (workoutToUse.computed?.overall || workout.computed?.overall) {
       minimalComputed.overall = workoutToUse.computed?.overall || workout.computed?.overall;
-      console.log('✅ Preserving overall from compute-workout-analysis');
     }
-    if (workoutToUse.computed?.analysis || workout.computed?.analysis) {
-      minimalComputed.analysis = workoutToUse.computed?.analysis || workout.computed?.analysis;
-      console.log('✅ Preserving analysis.series from compute-workout-analysis');
-    } else {
-      console.warn('⚠️ No analysis.series found - compute-workout-analysis may not have completed yet');
-    }
+    // NOTE: analysis (with series) is NOT included — it's owned by compute-workout-analysis
+    // and preserved by the JSONB || merge operator in merge_computed RPC.
     
     // Create analysis_v2 with version metadata
     const analysisV2 = {
@@ -1773,12 +1750,7 @@ Deno.serve(async (req) => {
       detailed_analysis: detailedAnalysis
     };
 
-    // Log what we're about to write
-    console.log('🔍 [PRE-UPDATE DEBUG] About to write to database:');
-    console.log('  - detailedAnalysis type:', typeof detailedAnalysis);
-    console.log('  - detailedAnalysis is null?:', detailedAnalysis === null);
-    console.log('  - detailedAnalysis keys:', detailedAnalysis ? Object.keys(detailedAnalysis) : 'N/A');
-    console.log('  - detailedAnalysis value:', JSON.stringify(detailedAnalysis, null, 2));
+    console.log('🔍 [PRE-UPDATE DEBUG] detailedAnalysis keys:', detailedAnalysis ? Object.keys(detailedAnalysis) : 'N/A');
     
     // Fetch plan context for smarter, plan-aware verbiage
     let planContext = null;
@@ -1808,15 +1780,13 @@ Deno.serve(async (req) => {
       }
     })();
 
-    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis, aerobicCeilingBpm, classifiedTypeKey);
+    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis, aerobicCeilingBpm, classifiedTypeKey, (hrAnalysisContext as any)?.weather?.temperatureF ?? null);
     const scoreExplanation = adherenceSummary?.verdict ?? null;
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
 
     // =========================================================================
     // Deterministic fact packet (v1) — single source of truth for coaching.
-    // Built from computed + workout_analysis + plan + baselines + historical queries.
-    // NOTE: Must run BEFORE summaryV1 so summary can consume it.
-    // =========================================================================
+    console.log(`🏁 BEFORE_FACTPACKET +${Date.now()-_t0}ms heap=${_mem()}`);
     let fact_packet_v1: any = null;
     let flags_v1: any = null;
     try {
@@ -2265,25 +2235,25 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to merge computed data: ${rpcError.message}. RPC function merge_computed is required.`);
     }
     
-    // Contract: merge into existing workout_analysis (do not replace).
-    const { data: existingRowForMerge, error: existingRowErr } = await supabase
-      .from('workouts')
-      .select('workout_analysis')
-      .eq('id', workout_id)
-      .single();
-    if (existingRowErr) {
-      console.warn('[analyze-running-workout] failed to read existing workout_analysis for merge:', existingRowErr.message);
-    }
-    const existingAnalysis = existingRowForMerge?.workout_analysis || {};
-
-    // On recompute, preserve the previous narrative when the LLM call fails
-    // rather than overwriting a good summary with null.
-    if (!ai_summary && typeof (existingAnalysis as any)?.ai_summary === 'string') {
-      ai_summary = (existingAnalysis as any).ai_summary;
-      ai_summary_generated_at = typeof (existingAnalysis as any)?.ai_summary_generated_at === 'string'
-        ? (existingAnalysis as any).ai_summary_generated_at
-        : null;
-      console.log('[analyze-running-workout] preserved previous ai_summary (LLM did not produce a new one)');
+    // Preserve previous ai_summary when LLM fails on recompute.
+    if (!ai_summary) {
+      const { data: existingRow, error: existingRowErr } = await supabase
+        .from('workouts')
+        .select('workout_analysis')
+        .eq('id', workout_id)
+        .single();
+      if (existingRowErr) {
+        console.warn('[analyze-running-workout] failed to read existing workout_analysis:', existingRowErr.message);
+      }
+      const prev = existingRow?.workout_analysis;
+      if (typeof prev?.ai_summary === 'string') {
+        ai_summary = prev.ai_summary;
+        ai_summary_generated_at = typeof prev?.ai_summary_generated_at === 'string'
+          ? prev.ai_summary_generated_at
+          : null;
+        console.log('[analyze-running-workout] preserved previous ai_summary');
+      }
+      // Don't hold the blob — we only needed ai_summary.
     }
 
     const sessionStateV1 = {
@@ -2322,11 +2292,9 @@ Deno.serve(async (req) => {
       },
     };
 
-    // Update workout_analysis separately (doesn't conflict with computed)
+    // Full replacement — every field is computed fresh in this run.
     const updatePayload = {
       workout_analysis: {
-        // Merge: preserve existing fields, overwrite with latest analysis outputs
-        ...(existingAnalysis || {}),
         classified_type: classifiedTypeKey,
         granular_analysis: enhancedAnalysis,
         performance: performance,
@@ -2347,8 +2315,7 @@ Deno.serve(async (req) => {
       analyzed_at: new Date().toISOString()
     };
     
-    console.log('🔍 [PRE-UPDATE DEBUG] Full update payload workout_analysis keys:', 
-      Object.keys(updatePayload.workout_analysis));
+    console.log(`🏁 BEFORE_DB_UPDATE +${Date.now()-_t0}ms heap=${_mem()} keys=${Object.keys(updatePayload.workout_analysis).length}`);
     
     // Update workout_analysis and status
     const { error: updateError } = await supabase
@@ -2360,50 +2327,12 @@ Deno.serve(async (req) => {
     
     if (updateError) {
       console.error('❌ Database update FAILED:', updateError);
-      console.error('❌ Update payload:', JSON.stringify({
-        computed: minimalComputed,
-        workout_analysis: {
-          ...existingAnalysis,
-          granular_analysis: enhancedAnalysis,
-          performance: performance
-        }
-      }, null, 2));
+      console.error('❌ Update payload keys:', Object.keys(updatePayload.workout_analysis));
     } else {
       console.log('✅ Analysis stored successfully in database');
-      console.log('🔍 Stored performance:', JSON.stringify(performance, null, 2));
-      console.log('🔍 Stored granular_analysis keys:', Object.keys(enhancedAnalysis));
-      
-      // Verify the update actually worked by reading it back
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('workouts')
-        .select('workout_analysis')
-        .eq('id', workout_id)
-        .single();
-      
-      if (verifyError) {
-        console.error('❌ Verification read failed:', verifyError);
-      } else {
-        console.log('✅ [POST-UPDATE VERIFY] workout_analysis keys in DB:', verifyData?.workout_analysis ? Object.keys(verifyData.workout_analysis) : 'NULL');
-        console.log('✅ [POST-UPDATE VERIFY] Has performance?:', !!verifyData?.workout_analysis?.performance);
-        console.log('✅ [POST-UPDATE VERIFY] Has granular_analysis?:', !!verifyData?.workout_analysis?.granular_analysis);
-        console.log('✅ [POST-UPDATE VERIFY] Has detailed_analysis?:', !!verifyData?.workout_analysis?.detailed_analysis);
-        
-        if (verifyData?.workout_analysis?.detailed_analysis) {
-          console.log('✅ [POST-UPDATE VERIFY] detailed_analysis keys:', Object.keys(verifyData.workout_analysis.detailed_analysis));
-        } else {
-          console.error('❌ [POST-UPDATE VERIFY] detailed_analysis is MISSING from database after write!');
-          console.error('❌ [POST-UPDATE VERIFY] This means either:');
-          console.error('   1. The update payload did not include it');
-          console.error('   2. A database trigger/constraint removed it');
-          console.error('   3. Supabase client serialization issue');
-        }
-      }
     }
 
     console.log(`✅ Running analysis complete for workout ${workout_id}`);
-    console.log(`📊 Overall adherence: ${(analysis.overall_adherence * 100).toFixed(1)}%`);
-    // Stored on workout_analysis.performance (object), not performance_assessment
-    console.log(`🎯 Performance: ${JSON.stringify(performance)}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -2787,7 +2716,8 @@ function generateAdherenceSummary(
   } | null,
   granularAnalysis?: any,
   aerobicCeilingBpm?: number | null,
-  classifiedTypeKey?: string | null
+  classifiedTypeKey?: string | null,
+  weatherTempF?: number | null
 ): WorkoutAdherenceSummary | null {
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
@@ -3135,7 +3065,7 @@ function generateAdherenceSummary(
   // -------------------------------------------------------------------------
   // HEAT-ADJUSTED TOLERANCE + HR TIE-BREAKER FOR STIMULUS DETERMINATION
   // -------------------------------------------------------------------------
-  const tempF: number | null = (hrAnalysisContext as any)?.weather?.temperatureF ?? null;
+  const tempF: number | null = weatherTempF ?? null;
   
   // Calculate effective slow floor with heat adjustment
   // Base: 15% slower = under-stimulated, but heat adds tolerance (+3% for 65-75°F, +7% for 75-85°F, +12% for >85°F)

@@ -74,92 +74,78 @@ export function generateMileByMileTerrainBreakdown(
     return null; // Too short for mile breakdown
   }
 
-  // Calculate cumulative distance from sensor samples
-  // Since extractSensorData doesn't preserve distance fields, calculate from pace and time
-  let cumulativeDistanceM = 0;
-  const samplesWithDistance = sensorData.map((sample) => {
-    // Calculate distance from pace and time (each sample is 1 second)
-    if (sample.pace_s_per_mi && sample.pace_s_per_mi > 0) {
-      const speedMps = 1609.34 / sample.pace_s_per_mi; // Convert pace (s/mi) to speed (m/s)
-      cumulativeDistanceM += speedMps * (sample.duration_s || 1); // Usually 1 second per sample
+  // Build a lightweight cumulative-distance array instead of copying every sample.
+  const len = sensorData.length;
+  const cumDist = new Float64Array(len);
+  let runningM = 0;
+  for (let i = 0; i < len; i++) {
+    const s = sensorData[i];
+    if (s.pace_s_per_mi && s.pace_s_per_mi > 0) {
+      runningM += (1609.34 / s.pace_s_per_mi) * (s.duration_s || 1);
     }
+    cumDist[i] = runningM;
+  }
+  const cumulativeDistanceM = runningM;
 
-    return {
-      ...sample,
-      distance_m: cumulativeDistanceM
-    };
-  });
+  console.log(`🔍 [MILE BREAKDOWN] Cumulative distance: ${cumulativeDistanceM.toFixed(0)}m (${(cumulativeDistanceM / 1609.34).toFixed(1)} mi) from ${len} samples`);
 
-  console.log(`🔍 [MILE BREAKDOWN] Calculated cumulative distance: ${cumulativeDistanceM.toFixed(2)}m (${(cumulativeDistanceM / 1609.34).toFixed(2)} miles) from ${samplesWithDistance.length} samples`);
-  console.log(`🔍 [MILE BREAKDOWN] Total distance from intervals: ${totalDistanceM.toFixed(2)}m (${totalDistanceMi.toFixed(2)} miles)`);
-
-  // Calculate mile splits
   const mileSplits: any[] = [];
   const miles = Math.floor(totalDistanceMi);
+  let searchStart = 0;
 
   for (let mile = 1; mile <= miles; mile++) {
     const mileStartM = (mile - 1) * 1609.34;
     const mileEndM = mile * 1609.34;
 
-    // Find samples in this mile
-    const mileSamples = samplesWithDistance.filter(s =>
-      s.distance_m >= mileStartM && s.distance_m < mileEndM
-    );
+    let paceSum = 0;
+    let paceCount = 0;
+    let firstElev: number | null = null;
+    let lastElev: number | null = null;
 
-    if (mileSamples.length === 0) continue;
+    for (let i = searchStart; i < len; i++) {
+      const d = cumDist[i];
+      if (d < mileStartM) continue;
+      if (d >= mileEndM) { searchStart = i; break; }
 
-    // Calculate average pace for this mile
-    const paces = mileSamples.map(s => s.pace_s_per_mi).filter(p => p && p > 0);
-    if (paces.length === 0) continue;
-
-    const avgPaceS = paces.reduce((a, b) => a + b, 0) / paces.length;
-
-    // Try to get elevation if available (check multiple field names)
-    const elevations = mileSamples
-      .map(s => s.elevation_m || s.elevation || s.elevationInMeters)
-      .filter(e => e != null && Number.isFinite(e));
-
-    // Use first and last elevation values for the mile
-    const startElev = elevations.length > 0 ? elevations[0] : null;
-    const endElev = elevations.length > 0 ? elevations[elevations.length - 1] : null;
-    const elevGain = endElev != null && startElev != null ? Math.max(0, endElev - startElev) : null;
-
-    // Calculate grade if elevation available
-    const distanceM = mileEndM - mileStartM;
-    const gradePercent = distanceM > 0 && startElev != null && endElev != null
-      ? ((endElev - startElev) / distanceM) * 100
-      : null;
-
-    // Determine terrain type
-    let terrainType = 'flat';
-    if (gradePercent != null) {
-      if (Math.abs(gradePercent) > 0.5) {
-        terrainType = gradePercent > 0 ? 'uphill' : 'downhill';
+      const s = sensorData[i];
+      if (s.pace_s_per_mi && s.pace_s_per_mi > 0) {
+        paceSum += s.pace_s_per_mi;
+        paceCount++;
+      }
+      const elev = s.elevation_m ?? s.elevation ?? s.elevationInMeters ?? null;
+      if (elev != null && Number.isFinite(elev)) {
+        if (firstElev === null) firstElev = elev;
+        lastElev = elev;
       }
     }
+
+    if (paceCount === 0) continue;
+
+    const avgPaceS = paceSum / paceCount;
+    const elevGain = firstElev != null && lastElev != null ? Math.max(0, lastElev - firstElev) : null;
+    const gradePercent = firstElev != null && lastElev != null
+      ? ((lastElev - firstElev) / 1609.34) * 100
+      : null;
 
     mileSplits.push({
       mile,
       pace_s_per_mi: avgPaceS,
       elevation_gain_m: elevGain,
       grade_percent: gradePercent,
-      terrain_type: terrainType,
-      start_elevation_m: startElev,
-      end_elevation_m: endElev
+      terrain_type: gradePercent != null && Math.abs(gradePercent) > 0.5
+        ? (gradePercent > 0 ? 'uphill' : 'downhill')
+        : 'flat',
+      start_elevation_m: firstElev,
+      end_elevation_m: lastElev,
     });
   }
 
   if (mileSplits.length === 0) {
     console.log('⚠️ [MILE BREAKDOWN] No mile splits generated.');
-    console.log(`   - Total distance from intervals: ${totalDistanceMi.toFixed(2)} miles`);
-    console.log(`   - Calculated cumulative distance: ${cumulativeDistanceM.toFixed(2)}m (${(cumulativeDistanceM / 1609.34).toFixed(2)} miles)`);
-    console.log(`   - Samples: ${samplesWithDistance.length}`);
-    console.log(`   - First sample distance_m: ${samplesWithDistance[0]?.distance_m}`);
-    console.log(`   - Last sample distance_m: ${samplesWithDistance[samplesWithDistance.length - 1]?.distance_m}`);
     return null;
   }
 
-  console.log(`✅ [MILE BREAKDOWN] Generated ${mileSplits.length} mile splits from ${samplesWithDistance.length} samples`);
+  console.log(`✅ [MILE BREAKDOWN] Generated ${mileSplits.length} mile splits from ${len} samples`);
 
   // Format as text section for UI display
   const formatPace = (seconds: number): string => {

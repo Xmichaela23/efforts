@@ -641,9 +641,13 @@ function buildAnalysisDetailRows(
     }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
 
     if (splits.length >= 2) {
-      const firstPace = splits[0].pace;
-      const lastPace = splits[splits.length - 1].pace;
-      const diff = firstPace - lastPace;
+      const mid = Math.ceil(splits.length / 2);
+      const firstHalf = splits.slice(0, mid);
+      const secondHalf = splits.slice(mid);
+      const avg = (arr: typeof splits) => arr.reduce((s, x) => s + x.pace, 0) / arr.length;
+      const firstAvg = avg(firstHalf);
+      const secondAvg = avg(secondHalf);
+      const diff = firstAvg - secondAvg;
       const absDiff = Math.abs(Math.round(diff));
       let pattern: string;
       if (absDiff <= 15) {

@@ -49,6 +49,12 @@ function validateNoGenericFiller(summary: string): { ok: boolean; why?: string }
     'be mindful of',
     'prioritize recovery to support',
     'in future workouts',
+    'nailed',
+    'crushed',
+    'is real',
+    'trust the process',
+    "you've got this",
+    'stay patient',
   ];
   const hit = banned.find((p) => s.includes(p));
   return hit ? { ok: false, why: `Generic filler phrase: "${hit}"` } : { ok: true };
@@ -137,7 +143,10 @@ RULES:
 - If nothing interesting happened (easy run, everything on plan, no flags), say so briefly: "Clean easy run, nothing to flag. Good recovery day."
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present in the data provided.
 - CRITICAL: Pace must use display format like "10:16/mi", never raw seconds.
-- FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall".`;
+- Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly. Instead of 'The week's accumulated fatigue is real' write 'Accumulated fatigue from 129% weekly load is a factor.' Instead of 'You nailed the pacing' write 'Pacing was well-controlled for the terrain.'
+- TEMPORAL PRECISION: Do not say 'yesterday', 'two days ago', or any relative time unless you can verify the exact date relationship from the workout date and the dates in LAST 48 HOURS. If unsure, omit the time reference entirely.
+- CROSS-DISCIPLINE CLAIMS: Only reference prior workouts affecting this one when the mechanism is physiologically plausible. Think about what muscle groups were used and whether they overlap with the current workout. Systemic fatigue (CNS load, sleep debt) is real but distinct from local muscular fatigue — be specific about which mechanism you mean.
+- FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
 
 function buildUserMessage(dp: any, coachingContext: string | null): string {
   const w = dp.workout || {};
@@ -145,6 +154,10 @@ function buildUserMessage(dp: any, coachingContext: string | null): string {
   const sections: string[] = [];
 
   sections.push('Here is the workout data. Answer the athlete\'s unasked questions — don\'t summarize what they can already see.');
+
+  if (w.date) {
+    sections.push(`\nWORKOUT DATE: ${w.date}`);
+  }
 
   // Workout
   const gapNote = w.avg_gap ? `(effort-adjusted: ${w.avg_gap})` : '';
@@ -306,6 +319,7 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
     generated_at: packet.generated_at,
     top_flags: topFlags,
     workout: {
+      date: (facts as any)?.workout_date ?? (packet.generated_at ? packet.generated_at.slice(0, 10) : null),
       type: String(facts?.workout_type || ''),
       distance: fmtMi(coerceNumber(facts?.total_distance_mi)),
       duration: fmtMin(coerceNumber(facts?.total_duration_min)),

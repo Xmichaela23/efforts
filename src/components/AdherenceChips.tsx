@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   type SessionInterpretationV1,
-  planAssessmentLines,
 } from '@/utils/performance-format';
 
 interface AdherenceChipsProps {
@@ -151,18 +150,6 @@ export default function AdherenceChips({
               {chip('Duration', durationAdherence, durationDelta != null ? fmtDeltaTime(durationDelta) : '—')}
             </div>
           </div>
-          {sd.session_interpretation && (() => {
-            const pa = planAssessmentLines(sd.session_interpretation);
-            if (pa.length === 0) return null;
-            return (
-              <div className="px-2 mb-2 max-w-lg mx-auto text-center space-y-1">
-                <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Plan assessment</div>
-                {pa.map((line, i) => (
-                  <p key={i} className="text-sm text-gray-300 leading-snug">{line}</p>
-                ))}
-              </div>
-            );
-          })()}
           {onNavigateToContext && workoutId && (
             <ViewContextLink workoutId={workoutId} onClick={onNavigateToContext} />
           )}
@@ -187,18 +174,6 @@ export default function AdherenceChips({
             {chip(paceChipLabel, paceAdherence, paceChipSubtitle)}
           </div>
         </div>
-        {sd.session_interpretation && (() => {
-          const pa = planAssessmentLines(sd.session_interpretation);
-          if (pa.length === 0) return null;
-          return (
-            <div className="px-2 mb-2 max-w-lg mx-auto text-center space-y-1">
-              <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">Plan assessment</div>
-              {pa.map((line, i) => (
-                <p key={i} className="text-sm text-gray-300 leading-snug">{line}</p>
-              ))}
-            </div>
-          );
-        })()}
         {onNavigateToContext && workoutId && (
           <ViewContextLink workoutId={workoutId} onClick={onNavigateToContext} />
         )}

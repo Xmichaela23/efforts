@@ -237,10 +237,7 @@ export async function buildCoachingContext(
   if (strengthPriority === "support" || strengthPriority === "maintenance") {
     lines.push("  Strength is in a support/maintenance role. Evaluate strength within that context — maintaining is success.");
   }
-  const recentStrength = recentFacts.filter((f) => f.discipline === "strength");
-  if (recentStrength.length > 0) {
-    lines.push("  Recent strength session detected. Consider muscular fatigue when interpreting cardio metrics (HR, pace, power).");
-  }
+  
   lines.push("=== END TRAINING CONTEXT ===");
 
   return {

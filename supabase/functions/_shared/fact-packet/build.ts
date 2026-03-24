@@ -641,6 +641,7 @@ export async function buildWorkoutFactPacketV1(args: {
     generated_at: new Date().toISOString(),
     inputs_present,
     facts: {
+      workout_date: workout?.date ?? null,
       workout_type,
       total_distance_mi: Math.round(overallDistMi * 100) / 100,
       total_duration_min: Math.round(overallDurMin * 10) / 10,
