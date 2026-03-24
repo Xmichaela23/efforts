@@ -194,8 +194,8 @@ export async function getSimilarWorkoutComparisons(
     const start = isoDateAddDays(end, -120);
     const rows = await fetchRecentWorkouts(supabase, userId, start, end, 60);
 
-    const bandLo = Math.max(5, durationMin - 10);
-    const bandHi = durationMin + 10;
+    const bandLo = Math.max(5, Math.round(durationMin * 0.7));
+    const bandHi = Math.round(durationMin * 1.3);
 
     const comparableKeys = getComparableTypeKeys(workoutTypeKey);
     const filtered = rows

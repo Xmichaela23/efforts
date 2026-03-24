@@ -138,6 +138,8 @@ export type SessionDetailV1 = {
     }>;
     direction: 'improving' | 'declining' | 'stable';
     summary: string;
+    /** True when lower values = better (pace). False when higher = better (power). */
+    lower_is_better: boolean;
   } | null;
 
   // ── Next session (forward-looking context) ────────────────────────────────

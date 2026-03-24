@@ -358,9 +358,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           is_current: !!p.is_current,
           label: fmtPace(Number(p.pace_sec_per_mi)),
         }));
-        const first = points[0]?.value;
-        const last = points[points.length - 1]?.value;
-        const delta = first != null && last != null ? Math.round(first - last) : 0;
+        const mid = Math.ceil(points.length / 2);
+        const avgArr = (arr: typeof points) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
+        const firstHalfAvg = avgArr(points.slice(0, mid));
+        const secondHalfAvg = avgArr(points.slice(mid));
+        const delta = Math.round(firstHalfAvg - secondHalfAvg);
         const direction = delta > 10 ? 'improving' as const : delta < -10 ? 'declining' as const : 'stable' as const;
         const absDelta = Math.abs(delta);
         const summary = direction === 'stable'
@@ -372,6 +374,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           points,
           direction,
           summary,
+          lower_is_better: true,
         };
       } catch { return null; }
     })(),

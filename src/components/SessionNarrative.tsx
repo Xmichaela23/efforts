@@ -15,6 +15,7 @@ type TrendData = {
   points: TrendPoint[];
   direction: 'improving' | 'declining' | 'stable';
   summary: string;
+  lower_is_better?: boolean;
 };
 
 type NextSession = {
