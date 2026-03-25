@@ -3509,6 +3509,39 @@ function fmtPaceRangeLabel(lower?: number, upper?: number): string {
   return `${lm}:${String(ls).padStart(2, '0')}-${um}:${String(us).padStart(2, '0')}/mi`;
 }
 
+function isStrideLikePlannedStep(step: any): boolean {
+  const lbl = String(step?.label ?? step?.name ?? '').toLowerCase();
+  const k = String(step?.kind ?? step?.type ?? step?.role ?? '').toLowerCase();
+  return (
+    lbl.includes('stride') ||
+    lbl.includes('pickup') ||
+    lbl.includes('drill') ||
+    k.includes('stride')
+  );
+}
+
+function formatStridePlannedLabel(step: any, plannedDurationSec: number): string {
+  const dm = Number(step?.distanceMeters ?? step?.distance_m ?? step?.m ?? step?.meters ?? 0);
+  const yd = Number(step?.distance_yd ?? step?.distance_yds ?? step?.yards ?? 0);
+  const ov = Number(step?.original_val ?? 0);
+  const ou = String(step?.original_units || '').toLowerCase();
+  let yardsOut = yd > 0 ? Math.round(yd) : 0;
+  if (!yardsOut && dm > 25 && dm < 800) yardsOut = Math.round(dm / 0.9144);
+  if (!yardsOut && ov > 0 && (ou === 'yd' || ou === 'yard' || ou === 'yards')) yardsOut = Math.round(ov);
+  if (yardsOut > 0) return `${yardsOut} yd Stride`;
+  const sec =
+    Number.isFinite(plannedDurationSec) && plannedDurationSec > 0
+      ? plannedDurationSec
+      : Number(step?.seconds ?? step?.duration_s ?? 0);
+  if (sec > 0) {
+    const s = Math.round(sec);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, '0')} Stride`;
+  }
+  return 'Stride';
+}
+
 function buildSessionIntervalRows(
   plannedWorkout: any,
   detailedAnalysis: any,
@@ -3580,6 +3613,10 @@ function buildSessionIntervalRows(
     const paceRange = step?.pace_range || match?.pace_range || null;
     const plannedDuration = Number(step?.duration_s ?? step?.seconds ?? step?.duration ?? match?.planned_duration_s ?? 0);
     const plannedLabel = (() => {
+      if (stepKind === 'work' && isStrideLikePlannedStep(step)) {
+        const du = Number.isFinite(plannedDuration) && plannedDuration > 0 ? plannedDuration : 0;
+        return formatStridePlannedLabel(step, du);
+      }
       const t = fmtDurationLabel(Number.isFinite(plannedDuration) && plannedDuration > 0 ? plannedDuration : null);
       const p = fmtPaceRangeLabel(paceRange?.lower, paceRange?.upper);
       if (t && p) return `${t} @ ${p}`;

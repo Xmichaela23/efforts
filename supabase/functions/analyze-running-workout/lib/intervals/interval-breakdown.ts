@@ -2,6 +2,31 @@ import { calculatePaceRangeAdherence } from '../adherence/pace-adherence.ts';
 import { calculateIntervalHeartRate } from '../analysis/heart-rate.ts';
 import { calculateIntervalElevation } from '../analysis/elevation.ts';
 
+const PACE_SEC_PER_MI_MIN = 180;
+const PACE_SEC_PER_MI_MAX = 1800;
+
+function paceSecPerMiIsValid(pace: number): boolean {
+  return Number.isFinite(pace) && pace >= PACE_SEC_PER_MI_MIN && pace <= PACE_SEC_PER_MI_MAX;
+}
+
+/** When device avg pace disagrees with segment duration/distance, prefer physics (same as work reps). */
+function reconcilePaceFromDurationDistance(
+  reportedPaceSPerMi: number,
+  durationS: number,
+  distanceM: number,
+): number {
+  if (!(durationS > 0 && distanceM > 0)) return reportedPaceSPerMi;
+  const miles = distanceM / 1609.34;
+  if (miles <= 0.01) return reportedPaceSPerMi;
+  const derived = durationS / miles;
+  if (!paceSecPerMiIsValid(derived)) return reportedPaceSPerMi;
+  const okReported = paceSecPerMiIsValid(reportedPaceSPerMi);
+  const disagree =
+    !okReported ||
+    (okReported && Math.abs(reportedPaceSPerMi - derived) / Math.max(derived, 1) > 0.22);
+  return disagree ? derived : reportedPaceSPerMi;
+}
+
 /**
  * Generate detailed interval breakdown with pace, duration, HR, and elevation metrics
  */
@@ -45,12 +70,7 @@ export function generateIntervalBreakdown(
     // -------------------------------------------------------------------------
     // PACE CALCULATION - Single source of truth with sanity checks
     // -------------------------------------------------------------------------
-    // Sanity bounds: reasonable running pace is 3:00/mi to 30:00/mi (180-1800 s/mi)
-    const MIN_VALID_PACE_S = 180;  // 3:00/mi (elite sprint)
-    const MAX_VALID_PACE_S = 1800; // 30:00/mi (slow walk)
-    
-    const isValidPace = (pace: number): boolean => 
-      Number.isFinite(pace) && pace >= MIN_VALID_PACE_S && pace <= MAX_VALID_PACE_S;
+    const isValidPace = (pace: number): boolean => paceSecPerMiIsValid(pace);
     
     let displayDurationS = actualDuration; // default: elapsed (for intervals)
     let actualPace = 0; // Will be set to valid pace or remain 0
@@ -290,6 +310,31 @@ export function generateIntervalBreakdown(
     };
     
     return {
+      planned_label: (() => {
+        if (!isStrideLike) {
+          return interval.planned_label || null;
+        }
+        const st = plannedStepForStride;
+        if (!st) {
+          return interval.planned_label || null;
+        }
+        const dm = Number(st?.distanceMeters ?? st?.distance_m ?? st?.m ?? st?.meters ?? 0);
+        const yd = Number(st?.distance_yd ?? st?.distance_yds ?? st?.yards ?? 0);
+        const ov = Number(st?.original_val ?? 0);
+        const ou = String(st?.original_units || '').toLowerCase();
+        let yardsOut = yd > 0 ? Math.round(yd) : 0;
+        if (!yardsOut && dm > 25 && dm < 800) yardsOut = Math.round(dm / 0.9144);
+        if (!yardsOut && ov > 0 && (ou === 'yd' || ou === 'yard' || ou === 'yards')) yardsOut = Math.round(ov);
+        if (yardsOut > 0) return `${yardsOut} yd Stride`;
+        const sec = Number(plannedDuration || st?.seconds || st?.duration_s || 0);
+        if (sec > 0) {
+          const s = Math.round(sec);
+          const m = Math.floor(s / 60);
+          const r = s % 60;
+          return `${m}:${String(r).padStart(2, '0')} Stride`;
+        }
+        return 'Stride';
+      })(),
       interval_type: 'work',
       interval_number: index + 1,
       interval_id: interval.planned_step_id || interval.id || null,
@@ -666,7 +711,13 @@ export function generateIntervalBreakdown(
         (i.planned_step_id === workInterval.interval_id || i.id === workInterval.interval_id),
       );
       if (matchingWorkInterval?.planned_label) {
-        workInterval.planned_label = matchingWorkInterval.planned_label;
+        const incoming = String(matchingWorkInterval.planned_label).trim();
+        const isGenericWork = /^work\s+\d+$/i.test(incoming);
+        if (!isGenericWork) {
+          workInterval.planned_label = matchingWorkInterval.planned_label;
+        } else if (!workInterval.planned_label) {
+          workInterval.planned_label = matchingWorkInterval.planned_label;
+        }
       }
       completeBreakdown.push(workInterval);
       
@@ -675,16 +726,20 @@ export function generateIntervalBreakdown(
         const recoveryInterval = recoveryIntervals[recoverySlot];
         // ✅ USE SAME SOURCE AS SUMMARY/DETAILS - get pace_range from planned step
         let recPaceRange = recoveryInterval.planned?.pace_range || recoveryInterval.pace_range;
-        if (!recPaceRange && plannedWorkout && recoveryInterval.planned_step_id) {
-          const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === recoveryInterval.planned_step_id);
+        if (!recPaceRange && plannedWorkout) {
+          const pid = String(recoveryInterval.planned_step_id || recoveryInterval.id || '').trim();
+          const plannedStep = pid
+            ? plannedWorkout?.computed?.steps?.find((s: any) => String(s?.id || '').trim() === pid)
+            : null;
           recPaceRange = plannedStep?.pace_range;
         }
         const recRangeLower = recPaceRange?.lower || 0;
         const recRangeUpper = recPaceRange?.upper || 0;
-        // ✅ USE SAME SOURCE AS SUMMARY SCREEN - executed.avg_pace_s_per_mi (single source of truth)
-        const recActualPace = recoveryInterval.executed?.avg_pace_s_per_mi || 0;
         const recPlannedDuration = recoveryInterval.planned?.duration_s || 0;
         const recActualDuration = recoveryInterval.executed?.duration_s || 0;
+        const recActualDist = Number(recoveryInterval.executed?.distance_m ?? 0);
+        let recActualPace = Number(recoveryInterval.executed?.avg_pace_s_per_mi ?? 0);
+        recActualPace = reconcilePaceFromDurationDistance(recActualPace, recActualDuration, recActualDist);
         
         // Calculate pace adherence for range (must pass 'recovery' — default 'work' penalizes slow jog as "failed rep")
         const recPaceAdherence = recRangeLower > 0 && recRangeUpper > 0 && recActualPace > 0

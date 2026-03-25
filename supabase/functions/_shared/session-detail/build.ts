@@ -163,7 +163,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         interval_type: normIntervalType(iv?.interval_type || iv?.kind),
         interval_number: typeof iv?.interval_number === 'number' ? iv.interval_number : undefined,
         recovery_number: typeof iv?.recovery_number === 'number' ? iv.recovery_number : undefined,
-        planned_label: String(sr?.planned_label ?? iv?.planned_label ?? iv?.interval_type ?? ''),
+        planned_label: String(iv?.planned_label ?? sr?.planned_label ?? iv?.interval_type ?? ''),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
         planned_pace_display: typeof sr?.planned_pace_display === 'string' ? sr.planned_pace_display : (hasRange ? fmtPaceRange(Number(lower), Number(upper)) : null),
@@ -175,7 +175,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           actual_gap_sec_per_mi: null,
           power_watts: fin(iv?.avg_power_watts) ?? null,
         },
-        pace_adherence_pct: fin(sr?.adherence_pct) ?? fin(iv?.pace_adherence_percent),
+        pace_adherence_pct: (() => {
+          if (iv && iv.pace_adherence_percent === null) return null;
+          const fromIv = fin(iv?.pace_adherence_percent);
+          if (fromIv != null) return fromIv;
+          return fin(sr?.adherence_pct);
+        })(),
         duration_adherence_pct: fin(iv?.duration_adherence_percent),
       });
     }
