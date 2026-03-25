@@ -2437,8 +2437,10 @@ function mergeMicroSegments(intervalList: any[], minDistanceMi: number = MIN_SEG
   // Prefer planned_step_id so consecutive work reps (e.g. 4× strides) are NOT merged — workIntervals
   // omits recoveries between them in this array, so role-only key incorrectly merges into one row.
   const key = (i: any): string => {
-    const pid = i?.planned_step_id ?? i?.plannedStepId;
+    const pid = i?.planned_step_id ?? i?.plannedStepId ?? i?.id;
     if (pid != null && String(pid).trim().length > 0) return `step:${String(pid)}`;
+    const idx = i?.planned_index ?? i?.step_index;
+    if (Number.isFinite(Number(idx))) return `idx:${Number(idx)}`;
     return String(i?.role ?? i?.kind ?? i?.label ?? '');
   };
 

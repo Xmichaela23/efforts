@@ -225,6 +225,8 @@ function enrichWithExecution(
         );
     return {
       ...planned,
+      // Downstream (mergeMicroSegments, interval_breakdown) expects planned_step_id; plan steps use `id`
+      planned_step_id: planned.planned_step_id ?? planned.id ?? null,
       executed: normalizedExecuted,
       sample_idx_start: computedInterval?.sample_idx_start,
       sample_idx_end: computedInterval?.sample_idx_end,

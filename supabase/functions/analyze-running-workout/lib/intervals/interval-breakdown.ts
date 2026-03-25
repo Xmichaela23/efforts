@@ -119,22 +119,24 @@ export function generateIntervalBreakdown(
       durationAdherence = 0; // No actual duration recorded
     }
     
+    const stepIdForLookup = interval.planned_step_id || interval.id || null;
+    const plannedStepForStride = plannedWorkout && stepIdForLookup
+      ? plannedWorkout?.computed?.steps?.find((s: any) => s.id === stepIdForLookup)
+      : null;
+
     // ✅ USE SAME SOURCE AS SUMMARY/DETAILS - get pace range from multiple sources
     // Check interval.pace_range first (enriched), then interval.planned.pace_range, then planned step
     let workPaceRange = interval.pace_range || interval.planned?.pace_range || interval.target_pace;
-    if (!workPaceRange && plannedWorkout && interval.planned_step_id) {
+    if (!workPaceRange && plannedWorkout && stepIdForLookup) {
       // Fallback: get from planned step directly (same as Summary/Details screens)
-      const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
+      const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === stepIdForLookup);
       workPaceRange = plannedStep?.pace_range;
     }
     const workRangeLower = workPaceRange?.lower || 0;
     const workRangeUpper = workPaceRange?.upper || 0;
-
-    const plannedStepForStride = plannedWorkout && interval.planned_step_id
-      ? plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id)
-      : null;
     const stepLabel = String(plannedStepForStride?.label || interval.planned_label || '').toLowerCase();
     const stepName = String(plannedStepForStride?.name || '').toLowerCase();
+    const stepKindPlanned = String(plannedStepForStride?.kind ?? plannedStepForStride?.type ?? '').toLowerCase();
     const stepDistM = Number(
       plannedStepForStride?.distance_m ??
         plannedStepForStride?.distanceMeters ??
@@ -163,7 +165,7 @@ export function generateIntervalBreakdown(
     type IntervalType = 'work' | 'recovery' | 'easy' | 'warmup' | 'cooldown';
     const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
 
-    const strideText = `${intervalRole} ${stepLabel} ${stepName}`.toLowerCase();
+    const strideText = `${intervalRole} ${stepKindPlanned} ${stepLabel} ${stepName}`.toLowerCase();
     const shortRepByTime = displayDurationS > 0 && displayDurationS <= 240; // ≤4 min reps
     const shortRepByDist = (plannedShortM > 25 && plannedShortM < 500) ||
       (execDistM > 25 && execDistM < 500 && shortRepByTime);
@@ -171,6 +173,7 @@ export function generateIntervalBreakdown(
       strideText.includes('stride') ||
       strideText.includes('pickup') ||
       strideText.includes('drill') ||
+      stepKindPlanned.includes('stride') ||
       (isEasyOrLongRun &&
         workoutName.includes('stride') &&
         shortRepByTime &&
@@ -268,7 +271,7 @@ export function generateIntervalBreakdown(
     return {
       interval_type: 'work',
       interval_number: index + 1,
-      interval_id: interval.planned_step_id || null,
+      interval_id: interval.planned_step_id || interval.id || null,
       planned_duration_s: plannedDuration,
       actual_duration_s: displayDurationS,
       planned_distance_m: interval.planned?.distance_m || 0,
@@ -637,8 +640,9 @@ export function generateIntervalBreakdown(
 
     breakdown.forEach((workInterval, workIndex) => {
       // Add work interval - find matching interval in allIntervals to get planned_label
-      const matchingWorkInterval = allIntervals?.find((i: any) => 
-        i.planned_step_id === workInterval.interval_id
+      const matchingWorkInterval = allIntervals?.find((i: any) =>
+        workInterval.interval_id != null &&
+        (i.planned_step_id === workInterval.interval_id || i.id === workInterval.interval_id),
       );
       if (matchingWorkInterval?.planned_label) {
         workInterval.planned_label = matchingWorkInterval.planned_label;
@@ -841,8 +845,9 @@ export function generateIntervalBreakdown(
     let paceRangeUpper = interval.planned_pace_range_upper;
     
     // If no range in interval, try to get from planned step (same as Summary/Details screens)
-    if ((!paceRangeLower || !paceRangeUpper) && plannedWorkout && interval.planned_step_id) {
-      const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id);
+    const breakdownStepId = interval.interval_id || (interval as any).planned_step_id;
+    if ((!paceRangeLower || !paceRangeUpper) && plannedWorkout && breakdownStepId) {
+      const plannedStep = plannedWorkout?.computed?.steps?.find((s: any) => s.id === breakdownStepId);
       if (plannedStep?.pace_range) {
         paceRangeLower = plannedStep.pace_range.lower;
         paceRangeUpper = plannedStep.pace_range.upper;
@@ -865,8 +870,9 @@ export function generateIntervalBreakdown(
     
     // Fallback: if no planned_label in interval, try to get from allIntervals
     if (plannedLabelStr === '—' && allIntervals && interval.interval_id) {
-      const matchingInterval = allIntervals.find((i: any) => 
-        i.planned_step_id === interval.interval_id || 
+      const matchingInterval = allIntervals.find((i: any) =>
+        i.planned_step_id === interval.interval_id ||
+        i.id === interval.interval_id ||
         (interval.interval_type === 'warmup' && (i.role === 'warmup' || i.kind === 'warmup')) ||
         (interval.interval_type === 'cooldown' && (i.role === 'cooldown' || i.kind === 'cooldown'))
       );
