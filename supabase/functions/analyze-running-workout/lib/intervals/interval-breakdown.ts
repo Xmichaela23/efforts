@@ -600,7 +600,7 @@ export function generateIntervalBreakdown(
         const warmupPlannedLabel = warmupInterval.planned_label || null;
         
         completeBreakdown.push({
-          interval_id: warmupInterval.planned_step_id || null,
+          interval_id: warmupInterval.planned_step_id || warmupInterval.id || null,
           interval_type: 'warmup',
           planned_duration_s: warmupPlannedDuration,
           actual_duration_s: warmupActualDuration,
@@ -689,7 +689,7 @@ export function generateIntervalBreakdown(
         
                  completeBreakdown.push({
                    interval_type: 'recovery',
-                   interval_id: recoveryInterval.planned_step_id || null,
+                   interval_id: recoveryInterval.planned_step_id || recoveryInterval.id || null,
                    recovery_number: recoverySlot + 1,
                    planned_duration_s: recPlannedDuration,
                    actual_duration_s: recActualDuration,
@@ -758,7 +758,7 @@ export function generateIntervalBreakdown(
         
                  completeBreakdown.push({
                    interval_type: 'cooldown',
-                   interval_id: cooldownInterval.planned_step_id || null,
+                   interval_id: cooldownInterval.planned_step_id || cooldownInterval.id || null,
                    planned_duration_s: cooldownPlannedDuration,
                    actual_duration_s: cooldownActualDuration,
                    planned_distance_m: cooldownInterval.planned?.distance_m || cooldownInterval.executed?.distance_m || 0,
