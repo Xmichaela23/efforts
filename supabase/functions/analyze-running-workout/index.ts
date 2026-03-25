@@ -2446,7 +2446,10 @@ function isWorkLikeForIntervalBreakdown(i: any): boolean {
   if (role.includes('warmup') || role.includes('warm')) return false;
   if (role.includes('cooldown') || role.includes('cool')) return false;
   const hasPace = !!(i?.pace_range || i?.target_pace || i?.planned?.pace_range);
-  return hasPace;
+  // planned_steps_light strides are often `role: work` with no pace_range on the snapshot (pace only on
+  // materialized plan). Excluding them collapses easy+strides to one work row + one recovery.
+  const isRepWork = role === 'work' || role === 'interval';
+  return hasPace || isRepWork;
 }
 
 /**
