@@ -7,6 +7,8 @@ import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
+import { buildReadiness } from '../_shared/readiness.ts';
+import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 
 type DetailOptions = {
   include_gps?: boolean;
@@ -528,6 +530,20 @@ Deno.serve(async (req) => {
         const weekEndDate = addDaysISO(weekStartDate, 6);
         const asOfDate = workoutDate;
 
+        let readinessSnapshot: ReadinessSnapshotV1 | null = null;
+        let readinessUnavailable = false;
+        const readinessP = buildReadiness(supabase, userId, new Date(workoutDate))
+          .then((r) => {
+            readinessSnapshot = r;
+          })
+          .catch((reErr: unknown) => {
+            readinessUnavailable = true;
+            console.warn(
+              '[session_detail_v1] readiness unavailable, using legacy load context:',
+              reErr instanceof Error ? reErr.message : reErr,
+            );
+          });
+
         const [plannedRes, weekWorkoutsRes] = await Promise.all([
           supabase
             .from('planned_workouts')
@@ -541,6 +557,7 @@ Deno.serve(async (req) => {
             .eq('user_id', userId)
             .gte('date', weekStartDate)
             .lte('date', weekEndDate),
+          readinessP,
         ]);
 
         const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
@@ -719,6 +736,8 @@ Deno.serve(async (req) => {
           completedComputed: (detail as any).computed ?? null,
           completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
           nextSession,
+          readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
+          readinessUnavailable,
         });
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);

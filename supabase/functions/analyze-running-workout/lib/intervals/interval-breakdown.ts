@@ -129,7 +129,28 @@ export function generateIntervalBreakdown(
     }
     const workRangeLower = workPaceRange?.lower || 0;
     const workRangeUpper = workPaceRange?.upper || 0;
-    
+
+    const plannedStepForStride = plannedWorkout && interval.planned_step_id
+      ? plannedWorkout?.computed?.steps?.find((s: any) => s.id === interval.planned_step_id)
+      : null;
+    const stepLabel = String(plannedStepForStride?.label || interval.planned_label || '').toLowerCase();
+    const stepName = String(plannedStepForStride?.name || '').toLowerCase();
+    const stepDistM = Number(
+      plannedStepForStride?.distance_m ??
+        plannedStepForStride?.distanceMeters ??
+        plannedStepForStride?.m ??
+        0,
+    );
+    const stepYd = Number(
+      plannedStepForStride?.distance_yd ??
+        plannedStepForStride?.distanceYards ??
+        plannedStepForStride?.yards ??
+        0,
+    );
+    const distMFromYd = stepYd > 0 ? stepYd * 0.9144 : 0;
+    const plannedShortM = stepDistM > 0 ? stepDistM : distMFromYd;
+    const execDistM = Number(interval.executed?.distance_m || 0);
+
     // Determine interval type for asymmetric scoring - check WORKOUT type first
     const workoutToken = String(plannedWorkout?.workout_token || '').toLowerCase();
     const workoutName = String(plannedWorkout?.workout_name || plannedWorkout?.name || plannedWorkout?.title || '').toLowerCase();
@@ -138,10 +159,23 @@ export function generateIntervalBreakdown(
     const isEasyOrLongRun = easyKeywords.some(kw => 
       workoutToken.includes(kw) || workoutName.includes(kw) || workoutDesc.includes(kw)
     );
-    
-    // Use asymmetric interval type based on workout type
+
     type IntervalType = 'work' | 'recovery' | 'easy' | 'warmup' | 'cooldown';
     const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
+
+    const strideText = `${intervalRole} ${stepLabel} ${stepName}`.toLowerCase();
+    const shortRepByTime = displayDurationS > 0 && displayDurationS <= 240; // ≤4 min reps
+    const shortRepByDist = (plannedShortM > 25 && plannedShortM < 500) ||
+      (execDistM > 25 && execDistM < 500 && shortRepByTime);
+    const isStrideLike =
+      strideText.includes('stride') ||
+      strideText.includes('pickup') ||
+      strideText.includes('drill') ||
+      (isEasyOrLongRun &&
+        workoutName.includes('stride') &&
+        shortRepByTime &&
+        shortRepByDist &&
+        index > 0);
     let intervalType: IntervalType = 'work';
     if (isEasyOrLongRun) {
       intervalType = 'easy';
@@ -166,10 +200,18 @@ export function generateIntervalBreakdown(
       paceAdherence = Math.max(0, 100 - (paceDelta / plannedPace) * 100);
     }
     
+    // Strides / neuromuscular reps — omit pace % (null) when there's no real range (inherited E-pace target is misleading)
+    let paceAdherenceOut = Math.round(paceAdherence);
+    if (isStrideLike && !(workRangeLower > 0 && workRangeUpper > 0)) {
+      paceAdherenceOut = NaN; // JSON → null downstream; UI can omit chip
+    }
+
     // Calculate overall performance score
     // Weight pace more heavily (70%) than duration (30%) for interval workouts
     // Pace is more important than exact duration match
-    const overallScore = (paceAdherence * 0.7) + (durationAdherence * 0.3);
+    const overallScore = Number.isFinite(paceAdherenceOut)
+      ? (paceAdherenceOut * 0.7) + (durationAdherence * 0.3)
+      : durationAdherence;
     
     // Calculate heart rate metrics for this work interval
     let hrMetrics = calculateIntervalHeartRate(sensorData || [], interval.sample_idx_start, interval.sample_idx_end);
@@ -233,8 +275,8 @@ export function generateIntervalBreakdown(
       actual_distance_m: interval.executed?.distance_m || 0,
       duration_adherence_percent: Math.round(durationAdherence),
       // Store pace range if available
-      planned_pace_range_lower: workRangeLower,
-      planned_pace_range_upper: workRangeUpper,
+      planned_pace_range_lower: workRangeLower > 0 && workRangeUpper > 0 ? workRangeLower : 0,
+      planned_pace_range_upper: workRangeLower > 0 && workRangeUpper > 0 ? workRangeUpper : 0,
       planned_pace_min_per_mi: workRangeLower > 0 && workRangeUpper > 0 
         ? null // Use range instead
         : (plannedPace > 0 ? Math.round(plannedPace / 60 * 100) / 100 : 0),
@@ -246,7 +288,7 @@ export function generateIntervalBreakdown(
       planned_pace_display: workRangeLower > 0 && workRangeUpper > 0
         ? formatPaceRangeDisplay(workRangeLower, workRangeUpper)
         : (plannedPace > 0 ? formatPaceDisplay(plannedPace) : '—'),
-      pace_adherence_percent: Math.round(paceAdherence),
+      pace_adherence_percent: Number.isFinite(paceAdherenceOut) ? paceAdherenceOut : null,
       performance_score: Math.round(overallScore),
       // Heart rate metrics
       avg_heart_rate_bpm: hrMetrics.avg_heart_rate_bpm,
@@ -313,8 +355,11 @@ export function generateIntervalBreakdown(
     const cooldownInterval = allIntervals.find((i: any) => (i.role === 'cooldown' || i.kind === 'cooldown') && i.executed);
     
     // Calculate work interval average adherence
-    const workIntervalAdherence = breakdown.length > 0
-      ? Math.round(breakdown.reduce((sum, i) => sum + i.pace_adherence_percent, 0) / breakdown.length)
+    const pacePercents = breakdown
+      .map((i) => i.pace_adherence_percent)
+      .filter((p): p is number => typeof p === 'number' && Number.isFinite(p));
+    const workIntervalAdherence = pacePercents.length > 0
+      ? Math.round(pacePercents.reduce((sum, p) => sum + p, 0) / pacePercents.length)
       : 0;
     
     // Analyze warmup
@@ -531,16 +576,16 @@ export function generateIntervalBreakdown(
         
         // Calculate pace adherence for range (not single target)
         const warmupPaceAdherence = warmupRangeLower > 0 && warmupRangeUpper > 0 && warmupActualPace > 0
-          ? calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper)
+          ? calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper, 'warmup')
           : 0;
-        
+
         // Calculate duration adherence
         let warmupDurationAdherence = 0;
         if (warmupPlannedDuration > 0 && warmupActualDuration > 0) {
           const durationDelta = Math.abs(warmupActualDuration - warmupPlannedDuration);
           warmupDurationAdherence = Math.max(0, 100 - (durationDelta / warmupPlannedDuration) * 100);
         }
-        
+
         // Calculate performance score using 70/30 weighting (pace/duration) - same as work intervals
         const warmupPerformanceScore = (warmupPaceAdherence * 0.7) + (warmupDurationAdherence * 0.3);
         
@@ -584,6 +629,12 @@ export function generateIntervalBreakdown(
     // Add work intervals with recovery periods between them
     const recoveryIntervals = allIntervals.filter((i: any) => (i.role === 'recovery' || i.kind === 'recovery' || i.type === 'recovery' || i.type === 'rest') && i.executed);
     
+    const firstWorkDur = Number(breakdown[0]?.actual_duration_s ?? breakdown[0]?.planned_duration_s ?? 0);
+    const multiWork = breakdown.length >= 2;
+    // Long easy + strides: recoveries follow stride reps, not the first continuous block (mergeMicroSegments
+    // only sees work[] so pairing recovery[i] after work[i] wrongly puts R1 under the main block).
+    const skipRecAfterFirstWork = multiWork && firstWorkDur >= 900;
+
     breakdown.forEach((workInterval, workIndex) => {
       // Add work interval - find matching interval in allIntervals to get planned_label
       const matchingWorkInterval = allIntervals?.find((i: any) => 
@@ -594,9 +645,9 @@ export function generateIntervalBreakdown(
       }
       completeBreakdown.push(workInterval);
       
-      // Add recovery period after each work interval (except after the last one)
-      if (workIndex < recoveryIntervals.length) {
-        const recoveryInterval = recoveryIntervals[workIndex];
+      const recoverySlot = skipRecAfterFirstWork ? workIndex - 1 : workIndex;
+      if (recoverySlot >= 0 && recoverySlot < recoveryIntervals.length) {
+        const recoveryInterval = recoveryIntervals[recoverySlot];
         // ✅ USE SAME SOURCE AS SUMMARY/DETAILS - get pace_range from planned step
         let recPaceRange = recoveryInterval.planned?.pace_range || recoveryInterval.pace_range;
         if (!recPaceRange && plannedWorkout && recoveryInterval.planned_step_id) {
@@ -610,9 +661,9 @@ export function generateIntervalBreakdown(
         const recPlannedDuration = recoveryInterval.planned?.duration_s || 0;
         const recActualDuration = recoveryInterval.executed?.duration_s || 0;
         
-        // Calculate pace adherence for range
+        // Calculate pace adherence for range (must pass 'recovery' — default 'work' penalizes slow jog as "failed rep")
         const recPaceAdherence = recRangeLower > 0 && recRangeUpper > 0 && recActualPace > 0
-          ? calculatePaceRangeAdherence(recActualPace, recRangeLower, recRangeUpper)
+          ? calculatePaceRangeAdherence(recActualPace, recRangeLower, recRangeUpper, 'recovery')
           : 0;
         
         // Calculate duration adherence for recovery
@@ -635,7 +686,7 @@ export function generateIntervalBreakdown(
                  completeBreakdown.push({
                    interval_type: 'recovery',
                    interval_id: recoveryInterval.planned_step_id || null,
-                   recovery_number: workIndex + 1,
+                   recovery_number: recoverySlot + 1,
                    planned_duration_s: recPlannedDuration,
                    actual_duration_s: recActualDuration,
                    planned_distance_m: recoveryInterval.planned?.distance_m || recoveryInterval.executed?.distance_m || 0,
@@ -681,7 +732,7 @@ export function generateIntervalBreakdown(
       
       // Calculate pace adherence for range
       const cooldownPaceAdherence = cooldownRangeLower > 0 && cooldownRangeUpper > 0 && cooldownActualPace > 0
-        ? calculatePaceRangeAdherence(cooldownActualPace, cooldownRangeLower, cooldownRangeUpper)
+        ? calculatePaceRangeAdherence(cooldownActualPace, cooldownRangeLower, cooldownRangeUpper, 'cooldown')
         : 0;
       
       // Calculate duration adherence for cooldown
@@ -1000,7 +1051,7 @@ export function generateIntervalBreakdown(
         const warmupActualDuration = warmupInterval.executed?.duration_s || 0;
         
         const warmupPaceAdherence = warmupRangeLower > 0 && warmupRangeUpper > 0 && warmupActualPace > 0
-          ? calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper)
+          ? calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper, 'warmup')
           : 0;
         const warmupDurationAdherence = warmupPlannedDuration > 0 && warmupActualDuration > 0
           ? Math.max(0, 100 - (Math.abs(warmupActualDuration - warmupPlannedDuration) / warmupPlannedDuration) * 100)
@@ -1067,7 +1118,7 @@ export function generateIntervalBreakdown(
                        cooldownActualPaceFromSensor = cooldownInterval.executed?.avg_pace_s_per_mi || 0;
                      }
                      const cooldownPaceAdh = cooldownPaceRange && cooldownActualPaceFromSensor > 0
-                       ? calculatePaceRangeAdherence(cooldownActualPaceFromSensor, cooldownPaceRange.lower, cooldownPaceRange.upper)
+                       ? calculatePaceRangeAdherence(cooldownActualPaceFromSensor, cooldownPaceRange.lower, cooldownPaceRange.upper, 'cooldown')
                        : 100;
                      const cooldownDurAdh = cooldownInterval.planned?.duration_s && cooldownInterval.executed?.duration_s
                        ? Math.max(0, 100 - (Math.abs(cooldownInterval.executed.duration_s - cooldownInterval.planned.duration_s) / cooldownInterval.planned.duration_s) * 100)

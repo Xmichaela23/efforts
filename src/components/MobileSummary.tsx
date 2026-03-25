@@ -64,6 +64,14 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
       if (computeRes.error) console.warn('[recompute] compute-workout-analysis error:', computeRes.error);
       else console.log('[recompute] compute-workout-analysis ok');
 
+      // Step 1b: session_load + facts (readiness / LOAD context); omitted before caused empty session_load after recompute
+      console.log('[recompute] Step 1b: compute-facts for', workoutId);
+      const factsRes = await supabase.functions.invoke('compute-facts', {
+        body: { workout_id: workoutId },
+      });
+      if (factsRes.error) console.warn('[recompute] compute-facts error:', factsRes.error);
+      else console.log('[recompute] compute-facts ok');
+
       // Step 2: Run the discipline-specific analysis (builds fact packet, narrative, etc.)
       console.log('[recompute] Step 2:', fnName, 'for', workoutId);
       const analyzeRes = await supabase.functions.invoke(fnName, {

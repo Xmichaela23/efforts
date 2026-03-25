@@ -5,6 +5,35 @@
 // Client renders this as-is. No local computation.
 // =============================================================================
 
+import type {
+  BlockAlignmentV1,
+  NarrativeCapsV1,
+  NextSessionReadinessV1,
+  PlanContextV1,
+  ProtectedSessionRiskV1,
+  WeekLoadStatusV1,
+} from "../readiness-types.ts";
+
+export type MuscularSummaryEntryV1 = {
+  target: string;
+  status: "fresh" | "manageable" | "compromised";
+  residual_stress: number;
+};
+
+/** Trimmed readiness for clients (no per-target raw stress map). */
+export type SessionDetailReadinessV1 = {
+  degraded: boolean;
+  degraded_reason: string | null;
+  degraded_missing?: string[] | null;
+  next_session_readiness: NextSessionReadinessV1 | null;
+  muscular_summary: MuscularSummaryEntryV1[];
+  plan_context: PlanContextV1 | null;
+  week_load_status: WeekLoadStatusV1 | null;
+  narrative_caps: NarrativeCapsV1 | null;
+  protected_session_risks?: ProtectedSessionRiskV1[] | null;
+  block_alignment?: BlockAlignmentV1 | null;
+};
+
 export type EnduranceMatchQuality =
   | 'followed' | 'shorter' | 'longer' | 'harder' | 'easier' | 'modified' | 'skipped' | 'unplanned';
 
@@ -170,6 +199,9 @@ export type SessionDetailV1 = {
 
   /** Structured assessment for all screens. Deterministic, no LLM. */
   session_interpretation?: SessionInterpretation | null;
+
+  /** Plan-aware load readiness at workout date (null if no session_load / unavailable). */
+  readiness?: SessionDetailReadinessV1 | null;
 }
 
 // ── Interval row: fully resolved, ready to render ─────────────────────────

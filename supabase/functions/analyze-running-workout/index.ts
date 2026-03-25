@@ -12,7 +12,9 @@ import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type W
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
-import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
+import { generateAISummaryV1, type GenerateAISummaryV1Options } from '../_shared/fact-packet/ai-summary.ts';
+import { buildReadiness } from '../_shared/readiness.ts';
+import { buildLoadContextFromReadiness, buildNarrativeCapsAppend } from '../_shared/session-detail/readiness-load-context.ts';
 import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
@@ -1913,7 +1915,23 @@ Deno.serve(async (req) => {
         } catch (e) {
           console.warn('[analyze-running-workout] coaching context failed (non-fatal):', e);
         }
-        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1, coachingCtxText);
+        let aiReadinessOpts: GenerateAISummaryV1Options | undefined;
+        try {
+          const asOfIso = String(workout?.date || '').slice(0, 10);
+          if (asOfIso.length === 10 && workout?.user_id) {
+            const snap = await buildReadiness(supabase, workout.user_id, new Date(asOfIso));
+            aiReadinessOpts = {
+              readinessLoadContextText: buildLoadContextFromReadiness(snap),
+              narrativeCapsAppend: snap.narrative_caps ? buildNarrativeCapsAppend(snap.narrative_caps) : null,
+            };
+          }
+        } catch (re: unknown) {
+          console.warn(
+            '[analyze-running-workout] readiness for ai_summary failed, using legacy load context:',
+            re instanceof Error ? re.message : re,
+          );
+        }
+        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1, coachingCtxText, aiReadinessOpts);
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }
     } catch (e) {
@@ -2416,7 +2434,13 @@ function mergeMicroSegments(intervalList: any[], minDistanceMi: number = MIN_SEG
     const dur = i?.executed?.duration_s ?? i?.duration_s ?? 0;
     return (dist > 0 && dist < minDistanceM) || (dur > 0 && dur < minDurationS);
   };
-  const key = (i: any): string => String(i?.role ?? i?.planned_step_id ?? i?.label ?? '');
+  // Prefer planned_step_id so consecutive work reps (e.g. 4× strides) are NOT merged — workIntervals
+  // omits recoveries between them in this array, so role-only key incorrectly merges into one row.
+  const key = (i: any): string => {
+    const pid = i?.planned_step_id ?? i?.plannedStepId;
+    if (pid != null && String(pid).trim().length > 0) return `step:${String(pid)}`;
+    return String(i?.role ?? i?.kind ?? i?.label ?? '');
+  };
 
   const out: any[] = [];
   let run: any[] = [];

@@ -163,7 +163,11 @@ RULES:
 - CROSS-DISCIPLINE CLAIMS: Only reference prior workouts affecting this one when the mechanism is physiologically plausible. Think about what muscle groups were used and whether they overlap with the current workout. Systemic fatigue (CNS load, sleep debt) is real but distinct from local muscular fatigue — be specific about which mechanism you mean.
 - FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
 
-function buildUserMessage(dp: any, coachingContext: string | null): string {
+function buildUserMessage(
+  dp: any,
+  coachingContext: string | null,
+  readinessLoadOverride: string | null = null,
+): string {
   const w = dp.workout || {};
   const sig = dp.signals || {};
   const sections: string[] = [];
@@ -215,32 +219,36 @@ function buildUserMessage(dp: any, coachingContext: string | null): string {
     ].filter(Boolean).join('\n'));
   }
 
-  // Load context
-  const tl = sig.training_load;
-  if (tl) {
-    const anyTl = tl as any;
-    const streakLine = (typeof anyTl.consecutive_training_days === 'number' && anyTl.consecutive_training_days > 0)
-      ? (() => {
-          const n = anyTl.consecutive_training_days;
-          const swl = coerceNumber(anyTl.streak_combined_workload);
-          const mix = typeof anyTl.streak_modality_summary === 'string' && anyTl.streak_modality_summary.trim()
-            ? anyTl.streak_modality_summary.trim()
-            : null;
-          const focus = typeof anyTl.previous_day_athletic_focus === 'string' ? anyTl.previous_day_athletic_focus : null;
-          const loadPart = swl != null && swl > 0 ? `, ~${Math.round(swl)} combined load` : '';
-          const mixPart = mix ? `, sessions: ${mix}` : '';
-          const focusPart = focus ? ` Yesterday (before this workout) was ${focus}-focused.` : '';
-          return `- Training streak: ${n} day(s) without rest${loadPart}${mixPart}.${focusPart}`;
-        })()
-      : null;
-    sections.push([
-      '\nLOAD CONTEXT:',
-      Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
-        ? tl.fatigue_evidence.map((e: string) => `- ${e}`).join('\n')
-        : null,
-      tl.cumulative_fatigue ? `- Cumulative fatigue: ${tl.cumulative_fatigue}` : null,
-      streakLine,
-    ].filter(Boolean).join('\n'));
+  // Load context — readiness override replaces generic streak / fatigue lines
+  if (readinessLoadOverride && readinessLoadOverride.trim()) {
+    sections.push('\n' + readinessLoadOverride.trim());
+  } else {
+    const tl = sig.training_load;
+    if (tl) {
+      const anyTl = tl as any;
+      const streakLine = (typeof anyTl.consecutive_training_days === 'number' && anyTl.consecutive_training_days > 0)
+        ? (() => {
+            const n = anyTl.consecutive_training_days;
+            const swl = coerceNumber(anyTl.streak_combined_workload);
+            const mix = typeof anyTl.streak_modality_summary === 'string' && anyTl.streak_modality_summary.trim()
+              ? anyTl.streak_modality_summary.trim()
+              : null;
+            const focus = typeof anyTl.previous_day_athletic_focus === 'string' ? anyTl.previous_day_athletic_focus : null;
+            const loadPart = swl != null && swl > 0 ? `, ~${Math.round(swl)} combined load` : '';
+            const mixPart = mix ? `, sessions: ${mix}` : '';
+            const focusPart = focus ? ` Yesterday (before this workout) was ${focus}-focused.` : '';
+            return `- Training streak: ${n} day(s) without rest${loadPart}${mixPart}.${focusPart}`;
+          })()
+        : null;
+      sections.push([
+        '\nLOAD CONTEXT:',
+        Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
+          ? tl.fatigue_evidence.map((e: string) => `- ${e}`).join('\n')
+          : null,
+        tl.cumulative_fatigue ? `- Cumulative fatigue: ${tl.cumulative_fatigue}` : null,
+        streakLine,
+      ].filter(Boolean).join('\n'));
+    }
   }
 
   // Flags
@@ -504,10 +512,18 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
   };
 }
 
+export type GenerateAISummaryV1Options = {
+  /** Full LOAD CONTEXT block from buildReadiness (replaces fact-packet training_load section). */
+  readinessLoadContextText?: string | null;
+  /** Appended to system prompt from readiness.narrative_caps */
+  narrativeCapsAppend?: string | null;
+};
+
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,
   flags: FlagV1[],
   coachingContext?: string | null,
+  opts?: GenerateAISummaryV1Options | null,
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
@@ -515,10 +531,16 @@ export async function generateAISummaryV1(
   }
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
-  const userMessage = buildUserMessage(displayPacket, coachingContext ?? null);
+  const loadCtx = opts?.readinessLoadContextText?.trim() || null;
+  if (loadCtx) {
+    (displayPacket as any).readiness_load_context = loadCtx;
+  }
+
+  const userMessage = buildUserMessage(displayPacket, coachingContext ?? null, loadCtx);
+  const systemPrompt = COACHING_SYSTEM_PROMPT + (opts?.narrativeCapsAppend?.trim() || '');
 
   try {
-    const s1 = await callLLMParagraph(COACHING_SYSTEM_PROMPT, userMessage, 0.2);
+    const s1 = await callLLMParagraph(systemPrompt, userMessage, 0.2);
     if (!s1) { console.warn('[ai-summary] attempt 1 returned empty'); return null; }
     const v1 = validateNoNewNumbers(s1, displayPacket);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
@@ -533,7 +555,7 @@ export async function generateAISummaryV1(
       z1.why, len1.why, td1.why, g1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
-    const s2 = await callLLMParagraph(COACHING_SYSTEM_PROMPT, corrective, 0);
+    const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
     if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
     const v2 = validateNoNewNumbers(s2, displayPacket);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);

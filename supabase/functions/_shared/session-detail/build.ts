@@ -4,6 +4,11 @@
 
 import type { SessionDetailV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
+import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
+import {
+  buildLoadContextFromReadiness,
+  packageSessionDetailReadiness,
+} from './readiness-load-context.ts';
 
 function normType(t: string | null | undefined): string {
   const s = String(t || '').toLowerCase().trim();
@@ -39,6 +44,10 @@ export type SessionDetailInput = {
   completedRefinedType?: string | null;
   /** Next planned session from the week (forward-looking context). */
   nextSession?: { name: string; date: string | null; type: string | null; prescription: string | null } | null;
+  /** From buildReadiness(asOf = workout date). If fetch threw, set readinessUnavailable. */
+  readinessSnapshot?: ReadinessSnapshotV1 | null;
+  /** True when buildReadiness threw — keep legacy load context. */
+  readinessUnavailable?: boolean;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -60,6 +69,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedComputed,
     completedRefinedType,
     nextSession,
+    readinessSnapshot,
+    readinessUnavailable,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -139,7 +150,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       ) ?? null;
       const paceRaw = fin(iv?.actual_pace_min_per_mi);
       const paceSec = paceRaw != null ? Math.round(paceRaw * 60) : (fin(sr?.executed?.actual_pace_sec_per_mi) ?? null);
-      const hasRange = Number.isFinite(lower) && Number.isFinite(upper);
+      // 0,0 from strides / distance-only reps is not a real range — avoid "0:00-0:00/mi"
+      const hasRange =
+        Number.isFinite(lower) &&
+        Number.isFinite(upper) &&
+        Number(lower) > 0 &&
+        Number(upper) > 0;
       intervals.push({
         id: String(iv?.interval_id || iv?.interval_number || intervals.length),
         interval_type: normIntervalType(iv?.interval_type || iv?.kind),
@@ -214,7 +230,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const weekLabel = buildWeekLabel(factPacket);
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
-  const analysisDetailRows = buildAnalysisDetailRows(factPacket, flagsV1, summaryBullets.length > 0, comp, !!perf?.gap_adjusted);
+  const readinessLoadText =
+    !readinessUnavailable && readinessSnapshot
+      ? buildLoadContextFromReadiness(readinessSnapshot)
+      : null;
+  const analysisDetailRows = buildAnalysisDetailRows(
+    factPacket,
+    flagsV1,
+    summaryBullets.length > 0,
+    comp,
+    !!perf?.gap_adjusted,
+    readinessLoadText,
+  );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
   const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)
@@ -391,6 +418,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     strength_weight_deviation: weightDev,
     strength_volume_deviation: volumeDev,
+    readiness: (() => {
+      if (readinessUnavailable || !readinessSnapshot) return null;
+      return packageSessionDetailReadiness(readinessSnapshot);
+    })(),
     session_interpretation: buildSessionInterpretation({
       type,
       match,
@@ -411,6 +442,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 // ── Helpers for builder ────────────────────────────────────────────────────
 
 function fin(v: unknown): number | null {
+  // Preserve explicit null (JSON null for "no adherence" e.g. strides) — Number(null) is 0 in JS
+  if (v === null || v === undefined) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -615,10 +648,20 @@ function buildPlannedTotals(
 
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
+  readinessLoadText: string | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
-  if (!factPacket) return rows;
+  if (!factPacket) {
+    const rt = readinessLoadText?.trim();
+    return rt ? [{ label: 'Load', value: rt }] : rows;
+  }
   const derived = factPacket?.derived;
+
+  if (readinessLoadText && readinessLoadText.trim()) {
+    try {
+      rows.push({ label: 'Load', value: readinessLoadText.trim() });
+    } catch { /* */ }
+  }
 
   try {
     const lim = derived?.primary_limiter;
@@ -731,7 +774,8 @@ function buildAnalysisDetailRows(
 
   try {
     const tl = derived?.training_load;
-    if (tl && typeof tl.cumulative_fatigue === 'string' && tl.cumulative_fatigue !== 'low') {
+    const hasReadinessLoad = rows.some((r) => r.label === 'Load');
+    if (!hasReadinessLoad && tl && typeof tl.cumulative_fatigue === 'string' && tl.cumulative_fatigue !== 'low') {
       const evidence = Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
         ? tl.fatigue_evidence.join(' · ')
         : `${tl.cumulative_fatigue.charAt(0).toUpperCase()}${tl.cumulative_fatigue.slice(1)} training load`;

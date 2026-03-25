@@ -171,7 +171,7 @@ export default function EnduranceIntervalTable({
             <th className="px-2 py-2 text-left font-medium text-gray-400">{isRide ? 'Watts' : 'Pace'}</th>
             <th className="px-2 py-2 text-left font-medium text-gray-400">Dist</th>
             <th className="px-2 py-2 text-left font-medium text-gray-400">Time</th>
-            <th className="px-1 py-2 text-left font-medium text-gray-400">BPM</th>
+            <th className="px-1 py-2 pr-2 text-right font-medium text-gray-400">BPM</th>
           </tr>
         </thead>
         <tbody>
@@ -219,7 +219,7 @@ export default function EnduranceIntervalTable({
             </th>
             <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Dist</th>
             <th className="px-2 py-2 text-left font-medium text-gray-400 whitespace-nowrap">Time</th>
-            <th className="px-1 py-2 text-left font-medium text-gray-400 whitespace-nowrap">BPM</th>
+            <th className="px-1 py-2 pr-2 text-right font-medium text-gray-400 whitespace-nowrap">BPM</th>
           </tr>
         </thead>
         <tbody>

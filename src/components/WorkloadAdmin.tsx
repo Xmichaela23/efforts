@@ -257,7 +257,7 @@ export default function WorkloadAdmin() {
     }
     setFixWorkoutLoading(true);
     try {
-      setResults({ message: 'Step 1/2: Running compute-workout-analysis...' });
+      setResults({ message: 'Step 1/3: Running compute-workout-analysis...' });
       
       // Step 1: Recompute intervals
       const { data: computeData, error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
@@ -268,7 +268,13 @@ export default function WorkloadAdmin() {
         throw new Error(`Compute failed: ${computeError.message}`);
       }
       
-      setResults({ message: 'Step 2/2: Running analyze-running-workout...' });
+      setResults({ message: 'Step 1.5/3: Running compute-facts (session_load)...' });
+      const { error: factsError } = await supabase.functions.invoke('compute-facts', {
+        body: { workout_id: fixWorkoutId.trim() },
+      });
+      if (factsError) console.warn('compute-facts:', factsError);
+
+      setResults({ message: 'Step 2/3: Running analyze-running-workout...' });
       
       // Step 2: Re-analyze (with optional weather refresh)
       const { data: analyzeData, error: analyzeError } = await supabase.functions.invoke('analyze-running-workout', {
