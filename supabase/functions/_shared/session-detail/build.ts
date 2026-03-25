@@ -10,6 +10,47 @@ import {
   packageSessionDetailReadiness,
 } from './readiness-load-context.ts';
 
+/** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
+function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
+  const derived = factPacket?.derived;
+  const ie = derived?.interval_execution;
+  if (typeof ie?.total_steps === 'number' && ie.total_steps > 2) return true;
+  const facts = factPacket?.facts;
+  const segments = Array.isArray(facts?.segments) ? facts.segments : [];
+  const paces = segments
+    .map((s: any) => {
+      const n = Number(s?.pace_sec_per_mi);
+      return Number.isFinite(n) && n > 120 && n < 2400 ? n : null;
+    })
+    .filter((n): n is number => n != null);
+  if (paces.length >= 5) {
+    const spread = Math.max(...paces) - Math.min(...paces);
+    if (spread >= 75) return true;
+  }
+  // Stale fact packets may omit interval_execution; use rendered interval rows (easy + strides + recoveries).
+  if (intervals && intervals.length >= 4) {
+    const rec = intervals.filter((iv) => String(iv.interval_type).toLowerCase() === 'recovery').length;
+    const workish = intervals.filter((iv) => {
+      const t = String(iv.interval_type).toLowerCase();
+      return t === 'work' || t === 'warmup';
+    }).length;
+    if (rec >= 1 && workish >= 2) return true;
+  }
+  return false;
+}
+
+function humanizePlannedSegmentLabel(raw: string, intervalType?: string): string {
+  const s = String(raw || '').trim();
+  const it = String(intervalType || '').toLowerCase();
+  if (!s && it === 'recovery') return 'Recovery';
+  const low = s.toLowerCase();
+  if (low === 'recovery') return 'Recovery';
+  if (low === 'warmup') return 'Warmup';
+  if (low === 'cooldown') return 'Cooldown';
+  if (low === 'work') return 'Work';
+  return s;
+}
+
 function normType(t: string | null | undefined): string {
   const s = String(t || '').toLowerCase().trim();
   if (s.startsWith('run') || s === 'running') return 'run';
@@ -158,12 +199,16 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         Number.isFinite(upper) &&
         Number(lower) > 0 &&
         Number(upper) > 0;
+      const ivType = normIntervalType(iv?.interval_type || iv?.kind);
       intervals.push({
         id: String(iv?.interval_id || iv?.interval_number || intervals.length),
-        interval_type: normIntervalType(iv?.interval_type || iv?.kind),
+        interval_type: ivType,
         interval_number: typeof iv?.interval_number === 'number' ? iv.interval_number : undefined,
         recovery_number: typeof iv?.recovery_number === 'number' ? iv.recovery_number : undefined,
-        planned_label: String(iv?.planned_label ?? sr?.planned_label ?? iv?.interval_type ?? ''),
+        planned_label: humanizePlannedSegmentLabel(
+          String(iv?.planned_label ?? sr?.planned_label ?? iv?.interval_type ?? ''),
+          ivType,
+        ),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
         planned_pace_display: typeof sr?.planned_pace_display === 'string' ? sr.planned_pace_display : (hasRange ? fmtPaceRange(Number(lower), Number(upper)) : null),
@@ -192,10 +237,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       const r = dataRows[i];
       const ex = r?.executed || {};
       const paceS = fin(ex.avg_pace_s_per_mi) ?? fin(ex.pace_s_per_mi);
+      const rowKind = normIntervalType(r?.kind);
       intervals.push({
         id: String(r.row_id || r.planned_step_id || i),
-        interval_type: normIntervalType(r?.kind),
-        planned_label: String(r.planned_label ?? ''),
+        interval_type: rowKind,
+        planned_label: humanizePlannedSegmentLabel(String(r.planned_label ?? ''), rowKind),
         planned_duration_s: null,
         planned_pace_display: typeof r.planned_pace_display === 'string' ? r.planned_pace_display : null,
         planned_pace_range: undefined,
@@ -278,6 +324,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     comp,
     !!perf?.gap_adjusted,
     readinessLoadText,
+    intervals,
   );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -686,6 +733,7 @@ function buildPlannedTotals(
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   readinessLoadText: string | null = null,
+  intervals: IntervalRow[] = [],
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) {
@@ -763,7 +811,11 @@ function buildAnalysisDetailRows(
   try {
     const driftBpm = typeof derived?.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
     const driftTypical = typeof derived?.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
-    if (driftBpm != null && Math.abs(driftBpm) >= 3) {
+    if (
+      driftBpm != null &&
+      Math.abs(driftBpm) >= 3 &&
+      !shouldSuppressSessionHrDrift(factPacket, intervals)
+    ) {
       const sign = driftBpm > 0 ? '+' : '';
       let value = `Drifted ${sign}${Math.round(driftBpm)} bpm over the session`;
       if (driftTypical != null && Math.abs(driftTypical) >= 1) {
