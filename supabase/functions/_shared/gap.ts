@@ -51,11 +51,17 @@ export function paceToGAP(paceSecPerUnit: number, gradePercent: number): number 
  * Returns grade in percent for each sample.
  *
  * @param samples  Array with at minimum { elevation_m, pace_s_per_mi } per sample.
- *                 Each sample represents ~1 second of data.
+ *                 If `distance_m` (cumulative horizontal meters from workout start) is set on
+ *                 any sample, it is used for grade — required when samples are not 1 Hz or
+ *                 rows were filtered (e.g. only HR-bearing points).
  * @param windowSize  Number of samples for smoothing (default 30 = 30s moving average)
  */
 export function computeSampleGrades(
-  samples: Array<{ elevation_m?: number | null; pace_s_per_mi?: number | null }>,
+  samples: Array<{
+    elevation_m?: number | null;
+    pace_s_per_mi?: number | null;
+    distance_m?: number | null;
+  }>,
   windowSize = 30,
 ): number[] {
   const n = samples.length;
@@ -63,15 +69,32 @@ export function computeSampleGrades(
 
   if (n < 2) return grades;
 
-  // Build cumulative distance from pace (each sample ≈ 1s)
   const cumDist: number[] = new Array(n).fill(0);
-  for (let i = 1; i < n; i++) {
-    const pace = samples[i].pace_s_per_mi;
-    if (pace && pace > 0 && pace < 2400) {
-      const speedMps = 1609.34 / pace;
-      cumDist[i] = cumDist[i - 1] + speedMps;
-    } else {
-      cumDist[i] = cumDist[i - 1];
+  const hasDist = samples.some(
+    (s) => s.distance_m != null && Number.isFinite(s.distance_m as number),
+  );
+  if (hasDist) {
+    for (let i = 0; i < n; i++) {
+      const dm = samples[i].distance_m;
+      if (dm != null && Number.isFinite(dm) && dm >= 0) {
+        cumDist[i] = dm;
+      } else {
+        cumDist[i] = i > 0 ? cumDist[i - 1] : 0;
+      }
+    }
+    for (let i = 1; i < n; i++) {
+      if (cumDist[i] < cumDist[i - 1]) cumDist[i] = cumDist[i - 1];
+    }
+  } else {
+    // ~1 Hz: integrate horizontal distance from pace (sec/mi → m/s per step)
+    for (let i = 1; i < n; i++) {
+      const pace = samples[i].pace_s_per_mi;
+      if (pace && pace > 0 && pace < 2400) {
+        const speedMps = 1609.34 / pace;
+        cumDist[i] = cumDist[i - 1] + speedMps;
+      } else {
+        cumDist[i] = cumDist[i - 1];
+      }
     }
   }
 

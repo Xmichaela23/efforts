@@ -672,9 +672,24 @@ Deno.serve(async (req) => {
         const compStrength = (detail as any).strength_exercises ?? row?.strength_exercises;
         const compStrengthArr = Array.isArray(compStrength) ? compStrength : (typeof compStrength === 'string' ? (() => { try { return JSON.parse(compStrength); } catch { return null; } })() : null);
 
-        const nextPlanned = plannedRows
+        let nextPlanned = plannedRows
           .filter((p: any) => String(p?.date || '') > workoutDate)
           .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
+
+        if (!nextPlanned) {
+          const dayAfter = addDaysISO(workoutDate, 1);
+          const lookAhead = addDaysISO(workoutDate, 14);
+          const { data: upcoming } = await supabase
+            .from('planned_workouts')
+            .select('id,date,type,name,description')
+            .eq('user_id', userId)
+            .gte('date', dayAfter)
+            .lte('date', lookAhead)
+            .order('date', { ascending: true })
+            .limit(1);
+          if (upcoming && upcoming.length > 0) nextPlanned = upcoming[0];
+        }
+
         const nextSession = nextPlanned ? {
           name: String(nextPlanned.name || nextPlanned.type || 'Workout'),
           date: String(nextPlanned.date || '').slice(0, 10) || null,

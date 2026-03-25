@@ -132,7 +132,7 @@ export type SessionDetailV1 = {
     points: Array<{
       date: string;
       value: number;
-      avg_hr: number;
+      avg_hr: number | null;
       is_current: boolean;
       label: string;
     }>;

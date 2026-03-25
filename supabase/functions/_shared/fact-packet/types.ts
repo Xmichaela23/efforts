@@ -62,7 +62,14 @@ export type PlanV1 = {
 export type TrainingLoadV1 = {
   previous_day_workload: number;
   previous_day_type: string | null;
+  /** Consecutive calendar days (before workout day) that pass the training-day threshold; all modalities count. */
   consecutive_training_days: number;
+  /** Sum of workload_actual across those streak days (same units as per-workout load). */
+  streak_combined_workload: number;
+  /** Session counts in the streak, e.g. "3× run, 1× strength, 1× ride" — use for nuanced fatigue copy. */
+  streak_modality_summary: string | null;
+  /** What dominated yesterday (before this workout): endurance | strength | mixed | other | null */
+  previous_day_athletic_focus: 'endurance' | 'strength' | 'mixed' | 'other' | null;
   week_load_pct: number | null;
   acwr_ratio: number | null;
   acwr_status: 'undertrained' | 'optimal' | 'elevated' | 'high_risk' | null;

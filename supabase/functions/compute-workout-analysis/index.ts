@@ -1487,11 +1487,14 @@ Deno.serve(async (req) => {
             const prevDurationMoving = prevOverall?.duration_s_moving;
             const safeDurationMoving = dur || (prevDurationMoving && prevDurationMoving >= 60 ? prevDurationMoving : null);
             
+            const swimHrVals = hr_bpm.filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+            const swimAvgHr = swimHrVals.length > 0 ? Math.round(swimHrVals.reduce((s, v) => s + v, 0) / swimHrVals.length) : null;
             return {
               ...(prevOverall||{}),
               distance_m: dist || prevOverall?.distance_m || 0,
               duration_s_moving: safeDurationMoving,
               duration_s_elapsed: elapsedDur || prevOverall?.duration_s_elapsed || null,
+              avg_hr: swimAvgHr ?? prevOverall?.avg_hr ?? null,
             };
           }
           // Non-swim (runs, rides)
@@ -1550,35 +1553,92 @@ Deno.serve(async (req) => {
             }
           }
           
+          // Compute avg/max HR from sensor series
+          let avgHrBpm: number | null = null;
+          let maxHrBpm: number | null = null;
+          const hrVals = hr_bpm.filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+          if (hrVals.length > 0) {
+            avgHrBpm = Math.round(hrVals.reduce((s, v) => s + v, 0) / hrVals.length);
+            maxHrBpm = Math.round(Math.max(...hrVals));
+          }
+
           return { 
             ...(prevOverall||{}), 
             distance_m: dist, 
             duration_s_moving: dur, 
             duration_s_elapsed: elapsedDur,
             avg_pace_s_per_mi: avgPaceSPerMi ?? prevOverall?.avg_pace_s_per_mi ?? null,
-            pace_display: paceDisplay !== '—' ? paceDisplay : (prevOverall?.pace_display ?? '—')
+            pace_display: paceDisplay !== '—' ? paceDisplay : (prevOverall?.pace_display ?? '—'),
+            avg_hr: avgHrBpm ?? prevOverall?.avg_hr ?? null,
+            max_hr: maxHrBpm ?? prevOverall?.max_hr ?? null,
           };
         } catch { return prevOverall || {}; }
       }
       return prevOverall || {};
     })();
 
-    // Compute overall GAP from mile splits (time-weighted)
+    // Compute overall GAP from per-sample GAP (more accurate on rolling terrain than per-mile-split)
     if (sport.includes('run') || sport.includes('walk')) {
-      const miSplits = computeSplits(1609.34);
-      let gapWeightedSum = 0;
-      let gapTimeSum = 0;
-      for (const sp of miSplits) {
-        if (sp.avgGapPace_s_per_km != null && sp.t0 != null && sp.t1 != null) {
-          const dur = sp.t1 - sp.t0;
-          if (dur > 0) { gapWeightedSum += sp.avgGapPace_s_per_km * dur; gapTimeSum += dur; }
+      try {
+        const { computeSampleGrades, paceToGAP, hasUsableElevation } = await import('../_shared/gap.ts');
+        // Rows from normalizeSamples use v_mps (not speed_mps). GAP does not need HR — filtering
+        // by HR breaks the 1 Hz assumption in computeSampleGrades unless distance_m is supplied.
+        const gapSamples = rows.map((r: any) => {
+          const spd =
+            typeof r.v_mps === 'number' && Number.isFinite(r.v_mps)
+              ? r.v_mps
+              : typeof r.speed_mps === 'number' && Number.isFinite(r.speed_mps)
+                ? r.speed_mps
+                : null;
+          return {
+            elevation_m: typeof r.elev === 'number' ? r.elev : null,
+            pace_s_per_mi: spd != null && spd > 0.2 ? 1609.34 / spd : null,
+            distance_m: Number.isFinite(r.d) ? Math.max(0, (r.d || 0) - d0) : null,
+          };
+        });
+
+        if (hasUsableElevation(gapSamples) && gapSamples.length > 60) {
+          const grades = computeSampleGrades(gapSamples);
+          let gapSum = 0;
+          let gapCount = 0;
+          for (let i = 0; i < gapSamples.length; i++) {
+            const p = gapSamples[i].pace_s_per_mi;
+            if (p != null && p > 180 && p < 2400) {
+              const g = paceToGAP(p, grades[i]);
+              gapSum += g;
+              gapCount++;
+            }
+          }
+          if (gapCount > 60) {
+            const avgGapPerMi = Math.round(gapSum / gapCount);
+            const avgActualPerMi = overall?.avg_pace_s_per_mi != null ? Math.round(Number(overall.avg_pace_s_per_mi)) : null;
+            console.log(`[GAP] per-sample: avgGAP=${avgGapPerMi}s/mi (${Math.floor(avgGapPerMi/60)}:${String(avgGapPerMi%60).padStart(2,'0')}), actual=${avgActualPerMi}s/mi, samples=${gapCount}`);
+            (overall as any).avg_gap_s_per_mi = avgGapPerMi;
+            (overall as any).has_gap = true;
+          }
         }
+      } catch (gapErr: any) {
+        console.warn('[GAP] per-sample computation failed:', gapErr?.message);
       }
-      if (gapTimeSum > 0 && overall?.avg_pace_s_per_mi != null) {
-        const avgGapPerKm = gapWeightedSum / gapTimeSum;
-        const avgGapPerMi = Math.round(avgGapPerKm * 1.60934);
-        (overall as any).avg_gap_s_per_mi = avgGapPerMi;
-        (overall as any).has_gap = true;
+
+      // Fallback: per-mile-split GAP if per-sample didn't work
+      if (!(overall as any)?.has_gap) {
+        const miSplits = computeSplits(1609.34);
+        let gapWeightedSum = 0;
+        let gapTimeSum = 0;
+        for (const sp of miSplits) {
+          if (sp.avgGapPace_s_per_km != null && sp.t0 != null && sp.t1 != null) {
+            const dur = sp.t1 - sp.t0;
+            if (dur > 0) { gapWeightedSum += sp.avgGapPace_s_per_km * dur; gapTimeSum += dur; }
+          }
+        }
+        if (gapTimeSum > 0 && overall?.avg_pace_s_per_mi != null) {
+          const avgGapPerKm = gapWeightedSum / gapTimeSum;
+          const avgGapPerMi = Math.round(avgGapPerKm * 1.60934);
+          console.log(`[GAP] per-split fallback: avgGAP=${avgGapPerMi}s/mi, actual=${Math.round(Number(overall.avg_pace_s_per_mi))}s/mi`);
+          (overall as any).avg_gap_s_per_mi = avgGapPerMi;
+          (overall as any).has_gap = true;
+        }
       }
     }
 

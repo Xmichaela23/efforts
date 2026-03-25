@@ -13,6 +13,9 @@
     "bake:all": "node scripts/bake-all.mjs",
     "plan:validate": "node scripts/validate-plan.mjs",
     "plan:minify": "node scripts/plan-minify.mjs",
+    "seed:exercises": "npx tsx scripts/seed-exercises.ts",
+    "seed:insert": "npx tsx scripts/insert-seed-exercises.ts",
+    "backfill:exercise-ids": "npx tsx scripts/backfill-exercise-ids.ts",
     "cap:sync": "cap sync ios",
     "ios": "npm run build && cap sync ios"
   },

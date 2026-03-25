@@ -165,7 +165,7 @@ async function fetchRecentWorkouts(
 ): Promise<WorkoutRowLite[]> {
   const { data, error } = await supabase
     .from('workouts')
-    .select('id,user_id,type,date,workout_status,computed,workout_analysis,workload_actual,workload_planned,duration,moving_time,distance,elevation_gain')
+    .select('id,user_id,type,date,workout_status,computed,workout_analysis,workload_actual,workload_planned,duration,moving_time,distance,elevation_gain,avg_heart_rate')
     .eq('user_id', userId)
     .gte('date', startDateIso)
     .lte('date', endDateIso)
@@ -198,28 +198,64 @@ export async function getSimilarWorkoutComparisons(
     const bandHi = Math.round(durationMin * 1.3);
 
     const comparableKeys = getComparableTypeKeys(workoutTypeKey);
-    const filtered = rows
-      .filter((r) => String(r.id) !== String(currentWorkoutId))
-      .filter((r) => String(r.workout_status || '').toLowerCase() === 'completed')
-      .filter((r) => {
-        if (!workoutTypeKey) return true;
-        const inferred = inferWorkoutTypeKey(r);
-        return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
-      })
-      .filter((r) => {
-        const d = getOverallDurationMin(r);
-        return d != null && d >= bandLo && d <= bandHi;
-      })
-      .map((r) => {
-        const pace = getOverallPaceSecPerMi(r);
-        const hr = getOverallAvgHr(r);
-        const drift = getHrDriftBpmFromAnalysis(r);
-        return { r, pace, hr, drift };
-      })
-      .filter((x) => x.pace != null && x.hr != null);
+    const notSelf = rows.filter((r) => String(r.id) !== String(currentWorkoutId));
+    const completed = notSelf.filter((r) => String(r.workout_status || '').toLowerCase() === 'completed');
+    const typeMatch = completed.filter((r) => {
+      if (!workoutTypeKey) return true;
+      const inferred = inferWorkoutTypeKey(r);
+      return inferred != null && (comparableKeys.length > 0 ? comparableKeys.includes(inferred) : inferred === workoutTypeKey);
+    });
+    const durationMatch = typeMatch.filter((r) => {
+      const d = getOverallDurationMin(r);
+      return d != null && d >= bandLo && d <= bandHi;
+    });
+    const withMetrics = durationMatch.map((r) => {
+      const pace = getOverallPaceSecPerMi(r);
+      const hr = getOverallAvgHr(r);
+      const drift = getHrDriftBpmFromAnalysis(r);
+      return { r, pace, hr, drift };
+    });
+    const filtered = withMetrics.filter((x) => x.pace != null && x.hr != null);
 
     const sample_size = filtered.length;
-    console.log(`[fact-packet] similar workouts: workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}], durationBand=[${bandLo}-${bandHi}]min, matched=${sample_size} of ${rows.length} recent`);
+    console.log(`[fact-packet] similar workouts funnel: total=${rows.length} → notSelf=${notSelf.length} → completed=${completed.length} → typeMatch=${typeMatch.length} → durationMatch(${bandLo}-${bandHi}min)=${durationMatch.length} → pace+hr=${sample_size} | workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}]`);
+    if (durationMatch.length > 0 && filtered.length < durationMatch.length) {
+      const missing = withMetrics.filter(x => x.pace == null || x.hr == null);
+      console.log(`[fact-packet] dropped ${missing.length} workouts missing pace/hr:`, missing.slice(0, 3).map(x => ({ id: x.r.id, date: x.r.date, pace: x.pace, hr: x.hr })));
+    }
+    // Trend sparkline: compute BEFORE the sample_size early return since
+    // trend uses a wider pool (type-matched, not duration-matched).
+    const wideBandLo = Math.max(5, Math.round(durationMin * 0.4));
+    const wideBandHi = Math.round(durationMin * 1.6);
+    const wideDurationMatch = typeMatch.filter((r) => {
+      const d = getOverallDurationMin(r);
+      return d != null && d >= wideBandLo && d <= wideBandHi;
+    });
+    const trendPoolSource = durationMatch.length >= 3
+      ? 'durationMatch'
+      : wideDurationMatch.length >= 3
+        ? 'wideDurationMatch'
+        : 'typeMatch';
+    const trendPool = trendPoolSource === 'durationMatch'
+      ? durationMatch
+      : trendPoolSource === 'wideDurationMatch'
+        ? wideDurationMatch
+        : typeMatch;
+    const trendWithPace = trendPool.filter((r) => r.date && getOverallPaceSecPerMi(r) != null);
+    console.log(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPace.length}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
+    const trend_points = trendWithPace
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .slice(-8)
+      .map((r) => {
+        const pace = getOverallPaceSecPerMi(r)!;
+        const hr = getOverallAvgHr(r);
+        return {
+          date: String(r.date),
+          pace_sec_per_mi: Math.round(pace),
+          avg_hr: hr != null ? Math.round(hr) : null,
+        };
+      });
+
     if (sample_size < 3) {
       return {
         sample_size,
@@ -229,6 +265,7 @@ export async function getSimilarWorkoutComparisons(
         assessment: 'insufficient_data',
         avg_pace_at_similar_hr: null,
         avg_hr_drift: null,
+        trend_points,
       };
     }
 
@@ -242,7 +279,6 @@ export async function getSimilarWorkoutComparisons(
     const avgHr = avg(filtered.map((x) => x.hr));
     const avgDrift = avg(filtered.map((x) => x.drift));
 
-    // Pace at similar HR (within ±5 bpm of current HR)
     let avgPaceAtSimilarHr: number | null = null;
     if (currentAvgHr != null) {
       const near = filtered.filter((x) => x.hr != null && Math.abs((x.hr as number) - currentAvgHr) <= 5);
@@ -265,16 +301,6 @@ export async function getSimilarWorkoutComparisons(
       if (paceWorse && hrSameOrHigher && driftBad) return 'worse_than_usual' as SimilarAssessment;
       return 'typical' as SimilarAssessment;
     })();
-
-    const trend_points = filtered
-      .filter((x) => x.r.date && x.pace != null && x.hr != null)
-      .sort((a, b) => String(a.r.date).localeCompare(String(b.r.date)))
-      .slice(-8)
-      .map((x) => ({
-        date: String(x.r.date),
-        pace_sec_per_mi: Math.round(x.pace!),
-        avg_hr: Math.round(x.hr!),
-      }));
 
     return {
       sample_size,
@@ -529,28 +555,59 @@ export async function getTrainingLoadContext(
     }
     const consecutive_training_days = streakDates.length;
 
-    const streakModalities = (() => {
-      const normalize = (t: string): string => {
-        const s = safeLower(t);
-        if (!s) return 'unknown';
-        if (/(run|walk)/i.test(s)) return 'run';
-        if (/(ride|bike|cycle)/i.test(s)) return 'ride';
-        if (/strength/i.test(s)) return 'strength';
-        if (/swim/i.test(s)) return 'swim';
-        if (/(mobility|yoga|stretch)/i.test(s)) return 'mobility';
-        return s;
-      };
-      const mods = new Set<string>();
-      for (const d of streakDates) {
-        const a = dayAgg.get(d);
-        if (!a) continue;
-        for (const t of Array.from(a.types || [])) mods.add(normalize(t));
-      }
-      mods.delete('unknown');
-      // Hide mobility if mixed with other modalities; keep if it's the only modality.
-      if (mods.size > 1) mods.delete('mobility');
-      return Array.from(mods).sort();
+    const streakDateSet = new Set(streakDates);
+
+    const normalizeStreakModality = (t: string): string => {
+      const s = safeLower(t);
+      if (!s) return 'other';
+      if (/(run|walk)/i.test(s)) return 'run';
+      if (/(ride|bike|cycle)/i.test(s)) return 'ride';
+      if (/strength/i.test(s)) return 'strength';
+      if (/swim/i.test(s)) return 'swim';
+      if (/(mobility|yoga|stretch)/i.test(s)) return 'mobility';
+      return 'other';
+    };
+
+    /** Per-session counts inside the streak window (not per calendar day). */
+    const streakModalityCounts: Record<string, number> = {};
+    for (const r of completed) {
+      const d = toDateOnly(r.date);
+      if (!d || !streakDateSet.has(d)) continue;
+      const k = normalizeStreakModality(safeLower(r.type) || '');
+      streakModalityCounts[k] = (streakModalityCounts[k] || 0) + 1;
+    }
+
+    const streak_modality_summary = (() => {
+      const entries = Object.entries(streakModalityCounts).filter(([, n]) => n > 0);
+      if (!entries.length) return null;
+      entries.sort((a, b) => b[1] - a[1]);
+      return entries.map(([k, n]) => (n === 1 ? `1× ${k}` : `${n}× ${k}`)).join(', ');
     })();
+
+    let streak_combined_workload = 0;
+    for (const d of streakDates) {
+      const a = dayAgg.get(d);
+      if (a) streak_combined_workload += a.workload;
+    }
+    streak_combined_workload = Math.round(streak_combined_workload);
+
+    const athleticFocusForDay = (d: string): TrainingLoadV1['previous_day_athletic_focus'] => {
+      const a = dayAgg.get(d);
+      if (!a) return null;
+      let endurance = false;
+      let strength = false;
+      for (const t of Array.from(a.types || [])) {
+        const s = safeLower(t);
+        if (/(run|walk|ride|bike|cycle|swim)/i.test(s)) endurance = true;
+        if (/strength/i.test(s)) strength = true;
+      }
+      if (endurance && strength) return 'mixed';
+      if (endurance) return 'endurance';
+      if (strength) return 'strength';
+      return 'other';
+    };
+
+    const previous_day_athletic_focus = athleticFocusForDay(prevDate);
     // Debug: log the streak and the last N unique workout dates seen.
     try {
       const uniqSorted = Array.from(dayAgg.keys()).sort(); // ascending
@@ -564,7 +621,7 @@ export async function getTrainingLoadContext(
         })
         .join(' | ');
       console.log(
-        `[fact-packet] consecutive_training_days=${consecutive_training_days} for workoutDate=${workoutDate}; streakDates=[${streakDates.join(', ')}]; dayAggDates(last<=25)=[${uniqSorted.slice(-25).join(', ')}]; last14_breakdown=${breakdown}`
+        `[fact-packet] consecutive_training_days=${consecutive_training_days} streak_wl=${streak_combined_workload} mix=${streak_modality_summary || '—'} prev_focus=${previous_day_athletic_focus || '—'} for workoutDate=${workoutDate}; streakDates=[${streakDates.join(', ')}]; dayAggDates(last<=25)=[${uniqSorted.slice(-25).join(', ')}]; last14_breakdown=${breakdown}`
       );
     } catch {}
 
@@ -624,11 +681,26 @@ export async function getTrainingLoadContext(
     const flagsHigh: boolean[] = [];
     const flagsMod: boolean[] = [];
 
-    const streakLabel = consecutive_training_days > 0
-      ? `${consecutive_training_days} consecutive training days${streakModalities.length ? ` (${streakModalities.join('/')})` : ''}`
-      : null;
-    if (consecutive_training_days >= 5) { flagsHigh.push(true); if (streakLabel) fatigue_evidence.push(streakLabel); }
-    else if (consecutive_training_days >= 3) { flagsMod.push(true); if (streakLabel) fatigue_evidence.push(streakLabel); }
+    // Streak flags: day count + minimum combined load so sparse days don't over-trigger.
+    const streakAvgDaily = consecutive_training_days > 0
+      ? streak_combined_workload / consecutive_training_days
+      : 0;
+    const streakMeaningful =
+      consecutive_training_days >= 3 &&
+      streak_combined_workload >= 28 &&
+      streakAvgDaily >= 12;
+    const streakLabel = consecutive_training_days > 0 && streak_modality_summary
+      ? `${consecutive_training_days} training day${consecutive_training_days !== 1 ? 's' : ''} without rest (~${streak_combined_workload} combined load; ${streak_modality_summary})`
+      : consecutive_training_days > 0
+        ? `${consecutive_training_days} training day${consecutive_training_days !== 1 ? 's' : ''} without rest (~${streak_combined_workload} combined load)`
+        : null;
+    if (consecutive_training_days >= 5 && streakMeaningful) {
+      flagsHigh.push(true);
+      if (streakLabel) fatigue_evidence.push(streakLabel);
+    } else if (consecutive_training_days >= 3 && streakMeaningful) {
+      flagsMod.push(true);
+      if (streakLabel) fatigue_evidence.push(streakLabel);
+    }
 
     if (previous_day_workload > 80) { flagsHigh.push(true); fatigue_evidence.push(`Hard session yesterday`); }
     else if (previous_day_workload > 50) { flagsMod.push(true); fatigue_evidence.push(`Moderate session yesterday`); }
@@ -648,6 +720,9 @@ export async function getTrainingLoadContext(
       previous_day_workload,
       previous_day_type,
       consecutive_training_days,
+      streak_combined_workload,
+      streak_modality_summary,
+      previous_day_athletic_focus,
       week_load_pct,
       acwr_ratio: acwr_ratio != null ? Math.round(acwr_ratio * 100) / 100 : null,
       acwr_status,

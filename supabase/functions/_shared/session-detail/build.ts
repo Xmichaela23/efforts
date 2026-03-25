@@ -116,7 +116,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     (durationAdherence ?? 0) === 0;
 
   const showAdherenceChips =
-    hasPlanned && !planModified && !allZero &&
+    !allZero &&
     (executionScore != null || paceAdherence != null || powerAdherence != null || durationAdherence != null);
 
   const hasMeasuredExecution =
@@ -199,12 +199,14 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     }
     return null;
   })();
+  const fpFacts = factPacket?.facts || {};
+  const fpDerived = factPacket?.derived || {};
   const completedTotals: SessionDetailV1['completed_totals'] = {
     duration_s: completedDurS,
     distance_m: completedDistM,
-    avg_pace_s_per_mi: fin(compOverall?.avg_pace_s_per_mi),
-    avg_gap_s_per_mi: fin(compOverall?.avg_gap_s_per_mi),
-    avg_hr: fin(compOverall?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
+    avg_pace_s_per_mi: fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi),
+    avg_gap_s_per_mi: fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi),
+    avg_hr: fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
     swim_pace_per_100_s: completedSwimPer100,
   };
 
@@ -354,7 +356,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         const points = sorted.map((p: any) => ({
           date: String(p.date),
           value: Number(p.pace_sec_per_mi),
-          avg_hr: Number(p.avg_hr),
+          avg_hr: p.avg_hr != null ? Number(p.avg_hr) : null,
           is_current: !!p.is_current,
           label: fmtPace(Number(p.pace_sec_per_mi)),
         }));
@@ -496,7 +498,14 @@ function buildFallbackNarrative(
   }
 
   // Terrain + GAP: connect hills to pace when relevant
-  if (gapAdjusted && gap != null && pace != null && Math.abs(pace - gap) > 5) {
+  // On net climbing, GAP (flat-equivalent) should be faster than clock pace (lower sec/mi).
+  // If gap > pace with meaningful gain, skip GAP copy and fall through to terrain-only below.
+  const hasGapComparison =
+    gapAdjusted && gap != null && pace != null && Math.abs(pace - gap) > 5;
+  const gapContradictsClimb =
+    hasGapComparison && elevFt != null && elevFt > 50 && gap > pace;
+
+  if (hasGapComparison && !gapContradictsClimb) {
     const costSec = Math.round(pace - gap);
     sentences.push(`The ${terrain || 'hilly'} course${elevFt != null && elevFt > 50 ? ` (${elevFt} ft gain)` : ''} cost about ${costSec}s/mi — effort-adjusted pace was ${fmtPace(gap)} vs ${fmtPace(pace)} actual.`);
   } else if (terrain && elevFt != null && elevFt > 50) {

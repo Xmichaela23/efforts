@@ -6,7 +6,8 @@
  * Runs on every workout ingest (after calculate-workload).
  * Reads the workout row + planned workout + baselines, then writes:
  *   - workout_facts  (one row per workout)
- *   - exercise_log   (one row per exercise, strength workouts only)
+ *   - exercise_log   (one row per exercise, strength workouts only; includes exercise_id when matched)
+ *   - session_load   (load ledger rows; delete+rewrite per workout; failures are non-fatal)
  *
  * No AI, no narratives, no sensor time-series. Pure math.
  *
@@ -28,6 +29,12 @@ import {
   type TRIMPInput,
 } from "../_shared/workload.ts";
 import { canonicalize, muscleGroup, bigFourLift } from "../_shared/canonicalize.ts";
+import {
+  buildRegistryLookup,
+  resolveExerciseId,
+  type ExerciseRegistryRow,
+} from "../_shared/exercise-registry-lookup.ts";
+import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/session-load.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1588,26 +1595,56 @@ serve(async (req: Request) => {
     }
 
     // -----------------------------------------------------------------------
-    // 9. Write exercise_log (strength only, DELETE + INSERT)
+    // 9. Write exercise_log (strength only, DELETE + INSERT) + resolve exercise_id
     // -----------------------------------------------------------------------
     let exercisesWritten = 0;
+    const registryById = new Map<string, ExerciseRegistryRow>();
+    let strengthSessionRows: ExerciseLogRowForLoad[] = [];
+
     if (exerciseRows.length > 0) {
       await supabase.from("exercise_log").delete().eq("workout_id", w.id);
 
-      const elRows = exerciseRows.map((e) => ({
-        workout_id: w.id,
-        user_id: w.user_id,
-        date: w.date,
-        exercise_name: e.name,
-        canonical_name: e.canonical,
-        discipline: "strength",
-        sets_completed: e.sets_completed,
-        best_weight: e.best_weight,
-        best_reps: e.best_reps,
-        total_volume: e.volume,
-        avg_rir: e.avg_rir,
-        estimated_1rm: e.estimated_1rm,
-      }));
+      const { data: regData, error: regErr } = await supabase
+        .from("exercises")
+        .select(
+          "id, slug, aliases, muscle_attribution, load_ratio, recovery_hours_typical, mechanical_stress, cns_demand",
+        )
+        .eq("is_active", true);
+
+      let lookup = null as ReturnType<typeof buildRegistryLookup> | null;
+      if (regErr) {
+        console.error("[compute-facts] exercises registry fetch failed:", regErr.message);
+      } else {
+        const built = buildRegistryLookup((regData ?? []) as ExerciseRegistryRow[]);
+        lookup = built;
+        for (const [k, v] of built.byId) registryById.set(k, v);
+      }
+
+      const elRows = exerciseRows.map((e) => {
+        let exercise_id: string | null = null;
+        if (lookup) {
+          const hit = resolveExerciseId(e.canonical, lookup);
+          exercise_id = hit?.id ?? null;
+          if (!hit) {
+            console.warn(`[compute-facts] No registry match for canonical_name=${e.canonical}`);
+          }
+        }
+        return {
+          workout_id: w.id,
+          user_id: w.user_id,
+          date: w.date,
+          exercise_name: e.name,
+          canonical_name: e.canonical,
+          discipline: "strength",
+          sets_completed: e.sets_completed,
+          best_weight: e.best_weight,
+          best_reps: e.best_reps,
+          total_volume: e.volume,
+          avg_rir: e.avg_rir,
+          estimated_1rm: e.estimated_1rm,
+          exercise_id,
+        };
+      });
 
       const { error: elErr } = await supabase.from("exercise_log").insert(elRows);
       if (elErr) {
@@ -1618,10 +1655,47 @@ serve(async (req: Request) => {
       }
       exercisesWritten = elRows.length;
 
+      strengthSessionRows = elRows.map((r) => ({
+        exercise_id: r.exercise_id,
+        canonical_name: r.canonical_name,
+        total_volume: r.total_volume,
+        avg_rir: r.avg_rir,
+        sets_completed: r.sets_completed,
+        best_weight: r.best_weight,
+        best_reps: r.best_reps,
+      }));
+
       // Update learned_fitness.strength_1rms from exercise_log (fire-and-forget)
       updateLearnedStrengthFromExerciseLog(supabase, w.user_id).catch((e) => {
         console.error("[compute-facts] Learned strength update failed:", e?.message ?? e);
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // 10. session_load (idempotent; failures are non-fatal)
+    // -----------------------------------------------------------------------
+    let sessionLoadInserted = 0;
+    try {
+      const intervalsRaw = w.computed?.intervals;
+      const hasStructuredIntervals = Array.isArray(intervalsRaw) &&
+        intervalsRaw.some((i: any) =>
+          i?.planned_label && !/(warm|cool|rest|recovery)/i.test(String(i.planned_label))
+        );
+
+      const { inserted } = await rewriteSessionLoad(supabase, w, {
+        discipline,
+        durationMinutes: durationMinutes(w),
+        workload: workload ?? null,
+        runFacts,
+        rideFacts,
+        swimFacts,
+        strengthRows: strengthSessionRows,
+        registryById,
+        hasStructuredIntervals,
+      });
+      sessionLoadInserted = inserted;
+    } catch (slErr: any) {
+      console.error("[compute-facts] session_load failed:", slErr?.message ?? slErr);
     }
 
     // Fire-and-forget: recompute weekly snapshot for this user
@@ -1647,6 +1721,7 @@ serve(async (req: Request) => {
         workload,
         facts_written: true,
         exercises_written: exercisesWritten,
+        session_load_rows: sessionLoadInserted,
         terrain_debug: terrainDebug,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

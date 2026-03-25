@@ -149,6 +149,8 @@ RULES:
 - When grade-adjusted pace (GAP) is available, translate it: "Your 11:04 pace was a 10:32 effort on this terrain — the hills cost about 30s/mi."
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
 - When HR drift data exists, interpret it in context: drift on a hilly course means something different than drift on a flat course.
+- STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
+- TRAINING STREAK: Use the provided streak day count, combined load, session mix (e.g. 3× run, 1× strength), and yesterday's athletic focus. All modalities count as training; interpret fatigue with context — upper-body strength is mostly systemic/neural load for a run, not leg glycogen depletion. Do not invent a different day count than the structured fields.
 - When load/fatigue data exists, connect it to what comes next: "Recovery matters before Tuesday's intervals" is actionable. "ACWR is 1.35" is not.
 - When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."
 - Use plain language. Not "positive split of 175s/mi" but "you slowed over the back half — expected on a course that back-loads the climbing."
@@ -216,12 +218,28 @@ function buildUserMessage(dp: any, coachingContext: string | null): string {
   // Load context
   const tl = sig.training_load;
   if (tl) {
+    const anyTl = tl as any;
+    const streakLine = (typeof anyTl.consecutive_training_days === 'number' && anyTl.consecutive_training_days > 0)
+      ? (() => {
+          const n = anyTl.consecutive_training_days;
+          const swl = coerceNumber(anyTl.streak_combined_workload);
+          const mix = typeof anyTl.streak_modality_summary === 'string' && anyTl.streak_modality_summary.trim()
+            ? anyTl.streak_modality_summary.trim()
+            : null;
+          const focus = typeof anyTl.previous_day_athletic_focus === 'string' ? anyTl.previous_day_athletic_focus : null;
+          const loadPart = swl != null && swl > 0 ? `, ~${Math.round(swl)} combined load` : '';
+          const mixPart = mix ? `, sessions: ${mix}` : '';
+          const focusPart = focus ? ` Yesterday (before this workout) was ${focus}-focused.` : '';
+          return `- Training streak: ${n} day(s) without rest${loadPart}${mixPart}.${focusPart}`;
+        })()
+      : null;
     sections.push([
       '\nLOAD CONTEXT:',
       Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
         ? tl.fatigue_evidence.map((e: string) => `- ${e}`).join('\n')
         : null,
       tl.cumulative_fatigue ? `- Cumulative fatigue: ${tl.cumulative_fatigue}` : null,
+      streakLine,
     ].filter(Boolean).join('\n'));
   }
 
@@ -305,6 +323,19 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
   const derived = packet?.derived as any;
   const segments = Array.isArray(facts?.segments) ? facts.segments : [];
 
+  const suppressHrDriftForIntervals = (() => {
+    const ie = derived?.interval_execution;
+    if (typeof ie?.total_steps === 'number' && ie.total_steps > 2) return true;
+    const paces = segments
+      .map((s: any) => coerceNumber(s?.pace_sec_per_mi))
+      .filter((n): n is number => n != null && n > 120 && n < 2400);
+    if (paces.length >= 5) {
+      const spread = Math.max(...paces) - Math.min(...paces);
+      if (spread >= 75) return true;
+    }
+    return false;
+  })();
+
   const displaySegments = segments.slice(0, 24).map((s: any) => {
     const pace = secondsToPaceString(coerceNumber(s?.pace_sec_per_mi));
     const target = secondsToPaceString(coerceNumber(s?.target_pace_sec_per_mi));
@@ -374,17 +405,27 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
             note: typeof derived.execution.note === 'string' ? derived.execution.note : null,
           }
         : null,
-      hr_drift: (coerceNumber(derived?.hr_drift_bpm) != null) ? `${Math.round(Number(derived.hr_drift_bpm))} bpm` : null,
-      hr_drift_typical: (coerceNumber(derived?.hr_drift_typical) != null) ? `${Math.round(Number(derived.hr_drift_typical))} bpm` : null,
+      hr_drift: (!suppressHrDriftForIntervals && coerceNumber(derived?.hr_drift_bpm) != null)
+        ? `${Math.round(Number(derived.hr_drift_bpm))} bpm`
+        : null,
+      hr_drift_typical: (!suppressHrDriftForIntervals && coerceNumber(derived?.hr_drift_typical) != null)
+        ? `${Math.round(Number(derived.hr_drift_typical))} bpm`
+        : null,
       cardiac_decoupling: (coerceNumber(derived?.cardiac_decoupling_pct) != null) ? `${Math.round(Number(derived.cardiac_decoupling_pct))}%` : null,
       pace_fade: (coerceNumber(derived?.pace_fade_pct) != null) ? `${Math.round(Number(derived.pace_fade_pct))}%` : null,
       training_load: derived?.training_load
-        ? {
-            previous_day_workload: coerceNumber(derived.training_load.previous_day_workload) ?? 0,
-            consecutive_training_days: coerceNumber(derived.training_load.consecutive_training_days) ?? 0,
-            cumulative_fatigue: derived.training_load.cumulative_fatigue ?? null,
-            fatigue_evidence: Array.isArray(derived.training_load.fatigue_evidence) ? derived.training_load.fatigue_evidence.slice(0, 4) : [],
-          }
+        ? (() => {
+            const anyTl = derived.training_load as any;
+            return {
+              previous_day_workload: coerceNumber(anyTl.previous_day_workload) ?? 0,
+              consecutive_training_days: coerceNumber(anyTl.consecutive_training_days) ?? 0,
+              streak_combined_workload: coerceNumber(anyTl.streak_combined_workload) ?? 0,
+              streak_modality_summary: typeof anyTl.streak_modality_summary === 'string' ? anyTl.streak_modality_summary : null,
+              previous_day_athletic_focus: typeof anyTl.previous_day_athletic_focus === 'string' ? anyTl.previous_day_athletic_focus : null,
+              cumulative_fatigue: anyTl.cumulative_fatigue ?? null,
+              fatigue_evidence: Array.isArray(anyTl.fatigue_evidence) ? anyTl.fatigue_evidence.slice(0, 4) : [],
+            };
+          })()
         : null,
       comparisons: derived?.comparisons
         ? {

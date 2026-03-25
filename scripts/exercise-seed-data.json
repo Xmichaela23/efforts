@@ -1,0 +1,6395 @@
+[
+  {
+    "slug": "ab_rollout",
+    "display_name": "Ab Rollout",
+    "aliases": [
+      "ab rollout",
+      "ab wheel rollout"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "air_squat",
+    "display_name": "Air Squat",
+    "aliases": [
+      "air squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "air_squats",
+    "display_name": "Air Squats",
+    "aliases": [
+      "air squats"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "archer_push_up",
+    "display_name": "Archer Push Up",
+    "aliases": [
+      "archer push-up"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "archer_push_ups",
+    "display_name": "Archer Push Ups",
+    "aliases": [
+      "archer push-ups"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "back_extension",
+    "display_name": "Back Extension",
+    "aliases": [
+      "back extension"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "erector_spinae",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lower_back": 0.5,
+        "erector_spinae": 0.5
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "band_face_pull",
+    "display_name": "Band Face Pull",
+    "aliases": [
+      "band face pull"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.5,
+        "upper_back": 0.5
+      },
+      "secondary": {}
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "band_face_pulls",
+    "display_name": "Band Face Pulls",
+    "aliases": [
+      "band face pulls"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.5,
+        "upper_back": 0.5
+      },
+      "secondary": {}
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "barbell_row",
+    "display_name": "Barbell Row",
+    "aliases": [
+      "barbell row",
+      "barbell rows",
+      "bent over row"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "erector_spinae",
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "upper_back": 0.45,
+        "lats": 0.35,
+        "biceps": 0.2
+      },
+      "secondary": {
+        "forearms": 0.1,
+        "erector_spinae": 0.08
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.8,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bear_crawl",
+    "display_name": "Bear Crawl",
+    "aliases": [
+      "bear crawl"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bench",
+    "display_name": "Bench",
+    "aliases": [
+      "bench"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bench_jumps",
+    "display_name": "Bench Jumps",
+    "aliases": [
+      "bench jumps"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bench_press",
+    "display_name": "Bench Press",
+    "aliases": [
+      "bench press"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.55,
+        "anterior_deltoid": 0.25,
+        "triceps": 0.2
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Retract shoulder blades | Barbell bench press. Use bench 1RM baseline directly.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bicycle",
+    "display_name": "Bicycle",
+    "aliases": [
+      "bicycle"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bicycle_crunch",
+    "display_name": "Bicycle Crunch",
+    "aliases": [
+      "bicycle crunch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bike_squat",
+    "display_name": "Bike Squat",
+    "aliases": [
+      "bike squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.48,
+        "glutes": 0.35,
+        "hamstrings": 0.17
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Focus on cycling-specific range",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bird_dog",
+    "display_name": "Bird Dog",
+    "aliases": [
+      "bird dog"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "erector_spinae",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lower_back": 0.5,
+        "erector_spinae": 0.5
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "bodyweight_reps",
+    "notes": "Maintain neutral spine",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bird_dogs",
+    "display_name": "Bird Dogs",
+    "aliases": [
+      "bird dogs"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "body_saw",
+    "display_name": "Body Saw",
+    "aliases": [
+      "body saw"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bodyweight_squat",
+    "display_name": "Bodyweight Squat",
+    "aliases": [
+      "bodyweight squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "hamstrings"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "hamstrings": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": "Go to parallel or below",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bodyweight_squats",
+    "display_name": "Bodyweight Squats",
+    "aliases": [
+      "bodyweight squats"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bounding",
+    "display_name": "Bounding",
+    "aliases": [
+      "bounding"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "box_jump",
+    "display_name": "Box Jump",
+    "aliases": [
+      "box jump"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "calves",
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "hamstrings"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.45,
+        "glutes": 0.4,
+        "calves": 0.15
+      },
+      "secondary": {
+        "hamstrings": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": "Land softly, focus on height",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "box_jumps",
+    "display_name": "Box Jumps",
+    "aliases": [
+      "box jumps"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "box_step_up",
+    "display_name": "Box Step Up",
+    "aliases": [
+      "box step-up"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "box_step_ups",
+    "display_name": "Box Step Ups",
+    "aliases": [
+      "box step-ups"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "broad_jump",
+    "display_name": "Broad Jump",
+    "aliases": [
+      "broad jump"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "calves",
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "hamstrings"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.45,
+        "glutes": 0.4,
+        "calves": 0.15
+      },
+      "secondary": {
+        "hamstrings": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": "Focus on distance",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "broad_jumps",
+    "display_name": "Broad Jumps",
+    "aliases": [
+      "broad jumps"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "bulgarian_split_squat",
+    "display_name": "Bulgarian Split Squat",
+    "aliases": [
+      "bulgarian split squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.48,
+        "glutes": 0.37,
+        "hamstrings": 0.15
+      },
+      "secondary": {
+        "core": 0.12
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Hold dumbbells at sides.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "cable_crunch",
+    "display_name": "Cable Crunch",
+    "aliases": [
+      "cable crunch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "cable",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "cable_row",
+    "display_name": "Cable Row",
+    "aliases": [
+      "cable row"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "upper_back": 0.4,
+        "lats": 0.35,
+        "biceps": 0.25
+      },
+      "secondary": {
+        "forearms": 0.08
+      }
+    },
+    "equipment": "cable",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "calf_raise",
+    "display_name": "Calf Raise",
+    "aliases": [
+      "calf raise"
+    ],
+    "movement_pattern": "isolation_lower",
+    "primary_muscles": [
+      "calves"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "calves": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "calf_raises",
+    "display_name": "Calf Raises",
+    "aliases": [
+      "calf raises"
+    ],
+    "movement_pattern": "isolation_lower",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "chest_fly",
+    "display_name": "Chest Fly",
+    "aliases": [
+      "chest fly"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.88,
+        "anterior_deltoid": 0.12
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.35,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "chin_ups",
+    "display_name": "Chin Ups",
+    "aliases": [
+      "chin-ups"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "chinup",
+    "display_name": "Chinup",
+    "aliases": [
+      "chin up",
+      "chin-up",
+      "chinup",
+      "chinups"
+    ],
+    "movement_pattern": "vertical_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "core",
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lats": 0.45,
+        "upper_back": 0.2,
+        "biceps": 0.35
+      },
+      "secondary": {
+        "forearms": 0.1,
+        "core": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "clamshell",
+    "display_name": "Clamshell",
+    "aliases": [
+      "clamshell"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "band",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "clamshells",
+    "display_name": "Clamshells",
+    "aliases": [
+      "clamshells"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "band",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "clean_pull",
+    "display_name": "Clean Pull",
+    "aliases": [
+      "clean pull"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core",
+      "forearms",
+      "quadriceps"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.34,
+        "glutes": 0.3,
+        "upper_back": 0.26,
+        "lats": 0.1
+      },
+      "secondary": {
+        "forearms": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": "Explosive hip extension",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "close_grip_bench_press",
+    "display_name": "Close Grip Bench Press",
+    "aliases": [
+      "close grip bench press"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.45,
+        "anterior_deltoid": 0.2,
+        "triceps": 0.35
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.9,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "copenhagen_plank",
+    "display_name": "Copenhagen Plank",
+    "aliases": [
+      "copenhagen plank"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "bodyweight_reps",
+    "notes": "Adductor-focused core stability.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "copenhagen_planks",
+    "display_name": "Copenhagen Planks",
+    "aliases": [
+      "copenhagen planks"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "core_circuit",
+    "display_name": "Core Circuit",
+    "aliases": [
+      "core circuit"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "core_work",
+    "display_name": "Core Work",
+    "aliases": [
+      "core work"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "crunch",
+    "display_name": "Crunch",
+    "aliases": [
+      "crunch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "db_bench_press",
+    "display_name": "Dumbbell Bench Press",
+    "aliases": [
+      "db bench press",
+      "dumbbell bench press"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.55,
+        "anterior_deltoid": 0.25,
+        "triceps": 0.2
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.8,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Control the movement",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "db_row",
+    "display_name": "Dumbbell Row",
+    "aliases": [
+      "db row",
+      "dumbbell row"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lats": 0.4,
+        "upper_back": 0.35,
+        "biceps": 0.25
+      },
+      "secondary": {
+        "forearms": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.45,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Keep elbow close to body",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "db_shoulder_press",
+    "display_name": "Db Shoulder Press",
+    "aliases": [
+      "db shoulder press"
+    ],
+    "movement_pattern": "vertical_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "lateral_deltoid",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "anterior_deltoid": 0.45,
+        "lateral_deltoid": 0.22,
+        "triceps": 0.33
+      },
+      "secondary": {
+        "core": 0.12
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.7,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "db_swings",
+    "display_name": "Db Swings",
+    "aliases": [
+      "db swings"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dead_bug",
+    "display_name": "Dead Bug",
+    "aliases": [
+      "dead bug"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [
+      "hip_flexors"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "bodyweight_reps",
+    "notes": "Keep lower back pressed to floor | merge: exercise-config isUnilateral took precedence over library rep pattern",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": true,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dead_bugs",
+    "display_name": "Dead Bugs",
+    "aliases": [
+      "dead bugs"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "deadlift",
+    "display_name": "Deadlift",
+    "aliases": [
+      "deadlift"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lower_back",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "forearms",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.3,
+        "glutes": 0.3,
+        "lower_back": 0.2,
+        "quadriceps": 0.2
+      },
+      "secondary": {
+        "upper_back": 0.15,
+        "forearms": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 72,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Keep bar close to shins",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "decline_crunch",
+    "display_name": "Decline Crunch",
+    "aliases": [
+      "decline crunch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "decline_push_up",
+    "display_name": "Decline Push Up",
+    "aliases": [
+      "decline push-up"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "decline_push_ups",
+    "display_name": "Decline Push Ups",
+    "aliases": [
+      "decline push-ups"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "diamond_push_up",
+    "display_name": "Diamond Push Up",
+    "aliases": [
+      "diamond push-up"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "diamond_push_ups",
+    "display_name": "Diamond Push Ups",
+    "aliases": [
+      "diamond push-ups"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dip",
+    "display_name": "Dip",
+    "aliases": [
+      "dip",
+      "dips"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "triceps": 0.45,
+        "chest": 0.35,
+        "anterior_deltoid": 0.2
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.9,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Total load (bodyweight + added). Shows added weight if ≥10 lb, otherwise \"Bodyweight\".",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dragon_flag",
+    "display_name": "Dragon Flag",
+    "aliases": [
+      "dragon flag"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_fly",
+    "display_name": "Dumbbell Fly",
+    "aliases": [
+      "dumbbell fly"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.88,
+        "anterior_deltoid": 0.12
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.35,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_incline_press",
+    "display_name": "Dumbbell Incline Press",
+    "aliases": [
+      "dumbbell incline press"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.7,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_lateral_raise",
+    "display_name": "Dumbbell Lateral Raise",
+    "aliases": [
+      "dumbbell lateral raise"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "lateral_deltoid"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "lateral_deltoid": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_lateral_raises",
+    "display_name": "Dumbbell Lateral Raises",
+    "aliases": [
+      "dumbbell lateral raises"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "lateral_deltoid"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "lateral_deltoid": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_rows",
+    "display_name": "Dumbbell Rows",
+    "aliases": [
+      "dumbbell rows"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.45,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_shoulder_press",
+    "display_name": "Dumbbell Shoulder Press",
+    "aliases": [
+      "dumbbell shoulder press"
+    ],
+    "movement_pattern": "vertical_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "lateral_deltoid",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "anterior_deltoid": 0.333,
+        "lateral_deltoid": 0.333,
+        "triceps": 0.334
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.7,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": true,
+    "heuristic_equal_multi_primary": true
+  },
+  {
+    "slug": "dumbbell_swing",
+    "display_name": "Dumbbell Swing",
+    "aliases": [
+      "dumbbell swing"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "dumbbell_swings",
+    "display_name": "Dumbbell Swings",
+    "aliases": [
+      "dumbbell swings"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "face_pull",
+    "display_name": "Face Pull",
+    "aliases": [
+      "face pull"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "biceps",
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.45,
+        "upper_back": 0.4,
+        "biceps": 0.15
+      },
+      "secondary": {
+        "forearms": 0.06
+      }
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "face_pulls",
+    "display_name": "Face Pulls",
+    "aliases": [
+      "face pulls"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.5,
+        "upper_back": 0.5
+      },
+      "secondary": {}
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "farmer_carry",
+    "display_name": "Farmer Carry",
+    "aliases": [
+      "farmer carry"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "forearms",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "forearms": 0.35,
+        "upper_back": 0.35,
+        "core": 0.3
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "flutter_kicks",
+    "display_name": "Flutter Kicks",
+    "aliases": [
+      "flutter kicks"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "front_raise",
+    "display_name": "Front Raise",
+    "aliases": [
+      "front raise"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "anterior_deltoid"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "anterior_deltoid": 1
+      },
+      "secondary": {
+        "core": 0.06
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "front_squat",
+    "display_name": "Front Squat",
+    "aliases": [
+      "front squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "erector_spinae"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.3,
+        "hamstrings": 0.2
+      },
+      "secondary": {
+        "core": 0.15,
+        "erector_spinae": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.85,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "glute_bridge",
+    "display_name": "Glute Bridge",
+    "aliases": [
+      "glute bridge"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.7,
+        "hamstrings": 0.3
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Squeeze glutes at top",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "glute_bridges",
+    "display_name": "Glute Bridges",
+    "aliases": [
+      "glute bridges"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "goblet_squat",
+    "display_name": "Goblet Squat",
+    "aliases": [
+      "goblet squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.35,
+        "hamstrings": 0.15
+      },
+      "secondary": {
+        "core": 0.12
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.45,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Hold dumbbell at chest | Single dumbbell/kettlebell at chest.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "good_morning",
+    "display_name": "Good Morning (Bodyweight)",
+    "aliases": [
+      "good morning",
+      "good morning (bodyweight)"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "erector_spinae",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.35,
+        "lower_back": 0.35,
+        "glutes": 0.3
+      },
+      "secondary": {
+        "erector_spinae": 0.12
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "hanging_knee_raise_oblique",
+    "display_name": "Hanging Knee Raise (Oblique)",
+    "aliases": [
+      "hanging knee raise (oblique)"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "hanging_leg_raise",
+    "display_name": "Hanging Leg Raise",
+    "aliases": [
+      "hanging leg raise"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "heel_touch",
+    "display_name": "Heel Touch",
+    "aliases": [
+      "heel touch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "hip_thrust",
+    "display_name": "Hip Thrust",
+    "aliases": [
+      "hip thrust",
+      "hip thrusts"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.55,
+        "hamstrings": 0.28,
+        "quadriceps": 0.17
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.9,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Barbell or smith machine. Strong hip-dominant athletes may exceed this.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "hollow_body_hold",
+    "display_name": "Hollow Body Hold",
+    "aliases": [
+      "hollow body hold"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "hollow_body_rock",
+    "display_name": "Hollow Body Rock",
+    "aliases": [
+      "hollow body rock"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "incline_bench",
+    "display_name": "Incline Bench",
+    "aliases": [
+      "incline bench"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.85,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "incline_bench_press",
+    "display_name": "Incline Bench Press",
+    "aliases": [
+      "incline bench press"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "anterior_deltoid": 0.3,
+        "triceps": 0.2
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.85,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "inverted_row",
+    "display_name": "Inverted Row",
+    "aliases": [
+      "inverted row"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "upper_back": 0.4,
+        "lats": 0.35,
+        "biceps": 0.25
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": "Feet elevated for progression.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "inverted_rows",
+    "display_name": "Inverted Rows",
+    "aliases": [
+      "inverted rows"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "jump_lunge",
+    "display_name": "Jump Lunge",
+    "aliases": [
+      "jump lunge"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "jump_lunges",
+    "display_name": "Jump Lunges",
+    "aliases": [
+      "jump lunges"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "jump_squat",
+    "display_name": "Jump Squat",
+    "aliases": [
+      "jump squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "jump_squats",
+    "display_name": "Jump Squats",
+    "aliases": [
+      "jump squats"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "kb_db_swings",
+    "display_name": "Kb Db Swings",
+    "aliases": [
+      "kb/db swings"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "kb_swings",
+    "display_name": "Kb Swings",
+    "aliases": [
+      "kb swings"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "kettlebell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "kettlebell_swing",
+    "display_name": "Kettlebell Swing",
+    "aliases": [
+      "kettlebell swing"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "kettlebell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Explosive hip hinge. Weight should allow powerful hip snap.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "kettlebell_swings",
+    "display_name": "Kettlebell Swings",
+    "aliases": [
+      "kettlebell swings"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "glutes": 0.5,
+        "hamstrings": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "kettlebell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "l_sit",
+    "display_name": "L-Sit",
+    "aliases": [
+      "l-sit"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "landmine_rotation",
+    "display_name": "Landmine Rotation",
+    "aliases": [
+      "landmine rotation"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "barbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lat_pulldown",
+    "display_name": "Lat Pulldown",
+    "aliases": [
+      "lat pulldown"
+    ],
+    "movement_pattern": "vertical_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lats": 0.55,
+        "upper_back": 0.25,
+        "biceps": 0.2
+      },
+      "secondary": {
+        "forearms": 0.08
+      }
+    },
+    "equipment": "cable",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.65,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lateral_band_walk",
+    "display_name": "Lateral Band Walk",
+    "aliases": [
+      "lateral band walk"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Mini band around ankles or above knees.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lateral_band_walks",
+    "display_name": "Lateral Band Walks",
+    "aliases": [
+      "lateral band walks"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lateral_lunge",
+    "display_name": "Lateral Lunge",
+    "aliases": [
+      "lateral lunge"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "adductors",
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.4,
+        "glutes": 0.3,
+        "adductors": 0.3
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.3,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lateral_lunges",
+    "display_name": "Lateral Lunges",
+    "aliases": [
+      "lateral lunges"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.3,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lateral_raise",
+    "display_name": "Lateral Raise",
+    "aliases": [
+      "lateral raise"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "lateral_deltoid"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lateral_deltoid": 1
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lateral_raises",
+    "display_name": "Lateral Raises",
+    "aliases": [
+      "lateral raises"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "lateral_deltoid"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "lateral_deltoid": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "leg_curl",
+    "display_name": "Leg Curl",
+    "aliases": [
+      "leg curl"
+    ],
+    "movement_pattern": "isolation_lower",
+    "primary_muscles": [
+      "hamstrings"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "machine",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.3,
+    "mechanical_stress": "low",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "leg_extension",
+    "display_name": "Leg Extension",
+    "aliases": [
+      "leg extension"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "machine",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.35,
+    "mechanical_stress": "low",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "leg_press",
+    "display_name": "Leg Press",
+    "aliases": [
+      "leg press"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "hamstrings"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.65,
+        "glutes": 0.35
+      },
+      "secondary": {
+        "hamstrings": 0.08
+      }
+    },
+    "equipment": "machine",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1.5,
+    "mechanical_stress": "low",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "leg_raise",
+    "display_name": "Leg Raise",
+    "aliases": [
+      "leg raise"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "lunge",
+    "display_name": "Lunge",
+    "aliases": [
+      "lunge"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.45,
+        "glutes": 0.38,
+        "hamstrings": 0.17
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "med_ball_throw",
+    "display_name": "Medicine Ball Throw",
+    "aliases": [
+      "medicine ball throw"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "core"
+    ],
+    "secondary_muscles": [
+      "triceps"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.35,
+        "anterior_deltoid": 0.35,
+        "core": 0.3
+      },
+      "secondary": {
+        "triceps": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Explosive movement",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "mountain_climber",
+    "display_name": "Mountain Climber",
+    "aliases": [
+      "mountain climber"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "overhead_press",
+    "display_name": "Overhead Press",
+    "aliases": [
+      "military press",
+      "ohp",
+      "overhead press",
+      "shoulder press"
+    ],
+    "movement_pattern": "vertical_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "lateral_deltoid",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "anterior_deltoid": 0.45,
+        "lateral_deltoid": 0.2,
+        "triceps": 0.35
+      },
+      "secondary": {
+        "core": 0.12
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Keep core tight",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pallof_press",
+    "display_name": "Pallof Press",
+    "aliases": [
+      "pallof press"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "cable",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pike_push_up",
+    "display_name": "Pike Push Up",
+    "aliases": [
+      "pike push-up"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": "Elevate feet to progress toward HSPU.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pike_push_ups",
+    "display_name": "Pike Push Ups",
+    "aliases": [
+      "pike push-ups"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "plank",
+    "display_name": "Plank",
+    "aliases": [
+      "plank"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "bodyweight_reps",
+    "notes": "Keep body straight",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "plank_hip_dip",
+    "display_name": "Plank Hip Dip",
+    "aliases": [
+      "plank hip dip"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "plank_shoulder_tap",
+    "display_name": "Plank Shoulder Tap",
+    "aliases": [
+      "plank shoulder tap"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "power_clean",
+    "display_name": "Power Clean",
+    "aliases": [
+      "power clean"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "core",
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.3,
+        "glutes": 0.28,
+        "hamstrings": 0.22,
+        "upper_back": 0.2
+      },
+      "secondary": {
+        "forearms": 0.12,
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pull_ups",
+    "display_name": "Pull Ups",
+    "aliases": [
+      "pull-ups"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pullup",
+    "display_name": "Pull-up",
+    "aliases": [
+      "pull up",
+      "pull-up",
+      "pullup",
+      "pullups"
+    ],
+    "movement_pattern": "vertical_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "core",
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lats": 0.5,
+        "upper_back": 0.25,
+        "biceps": 0.25
+      },
+      "secondary": {
+        "forearms": 0.1,
+        "core": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": "Full range of motion | Bodyweight. Add weight when 3x12 is easy.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "push_ups",
+    "display_name": "Push Ups",
+    "aliases": [
+      "push-ups"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pushup",
+    "display_name": "Push-up",
+    "aliases": [
+      "push up",
+      "push-up",
+      "pushup"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "anterior_deltoid": 0.2,
+        "triceps": 0.3
+      },
+      "secondary": {
+        "core": 0.12
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": "Maintain plank position | Standard → Diamond → Decline → Archer for progression.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "pushups",
+    "display_name": "Pushups",
+    "aliases": [
+      "pushups"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "chest": 0.5,
+        "triceps": 0.5
+      },
+      "secondary": {
+        "anterior_deltoid": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "reverse_crunch",
+    "display_name": "Reverse Crunch",
+    "aliases": [
+      "reverse crunch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "reverse_fly",
+    "display_name": "Reverse Fly",
+    "aliases": [
+      "reverse fly"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.55,
+        "upper_back": 0.45
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.2,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "reverse_flye",
+    "display_name": "Reverse Flye",
+    "aliases": [
+      "reverse flye"
+    ],
+    "movement_pattern": "horizontal_push",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.5,
+        "upper_back": 0.5
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.2,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "reverse_hyper",
+    "display_name": "Reverse Hyper",
+    "aliases": [
+      "reverse hyper"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "erector_spinae",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lower_back": 0.5,
+        "erector_spinae": 0.5
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "reverse_lunge",
+    "display_name": "Reverse Lunge",
+    "aliases": [
+      "reverse lunge"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "reverse_lunges",
+    "display_name": "Reverse Lunges",
+    "aliases": [
+      "reverse lunges"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "romanian_deadlift",
+    "display_name": "Romanian Deadlift",
+    "aliases": [
+      "rdl",
+      "romanian deadlift"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "forearms",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.45,
+        "glutes": 0.35,
+        "lower_back": 0.2
+      },
+      "secondary": {
+        "forearms": 0.08,
+        "upper_back": 0.08
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.75,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 72,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Keep bar close to legs",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "rows",
+    "display_name": "Rows",
+    "aliases": [
+      "rows"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.85,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Generic rows - assumes barbell row weight.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "running_lunge",
+    "display_name": "Running Lunge",
+    "aliases": [
+      "running lunge"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.45,
+        "glutes": 0.38,
+        "hamstrings": 0.17
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Simulate running stride",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "russian_twist",
+    "display_name": "Russian Twist",
+    "aliases": [
+      "russian twist"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "scissor_kicks",
+    "display_name": "Scissor Kicks",
+    "aliases": [
+      "scissor kicks"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "seated_row",
+    "display_name": "Seated Row",
+    "aliases": [
+      "seated row"
+    ],
+    "movement_pattern": "horizontal_pull",
+    "primary_muscles": [
+      "biceps",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "upper_back": 0.42,
+        "lats": 0.33,
+        "biceps": 0.25
+      },
+      "secondary": {
+        "forearms": 0.08
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "side_bend",
+    "display_name": "Side Bend",
+    "aliases": [
+      "side bend"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "side_crunch",
+    "display_name": "Side Crunch",
+    "aliases": [
+      "side crunch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "side_plank",
+    "display_name": "Side Plank",
+    "aliases": [
+      "side plank"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [
+      "glutes"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "bodyweight_reps",
+    "notes": "Maintain straight line",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "single_leg_calf_raise",
+    "display_name": "Single Leg Calf Raise",
+    "aliases": [
+      "single leg calf raise"
+    ],
+    "movement_pattern": "isolation_lower",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "single_leg_calf_raises",
+    "display_name": "Single Leg Calf Raises",
+    "aliases": [
+      "single leg calf raises"
+    ],
+    "movement_pattern": "isolation_lower",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "single_leg_glute_bridge",
+    "display_name": "Single Leg Glute Bridge",
+    "aliases": [
+      "single leg glute bridge"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "single_leg_glute_bridges",
+    "display_name": "Single Leg Glute Bridges",
+    "aliases": [
+      "single leg glute bridges"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "single_leg_rdl",
+    "display_name": "Single Leg Rdl",
+    "aliases": [
+      "single leg rdl"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "core",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.45,
+        "glutes": 0.4,
+        "lower_back": 0.15
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 72,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Hold dumbbell on opposite side of working leg.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "single_leg_romanian_deadlift",
+    "display_name": "Single Leg Romanian Deadlift",
+    "aliases": [
+      "single leg romanian deadlift"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.25,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 72,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "sit_up",
+    "display_name": "Sit-Up",
+    "aliases": [
+      "sit-up"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "skater_hop",
+    "display_name": "Skater Hop",
+    "aliases": [
+      "skater hop"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "skater_hops",
+    "display_name": "Skater Hops",
+    "aliases": [
+      "skater hops"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "snatch_pull",
+    "display_name": "Snatch Pull",
+    "aliases": [
+      "snatch pull"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lats",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "core",
+      "forearms",
+      "quadriceps"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.32,
+        "glutes": 0.3,
+        "upper_back": 0.28,
+        "lats": 0.1
+      },
+      "secondary": {
+        "forearms": 0.1,
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": "Wide grip, explosive movement",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "split_squat",
+    "display_name": "Split Squat",
+    "aliases": [
+      "split squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.48,
+        "glutes": 0.37,
+        "hamstrings": 0.15
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "squat",
+    "display_name": "Squat",
+    "aliases": [
+      "back squat",
+      "squat"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core",
+      "erector_spinae"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.45,
+        "glutes": 0.35,
+        "hamstrings": 0.2
+      },
+      "secondary": {
+        "core": 0.15,
+        "erector_spinae": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Focus on depth and form",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "squat_jump",
+    "display_name": "Squat Jump",
+    "aliases": [
+      "squat jump"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "squat_jumps",
+    "display_name": "Squat Jumps",
+    "aliases": [
+      "squat jumps"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "bodyweight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "step_up",
+    "display_name": "Step Up",
+    "aliases": [
+      "step up",
+      "step-up"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.35,
+        "hamstrings": 0.15
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "step_ups",
+    "display_name": "Step Ups",
+    "aliases": [
+      "step ups",
+      "step-ups"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.4,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "stir_the_pot",
+    "display_name": "Stir the Pot",
+    "aliases": [
+      "stir the pot"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "suitcase_carry",
+    "display_name": "Suitcase Carry",
+    "aliases": [
+      "suitcase carry"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core",
+      "forearms",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "forearms": 0.35,
+        "upper_back": 0.35,
+        "core": 0.3
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "sumo_deadlift",
+    "display_name": "Sumo Deadlift",
+    "aliases": [
+      "sumo deadlift"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "adductors",
+      "glutes",
+      "hamstrings",
+      "lower_back",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "forearms",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.28,
+        "glutes": 0.32,
+        "adductors": 0.15,
+        "quadriceps": 0.15,
+        "lower_back": 0.1
+      },
+      "secondary": {
+        "upper_back": 0.12,
+        "forearms": 0.1
+      }
+    },
+    "equipment": "barbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.95,
+    "mechanical_stress": "high",
+    "cns_demand": "high",
+    "recovery_hours_typical": 72,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "superman",
+    "display_name": "Superman",
+    "aliases": [
+      "superman"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "erector_spinae",
+      "lower_back"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lower_back": 0.5,
+        "erector_spinae": 0.5
+      },
+      "secondary": {
+        "core": 0.08
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "swimmers_pull",
+    "display_name": "Swimmer's Pull",
+    "aliases": [
+      "swimmer's pull",
+      "swimmers pull"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "lats",
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [
+      "anterior_deltoid",
+      "biceps",
+      "forearms"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "lats": 0.45,
+        "upper_back": 0.35,
+        "posterior_deltoid": 0.2
+      },
+      "secondary": {
+        "biceps": 0.08,
+        "forearms": 0.06
+      }
+    },
+    "equipment": "band",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Simulate swimming pull motion",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "toe_touch",
+    "display_name": "Toe Touch",
+    "aliases": [
+      "toe touch"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "transition_burpee",
+    "display_name": "Transition Burpee",
+    "aliases": [
+      "transition burpee"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "chest",
+      "core",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "triceps"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.35,
+        "chest": 0.25,
+        "core": 0.25,
+        "anterior_deltoid": 0.15
+      },
+      "secondary": {
+        "triceps": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": "Simulate triathlon transitions",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "trap_bar_deadlift",
+    "display_name": "Trap Bar Deadlift",
+    "aliases": [
+      "trap bar deadlift"
+    ],
+    "movement_pattern": "hip_hinge",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lower_back",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "forearms",
+      "upper_back"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "hamstrings": 0.28,
+        "glutes": 0.32,
+        "lower_back": 0.18,
+        "quadriceps": 0.22
+      },
+      "secondary": {
+        "upper_back": 0.14,
+        "forearms": 0.1
+      }
+    },
+    "equipment": "trap_bar",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 1,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 72,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "turkish_getup",
+    "display_name": "Turkish Get-Up",
+    "aliases": [
+      "turkish get-up"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "anterior_deltoid",
+      "core",
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 0.35,
+        "glutes": 0.25,
+        "quadriceps": 0.2,
+        "anterior_deltoid": 0.2
+      },
+      "secondary": {}
+    },
+    "equipment": "kettlebell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "full_body",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "v_up",
+    "display_name": "V-Up",
+    "aliases": [
+      "v-up"
+    ],
+    "movement_pattern": "core",
+    "primary_muscles": [
+      "core"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "core": 1
+      },
+      "secondary": {}
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": false,
+    "is_compound": false,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "walking_lunge",
+    "display_name": "Walking Lunge",
+    "aliases": [
+      "walking lunge"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.45,
+        "glutes": 0.38,
+        "hamstrings": 0.17
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": "Hold dumbbells at sides.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "walking_lunges",
+    "display_name": "Walking Lunges",
+    "aliases": [
+      "walking lunges"
+    ],
+    "movement_pattern": "squat",
+    "primary_muscles": [
+      "glutes",
+      "quadriceps"
+    ],
+    "secondary_muscles": [
+      "core"
+    ],
+    "muscle_attribution": {
+      "primary": {
+        "quadriceps": 0.5,
+        "glutes": 0.5
+      },
+      "secondary": {
+        "core": 0.1
+      }
+    },
+    "equipment": "bodyweight",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "high",
+    "recovery_hours_typical": 48,
+    "body_region": "lower",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "woodchop",
+    "display_name": "Woodchop",
+    "aliases": [
+      "woodchop"
+    ],
+    "movement_pattern": "rotational",
+    "primary_muscles": [
+      "core",
+      "obliques"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "obliques": 0.85,
+        "core": 0.15
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": true,
+    "is_compound": true,
+    "load_ratio": 0.5,
+    "mechanical_stress": "moderate",
+    "cns_demand": "moderate",
+    "recovery_hours_typical": 48,
+    "body_region": "core",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "ytw_raise",
+    "display_name": "Ytw Raise",
+    "aliases": [
+      "ytw raise"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.5,
+        "upper_back": 0.5
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.15,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": null,
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  },
+  {
+    "slug": "ytw_raises",
+    "display_name": "Ytw Raises",
+    "aliases": [
+      "ytw raises"
+    ],
+    "movement_pattern": "isolation_upper",
+    "primary_muscles": [
+      "posterior_deltoid",
+      "upper_back"
+    ],
+    "secondary_muscles": [],
+    "muscle_attribution": {
+      "primary": {
+        "posterior_deltoid": 0.5,
+        "upper_back": 0.5
+      },
+      "secondary": {}
+    },
+    "equipment": "dumbbell",
+    "is_unilateral": false,
+    "is_compound": true,
+    "load_ratio": 0.15,
+    "mechanical_stress": "moderate",
+    "cns_demand": "low",
+    "recovery_hours_typical": 24,
+    "body_region": "upper",
+    "display_format": "weight_reps",
+    "notes": "Light dumbbells or plates for scapular health.",
+    "source": "seed",
+    "is_active": true,
+    "needs_review": false,
+    "heuristic_equal_multi_primary": false
+  }
+]
