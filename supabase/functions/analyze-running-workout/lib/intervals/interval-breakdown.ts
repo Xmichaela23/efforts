@@ -104,6 +104,27 @@ export function generateIntervalBreakdown(
         }
       }
     }
+
+    // Device-reported avg pace can disagree badly with segment distance/time (pauses, bad splits).
+    // Prefer duration ÷ distance when the gap is large so UI never shows impossible paces (e.g. 2:17/mi on a jog).
+    if (!isOverallRow && displayDurationS > 0 && intervalDistanceM > 0) {
+      const miles = intervalDistanceM / 1609.34;
+      if (miles > 0.01) {
+        const derivedPace = displayDurationS / miles;
+        if (isValidPace(derivedPace)) {
+          const disagree =
+            !paceValid ||
+            (paceValid && Math.abs(actualPace - derivedPace) / Math.max(derivedPace, 1) > 0.22);
+          if (disagree) {
+            actualPace = derivedPace;
+            paceValid = true;
+            console.log(
+              `🔍 [PACE CALC] Interval ${index + 1} reconciled from duration/distance: ${actualPace.toFixed(0)}s/mi`,
+            );
+          }
+        }
+      }
+    }
     
     // Log warning if pace is invalid
     if (!paceValid) {

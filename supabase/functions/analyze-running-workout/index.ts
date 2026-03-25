@@ -2420,6 +2420,35 @@ Deno.serve(async (req) => {
 const MIN_SEGMENT_DISTANCE_MI = 0.25;
 const MIN_SEGMENT_DURATION_S = 120;
 
+/** Chronological order for plan-linked segments (matches granular segment logic). */
+function sortIntervalsChrono(list: any[]): any[] {
+  return [...list].sort((a: any, b: any) => {
+    const aTime = a.start_time_s ?? a.start_offset_s;
+    const bTime = b.start_time_s ?? b.start_offset_s;
+    if (aTime != null && bTime != null) return aTime - bTime;
+    const aS = a.sample_idx_start ?? null;
+    const bS = b.sample_idx_start ?? null;
+    if (aS != null && bS != null) return aS - bS;
+    const aIdx = Number(a.planned_index ?? a.planned_step_index ?? a.step_index ?? 0);
+    const bIdx = Number(b.planned_index ?? b.planned_step_index ?? b.step_index ?? 0);
+    return aIdx - bIdx;
+  });
+}
+
+/**
+ * Non-recovery segments with a pace prescription (steady easy block, strides, tempo, etc.).
+ * Must NOT mirror `role === 'work'` only — materialized easy blocks are often `steady`.
+ */
+function isWorkLikeForIntervalBreakdown(i: any): boolean {
+  if (!i?.executed) return false;
+  const role = String(i?.role || i?.kind || '').toLowerCase();
+  if (role.includes('recovery') || role.includes('rest')) return false;
+  if (role.includes('warmup') || role.includes('warm')) return false;
+  if (role.includes('cooldown') || role.includes('cool')) return false;
+  const hasPace = !!(i?.pace_range || i?.target_pace || i?.planned?.pace_range);
+  return hasPace;
+}
+
 /**
  * Merge consecutive micro-segments (e.g. 0.06 mi, 0.13 mi) into single segments so a steady
  * easy run shows one row instead of a dozen. Segments under minDistanceMi or minDurationS
@@ -2519,9 +2548,14 @@ function mergeMicroSegments(intervalList: any[], minDistanceMi: number = MIN_SEG
 function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], granularAnalysis: any, plannedPaceInfo: any, workout?: any, userUnits: 'metric' | 'imperial' = 'imperial', plannedWorkout?: any): any {
   console.log('📊 Generating detailed chart analysis...');
   
-  // Extract work intervals for detailed analysis
-  const workIntervals = intervals.filter(i => i.role === 'work' && i.executed);
-  const recoveryIntervals = intervals.filter(i => i.role === 'recovery' && i.executed);
+  // Extract work-like intervals (steady + work + strides), sorted in true workout order
+  const workIntervals = sortIntervalsChrono(intervals.filter(isWorkLikeForIntervalBreakdown));
+  const recoveryIntervals = sortIntervalsChrono(
+    intervals.filter((i: any) => {
+      const role = String(i?.role || i?.kind || '').toLowerCase();
+      return !!i?.executed && (role.includes('recovery') || role.includes('rest'));
+    }),
+  );
   
   // Speed fluctuation analysis
   const speedAnalysis = analyzeSpeedFluctuations(sensorData, workIntervals);
@@ -2536,7 +2570,9 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
     : undefined;
   
   // Interval-by-interval breakdown: merge micro-segments (<0.25 mi or <2 min) so steady runs show one row
-  const intervalsForBreakdown = workIntervals.length > 0 ? workIntervals : intervals.filter(i => i.executed);
+  const intervalsForBreakdown = workIntervals.length > 0
+    ? workIntervals
+    : sortIntervalsChrono(intervals.filter((i: any) => i?.executed));
   const mergedForBreakdown = mergeMicroSegments(intervalsForBreakdown, MIN_SEGMENT_DISTANCE_MI, MIN_SEGMENT_DURATION_S);
   const intervalBreakdown = generateIntervalBreakdown(mergedForBreakdown, intervals, paceAdherenceForBreakdown, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
   
