@@ -141,8 +141,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const sessionRows: any[] = Array.isArray(sessionState?.details?.interval_rows) ? sessionState.details.interval_rows : [];
 
   const intervals: IntervalRow[] = [];
-  if (ib?.available && Array.isArray(ib.intervals)) {
-    for (const iv of ib.intervals) {
+  const ibList: any[] = Array.isArray(ib?.intervals) ? ib.intervals : [];
+  // Use any non-empty breakdown intervals (some pipelines set available:false while still emitting rows).
+  if (ibList.length > 0) {
+    for (const iv of ibList) {
       const lower = iv.planned_pace_range_lower ?? iv.planned_pace_range?.lower;
       const upper = iv.planned_pace_range_upper ?? iv.planned_pace_range?.upper;
       const sr = sessionRows.find((r: any) =>
@@ -177,13 +179,43 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         duration_adherence_pct: fin(iv?.duration_adherence_percent),
       });
     }
+  } else if (sessionRows.length > 0) {
+    // Analysis sometimes omits interval_breakdown.intervals while session_state_v1.interval_rows
+    // still has plan-aligned rows — smart server should still ship a renderable table.
+    const dataRows = sessionRows.filter((r: any) => String(r?.kind || '').toLowerCase() !== 'overall');
+    for (let i = 0; i < dataRows.length; i++) {
+      const r = dataRows[i];
+      const ex = r?.executed || {};
+      const paceS = fin(ex.avg_pace_s_per_mi) ?? fin(ex.pace_s_per_mi);
+      intervals.push({
+        id: String(r.row_id || r.planned_step_id || i),
+        interval_type: normIntervalType(r?.kind),
+        planned_label: String(r.planned_label ?? ''),
+        planned_duration_s: null,
+        planned_pace_display: typeof r.planned_pace_display === 'string' ? r.planned_pace_display : null,
+        planned_pace_range: undefined,
+        executed: {
+          duration_s: fin(ex.duration_s),
+          distance_m: fin(ex.distance_m),
+          avg_hr: fin(ex.avg_hr),
+          actual_pace_sec_per_mi: paceS,
+          actual_gap_sec_per_mi: null,
+          power_watts: fin(ex.power_watts) ?? null,
+        },
+        pace_adherence_pct: fin(r.adherence_pct),
+        duration_adherence_pct: null,
+      });
+    }
   }
 
-  const intervalDisplayMode = (() => {
+  let intervalDisplayMode = (() => {
     const m = String(intervalDisplay?.mode || '');
     if (m === 'interval_compare_ready' || m === 'overall_only' || m === 'awaiting_recompute') return m as any;
     return 'none' as const;
   })();
+  if (intervals.length > 0 && intervalDisplayMode === 'overall_only') {
+    intervalDisplayMode = 'interval_compare_ready';
+  }
 
   // ── Summary (pre-merged bullets) ───────────────────────────────────────────
   const summaryTitle = String(sessionState?.summary?.title || 'Insights');

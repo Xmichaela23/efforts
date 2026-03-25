@@ -3435,7 +3435,13 @@ function getPlannedWorkSteps(plannedWorkout: any): any[] {
   return steps.filter((step: any) => {
     const kind = String(step?.kind ?? step?.role ?? step?.step_type ?? step?.type ?? '').toLowerCase();
     const label = String(step?.name ?? step?.label ?? step?.description ?? '').toLowerCase();
-    const hasPaceRange = !!step?.pace_range;
+    const pr = step?.pace_range;
+    const hasPaceRange =
+      !!pr &&
+      Number.isFinite(Number(pr.lower)) &&
+      Number.isFinite(Number(pr.upper)) &&
+      Number(pr.lower) > 0 &&
+      Number(pr.upper) > 0;
     const recoveryLike = /warm|cool|recover|rest/.test(kind) || /warm.?up|cool.?down|recovery|rest/.test(label);
     // Accept any pace-targeted non-recovery step to keep plan linkage robust across generator variants
     // (e.g. kind: easy/tempo/threshold/work/repeat).

@@ -254,9 +254,15 @@ export async function buildReadiness(
   const degraded_missing: string[] = [];
   let degraded_reason: string | undefined;
 
-  if (rows96.length === 0) {
-    degraded_missing.push("session_load_96h");
+  // Residuals: prefer 96h window; if empty but 14d has rows, decay still yields a useful LOAD context
+  // (e.g. easy day after several rest days — not "no load data" when history exists).
+  const rowsForResiduals: SessionLoadRow[] = rows96.length > 0 ? rows96 : rows14;
+
+  if (rows14.length === 0) {
+    degraded_missing.push("session_load_14d");
     degraded_reason = "no_load_data";
+  } else if (rows96.length === 0) {
+    degraded_missing.push("session_load_96h");
   }
 
   const muscular: Record<string, MuscularResidualEntry> = {};
@@ -270,7 +276,7 @@ export async function buildReadiness(
     gLast: string | null = null,
     nLast: string | null = null;
 
-  for (const r of rows96) {
+  for (const r of rowsForResiduals) {
     const res = residualStress(r, asOf);
     const dom = (r.load_domain ?? "").toLowerCase();
     const tgt = r.load_target ?? "";
@@ -292,7 +298,7 @@ export async function buildReadiness(
   }
 
   for (const [tgt, residual_stress] of byMuscTarget) {
-    const rowsForTarget = rows96.filter((x) => x.load_domain === "muscular" && x.load_target === tgt);
+    const rowsForTarget = rowsForResiduals.filter((x) => x.load_domain === "muscular" && x.load_target === tgt);
     let last_loaded_at: string | null = null;
     for (const x of rowsForTarget) {
       if (!last_loaded_at || x.completed_at > last_loaded_at) last_loaded_at = x.completed_at;
