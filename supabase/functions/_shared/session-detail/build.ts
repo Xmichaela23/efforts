@@ -6,7 +6,7 @@ import type { SessionDetailV1, IntervalRow, SessionInterpretation, DeviationDime
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import {
-  buildLoadContextFromReadiness,
+  buildLoadDisplaySummaryFromReadiness,
   packageSessionDetailReadiness,
 } from './readiness-load-context.ts';
 
@@ -315,7 +315,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   // ── Analysis detail rows ───────────────────────────────────────────────────
   const readinessLoadText =
     !readinessUnavailable && readinessSnapshot
-      ? buildLoadContextFromReadiness(readinessSnapshot)
+      ? buildLoadDisplaySummaryFromReadiness(readinessSnapshot)
       : null;
   const analysisDetailRows = buildAnalysisDetailRows(
     factPacket,

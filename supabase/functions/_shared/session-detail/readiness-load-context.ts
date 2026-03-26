@@ -60,6 +60,60 @@ function humanizeRecommendation(r: string): string {
   return map[r] ?? r.replace(/_/g, " ");
 }
 
+function shortWorkoutRef(src: {
+  workout_date: string | null;
+  workout_type: string | null;
+  workout_name: string | null;
+}): string {
+  const d = src.workout_date && src.workout_date.length >= 10 ? src.workout_date.slice(5, 10) : null;
+  const nm = (src.workout_name || src.workout_type || "session").trim();
+  return d ? `${d} ${nm}` : nm;
+}
+
+/** Short user-facing LOAD summary for Analysis Details (1-2 lines, no raw model dump). */
+export function buildLoadDisplaySummaryFromReadiness(readiness: ReadinessSnapshotV1): string {
+  if (readiness.degraded && readiness.degraded_reason === "no_load_data") {
+    return "Load context unavailable.";
+  }
+
+  const parts: string[] = [];
+  const pc = readiness.plan_context;
+  if (pc) {
+    const phase = `${capitalize(pc.block_phase)} week`;
+    const race = pc.weeks_to_a_race != null ? `${pc.weeks_to_a_race} weeks to race` : null;
+    const intent = pc.week_intent ? `${pc.week_intent} intent` : null;
+    parts.push([phase, intent, race].filter(Boolean).join(", "));
+  }
+
+  const topMuscles = Object.entries(readiness.muscular || {})
+    .filter(([, v]) => (v?.residual_stress ?? 0) > 50)
+    .sort((a, b) => (b[1]?.residual_stress ?? 0) - (a[1]?.residual_stress ?? 0))
+    .slice(0, 3)
+    .map(([target, data]) => {
+      const status = muscularStatusLabel(target, data.residual_stress, pc);
+      const lead = Array.isArray(data.top_sources) && data.top_sources[0] ? shortWorkoutRef(data.top_sources[0]) : "recent sessions";
+      return `${target.replace(/_/g, " ")} ${status} (${lead})`;
+    });
+  if (topMuscles.length > 0) {
+    parts.push(topMuscles.join(" · "));
+  } else {
+    parts.push("all muscle groups fresh");
+  }
+
+  const aero = readiness.energy_systems?.aerobic;
+  if (aero) {
+    const t = (aero as { trend_7d_pct?: number | null; trend_7d?: number | null }).trend_7d_pct
+      ?? (aero as { trend_7d?: number | null }).trend_7d
+      ?? null;
+    const aeroShort = t == null || !Number.isFinite(t)
+      ? "aerobic stable"
+      : (t > 5 ? "aerobic building" : t < -5 ? "aerobic declining" : "aerobic stable");
+    parts.push(aeroShort);
+  }
+
+  return parts.join(" · ");
+}
+
 function compactWorkoutLabel(src: {
   workout_date: string | null;
   workout_type: string | null;
