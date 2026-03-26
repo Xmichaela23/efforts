@@ -91,13 +91,35 @@ export function buildLoadDisplaySummaryFromReadiness(readiness: ReadinessSnapsho
     .slice(0, 3)
     .map(([target, data]) => {
       const status = muscularStatusLabel(target, data.residual_stress, pc);
-      const lead = Array.isArray(data.top_sources) && data.top_sources[0] ? shortWorkoutRef(data.top_sources[0]) : "recent sessions";
-      return `${target.replace(/_/g, " ")} ${status} (${lead})`;
+      return `${target.replace(/_/g, " ")} ${status}`;
     });
   if (topMuscles.length > 0) {
-    parts.push(topMuscles.join(" · "));
+    parts.push(topMuscles.join(", "));
   } else {
     parts.push("all muscle groups fresh");
+  }
+
+  const impactingSessions = (() => {
+    const bySession = new Map<string, { label: string; share: number }>();
+    for (const [, data] of Object.entries(readiness.muscular || {})) {
+      if ((data?.residual_stress ?? 0) <= 50) continue;
+      const src = Array.isArray(data.top_sources) ? data.top_sources[0] : null;
+      if (!src?.workout_id) continue;
+      const key = String(src.workout_id);
+      const label = shortWorkoutRef(src);
+      const share = Number(src.share_pct || 0);
+      const prev = bySession.get(key);
+      if (!prev || share > prev.share) {
+        bySession.set(key, { label, share });
+      }
+    }
+    return Array.from(bySession.values())
+      .sort((a, b) => b.share - a.share)
+      .slice(0, 2)
+      .map((x) => x.label);
+  })();
+  if (impactingSessions.length > 0) {
+    parts.push(`mainly impacted by ${impactingSessions.join(" + ")}`);
   }
 
   const aero = readiness.energy_systems?.aerobic;
