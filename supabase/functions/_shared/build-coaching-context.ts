@@ -202,7 +202,7 @@ export async function buildCoachingContext(
     }
   }
 
-  // Recent workouts (last 48h) for interference detection
+  // Recent workouts (calendar window before this workout) for interference detection
   if (recentFacts.length > 0) {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     lines.push("");
@@ -243,6 +243,10 @@ export async function buildCoachingContext(
       }
       lines.push(detail);
     }
+  } else {
+    lines.push("");
+    lines.push("RECENT SESSIONS BEFORE THIS WORKOUT: (none in workout_facts for this window)");
+    lines.push("  → You have no logged session list for recent days here. Do not describe what the athlete did on a specific prior day.");
   }
 
   // Interpretation hints for the AI
@@ -258,7 +262,13 @@ export async function buildCoachingContext(
   if (strengthPriority === "support" || strengthPriority === "maintenance") {
     lines.push("  Strength is in a support/maintenance role. Evaluate strength within that context — maintaining is success.");
   }
-  
+  lines.push(
+    "  LOAD CONTEXT muscular residuals (if present elsewhere in the prompt) are not tied to a named workout; do not infer strength vs run from muscle group names alone.",
+  );
+  lines.push(
+    "  Only cite a prior strength session if RECENT SESSIONS shows a line with discipline strength. Otherwise omit strength as a cause.",
+  );
+
   lines.push("=== END TRAINING CONTEXT ===");
 
   return {

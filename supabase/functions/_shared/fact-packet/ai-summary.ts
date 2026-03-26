@@ -118,6 +118,32 @@ function validateAdaptiveLength(summary: string, displayPacket: any): { ok: bool
   return { ok: true, why: null };
 }
 
+/** Block invented "yesterday's strength" when workout_facts did not record a strength session in RECENT SESSIONS. */
+function validatePriorSessionAttribution(summary: string, userMessage: string): { ok: boolean; why: string | null } {
+  const s = String(summary || '');
+  const u = String(userMessage || '');
+  const marker = 'RECENT SESSIONS BEFORE THIS WORKOUT:';
+  const idx = u.indexOf(marker);
+  const recentBlock = idx >= 0 ? u.slice(idx, idx + 8000) : '';
+  const hasStrengthSession = /—\s*strength\b/i.test(recentBlock);
+  const noneLine = /RECENT SESSIONS BEFORE THIS WORKOUT:\s*\(none/i.test(recentBlock);
+
+  const impliesPriorStrength =
+    /\b(strength\s+(work|session|training|day)|leg\s+day|lower\s+body\s+strength)\b/i.test(s) ||
+    /\byesterday[^\n.]{0,80}\b(strength|lift)/i.test(s) ||
+    /\b(strength|lifting)[^\n.]{0,40}\byesterday\b/i.test(s) ||
+    /\bfrom\s+yesterday[^\n.]{0,60}strength/i.test(s);
+
+  if ((impliesPriorStrength && !hasStrengthSession) || (impliesPriorStrength && noneLine)) {
+    return {
+      ok: false,
+      why:
+        'attributed load/fatigue to a prior strength session but RECENT SESSIONS does not list strength — describe only neutral load-model residual or omit',
+    };
+  }
+  return { ok: true, why: null };
+}
+
 function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
   const top = getTopFlags(displayPacket);
   const hasTerrainDriftFlag = top.some((f) => /drift/i.test(f.message) && /hilly terrain/i.test(f.message));
@@ -150,7 +176,9 @@ RULES:
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
 - When HR drift data exists, interpret it in context: drift on a hilly course means something different than drift on a flat course.
 - STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
-- TRAINING STREAK: Use the provided streak day count, combined load, session mix (e.g. 3× run, 1× strength), and yesterday's athletic focus. All modalities count as training; interpret fatigue with context — upper-body strength is mostly systemic/neural load for a run, not leg glycogen depletion. Do not invent a different day count than the structured fields.
+- TRAINING STREAK: Use the provided streak day count, combined load, session mix (e.g. 3× run, 1× strength), and yesterday's athletic focus **only when those fields appear in the user message**. All modalities count as training; interpret fatigue with context — upper-body strength is mostly systemic/neural load for a run, not leg glycogen depletion. Do not invent a different day count than the structured fields.
+- LOAD CONTEXT MUSCULAR RESIDUALS: Quad/calf/hamstring numbers are **aggregated internal load estimates**. They are **not** proof the athlete did strength, a leg day, or any specific session. **Never** explain them as "from yesterday's strength work", "leg day", "lifting", etc. unless **RECENT SESSIONS BEFORE THIS WORKOUT** explicitly lists a strength session on that timeline. Prefer: "the load model still shows moderate residual in quads/calves" (no invented cause) or tie only to terrain/GAP/pace data from this workout.
+- PRIOR SESSION ATTRIBUTION: Only mention a **specific prior day, weekday, or modality** (e.g. "Monday", "yesterday's strength session") if **RECENT SESSIONS BEFORE THIS WORKOUT** explicitly lists that session with date/discipline. If that section is missing, empty, or has no strength line, **do not** mention strength as something they did before this workout. Missing data means you cannot see that day — do not fill in.
 - When load/fatigue data exists, connect it to what comes next: "Recovery matters before Tuesday's intervals" is actionable. "ACWR is 1.35" is not.
 - When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."
 - Use plain language. Not "positive split of 175s/mi" but "you slowed over the back half — expected on a course that back-loads the climbing."
@@ -547,12 +575,13 @@ export async function generateAISummaryV1(
     const len1 = validateAdaptiveLength(s1, displayPacket);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why }));
+    const ps1 = validatePriorSessionAttribution(s1, userMessage);
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && ps1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, prior: ps1.why }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why,
+      z1.why, len1.why, td1.why, g1.why, ps1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -562,7 +591,8 @@ export async function generateAISummaryV1(
     const len2 = validateAdaptiveLength(s2, displayPacket);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) return s2;
+    const ps2 = validatePriorSessionAttribution(s2, userMessage);
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && ps2.ok) return s2;
     console.warn('[ai-summary] attempt 2 also rejected, returning anyway');
     return s2;
   } catch (e) {

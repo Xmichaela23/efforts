@@ -72,6 +72,11 @@ export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): s
     ? ["LOAD CONTEXT (no active plan — muscle data only)"]
     : ["LOAD CONTEXT"];
 
+  lines.push(
+    "Note: Muscular lines below are decayed sums from session_load modeling — not a workout diary. " +
+      "They do not name which session or modality (strength vs run vs other) produced the residual.",
+  );
+
   if (pc) {
     const weekLabel = pc.weeks_to_a_race != null ? `${pc.weeks_to_a_race} weeks to race` : "";
     const phaseCap = capitalize(pc.block_phase);
