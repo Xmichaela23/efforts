@@ -5,10 +5,7 @@
 import type { SessionDetailV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
-import {
-  buildLoadDisplaySummaryFromReadiness,
-  packageSessionDetailReadiness,
-} from './readiness-load-context.ts';
+import { packageSessionDetailReadiness } from './readiness-load-context.ts';
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
 function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
@@ -313,17 +310,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const weekLabel = buildWeekLabel(factPacket);
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
-  const readinessLoadText =
-    !readinessUnavailable && readinessSnapshot
-      ? buildLoadDisplaySummaryFromReadiness(readinessSnapshot)
-      : null;
   const analysisDetailRows = buildAnalysisDetailRows(
     factPacket,
     flagsV1,
     summaryBullets.length > 0,
     comp,
     !!perf?.gap_adjusted,
-    readinessLoadText,
     intervals,
   );
 
@@ -597,7 +589,6 @@ function buildFallbackNarrative(
   const driftBpm = typeof derived.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
   const driftTyp = typeof derived.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
   const vsSim = derived.comparisons?.vs_similar;
-  const fatigue = derived.training_load;
   const typeLabel = type === 'run' ? 'run' : type === 'ride' ? 'ride' : type === 'swim' ? 'swim' : 'workout';
 
   const sentences: string[] = [];
@@ -645,16 +636,6 @@ function buildFallbackNarrative(
     const tempF = typeof wx.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
     if (tempF != null) {
       sentences.push(`${wx.heat_stress_level.charAt(0).toUpperCase() + wx.heat_stress_level.slice(1)} heat stress at ${tempF}°F — expect pace to run slower in these conditions.`);
-    }
-  }
-
-  // Fatigue / load: make it actionable
-  if (fatigue?.cumulative_fatigue && fatigue.cumulative_fatigue !== 'low') {
-    const weekPct = typeof fatigue.week_load_pct === 'number' ? fatigue.week_load_pct : null;
-    if (weekPct != null && weekPct > 120) {
-      sentences.push(`Weekly load is running hot at ${Math.round(weekPct)}% — easy day tomorrow.`);
-    } else if (fatigue.cumulative_fatigue === 'high') {
-      sentences.push(`Fatigue is accumulating — recovery before the next key session matters.`);
     }
   }
 
@@ -732,21 +713,11 @@ function buildPlannedTotals(
 
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
-  readinessLoadText: string | null = null,
   intervals: IntervalRow[] = [],
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
-  if (!factPacket) {
-    const rt = readinessLoadText?.trim();
-    return rt ? [{ label: 'Load', value: rt }] : rows;
-  }
+  if (!factPacket) return rows;
   const derived = factPacket?.derived;
-
-  if (readinessLoadText && readinessLoadText.trim()) {
-    try {
-      rows.push({ label: 'Load', value: readinessLoadText.trim() });
-    } catch { /* */ }
-  }
 
   try {
     const lim = derived?.primary_limiter;
@@ -862,21 +833,8 @@ function buildAnalysisDetailRows(
   } catch { /* */ }
 
   try {
-    const tl = derived?.training_load;
-    const hasReadinessLoad = rows.some((r) => r.label === 'Load');
-    if (!hasReadinessLoad && tl && typeof tl.cumulative_fatigue === 'string' && tl.cumulative_fatigue !== 'low') {
-      const evidence = Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
-        ? tl.fatigue_evidence.join(' · ')
-        : `${tl.cumulative_fatigue.charAt(0).toUpperCase()}${tl.cumulative_fatigue.slice(1)} training load`;
-      rows.push({ label: 'Load', value: evidence.trim() });
-    }
-  } catch { /* */ }
-
-  try {
-    const hasLoadRow = rows.some((r) => r.label === 'Load');
     const concerns = flagsV1
       .filter((f: any) => f && f.type === 'concern' && typeof f.message === 'string' && f.message.length > 0 && Number(f.priority || 99) <= 2)
-      .filter((f: any) => !(hasLoadRow && f.category === 'fatigue'))
       .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 2);
     for (const f of concerns) {

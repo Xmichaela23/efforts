@@ -313,6 +313,13 @@ export type CoachWeekContextResponseV1 = {
       marathon_readiness?: CoachWeekContextResponseV1['marathon_readiness'];
       interference: CoachWeekContextResponseV1['interference'];
     };
+    longitudinal_signals?: Array<{
+      id: string;
+      category: 'is_it_working' | 'adherence' | 'pattern';
+      severity: 'info' | 'warning' | 'concern';
+      headline: string;
+      detail: string;
+    }>;
     run_session_types_7d?: RunSessionType7d[];
     response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
   };

@@ -31,7 +31,7 @@ export type SessionInterpretationForPrompt = {
 
 export function snapshotToPrompt(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
-  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[] },
+  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null },
 ): string {
   const lines: string[] = [];
   const { identity: id, plan_position: pp, daily_ledger: ledger, body_response: br, upcoming } = snapshot;
@@ -151,6 +151,13 @@ export function snapshotToPrompt(
   }
   lines.push(`Load: ${br.load_status.interpretation}.`);
 
+  // --- LONGITUDINAL PATTERNS ---
+  const longBlock = opts?.longitudinalBlock?.trim();
+  if (longBlock) {
+    lines.push('');
+    lines.push(longBlock);
+  }
+
   // --- UPCOMING ---
   if (upcoming.length > 0) {
     lines.push('');
@@ -232,7 +239,7 @@ CRITICAL — ACCURACY:
 export async function generateCoaching(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
   _anthropicKey?: string,
-  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[] },
+  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null },
 ): Promise<Coaching> {
   const prompt = snapshotToPrompt(snapshot, opts);
 

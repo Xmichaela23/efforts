@@ -47,6 +47,7 @@ import {
   type AthleteSnapshot,
   type SessionInterpretationForPrompt,
 } from '../_shared/athlete-snapshot/index.ts';
+import { computeLongitudinalSignals, longitudinalSignalsToPrompt } from '../_shared/longitudinal-signals.ts';
 import {
   isPlanTransitionWindowByWeekIndex,
   resolvePlanWeekIndex,
@@ -1687,6 +1688,7 @@ Deno.serve(async (req) => {
         narrative: '',
         next_session_guidance: null,
       };
+      let longitudinalSignalsResult: Awaited<ReturnType<typeof computeLongitudinalSignals>> | null = null;
 
       if (anthropicKey) {
         try {
@@ -1730,7 +1732,15 @@ Deno.serve(async (req) => {
             .sort((a, b) => (a as any).__sort.localeCompare((b as any).__sort));
           const sessionInterpretations: SessionInterpretationForPrompt[] = completedWorkouts.map(({ __sort, has_interpretation, ...rest }) => rest);
 
-          coaching = await generateCoaching(partialSnapshot, anthropicKey, { sessionInterpretations });
+          let longitudinalBlock: string | null = null;
+          try {
+            longitudinalSignalsResult = await computeLongitudinalSignals(supabase, userId, asOfDate, 6);
+            longitudinalBlock = longitudinalSignalsToPrompt(longitudinalSignalsResult) || null;
+          } catch (longErr: any) {
+            console.warn('[coach] longitudinal signals failed (non-fatal):', longErr?.message || longErr);
+          }
+
+          coaching = await generateCoaching(partialSnapshot, anthropicKey, { sessionInterpretations, longitudinalBlock });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
         }
@@ -2422,6 +2432,15 @@ ${narrativeFacts.join('\n')}`;
         marathon_readiness,
         interference,
       },
+      longitudinal_signals: longitudinalSignalsResult?.signals?.length
+        ? longitudinalSignalsResult.signals.map((s) => ({
+            id: s.id,
+            category: s.category,
+            severity: s.severity,
+            headline: s.headline,
+            detail: s.detail,
+          }))
+        : undefined,
       run_session_types_7d: runSessionTypes7d,
       response_model: weeklyResponseModel,
     };

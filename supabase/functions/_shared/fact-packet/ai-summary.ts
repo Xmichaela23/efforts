@@ -118,8 +118,8 @@ function validateAdaptiveLength(summary: string, displayPacket: any): { ok: bool
   return { ok: true, why: null };
 }
 
-/** Block invented or implausible prior-session stories (strength / leg causality). */
-function validatePriorSessionAttribution(summary: string, userMessage: string): { ok: boolean; why: string | null } {
+/** @deprecated — no cross-session context in prompt; kept as no-op for compile compat. */
+function _unused_validatePriorSessionAttribution(summary: string, userMessage: string): { ok: boolean; why: string | null } {
   const s = String(summary || '');
   const u = String(userMessage || '');
   const marker = 'RECENT SESSIONS BEFORE THIS WORKOUT:';
@@ -181,8 +181,8 @@ function validatePriorSessionAttribution(summary: string, userMessage: string): 
   return { ok: true, why: null };
 }
 
-/** LLM workaround: "glutes … from 36 hours ago" — clock times are not athlete-visible muscle timelines. */
-function validateMuscleClockClaims(summary: string): { ok: boolean; why: string | null } {
+/** @deprecated — no muscular data in prompt; kept as no-op for compile compat. */
+function _unused_validateMuscleClockClaims(summary: string): { ok: boolean; why: string | null } {
   const s = String(summary || '');
   const legNamed =
     /\b(glute|glutes|quad|calf|calves|hamstring|hamstrings|hip\s+flexors?)\b/i.test(s);
@@ -221,38 +221,29 @@ function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok
 
 const COACHING_SYSTEM_PROMPT = `You are an experienced endurance coach reviewing a completed workout. Your athlete can already see their pace, HR, distance, and duration — do not restate those numbers unless you're connecting them to an insight.
 
-Write 2-3 sentences (4 maximum if there is a genuine concern). Prioritize ruthlessly — pick the 2-3 most useful insights and cut the rest. This is a mobile screen; the athlete glances, not reads. Draw from the data provided but speak like a coach, not a dashboard.
+Write 1-2 sentences (3 maximum if there is a genuine concern). This narrative covers THIS session only — no references to prior workouts, training load, muscular fatigue, or weekly context. Those belong on the weekly screen, not here.
 
 RULES:
 - THE CORE TEST: Before writing any sentence, ask "Could the athlete figure this out by looking at the pace/HR/distance numbers and adherence chips above?" If yes, cut it. Only say things the athlete cannot see for themselves.
 - NEVER start with a restatement of distance/time/pace. The athlete already sees those.
 - NEVER restate execution percentages, pace adherence, or duration adherence — these are displayed as chips above the narrative.
 - NEVER describe the workout the athlete just did ("You ran 13 miles at 11:04 pace"). They were there.
+- NEVER reference prior workouts, strength sessions, yesterday's training, weekly load, muscular fatigue, or recovery needs. This narrative is session-scoped.
 - Connect data across domains: if terrain was hilly AND pace was "slow", say the pace was appropriate for the terrain — don't report them as separate facts.
 - When grade-adjusted pace (GAP) is available, translate it: "Your 11:04 pace was a 10:32 effort on this terrain — the hills cost about 30s/mi."
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
 - When HR drift data exists, interpret it in context: drift on a hilly course means something different than drift on a flat course.
 - STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
-- TRAINING STREAK: Use the provided streak day count, combined load, session mix (e.g. 3× run, 1× strength), and yesterday's athletic focus **only when those fields appear in the user message**. All modalities count as training; interpret fatigue with context — upper-body strength is mostly systemic/neural load for a run, not leg glycogen depletion. Do not invent a different day count than the structured fields.
-- LOAD CONTEXT MUSCULAR RESIDUALS: Quad/calf/hamstring/**glute** numbers are **aggregated internal load estimates** (runs and posterior-chain work in the model both contribute). They are **not** a log of what the athlete did on a given day. **Never** tie them to bench/rows/OHP/pull-ups or **upper-body** work — that combination is **banned**. **Never** tie them to a prior **strength** workout unless that RECENT SESSIONS line shows **[leg_relevant_strength: yes]**. Do **not** use weasel phrases like "glute residual from upper-body session (systemic)" — that still reads as leg-specific blame. Prefer **omitting** named muscles; cite **terrain, GAP, easy intent, strides** or one vague "training load context is a bit elevated" **without** naming body parts or guessing causes.
-- PRIOR SESSION ATTRIBUTION: Only mention a **specific prior day, weekday, or modality** (e.g. "Monday", "yesterday's strength session") if **RECENT SESSIONS BEFORE THIS WORKOUT** explicitly lists that session with date/discipline. If that section is missing, empty, or has no strength line, **do not** mention strength as something they did before this workout. Missing data means you cannot see that day — do not fill in.
-- When load/fatigue data exists, connect it to what comes next: "Recovery matters before Tuesday's intervals" is actionable. "ACWR is 1.35" is not.
 - When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."
 - Use plain language. Not "positive split of 175s/mi" but "you slowed over the back half — expected on a course that back-loads the climbing."
 - Do not list metrics. Do not use bullet points. Write in connected prose.
 - If nothing interesting happened (easy run, everything on plan, no flags), one sentence is enough: "Clean easy run, no flags."
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present in the data provided.
 - CRITICAL: Pace must use display format like "10:16/mi", never raw seconds.
-- Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly. Instead of 'The week's accumulated fatigue is real' write 'Accumulated fatigue from 129% weekly load is a factor.' Instead of 'You nailed the pacing' write 'Pacing was well-controlled for the terrain.'
-- TEMPORAL PRECISION: The RECENT SESSIONS section already labels each session with its exact timing (e.g. "yesterday", "2 days before"). Use those labels verbatim. NEVER invent your own temporal claims — do not say "yesterday" unless the data literally says "yesterday". If timing is not labeled, omit any time reference. NEVER pair **quad/calf/hamstring/glutes** with **"N hours ago"** or **"N days ago"** — that reads as fake physiology; those clock phrases are banned with named muscles.
-- CROSS-DISCIPLINE CLAIMS: Only reference prior workouts affecting this one when the mechanism is physiologically plausible. Think about what muscle groups were used and whether they overlap with the current workout. Systemic fatigue (CNS load, sleep debt) is real but distinct from local muscular fatigue — be specific about which mechanism you mean.
+- Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly.
 - FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
 
-function buildUserMessage(
-  dp: any,
-  coachingContext: string | null,
-  readinessLoadOverride: string | null = null,
-): string {
+function buildUserMessage(dp: any): string {
   const w = dp.workout || {};
   const sig = dp.signals || {};
   const sections: string[] = [];
@@ -304,38 +295,6 @@ function buildUserMessage(
     ].filter(Boolean).join('\n'));
   }
 
-  // Load context — readiness override replaces generic streak / fatigue lines
-  if (readinessLoadOverride && readinessLoadOverride.trim()) {
-    sections.push('\n' + readinessLoadOverride.trim());
-  } else {
-    const tl = sig.training_load;
-    if (tl) {
-      const anyTl = tl as any;
-      const streakLine = (typeof anyTl.consecutive_training_days === 'number' && anyTl.consecutive_training_days > 0)
-        ? (() => {
-            const n = anyTl.consecutive_training_days;
-            const swl = coerceNumber(anyTl.streak_combined_workload);
-            const mix = typeof anyTl.streak_modality_summary === 'string' && anyTl.streak_modality_summary.trim()
-              ? anyTl.streak_modality_summary.trim()
-              : null;
-            const focus = typeof anyTl.previous_day_athletic_focus === 'string' ? anyTl.previous_day_athletic_focus : null;
-            const loadPart = swl != null && swl > 0 ? `, ~${Math.round(swl)} combined load` : '';
-            const mixPart = mix ? `, sessions: ${mix}` : '';
-            const focusPart = focus ? ` Yesterday (before this workout) was ${focus}-focused.` : '';
-            return `- Training streak: ${n} day(s) without rest${loadPart}${mixPart}.${focusPart}`;
-          })()
-        : null;
-      sections.push([
-        '\nLOAD CONTEXT:',
-        Array.isArray(tl.fatigue_evidence) && tl.fatigue_evidence.length > 0
-          ? tl.fatigue_evidence.map((e: string) => `- ${e}`).join('\n')
-          : null,
-        tl.cumulative_fatigue ? `- Cumulative fatigue: ${tl.cumulative_fatigue}` : null,
-        streakLine,
-      ].filter(Boolean).join('\n'));
-    }
-  }
-
   // Flags
   const flags = dp.top_flags || [];
   if (flags.length > 0) {
@@ -355,11 +314,6 @@ function buildUserMessage(
     sections.push('\nFAMILIAR SEGMENTS:\n' + sig.terrain.segment_comparisons.map((c: any) =>
       `- ${c.type} (${c.times_seen}x): today ${c.today_pace}${c.today_hr ? ` @ ${c.today_hr}` : ''}, avg ${c.avg_pace}${c.avg_hr ? ` @ ${c.avg_hr}` : ''}`
     ).join('\n'));
-  }
-
-  // Coaching context
-  if (coachingContext) {
-    sections.push('\n' + coachingContext);
   }
 
   return sections.join('\n');
@@ -597,18 +551,17 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
   };
 }
 
+/** @deprecated — kept for backwards-compat; fields are ignored. */
 export type GenerateAISummaryV1Options = {
-  /** Full LOAD CONTEXT block from buildReadiness (replaces fact-packet training_load section). */
   readinessLoadContextText?: string | null;
-  /** Appended to system prompt from readiness.narrative_caps */
   narrativeCapsAppend?: string | null;
 };
 
 export async function generateAISummaryV1(
   factPacket: FactPacketV1,
   flags: FlagV1[],
-  coachingContext?: string | null,
-  opts?: GenerateAISummaryV1Options | null,
+  _coachingContext?: string | null,
+  _opts?: GenerateAISummaryV1Options | null,
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
@@ -616,13 +569,9 @@ export async function generateAISummaryV1(
   }
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
-  const loadCtx = opts?.readinessLoadContextText?.trim() || null;
-  if (loadCtx) {
-    (displayPacket as any).readiness_load_context = loadCtx;
-  }
 
-  const userMessage = buildUserMessage(displayPacket, coachingContext ?? null, loadCtx);
-  const systemPrompt = COACHING_SYSTEM_PROMPT + (opts?.narrativeCapsAppend?.trim() || '');
+  const userMessage = buildUserMessage(displayPacket);
+  const systemPrompt = COACHING_SYSTEM_PROMPT;
 
   try {
     const s1 = await callLLMParagraph(systemPrompt, userMessage, 0.2);
@@ -632,14 +581,12 @@ export async function generateAISummaryV1(
     const len1 = validateAdaptiveLength(s1, displayPacket);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
-    const ps1 = validatePriorSessionAttribution(s1, userMessage);
-    const mc1 = validateMuscleClockClaims(s1);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && ps1.ok && mc1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, prior: ps1.why, muscleClock: mc1.why }));
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why, ps1.why, mc1.why,
+      z1.why, len1.why, td1.why, g1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -649,9 +596,7 @@ export async function generateAISummaryV1(
     const len2 = validateAdaptiveLength(s2, displayPacket);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
-    const ps2 = validatePriorSessionAttribution(s2, userMessage);
-    const mc2 = validateMuscleClockClaims(s2);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && ps2.ok && mc2.ok) return s2;
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) return s2;
     console.warn('[ai-summary] attempt 2 also rejected, returning anyway');
     return s2;
   } catch (e) {

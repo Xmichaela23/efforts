@@ -12,10 +12,7 @@ import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type W
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
-import { generateAISummaryV1, type GenerateAISummaryV1Options } from '../_shared/fact-packet/ai-summary.ts';
-import { buildReadiness } from '../_shared/readiness.ts';
-import { buildLoadContextFromReadiness, buildNarrativeCapsAppend } from '../_shared/session-detail/readiness-load-context.ts';
-import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
+import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 // =============================================================================
@@ -1902,36 +1899,7 @@ Deno.serve(async (req) => {
     let ai_summary_generated_at: string | null = null;
     try {
       if (fact_packet_v1 && flags_v1) {
-        let coachingCtxText: string | null = null;
-        try {
-          const ctx = await buildCoachingContext(
-            supabase,
-            workout.user_id,
-            workout.date || new Date().toISOString(),
-            plannedWorkout?.training_plan_id ?? null,
-            planContextForDrift?.weekIndex ?? null,
-          );
-          coachingCtxText = ctx.text;
-        } catch (e) {
-          console.warn('[analyze-running-workout] coaching context failed (non-fatal):', e);
-        }
-        let aiReadinessOpts: GenerateAISummaryV1Options | undefined;
-        try {
-          const asOfIso = String(workout?.date || '').slice(0, 10);
-          if (asOfIso.length === 10 && workout?.user_id) {
-            const snap = await buildReadiness(supabase, workout.user_id, new Date(asOfIso));
-            aiReadinessOpts = {
-              readinessLoadContextText: buildLoadContextFromReadiness(snap),
-              narrativeCapsAppend: snap.narrative_caps ? buildNarrativeCapsAppend(snap.narrative_caps) : null,
-            };
-          }
-        } catch (re: unknown) {
-          console.warn(
-            '[analyze-running-workout] readiness for ai_summary failed, using legacy load context:',
-            re instanceof Error ? re.message : re,
-          );
-        }
-        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1, coachingCtxText, aiReadinessOpts);
+        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1);
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }
     } catch (e) {

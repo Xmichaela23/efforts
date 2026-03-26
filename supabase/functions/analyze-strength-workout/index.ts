@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 /**
@@ -1541,21 +1540,6 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   
   console.log(`📊 SESSION RPE: ${sessionRPEData ? 'Available' : 'Not provided'}`);
   console.log(`📊 READINESS: ${readinessData ? 'Available' : 'Not provided'}`);
-  
-  // Build holistic coaching context from deterministic layer
-  let coachingCtxText: string | null = null;
-  try {
-    const ctx = await buildCoachingContext(
-      supabase,
-      workout.user_id,
-      workout.date || new Date().toISOString(),
-      plannedWorkout?.training_plan_id ?? null,
-      weekNumber ?? null,
-    );
-    coachingCtxText = ctx.text;
-  } catch (e) {
-    console.warn('[analyze-strength-workout] coaching context failed (non-fatal):', e);
-  }
 
   // Generate enhanced insights using GPT-4
   const insights = await generateEnhancedStrengthInsights(
@@ -1572,7 +1556,6 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     rirProgression,
     volumeAnalysis,
     dataQuality,
-    coachingCtxText
   );
   
   return {
@@ -1609,7 +1592,6 @@ async function generateEnhancedStrengthInsights(
   rirProgression: any,
   volumeAnalysis: any,
   dataQuality: any,
-  coachingContextText?: string | null,
 ): Promise<string[]> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
@@ -2204,10 +2186,6 @@ DATA QUALITY FLAGS
 COACHING INSIGHT
 ───────────────────────────────────────────────────────────────
 [Actionable recommendations: Load increases, progression protocol, data quality fixes, next session targets]`;
-
-  if (coachingContextText) {
-    context += `\n\n${coachingContextText}`;
-  }
 
   const timeoutId = setTimeout(() => {}, 0); // kept for cleanup symmetry below
   

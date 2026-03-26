@@ -4,7 +4,6 @@ import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
-import { buildCoachingContext } from '../_shared/build-coaching-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 
 // =============================================================================
@@ -1674,20 +1673,7 @@ Deno.serve(async (req) => {
     let ai_summary: string | null = null;
     let ai_summary_generated_at: string | null = null;
     try {
-      let coachingCtxText: string | null = null;
-      try {
-        const workoutDateIso = String((workout as any)?.date || '');
-        const userId = String((workout as any)?.user_id || '');
-        const plannedPlanId = String((plannedWorkout as any)?.training_plan_id || '').trim() || null;
-        const weekIdx = planContext?.weekIndex ?? null;
-        if (userId && workoutDateIso) {
-          const ctx = await buildCoachingContext(supabase as any, userId, workoutDateIso, plannedPlanId, weekIdx);
-          coachingCtxText = ctx.text;
-        }
-      } catch (e) {
-        console.warn('[analyze-cycling-workout] coaching context failed (non-fatal):', e);
-      }
-      ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, coachingCtxText);
+      ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null);
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
     } catch (e) {
       console.log('⚠️ Cycling ai_summary generation failed:', e);

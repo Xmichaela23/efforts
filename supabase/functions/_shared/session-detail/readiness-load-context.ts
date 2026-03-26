@@ -70,7 +70,7 @@ function shortWorkoutRef(src: {
   return d ? `${d} ${nm}` : nm;
 }
 
-/** Short user-facing LOAD summary for Analysis Details (1-2 lines, no raw model dump). */
+/** @deprecated — LOAD row removed from Performance. Kept for potential weekly-coach reuse. */
 export function buildLoadDisplaySummaryFromReadiness(readiness: ReadinessSnapshotV1): string {
   if (readiness.degraded && readiness.degraded_reason === "no_load_data") {
     return "Load context unavailable.";
@@ -149,7 +149,7 @@ function compactWorkoutLabel(src: {
   return `${d ? `${d} ` : ""}${nm} (${Math.max(1, Math.round(src.share_pct))}%)`;
 }
 
-/** Full LOAD CONTEXT block for LLM user message / analysis Load row. */
+/** @deprecated — no longer used by Performance LLM. Kept for potential weekly-coach reuse. */
 export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): string {
   if (readiness.degraded && readiness.degraded_reason === "no_load_data") {
     return "LOAD CONTEXT\nNo load data available — training load assessment unavailable.";
@@ -265,7 +265,7 @@ export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): s
   return lines.join("\n");
 }
 
-/** Appended to coaching system prompt when narrative_caps is present. */
+/** @deprecated — narrative caps no longer appended to Performance LLM. Kept for potential weekly reuse. */
 export function buildNarrativeCapsAppend(caps: NarrativeCapsV1 | null | undefined): string {
   if (!caps) return "";
 
@@ -325,7 +325,7 @@ export function summarizeMuscularForClient(
   return out;
 }
 
-/** Client payload: no raw muscular map; summary + plan fields only. */
+/** Client payload: plan/week fields only. Muscular summary deprecated — always empty. */
 export function packageSessionDetailReadiness(
   readiness: ReadinessSnapshotV1,
 ): SessionDetailReadinessV1 | null {
@@ -336,7 +336,7 @@ export function packageSessionDetailReadiness(
     degraded_reason: readiness.degraded_reason ?? null,
     degraded_missing: readiness.degraded_missing ?? null,
     next_session_readiness: readiness.next_session_readiness ?? null,
-    muscular_summary: summarizeMuscularForClient(readiness.muscular || {}, readiness.plan_context ?? null),
+    muscular_summary: [],
     plan_context: readiness.plan_context ?? null,
     week_load_status: readiness.week_load_status ?? null,
     narrative_caps: readiness.narrative_caps ?? null,
