@@ -18,6 +18,13 @@ export type MuscularSummaryEntryV1 = {
   target: string;
   status: "fresh" | "manageable" | "compromised";
   residual_stress: number;
+  top_sources?: Array<{
+    workout_id: string;
+    workout_date: string | null;
+    workout_type: string | null;
+    workout_name: string | null;
+    share_pct: number;
+  }>;
 };
 
 /** Trimmed readiness for clients (no per-target raw stress map). */

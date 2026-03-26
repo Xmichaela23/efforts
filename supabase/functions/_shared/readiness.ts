@@ -39,6 +39,13 @@ export type SessionLoadRow = {
   source: string | null;
 };
 
+type WorkoutMeta = {
+  id: string;
+  name: string | null;
+  type: string | null;
+  date: string | null;
+};
+
 export function residualStress(row: SessionLoadRow, asOf: Date): number {
   const hoursElapsed = (asOf.getTime() - new Date(row.completed_at).getTime()) / MS_H;
   const dh = Math.max(1, row.decay_hours || 48);
@@ -221,6 +228,36 @@ function targetDisplayName(t: string): string {
   return t.replace(/_/g, " ");
 }
 
+function buildMuscleTopSources(
+  rowsForTarget: SessionLoadRow[],
+  asOf: Date,
+  workoutsById: Map<string, WorkoutMeta>,
+): MuscularResidualEntry["top_sources"] {
+  if (!rowsForTarget.length) return [];
+  const byWorkout = new Map<string, number>();
+  for (const r of rowsForTarget) {
+    const id = String(r.workout_id || "").trim();
+    if (!id) continue;
+    byWorkout.set(id, (byWorkout.get(id) ?? 0) + residualStress(r, asOf));
+  }
+  const total = Array.from(byWorkout.values()).reduce((s, n) => s + n, 0);
+  if (!(total > 0)) return [];
+  return Array.from(byWorkout.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([workout_id, stress]) => {
+      const m = workoutsById.get(workout_id);
+      return {
+        workout_id,
+        workout_date: m?.date ?? null,
+        workout_type: m?.type ?? null,
+        workout_name: m?.name ?? null,
+        residual_stress: Math.round(stress * 10) / 10,
+        share_pct: Math.round((stress / total) * 100),
+      };
+    });
+}
+
 export async function buildReadiness(
   supabase: SupabaseClient,
   userId: string,
@@ -257,6 +294,23 @@ export async function buildReadiness(
   // Residuals: prefer 96h window; if empty but 14d has rows, decay still yields a useful LOAD context
   // (e.g. easy day after several rest days — not "no load data" when history exists).
   const rowsForResiduals: SessionLoadRow[] = rows96.length > 0 ? rows96 : rows14;
+
+  const workoutIds = Array.from(new Set(rowsForResiduals.map((r) => String(r.workout_id || "").trim()).filter(Boolean)));
+  const workoutsById = new Map<string, WorkoutMeta>();
+  if (workoutIds.length > 0) {
+    const { data: wMetaRaw } = await supabase
+      .from("workouts")
+      .select("id, name, type, date")
+      .in("id", workoutIds);
+    for (const w of (wMetaRaw ?? []) as Array<{ id: string; name?: string | null; type?: string | null; date?: string | null }>) {
+      workoutsById.set(String(w.id), {
+        id: String(w.id),
+        name: w.name ?? null,
+        type: w.type ?? null,
+        date: w.date ?? null,
+      });
+    }
+  }
 
   if (rows14.length === 0) {
     degraded_missing.push("session_load_14d");
@@ -311,6 +365,7 @@ export async function buildReadiness(
       last_loaded_at,
       intensity_context: muscularIntensityLast.get(tgt) ?? null,
       hours_since: hours_since != null ? Math.round(hours_since * 10) / 10 : null,
+      top_sources: buildMuscleTopSources(rowsForTarget, asOf, workoutsById),
     };
   }
 

@@ -13,6 +13,14 @@ export type MuscularResidualEntry = {
   last_loaded_at: string | null;
   intensity_context: string | null;
   hours_since: number | null;
+  top_sources?: Array<{
+    workout_id: string;
+    workout_date: string | null;
+    workout_type: string | null;
+    workout_name: string | null;
+    residual_stress: number;
+    share_pct: number;
+  }>;
 };
 
 export type EnergyResidualEntry = {

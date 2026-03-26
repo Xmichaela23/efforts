@@ -60,6 +60,19 @@ function humanizeRecommendation(r: string): string {
   return map[r] ?? r.replace(/_/g, " ");
 }
 
+function compactWorkoutLabel(src: {
+  workout_date: string | null;
+  workout_type: string | null;
+  workout_name: string | null;
+  share_pct: number;
+}): string {
+  const dt = src.workout_date;
+  const d = dt && dt.length >= 10 ? dt.slice(5, 10) : null;
+  const tp = src.workout_type ? src.workout_type.replace(/_/g, " ") : "session";
+  const nm = src.workout_name?.trim() || tp;
+  return `${d ? `${d} ` : ""}${nm} (${Math.max(1, Math.round(src.share_pct))}%)`;
+}
+
 /** Full LOAD CONTEXT block for LLM user message / analysis Load row. */
 export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): string {
   if (readiness.degraded && readiness.degraded_reason === "no_load_data") {
@@ -72,10 +85,7 @@ export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): s
     ? ["LOAD CONTEXT (no active plan — muscle data only)"]
     : ["LOAD CONTEXT"];
 
-  lines.push(
-    "Note: Muscular lines below are decayed sums from session_load modeling — not a workout diary. " +
-      "They do not name which session or modality (strength vs run vs other) produced the residual.",
-  );
+  lines.push("Muscular state uses model residuals; source sessions below explain where most load came from.");
 
   if (pc) {
     const weekLabel = pc.weeks_to_a_race != null ? `${pc.weeks_to_a_race} weeks to race` : "";
@@ -121,11 +131,11 @@ export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): s
     for (const [target, data] of muscularEntries) {
       const displayTarget = target.replace(/_/g, " ");
       const label = muscularStatusLabel(target, data.residual_stress, pc);
-      const hrs = data.hours_since != null ? `${Math.round(data.hours_since)}h` : "?h";
-      const inten = data.intensity_context?.trim() || "recent session";
-      lines.push(
-        `  ${displayTarget}: ${Math.round(data.residual_stress)} residual (${label}) — loaded ${hrs} ago, ${inten}`,
-      );
+      const srcs = Array.isArray(data.top_sources) ? data.top_sources : [];
+      const srcText = srcs.length > 0
+        ? srcs.slice(0, 2).map(compactWorkoutLabel).join(" + ")
+        : "recent sessions";
+      lines.push(`  ${displayTarget}: ${label} — mainly from ${srcText}`);
     }
   }
 
@@ -224,6 +234,15 @@ export function summarizeMuscularForClient(
       target: target.replace(/_/g, " "),
       status: muscularStatusLabel(target, data.residual_stress, planContext),
       residual_stress: Math.round(data.residual_stress),
+      top_sources: Array.isArray(data.top_sources)
+        ? data.top_sources.slice(0, 3).map((s) => ({
+            workout_id: String(s.workout_id || ""),
+            workout_date: s.workout_date ?? null,
+            workout_type: s.workout_type ?? null,
+            workout_name: s.workout_name ?? null,
+            share_pct: Math.max(1, Math.round(Number(s.share_pct || 0))),
+          }))
+        : [],
     });
   }
   out.sort((a, b) => b.residual_stress - a.residual_stress);
