@@ -118,7 +118,7 @@ function validateAdaptiveLength(summary: string, displayPacket: any): { ok: bool
   return { ok: true, why: null };
 }
 
-/** Block invented "yesterday's strength" when workout_facts did not record a strength session in RECENT SESSIONS. */
+/** Block invented or implausible prior-session stories (strength / leg causality). */
 function validatePriorSessionAttribution(summary: string, userMessage: string): { ok: boolean; why: string | null } {
   const s = String(summary || '');
   const u = String(userMessage || '');
@@ -141,6 +141,32 @@ function validatePriorSessionAttribution(summary: string, userMessage: string): 
         'attributed load/fatigue to a prior strength session but RECENT SESSIONS does not list strength — describe only neutral load-model residual or omit',
     };
   }
+
+  // Quad/calf/hamstring + strength: only allowed if workout_facts shows leg/posterior volume for that story.
+  const legLocal = /\b(quad|calf|calves|hamstring|hamstrings)\b/i.test(s);
+  const strengthCausal = /\b(strength|lifting|leg\s+day)\b/i.test(s);
+  if (legLocal && strengthCausal) {
+    const lines = recentBlock.split('\n');
+    const legStrengthLines = lines.filter((line) => /\[leg_relevant_strength:\s*yes\]/i.test(line));
+    if (legStrengthLines.length === 0) {
+      return {
+        ok: false,
+        why:
+          'linked leg muscle residual to strength but no RECENT SESSIONS strength line has [leg_relevant_strength: yes] (logged session was upper-body dominant)',
+      };
+    }
+    if (/\byesterday\b/i.test(s)) {
+      const hit = legStrengthLines.some((line) => /yesterday/i.test(line));
+      if (!hit) {
+        return {
+          ok: false,
+          why:
+            'mentioned yesterday and tied leg muscles to strength but yesterday’s logged strength is not leg/posterior-dominant per [leg_relevant_strength: yes]',
+        };
+      }
+    }
+  }
+
   return { ok: true, why: null };
 }
 
@@ -177,7 +203,7 @@ RULES:
 - When HR drift data exists, interpret it in context: drift on a hilly course means something different than drift on a flat course.
 - STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
 - TRAINING STREAK: Use the provided streak day count, combined load, session mix (e.g. 3× run, 1× strength), and yesterday's athletic focus **only when those fields appear in the user message**. All modalities count as training; interpret fatigue with context — upper-body strength is mostly systemic/neural load for a run, not leg glycogen depletion. Do not invent a different day count than the structured fields.
-- LOAD CONTEXT MUSCULAR RESIDUALS: Quad/calf/hamstring numbers are **aggregated internal load estimates**. They are **not** proof the athlete did strength, a leg day, or any specific session. **Never** explain them as "from yesterday's strength work", "leg day", "lifting", etc. unless **RECENT SESSIONS BEFORE THIS WORKOUT** explicitly lists a strength session on that timeline. Prefer: "the load model still shows moderate residual in quads/calves" (no invented cause) or tie only to terrain/GAP/pace data from this workout.
+- LOAD CONTEXT MUSCULAR RESIDUALS: Quad/calf/hamstring numbers are **aggregated internal load estimates**. They are **not** proof the athlete did strength, a leg day, or any specific session. **Never** tie them to a prior **strength** workout unless that line shows **[leg_relevant_strength: yes]** (leg/posterior volume in the log). Upper-body bench/row/OHP/pull-up does **not** explain local quad/calf fatigue — if you mention strength at all in that case, frame it as **systemic/neural**, not leg muscles. Prefer neutral wording: "the load model still shows moderate residual in quads/calves" plus terrain/GAP, without inventing a cause.
 - PRIOR SESSION ATTRIBUTION: Only mention a **specific prior day, weekday, or modality** (e.g. "Monday", "yesterday's strength session") if **RECENT SESSIONS BEFORE THIS WORKOUT** explicitly lists that session with date/discipline. If that section is missing, empty, or has no strength line, **do not** mention strength as something they did before this workout. Missing data means you cannot see that day — do not fill in.
 - When load/fatigue data exists, connect it to what comes next: "Recovery matters before Tuesday's intervals" is actionable. "ACWR is 1.35" is not.
 - When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."

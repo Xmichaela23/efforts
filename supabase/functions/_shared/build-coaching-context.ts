@@ -25,6 +25,16 @@ export interface CoachingContext {
   strengthPriority: string | null;
 }
 
+/** From workout_facts.strength_facts.muscle_groups (volume by tag). */
+function strengthSessionLegPosteriorRelevant(sf: any): boolean {
+  const mg = sf?.muscle_groups;
+  if (!mg || typeof mg !== "object") return false;
+  const legs = Number(mg.legs ?? 0) + Number(mg.posterior ?? 0);
+  const total = Object.values(mg).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  if (!(total > 0)) return false;
+  return legs / total >= 0.12;
+}
+
 function weekMonday(date: Date): string {
   const d = new Date(date);
   const day = d.getDay();
@@ -231,11 +241,13 @@ export async function buildCoachingContext(
       let detail = `  ${timeLabel} — ${f.discipline}, workload: ${f.workload ?? 0}, ${Math.round(f.duration_minutes ?? 0)} min`;
       if (f.discipline === "strength" && f.strength_facts) {
         const sf = f.strength_facts;
+        const legRel = strengthSessionLegPosteriorRelevant(sf);
         detail += ` (vol: ${sf.total_volume_lbs ?? 0} lbs, ${sf.total_sets ?? 0} sets)`;
         if (sf.exercises?.length) {
           const names = sf.exercises.map((e: any) => e.name).slice(0, 4).join(", ");
           detail += ` [${names}]`;
         }
+        detail += ` [leg_relevant_strength: ${legRel ? "yes" : "no"}]`;
       }
       if (f.discipline === "run" && f.run_facts) {
         const rf = f.run_facts;
@@ -266,7 +278,7 @@ export async function buildCoachingContext(
     "  LOAD CONTEXT muscular residuals (if present elsewhere in the prompt) are not tied to a named workout; do not infer strength vs run from muscle group names alone.",
   );
   lines.push(
-    "  Only cite a prior strength session if RECENT SESSIONS shows a line with discipline strength. Otherwise omit strength as a cause.",
+    "  Only tie quad/calf/hamstring fatigue to a prior STRENGTH session if that line ends with [leg_relevant_strength: yes] (leg/posterior volume in the log). Upper-only push/pull does not explain local leg soreness — cite systemic/neural load or omit.",
   );
 
   lines.push("=== END TRAINING CONTEXT ===");
