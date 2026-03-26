@@ -181,6 +181,26 @@ function validatePriorSessionAttribution(summary: string, userMessage: string): 
   return { ok: true, why: null };
 }
 
+/** LLM workaround: "glutes … from 36 hours ago" — clock times are not athlete-visible muscle timelines. */
+function validateMuscleClockClaims(summary: string): { ok: boolean; why: string | null } {
+  const s = String(summary || '');
+  const legNamed =
+    /\b(glute|glutes|quad|calf|calves|hamstring|hamstrings|hip\s+flexors?)\b/i.test(s);
+  const clockCausal =
+    /\b\d{1,3}\s*hours?\s+ago\b/i.test(s) ||
+    /\b\d{1,3}\s*h\s+ago\b/i.test(s) ||
+    /\b\d{1,2}\s*days?\s+ago\b/i.test(s) ||
+    /\b(a|one|two|three)\s+days?\s+ago\b/i.test(s);
+  if (legNamed && clockCausal) {
+    return {
+      ok: false,
+      why:
+        'do not tie named leg/hip muscles to hours/days-ago timelines — not in the data; use terrain, GAP, easy intent, strides only',
+    };
+  }
+  return { ok: true, why: null };
+}
+
 function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
   const top = getTopFlags(displayPacket);
   const hasTerrainDriftFlag = top.some((f) => /drift/i.test(f.message) && /hilly terrain/i.test(f.message));
@@ -224,7 +244,7 @@ RULES:
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present in the data provided.
 - CRITICAL: Pace must use display format like "10:16/mi", never raw seconds.
 - Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly. Instead of 'The week's accumulated fatigue is real' write 'Accumulated fatigue from 129% weekly load is a factor.' Instead of 'You nailed the pacing' write 'Pacing was well-controlled for the terrain.'
-- TEMPORAL PRECISION: The RECENT SESSIONS section already labels each session with its exact timing (e.g. "yesterday", "2 days before"). Use those labels verbatim. NEVER invent your own temporal claims — do not say "yesterday" unless the data literally says "yesterday". If timing is not labeled, omit any time reference.
+- TEMPORAL PRECISION: The RECENT SESSIONS section already labels each session with its exact timing (e.g. "yesterday", "2 days before"). Use those labels verbatim. NEVER invent your own temporal claims — do not say "yesterday" unless the data literally says "yesterday". If timing is not labeled, omit any time reference. NEVER pair **quad/calf/hamstring/glutes** with **"N hours ago"** or **"N days ago"** — that reads as fake physiology; those clock phrases are banned with named muscles.
 - CROSS-DISCIPLINE CLAIMS: Only reference prior workouts affecting this one when the mechanism is physiologically plausible. Think about what muscle groups were used and whether they overlap with the current workout. Systemic fatigue (CNS load, sleep debt) is real but distinct from local muscular fatigue — be specific about which mechanism you mean.
 - FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
 
@@ -613,12 +633,13 @@ export async function generateAISummaryV1(
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
     const ps1 = validatePriorSessionAttribution(s1, userMessage);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && ps1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, prior: ps1.why }));
+    const mc1 = validateMuscleClockClaims(s1);
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && ps1.ok && mc1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, prior: ps1.why, muscleClock: mc1.why }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why, ps1.why,
+      z1.why, len1.why, td1.why, g1.why, ps1.why, mc1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -629,7 +650,8 @@ export async function generateAISummaryV1(
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
     const ps2 = validatePriorSessionAttribution(s2, userMessage);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && ps2.ok) return s2;
+    const mc2 = validateMuscleClockClaims(s2);
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && ps2.ok && mc2.ok) return s2;
     console.warn('[ai-summary] attempt 2 also rejected, returning anyway');
     return s2;
   } catch (e) {
