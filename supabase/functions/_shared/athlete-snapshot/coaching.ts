@@ -229,6 +229,7 @@ RULES:
 
 CRITICAL — ACCURACY:
 - The PLAN POSITION section tells you the exact week number and phase. ONLY use those values. Never invent or guess a week number or phase name. If it says "week 3, phase: build" then it is week 3 build. Not "Week 1 Speed." Not anything else.
+- If LONGITUDINAL PATTERNS mention session counts (e.g. "X of Y sessions"), do NOT repeat those raw numbers. Describe the trend qualitatively: "you've been skipping runs lately" or "run consistency has dropped" — not "you missed 18 of 30 runs."
 - Never output raw numbers for RIR, RPE, or effort scores. "1.7 reps in reserve" is banned. Say "not much left in the tank" or "closer to your limit than usual." The user doesn't think in decimals.
 - Never output percentage numbers for weights (like "78% target" or "80% 1RM"). The user thinks in actual weight: "the plan called for heavy triples and you hit them." Only reference percentages if the plan prescription literally uses them AND it helps the user understand.`;
 

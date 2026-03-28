@@ -80,7 +80,7 @@ export async function computeLongitudinalSignals(
   detectEasyHrTrend(facts, signals);
   detectThresholdPacePlateau(facts, signals);
   detectE1rmTrends(facts, signals);
-  detectSessionSkipPatterns(planned, signals);
+  detectSessionSkipPatterns(planned, facts, asOfDate, signals);
   detectStrengthVolumeTrend(facts, signals);
   detectEasyPaceDrift(facts, signals);
 
@@ -230,31 +230,41 @@ function detectE1rmTrends(facts: WorkoutFactRow[], out: LongitudinalSignal[]): v
   }
 }
 
-function detectSessionSkipPatterns(planned: PlannedRow[], out: LongitudinalSignal[]): void {
+function detectSessionSkipPatterns(planned: PlannedRow[], facts: WorkoutFactRow[], asOfDate: string, out: LongitudinalSignal[]): void {
   if (planned.length < 5) return;
+
+  // Build set of planned IDs that have a matching workout_facts row (completed but not linked)
+  const completedByFact = new Set<string>();
+  for (const f of facts) {
+    if (f.planned_workout_id) completedByFact.add(f.planned_workout_id);
+  }
 
   const byDiscipline = new Map<string, { total: number; skipped: number }>();
   for (const p of planned) {
+    // Only count strictly past dates — today's workouts may not be done yet
+    if (p.date >= asOfDate) continue;
+
     const type = normDiscipline(p.type);
     if (!byDiscipline.has(type)) byDiscipline.set(type, { total: 0, skipped: 0 });
     const entry = byDiscipline.get(type)!;
     entry.total++;
+
     const status = String(p.workout_status || '').toLowerCase();
-    if (status === 'skipped' || (status !== 'completed' && !p.completed_workout_id)) {
-      entry.skipped++;
-    }
+    const linkedOrFactMatched = !!p.completed_workout_id || completedByFact.has(p.id);
+    if (status === 'completed' || linkedOrFactMatched) continue;
+    entry.skipped++;
   }
 
   for (const [type, { total, skipped }] of byDiscipline) {
     if (total < 3) continue;
     const skipRate = skipped / total;
-    if (skipRate >= 0.4 && skipped >= 2) {
+    if (skipRate >= 0.4 && skipped >= 3) {
       out.push({
         id: `skip_pattern_${type}`,
         category: 'adherence',
         severity: skipRate >= 0.6 ? 'concern' : 'warning',
-        headline: `Skipped ${skipped} of ${total} planned ${type} sessions`,
-        detail: `${Math.round(skipRate * 100)}% of planned ${type} sessions were skipped or missed. This may impact ${type === 'swim' ? 'aerobic base balance' : type === 'strength' ? 'strength maintenance' : 'training progression'}.`,
+        headline: `${type} session consistency trending low`,
+        detail: `Completed ${total - skipped} of ${total} planned ${type} sessions over the last few weeks. ${type === 'swim' ? 'Aerobic base balance' : type === 'strength' ? 'Strength maintenance' : 'Training progression'} benefits from regularity.`,
         evidence: `${skipped}/${total} ${type} sessions skipped over the window`,
       });
     }
@@ -361,7 +371,7 @@ export function longitudinalSignalsToPrompt(signals: LongitudinalSignals): strin
 
   lines.push('=== END LONGITUDINAL PATTERNS ===');
   lines.push('');
-  lines.push('When referencing these patterns, pick at most 1-2 that are most actionable this week. Speak plainly — "your easy pace has been creeping faster" not "longitudinal signal detected."');
+  lines.push('When referencing these patterns, pick at most 1-2 that are most actionable this week. Speak plainly — "your easy pace has been creeping faster" not "longitudinal signal detected." Do NOT quote raw counts like "X of Y sessions" — describe the trend qualitatively ("you\'ve been skipping runs more often" or "consistency has dropped").');
 
   return lines.join('\n');
 }
