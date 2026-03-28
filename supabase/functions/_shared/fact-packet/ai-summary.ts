@@ -201,6 +201,33 @@ function _unused_validateMuscleClockClaims(summary: string): { ok: boolean; why:
   return { ok: true, why: null };
 }
 
+function validateNoPaceDeltaFormat(summary: string): { ok: boolean; why: string | null } {
+  const s = String(summary || '');
+  const rawDelta = /\b\d{1,3}s\/mi\b/i.test(s);
+  if (rawDelta) {
+    return { ok: false, why: 'Used raw "Xs/mi" pace delta — express pace as actual values (e.g. "12:25/mi") not deltas in seconds' };
+  }
+  return { ok: true, why: null };
+}
+
+function validateNoHrWithoutData(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const hasHr = !!(displayPacket?.workout?.avg_hr || displayPacket?.workout?.max_hr);
+  if (hasHr) return { ok: true, why: null };
+  const s = String(summary || '').toLowerCase();
+  const hrClaim =
+    /\bheart\s*rate\b/.test(s) ||
+    /\bhr\b/.test(s) ||
+    /\bcardiac\b/.test(s) ||
+    /\bbpm\b/.test(s) ||
+    /\bdrift\b/.test(s) ||
+    /\baerobic response\b/.test(s) ||
+    /\bphysiological response\b/.test(s) ||
+    /\brecovery readiness\b/.test(s);
+  return hrClaim
+    ? { ok: false, why: 'HR/cardiac/physiological claim but no HR data exists for this workout — remove all HR references' }
+    : { ok: true, why: null };
+}
+
 function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
   const top = getTopFlags(displayPacket);
   const hasTerrainDriftFlag = top.some((f) => /drift/i.test(f.message) && /hilly terrain/i.test(f.message));
@@ -239,7 +266,8 @@ RULES:
 - Do not list metrics. Do not use bullet points. Write in connected prose.
 - If nothing interesting happened (easy run, everything on plan, no flags), one sentence is enough: "Clean easy run, no flags."
 - CRITICAL: Do not introduce ANY numbers or percentages that are not present in the data provided.
-- CRITICAL: Pace must use display format like "10:16/mi", never raw seconds.
+- CRITICAL: Pace must use display format like "10:16/mi", never raw seconds. Never express pace differences as "Xs/mi slower/faster" — convert to actual pace values.
+- CRITICAL: If NO HR data is provided (no avg_hr line in the WORKOUT section), you MUST NOT mention heart rate, HR, cardiac drift, physiological response, aerobic response, or recovery readiness. No HR data means NO HR claims of any kind.
 - Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly.
 - FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
 
@@ -581,12 +609,14 @@ export async function generateAISummaryV1(
     const len1 = validateAdaptiveLength(s1, displayPacket);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why }));
+    const hr1 = validateNoHrWithoutData(s1, displayPacket);
+    const pd1 = validateNoPaceDeltaFormat(s1);
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why,
+      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -596,8 +626,11 @@ export async function generateAISummaryV1(
     const len2 = validateAdaptiveLength(s2, displayPacket);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok) return s2;
-    console.warn('[ai-summary] attempt 2 also rejected, returning anyway');
+    const hr2 = validateNoHrWithoutData(s2, displayPacket);
+    const pd2 = validateNoPaceDeltaFormat(s2);
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok) return s2;
+    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why }));
+    if (!hr2.ok) return null;
     return s2;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);

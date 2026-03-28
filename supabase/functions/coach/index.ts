@@ -1585,6 +1585,7 @@ Deno.serve(async (req) => {
     // =========================================================================
     let athleteSnapshot: AthleteSnapshot | null = null;
     let week_narrative: string | null = null;
+    let longitudinalSignalsResult: Awaited<ReturnType<typeof computeLongitudinalSignals>> | null = null;
     try {
       const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
 
@@ -1688,8 +1689,6 @@ Deno.serve(async (req) => {
         narrative: '',
         next_session_guidance: null,
       };
-      let longitudinalSignalsResult: Awaited<ReturnType<typeof computeLongitudinalSignals>> | null = null;
-
       if (anthropicKey) {
         try {
           // Build session interpretations from persisted session_detail_v1 (chronological).
