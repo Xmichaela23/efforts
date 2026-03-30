@@ -12,6 +12,11 @@ import {
   Weekday,
   Slot,
 } from './types.ts';
+import {
+  resolveStrengthRoleSlots,
+  type StrengthRoleSlot,
+  type ResolverSchedule,
+} from './strength-slot-resolver.ts';
 
 /**
  * Get placement strategy based on methodology and constraints
@@ -39,34 +44,45 @@ function hasLowerBodyHotspot(hotspots: string[]): boolean {
   );
 }
 
+function resolverScheduleFromCtx(ctx: PlacementContext): ResolverSchedule {
+  const runDays =
+    ctx.runDays && ctx.runDays.length > 0
+      ? ctx.runDays
+      : [...new Set<Weekday>([ctx.longRunDay, ...ctx.qualityDays])];
+  return {
+    longRunDay: ctx.longRunDay,
+    qualityDays: ctx.qualityDays,
+    runDays,
+  };
+}
+
 /**
- * Hal Higdon (Completion) Strategy
- * 
- * Philosophy: Long run (Sunday) is the dominant stressor.
- * Tue/Thu are aerobic volume, not high-intensity quality.
- * 
- * Schedule:
- * - Monday: Upper Body (Priority)
- * - Wednesday: Lower Body (Priority) - furthest from Sunday long run
- * - Friday: Optional / Durability (Light) — upper only when lower-body hotspots are flagged
+ * Hal Higdon (Completion) Strategy — role-based placement resolved against the real plan week.
  */
 function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
-  const slots: Partial<Record<Weekday, Slot>> = {
-    mon: 'upper_primary',
-    wed: 'lower_primary',
-  };
-
+  const lowerBodyRisk = hasLowerBodyHotspot(ctx.injuryHotspots ?? []);
+  const sched = resolverScheduleFromCtx(ctx);
+  const roleSlots: StrengthRoleSlot[] = [
+    { role: 'day_after_long', focus: 'upper' },
+    { role: 'mid_week_easy', focus: 'lower' },
+  ];
   if (ctx.strengthFrequency >= 3) {
-    // Friday lower creates fatigue the day before Saturday easy run and two days before Sunday long run.
-    // When lower-body hotspots are flagged (e.g. achilles, IT band), protect that window.
-    const lowerBodyRisk = hasLowerBodyHotspot(ctx.injuryHotspots ?? []);
-    slots.fri = lowerBodyRisk ? 'upper_optional' : 'lower_optional';
+    roleSlots.push({
+      role: 'second_easy',
+      focus: lowerBodyRisk ? 'upper' : 'lower',
+      optional: true,
+    });
   }
+  const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, {
+    excludeDayBeforeLong: true,
+    lowerBufferQuality: true,
+  });
 
   return {
     name: 'Hal Higdon (Completion)',
-    slotsByDay: slots,
-    notes: 'Wednesday lower is ideal as it is furthest from Sunday long run and there is no Tuesday/Thursday intensity interference.',
+    slotsByDay,
+    notes:
+      'Upper after the long run; lower on the best-buffered easy day; optional third slot respects injury flags.',
   };
 }
 
@@ -89,28 +105,34 @@ function getHigdonStrategy(ctx: PlacementContext): PlacementStrategy {
  */
 function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
   if (!ctx.noDoubles) {
-    // Mon upper + Wed lower: Wednesday is always an easy-run day in JD plans,
-    // so lower neural here never conflicts with quality work. Thursday stays
-    // clean for T-pace / I-pace sessions. 72h from Wed lower → Sat, 96h → Sun
-    // long run — plenty of recovery on both ends.
-    const slots: Partial<Record<Weekday, Slot>> = {
-      mon: 'upper_primary',
-      wed: 'lower_primary',
-      thu: 'none', // Quality run day — no strength stacking
-    };
-
-    // Always include Friday as an optional upper slot — athletes doing 2x/week
-    // can skip it, but it should always be offered.
-    slots.fri = 'upper_optional';
+    const sched = resolverScheduleFromCtx(ctx);
+    const roleSlots: StrengthRoleSlot[] = [
+      { role: 'day_after_long', focus: 'upper' },
+      { role: 'mid_week_easy', focus: 'lower' },
+    ];
+    if (ctx.strengthFrequency >= 3) {
+      roleSlots.push({ role: 'second_easy', focus: 'upper', optional: true });
+    }
+    const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, {
+      excludeDayBeforeLong: true,
+      lowerBufferQuality: true,
+    });
+    // JD distributed: strength is intentionally confined to **easy** days only (resolver never
+    // picks quality). We still stamp quality weekdays as `none` so any future slot logic or
+    // guardrails cannot stack sessions on I/T/M days — this is a hard polarisation rule, not
+    // masking a failed resolve (easy candidates are already excluded from the role picks).
+    for (const q of ctx.qualityDays) {
+      slotsByDay[q] = 'none';
+    }
 
     return {
       name: 'Jack Daniels (Performance) - Distributed',
-      slotsByDay: slots,
-      notes: 'Upper Monday, lower Thursday. Wednesday stays clean. Thursday lower is 48h after Tuesday quality and 72h before Sunday long run.',
+      slotsByDay,
+      notes:
+        'Upper after long run; lower on the most buffered easy day; quality days stay clear; optional upper on another easy day.',
     };
   }
 
-  // Fallback: No doubles allowed
   return getDanielsFallbackStrategy(ctx);
 }
 
@@ -118,62 +140,69 @@ function getDanielsStrategy(ctx: PlacementContext): PlacementStrategy {
  * Jack Daniels Fallback Strategy (No Doubles)
  */
 function getDanielsFallbackStrategy(ctx: PlacementContext): PlacementStrategy {
-  const slots: Partial<Record<Weekday, Slot>> = {
-    mon: 'upper_primary',
-    wed: 'none', // Protected recovery valley
-  };
+  const sched = resolverScheduleFromCtx(ctx);
+  const baseOpts = {
+    excludeDayBeforeLong: true,
+    lowerBufferQuality: true,
+  } as const;
 
   if (ctx.protocol === 'neural_speed') {
-    // Neural Speed: Lower on Wednesday is acceptable
-    // (CNS fatigue is high, but metabolic/structural damage is low)
-    slots.wed = 'lower_primary';
-
+    const roleSlots: StrengthRoleSlot[] = [
+      { role: 'day_after_long', focus: 'upper' },
+      { role: 'mid_week_easy', focus: 'lower' },
+    ];
     if (ctx.strengthFrequency >= 3) {
-      slots.fri = 'upper_optional';
+      roleSlots.push({ role: 'second_easy', focus: 'upper', optional: true });
     }
+    const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, baseOpts);
 
     return {
       name: 'Jack Daniels (Performance) - Neural Speed Fallback',
-      slotsByDay: slots,
-      notes: 'Lower neural on Wednesday acceptable because CNS fatigue is high but structural damage is low.',
+      slotsByDay,
+      notes:
+        'No doubles: upper after long run; lower neural on the best mid-week easy day; optional upper if frequency allows.',
     };
   }
 
   if (ctx.protocol === 'durability') {
-    // Saturday is adjacent to Sunday long run. When lower-body hotspots are flagged,
-    // skip the lower session entirely — the long run is the priority stressor.
     const lowerBodyRisk = hasLowerBodyHotspot(ctx.injuryHotspots ?? []);
-    slots.sat = lowerBodyRisk ? 'none' : 'lower_primary';
-
-    if (ctx.strengthFrequency >= 3) {
-      slots.fri = 'upper_optional';
+    const roleSlots: StrengthRoleSlot[] = [
+      { role: 'day_after_long', focus: 'upper' },
+    ];
+    if (!lowerBodyRisk) {
+      roleSlots.push({ role: 'pre_long_buffer', focus: 'lower' });
     }
+    if (ctx.strengthFrequency >= 3) {
+      roleSlots.push({ role: 'second_easy', focus: 'upper', optional: true });
+    }
+    const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, baseOpts);
 
     const hotspotNote = lowerBodyRisk
-      ? ' Saturday lower omitted: lower-body injury flags detected — protecting Sunday long run.'
+      ? ' Lower omitted: lower-body injury flags — protecting the long run.'
       : '';
 
     return {
       name: 'Jack Daniels (Performance) - Durability Fallback',
-      slotsByDay: slots,
-      notes: `Lower durability on Saturday (light/maintenance) to preserve Sunday long run performance.${hotspotNote}`,
+      slotsByDay,
+      notes: `Lower on a buffered day two steps before long when safe; upper after long.${hotspotNote}`,
     };
   }
 
-  // upper_aesthetics: Keep upper-dominant, lower optional on Sat or none
+  const roleSlots: StrengthRoleSlot[] = [
+    { role: 'day_after_long', focus: 'upper' },
+  ];
   if (ctx.strengthFrequency >= 2) {
-    slots.wed = 'upper_optional'; // Additional upper work
+    roleSlots.push({ role: 'mid_week_easy', focus: 'upper', optional: true });
   }
-
   if (ctx.strengthFrequency >= 3) {
-    slots.fri = 'upper_optional';
-    slots.sat = 'lower_optional'; // Optional lower maintenance
+    roleSlots.push({ role: 'second_easy', focus: 'lower', optional: true });
   }
+  const slotsByDay = resolveStrengthRoleSlots(roleSlots, sched, baseOpts);
 
   return {
     name: 'Jack Daniels (Performance) - Upper Aesthetics Fallback',
-    slotsByDay: slots,
-    notes: 'Upper-dominant protocol. Lower work is optional on Saturday or omitted.',
+    slotsByDay,
+    notes: 'Upper-dominant: stacked on easy days away from long/quality; optional lower on another easy day.',
   };
 }
 

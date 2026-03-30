@@ -22,6 +22,20 @@ import {
 } from './strategy.ts';
 import type { Weekday, Slot } from './types.ts';
 
+const SUN_RING: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function computeRunDaysFromPrimary(primarySchedule: {
+  longSessionDays: string[];
+  qualitySessionDays: string[];
+  easySessionDays: string[];
+}): Weekday[] {
+  const set = new Set<Weekday>();
+  for (const d of primarySchedule.longSessionDays) set.add(normalizeWeekday(d));
+  for (const d of primarySchedule.qualitySessionDays) set.add(normalizeWeekday(d));
+  for (const d of primarySchedule.easySessionDays) set.add(normalizeWeekday(d));
+  return SUN_RING.filter(d => set.has(d));
+}
+
 export const simplePlacementPolicy: PlacementPolicy = {
   id: 'methodology_aware',
   name: 'Methodology-Aware',
@@ -100,7 +114,8 @@ function assignSessionsWithStrategy(
   const longRunDay: Weekday = primarySchedule.longSessionDays.length > 0
     ? normalizeWeekday(primarySchedule.longSessionDays[0])
     : 'sun';
-  
+  const runDays = computeRunDaysFromPrimary(primarySchedule);
+
   const ctx: PlacementContext = {
     methodology: placementContext.methodology,
     protocol: (placementContext.protocol || 'durability') as 'durability' | 'neural_speed' | 'upper_aesthetics' | 'triathlon',
@@ -108,6 +123,7 @@ function assignSessionsWithStrategy(
     noDoubles: placementContext.noDoubles || false,
     qualityDays,
     longRunDay,
+    runDays: runDays.length > 0 ? runDays : undefined,
     injuryHotspots: placementContext.injuryHotspots ?? [],
     brickDays: (placementContext.brickDays ?? []).map(normalizeWeekday),
     hardEnduranceDays: (placementContext.hardEnduranceDays ?? []).map(normalizeWeekday),

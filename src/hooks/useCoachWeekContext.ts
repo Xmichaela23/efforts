@@ -330,7 +330,49 @@ export function useCoachWeekContext(date?: string) {
       if (!resp) throw new Error('No response from server');
       if (!(resp as any)?.weekly_state_v1) throw new Error('Weekly data contract missing');
 
-      setData(resp as CoachWeekContextV1);
+      let merged = resp as CoachWeekContextV1;
+
+      // Only call adapt-plan suggest when there is an active plan (avoids extra latency for
+      // athletes with no plan). Future: gate on fingerprint presence from coach if exposed.
+      const hasActivePlan = Boolean(merged.weekly_state_v1?.plan?.has_active_plan);
+      let adaptResult: { data: unknown; error: Error | null } = { data: null, error: null };
+      if (hasActivePlan) {
+        adaptResult = await supabase.functions.invoke('adapt-plan', {
+          body: { user_id: userId, action: 'suggest' },
+        });
+      }
+
+      // Merge strength relayout from adapt-plan suggest (same payload auto-adapt would persist).
+      const adapt = adaptResult.data as {
+        suggestions?: Array<{ id?: string; type?: string; title?: string; description?: string }>;
+      } | null;
+      const adaptErr = adaptResult.error;
+      if (!adaptErr && adapt?.suggestions?.length) {
+        const sr = adapt.suggestions.find(s => s.type === 'strength_relayout' || s.id === 'strength_relayout');
+        if (sr) {
+          const wsv = { ...(merged.weekly_state_v1 as CoachWeekContextV1['weekly_state_v1']) };
+          const coach = { ...(wsv.coach || {}) };
+          const base = [...(coach.plan_adaptation_suggestions ?? [])];
+          if (!base.some(x => x.code === 'strength_relayout')) {
+            coach.plan_adaptation_suggestions = [
+              {
+                code: 'strength_relayout',
+                title: sr.title || 'Update strength to match this week',
+                details: sr.description || '',
+              },
+              ...base,
+            ];
+            wsv.coach = coach;
+            merged = {
+              ...merged,
+              weekly_state_v1: wsv,
+              plan_adaptation_suggestions: coach.plan_adaptation_suggestions,
+            };
+          }
+        }
+      }
+
+      setData(merged);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {

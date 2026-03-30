@@ -4,6 +4,7 @@ import {
   resolveAdaptiveMarathonDecisionFromMemory,
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
+import { computeRunPlanningSignals } from '../_shared/planning-context.ts';
 
 type GoalAction = 'keep' | 'replace';
 type RequestMode = 'create' | 'build_existing' | 'link_existing';
@@ -608,138 +609,20 @@ Deno.serve(async (req: Request) => {
         .order('created_at', { ascending: false })
         .limit(3),
     ]);
-    // Convenience alias: most recent snapshot (used below for weeklyMiles)
-    const snapshot = recentSnapshots?.[0] ?? null;
 
-    // ── Training Transition Classification ────────────────────────────────────
-    // Read tombstones from recently ended plans to understand where the athlete
-    // is coming from. This drives the plan shape (taper vs build vs bridge).
-    type TransitionMode = 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
-    interface TrainingTransition {
-      mode: TransitionMode;
-      reasoning: string;
-      peak_long_run_miles?: number;
-      weeks_since_last_plan?: number;
+    const planningCtx = computeRunPlanningSignals(baseline, recentSnapshots, recentEndedPlans, {
+      newDiscipline: String(resolvedGoal?.sport || 'run'),
+      weeksOut,
+    });
+    const trainingTransition = planningCtx.transition;
+    const weeklyMiles = planningCtx.current_weekly_miles;
+    const recent_long_run_miles = planningCtx.recent_long_run_miles;
+    const weeks_since_peak_long_run = planningCtx.weeks_since_peak_long_run;
+    const current_acwr = planningCtx.current_acwr;
+    const volume_trend = planningCtx.volume_trend;
+    if (recent_long_run_miles != null && weeks_since_peak_long_run != null) {
+      console.log(`[AthleteState] Peak long run: ${recent_long_run_miles} mi, ${weeks_since_peak_long_run} weeks ago (planning context)`);
     }
-
-    function classifyTrainingTransition(): TrainingTransition {
-      const tombstone = recentEndedPlans?.[0]?.config?.tombstone;
-
-      if (!tombstone) {
-        return { mode: 'fresh_build', reasoning: 'No previous plan history found — building from current fitness.' };
-      }
-
-      const endedAt = tombstone.ended_at ? new Date(tombstone.ended_at) : null;
-      const weeksSinceEnd = endedAt
-        ? Math.floor((new Date().getTime() - endedAt.getTime()) / (7 * 24 * 60 * 60 * 1000))
-        : 999;
-
-      const completionPct = tombstone.completion_pct ?? 0;
-      const peakLongRun = tombstone.peak_long_run_miles ?? 0;
-      const prevDiscipline = tombstone.discipline ?? 'run';
-      const newDiscipline = (resolvedGoal?.sport || 'run').toLowerCase();
-      const sameDiscipline = prevDiscipline === newDiscipline;
-
-      // Peak bridge: was in a build, near or at peak, same discipline, new race ≤ 12 weeks out
-      if (
-        sameDiscipline &&
-        completionPct >= 40 &&
-        peakLongRun >= 14 &&
-        weeksSinceEnd <= 3 &&
-        weeksOut <= 12
-      ) {
-        return {
-          mode: 'peak_bridge',
-          reasoning: `You ended your ${tombstone.goal_name || 'previous plan'} at week ${tombstone.weeks_completed}/${tombstone.total_weeks} with a ${peakLongRun}-mile long run ${weeksSinceEnd <= 0 ? 'this week' : `${weeksSinceEnd} week${weeksSinceEnd === 1 ? '' : 's'} ago`}. Your fitness is at or near peak — bridging into ${weeksOut}-week taper.`,
-          peak_long_run_miles: peakLongRun,
-          weeks_since_last_plan: weeksSinceEnd,
-        };
-      }
-
-      // Recovery rebuild: ended a plan but fitness has had time to decay (3-12 weeks ago)
-      if (sameDiscipline && completionPct >= 20 && weeksSinceEnd > 3 && weeksSinceEnd <= 12) {
-        return {
-          mode: 'recovery_rebuild',
-          reasoning: `Your last ${tombstone.goal_name || 'plan'} ended ${weeksSinceEnd} weeks ago at ${completionPct}% completion. Rebuilding conservatively from current fitness.`,
-          peak_long_run_miles: peakLongRun,
-          weeks_since_last_plan: weeksSinceEnd,
-        };
-      }
-
-      // Default: fresh build
-      return {
-        mode: 'fresh_build',
-        reasoning: weeksSinceEnd > 12
-          ? `Last training block was ${weeksSinceEnd} weeks ago — treating as a fresh build.`
-          : 'Building from current fitness.',
-      };
-    }
-
-    const trainingTransition = classifyTrainingTransition();
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // ── Athlete Current State ─────────────────────────────────────────────────
-    // Derive athlete state signals from recent snapshots so generators can find
-    // the right starting point rather than always using week-1 table defaults.
-    let recent_long_run_miles: number | undefined;
-    let weeks_since_peak_long_run: number | undefined;
-    let current_acwr: number | undefined;
-    let volume_trend: 'building' | 'holding' | 'declining' | undefined;
-
-    // Seed recent_long_run_miles from tombstone if available (catches same-day
-    // plan switches before the snapshot has been recomputed for today's run).
-    if (trainingTransition.peak_long_run_miles && trainingTransition.peak_long_run_miles > 0) {
-      recent_long_run_miles = trainingTransition.peak_long_run_miles;
-      // NOTE: do NOT seed weeks_since_peak_long_run from tombstone's
-      // weeks_since_last_plan — that measures when the PLAN ended, not when
-      // the peak long run happened. Snapshots have the actual temporal data.
-    }
-
-    if (recentSnapshots && recentSnapshots.length > 0) {
-      // Recent long run: peak from last 8 weeks (extended window, use max to avoid
-      // diluting with recovery weeks that artificially lower the average).
-      // Also track WHICH snapshot index held the peak so we know recency.
-      const easyPaceSecPerMile: number = baseline?.effort_paces?.base ?? 600; // 10 min/mile default
-      const snapshotsWithLongRun = recentSnapshots
-        .map((s: any, idx: number) => ({
-          duration: s.run_long_run_duration as number | null,
-          weeksAgo: idx, // snapshots ordered newest-first, so index = weeks ago
-        }))
-        .filter((s): s is { duration: number; weeksAgo: number } =>
-          s.duration != null && s.duration > 0);
-
-      if (snapshotsWithLongRun.length > 0) {
-        const peakSnapshot = snapshotsWithLongRun.reduce((best, s) =>
-          s.duration > best.duration ? s : best);
-        const snapshotLongRun = Math.round((peakSnapshot.duration * 60 / easyPaceSecPerMile) * 10) / 10;
-
-        // Distance: use whichever is higher (tombstone or snapshot)
-        if (!recent_long_run_miles || snapshotLongRun > recent_long_run_miles) {
-          recent_long_run_miles = snapshotLongRun;
-        }
-        // Recency: ALWAYS use the snapshot's temporal position — this is the
-        // actual week the peak long run happened, not when the plan ended.
-        weeks_since_peak_long_run = peakSnapshot.weeksAgo;
-        console.log(`[AthleteState] Peak long run: ${recent_long_run_miles} mi, ${weeks_since_peak_long_run} weeks ago (snapshot idx ${peakSnapshot.weeksAgo}, duration ${peakSnapshot.duration} min)`);
-      }
-
-      // ACWR from the most recent snapshot
-      const latestAcwr = recentSnapshots[0]?.acwr;
-      if (latestAcwr != null && Number.isFinite(Number(latestAcwr))) {
-        current_acwr = Number(latestAcwr);
-      }
-
-      // Volume trend: compare most-recent vs oldest of the 4 snapshots
-      if (recentSnapshots.length >= 2) {
-        const newest = Number(recentSnapshots[0]?.workload_total ?? 0);
-        const oldest = Number(recentSnapshots[recentSnapshots.length - 1]?.workload_total ?? 0);
-        if (oldest > 0) {
-          const pct = (newest - oldest) / oldest;
-          volume_trend = pct > 0.10 ? 'building' : pct < -0.10 ? 'declining' : 'holding';
-        }
-      }
-    }
-    // ─────────────────────────────────────────────────────────────────────────
 
     let personalizedFloorWeeks = floorWeeks;
     if (distanceApi === 'marathon') {
@@ -893,10 +776,6 @@ Deno.serve(async (req: Request) => {
       }
     }
     // ── End combined plan routing ─────────────────────────────────────────
-
-    const weeklyMiles = snapshot?.workload_by_discipline?.run
-      ? Math.round(Number(snapshot.workload_by_discipline.run) / 10)
-      : undefined;
 
     const generateBody: Record<string, any> = {
       user_id,

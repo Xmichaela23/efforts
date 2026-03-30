@@ -23,6 +23,8 @@ export interface PlacementContext {
   noDoubles: boolean; // cannot do Tue AM + Tue PM
   qualityDays: Weekday[]; // e.g. ['tue','thu']
   longRunDay: Weekday; // e.g. 'sun'
+  /** Union of run days from the plan schedule (long + quality + easy). Drives role resolution. */
+  runDays?: Weekday[];
   /** Flagged injury-prone areas from athlete_memory (e.g. ['achilles','it_band']). Used to protect the day before the long run from heavy lower-body sessions. */
   injuryHotspots?: string[];
   /** Days with brick sessions — strength must never be placed here (triathlon only). */

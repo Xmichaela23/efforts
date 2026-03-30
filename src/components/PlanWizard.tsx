@@ -809,6 +809,47 @@ export default function PlanWizard() {
         }
       }
 
+      // Align with goal-driven generation: snapshots + ended-plan tombstones → starting volume / transition
+      try {
+        const weeksOut =
+          state.hasRaceDate && state.raceDate
+            ? Math.max(
+                0,
+                Math.round(
+                  (new Date(`${state.raceDate}T12:00:00`).getTime() - Date.now()) /
+                    (7 * 24 * 60 * 60 * 1000),
+                ),
+              )
+            : undefined;
+        const { data: pc, error: pcErr } = await supabase.functions.invoke('planning-context', {
+          body: {
+            user_id: userId,
+            ...(weeksOut != null ? { weeks_out: weeksOut } : {}),
+            new_discipline: 'run',
+          },
+        });
+        if (!pcErr && pc && typeof pc === 'object' && !(pc as { error?: string }).error) {
+          const o = pc as Record<string, unknown>;
+          if (o.current_weekly_miles != null) requestBody.current_weekly_miles = o.current_weekly_miles;
+          if (o.recent_long_run_miles != null) requestBody.recent_long_run_miles = o.recent_long_run_miles;
+          if (o.weeks_since_peak_long_run != null) {
+            requestBody.weeks_since_peak_long_run = o.weeks_since_peak_long_run;
+          }
+          if (o.current_acwr != null) requestBody.current_acwr = o.current_acwr;
+          if (typeof o.volume_trend === 'string') requestBody.volume_trend = o.volume_trend;
+          if (typeof o.transition_mode === 'string') requestBody.transition_mode = o.transition_mode;
+        }
+      } catch {
+        /* generate-run-plan still works without history */
+      }
+
+      const strengthFreq = Number(requestBody.strength_frequency ?? 0);
+      const strengthProto = String(requestBody.strength_protocol ?? '');
+      const strengthTier = String(requestBody.strength_tier ?? '');
+      if (strengthFreq >= 2 && (strengthProto === 'neural_speed' || strengthTier === 'strength_power')) {
+        requestBody.structural_load_hint = strengthProto === 'neural_speed' ? 'heavy_lower' : 'moderate';
+      }
+
       const response = await supabase.functions.invoke('generate-run-plan', {
         body: requestBody
       });

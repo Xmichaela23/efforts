@@ -263,118 +263,38 @@ export function overlayStrength(
     );
   }
 
-  // Get protocol
-  // - If protocolId is undefined (PlanWizard case - not exposed yet): use default
-  // - If protocolId is provided: validate it exists, error if invalid (no fallback)
-  const protocol = getProtocol(protocolId);
-
-  // Extract primary sport schedule from plan (for placement/guardrails)
-  const primarySchedule = extractPrimarySchedule(plan);
-
   for (const [weekStr, sessions] of Object.entries(plan.sessions_by_week)) {
     const week = parseInt(weekStr, 10);
     const phase = getCurrentPhase(week, phaseStructure);
-    const isRecovery = phaseStructure.recovery_weeks.includes(week);
-    // Calculate weekInPhase excluding recovery weeks
-    // Count only non-recovery weeks from phase start to current week
-    let weekInPhase = 0;
-    for (let w = phase.start_week; w <= week; w++) {
-      if (!phaseStructure.recovery_weeks.includes(w)) {
-        weekInPhase++;
-      }
-    }
-
-    // Taper sensitivity: compute params when in taper phase
     const isTaperPhase = phase.name === 'Taper';
-    const taperParams = isTaperPhase
-      ? getTaperStrengthParams(
-          week - phase.start_week + 1,                // weekInTaper (1-based)
-          phase.end_week - phase.start_week + 1,      // taperLength
-          memoryContext?.taperSensitivity ?? null,
-        )
-      : null;
-
-    if (taperParams) {
+    if (isTaperPhase) {
+      const taperParams = getTaperStrengthParams(
+        week - phase.start_week + 1,
+        phase.end_week - phase.start_week + 1,
+        memoryContext?.taperSensitivity ?? null,
+      );
       console.log(
         `[PlanGen] Taper week ${week}: strategy=${taperParams.strategy}, freq=${taperParams.effectiveFrequency}, loadScale=${taperParams.taperLoadScale} (sensitivity=${memoryContext?.taperSensitivity ?? 'default'})`
       );
     }
-    
-    // Build protocol context
-    const context: ProtocolContext = {
-      weekIndex: week,
-      weekInPhase,
-      phase: convertPhase(phase),
+
+    const primarySchedule = methodology
+      ? extractPrimaryScheduleForWeekSessions(sessions)
+      : extractPrimarySchedule(plan);
+
+    const strengthSessions = computeStrengthForPlanWeek({
+      week,
       totalWeeks,
-      isRecovery,
       primarySchedule,
-      strengthFrequency: frequency,
-      userBaselines: {
-        // Will be populated during materialization
-        equipment: tier === 'barbell' ? 'commercial_gym' : 'home_gym',
-      },
-      constraints: {
-        maxSessionDuration: 60,
-        taperLoadScale: taperParams?.taperLoadScale,
-      },
-    };
-
-    // Generate intent sessions (no day assignment)
-    let intentSessions = protocol.createWeekSessions(context);
-
-    // Apply taper sensitivity post-protocol:
-    // 1. Scale sets down (preserves intensity — the golden rule of tapering)
-    // 2. Filter to effectiveFrequency (prefer upper/full-body when cutting to 1 session)
-    if (taperParams) {
-      intentSessions = applyTaperLoadScale(intentSessions, taperParams.taperLoadScale, taperParams.strategy);
-      intentSessions = filterToTaperFrequency(intentSessions, taperParams.effectiveFrequency);
-    }
-
-    // Filter sessions based on frequency and protocol
-    let filteredSessions = intentSessions;
-    
-    // Legacy behavior: upper_aesthetics doesn't handle frequency internally,
-    // so we filter out upper body when frequency = 2
-    if (protocol.id === 'upper_aesthetics' && frequency === 2) {
-      filteredSessions = intentSessions.filter(
-        s => s.intent !== 'UPPER_STRENGTH' && s.intent !== 'UPPER_MAINTENANCE'
-      );
-    }
-    
-    // Do not strip optional sessions at frequency=2 — optional sessions are bonus
-    // work the athlete can take or skip. They are placed on Friday by the strategy
-    // and labelled optional in the UI. Taper sessions are handled separately above.
-
-    // Apply guardrails (for now, empty - will be implemented later)
-    const guardrails: any[] = [];
-
-    // In taper weeks, use the sensitivity-gated frequency for slot assignment so
-    // the placement strategy doesn't try to fill more slots than we have sessions.
-    const placementFrequency = taperParams
-      ? (taperParams.effectiveFrequency as 0 | 1 | 2 | 3)
-      : frequency;
-
-    // Assign to days using placement policy (with methodology-aware context if available)
-    const placedSessions = simplePlacementPolicy.assignSessions(
-      filteredSessions,
-      primarySchedule,
-      guardrails,
-      methodology ? {
-        methodology,
-        protocol: protocolId,
-        strengthFrequency: placementFrequency,
-        noDoubles: effectiveNoDoubles,
-        injuryHotspots: memoryContext?.injuryHotspots ?? [],
-      } : undefined
-    );
-
-    // Resolve exercise weights from 1RM memory before converting to Session[]
-    const resolvedPlaced = memoryContext
-      ? resolveExerciseWeights(placedSessions, memoryContext, isMetric)
-      : placedSessions;
-
-    // Convert PlacedSession[] to Session[]
-    const strengthSessions = resolvedPlaced.map(placed => convertToSession(placed, tier));
+      phaseStructure,
+      frequency,
+      tier,
+      protocolId,
+      methodology,
+      effectiveNoDoubles,
+      memoryContext,
+      isMetric,
+    });
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
   }
@@ -445,20 +365,160 @@ function normalizePrimarySchedule(
   };
 }
 
-function extractPrimarySchedule(plan: TrainingPlan): ProtocolContext['primarySchedule'] {
-  // Extract primary sport schedule from plan sessions
-  // Normalized across disciplines (running, cycling, triathlon)
-  // For now, return default - will be enhanced later to parse actual sessions
-  // 
-  // Future: For multi-sport plans, this can be extended to return multiple schedules
-  // or a scheduleBlocks array with discipline tags
-  
-  // Always normalize to arrays (never undefined) to avoid ?. logic in placement/guardrails
+const DEFAULT_LONG_DAYS = ['Sunday'];
+const DEFAULT_QUALITY_DAYS = ['Tuesday', 'Thursday'];
+const DEFAULT_EASY_DAYS = ['Monday', 'Wednesday', 'Friday', 'Saturday'];
+
+/** Calendar order (not alphabetical — avoid Friday-before-Monday sorts). */
+const WEEKDAY_ORDER = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+] as const;
+
+function sortDaysCalendar(days: string[]): string[] {
+  const rank = (d: string) => {
+    const i = WEEKDAY_ORDER.indexOf(d as (typeof WEEKDAY_ORDER)[number]);
+    return i === -1 ? 99 : i;
+  };
+  return [...new Set(days)].sort((a, b) => rank(a) - rank(b));
+}
+
+function dayVoteTop(votes: Record<string, number>, minCount = 1): string[] {
+  const entries = Object.entries(votes).filter(([, c]) => c >= minCount);
+  if (entries.length === 0) return [];
+  const max = Math.max(...entries.map(([, c]) => c));
+  return sortDaysCalendar(entries.filter(([, c]) => c === max).map(([d]) => d));
+}
+
+/** When tags are missing, pick the run day whose long runs accumulate the most planned minutes. */
+function pickDominantLongRunDay(plan: TrainingPlan): string {
+  const score: Record<string, number> = {};
+  for (const sessions of Object.values(plan.sessions_by_week)) {
+    const weekRuns = sessions.filter(s => s.type === 'run');
+    if (weekRuns.length === 0) continue;
+    const longest = weekRuns.reduce((a, b) => (a.duration >= b.duration ? a : b));
+    score[longest.day] = (score[longest.day] ?? 0) + longest.duration;
+  }
+  const sorted = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  return sorted[0]?.[0] ?? 'Sunday';
+}
+
+/**
+ * Derive long / quality / easy run days from the **actual** generated plan so strength
+ * placement respects each athlete's schedule instead of a fixed Sun / Tue–Thu template.
+ */
+export function extractPrimarySchedule(plan: TrainingPlan): ProtocolContext['primarySchedule'] {
+  const longVotes: Record<string, number> = {};
+  const qualityVotes: Record<string, number> = {};
+  const runDaysSeen = new Set<string>();
+
+  const qualityTag = (tags: string[]) => {
+    const t = new Set(tags.map(x => x.toLowerCase()));
+    if (t.has('long_run')) return false;
+    return (
+      t.has('hard_run') ||
+      t.has('intervals') ||
+      t.has('vo2max') ||
+      t.has('tempo') ||
+      t.has('fartlek') ||
+      t.has('strides') ||
+      t.has('marathon_pace')
+    );
+  };
+
+  for (const sessions of Object.values(plan.sessions_by_week)) {
+    const weekRuns = sessions.filter(s => s.type === 'run');
+    let hasLongTag = false;
+    for (const s of weekRuns) {
+      runDaysSeen.add(s.day);
+      const tags = (s.tags || []).map(x => String(x).toLowerCase());
+      const tset = new Set(tags);
+      if (tset.has('long_run')) {
+        hasLongTag = true;
+        longVotes[s.day] = (longVotes[s.day] ?? 0) + 1;
+      }
+      if (qualityTag(tags)) {
+        qualityVotes[s.day] = (qualityVotes[s.day] ?? 0) + 1;
+      }
+    }
+    // Longest run this week only when no explicit long_run tag (legacy / odd templates)
+    if (!hasLongTag && weekRuns.length > 0) {
+      const longest = weekRuns.reduce((a, b) => (a.duration >= b.duration ? a : b));
+      if (longest.duration >= 50) {
+        longVotes[longest.day] = (longVotes[longest.day] ?? 0) + 1;
+      }
+    }
+  }
+
+  let longSessionDays = dayVoteTop(longVotes, 1);
+  let qualitySessionDays = dayVoteTop(qualityVotes, 1);
+
+  // Name/description hint for quality when tags are sparse (legacy weeks)
+  if (qualitySessionDays.length === 0) {
+    const hintVotes: Record<string, number> = {};
+    const qre =
+      /\b(tempo|interval|intervals|repeats|vo2|speed|fartlek|cruise|threshold|strides|400m|800m|mile repeat|m pace|marathon pace)\b/i;
+    for (const sessions of Object.values(plan.sessions_by_week)) {
+      for (const s of sessions) {
+        if (s.type !== 'run') continue;
+        const tags = (s.tags || []).map(x => String(x).toLowerCase());
+        if (tags.includes('long_run')) continue;
+        if (qre.test(`${s.name} ${s.description}`)) {
+          hintVotes[s.day] = (hintVotes[s.day] ?? 0) + 1;
+        }
+      }
+    }
+    qualitySessionDays = dayVoteTop(hintVotes, 1);
+  }
+
+  if (longSessionDays.length === 0) longSessionDays = [...DEFAULT_LONG_DAYS];
+  if (qualitySessionDays.length === 0) qualitySessionDays = [...DEFAULT_QUALITY_DAYS];
+
+  // Template defaults (Sun / Tue–Thu) are wrong for many schedules — keep only days this plan runs on.
+  if (runDaysSeen.size > 0) {
+    const longOnPlan = longSessionDays.filter(d => runDaysSeen.has(d));
+    if (longOnPlan.length > 0) {
+      longSessionDays = sortDaysCalendar(longOnPlan);
+    } else {
+      longSessionDays = [pickDominantLongRunDay(plan)];
+    }
+
+    const qualityOnPlan = qualitySessionDays.filter(d => runDaysSeen.has(d));
+    if (qualityOnPlan.length > 0) {
+      qualitySessionDays = sortDaysCalendar(qualityOnPlan);
+    } else {
+      qualitySessionDays = [];
+    }
+  }
+
+  const hard = new Set([...longSessionDays, ...qualitySessionDays]);
+  const easySessionDays = [...runDaysSeen].filter(d => !hard.has(d));
+  const easyFallback = easySessionDays.length > 0 ? easySessionDays : DEFAULT_EASY_DAYS.filter(d => !hard.has(d));
+
   return normalizePrimarySchedule({
-    longSessionDays: ['Sunday'], // Default assumption - longest/highest volume session(s)
-    // Future: Can add highFatigueDays: string[] for days with tempo + long-ish sessions
-    qualitySessionDays: ['Tuesday', 'Thursday'], // Default assumption - quality/speed work
-    easySessionDays: ['Monday', 'Wednesday', 'Friday', 'Saturday'], // Default assumption - easy/recovery sessions
+    longSessionDays,
+    qualitySessionDays,
+    easySessionDays: easyFallback.length > 0 ? easyFallback : [...DEFAULT_EASY_DAYS],
+  });
+}
+
+/** Primary schedule from a single week's sessions (taper / adapt / relayout). */
+export function extractPrimaryScheduleForWeekSessions(
+  weekSessions: Session[],
+): ProtocolContext['primarySchedule'] {
+  return extractPrimarySchedule({ sessions_by_week: { '0': weekSessions } } as TrainingPlan);
+}
+
+export function primaryScheduleSignature(sched: ProtocolContext['primarySchedule']): string {
+  return JSON.stringify({
+    l: [...sched.longSessionDays].sort(),
+    q: [...sched.qualitySessionDays].sort(),
+    e: [...sched.easySessionDays].sort(),
   });
 }
 
@@ -473,6 +533,133 @@ function getCurrentPhase(weekNumber: number, phaseStructure: PhaseStructure): Ph
     }
   }
   return phaseStructure.phases[phaseStructure.phases.length - 1];
+}
+
+function computeStrengthForPlanWeek(args: {
+  week: number;
+  totalWeeks: number;
+  primarySchedule: ProtocolContext['primarySchedule'];
+  phaseStructure: PhaseStructure;
+  frequency: StrengthFrequency;
+  tier: StrengthTier;
+  protocolId?: string;
+  methodology?: 'hal_higdon_complete' | 'jack_daniels_performance';
+  effectiveNoDoubles: boolean;
+  memoryContext?: PlanningMemoryContext;
+  isMetric?: boolean;
+}): Session[] {
+  const protocol = getProtocol(args.protocolId);
+  const week = args.week;
+  const phase = getCurrentPhase(week, args.phaseStructure);
+  const isRecovery = args.phaseStructure.recovery_weeks.includes(week);
+  let weekInPhase = 0;
+  for (let w = phase.start_week; w <= week; w++) {
+    if (!args.phaseStructure.recovery_weeks.includes(w)) {
+      weekInPhase++;
+    }
+  }
+
+  const isTaperPhase = phase.name === 'Taper';
+  const taperParams = isTaperPhase
+    ? getTaperStrengthParams(
+        week - phase.start_week + 1,
+        phase.end_week - phase.start_week + 1,
+        args.memoryContext?.taperSensitivity ?? null,
+      )
+    : null;
+
+  const context: ProtocolContext = {
+    weekIndex: week,
+    weekInPhase,
+    phase: convertPhase(phase),
+    totalWeeks: args.totalWeeks,
+    isRecovery,
+    primarySchedule: args.primarySchedule,
+    strengthFrequency: args.frequency,
+    userBaselines: {
+      equipment: args.tier === 'barbell' ? 'commercial_gym' : 'home_gym',
+    },
+    constraints: {
+      maxSessionDuration: 60,
+      taperLoadScale: taperParams?.taperLoadScale,
+    },
+  };
+
+  let intentSessions = protocol.createWeekSessions(context);
+
+  if (taperParams) {
+    intentSessions = applyTaperLoadScale(intentSessions, taperParams.taperLoadScale, taperParams.strategy);
+    intentSessions = filterToTaperFrequency(intentSessions, taperParams.effectiveFrequency);
+  }
+
+  let filteredSessions = intentSessions;
+  if (protocol.id === 'upper_aesthetics' && args.frequency === 2) {
+    filteredSessions = intentSessions.filter(
+      s => s.intent !== 'UPPER_STRENGTH' && s.intent !== 'UPPER_MAINTENANCE',
+    );
+  }
+
+  const guardrails: any[] = [];
+  const placementFrequency = taperParams
+    ? (taperParams.effectiveFrequency as 0 | 1 | 2 | 3)
+    : args.frequency;
+
+  const placedSessions = simplePlacementPolicy.assignSessions(
+    filteredSessions,
+    args.primarySchedule,
+    guardrails,
+    args.methodology
+      ? {
+          methodology: args.methodology,
+          protocol: args.protocolId,
+          strengthFrequency: placementFrequency,
+          noDoubles: args.effectiveNoDoubles,
+          injuryHotspots: args.memoryContext?.injuryHotspots ?? [],
+        }
+      : undefined,
+  );
+
+  const resolvedPlaced = args.memoryContext
+    ? resolveExerciseWeights(placedSessions, args.memoryContext, args.isMetric ?? false)
+    : placedSessions;
+
+  return resolvedPlaced.map(placed => convertToSession(placed, args.tier));
+}
+
+/** Recompute strength sessions for one plan week (e.g. adapt-plan when run shape changes). */
+export function buildStrengthSessionsForPlanWeek(params: {
+  weekNumber: number;
+  totalWeeks: number;
+  enduranceSessions: Session[];
+  phaseStructure: PhaseStructure;
+  frequency: 2 | 3;
+  tier: 'bodyweight' | 'barbell';
+  protocolId?: string;
+  methodology: 'hal_higdon_complete' | 'jack_daniels_performance';
+  noDoubles?: boolean;
+  memoryContext?: PlanningMemoryContext;
+  isMetric?: boolean;
+}): Session[] {
+  const memoryDrivenNoDoubles =
+    params.memoryContext?.interferenceRisk != null &&
+    params.memoryContext.interferenceRisk >= INTERFERENCE_RISK_NO_DOUBLES_THRESHOLD;
+  const effectiveNoDoubles = (params.noDoubles ?? false) || memoryDrivenNoDoubles;
+
+  const primarySchedule = extractPrimaryScheduleForWeekSessions(params.enduranceSessions);
+
+  return computeStrengthForPlanWeek({
+    week: params.weekNumber,
+    totalWeeks: params.totalWeeks,
+    primarySchedule,
+    phaseStructure: params.phaseStructure,
+    frequency: params.frequency,
+    tier: params.tier,
+    protocolId: params.protocolId,
+    methodology: params.methodology,
+    effectiveNoDoubles,
+    memoryContext: params.memoryContext,
+    isMetric: params.isMetric,
+  });
 }
 
 // ============================================================================

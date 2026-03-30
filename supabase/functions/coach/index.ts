@@ -19,7 +19,7 @@ import type {
 } from './types.ts';
 import { getMethodology } from './methodologies/registry.ts';
 import type { MethodologyContext } from './methodologies/types.ts';
-import { computeMarathonReadiness } from '../_shared/marathon-readiness/index.ts';
+import { computeMarathonReadiness, type PlanContext } from '../_shared/marathon-readiness/index.ts';
 import {
   getAcwrRiskFlag,
   getAcwrStatus,
@@ -2381,10 +2381,88 @@ ${narrativeFacts.join('\n')}`;
       console.warn('[coach] week narrative generation failed (non-fatal):', narErr?.message || narErr);
     }
 
-    // Phase 3.5: Marathon readiness checklist (when run data exists)
+    // Phase 3.5: Race readiness checklist (plan-aware)
     let marathon_readiness: CoachWeekContextResponseV1['marathon_readiness'];
     try {
-      const mr = await computeMarathonReadiness(userId, asOfDate, acwr ?? null, supabase);
+      // Build plan context for readiness thresholds
+      let planCtx: PlanContext | null = null;
+      if (activePlan) {
+        const raceDistance = activePlan.config?.distance ?? goalContext.primary_event?.distance ?? null;
+        const weeksOutVal = goalContext.primary_event?.weeks_out ?? null;
+        const currentPhase = weekIntent !== 'unknown' ? weekIntent : null;
+
+        // Query all planned runs to derive peak long run and weekly targets
+        const { data: allPlannedRuns } = await supabase
+          .from('planned_workouts')
+          .select('date,type,description,workload_planned')
+          .eq('training_plan_id', activePlan.id)
+          .eq('type', 'run')
+          .order('date', { ascending: true });
+
+        const miRe = /(\d+\.?\d*)\s*(?:miles|mi\b)/i;
+        let peakLongRunMi: number | null = null;
+        let nextLongRunMi: number | null = null;
+        let nextLongRunDate: string | null = null;
+        let longRunStillScheduled = false;
+        const weekMiles: Record<string, number> = {};
+
+        // Race week start: 7 days before race date
+        const raceDate = activePlan.config?.race_date ? String(activePlan.config.race_date).slice(0, 10) : null;
+        const raceWeekStart = raceDate ? (() => {
+          const d = new Date(raceDate + 'T12:00:00');
+          d.setDate(d.getDate() - 6);
+          return d.toISOString().slice(0, 10);
+        })() : null;
+
+        for (const pw of (allPlannedRuns ?? [])) {
+          const desc = String(pw.description ?? '');
+          const m = miRe.exec(desc);
+          const mi = m ? parseFloat(m[1]) : 0;
+          if (mi <= 0) continue;
+
+          // Skip race day itself for peak calculations
+          if (raceDate && pw.date === raceDate) continue;
+          // Skip race week for peak weekly mileage
+          const isRaceWeek = raceWeekStart && pw.date >= raceWeekStart;
+
+          if (mi > (peakLongRunMi ?? 0)) peakLongRunMi = mi;
+
+          // Track if a long run (>= 10 mi) is still scheduled after today
+          if (mi >= 10 && pw.date > asOfDate) {
+            longRunStillScheduled = true;
+            if (nextLongRunMi == null || pw.date < (nextLongRunDate ?? '9999')) {
+              nextLongRunMi = mi;
+              nextLongRunDate = pw.date;
+            }
+          }
+
+          if (!isRaceWeek) {
+            // Bucket by Mon-start week using epoch day
+            const d = new Date(pw.date + 'T12:00:00');
+            const epochDay = Math.floor(d.getTime() / 86400000);
+            const weekBucket = Math.floor((epochDay + 3) / 7); // +3 shifts epoch (Thu) to Mon
+            weekMiles[weekBucket] = (weekMiles[weekBucket] ?? 0) + mi;
+          }
+        }
+
+        const weekTotals = Object.values(weekMiles);
+        const peakWeekMi = weekTotals.length > 0 ? Math.max(...weekTotals) : null;
+        const avgWeekMi = weekTotals.length > 0 ? weekTotals.reduce((a, b) => a + b, 0) / weekTotals.length : null;
+
+        planCtx = {
+          peakLongRunMi,
+          peakWeekMi,
+          avgWeekMi,
+          raceDistance,
+          weeksOut: weeksOutVal,
+          phase: currentPhase,
+          longRunStillScheduled,
+          nextLongRunMi,
+          nextLongRunDate,
+        };
+      }
+
+      const mr = await computeMarathonReadiness(userId, asOfDate, acwr ?? null, supabase, planCtx);
       marathon_readiness = mr ?? undefined;
       // When athlete says they're sick/injured and readiness is needs_work, add a recovery-focused note
       if (marathon_readiness?.summary === 'needs_work' && athleteContextStr) {

@@ -6,11 +6,32 @@
 //   - Strength: weight auto-progression via plan_adjustments
 //   - Endurance: pace/power target updates via user_baselines
 //
-// Input: { user_id, action?: 'suggest' | 'accept' | 'dismiss', suggestion_id? }
-// Output: { suggestions: [...], applied: [...] }
+// Input: { user_id, action?: 'suggest' | 'accept' | 'dismiss' | 'auto' | 'auto_batch', suggestion_id?, cron_secret? }
+// Output (suggest): { suggestions, plan_id, strength_relayout? } — strength_relayout matches auto-adapt merge when fingerprint differs.
+// Output (auto): { action: 'auto', adaptations, relayout_applied, relayout_week, previous_sig, new_sig, sessions_replaced }
+// accept: suggestion_id `strength_relayout` runs the same persist path as auto-adapt.
+// auto_batch: cron-only; body.cron_secret must equal env ADAPT_PLAN_CRON_SECRET. Runs auto-adapt per distinct active-plan user (cap ADAPT_PLAN_BATCH_MAX_USERS, default 250).
+// auto is also invoked fire-and-forget from ingest-activity after each successful upsert (disable via ADAPT_PLAN_AUTO_ON_INGEST=false on ingest).
+//
+// Ingest-triggered auto is safe by design (not accidental): logging a workout does not mutate
+// plans.sessions_by_week / run shape, so primaryScheduleSignature is unchanged → fingerprint matches
+// stored strength_primary_sig_by_week → persistStrengthRelayoutIfNeeded is a no-op. Relayout only
+// runs when plan JSON for the current week actually differs from the stored fingerprint (editor,
+// reschedule, generator, first-time sig seed, etc.).
 // =============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { Phase, PhaseStructure } from '../generate-run-plan/types.ts';
+import {
+  buildStrengthSessionsForPlanWeek,
+  extractPrimaryScheduleForWeekSessions,
+  primaryScheduleSignature,
+} from '../generate-run-plan/strength-overlay.ts';
+import {
+  getLatestAthleteMemory,
+  resolveMemoryContextForPlanning,
+  type PlanningMemoryContext,
+} from '../_shared/athlete-memory.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,12 +41,17 @@ const corsHeaders = {
 
 type AdaptationSuggestion = {
   id: string;
-  type: 'strength_progression' | 'strength_deload' | 'endurance_pace_update' | 'endurance_deload';
+  type:
+    | 'strength_progression'
+    | 'strength_deload'
+    | 'endurance_pace_update'
+    | 'endurance_deload'
+    | 'strength_relayout';
   title: string;
   description: string;
   exercise?: string;
-  current_value: number;
-  suggested_value: number;
+  current_value?: number;
+  suggested_value?: number;
   unit: string;
   confidence: 'low' | 'medium' | 'high';
   reason: string;
@@ -44,6 +70,14 @@ function parseJson<T = any>(val: any): T | null {
   }
 }
 
+/** Default 250; set ADAPT_PLAN_BATCH_MAX_USERS to raise without deploy. Capped at 5000. */
+function parseBatchMaxUsers(): number {
+  const raw = Deno.env.get('ADAPT_PLAN_BATCH_MAX_USERS');
+  const n = raw != null && raw !== '' ? parseInt(raw, 10) : 250;
+  if (!Number.isFinite(n) || n < 1) return 250;
+  return Math.min(n, 5000);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -51,14 +85,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { user_id, action = 'suggest', suggestion_id } = payload;
-
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const { user_id, action = 'suggest', suggestion_id, cron_secret } = payload;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -67,6 +94,31 @@ Deno.serve(async (req) => {
 
     const today = new Date().toISOString().slice(0, 10);
     const fourWeeksAgo = new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10);
+
+    // =========================================================================
+    // AUTO-ADAPT BATCH (cron): all users with an active plan — ambient relayout + adjustments
+    // =========================================================================
+    if (action === 'auto_batch') {
+      const expected = Deno.env.get('ADAPT_PLAN_CRON_SECRET');
+      if (!expected || cron_secret !== expected) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const batchResult = await autoAdaptAllActiveUsers(supabase, today, fourWeeksAgo, parseBatchMaxUsers());
+      return new Response(JSON.stringify(batchResult), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!user_id) {
+      return new Response(JSON.stringify({ error: 'user_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // =========================================================================
     // AUTO-ADAPT: Apply safe adaptations automatically (Phase 2)
@@ -101,14 +153,45 @@ Deno.serve(async (req) => {
     // SUGGEST: Generate adaptation suggestions
     // =========================================================================
 
-    // 1. Get active plan
+    // 1. Get active plan (full row for strength relayout preview — matches auto-adapt payload)
     const { data: plans } = await supabase
       .from('plans')
-      .select('id,name,config')
+      .select('id,name,config,sessions_by_week,duration_weeks,current_week')
       .eq('user_id', user_id)
       .eq('status', 'active')
       .limit(1);
     const activePlan = plans?.[0] || null;
+
+    const memoryForRelayout = activePlan
+      ? await loadPlanningMemoryForRelayout(supabase, user_id)
+      : undefined;
+
+    const relayoutAnalysis = activePlan
+      ? analyzeStrengthRelayoutForCurrentWeek(activePlan as StrengthRelayoutPlanRow)
+      : { ok: false };
+
+    let strength_relayout: {
+      week_key: string;
+      schedule_signature: string;
+      previous_signature: string | null | undefined;
+      merged_week_sessions: any[];
+      applies_same_as_auto_adapt: true;
+    } | null = null;
+
+    if (
+      relayoutAnalysis.ok &&
+      relayoutAnalysis.prev != null &&
+      relayoutAnalysis.sig !== relayoutAnalysis.prev
+    ) {
+      const { merged } = buildStrengthRelayoutSessions(relayoutAnalysis, memoryForRelayout);
+      strength_relayout = {
+        week_key: relayoutAnalysis.weekKey,
+        schedule_signature: relayoutAnalysis.sig,
+        previous_signature: relayoutAnalysis.prev,
+        merged_week_sessions: merged,
+        applies_same_as_auto_adapt: true,
+      };
+    }
 
     // 2. Get user baselines
     const { data: ub } = await supabase
@@ -276,10 +359,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ suggestions, plan_id: activePlan?.id || null }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    if (strength_relayout) {
+      suggestions.push({
+        id: 'strength_relayout',
+        type: 'strength_relayout',
+        title: 'Update strength to match this week',
+        description:
+          'Your run pattern changed (for example taper or recovery). Strength is replanned so it sits on easier days relative to your long run and quality work. Tap Got it to save — same logic as background auto-adapt.',
+        unit: 'plan',
+        confidence: 'high',
+        reason: `Week ${strength_relayout.week_key}: schedule fingerprint changed vs stored baseline.`,
+      });
+    }
+
+    return new Response(
+      JSON.stringify({
+        suggestions,
+        plan_id: activePlan?.id || null,
+        strength_relayout,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    );
   } catch (e: any) {
     console.error('[adapt-plan] error:', e);
     return new Response(JSON.stringify({ error: String(e?.message || e) }), {
@@ -315,13 +418,314 @@ function avg(nums: number[]): number | null {
   return nums.reduce((s, n) => s + n, 0) / nums.length;
 }
 
+/** Minimal phase structure for a single week (overlay / relayout). */
+function minimalPhaseStructureForWeek(
+  weekNum: number,
+  phaseByWeek: string[] | undefined,
+): PhaseStructure {
+  const tag = phaseByWeek?.[weekNum - 1] ?? 'build';
+  const recovery = tag === 'recovery';
+  const name =
+    tag === 'taper' ? 'Taper' :
+    tag === 'recovery' ? 'Recovery' :
+    tag === 'base' ? 'Base' : 'Build';
+  const phase: Phase = {
+    name,
+    start_week: weekNum,
+    end_week: weekNum,
+    weeks_in_phase: 1,
+    focus: '',
+    quality_density: 'low',
+    volume_multiplier: name === 'Taper' ? 0.6 : 1,
+  };
+  return {
+    phases: [phase],
+    recovery_weeks: recovery ? [weekNum] : [],
+  };
+}
+
+/**
+ * Single-week phase stub can mis-read `phase_by_week` near the race. If relayout fires in the
+ * last two plan weeks, force a taper-shaped phase so strength volume/frequency still steps down.
+ */
+function phaseStructureForRelayoutWeek(
+  weekNum: number,
+  totalWeeks: number,
+  phaseByWeek: string[] | undefined,
+): PhaseStructure {
+  const inLateRaceWindow = totalWeeks >= 2 && weekNum >= totalWeeks - 1;
+  if (inLateRaceWindow) {
+    return {
+      phases: [
+        {
+          name: 'Taper',
+          start_week: weekNum,
+          end_week: weekNum,
+          weeks_in_phase: 1,
+          focus: '',
+          quality_density: 'low',
+          volume_multiplier: 0.6,
+        },
+      ],
+      recovery_weeks: [],
+    };
+  }
+  return minimalPhaseStructureForWeek(weekNum, phaseByWeek);
+}
+
+type StrengthRelayoutPlanRow = {
+  id: string;
+  config: Record<string, any> | null;
+  sessions_by_week: Record<string, any[]> | null;
+  duration_weeks?: number | null;
+  current_week?: number | null;
+};
+
+type StrengthRelayoutAnalysis =
+  | { ok: false }
+  | {
+      ok: true;
+      planId: string;
+      weekNum: number;
+      weekKey: string;
+      sig: string;
+      prev: string | null | undefined;
+      endurance: any[];
+      sbw: Record<string, any[]>;
+      cfg: Record<string, any>;
+      strengthFreq: 2 | 3;
+      totalWeeks: number;
+      contract: any;
+    };
+
+/** Shared fingerprint + eligibility logic for auto-adapt, suggest preview, and accept. */
+function analyzeStrengthRelayoutForCurrentWeek(planRow: StrengthRelayoutPlanRow): StrengthRelayoutAnalysis {
+  const cfg = planRow.config || {};
+  const strengthFreq = Number(cfg.strength_frequency ?? 0);
+  if (strengthFreq !== 2 && strengthFreq !== 3) return { ok: false };
+
+  const contract = cfg.plan_contract_v1;
+  if (contract?.strength != null && contract.strength.enabled === false) {
+    return { ok: false };
+  }
+
+  const weekNum = Number(planRow.current_week) || 1;
+  const weekKey = String(weekNum);
+  const sbw = { ...(planRow.sessions_by_week || {}) };
+  const weekSessions = sbw[weekKey] || [];
+  const endurance = weekSessions.filter((s: any) => s?.type !== 'strength');
+  if (endurance.length === 0) return { ok: false };
+
+  const sched = extractPrimaryScheduleForWeekSessions(endurance);
+  const sig = primaryScheduleSignature(sched);
+  const prev = cfg.strength_primary_sig_by_week?.[weekKey];
+
+  const totalWeeks =
+    Number(planRow.duration_weeks) ||
+    Math.max(1, ...Object.keys(sbw).map(k => parseInt(k, 10)).filter(n => Number.isFinite(n)));
+
+  return {
+    ok: true,
+    planId: planRow.id,
+    weekNum,
+    weekKey,
+    sig,
+    prev,
+    endurance,
+    sbw,
+    cfg,
+    strengthFreq: strengthFreq as 2 | 3,
+    totalWeeks,
+    contract,
+  };
+}
+
+function buildStrengthRelayoutSessions(
+  a: Extract<StrengthRelayoutAnalysis, { ok: true }>,
+  memoryContext?: PlanningMemoryContext,
+): { merged: any[]; newStrength: any[] } {
+  const approach = String(a.cfg.approach || 'sustainable');
+  const methodology =
+    approach === 'performance_build' ? 'jack_daniels_performance' : 'hal_higdon_complete';
+
+  const phaseStructure = phaseStructureForRelayoutWeek(
+    a.weekNum,
+    a.totalWeeks,
+    a.contract?.phase_by_week,
+  );
+  const tier = a.cfg.strength_tier === 'strength_power' ? 'barbell' : 'bodyweight';
+
+  const newStrength = buildStrengthSessionsForPlanWeek({
+    weekNumber: a.weekNum,
+    totalWeeks: a.totalWeeks,
+    enduranceSessions: a.endurance,
+    phaseStructure,
+    frequency: a.strengthFreq,
+    tier,
+    protocolId: a.cfg.strength_protocol ?? undefined,
+    methodology,
+    noDoubles: Boolean(a.cfg.no_doubles),
+    isMetric: String(a.cfg.units || '').toLowerCase() === 'metric',
+    memoryContext,
+  });
+
+  return { merged: [...a.endurance, ...newStrength], newStrength };
+}
+
+async function loadPlanningMemoryForRelayout(
+  supabase: any,
+  userId: string,
+): Promise<PlanningMemoryContext | undefined> {
+  try {
+    const row = await getLatestAthleteMemory(supabase, userId);
+    return resolveMemoryContextForPlanning(row);
+  } catch (e) {
+    console.warn('[adapt-plan] athlete_memory load for relayout (non-fatal):', e);
+    return undefined;
+  }
+}
+
+/**
+ * When the current week's run shape (long/quality/easy) changes vs last adapt,
+ * re-place strength sessions for that week only.
+ *
+ * Loads `athlete_memory` when possible so injury_hotspots, taper_sensitivity, interference_risk,
+ * and 1RM resolution match generate-run-plan — relayout is schedule-triggered today, but hotspots
+ * still affect durability vs neural placement when the week is rebuilt.
+ */
+type StrengthRelayoutPersistResult = {
+  applied: boolean;
+  detail?: string;
+  relayout_week: number | null;
+  previous_sig: string | null;
+  new_sig: string | null;
+  sessions_replaced: number | null;
+};
+
+function emptyStrengthRelayoutTelemetry(): Omit<StrengthRelayoutPersistResult, 'applied' | 'detail'> {
+  return {
+    relayout_week: null,
+    previous_sig: null,
+    new_sig: null,
+    sessions_replaced: null,
+  };
+}
+
+async function persistStrengthRelayoutIfNeeded(
+  supabase: any,
+  analysis: StrengthRelayoutAnalysis,
+  memoryContext?: PlanningMemoryContext,
+): Promise<StrengthRelayoutPersistResult> {
+  const empty = (): StrengthRelayoutPersistResult => ({
+    applied: false,
+    ...emptyStrengthRelayoutTelemetry(),
+  });
+
+  if (!analysis.ok) return empty();
+
+  const a = analysis;
+
+  if (a.prev != null && a.sig === a.prev) return empty();
+
+  if (a.prev == null) {
+    const nextConfig = {
+      ...a.cfg,
+      strength_primary_sig_by_week: {
+        ...(a.cfg.strength_primary_sig_by_week || {}),
+        [a.weekKey]: a.sig,
+      },
+    };
+    await supabase
+      .from('plans')
+      .update({ config: nextConfig, updated_at: new Date().toISOString() })
+      .eq('id', a.planId);
+    return empty();
+  }
+
+  const { merged, newStrength } = buildStrengthRelayoutSessions(a, memoryContext);
+  const relayoutAt = new Date().toISOString();
+  const nextConfig = {
+    ...a.cfg,
+    strength_primary_sig_by_week: {
+      ...(a.cfg.strength_primary_sig_by_week || {}),
+      [a.weekKey]: a.sig,
+    },
+    last_relayout_at: relayoutAt,
+    last_relayout_week: a.weekNum,
+  };
+
+  const { error } = await supabase
+    .from('plans')
+    .update({
+      sessions_by_week: { ...a.sbw, [a.weekKey]: merged },
+      config: nextConfig,
+      updated_at: relayoutAt,
+    })
+    .eq('id', a.planId);
+
+  if (error) {
+    console.error('[adapt-plan] strength relayout failed:', error);
+    return empty();
+  }
+
+  return {
+    applied: true,
+    detail: `Strength placement updated for week ${a.weekKey} (run schedule shape changed).`,
+    relayout_week: a.weekNum,
+    previous_sig: a.prev,
+    new_sig: a.sig,
+    sessions_replaced: newStrength.length,
+  };
+}
+
+async function maybeRelayoutStrengthForCurrentWeek(
+  supabase: any,
+  planRow: StrengthRelayoutPlanRow,
+  memoryContext?: PlanningMemoryContext,
+): Promise<StrengthRelayoutPersistResult> {
+  const analysis = analyzeStrengthRelayoutForCurrentWeek(planRow);
+  return persistStrengthRelayoutIfNeeded(supabase, analysis, memoryContext);
+}
+
 async function acceptSuggestion(
   supabase: any,
   userId: string,
   suggestionId: string,
   today: string,
 ): Promise<{ applied: boolean; type: string; detail: string }> {
-  // Suggestion IDs encode the type: str_prog_<lift>, str_deload_<lift>, end_easy_pace, end_ftp
+  // Suggestion IDs encode the type: str_prog_<lift>, str_deload_<lift>, end_easy_pace, end_ftp, strength_relayout
+  if (suggestionId === 'strength_relayout') {
+    const { data: plans } = await supabase
+      .from('plans')
+      .select('id, config, sessions_by_week, duration_weeks, current_week')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .limit(1);
+    const planRow = plans?.[0] as StrengthRelayoutPlanRow | undefined;
+    if (!planRow) {
+      return { applied: false, type: 'strength_relayout', detail: 'No active plan' };
+    }
+    const memoryCtx = await loadPlanningMemoryForRelayout(supabase, userId);
+    const analysis = analyzeStrengthRelayoutForCurrentWeek(planRow);
+    const r = await persistStrengthRelayoutIfNeeded(supabase, analysis, memoryCtx);
+    if (r.applied) {
+      try {
+        await supabase.functions.invoke('materialize-plan', {
+          body: { training_plan_id: planRow.id },
+        });
+      } catch (e) {
+        console.error('[adapt-plan] materialize after strength_relayout:', e);
+      }
+    }
+    return {
+      applied: r.applied,
+      type: 'strength_relayout',
+      detail:
+        r.detail ||
+        (r.applied ? 'Strength placement updated' : 'No relayout needed (schedule already matches).'),
+    };
+  }
+
   if (suggestionId.startsWith('str_prog_') || suggestionId.startsWith('str_deload_')) {
     const liftKey = suggestionId.replace(/^str_(prog|deload)_/, '');
     const liftName = liftKey.replace(/_/g, ' ');
@@ -462,13 +866,77 @@ async function acceptSuggestion(
 // - Recovery insertion when: response model says "overreaching" with high confidence
 // =============================================================================
 
+async function autoAdaptAllActiveUsers(
+  supabase: any,
+  today: string,
+  fourWeeksAgo: string,
+  maxUsers: number,
+): Promise<{
+  users_scanned: number;
+  total_distinct_users: number;
+  batch_truncated: boolean;
+  users_with_applied_adaptation: number;
+  errors: string[];
+}> {
+  const { data: rows, error } = await supabase
+    .from('plans')
+    .select('user_id')
+    .eq('status', 'active');
+  if (error) {
+    return {
+      users_scanned: 0,
+      total_distinct_users: 0,
+      batch_truncated: false,
+      users_with_applied_adaptation: 0,
+      errors: [error.message],
+    };
+  }
+  const distinct = [...new Set((rows || []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
+  const batchTruncated = distinct.length > maxUsers;
+  if (batchTruncated) {
+    console.warn(
+      `[adapt-plan] auto_batch: ${distinct.length} distinct users with active plans; processing only first ${maxUsers}. Set ADAPT_PLAN_BATCH_MAX_USERS or run additional batches.`,
+    );
+  }
+  const ids = distinct.slice(0, maxUsers);
+  let usersWithApplied = 0;
+  const errors: string[] = [];
+  for (const uid of ids) {
+    try {
+      const r = await autoAdapt(supabase, uid, today, fourWeeksAgo);
+      if (r.adaptations.some(a => a.applied)) usersWithApplied++;
+    } catch (e) {
+      errors.push(`${uid}: ${String((e as Error)?.message || e)}`);
+    }
+  }
+  return {
+    users_scanned: ids.length,
+    total_distinct_users: distinct.length,
+    batch_truncated: batchTruncated,
+    users_with_applied_adaptation: usersWithApplied,
+    errors,
+  };
+}
+
 async function autoAdapt(
   supabase: any,
   userId: string,
   today: string,
   fourWeeksAgo: string,
-): Promise<{ adaptations: Array<{ type: string; detail: string; applied: boolean }> }> {
+): Promise<{
+  action: 'auto';
+  adaptations: Array<{ type: string; detail: string; applied: boolean }>;
+  relayout_applied: boolean;
+  relayout_week: number | null;
+  previous_sig: string | null;
+  new_sig: string | null;
+  sessions_replaced: number | null;
+}> {
   const adaptations: Array<{ type: string; detail: string; applied: boolean }> = [];
+  let relayoutTelemetry: StrengthRelayoutPersistResult = {
+    applied: false,
+    ...emptyStrengthRelayoutTelemetry(),
+  };
 
   // 1. Get data
   const [{ data: ub }, { data: exerciseLogs }, { data: existingAdj }, { data: plans }] = await Promise.all([
@@ -477,13 +945,31 @@ async function autoAdapt(
       .eq('user_id', userId).gte('workout_date', fourWeeksAgo).lte('workout_date', today).order('workout_date', { ascending: true }),
     supabase.from('plan_adjustments').select('exercise_name,applies_from,status')
       .eq('user_id', userId).eq('status', 'active'),
-    supabase.from('plans').select('id').eq('user_id', userId).eq('status', 'active').limit(1),
+    supabase
+      .from('plans')
+      .select('id, config, sessions_by_week, duration_weeks, current_week')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .limit(1),
   ]);
 
   const perf = parseJson(ub?.performance_numbers) || {};
   const learned = parseJson(ub?.learned_fitness) || {};
   const isMetric = String(ub?.units || 'imperial').toLowerCase() === 'metric';
-  const planId = plans?.[0]?.id || null;
+  const planRow = plans?.[0] || null;
+  const planId = planRow?.id || null;
+
+  if (planRow) {
+    const memoryCtx = await loadPlanningMemoryForRelayout(supabase, userId);
+    relayoutTelemetry = await maybeRelayoutStrengthForCurrentWeek(supabase, planRow, memoryCtx);
+    if (relayoutTelemetry.applied && relayoutTelemetry.detail) {
+      adaptations.push({
+        type: 'strength_relayout',
+        detail: relayoutTelemetry.detail,
+        applied: true,
+      });
+    }
+  }
 
   // 2. Strength auto-progression
   const liftGroups = groupByLift(exerciseLogs || []);
@@ -618,5 +1104,28 @@ async function autoAdapt(
     }
   }
 
-  return { adaptations };
+  const out = {
+    action: 'auto' as const,
+    adaptations,
+    relayout_applied: relayoutTelemetry.applied,
+    relayout_week: relayoutTelemetry.relayout_week,
+    previous_sig: relayoutTelemetry.previous_sig,
+    new_sig: relayoutTelemetry.new_sig,
+    sessions_replaced: relayoutTelemetry.sessions_replaced,
+  };
+
+  console.log(
+    JSON.stringify({
+      tag: 'adapt_plan_auto',
+      user_id: userId,
+      relayout_applied: out.relayout_applied,
+      relayout_week: out.relayout_week,
+      previous_sig: out.previous_sig,
+      new_sig: out.new_sig,
+      sessions_replaced: out.sessions_replaced,
+      adaptations_applied: adaptations.filter((a) => a.applied).length,
+    }),
+  );
+
+  return out;
 }

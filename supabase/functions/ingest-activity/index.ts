@@ -1433,7 +1433,7 @@ Deno.serve(async (req)=>{
         // Compute deterministic facts (Phase 1 – deterministic layer). Never fail ingestion.
         try {
           const factsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-facts`;
-          fetch(factsUrl, {
+          const factsResp = await fetch(factsUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1441,8 +1441,15 @@ Deno.serve(async (req)=>{
               'apikey': key
             },
             body: JSON.stringify({ workout_id: wid })
-          }).catch(() => {});
-        } catch {}
+          });
+          if (!factsResp.ok) {
+            console.error('[ingest-activity] compute-facts failed:', factsResp.status, await factsResp.text().catch(() => ''));
+          } else {
+            console.log('[ingest-activity] compute-facts succeeded for workout:', wid);
+          }
+        } catch (factsErr) {
+          console.error('[ingest-activity] compute-facts error:', factsErr);
+        }
 
         // Invalidate server-side block cache (24h TTL, safe to delete all for user)
         try {
@@ -1499,6 +1506,38 @@ Deno.serve(async (req)=>{
         }
       }
     } catch  {}
+
+    // Plan auto-adapt (progression, deload signals, strength fingerprint relayout, materialize) — fire-and-forget.
+    // Idempotent by design: a normal activity ingest does not mutate plan JSON, so the run-shape
+    // fingerprint is unchanged → relayout is a no-op unless the template/week was edited elsewhere.
+    // Telemetry: adapt-plan logs JSON lines tag=adapt_plan_auto and returns relayout_* fields on action=auto.
+    // When relayout does apply, it can be silent (no Coach row); suggest flow still offers the same merge.
+    // Set ADAPT_PLAN_AUTO_ON_INGEST=false to disable.
+    try {
+      const off = Deno.env.get('ADAPT_PLAN_AUTO_ON_INGEST');
+      if (off !== '0' && off !== 'false') {
+        const adaptUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/adapt-plan`;
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        fetch(adaptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${key}`,
+            apikey: key,
+          },
+          body: JSON.stringify({ user_id: userId, action: 'auto' }),
+        })
+          .then((r) => {
+            if (!r.ok) {
+              console.error('[ingest-activity] adapt-plan auto non-OK:', r.status, r.statusText);
+            }
+          })
+          .catch((e) => console.error('[ingest-activity] adapt-plan auto failed:', e));
+      }
+    } catch (e) {
+      console.error('[ingest-activity] adapt-plan auto trigger error:', e);
+    }
+
     return new Response(JSON.stringify({
       success: true
     }), {

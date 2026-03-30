@@ -942,7 +942,12 @@ export default function CoachWeekTab() {
               onAccept={async (code) => {
                 const uId = getStoredUserId();
                 if (!uId) return;
-                if (code.startsWith('str_prog_') || code.startsWith('str_deload_') || code.startsWith('end_')) {
+                if (
+                  code === 'strength_relayout' ||
+                  code.startsWith('str_prog_') ||
+                  code.startsWith('str_deload_') ||
+                  code.startsWith('end_')
+                ) {
                   try {
                     await supabase.functions.invoke('adapt-plan', {
                       body: { user_id: uId, action: 'accept', suggestion_id: code },

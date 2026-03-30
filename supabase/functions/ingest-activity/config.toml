@@ -1,6 +1,8 @@
 [functions]
 verify_jwt = false
 
+# Optional: ADAPT_PLAN_AUTO_ON_INGEST=false disables post-ingest adapt-plan action=auto (default on).
+
 [functions.headers]
 Access-Control-Allow-Origin = "*"
 Access-Control-Allow-Headers = "authorization, x-client-info, apikey, content-type"

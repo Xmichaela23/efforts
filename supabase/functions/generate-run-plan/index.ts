@@ -290,6 +290,7 @@ Deno.serve(async (req: Request) => {
           strength_frequency: request.strength_frequency || 0,
           strength_tier: request.strength_tier || null,
           strength_protocol: request.strength_protocol || null, // Canonical protocol ID
+          no_doubles: request.no_doubles || false,
           user_selected_start_date: startDate,
           race_date: request.race_date || null,
           race_name: request.race_name || null,

@@ -1,0 +1,12 @@
+[functions]
+# Client invokes with anon key + body.user_id; cron uses auto_batch + cron_secret.
+# Ops: if ADAPT_PLAN_CRON_SECRET leaks, rotate: set new secret in Dashboard, update schedule
+# payload cron_secret, deploy; old secret invalid immediately. auto_batch is the only gate.
+verify_jwt = false
+
+# Optional secrets (Project Settings → Edge Functions → Secrets):
+#   ADAPT_PLAN_CRON_SECRET     — required for action=auto_batch (schedule body must match)
+#   ADAPT_PLAN_BATCH_MAX_USERS — default 250; raise if auto_batch logs truncation warnings
+
+# Dashboard → Edge Functions → adapt-plan → Schedules, e.g. daily:
+#   Body: {"action":"auto_batch","cron_secret":"<ADAPT_PLAN_CRON_SECRET>"}
