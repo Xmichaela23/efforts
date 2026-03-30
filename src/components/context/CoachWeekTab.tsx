@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X, Target } from 'lucide-react';
+import { Activity, AlertCircle, Check, ChevronLeft, ChevronRight, Link2, Loader2, RefreshCw, X, Target } from 'lucide-react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -381,18 +381,24 @@ export default function CoachWeekTab() {
   // Smart server, dumb client: use the server's verdict directly
   const verdictCode = ws?.glance?.verdict_code ?? 'on_track';
 
-  // Goals from snapshot identity
+  // Goals from snapshot identity — only real events, never body-response signals
   const activeGoals = useMemo(() => {
     const ev = snap?.identity?.primary_event;
-    if (ev) {
-      const parts = [ev.name];
-      if (ev.weeks_out != null) parts.push(`${ev.weeks_out} weeks out`);
-      return [{ id: 'primary', subtitle: parts.join(' · ') }];
-    }
+    if (!ev) return [];
+    const parts = [ev.name];
+    if (ev.weeks_out != null) parts.push(`${ev.weeks_out} weeks out`);
+    return [{ id: 'primary', subtitle: parts.join(' · ') }];
+  }, [snap?.identity?.primary_event]);
+
+  // Body-response signal — shown when no event goal exists and training_state has a subtitle
+  const bodySignal = useMemo(() => {
+    if (snap?.identity?.primary_event) return null;
     const ts = ws?.details?.training_state;
     const subtitle = ts?.subtitle;
-    if (!subtitle || subtitle === '—' || !subtitle.trim()) return [];
-    return [{ id: 'primary', subtitle }];
+    if (!subtitle || subtitle === '—' || !subtitle.trim()) return null;
+    const code = ts?.code ?? '';
+    const isAlert = code === 'strained' || code === 'overstrained';
+    return { text: subtitle, isAlert };
   }, [snap?.identity?.primary_event, ws?.details?.training_state]);
 
   const loadDriverRows = useMemo(() => {
@@ -593,6 +599,16 @@ export default function CoachWeekTab() {
                     {goal.subtitle}
                   </div>
                 ))}
+              </div>
+            )}
+            {!activeGoals.length && bodySignal && (
+              <div className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-3 py-1 mb-3 ${
+                bodySignal.isAlert
+                  ? 'text-amber-200/90 bg-amber-500/10 border border-amber-500/25'
+                  : 'text-white/55 bg-white/[0.05] border border-white/10'
+              }`}>
+                <Activity className="w-3 h-3 shrink-0 opacity-70" />
+                {bodySignal.text}
               </div>
             )}
 

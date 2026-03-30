@@ -190,9 +190,12 @@ export type BodyResponse = {
     actual_vs_planned_pct: number | null;
     acwr: number | null;
     running_acwr: number | null;
+    run_only_week_load: number | null;
+    run_only_week_load_pct: number | null;
     running_weighted_week_load: number | null;
     running_weighted_week_load_pct: number | null;
     unplanned_summary: string | null;
+    cross_training_load_summary: string | null;
     status: 'under' | 'on_target' | 'elevated' | 'high';
     interpretation: string;
   };

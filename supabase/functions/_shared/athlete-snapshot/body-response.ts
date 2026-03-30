@@ -388,7 +388,24 @@ export function buildBodyResponse(
       }, 'higher')
     : { trend: 'insufficient', detail: strengthSessions.length === 0 ? 'no strength sessions' : 'not enough data', based_on_sessions: strengthSessions.length };
 
-  // Running-weighted week load: discount non-running modalities
+  // ── Discipline-pure run load: how much you actually ran ──
+  const runOnlyWeekLoad = Math.round(
+    allActual
+      .filter(s => normType(s.type) === 'run')
+      .reduce((sum, s) => sum + (s.load_actual ?? 0), 0),
+  );
+
+  // Planned running load (only sessions typed as run)
+  const plannedRunningLoad = allPlanned
+    .filter(p => normType(p.type) === 'run')
+    .reduce((sum, p) => sum + (p.load_planned ?? 0), 0);
+
+  const runOnlyWeekLoadPct = plannedRunningLoad > 0
+    ? Math.round(((runOnlyWeekLoad - plannedRunningLoad) / plannedRunningLoad) * 100)
+    : null;
+
+  // ── Fatigue-weighted load: cross-modal impact on the running system ──
+  // Used for ACWR gating, NOT for the "% vs plan" comparison.
   let runningWeightedWeekLoad = 0;
   for (const s of allActual) {
     const w = getRunningFatigueWeight({ type: s.type, name: s.name });
@@ -396,16 +413,11 @@ export function buildBodyResponse(
   }
   runningWeightedWeekLoad = Math.round(runningWeightedWeekLoad);
 
-  // Planned running load (only sessions typed as run)
-  const plannedRunningLoad = allPlanned
-    .filter(p => normType(p.type) === 'run')
-    .reduce((sum, p) => sum + (p.load_planned ?? 0), 0);
-
   const runningWeightedWeekLoadPct = plannedRunningLoad > 0
     ? Math.round(((runningWeightedWeekLoad - plannedRunningLoad) / plannedRunningLoad) * 100)
     : null;
 
-  // Unplanned sessions: actuals without a matching planned entry
+  // ── Unplanned sessions ──
   const unplannedActuals = allActual.filter(a => {
     const match = allMatches.find(m => m.workout_id === a.workout_id);
     return !match || match.planned_id == null;
@@ -421,30 +433,46 @@ export function buildBodyResponse(
     unplannedSummary = `${unplannedActuals.length} unplanned: ${parts.join(', ')}`;
   }
 
-  // Load interpretation — ACWR is the actual fatigue signal; % above plan is context.
-  // Recovery/deload weeks have tiny planned loads, inflating % — don't cry wolf.
+  // ── Cross-training load summary (non-run disciplines with load and fatigue weight) ──
+  const nonRunActuals = allActual.filter(s => normType(s.type) !== 'run');
+  let crossTrainingLoadSummary: string | null = null;
+  if (nonRunActuals.length > 0) {
+    const byType = new Map<string, { count: number; load: number }>();
+    for (const s of nonRunActuals) {
+      const t = normType(s.type);
+      const cur = byType.get(t) || { count: 0, load: 0 };
+      cur.count += 1;
+      cur.load += s.load_actual ?? 0;
+      byType.set(t, cur);
+    }
+    const xParts: string[] = [];
+    for (const [t, info] of byType) {
+      const w = getRunningFatigueWeight({ type: t });
+      const impact = w <= 0.3 ? 'low' : w <= 0.5 ? 'moderate' : 'notable';
+      xParts.push(`${info.count} ${t} (${Math.round(info.load)} pts, ${impact} running impact)`);
+    }
+    crossTrainingLoadSummary = xParts.join(', ');
+  }
+
+  // ── Load interpretation ──
+  // Primary signal: run-only load vs run plan. ACWR gates false alarms.
   const rAcwr = loadStatus.running_acwr;
-  const runPct = runningWeightedWeekLoadPct;
+  const runPct = runOnlyWeekLoadPct;
   let loadStatusLabel: BodyResponse['load_status']['status'] = 'on_target';
   let loadInterp: string;
 
   if (runPct != null) {
-    // Start from % above plan as a baseline signal
     if (runPct > 30) { loadStatusLabel = 'high'; }
     else if (runPct > 15) { loadStatusLabel = 'elevated'; }
     else if (runPct < -20) { loadStatusLabel = 'under'; }
 
-    // ACWR gate: if running ACWR says fatigue is manageable, cap the alarm level.
-    // % above plan on a recovery week is noise when ACWR confirms low fatigue.
+    // ACWR gate: cap alarm level when running ACWR confirms manageable fatigue
     if (rAcwr != null && rAcwr < 1.2 && loadStatusLabel === 'high') {
       loadStatusLabel = 'elevated';
     }
     if (rAcwr != null && rAcwr < 1.0 && loadStatusLabel === 'elevated') {
       loadStatusLabel = 'on_target';
     }
-
-    // Phase gate: recovery/deload/taper weeks have intentionally low planned load —
-    // excess from low-impact cross-training shouldn't flash red.
     if (easy && rAcwr != null && rAcwr < 1.3 && loadStatusLabel === 'high') {
       loadStatusLabel = 'elevated';
     }
@@ -463,23 +491,9 @@ export function buildBodyResponse(
     loadInterp = 'insufficient data for running load assessment';
   }
 
-  // Contextualize cross-training
-  const nonRunActuals = allActual.filter(s => normType(s.type) !== 'run');
-  if (nonRunActuals.length > 0) {
-    const byType = new Map<string, number>();
-    for (const s of nonRunActuals) {
-      const t = normType(s.type);
-      byType.set(t, (byType.get(t) || 0) + 1);
-    }
-    const xParts: string[] = [];
-    for (const [t, c] of byType) {
-      const w = getRunningFatigueWeight({ type: t });
-      const impact = w <= 0.3 ? 'low' : w <= 0.5 ? 'moderate' : 'notable';
-      xParts.push(`${c} ${t} (${impact} running impact)`);
-    }
-    loadInterp += `. Cross-training: ${xParts.join(', ')}`;
+  if (crossTrainingLoadSummary) {
+    loadInterp += `. Cross-training: ${crossTrainingLoadSummary}`;
   }
-
   if (unplannedSummary) {
     loadInterp += `. ${unplannedSummary}`;
   }
@@ -497,9 +511,12 @@ export function buildBodyResponse(
       actual_vs_planned_pct: loadStatus.actual_vs_planned_pct,
       acwr: loadStatus.acwr,
       running_acwr: loadStatus.running_acwr,
+      run_only_week_load: runOnlyWeekLoad,
+      run_only_week_load_pct: runOnlyWeekLoadPct,
       running_weighted_week_load: runningWeightedWeekLoad,
       running_weighted_week_load_pct: runningWeightedWeekLoadPct,
       unplanned_summary: unplannedSummary,
+      cross_training_load_summary: crossTrainingLoadSummary,
       status: loadStatusLabel,
       interpretation: loadInterp,
     },

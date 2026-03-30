@@ -2473,6 +2473,8 @@ ${narrativeFacts.join('\n')}`;
         chronic28_actual_load: chronic28Load ?? null,
         acwr: acwr ?? null,
         running_acwr: runningAcwr,
+        run_only_week_load: athleteSnapshot?.body_response?.load_status?.run_only_week_load ?? null,
+        run_only_week_load_pct: athleteSnapshot?.body_response?.load_status?.run_only_week_load_pct ?? null,
         running_weighted_week_load: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load ?? null,
         running_weighted_week_load_pct: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load_pct ?? null,
         unplanned_summary: athleteSnapshot?.body_response?.load_status?.unplanned_summary ?? null,

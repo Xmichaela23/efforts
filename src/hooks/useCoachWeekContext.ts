@@ -251,6 +251,8 @@ export type CoachWeekContextV1 = {
       chronic28_actual_load: number | null;
       acwr: number | null;
       running_acwr: number | null;
+      run_only_week_load: number | null;
+      run_only_week_load_pct: number | null;
       running_weighted_week_load: number | null;
       running_weighted_week_load_pct: number | null;
       unplanned_summary: string | null;

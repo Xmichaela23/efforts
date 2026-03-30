@@ -151,18 +151,21 @@ export function snapshotToPrompt(
   }
 
   lines.push('');
-  lines.push('## TRAINING LOAD (modality-decomposed)');
+  lines.push('## TRAINING LOAD (discipline-separated)');
   const ls = br.load_status;
-  if (ls.running_weighted_week_load_pct != null) {
-    lines.push(`Running load: ${ls.running_weighted_week_load_pct > 0 ? '+' : ''}${ls.running_weighted_week_load_pct}% vs plan${ls.running_acwr != null ? ` (running ACWR: ${ls.running_acwr.toFixed(2)})` : ''}`);
+  if (ls.run_only_week_load_pct != null) {
+    lines.push(`Running volume (runs only): ${ls.run_only_week_load_pct > 0 ? '+' : ''}${ls.run_only_week_load_pct}% vs plan (${ls.run_only_week_load ?? 0} pts actual)${ls.running_acwr != null ? ` | Running ACWR: ${ls.running_acwr.toFixed(2)}` : ''}`);
   } else if (ls.running_acwr != null) {
     lines.push(`Running ACWR: ${ls.running_acwr.toFixed(2)} (no plan comparison available)`);
+  }
+  if (ls.cross_training_load_summary) {
+    lines.push(`Cross-training (not counted in running volume): ${ls.cross_training_load_summary}`);
   }
   if (ls.unplanned_summary) {
     lines.push(`Unplanned work: ${ls.unplanned_summary}`);
   }
   lines.push(`Overall: ${ls.interpretation}.`);
-  lines.push('Running ACWR is the primary fatigue signal for running readiness. Upper body strength has near-zero impact on running fatigue. Easy cycling and swimming have minimal impact. Only flag fatigue concerns when running-specific load is elevated.');
+  lines.push('"Running load" means run-only volume. Cross-training (rides, swims) adds aerobic fatigue but is NOT running volume — report them separately. Running ACWR is the primary fatigue signal. Only flag running fatigue concerns when RUNNING-SPECIFIC ACWR > 1.3 or running volume exceeds plan by > 30%.');
 
   // --- LONGITUDINAL PATTERNS ---
   const longBlock = opts?.longitudinalBlock?.trim();
@@ -262,19 +265,18 @@ RULES:
 - If SESSION INTERPRETATIONS are provided, those are what the athlete already saw. Your job is to SYNTHESIZE them into a weekly arc — connect the dots across sessions, spot the weekly pattern, frame guidance. Do NOT re-interpret or contradict the session-level narrative or plan_adherence. Build on top of it.
 - THIS WEEK ONLY. Your scope is the current week's ledger. Do not make multi-week trend claims ("consistency remains problematic", "you keep skipping", "this is becoming a pattern"). If a session was skipped this week, state it plainly as a this-week fact — do not frame it as part of a longer pattern.
 - "upcoming" sessions haven't happened — never call them missed.
-- If RUNNING load is high (running ACWR > 1.3 or running load > 130% of plan), suggest dialing back remaining run sessions.
+- If RUNNING volume is high (running ACWR > 1.3 or running volume > 130% of plan), suggest dialing back remaining run sessions. Cross-training load does not count toward running volume.
 - If a race is coming up, anchor advice to that timeline.
 - The PLANNED prescription includes target weights and RIR. Compare actual to this. If the athlete followed the plan exactly, say so and move on quickly.
 - Don't call progress stalling after 1-2 sessions early in the week.
 
-MODALITY-WEIGHTED FATIGUE — the load section is decomposed by modality. Follow these rules strictly:
-- Use RUNNING-WEIGHTED load and running ACWR as the primary fatigue indicator for running readiness.
-- Upper body strength (weight: 0.3) does NOT meaningfully contribute to running fatigue. Do not cite upper body sessions as evidence of accumulated fatigue for running.
-- Easy cycling (weight: 0.4) has modest impact. Do not treat an easy ride as equivalent to a run when assessing running fatigue.
-- Swimming (weight: 0.2) has minimal running fatigue impact.
-- When total session count looks high but running-specific load is on target, say so explicitly: "Total volume is up but your running load is on plan."
-- Only recommend recovery adjustments when RUNNING-SPECIFIC ACWR > 1.3 or running load exceeds plan by > 30%.
-- When unplanned sessions are present, note what they were and whether they matter for running fatigue. "An unplanned easy ride adds minimal running fatigue" is coaching. "1 extra session" without context is not.
+DISCIPLINE-SEPARATED LOAD — "running load" means actual running volume only. Cross-training is reported separately. Follow these rules strictly:
+- "Running load X% above/below plan" compares ONLY run sessions against the run plan. Rides, swims, and strength are NOT included in that number.
+- Cross-training adds aerobic fatigue but is NOT running volume. An unplanned ride does NOT make running load "above plan" — it adds bike load separately.
+- When the athlete under-ran but did cross-training, say both: "Running volume was below plan. An unplanned ride added aerobic load from a different discipline."
+- Running ACWR is the primary fatigue signal. It includes cross-modal fatigue weights (rides contribute ~60%, swims ~20%), so it can be elevated even when pure running volume is on target. If so, explain the source.
+- Only recommend recovery adjustments when RUNNING-SPECIFIC ACWR > 1.3 or running volume exceeds plan by > 30%.
+- When unplanned sessions are present, name the discipline and note whether they matter for running fatigue. "An unplanned easy ride adds some aerobic fatigue but no running-specific stress" is coaching. "1 extra session" without context is not.
 
 CRITICAL — ACCURACY:
 - The PLAN POSITION section tells you the exact week number and phase. ONLY use those values. Never invent or guess a week number or phase name. If it says "week 3, phase: build" then it is week 3 build. Not "Week 1 Speed." Not anything else.
