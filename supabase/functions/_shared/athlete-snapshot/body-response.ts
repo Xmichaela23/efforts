@@ -357,6 +357,7 @@ export function buildBodyResponse(
   weekIntent?: string | null,
 ): BodyResponse {
   const phase = resolveWeekPhase(weekIntent);
+  const easy = isEasyPhase(phase);
   const sessionSignals = buildSessionObservations(ledger, norms, imperial, phase);
 
   const allActual: ActualSession[] = [];
@@ -420,19 +421,39 @@ export function buildBodyResponse(
     unplannedSummary = `${unplannedActuals.length} unplanned: ${parts.join(', ')}`;
   }
 
-  // Load interpretation — running-specific first, then overall context
+  // Load interpretation — ACWR is the actual fatigue signal; % above plan is context.
+  // Recovery/deload weeks have tiny planned loads, inflating % — don't cry wolf.
   const rAcwr = loadStatus.running_acwr;
   const runPct = runningWeightedWeekLoadPct;
   let loadStatusLabel: BodyResponse['load_status']['status'] = 'on_target';
   let loadInterp: string;
 
   if (runPct != null) {
+    // Start from % above plan as a baseline signal
     if (runPct > 30) { loadStatusLabel = 'high'; }
     else if (runPct > 15) { loadStatusLabel = 'elevated'; }
     else if (runPct < -20) { loadStatusLabel = 'under'; }
 
+    // ACWR gate: if running ACWR says fatigue is manageable, cap the alarm level.
+    // % above plan on a recovery week is noise when ACWR confirms low fatigue.
+    if (rAcwr != null && rAcwr < 1.2 && loadStatusLabel === 'high') {
+      loadStatusLabel = 'elevated';
+    }
+    if (rAcwr != null && rAcwr < 1.0 && loadStatusLabel === 'elevated') {
+      loadStatusLabel = 'on_target';
+    }
+
+    // Phase gate: recovery/deload/taper weeks have intentionally low planned load —
+    // excess from low-impact cross-training shouldn't flash red.
+    if (easy && rAcwr != null && rAcwr < 1.3 && loadStatusLabel === 'high') {
+      loadStatusLabel = 'elevated';
+    }
+
     const pctWord = runPct > 0 ? `${runPct}% above plan` : runPct < 0 ? `${Math.abs(runPct)}% below plan` : 'on target';
     loadInterp = `Running load ${pctWord}`;
+    if (rAcwr != null && runPct > 15 && rAcwr < 1.2) {
+      loadInterp += ` (ACWR ${rAcwr.toFixed(2)} — manageable)`;
+    }
   } else if (rAcwr != null) {
     if (rAcwr > 1.3) { loadStatusLabel = 'high'; loadInterp = 'running load ramping quickly'; }
     else if (rAcwr > 1.1) { loadStatusLabel = 'elevated'; loadInterp = 'running load building gradually'; }

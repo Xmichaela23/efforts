@@ -377,13 +377,9 @@ export default function CoachWeekTab() {
 
   // Load status from snapshot
   const loadStatus = bodyResponse?.load_status ?? null;
-  const loadStatusCode = loadStatus?.status ?? 'on_target';
 
-  // Verdict coloring derived from snapshot load status
-  const verdictCode = loadStatusCode === 'high' ? 'recover_overreaching'
-    : loadStatusCode === 'elevated' ? 'caution_ramping_fast'
-    : loadStatusCode === 'under' ? 'undertraining'
-    : ws?.glance?.verdict_code ?? 'on_track';
+  // Smart server, dumb client: use the server's verdict directly
+  const verdictCode = ws?.glance?.verdict_code ?? 'on_track';
 
   // Goals from snapshot identity
   const activeGoals = useMemo(() => {
