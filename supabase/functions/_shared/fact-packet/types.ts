@@ -122,6 +122,13 @@ export type FlagV1 = {
   priority: number; // 1 = most important
 };
 
+export type AthleteReportedV1 = {
+  rpe: number | null; // 1-10
+  feeling: 'great' | 'good' | 'ok' | 'tired' | 'exhausted' | null;
+};
+
+export type DriftExplanation = 'pace_driven' | 'cardiac_drift' | 'terrain_driven' | 'mixed';
+
 export type FactPacketV1 = {
   version: 1;
   generated_at: string; // ISO
@@ -138,6 +145,7 @@ export type FactPacketV1 = {
     segments: WorkoutSegmentV1[];
     weather: WeatherV1 | null;
     plan: PlanV1 | null;
+    athlete_reported: AthleteReportedV1 | null;
   };
   derived: {
     execution?: {
@@ -151,11 +159,19 @@ export type FactPacketV1 = {
       note?: string | null;
     };
     hr_drift_bpm: number | null;
+    /** Raw drift before terrain adjustment; null when no terrain adjustment was applied. */
+    raw_hr_drift_bpm: number | null;
+    /** Estimated bpm of drift attributable to terrain (grade changes between early/late windows). */
+    terrain_contribution_bpm: number | null;
+    /** Drift after removing the expected HR increase from pace changes between halves.
+     *  Near zero on a negative-split run where HR tracked pace proportionally. */
+    pace_normalized_drift_bpm: number | null;
+    /** What primarily explains the observed HR increase across the session. */
+    drift_explanation: DriftExplanation | null;
     hr_drift_typical: number | null;
     cardiac_decoupling_pct: number | null;
     pace_fade_pct: number | null;
     pacing_pattern?: {
-      // Deterministic explanation for why pace may be faster/slower (e.g. downhill miles).
       speedups_note: string | null;
     };
     training_load: TrainingLoadV1 | null;
@@ -170,8 +186,8 @@ export type FactPacketV1 = {
     terrain_context?: {
       terrain_class: string | null;
       segment_matches: number;
-      segment_insight_eligible: boolean; // true when any matched segment has sample_count >= 3
-      segment_trend_eligible: boolean; // true when any matched segment has sample_count >= 6
+      segment_insight_eligible: boolean;
+      segment_trend_eligible: boolean;
     } | null;
   };
 };

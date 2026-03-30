@@ -150,7 +150,9 @@ Deno.serve(async (req) => {
         avg_temperature,
         start_position_lat,
         start_position_long,
-        date
+        date,
+        rpe,
+        feeling
       `)
       .eq('id', workout_id)
       .single();

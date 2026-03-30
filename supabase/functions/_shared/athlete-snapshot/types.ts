@@ -79,9 +79,12 @@ export type EnduranceMatchQuality =
   | 'unplanned';        // done but nothing was planned
 
 export type StrengthMatchQuality =
-  | 'followed'          // did prescribed exercises at appropriate intensity
-  | 'dialed_back'       // did exercises but lighter/more RIR
-  | 'pushed_hard'       // RIR consistently under 2
+  | 'on_target'         // actual RIR within ±0.5 of prescribed (plan-relative)
+  | 'under_intensity'   // left more in reserve than prescribed (rir_delta > 1.0)
+  | 'over_intensity'    // pushed harder than prescribed (rir_delta < -1.0)
+  | 'followed'          // fallback when no target RIR: did exercises at reasonable intensity
+  | 'dialed_back'       // fallback when no target RIR: absolute RIR > 3.5
+  | 'pushed_hard'       // fallback when no target RIR: absolute RIR < 1.5
   | 'modified'          // swapped exercises or changed structure
   | 'skipped'
   | 'unplanned';
@@ -92,7 +95,18 @@ export type StrengthExerciseActual = {
   best_weight: number;
   best_reps: number;
   avg_rir: number | null;
+  target_rir: number | null;
+  rir_delta: number | null;          // avg_rir - target_rir (positive = left more in reserve)
   unit: 'lbs' | 'kg';
+};
+
+export type StrengthExercisePrescription = {
+  exercise: string;
+  sets: number;
+  reps: string;                      // "8-10" or "5"
+  target_weight: number | null;
+  target_rir: number | null;
+  notes: string | null;
 };
 
 export type PlannedSession = {
@@ -103,12 +117,7 @@ export type PlannedSession = {
   duration_seconds: number | null;
   distance_meters: number | null;
   load_planned: number | null;
-  strength_prescription: Array<{
-    exercise: string;
-    sets: number;
-    reps: string;                    // "8-10" or "5"
-    notes: string | null;
-  }> | null;
+  strength_prescription: StrengthExercisePrescription[] | null;
 };
 
 export type ActualSession = {
@@ -180,8 +189,12 @@ export type BodyResponse = {
   load_status: {
     actual_vs_planned_pct: number | null;
     acwr: number | null;
+    running_acwr: number | null;
+    running_weighted_week_load: number | null;
+    running_weighted_week_load_pct: number | null;
+    unplanned_summary: string | null;
     status: 'under' | 'on_target' | 'elevated' | 'high';
-    interpretation: string;          // "76% above plan — driven by Monday's sessions"
+    interpretation: string;
   };
 };
 

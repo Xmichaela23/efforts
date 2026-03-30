@@ -10,12 +10,14 @@ export type LimiterInput = {
   weather: WeatherV1 | null;
   hr_drift_bpm: number | null;
   hr_drift_typical: number | null;
+  pace_normalized_drift_bpm?: number | null;
+  drift_explanation?: string | null;
   pace_fade_pct: number | null;
   training_load: { cumulative_fatigue?: 'low' | 'moderate' | 'high'; acwr_ratio?: number | null; week_load_pct?: number | null; previous_day_workload?: number } | null;
   vs_similar: { hr_delta_bpm?: number | null };
   trend: { direction?: string };
-  workout_intent?: string | null; // "recovery" | "easy" | ...
-  week_intent?: string | null; // "recovery" | ...
+  workout_intent?: string | null;
+  week_intent?: string | null;
 };
 
 function workSegmentsWithTargets(segments: WorkoutSegmentV1[]): WorkoutSegmentV1[] {
@@ -101,13 +103,16 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
       if (week != null && week > 110) evidence.push(`Week at ${Math.round(week)}% of planned load`);
       if (acwr != null && acwr > 1.3) evidence.push(`ACWR ${acwr.toFixed(2)} (elevated)`);
 
-      const drift = coerceNumber(input.hr_drift_bpm);
+      const paceNorm = coerceNumber(input.pace_normalized_drift_bpm);
+      const rawDrift = coerceNumber(input.hr_drift_bpm);
+      const driftSignal = paceNorm ?? rawDrift;
       const driftTyp = coerceNumber(input.hr_drift_typical);
-      const driftElevated = drift != null && driftTyp != null ? drift > driftTyp + 3 : false;
+      const isPaceDriven = input.drift_explanation === 'pace_driven';
+      const driftElevated = !isPaceDriven && driftSignal != null && driftTyp != null ? driftSignal > driftTyp + 3 : false;
       const fade = coerceNumber(input.pace_fade_pct);
       const paceFaded = fade != null ? fade > 3 : false;
 
-      if (driftElevated) evidence.push(`HR drift ${Math.round(drift!)} bpm vs typical ${Math.round(driftTyp!)} bpm`);
+      if (driftElevated) evidence.push(`HR drift ${Math.round(driftSignal!)} bpm (pace-normalized) vs typical ${Math.round(driftTyp!)} bpm`);
       if (paceFaded) evidence.push(`Pace faded ${fade!.toFixed(1)}% over the workout`);
 
       if (evidence.length >= 2 && (driftElevated || paceFaded)) {

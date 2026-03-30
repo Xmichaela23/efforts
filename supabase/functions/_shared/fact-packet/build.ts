@@ -1,4 +1,4 @@
-import type { FactPacketV1, FlagV1, HrZone, WeatherV1, WorkoutSegmentV1 } from './types.ts';
+import type { DriftExplanation, FactPacketV1, FlagV1, HrZone, WeatherV1, WorkoutSegmentV1 } from './types.ts';
 import {
   classifyTerrain,
   coerceNumber,
@@ -363,7 +363,9 @@ export async function buildWorkoutFactPacketV1(args: {
   if ((weekIntent === 'recovery' || isRecoveryWeek) && (comparisonTypeKey === 'intervals' || comparisonTypeKey === 'interval_run')) {
     comparisonTypeKey = 'recovery';
   }
-  const hrDriftCurrent = coerceNumber(workout?.workout_analysis?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm) ?? null;
+  const hrAnalysis = workout?.workout_analysis?.granular_analysis?.heart_rate_analysis;
+  const hrDriftCurrent = coerceNumber(hrAnalysis?.hr_drift_bpm) ?? null;
+  const terrainContributionBpm = coerceNumber(hrAnalysis?.terrain_contribution_bpm) ?? null;
 
   const [vsSimilar, trend, achievements, trainingLoad] = await Promise.all([
     getSimilarWorkoutComparisons(supabase, {
@@ -381,20 +383,132 @@ export async function buildWorkoutFactPacketV1(args: {
   ]);
 
   const hr_drift_bpm = (() => {
-    // Prefer analyzer drift (steady-state), else segment drift.
     const d = coerceNumber(hrDriftCurrent);
     if (d != null) return Math.round(d);
-    // Segment drift (last - first)
     const first = segments.find((s) => s.avg_hr != null);
     const last = [...segments].reverse().find((s) => s.avg_hr != null);
     if (!first || !last) return null;
     return Math.round((coerceNumber(last.avg_hr) || 0) - (coerceNumber(first.avg_hr) || 0));
   })();
 
+  // hrDriftCurrent is already terrain-adjusted; reconstruct raw for transparency.
+  const raw_hr_drift_bpm = (() => {
+    if (hrDriftCurrent == null) return null;
+    if (terrainContributionBpm != null && Math.abs(terrainContributionBpm) >= 3) {
+      return Math.round(hrDriftCurrent + terrainContributionBpm);
+    }
+    return null; // no meaningful adjustment was applied
+  })();
+
   const hr_drift_typical = coerceNumber((vsSimilar as any)?.avg_hr_drift) ?? null;
   const dec = calculateCardiacDecouplingPct(segments);
   const fade = calculatePaceFadePct(segments);
   const driftSeg = calculateOverallHrDriftBpm(segments);
+
+  const { pace_normalized_drift_bpm, drift_explanation } = (() => {
+    const effectiveDrift = hr_drift_bpm ?? driftSeg;
+    if (effectiveDrift == null) {
+      return { pace_normalized_drift_bpm: null, drift_explanation: null };
+    }
+
+    type PaceHrPoint = { pace: number; hr: number; dist: number };
+    let points: PaceHrPoint[] = [];
+
+    if (segments.length >= 4) {
+      points = segments
+        .filter((s) => coerceNumber(s.pace_sec_per_mi) != null && coerceNumber(s.avg_hr) != null)
+        .filter((s) => {
+          const p = coerceNumber(s.pace_sec_per_mi)!;
+          return p > 120 && p < 2400;
+        })
+        .map((s) => ({
+          pace: coerceNumber(s.pace_sec_per_mi)!,
+          hr: coerceNumber(s.avg_hr)!,
+          dist: coerceNumber(s.distance_mi) || 1,
+        }));
+    }
+
+    if (points.length < 4) {
+      const splits = workout?.workout_analysis?.detailed_analysis?.mile_by_mile_terrain?.splits;
+      if (Array.isArray(splits) && splits.length >= 4) {
+        points = splits
+          .map((sp: any) => ({
+            pace: coerceNumber(sp?.pace_s_per_mi) ?? 0,
+            hr: coerceNumber(sp?.avg_hr_bpm ?? sp?.avg_hr) ?? 0,
+            dist: 1,
+          }))
+          .filter((p) => p.pace > 120 && p.pace < 2400 && p.hr > 40 && p.hr < 250);
+      }
+    }
+
+    if (points.length < 4) {
+      return { pace_normalized_drift_bpm: null, drift_explanation: null };
+    }
+
+    const mid = Math.ceil(points.length / 2);
+    const firstHalf = points.slice(0, mid);
+    const secondHalf = points.slice(mid);
+
+    const wavg = (arr: PaceHrPoint[], fn: (p: PaceHrPoint) => number) => {
+      let sumW = 0, sumV = 0;
+      for (const p of arr) {
+        sumW += p.dist;
+        sumV += fn(p) * p.dist;
+      }
+      return sumW > 0 ? sumV / sumW : 0;
+    };
+
+    const earlyHr = wavg(firstHalf, (p) => p.hr);
+    const lateHr = wavg(secondHalf, (p) => p.hr);
+    const earlyPace = wavg(firstHalf, (p) => p.pace);
+    const latePace = wavg(secondHalf, (p) => p.pace);
+
+    const paceDiff = latePace - earlyPace;
+    const rawDrift = lateHr - earlyHr;
+
+    // Linear regression: HR = a + slope * pace across all points.
+    const allPaces = points.map((p) => p.pace);
+    const allHrs = points.map((p) => p.hr);
+    const n = allPaces.length;
+    const meanP = allPaces.reduce((a, b) => a + b, 0) / n;
+    const meanH = allHrs.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      const dp = allPaces[i] - meanP;
+      num += dp * (allHrs[i] - meanH);
+      den += dp * dp;
+    }
+    const slope = den > 0 ? num / den : 0;
+
+    const expectedHrChange = slope * paceDiff;
+    const paceNorm = Math.round(rawDrift - expectedHrChange);
+
+    const significantPaceChange = Math.abs(paceDiff) >= 30;
+    const terrainContrib = coerceNumber(terrainContributionBpm) ?? 0;
+    const absRaw = Math.abs(rawDrift);
+    // Only positive terrain contribution (late portion was hillier) explains drift.
+    // Negative contribution (late was easier/downhill) means terrain dampened the
+    // drift — it does NOT explain the HR increase.
+    const terrainExplainsPct = (terrainContrib > 0 && absRaw > 0)
+      ? terrainContrib / absRaw
+      : 0;
+
+    let explanation: DriftExplanation;
+    if (Math.abs(paceNorm) < 3 && significantPaceChange && absRaw >= 5) {
+      explanation = 'pace_driven';
+    } else if (terrainExplainsPct >= 0.4 && Math.abs(paceNorm) < 5) {
+      explanation = 'terrain_driven';
+    } else if (Math.abs(paceNorm) >= 5) {
+      explanation = 'cardiac_drift';
+    } else {
+      explanation = 'mixed';
+    }
+
+    return {
+      pace_normalized_drift_bpm: paceNorm,
+      drift_explanation: explanation,
+    };
+  })();
 
   const pacing_pattern = (() => {
     try {
@@ -620,6 +734,8 @@ export async function buildWorkoutFactPacketV1(args: {
     weather,
     hr_drift_bpm: hr_drift_bpm ?? driftSeg,
     hr_drift_typical,
+    pace_normalized_drift_bpm,
+    drift_explanation,
     pace_fade_pct: fade,
     training_load: trainingLoad,
     vs_similar: { hr_delta_bpm: (vsSimilar as any)?.hr_delta_bpm ?? null },
@@ -628,6 +744,17 @@ export async function buildWorkoutFactPacketV1(args: {
     week_intent: factsPlan?.week_intent ? String(factsPlan.week_intent).toLowerCase() : null,
   });
 
+  const athleteReported = (() => {
+    const rpe = coerceNumber(workout?.rpe);
+    const feeling = typeof workout?.feeling === 'string' ? workout.feeling.trim().toLowerCase() : null;
+    const validFeelings = ['great', 'good', 'ok', 'tired', 'exhausted'];
+    if (rpe == null && !feeling) return null;
+    return {
+      rpe: (rpe != null && rpe >= 1 && rpe <= 10) ? rpe : null,
+      feeling: (feeling && validFeelings.includes(feeling)) ? feeling as any : null,
+    };
+  })();
+
   const inputs_present: string[] = [];
   if (workout?.sensor_data) inputs_present.push('sensor_data');
   if (workout?.computed) inputs_present.push('computed');
@@ -635,6 +762,7 @@ export async function buildWorkoutFactPacketV1(args: {
   if (weather) inputs_present.push('weather');
   if (zones) inputs_present.push('hr_zones');
   if (trainingLoad) inputs_present.push('training_load');
+  if (athleteReported) inputs_present.push('athlete_reported');
 
   const factPacket: FactPacketV1 = {
     version: 1,
@@ -655,10 +783,15 @@ export async function buildWorkoutFactPacketV1(args: {
       segments,
       weather,
       plan: factsPlan,
+      athlete_reported: athleteReported,
     },
     derived: {
       execution,
       hr_drift_bpm: hr_drift_bpm ?? driftSeg,
+      raw_hr_drift_bpm,
+      terrain_contribution_bpm: terrainContributionBpm != null ? Math.round(terrainContributionBpm) : null,
+      pace_normalized_drift_bpm,
+      drift_explanation,
       hr_drift_typical,
       cardiac_decoupling_pct: dec,
       pace_fade_pct: fade,

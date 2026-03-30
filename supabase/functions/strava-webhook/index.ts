@@ -130,12 +130,12 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     }
     if (!accessToken) { console.log(`⚠️ No access token for user ${userId}`); return; }
 
-    // Fetch detailed activity data from Strava
+    // Fetch detailed activity data from Strava (retry if Strava hasn't finished processing)
     let { data: activityData, status } = await fetchStravaActivityWithStatus(activityId, accessToken);
     if (status === 401) {
-      // Access token expired/invalid → refresh and retry once
       const refreshed = await refreshStravaAccessToken(userId);
       if (refreshed) {
+        accessToken = refreshed;
         const retry = await fetchStravaActivityWithStatus(activityId, refreshed);
         activityData = retry.data;
         status = retry.status;
@@ -146,11 +146,38 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
       return;
     }
 
+    // Strava fires webhooks before finishing .fit processing (especially for Garmin syncs).
+    // Retry if critical derived fields are still missing for GPS-based activities.
+    const sportLower = (activityData.sport_type || activityData.type || '').toLowerCase();
+    const isGpsSport = sportLower.includes('run') || sportLower.includes('ride') || sportLower.includes('bike') || sportLower.includes('walk') || sportLower.includes('hike') || sportLower.includes('swim');
+    const isProcessingIncomplete = (d: any) =>
+      isGpsSport && (d.max_speed == null || !d.map?.polyline);
+
+    if (isProcessingIncomplete(activityData)) {
+      for (const delaySec of [10, 20]) {
+        console.log(`⏳ Activity ${activityId} data incomplete (max_speed=${activityData.max_speed}, polyline=${!!activityData.map?.polyline}), retrying in ${delaySec}s...`);
+        await new Promise(r => setTimeout(r, delaySec * 1000));
+        const retry = await fetchStravaActivityWithStatus(activityId, accessToken);
+        if (retry.status === 401) {
+          const refreshed = await refreshStravaAccessToken(userId);
+          if (refreshed) { accessToken = refreshed; }
+          const retry2 = await fetchStravaActivityWithStatus(activityId, accessToken);
+          if (retry2.data) activityData = retry2.data;
+        } else if (retry.data) {
+          activityData = retry.data;
+        }
+        if (!isProcessingIncomplete(activityData)) break;
+      }
+      if (isProcessingIncomplete(activityData)) {
+        console.warn(`⚠️ Activity ${activityId} still incomplete after retries, proceeding with available data`);
+      }
+    }
+
     // Store the activity in our system
     await storeStravaActivity(activityId, userId, activityData);
     
     // Create workout entry if it's a supported sport
-    await createWorkoutFromStravaActivity(userId, activityData);
+    await createWorkoutFromStravaActivity(userId, activityData, accessToken);
     
     console.log(`✅ Activity ${activityId} processed successfully for user ${userId}`);
   } catch (error) {
@@ -230,8 +257,8 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     // Update the stored activity
     await updateStravaActivity(activityId, userId, activityData);
     
-    // Update workout entry if it exists
-    await updateWorkoutFromStravaActivity(userId, activityData);
+    // Full re-ingest (upsert) so GPS, sensor_data, and computed all get refreshed
+    await createWorkoutFromStravaActivity(userId, activityData, accessToken);
     
     console.log(`✅ Activity ${activityId} updated successfully for user ${userId}`);
   } catch (error) {
@@ -450,7 +477,7 @@ async function markStravaActivityDeleted(activityId: number, userId: string) {
   }
 }
 
-async function createWorkoutFromStravaActivity(userId: string, activityData: any) {
+async function createWorkoutFromStravaActivity(userId: string, activityData: any, accessToken?: string) {
   try {
     // Map Strava sport to our type values used in UI
     const s = (activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase() || '');
@@ -464,18 +491,24 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
     // Only persist supported types
     if (!['run','ride','swim','strength','walk'].includes(type)) return;
 
-    // Fetch streams to enrich the activity
-    let streams: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[] } | null = null;
-    try {
-      const token = (await supabase.from('device_connections').select('connection_data').eq('user_id', userId).eq('provider', 'strava').single()).data?.connection_data?.access_token;
-      if (token) {
+    // Resolve token: prefer passed-in (already-refreshed), else look up
+    let token = accessToken;
+    if (!token) {
+      token = (await supabase.from('device_connections').select('connection_data').eq('user_id', userId).eq('provider', 'strava').single()).data?.connection_data?.access_token;
+    }
+
+    // Fetch streams — retry once after 10s if Strava hasn't finished processing
+    let streams: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[], watts?: number[], distance?: number[], velocity_smooth?: number[] } | null = null;
+    if (token) {
+      streams = await fetchStravaStreamsData(activityData.id, token);
+      if (!streams || !streams.latlng?.length) {
+        console.log(`⏳ Streams not yet available for activity ${activityData.id}, retrying in 10s...`);
+        await new Promise(r => setTimeout(r, 10_000));
         streams = await fetchStravaStreamsData(activityData.id, token);
-        if (streams) {
-          console.log(`📊 Fetched streams for activity ${activityData.id}: hr=${streams.heartrate?.length || 0}, cad=${streams.cadence?.length || 0}, watts=${streams.watts?.length || 0}, latlng=${streams.latlng?.length || 0}, dist=${streams.distance?.length || 0}, speed=${streams.velocity_smooth?.length || 0}`);
-        }
       }
-    } catch (e) {
-      console.warn(`⚠️ Could not fetch streams for activity ${activityData.id}:`, e);
+      if (streams) {
+        console.log(`📊 Fetched streams for activity ${activityData.id}: hr=${streams.heartrate?.length || 0}, cad=${streams.cadence?.length || 0}, watts=${streams.watts?.length || 0}, latlng=${streams.latlng?.length || 0}, dist=${streams.distance?.length || 0}, speed=${streams.velocity_smooth?.length || 0}`);
+      }
     }
 
     // Package activity with streams and call ingest-activity

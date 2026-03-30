@@ -149,7 +149,20 @@ export function snapshotToPrompt(
   if (br.weekly_trends.cross_training.interference) {
     lines.push(`Cross-training: ${br.weekly_trends.cross_training.detail}`);
   }
-  lines.push(`Load: ${br.load_status.interpretation}.`);
+
+  lines.push('');
+  lines.push('## TRAINING LOAD (modality-decomposed)');
+  const ls = br.load_status;
+  if (ls.running_weighted_week_load_pct != null) {
+    lines.push(`Running load: ${ls.running_weighted_week_load_pct > 0 ? '+' : ''}${ls.running_weighted_week_load_pct}% vs plan${ls.running_acwr != null ? ` (running ACWR: ${ls.running_acwr.toFixed(2)})` : ''}`);
+  } else if (ls.running_acwr != null) {
+    lines.push(`Running ACWR: ${ls.running_acwr.toFixed(2)} (no plan comparison available)`);
+  }
+  if (ls.unplanned_summary) {
+    lines.push(`Unplanned work: ${ls.unplanned_summary}`);
+  }
+  lines.push(`Overall: ${ls.interpretation}.`);
+  lines.push('Running ACWR is the primary fatigue signal for running readiness. Upper body strength has near-zero impact on running fatigue. Easy cycling and swimming have minimal impact. Only flag fatigue concerns when running-specific load is elevated.');
 
   // --- LONGITUDINAL PATTERNS ---
   const longBlock = opts?.longitudinalBlock?.trim();
@@ -173,7 +186,7 @@ export function snapshotToPrompt(
   return lines.join('\n');
 }
 
-function formatActual(a: { duration_seconds: number | null; distance_meters: number | null; pace: string | null; avg_hr: number | null; rpe: number | null; load_actual: number | null }): string {
+function formatActual(a: import('./types.ts').ActualSession): string {
   const parts: string[] = [];
   if (a.distance_meters && a.distance_meters > 0) parts.push(`${(a.distance_meters / 1609.34).toFixed(1)} mi`);
   if (a.duration_seconds) parts.push(`${Math.round(a.duration_seconds / 60)} min`);
@@ -184,6 +197,32 @@ function formatActual(a: { duration_seconds: number | null; distance_meters: num
     else if (a.rpe >= 6) parts.push('moderate effort');
     else parts.push('felt easy');
   }
+
+  const exercises = a.strength_actual;
+  if (exercises && exercises.length > 0) {
+    const rirs = exercises.map(e => e.avg_rir).filter((r): r is number => r != null);
+    const avgRir = rirs.length > 0 ? rirs.reduce((s, v) => s + v, 0) / rirs.length : null;
+    const targetRirs = exercises.map(e => e.target_rir).filter((r): r is number => r != null);
+    const avgTargetRir = targetRirs.length > 0 ? targetRirs.reduce((s, v) => s + v, 0) / targetRirs.length : null;
+    const liftSummaries = exercises
+      .filter(e => e.best_weight > 0)
+      .map(e => {
+        let s = `${e.name} ${e.best_weight}${e.unit}×${e.best_reps}`;
+        if (e.avg_rir != null && e.target_rir != null) {
+          s += ` (${e.avg_rir.toFixed(1)} RIR, target ${e.target_rir})`;
+        } else if (e.avg_rir != null) {
+          s += ` (${e.avg_rir.toFixed(1)} RIR)`;
+        }
+        return s;
+      });
+    if (liftSummaries.length > 0) parts.push(`lifts: ${liftSummaries.join(', ')}`);
+    if (avgRir != null && avgTargetRir != null) {
+      parts.push(`avg ${avgRir.toFixed(1)} RIR (target ${Math.round(avgTargetRir)})`);
+    } else if (avgRir != null) {
+      parts.push(`avg ${avgRir.toFixed(1)} RIR`);
+    }
+  }
+
   return parts.join(', ') || 'completed';
 }
 
@@ -206,32 +245,42 @@ Provide THREE things:
 3. NEXT SESSION GUIDANCE (1-2 sentences): What to focus on in the next upcoming session, specific to the prescription.
 
 WHAT NOT TO DO:
-- NEVER list exercises and weights the athlete just did. "bench at 130 for 5, rows at 105 for 5" — they know this. Instead say "you hit the prescribed weights" or "bench was 10 lbs above the plan."
+- Do NOT list exercises and weights as a recap — the athlete knows what they lifted. But DO compare against the plan when there's a meaningful difference: "bench was 10 lbs above the plan" or "plan called for 2 RIR but you averaged 4."
 - NEVER describe the workout back to them. "Monday's strength session showed..." is useless. Start with the insight.
 - NEVER recap that a session happened. "You completed both sessions" — they know.
 
 TONE:
 - Write like a coach who's read the data and is telling the athlete something they can't see themselves.
 - NO hype language. Never use: crushed, smashed, nailed, killed it, beast mode, solid work, great job, strong session, dialed in.
-- NO percentage comparisons for load or volume. Use plain language: "ahead of plan", "shorter than planned."
-- NO jargon: ACWR, TRIMP, RPE scores, z-score, execution score, load points, RIR numbers, "effort X/10".
-- Say "you had a little left in the tank" not "1.7 RIR." Say "felt harder than usual" not "RPE 7/10."
+- NO jargon: TRIMP, z-score, execution score, load points.
+- For RPE: say "felt harder than usual" not "RPE 7/10."
+- For RIR: you MAY cite RIR when comparing planned vs actual strength intensity. "Plan called for 2 RIR, you averaged 4 — good recovery discipline" is useful. But "1.7 RIR" in isolation is not — always compare against the plan or against the athlete's recent average.
+- For load: use plain language like "ahead of plan" rather than raw percentages. You may mention running ACWR when it's actionable (e.g. above 1.3).
 
 RULES:
 - The ledger is truth. If ACTUAL exists, it happened. Never contradict it.
 - If SESSION INTERPRETATIONS are provided, those are what the athlete already saw. Your job is to SYNTHESIZE them into a weekly arc — connect the dots across sessions, spot the weekly pattern, frame guidance. Do NOT re-interpret or contradict the session-level narrative or plan_adherence. Build on top of it.
 - THIS WEEK ONLY. Your scope is the current week's ledger. Do not make multi-week trend claims ("consistency remains problematic", "you keep skipping", "this is becoming a pattern"). If a session was skipped this week, state it plainly as a this-week fact — do not frame it as part of a longer pattern.
 - "upcoming" sessions haven't happened — never call them missed.
-- If load is high, suggest dialing back remaining sessions.
+- If RUNNING load is high (running ACWR > 1.3 or running load > 130% of plan), suggest dialing back remaining run sessions.
 - If a race is coming up, anchor advice to that timeline.
-- Upper body lifting does NOT interfere with running. Never claim upper body work hurt a run.
-- Don't call progress stalling after 1-2 sessions early in the week.
 - The PLANNED prescription includes target weights and RIR. Compare actual to this. If the athlete followed the plan exactly, say so and move on quickly.
+- Don't call progress stalling after 1-2 sessions early in the week.
+
+MODALITY-WEIGHTED FATIGUE — the load section is decomposed by modality. Follow these rules strictly:
+- Use RUNNING-WEIGHTED load and running ACWR as the primary fatigue indicator for running readiness.
+- Upper body strength (weight: 0.3) does NOT meaningfully contribute to running fatigue. Do not cite upper body sessions as evidence of accumulated fatigue for running.
+- Easy cycling (weight: 0.4) has modest impact. Do not treat an easy ride as equivalent to a run when assessing running fatigue.
+- Swimming (weight: 0.2) has minimal running fatigue impact.
+- When total session count looks high but running-specific load is on target, say so explicitly: "Total volume is up but your running load is on plan."
+- Only recommend recovery adjustments when RUNNING-SPECIFIC ACWR > 1.3 or running load exceeds plan by > 30%.
+- When unplanned sessions are present, note what they were and whether they matter for running fatigue. "An unplanned easy ride adds minimal running fatigue" is coaching. "1 extra session" without context is not.
 
 CRITICAL — ACCURACY:
 - The PLAN POSITION section tells you the exact week number and phase. ONLY use those values. Never invent or guess a week number or phase name. If it says "week 3, phase: build" then it is week 3 build. Not "Week 1 Speed." Not anything else.
 - If any data section mentions session counts, do NOT repeat raw "X of Y" numbers. Describe qualitatively.
-- Never output raw numbers for RIR, RPE, or effort scores. "1.7 reps in reserve" is banned. Say "not much left in the tank" or "closer to your limit than usual." The user doesn't think in decimals.
+- For STRENGTH: compare planned RIR vs actual RIR when both are available. Round to whole numbers: "plan called for 2 RIR, you averaged 4" is good. "1.7 reps in reserve" in isolation is not — always compare.
+- For RPE: say "felt harder than usual" not "RPE 7/10." The user doesn't think in RPE numbers.
 - Never output percentage numbers for weights (like "78% target" or "80% 1RM"). The user thinks in actual weight: "the plan called for heavy triples and you hit them." Only reference percentages if the plan prescription literally uses them AND it helps the user understand.`;
 
 // ---------------------------------------------------------------------------
@@ -250,7 +299,7 @@ export async function generateCoaching(
     user: `Here is the athlete snapshot for this week. Write the headline, narrative, and next session guidance.\n\n${prompt}`,
     model: 'claude-sonnet-4-20250514',
     maxTokens: 400,
-    temperature: 1.0,
+    temperature: 0.4,
   });
 
   if (!raw) {

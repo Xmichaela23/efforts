@@ -44,8 +44,12 @@ import {
   buildBodyResponse,
   generateCoaching,
   snapshotToPrompt,
+  getRunningFatigueWeight,
+  assessAdaptation,
+  adaptationSignalsToPrompt,
   type AthleteSnapshot,
   type SessionInterpretationForPrompt,
+  type AdaptationInput,
 } from '../_shared/athlete-snapshot/index.ts';
 import { computeLongitudinalSignals, longitudinalSignalsToPrompt } from '../_shared/longitudinal-signals.ts';
 import {
@@ -440,7 +444,7 @@ Deno.serve(async (req) => {
     // rows from ended plans in the same date range are excluded.
     let plannedWeekQuery = supabase
       .from('planned_workouts')
-      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id,total_duration_seconds,computed')
+      .select('id,date,type,name,description,rendered_description,steps_preset,tags,workout_status,workload_planned,completed_workout_id,skip_reason,skip_note,training_plan_id,total_duration_seconds,computed,strength_exercises')
       .eq('user_id', userId)
       .gte('date', weekStartDate)
       .lte('date', weekEndDate);
@@ -1120,6 +1124,17 @@ Deno.serve(async (req) => {
     const acute7Load = acute7Rows.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
     const chronic28Load = completedRolling.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
 
+    // Running-weighted ACWR: discount non-running modalities by their fatigue contribution
+    const weightedLoad = (rows: any[]) => rows.reduce((sum: number, r: any) => {
+      const w = getRunningFatigueWeight({ type: String(r?.type || ''), name: String(r?.name || '') });
+      return sum + (safeNum(r?.workload_actual) || 0) * w;
+    }, 0);
+    const acute7RunLoad = weightedLoad(acute7Rows);
+    const chronic28RunLoad = weightedLoad(completedRolling);
+    const runningAcwr = chronic28RunLoad > 0
+      ? (acute7RunLoad / 7) / (chronic28RunLoad / 28)
+      : null;
+
     // =========================================================================
     // Unified Response Model (new: shared with block view)
     // =========================================================================
@@ -1644,11 +1659,12 @@ Deno.serve(async (req) => {
         dailyLedger,
         snapshotNorms,
         isImperialForSnapshot,
-        { actual_vs_planned_pct: loadPct, acwr: acwr ?? null },
+        { actual_vs_planned_pct: loadPct, acwr: acwr ?? null, running_acwr: runningAcwr },
         {
           interference: weeklyResponseModel?.cross_domain?.interference_detected || false,
           detail: weeklyResponseModel?.cross_domain?.patterns?.[0]?.description || 'No interference detected.',
         },
+        weekIntent,
       );
 
       // Upcoming sessions with full prescription
@@ -1737,9 +1753,54 @@ Deno.serve(async (req) => {
             console.warn('[coach] longitudinal signals failed (non-fatal):', longErr?.message || longErr);
           }
 
+          // Adaptation trajectory: multi-week lookback from normWorkouts (28d)
+          let adaptationBlock: string | null = null;
+          try {
+            const adaptationInputs: AdaptationInput[] = (Array.isArray(normWorkouts) ? normWorkouts : [])
+              .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+              .map((w: any) => {
+                const exRaw = (w as any)?.strength_exercises;
+                const exArr = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (() => { try { return JSON.parse(exRaw); } catch { return []; } })() : []);
+                const dur = Number(w?.moving_time ?? w?.duration ?? 0);
+                const dist = Number(w?.distance ?? 0);
+                const durSec = dur > 0 ? (dur < 1000 ? Math.round(dur * 60) : Math.round(dur)) : null;
+                const distM = dist > 0 ? Math.round(dist * 1000) : null;
+                const paceSec = (distM && distM > 0 && durSec && durSec > 0)
+                  ? durSec / (distM / 1609.34) : null;
+                return {
+                  date: String(w?.date || '').slice(0, 10),
+                  type: String(w?.type || ''),
+                  name: String(w?.name || ''),
+                  avg_hr: Number(w?.avg_hr || w?.average_heartrate) || null,
+                  pace_sec_per_unit: paceSec,
+                  duration_seconds: durSec,
+                  rpe: Number(w?.session_rpe || w?.rpe) || null,
+                  exercises: exArr.length > 0 ? exArr.map((ex: any) => {
+                    const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+                    const weights = sets.map((s: any) => Number(s?.weight) || 0).filter((v: number) => v > 0);
+                    const rirs = sets.map((s: any) => Number(s?.rir)).filter((r: number) => Number.isFinite(r));
+                    return {
+                      name: String(ex?.name || ''),
+                      best_weight: weights.length ? Math.max(...weights) : 0,
+                      avg_rir: rirs.length ? rirs.reduce((a: number, b: number) => a + b, 0) / rirs.length : null,
+                      unit: isImperialForSnapshot ? 'lbs' : 'kg',
+                    };
+                  }) : null,
+                } as AdaptationInput;
+              });
+            const signals = assessAdaptation(adaptationInputs);
+            adaptationBlock = adaptationSignalsToPrompt(signals);
+          } catch (adaptErr: any) {
+            console.warn('[coach] adaptation assessment failed (non-fatal):', adaptErr?.message || adaptErr);
+          }
+
           // Longitudinal signals are computed for the API response (Block view) but NOT
           // fed to the weekly LLM — the weekly narrative should be about this week only.
-          coaching = await generateCoaching(partialSnapshot, anthropicKey, { sessionInterpretations });
+          // Adaptation trajectory IS fed — it's about how the body is handling the current block.
+          coaching = await generateCoaching(partialSnapshot, anthropicKey, {
+            sessionInterpretations,
+            longitudinalBlock: adaptationBlock,
+          });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
         }
@@ -2411,6 +2472,10 @@ ${narrativeFacts.join('\n')}`;
         acute7_actual_load: acute7Load ?? null,
         chronic28_actual_load: chronic28Load ?? null,
         acwr: acwr ?? null,
+        running_acwr: runningAcwr,
+        running_weighted_week_load: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load ?? null,
+        running_weighted_week_load_pct: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load_pct ?? null,
+        unplanned_summary: athleteSnapshot?.body_response?.load_status?.unplanned_summary ?? null,
         by_discipline: (training_state.load_ramp.acute7_by_type || []).map((r: any) => ({
           discipline: String(r.type || 'other'),
           planned_load: typeof r.linked_load === 'number' ? r.linked_load : null,

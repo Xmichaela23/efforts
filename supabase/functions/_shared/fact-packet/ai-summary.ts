@@ -228,39 +228,145 @@ function validateNoHrWithoutData(summary: string, displayPacket: any): { ok: boo
     : { ok: true, why: null };
 }
 
+function validateNoAthleteContradiction(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const ar = displayPacket?.workout?.athlete_reported;
+  if (!ar) return { ok: true, why: null };
+  const s = normalizeParagraph(summary).toLowerCase();
+
+  const feelingPositive = ar.feeling === 'great' || ar.feeling === 'good' || (ar.rpe != null && ar.rpe <= 4);
+  const feelingNegative = ar.feeling === 'exhausted' || ar.feeling === 'tired' || (ar.rpe != null && ar.rpe >= 8);
+
+  if (feelingPositive) {
+    const contradictsPositive =
+      /felt harder/i.test(s) ||
+      /struggled/i.test(s) ||
+      /weren.t (fully )?recovered/i.test(s) ||
+      /not fully recovered/i.test(s) ||
+      /more fatigued/i.test(s) ||
+      /taxing/i.test(s);
+    if (contradictsPositive) {
+      return { ok: false, why: `Athlete reported ${ar.feeling || `RPE ${ar.rpe}`} — narrative contradicts their experience with negative framing` };
+    }
+  }
+
+  if (feelingNegative) {
+    const contradictsNegative =
+      /clean.*run/i.test(s) ||
+      /no flags/i.test(s) ||
+      /easy.*effort/i.test(s);
+    if (contradictsNegative) {
+      return { ok: false, why: `Athlete reported ${ar.feeling || `RPE ${ar.rpe}`} — narrative dismisses their fatigue` };
+    }
+  }
+
+  return { ok: true, why: null };
+}
+
 function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const sig = displayPacket?.signals;
+  const driftExp = sig?.drift_explanation;
+  const s = normalizeParagraph(summary).toLowerCase();
+
+  // If drift is pace-driven, the narrative MUST NOT frame it as cardiac drift, fatigue, or a concern.
+  if (driftExp === 'pace_driven') {
+    const driftMentioned = /\bdrift\b|\bcardiac\b|\bdecoupl/i.test(s);
+    const fatiguePhrases = /drift.*suggests|drift.*fatigue|drift.*harder|dial.back|working harder.*intended|cardiovascular.*drift|decoupl/.test(s);
+    if (fatiguePhrases) {
+      return { ok: false, why: 'drift_explanation is pace_driven — HR rose because the athlete ran faster, not from cardiovascular drift. Do NOT mention drift, decoupling, or fatigue from HR changes.' };
+    }
+    if (driftMentioned) {
+      return { ok: false, why: 'drift_explanation is pace_driven — do not mention "drift" or "cardiac" when HR increase is fully explained by pace increase (negative split).' };
+    }
+    return { ok: true, why: null };
+  }
+
+  // Terrain-driven: existing guard
+  if (driftExp === 'terrain_driven') {
+    const negativePhrases = /despite.*drift|drift.*suggests.*(fatigue|not.*recovered|recovery)|drift.*increase in effort|weren.t.*recovered.*drift|drift.*harder/.test(s);
+    if (negativePhrases) return { ok: false, why: 'drift framed as effort/fatigue signal despite terrain contributing to drift' };
+    return { ok: true, why: null };
+  }
+
+  // Cardiac drift within expected range for the duration should not be framed as a concern.
+  if (driftExp === 'cardiac_drift') {
+    const driftMatch = sig?.hr_drift?.match?.(/^(-?\d+)/);
+    const driftVal = driftMatch ? Math.abs(parseInt(driftMatch[1], 10)) : null;
+    const durationMin = coerceNumber(displayPacket?.workout?.duration?.replace?.(/[^\d.]/g, ''));
+
+    if (driftVal != null && durationMin != null) {
+      let upperExpected = 12;
+      if (durationMin < 60) upperExpected = 8;
+      else if (durationMin < 90) upperExpected = 12;
+      else if (durationMin < 150) upperExpected = 15;
+      else upperExpected = 20;
+
+      if (driftVal <= upperExpected) {
+        const alarmPhrases = /dial.back|working harder|not.*(fully|adequately).*recover|fatigue|suggests.*concern|drift.*elevated|higher than|weren.t.*recovered|harder than intended/.test(s);
+        if (alarmPhrases) {
+          return { ok: false, why: `drift_explanation is cardiac_drift at ${driftVal} bpm over ${Math.round(durationMin)} min — within the normal ${upperExpected} bpm upper bound. Do NOT frame as elevated, concerning, or a recovery issue. This is expected physiology.` };
+        }
+      }
+    }
+    return { ok: true, why: null };
+  }
+
+  // Fallback for legacy packets without drift_explanation
   const top = getTopFlags(displayPacket);
-  const hasTerrainDriftFlag = top.some((f) => /drift/i.test(f.message) && /hilly terrain/i.test(f.message));
+  const hasTerrainDriftFlag = top.some((f) => /drift/i.test(f.message) && /terrain/i.test(f.message));
   if (!hasTerrainDriftFlag) return { ok: true, why: null };
 
-  const s = normalizeParagraph(summary).toLowerCase();
   const mentionsDrift = /\bdrift\b/.test(s);
-  if (!mentionsDrift) return { ok: false, why: 'terrain-drift flag present but summary did not mention drift' };
+  if (!mentionsDrift) return { ok: true, why: null };
 
-  const connects = /terrain-driven|driven by the (hills|terrain)|consistent with (the )?hills|consistent with (the )?terrain|hill-driven/.test(s);
-  if (!connects) return { ok: false, why: 'drift mentioned without explicitly attributing it to terrain' };
-
-  const negativePhrases = /despite.*drift|drift.*suggests|drift.*increase in effort|elevated drift/.test(s);
-  if (negativePhrases) return { ok: false, why: 'drift framed as effort/fatigue signal despite terrain-drift flag' };
+  const negativePhrases = /despite.*drift|drift.*suggests.*(fatigue|not.*recovered|recovery)|drift.*increase in effort|weren.t.*recovered.*drift|drift.*harder/.test(s);
+  if (negativePhrases) return { ok: false, why: 'drift framed as effort/fatigue signal despite terrain contributing to drift' };
 
   return { ok: true, why: null };
 }
 
 const COACHING_SYSTEM_PROMPT = `You are an experienced endurance coach reviewing a completed workout. Your athlete can already see their pace, HR, distance, and duration — do not restate those numbers unless you're connecting them to an insight.
 
-Write 1-2 sentences (3 maximum if there is a genuine concern). This narrative covers THIS session only — no references to prior workouts, training load, muscular fatigue, or weekly context. Those belong on the weekly screen, not here.
+Write 1-2 sentences (3 maximum if there is a genuine concern). This narrative covers THIS session only.
+
+STRICTLY SESSION-SCOPED — you will NOT receive training load, fatigue, weekly volume, or prior-session data. Do not reference, infer, or speculate about: training load, weekly volume, cumulative fatigue, prior workouts, recovery needs, or "this week's" anything. If none of that data is in the message, it doesn't exist for this narrative.
 
 RULES:
 - THE CORE TEST: Before writing any sentence, ask "Could the athlete figure this out by looking at the pace/HR/distance numbers and adherence chips above?" If yes, cut it. Only say things the athlete cannot see for themselves.
 - NEVER start with a restatement of distance/time/pace. The athlete already sees those.
 - NEVER restate execution percentages, pace adherence, or duration adherence — these are displayed as chips above the narrative.
 - NEVER describe the workout the athlete just did ("You ran 13 miles at 11:04 pace"). They were there.
-- NEVER reference prior workouts, strength sessions, yesterday's training, weekly load, muscular fatigue, or recovery needs. This narrative is session-scoped.
+- NEVER reference prior workouts, strength sessions, yesterday's training, weekly load, muscular fatigue, or recovery needs.
 - Connect data across domains: if terrain was hilly AND pace was "slow", say the pace was appropriate for the terrain — don't report them as separate facts.
 - When grade-adjusted pace (GAP) is available, translate it: "Your 11:04 pace was a 10:32 effort on this terrain — the hills cost about 30s/mi."
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
-- When HR drift data exists, interpret it in context: drift on a hilly course means something different than drift on a flat course.
+
+HR DRIFT — USE PACE-NORMALIZED VALUES:
+- The "drift" value is pace-normalized: the expected HR increase from pace changes has been removed. A negative-split run where HR rose because the athlete ran faster will show near-zero drift.
+- Check "drift_explanation" for context:
+  - "pace_driven": HR increase is fully explained by the athlete running faster. This is NOT a concern. Do NOT mention drift or cardiovascular decoupling.
+  - "terrain_driven": HR increase is mostly from grade changes on a hillier late portion. Not a fatigue signal.
+  - "cardiac_drift": genuine cardiovascular drift after removing pace and terrain effects. Compare to expected ranges below before calling it elevated.
+  - "mixed": multiple factors contributed — do not attribute to any single cause.
+- EXPECTED DRIFT RANGES (exercise physiology norms for steady-state running):
+  - Under 60 min: 3–8 bpm normal
+  - 60–90 min: 5–12 bpm normal
+  - 90–150 min: 8–15 bpm normal (long runs)
+  - 150+ min: 10–20 bpm normal
+  If the drift value falls within the expected range for the workout's duration, it is a normal physiological response and NOT a concern. Do not frame normal drift as fatigue, decoupling, or a recovery problem.
+- "hr_drift_raw_absolute" shows the total first-half vs second-half HR gap for transparency, but do NOT use it as a signal. It conflates pace changes, terrain, and actual drift.
 - STRUCTURED INTERVALS: If the workout has multiple planned work/recovery segments, HR differences between segments are expected (pace targets change). Do not describe that as "cardiac drift" or cite a single bpm drift figure unless the data explicitly says steady-state drift for the main work block.
+
+ATHLETE REPORTED FEELING:
+- When ATHLETE REPORTED data is present, it is ground truth for the athlete's subjective experience.
+- NEVER contradict the athlete's reported feeling. If they reported RPE 4/10 and feeling "good", do NOT say the workout "felt harder than it should have" or suggest they were struggling.
+- If HR data suggests harder effort than the athlete reported, frame it as a physiological observation without overriding their experience: "HR ran higher than expected for this effort level" NOT "this felt harder than it should have."
+- If no ATHLETE REPORTED data is present, do not speculate about how the workout felt.
+
+PACE vs PRESCRIBED RANGE:
+- When "pace vs prescribed range" says "slower_than_prescribed", the athlete ran SLOWER than target. Do not say they ran "too hard" or at "threshold" — their pace was easy; only HR may have been elevated.
+- When "faster_than_prescribed", the athlete ran faster than planned.
+- Elevated HR at easy pace is a different claim than "ran too hard." The first is physiology; the second is pacing. Do not conflate them.
+
 - When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."
 - Use plain language. Not "positive split of 175s/mi" but "you slowed over the back half — expected on a course that back-loads the climbing."
 - Do not list metrics. Do not use bullet points. Write in connected prose.
@@ -269,7 +375,7 @@ RULES:
 - CRITICAL: Pace must use display format like "10:16/mi", never raw seconds. Never express pace differences as "Xs/mi slower/faster" — convert to actual pace values.
 - CRITICAL: If NO HR data is provided (no avg_hr line in the WORKOUT section), you MUST NOT mention heart rate, HR, cardiac drift, physiological response, aerobic response, or recovery readiness. No HR data means NO HR claims of any kind.
 - Write in direct, professional prose. No idioms ('is real', 'nailed it', 'crushed it'). No motivational language ('stay patient', 'trust the process', 'you've got this'). State observations and recommendations plainly.
-- FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient".`;
+- FORBIDDEN words/phrases: "successfully", "excellent", "resilience", "confidence", "crucial", "reinforcing", "effective management", "aligns well", "recovery-integrity cost", "be mindful of", "attention should be paid", "ensure", "focus on", "in future workouts", "indicating", "should be monitored", "monitor closely", "overall", "nailed", "crushed", "is real", "trust the process", "you've got this", "stay patient", "felt harder than it should have".`;
 
 function buildUserMessage(dp: any): string {
   const w = dp.workout || {};
@@ -290,7 +396,7 @@ function buildUserMessage(dp: any): string {
     `- Type: ${w.type || 'run'}${dp.plan?.workout_purpose ? ` (${dp.plan.workout_purpose})` : ''}`,
     w.distance && w.duration ? `- Distance: ${w.distance} in ${w.duration}` : null,
     w.avg_pace ? `- Pace: ${w.avg_pace} ${gapNote}`.trim() : null,
-    w.avg_hr ? `- HR: ${w.avg_hr}${sig.hr_drift ? ` (drift: ${sig.hr_drift}, typical: ${sig.hr_drift_typical || 'unknown'})` : ''}` : null,
+    w.avg_hr ? `- HR: ${w.avg_hr}${sig.hr_drift ? ` (drift: ${sig.hr_drift}${sig.drift_explanation ? `, explanation: ${sig.drift_explanation}` : ''}${sig.hr_drift_raw_absolute ? `, raw first→second half: ${sig.hr_drift_raw_absolute}` : ''}, typical: ${sig.hr_drift_typical || 'unknown'})` : ''}` : null,
     terrainNote ? `- Terrain: ${terrainNote}` : null,
     dp.conditions ? `- Weather: ${dp.conditions.temperature}, ${dp.conditions.humidity} humidity${dp.conditions.heat_stress_level !== 'none' ? ` (${dp.conditions.heat_stress_level} heat stress)` : ''}` : null,
   ].filter(Boolean).join('\n'));
@@ -305,9 +411,19 @@ function buildUserMessage(dp: any): string {
       ie.pace_adherence ? `- Pace adherence: ${ie.pace_adherence}${ie.pace_adherence_note ? ` (${ie.pace_adherence_note})` : ''}` : null,
       ie.completed_steps ? `- Completed steps: ${ie.completed_steps}` : null,
       sig.pace_fade ? `- Pace fade: ${sig.pace_fade}` : null,
+      ex.pace_vs_range ? `- Pace vs prescribed range: ${ex.pace_vs_range.replace(/_/g, ' ')}` : null,
       ex.assessed_against === 'actual' ? '- Note: assessed against actual execution (no plan targets available)' : null,
       dp.plan?.week_intent ? `- Plan role: ${dp.plan.week_intent}${dp.plan.week_number != null ? `, Week ${dp.plan.week_number}` : ''}${dp.plan.phase ? ` of ${dp.plan.phase} phase` : ''}` : null,
     ].filter(Boolean).join('\n'));
+  }
+
+  // Athlete reported feeling
+  const ar = w.athlete_reported;
+  if (ar && (ar.rpe != null || ar.feeling)) {
+    const parts: string[] = [];
+    if (ar.rpe != null) parts.push(`RPE: ${ar.rpe}/10`);
+    if (ar.feeling) parts.push(`Feeling: ${ar.feeling}`);
+    sections.push('\nATHLETE REPORTED:\n' + parts.map((p) => `- ${p}`).join('\n'));
   }
 
   // Similar workouts
@@ -323,14 +439,22 @@ function buildUserMessage(dp: any): string {
     ].filter(Boolean).join('\n'));
   }
 
-  // Flags
-  const flags = dp.top_flags || [];
+  // Flags — exclude fatigue/load flags: the narrative is session-scoped and has no
+  // proper cross-session context to interpret training load honestly.
+  const flags = (dp.top_flags || []).filter((f: any) => {
+    const cat = String(f?.category || '').toLowerCase();
+    const msg = String(f?.message || '').toLowerCase();
+    if (cat === 'fatigue') return false;
+    if (msg.includes('planned load') || msg.includes('training stress') || msg.includes('training load')) return false;
+    return true;
+  });
   if (flags.length > 0) {
     sections.push('\nFLAGS:\n' + flags.map((f: any) => `- [${f.type}] ${f.message}`).join('\n'));
   }
 
-  // Limiter
-  if (sig.limiter?.limiter) {
+  // Limiter — suppress fatigue limiter (relies on cross-session load signals the
+  // narrative can't properly contextualize).
+  if (sig.limiter?.limiter && sig.limiter.limiter !== 'fatigue') {
     sections.push(`\nPRIMARY LIMITER: ${sig.limiter.limiter}${sig.limiter.confidence != null ? ` (${sig.limiter.confidence}% confidence)` : ''}`);
   }
 
@@ -448,6 +572,7 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       max_hr: fmtBpm(coerceNumber(facts?.max_hr)),
       elevation_gain: (coerceNumber(facts?.elevation_gain_ft) != null) ? `${Math.round(Number(facts.elevation_gain_ft))} ft` : null,
       terrain: typeof facts?.terrain_type === 'string' ? facts.terrain_type : null,
+      athlete_reported: facts?.athlete_reported ?? null,
     },
     plan: facts?.plan
       ? {
@@ -478,11 +603,37 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
             intentional_deviation: !!derived.execution.intentional_deviation,
             assessed_against: (derived.execution.assessed_against === 'actual') ? 'actual' : 'plan',
             note: typeof derived.execution.note === 'string' ? derived.execution.note : null,
+            pace_vs_range: (() => {
+              const segs = Array.isArray(facts?.segments) ? facts.segments : [];
+              const work = segs
+                .filter((s: any) => s.target_pace_sec_per_mi != null && !/warm|cool/i.test(String(s.name || '')));
+              if (!work.length) return null;
+              const devs = work
+                .map((s: any) => coerceNumber(s.pace_deviation_sec))
+                .filter((n): n is number => n != null && Number.isFinite(n));
+              if (!devs.length) return null;
+              const avg = devs.reduce((a, b) => a + b, 0) / devs.length;
+              if (avg > 15) return 'slower_than_prescribed';
+              if (avg < -15) return 'faster_than_prescribed';
+              return 'within_range';
+            })(),
           }
         : null,
-      hr_drift: (!suppressHrDriftForIntervals && coerceNumber(derived?.hr_drift_bpm) != null)
+      hr_drift: (() => {
+        if (suppressHrDriftForIntervals) return null;
+        const paceNorm = coerceNumber(derived?.pace_normalized_drift_bpm);
+        const raw = coerceNumber(derived?.hr_drift_bpm);
+        if (raw == null) return null;
+        if (paceNorm != null) return `${Math.round(paceNorm)} bpm (pace-normalized)`;
+        return `${Math.round(raw)} bpm`;
+      })(),
+      hr_drift_raw_absolute: (!suppressHrDriftForIntervals && coerceNumber(derived?.hr_drift_bpm) != null)
         ? `${Math.round(Number(derived.hr_drift_bpm))} bpm`
         : null,
+      hr_drift_terrain_contribution: (!suppressHrDriftForIntervals && coerceNumber(derived?.terrain_contribution_bpm) != null)
+        ? `${Math.round(Number(derived.terrain_contribution_bpm))} bpm`
+        : null,
+      drift_explanation: derived?.drift_explanation ?? null,
       hr_drift_typical: (!suppressHrDriftForIntervals && coerceNumber(derived?.hr_drift_typical) != null)
         ? `${Math.round(Number(derived.hr_drift_typical))} bpm`
         : null,
@@ -611,12 +762,13 @@ export async function generateAISummaryV1(
     const g1 = validateNoGenericFiller(s1);
     const hr1 = validateNoHrWithoutData(s1, displayPacket);
     const pd1 = validateNoPaceDeltaFormat(s1);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why }));
+    const ac1 = validateNoAthleteContradiction(s1, displayPacket);
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why,
+      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -628,9 +780,10 @@ export async function generateAISummaryV1(
     const g2 = validateNoGenericFiller(s2);
     const hr2 = validateNoHrWithoutData(s2, displayPacket);
     const pd2 = validateNoPaceDeltaFormat(s2);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok) return s2;
-    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why }));
-    if (!hr2.ok) return null;
+    const ac2 = validateNoAthleteContradiction(s2, displayPacket);
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok) return s2;
+    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why }));
+    if (!hr2.ok || !ac2.ok) return null;
     return s2;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);

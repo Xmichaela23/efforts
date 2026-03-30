@@ -13,6 +13,7 @@ import type {
   EnduranceMatchQuality,
   StrengthMatchQuality,
   StrengthExerciseActual,
+  StrengthExercisePrescription,
 } from './types.ts';
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,18 @@ function normType(t: string | null | undefined): string {
 
 function metersToMi(m: number): number { return m / 1609.34; }
 function secToMin(s: number): number { return Math.round(s / 60); }
+
+/** Most common value in an array of numbers (for uniform prescription targets). */
+function modalValue(nums: number[]): number {
+  const freq = new Map<number, number>();
+  for (const n of nums) freq.set(n, (freq.get(n) || 0) + 1);
+  let best = nums[0];
+  let bestCount = 0;
+  for (const [val, count] of freq) {
+    if (count > bestCount) { best = val; bestCount = count; }
+  }
+  return best;
+}
 
 function paceStr(distMeters: number, durSeconds: number, imperial: boolean): string | null {
   if (distMeters <= 0 || durSeconds <= 0) return null;
@@ -85,7 +98,51 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
   const distM = Number(computed?.total_distance_meters) || Number(computed?.distance_meters) || null;
 
   const isStrength = normType(row?.type) === 'strength';
+  const unitLabel = imperial ? 'lbs' : 'kg';
 
+  // --- Structured strength prescription from planned_workouts.strength_exercises ---
+  let strengthRx: StrengthExercisePrescription[] | null = null;
+  const rawExercises = parseStrengthExercisesField(row?.strength_exercises);
+
+  if (isStrength && rawExercises.length > 0) {
+    strengthRx = rawExercises.slice(0, 10).map((ex: any) => {
+      const numSets = typeof ex.sets === 'number' ? ex.sets : (Array.isArray(ex.sets) ? ex.sets.length : 0);
+      const reps = String(ex.reps ?? '');
+      const weight = typeof ex.weight === 'number' ? ex.weight : null;
+      const rir = typeof ex.target_rir === 'number' ? ex.target_rir
+        : (typeof ex.rir === 'number' ? ex.rir : null);
+      return {
+        exercise: String(ex.name || ''),
+        sets: numSets,
+        reps,
+        target_weight: weight,
+        target_rir: rir,
+        notes: ex.notes ? String(ex.notes) : null,
+      };
+    });
+  }
+
+  // Fallback: parse description text for legacy rows without structured exercises
+  if (isStrength && !strengthRx && row?.description) {
+    try {
+      const lines = String(row.description).split('\n').filter(Boolean);
+      strengthRx = lines.slice(0, 8).map(line => {
+        const name = line.replace(/^\d+[\.\)]\s*/, '').split(':')[0]?.trim() || line.trim();
+        const setsMatch = line.match(/(\d+)\s*x\s*(\d+)/i);
+        const weightMatch = line.match(/([\d.]+)\s*(?:lbs?|kg)/i);
+        return {
+          exercise: name,
+          sets: setsMatch ? parseInt(setsMatch[1]) : 0,
+          reps: setsMatch ? setsMatch[2] : '',
+          target_weight: weightMatch ? parseFloat(weightMatch[1]) : null,
+          target_rir: null,
+          notes: null,
+        };
+      });
+    } catch { /* non-critical */ }
+  }
+
+  // --- Build human-readable prescription string ---
   const prescriptionParts: string[] = [];
   if (row?.name) prescriptionParts.push(String(row.name));
   if (durSec) prescriptionParts.push(`${secToMin(durSec)} min`);
@@ -93,8 +150,15 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
     prescriptionParts.push(imperial ? `${metersToMi(distM).toFixed(1)} mi` : `${(distM / 1000).toFixed(1)} km`);
   }
 
-  // For strength: include the full plan description (has sets, reps, weights, RIR)
-  if (isStrength && row?.description) {
+  if (isStrength && strengthRx && strengthRx.length > 0) {
+    for (const ex of strengthRx.slice(0, 6)) {
+      const parts = [ex.exercise];
+      if (ex.sets > 0 && ex.reps) parts.push(`${ex.sets}x${ex.reps}`);
+      if (ex.target_weight) parts.push(`@ ${ex.target_weight}${unitLabel}`);
+      if (ex.target_rir != null) parts.push(`RIR ${ex.target_rir}`);
+      prescriptionParts.push(parts.join(' '));
+    }
+  } else if (isStrength && row?.description) {
     const desc = String(row.description).slice(0, 300);
     if (desc) prescriptionParts.push(desc);
   } else if (row?.rendered_description) {
@@ -102,24 +166,6 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
     if (desc && !prescriptionParts.some(p => desc.includes(p))) {
       prescriptionParts.push(desc);
     }
-  }
-
-  let strengthRx: PlannedSession['strength_prescription'] = null;
-  if (isStrength && row?.description) {
-    try {
-      const lines = String(row.description).split('\n').filter(Boolean);
-      strengthRx = lines.slice(0, 8).map(line => {
-        const name = line.replace(/^\d+[\.\)]\s*/, '').split(':')[0]?.trim() || line.trim();
-        const setsMatch = line.match(/(\d+)\s*x\s*(\d+)/i);
-        const weightMatch = line.match(/(\d+%?\s*1?RM|[\d.]+\s*(?:lbs?|kg)|bodyweight|light|heavy)/i);
-        return {
-          exercise: name,
-          sets: setsMatch ? parseInt(setsMatch[1]) : 0,
-          reps: setsMatch ? setsMatch[2] : '',
-          notes: weightMatch ? weightMatch[0] : null,
-        };
-      });
-    } catch { /* non-critical */ }
   }
 
   return {
@@ -132,6 +178,17 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
     load_planned: Number(row?.workload_planned) || null,
     strength_prescription: strengthRx,
   };
+}
+
+function parseStrengthExercisesField(raw: unknown): any[] {
+  if (Array.isArray(raw) && raw.length > 0) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* ignore */ }
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -157,12 +214,29 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
         const weights = sets.map((s: any) => Number(s?.weight) || 0).filter((w: number) => w > 0);
         const reps = sets.map((s: any) => Number(s?.reps) || 0).filter((r: number) => r > 0);
         const rirs = sets.map((s: any) => Number(s?.rir)).filter((r: number) => Number.isFinite(r));
+        const avgRir = rirs.length ? Math.round((rirs.reduce((a: number, b: number) => a + b, 0) / rirs.length) * 10) / 10 : null;
+
+        // Extract target_rir: prefer per-set target_rir (seeded from prescription), fall back to exercise-level
+        const targetRirs = sets.map((s: any) => Number(s?.target_rir)).filter((r: number) => Number.isFinite(r));
+        let targetRir: number | null = null;
+        if (targetRirs.length > 0) {
+          targetRir = modalValue(targetRirs);
+        } else if (typeof ex?.target_rir === 'number') {
+          targetRir = ex.target_rir;
+        } else if (typeof ex?.rir === 'number') {
+          targetRir = ex.rir;
+        }
+
+        const rirDelta = (avgRir != null && targetRir != null) ? Math.round((avgRir - targetRir) * 10) / 10 : null;
+
         return {
           name: String(ex?.name || ex?.exercise || ''),
           sets: sets.length,
           best_weight: weights.length ? Math.max(...weights) : 0,
           best_reps: reps.length ? Math.max(...reps) : 0,
-          avg_rir: rirs.length ? Math.round((rirs.reduce((a: number, b: number) => a + b, 0) / rirs.length) * 10) / 10 : null,
+          avg_rir: avgRir,
+          target_rir: targetRir,
+          rir_delta: rirDelta,
           unit: imperial ? 'lbs' as const : 'kg' as const,
         };
       }).filter((e: StrengthExerciseActual) => e.name);
@@ -230,12 +304,21 @@ function strengthMatchQuality(planned: PlannedSession, actual: ActualSession): S
   const exercises = actual.strength_actual;
   if (!exercises || exercises.length === 0) return 'followed';
 
-  const avgRir = exercises
-    .map(e => e.avg_rir)
-    .filter((r): r is number => r != null);
+  const withTarget = exercises.filter(e => e.avg_rir != null && e.target_rir != null);
 
-  if (avgRir.length > 0) {
-    const mean = avgRir.reduce((a, b) => a + b, 0) / avgRir.length;
+  // Plan-relative path: compare actual RIR against prescribed RIR
+  if (withTarget.length > 0) {
+    const avgDelta = withTarget.reduce((s, e) => s + e.rir_delta!, 0) / withTarget.length;
+    if (Math.abs(avgDelta) <= 0.5) return 'on_target';
+    if (avgDelta > 1.0) return 'under_intensity';
+    if (avgDelta < -1.0) return 'over_intensity';
+    return 'on_target';
+  }
+
+  // Absolute fallback for unplanned sessions or missing targets
+  const rirs = exercises.map(e => e.avg_rir).filter((r): r is number => r != null);
+  if (rirs.length > 0) {
+    const mean = rirs.reduce((a, b) => a + b, 0) / rirs.length;
     if (mean < 1.5) return 'pushed_hard';
     if (mean > 3.5) return 'dialed_back';
   }
@@ -263,16 +346,20 @@ function matchSummary(
 
   if (type === 'strength') {
     const parts: string[] = ['completed'];
-    if (sQ === 'pushed_hard') parts.push('pushing hard (low RIR)');
-    else if (sQ === 'dialed_back') parts.push('dialed back (high RIR)');
+    if (sQ === 'on_target') parts.push('hit prescribed intensity');
+    else if (sQ === 'under_intensity') parts.push('held back vs plan (higher RIR than prescribed)');
+    else if (sQ === 'over_intensity') parts.push('pushed harder than plan (lower RIR than prescribed)');
+    else if (sQ === 'pushed_hard') parts.push('pushing hard (low RIR, no plan target)');
+    else if (sQ === 'dialed_back') parts.push('conservative intensity (high RIR, no plan target)');
     else if (sQ === 'modified') parts.push('modified from plan');
 
-    // Summarize actual lifts for the LLM to compare against planned prescription
     const lifts = actual.strength_actual;
     if (lifts && lifts.length > 0) {
       const liftSummary = lifts.slice(0, 4).map(l => {
-        const rirNote = l.avg_rir != null ? ` @ ~${l.avg_rir.toFixed(1)} RIR` : '';
-        return `${l.name}: ${l.best_weight}${l.unit} x${l.best_reps}${rirNote}`;
+        const rirPart = l.avg_rir != null && l.target_rir != null
+          ? ` @ ${l.avg_rir.toFixed(1)} RIR (target ${l.target_rir})`
+          : l.avg_rir != null ? ` @ ~${l.avg_rir.toFixed(1)} RIR` : '';
+        return `${l.name}: ${l.best_weight}${l.unit} x${l.best_reps}${rirPart}`;
       }).join(', ');
       parts.push(liftSummary);
     }

@@ -99,6 +99,8 @@ export function generateMileByMileTerrainBreakdown(
 
     let paceSum = 0;
     let paceCount = 0;
+    let hrSum = 0;
+    let hrCount = 0;
     let firstElev: number | null = null;
     let lastElev: number | null = null;
 
@@ -112,6 +114,11 @@ export function generateMileByMileTerrainBreakdown(
         paceSum += s.pace_s_per_mi;
         paceCount++;
       }
+      const hr = s.heartRate ?? s.heart_rate ?? s.hr ?? s.heartRateInBeatsPerMinute;
+      if (typeof hr === 'number' && hr > 40 && hr < 250) {
+        hrSum += hr;
+        hrCount++;
+      }
       const elev = s.elevation_m ?? s.elevation ?? s.elevationInMeters ?? null;
       if (elev != null && Number.isFinite(elev)) {
         if (firstElev === null) firstElev = elev;
@@ -122,6 +129,7 @@ export function generateMileByMileTerrainBreakdown(
     if (paceCount === 0) continue;
 
     const avgPaceS = paceSum / paceCount;
+    const avgHrBpm = hrCount > 0 ? Math.round(hrSum / hrCount) : null;
     const elevGain = firstElev != null && lastElev != null ? Math.max(0, lastElev - firstElev) : null;
     const gradePercent = firstElev != null && lastElev != null
       ? ((lastElev - firstElev) / 1609.34) * 100
@@ -130,6 +138,7 @@ export function generateMileByMileTerrainBreakdown(
     mileSplits.push({
       mile,
       pace_s_per_mi: avgPaceS,
+      avg_hr_bpm: avgHrBpm,
       elevation_gain_m: elevGain,
       grade_percent: gradePercent,
       terrain_type: gradePercent != null && Math.abs(gradePercent) > 0.5

@@ -620,14 +620,26 @@ function buildFallbackNarrative(
     sentences.push(`${terrain.charAt(0).toUpperCase() + terrain.slice(1)} course with ${elevFt} ft of climbing.`);
   }
 
-  // HR drift: interpret, don't just report
-  if (driftBpm != null && Math.abs(driftBpm) >= 3) {
-    if (driftTyp != null && Math.abs(driftBpm) - Math.abs(driftTyp) <= 3) {
+  // HR drift: use pace-normalized drift + drift_explanation when available
+  const paceNormDriftFb = typeof derived?.pace_normalized_drift_bpm === 'number' ? derived.pace_normalized_drift_bpm : null;
+  const driftExpFb = typeof derived?.drift_explanation === 'string' ? derived.drift_explanation : null;
+  const driftSignalFb = paceNormDriftFb ?? driftBpm;
+  const durMinFb = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
+
+  if (driftExpFb === 'pace_driven' && driftBpm != null && Math.abs(driftBpm) >= 5) {
+    sentences.push(`HR rose ${Math.abs(Math.round(driftBpm))} bpm — proportional to the pace increase, not cardiovascular drift.`);
+  } else if (driftSignalFb != null && Math.abs(driftSignalFb) >= 3) {
+    if (driftExpFb === 'terrain_driven' && terrain) {
+      sentences.push(`HR drifted ${Math.abs(Math.round(driftSignalFb))} bpm, consistent with the ${terrain} terrain.`);
+    } else if (driftTyp != null && Math.abs(driftSignalFb) - Math.abs(driftTyp) <= 3) {
       sentences.push(`HR drift was normal for this effort — no red flags.`);
-    } else if (driftBpm > 0 && terrain) {
-      sentences.push(`HR climbed ${Math.abs(Math.round(driftBpm))} bpm, consistent with the ${terrain} terrain — you were climbing, not fading.`);
-    } else if (driftBpm > 0 && driftTyp != null && Math.abs(driftBpm) > Math.abs(driftTyp) + 3) {
-      sentences.push(`HR drifted +${Math.abs(Math.round(driftBpm))} bpm, more than your typical +${Math.abs(Math.round(driftTyp))} — worth checking hydration and sleep.`);
+    } else if (driftSignalFb > 0 && driftTyp != null && Math.abs(driftSignalFb) > Math.abs(driftTyp) + 3) {
+      sentences.push(`HR drifted +${Math.abs(Math.round(driftSignalFb))} bpm, more than your typical +${Math.abs(Math.round(driftTyp))}.`);
+    } else if (durMinFb != null) {
+      const expectedMax = durMinFb >= 150 ? 20 : durMinFb >= 90 ? 15 : durMinFb >= 60 ? 12 : 8;
+      if (Math.abs(driftSignalFb) <= expectedMax) {
+        sentences.push(`HR drift ${Math.abs(Math.round(driftSignalFb))} bpm — normal for a ${Math.round(durMinFb)}-minute run.`);
+      }
     }
   }
 
@@ -721,7 +733,9 @@ function buildAnalysisDetailRows(
 
   try {
     const lim = derived?.primary_limiter;
-    if (lim?.limiter) {
+    // Suppress fatigue limiter: it uses mixed-modality load data that can't
+    // distinguish a bike ride from a hard run. Show only session-observable limiters.
+    if (lim?.limiter && lim.limiter !== 'fatigue') {
       const conf = typeof lim.confidence === 'number' ? Math.round(lim.confidence * 100) : null;
       const ev0 = Array.isArray(lim.evidence) && lim.evidence[0] ? String(lim.evidence[0]) : '';
       rows.push({
@@ -780,20 +794,53 @@ function buildAnalysisDetailRows(
   } catch { /* */ }
 
   try {
-    const driftBpm = typeof derived?.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
+    const rawAbsDrift = typeof derived?.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
+    const paceNormDrift = typeof (derived as any)?.pace_normalized_drift_bpm === 'number'
+      ? (derived as any).pace_normalized_drift_bpm : null;
+    const driftExplanation = (derived as any)?.drift_explanation as string | null;
     const driftTypical = typeof derived?.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
-    if (
-      driftBpm != null &&
-      Math.abs(driftBpm) >= 3 &&
-      !shouldSuppressSessionHrDrift(factPacket, intervals)
-    ) {
-      const sign = driftBpm > 0 ? '+' : '';
-      let value = `Drifted ${sign}${Math.round(driftBpm)} bpm over the session`;
+    const durMinHr = typeof factPacket?.facts?.total_duration_min === 'number' ? factPacket.facts.total_duration_min : null;
+
+    const signal = paceNormDrift ?? rawAbsDrift;
+
+    const durationExpectedMax =
+      durMinHr != null
+        ? (durMinHr >= 150 ? 20 : durMinHr >= 90 ? 15 : durMinHr >= 60 ? 12 : 8)
+        : null;
+
+    if (shouldSuppressSessionHrDrift(factPacket, intervals)) {
+      // no row
+    } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {
+      rows.push({
+        label: 'Heart rate',
+        value: `HR rose ${Math.round(Math.abs(rawAbsDrift))} bpm across the session — proportional to the pace increase (negative split), not cardiovascular drift`,
+      });
+    } else if (signal != null && Math.abs(signal) >= 3) {
+      const absSig = Math.round(Math.abs(signal));
+      const sign = signal > 0 ? '+' : '';
+      let value = `Drifted ${sign}${absSig} bpm over the session`;
+
+      if (driftExplanation === 'terrain_driven') {
+        const terrainContrib = typeof derived?.terrain_contribution_bpm === 'number' ? derived.terrain_contribution_bpm : null;
+        if (terrainContrib != null) {
+          value += ` (mostly terrain-driven; ~${Math.round(Math.abs(terrainContrib))} bpm from grade changes)`;
+        }
+      } else if (driftExplanation === 'mixed' && rawAbsDrift != null && Math.abs(rawAbsDrift) > Math.abs(signal) + 3) {
+        value += ` (pace-normalized from ${rawAbsDrift > 0 ? '+' : ''}${Math.round(rawAbsDrift)} raw)`;
+      }
+
+      // Duration context first, then typical comparison
+      if (durationExpectedMax != null && absSig <= durationExpectedMax) {
+        value += ` — normal for ${Math.round(durMinHr!)} min`;
+      }
+
       if (driftTypical != null && Math.abs(driftTypical) >= 1) {
         const typSign = driftTypical > 0 ? '+' : '';
-        const delta = Math.abs(driftBpm) - Math.abs(driftTypical);
+        const delta = absSig - Math.abs(driftTypical);
         if (Math.abs(delta) <= 3) {
-          value += ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
+          value += durationExpectedMax != null && absSig <= durationExpectedMax
+            ? ` (typical ${typSign}${Math.round(driftTypical)})`
+            : ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
         } else if (delta > 0) {
           value += ` — higher than your typical ${typSign}${Math.round(driftTypical)} bpm`;
         } else {
@@ -957,7 +1004,9 @@ function buildSessionInterpretation(params: {
   // Match quality override
   const eq = match?.endurance_quality;
   const sq = match?.strength_quality;
-  if (eq === 'harder' || eq === 'easier' || eq === 'longer' || eq === 'shorter' || sq === 'pushed_hard' || sq === 'dialed_back') {
+  if (eq === 'harder' || eq === 'easier' || eq === 'longer' || eq === 'shorter'
+    || sq === 'pushed_hard' || sq === 'dialed_back'
+    || sq === 'under_intensity' || sq === 'over_intensity') {
     overall = 'modified';
   }
   if (eq === 'modified' || eq === 'skipped' || sq === 'modified' || sq === 'skipped') {

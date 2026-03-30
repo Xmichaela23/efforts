@@ -63,48 +63,60 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     }
   } catch {}
 
-  // Terrain-driven drift context (even when vs-typical delta is small).
+  // HR drift: use pace-normalized drift as the physiological signal.
+  // Pace-driven HR increases (negative splits) are not drift and should not flag.
   try {
-    const drift = coerceNumber(packet.derived.hr_drift_bpm);
-    const dec = coerceNumber(packet.derived.cardiac_decoupling_pct);
-    const fade = coerceNumber(packet.derived.pace_fade_pct);
-    if (terrain === 'hilly' && drift != null && drift >= 8 && drift <= 20) {
-      const already = flags.some((f) => /hilly terrain/i.test(String(f.message || '')) && /drift/i.test(String(f.message || '')));
-      const steady = (dec == null || dec <= 5) && (fade == null || fade <= 5);
-      if (!already && steady) {
+    const driftExplanation = (packet.derived as any).drift_explanation;
+    const paceNorm = coerceNumber((packet.derived as any).pace_normalized_drift_bpm);
+    const rawDrift = coerceNumber(packet.derived.hr_drift_bpm);
+    const typ = coerceNumber(packet.derived.hr_drift_typical);
+    const terrainContrib = coerceNumber(packet.derived.terrain_contribution_bpm);
+
+    // Use pace-normalized drift as the signal when available, else fall back to raw
+    const signal = paceNorm ?? rawDrift;
+
+    if (driftExplanation === 'pace_driven') {
+      // HR increase was entirely explained by the athlete running faster — not a concern
+      if (rawDrift != null && Math.abs(rawDrift) >= 8) {
         push(flags, {
           type: 'neutral',
           category: 'hr',
-          message: `HR drift ${Math.round(drift)} bpm is consistent with hilly terrain — treat it as terrain-driven, not fatigue-driven.`,
+          message: `HR rose ${Math.round(Math.abs(rawDrift))} bpm across the session — explained by negative-split pacing, not cardiovascular drift.`,
+          priority: 3,
+        });
+      }
+    } else if (driftExplanation === 'terrain_driven') {
+      if (signal != null && Math.abs(signal) >= 3) {
+        const contribNote = terrainContrib != null ? ` (~${Math.round(Math.abs(terrainContrib))} bpm from grade changes)` : '';
+        push(flags, {
+          type: 'neutral',
+          category: 'hr',
+          message: `HR drift ${Math.round(Math.abs(signal))} bpm is consistent with ${terrain || 'rolling'} terrain${contribNote} — not a fatigue signal.`,
           priority: 2,
         });
       }
-    }
-  } catch {}
+    } else if (signal != null && (driftExplanation === 'cardiac_drift' || driftExplanation === 'mixed') && Math.abs(signal) >= 3) {
+      const durMin = coerceNumber(packet.facts.total_duration_min) ?? 0;
+      const expectedMax =
+        durMin >= 150 ? 20 :
+        durMin >= 90  ? 15 :
+        durMin >= 60  ? 12 :
+        8;
+      const absSig = Math.round(Math.abs(signal));
 
-  // HR drift vs typical
-  try {
-    const drift = coerceNumber(packet.derived.hr_drift_bpm);
-    const typ = coerceNumber(packet.derived.hr_drift_typical);
-    if (drift != null && typ != null && typ > 0) {
-      const delta = drift - typ;
-      if (delta <= -3) {
-        push(flags, { type: 'positive', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm — better than usual.`, priority: 2 });
-      } else if (delta >= 5) {
-        // If terrain is hilly, elevated drift can be terrain-driven (climbs raise HR even at controlled effort).
-        // Prefer an explanatory neutral flag over a concern in this case.
-        if (terrain === 'hilly' && drift >= 8 && drift <= 20) {
-          push(flags, {
-            type: 'neutral',
-            category: 'hr',
-            message: `HR drift ${Math.round(drift)} bpm is consistent with hilly terrain — not necessarily a fatigue signal.`,
-            priority: 2,
-          });
+      if (typ != null && typ > 0) {
+        const delta = absSig - Math.abs(typ);
+        if (delta <= -3) {
+          push(flags, { type: 'positive', category: 'hr', message: `HR drift ${absSig} bpm vs typical ~${Math.round(Math.abs(typ))} bpm — better than usual.`, priority: 2 });
+        } else if (delta >= 5 && absSig > expectedMax) {
+          push(flags, { type: 'concern', category: 'hr', message: `HR drift ${absSig} bpm vs typical ~${Math.round(Math.abs(typ))} bpm — elevated.`, priority: 1 });
         } else {
-          push(flags, { type: 'concern', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm — elevated.`, priority: 1 });
+          push(flags, { type: 'neutral', category: 'hr', message: `HR drift ${absSig} bpm vs typical ~${Math.round(Math.abs(typ))} bpm.`, priority: 3 });
         }
+      } else if (absSig > expectedMax) {
+        push(flags, { type: 'concern', category: 'hr', message: `HR drift ${absSig} bpm — above expected range for a ${Math.round(durMin)}-minute session.`, priority: 1 });
       } else {
-        push(flags, { type: 'neutral', category: 'hr', message: `HR drift ${Math.round(drift)} bpm vs typical ~${Math.round(typ)} bpm.`, priority: 3 });
+        push(flags, { type: 'neutral', category: 'hr', message: `HR drift ${absSig} bpm — normal for a ${Math.round(durMin)}-minute session.`, priority: 3 });
       }
     }
   } catch {}
@@ -123,36 +135,11 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     }
   } catch {}
 
-  // Fatigue / load flags — plan-aware: elevated ACWR during build/work phases is expected
-  try {
-    const tl = packet.derived.training_load;
-    if (tl) {
-      const plan = (packet as any)?.facts?.plan;
-      const planPhase = String(plan?.phase || '').toLowerCase();
-      const weekIntent = String(plan?.week_intent || '').toLowerCase();
-      const isRecoveryWeek = plan?.is_recovery_week === true;
-      const isPlanLinked = !!plan;
-      const isBuildPhase = ['build', 'peak', 'specific', 'base', 'general'].some(p => planPhase.includes(p))
-        || ['build', 'work', 'quality', 'key'].some(w => weekIntent.includes(w));
-
-      if (tl.acwr_ratio != null && tl.acwr_ratio > 1.3) {
-        if (isPlanLinked && isBuildPhase && !isRecoveryWeek && tl.acwr_ratio <= 1.6) {
-          push(flags, { type: 'neutral', category: 'fatigue', message: `Training stress is up — expected for ${planPhase || 'build'} phase.`, priority: 3 });
-        } else if (isPlanLinked && isRecoveryWeek) {
-          push(flags, { type: 'concern', category: 'fatigue', message: `Training stress elevated during a recovery week — check if this is intentional.`, priority: 1 });
-        } else {
-          push(flags, { type: 'concern', category: 'fatigue', message: `Training stress elevated — injury risk increases at this load level.`, priority: 1 });
-        }
-      } else if (tl.acwr_ratio != null && tl.acwr_ratio > 1.1) {
-        push(flags, { type: 'neutral', category: 'fatigue', message: `Training load trending up.`, priority: 3 });
-      }
-      if (tl.week_load_pct != null && tl.week_load_pct > 120) {
-        push(flags, { type: 'concern', category: 'fatigue', message: `Week at ${Math.round(tl.week_load_pct)}% of planned load — recovery matters.`, priority: 1 });
-      } else if (tl.previous_day_workload > 80) {
-        push(flags, { type: 'neutral', category: 'fatigue', message: `Hard session yesterday.`, priority: 3 });
-      }
-    }
-  } catch {}
+  // Fatigue / load flags — SUPPRESSED until modality-specific load isolation exists.
+  // Current ACWR and week_load_pct mix all modalities (cycling, strength, running)
+  // into a single number, which produces misleading claims like "171% of planned load"
+  // when the overage is an easy bike ride. Showing a number without context is dishonest.
+  // TODO: re-enable when running-specific load can be isolated from cross-training.
 
   // Stimulus: not emitted as a flag — stimulus has its own coach signals row and summary bullet; flag was redundant.
 

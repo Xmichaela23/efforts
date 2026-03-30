@@ -288,6 +288,10 @@ export type CoachWeekContextResponseV1 = {
       acute7_actual_load: number | null;
       chronic28_actual_load: number | null;
       acwr: number | null;
+      running_acwr: number | null;
+      running_weighted_week_load: number | null;
+      running_weighted_week_load_pct: number | null;
+      unplanned_summary: string | null;
       by_discipline: Array<{
         discipline: string;
         planned_load: number | null;

@@ -45,6 +45,7 @@ export type EnduranceMatchQuality =
   | 'followed' | 'shorter' | 'longer' | 'harder' | 'easier' | 'modified' | 'skipped' | 'unplanned';
 
 export type StrengthMatchQuality =
+  | 'on_target' | 'under_intensity' | 'over_intensity'
   | 'followed' | 'dialed_back' | 'pushed_hard' | 'modified' | 'skipped' | 'unplanned';
 
 export type SessionDetailV1 = {
