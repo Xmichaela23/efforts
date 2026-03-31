@@ -250,6 +250,7 @@ export type CoachWeekContextResponseV1 = {
       index: number | null;
       intent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
       focus_label: string | null;
+      intent_summary: string | null;
     };
     plan: {
       has_active_plan: boolean;
@@ -288,7 +289,10 @@ export type CoachWeekContextResponseV1 = {
       acute7_actual_load: number | null;
       chronic28_actual_load: number | null;
       acwr: number | null;
+      label: string | null;
       running_acwr: number | null;
+      run_only_week_load: number | null;
+      run_only_week_load_pct: number | null;
       running_weighted_week_load: number | null;
       running_weighted_week_load_pct: number | null;
       unplanned_summary: string | null;
@@ -303,6 +307,7 @@ export type CoachWeekContextResponseV1 = {
     trends: {
       fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
       readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+      readiness_label: string | null;
       signals: Array<{
         metric: 'aerobic_efficiency' | 'strength_reserve' | 'effort_level' | 'execution_quality';
         direction: 'improving' | 'stable' | 'declining';

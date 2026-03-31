@@ -212,6 +212,7 @@ export type CoachWeekContextV1 = {
       index: number | null;
       intent: string;
       focus_label: string | null;
+      intent_summary: string | null;
     };
     plan: {
       has_active_plan: boolean;
@@ -250,6 +251,7 @@ export type CoachWeekContextV1 = {
       acute7_actual_load: number | null;
       chronic28_actual_load: number | null;
       acwr: number | null;
+      label: string | null;
       running_acwr: number | null;
       run_only_week_load: number | null;
       run_only_week_load_pct: number | null;
@@ -262,6 +264,17 @@ export type CoachWeekContextV1 = {
         actual_load: number;
         extra_load: number;
         session_count: number;
+      }>;
+    };
+    trends: {
+      fitness_direction: string;
+      readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+      readiness_label: string | null;
+      signals: Array<{
+        metric: string;
+        direction: string;
+        magnitude: string;
+        delta: number | null;
       }>;
     };
     details: {

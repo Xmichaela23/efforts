@@ -1563,11 +1563,19 @@ Deno.serve(async (req) => {
           "You're showing signs of overreaching. A deload or recovery week before continuing to build can help you absorb your gains.",
         );
       } else if (readinessState === 'fatigued' || v.code === 'caution_ramping_fast') {
-        addSuggestion(
-          'add_recovery',
-          'Consider adding recovery',
-          'Fatigue is elevated. Swap a quality session for easy or add a rest day this week.',
-        );
+        // Only surface the recovery suggestion when actual body signals confirm it.
+        // If signals_concerning === 0 the body is handling the load fine — ACWR or
+        // execution alone isn't enough to warrant a recovery prompt.
+        const rm = weeklyResponseModel;
+        const bodyConfirmed = rm.assessment.signals_concerning > 0
+          || rm.assessment.label === 'overreaching';
+        if (bodyConfirmed) {
+          addSuggestion(
+            'add_recovery',
+            'Consider adding recovery',
+            'Fatigue is elevated. Swap a quality session for easy or add a rest day this week.',
+          );
+        }
       }
 
       // Strength auto-progression suggestions from response model
@@ -1705,6 +1713,7 @@ Deno.serve(async (req) => {
         narrative: '',
         next_session_guidance: null,
       };
+      let earlyRunAdherenceArtifact = false;
       if (anthropicKey) {
         try {
           // Build session interpretations from persisted session_detail_v1 (chronological).
@@ -1797,9 +1806,42 @@ Deno.serve(async (req) => {
           // Longitudinal signals are computed for the API response (Block view) but NOT
           // fed to the weekly LLM — the weekly narrative should be about this week only.
           // Adaptation trajectory IS fed — it's about how the body is handling the current block.
+
+          // Early artifact detection — needed before generateCoaching so the LLM prompt
+          // can suppress spike language when run sessions hit planned duration/distance.
+          if (plannedWtdLoad > 0 && actualWtdLoad >= 0) {
+            const earlyLoadDeltaPct = Math.round(((actualWtdLoad - plannedWtdLoad) / plannedWtdLoad) * 100);
+            if (earlyLoadDeltaPct > 15) {
+              const earlyRunSessions = (Array.isArray(weekWorkouts) ? weekWorkouts : [])
+                .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed' && normalizeType(w?.type) === 'run');
+              if (earlyRunSessions.length > 0) {
+                const earlyChecks = earlyRunSessions.map((w: any) => {
+                  const pid = w?.planned_id != null ? String(w.planned_id) : null;
+                  const localDate = String(w?.__local_date || w?.date || '').slice(0, 10);
+                  const matched = pid
+                    ? plannedWtdArr.find((p: any) => String(p?.id) === pid)
+                    : plannedWtdArr.find((p: any) => String(p?.date || '').slice(0, 10) === localDate && normalizeType(p?.type) === 'run');
+                  if (!matched) return null;
+                  const pDurSec = safeNum(matched?.total_duration_seconds);
+                  const wDurSec = (() => { const raw = safeNum(w?.moving_time); if (raw == null) return null; return raw < 1000 ? Math.round(raw * 60) : Math.round(raw); })();
+                  const pDistM = safeNum(matched?.computed?.total_distance_meters) ?? safeNum(matched?.computed?.distance_meters);
+                  const wDistM = safeNum(w?.distance) != null ? Math.round(safeNum(w?.distance)! * 1000) : null;
+                  return { durPct: pDurSec && wDurSec ? wDurSec / pDurSec : null, distPct: pDistM && wDistM ? wDistM / pDistM : null };
+                }).filter(Boolean) as Array<{ durPct: number | null; distPct: number | null }>;
+                if (earlyChecks.length > 0 && earlyChecks.every((c: any) =>
+                  (c.durPct == null || (c.durPct >= 0.85 && c.durPct <= 1.15)) &&
+                  (c.distPct == null || (c.distPct >= 0.85 && c.distPct <= 1.15))
+                )) {
+                  earlyRunAdherenceArtifact = true;
+                }
+              }
+            }
+          }
+
           coaching = await generateCoaching(partialSnapshot, anthropicKey, {
             sessionInterpretations,
             longitudinalBlock: adaptationBlock,
+            suppressRunLoadSpike: earlyRunAdherenceArtifact,
           });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
@@ -1807,6 +1849,26 @@ Deno.serve(async (req) => {
       }
 
       athleteSnapshot = { ...partialSnapshot, coaching };
+
+      // Patch load bar when run load delta is an IF calculation artifact.
+      // The bar reads body_response.load_status — without this patch it shows
+      // the elevated dot and "68% above plan" text even when the narrative is correct.
+      if (earlyRunAdherenceArtifact && athleteSnapshot?.body_response?.load_status) {
+        const ls = athleteSnapshot.body_response.load_status;
+        const crossTrainingNote = ls.cross_training_load_summary ? ` Cross-training: ${ls.cross_training_load_summary}` : '';
+        athleteSnapshot = {
+          ...athleteSnapshot,
+          body_response: {
+            ...athleteSnapshot.body_response,
+            load_status: {
+              ...ls,
+              status: 'on_target' as const,
+              interpretation: `Running load on target.${crossTrainingNote}`,
+            },
+          },
+        };
+      }
+
       week_narrative = coaching.narrative || null;
 
     } catch (snapErr: any) {
@@ -1890,6 +1952,7 @@ Deno.serve(async (req) => {
 
         // Narrative facts are built from the same canonical weekly inputs used for
         // deterministic state. Do not read parallel fact pipelines here.
+        let runAdherenceArtifact = false; // hoisted so per-workout loop can suppress IF load comparisons
         const completedNarrativeWorkouts = (Array.isArray(weekWorkouts) ? weekWorkouts : [])
           .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
           .sort((a: any, b: any) => {
@@ -1986,11 +2049,52 @@ Deno.serve(async (req) => {
         // data which cannot be compared to actual TRIMP load).
         if (plannedWtdLoad > 0 && actualWtdLoad >= 0) {
           const loadDeltaPct = Math.round(((actualWtdLoad - plannedWtdLoad) / plannedWtdLoad) * 100);
-          const loadLabel = loadDeltaPct > 15
-            ? 'running hot — push recovery emphasis'
-            : loadDeltaPct < -15
-              ? 'running light — room to add stress if feeling good'
-              : 'on target';
+
+          // Check run session duration/distance adherence to detect TRIMP calculation artifacts.
+          // When sessions are on-target by duration+distance, a large TRIMP delta is an IF mismatch,
+          // not a real training spike. Only flag as "running hot" if sessions actually ran long.
+          const runSessions = completedNarrativeWorkouts.filter((w: any) => normalizeType(w?.type) === 'run');
+          if (loadDeltaPct > 15 && runSessions.length > 0) {
+            const runAdherenceChecks = runSessions.map((w: any) => {
+              // Read-only lookup — does not consume usedPlannedIds (softMatchPlanned not available yet)
+              const pid = w?.planned_id != null ? String(w.planned_id) : null;
+              const localDate = String(w?.__local_date || w?.date || '').slice(0, 10);
+              const matched = pid
+                ? plannedWtdArr.find((p: any) => String(p?.id) === pid)
+                : plannedWtdArr.find((p: any) =>
+                    String(p?.date || '').slice(0, 10) === localDate &&
+                    normalizeType(p?.type) === 'run'
+                  );
+              if (!matched) return null;
+              const pDurSec = safeNum(matched?.total_duration_seconds);
+              const wDurSec = (() => {
+                const raw = safeNum((w as any)?.moving_time);
+                if (raw == null) return null;
+                return raw < 1000 ? Math.round(raw * 60) : Math.round(raw);
+              })();
+              const pDistM = safeNum(matched?.computed?.total_distance_meters) ?? safeNum(matched?.computed?.distance_meters);
+              const wDistM = safeNum((w as any)?.distance) != null ? Math.round(safeNum((w as any)?.distance)! * 1000) : null;
+              const durPct = pDurSec && wDurSec ? wDurSec / pDurSec : null;
+              const distPct = pDistM && wDistM ? wDistM / pDistM : null;
+              return { durPct, distPct };
+            }).filter(Boolean) as Array<{ durPct: number | null; distPct: number | null }>;
+
+            // If all matched run sessions were within 15% of planned duration AND distance, flag as artifact
+            const allOnTarget = runAdherenceChecks.length > 0 && runAdherenceChecks.every(c =>
+              (c.durPct == null || (c.durPct >= 0.85 && c.durPct <= 1.15)) &&
+              (c.distPct == null || (c.distPct >= 0.85 && c.distPct <= 1.15))
+            );
+            if (allOnTarget) runAdherenceArtifact = true;
+          }
+
+          const loadLabel = runAdherenceArtifact
+            ? 'TRIMP delta is likely an intensity-factor calculation artifact — run sessions hit planned duration and distance, do NOT headline as a spike'
+            : loadDeltaPct > 15
+              ? 'running hot — push recovery emphasis'
+              : loadDeltaPct < -15
+                ? 'running light — room to add stress if feeling good'
+                : 'on target';
+
           narrativeFacts.push(
             `Weekly load (TRIMP): planned ${Math.round(plannedWtdLoad)} pts, actual ${Math.round(actualWtdLoad)} pts` +
             ` (${loadDeltaPct > 0 ? '+' : ''}${loadDeltaPct}% vs plan) — ${loadLabel}.`
@@ -2128,19 +2232,45 @@ Deno.serve(async (req) => {
           const ex = executionScoreFromWorkout(w);
           if (ex != null) parts.push(`execution ${Math.round(ex)}%`);
           const matched = softMatchPlanned(w);
-          const pvA = matched ? planVsActualLine(matched, w) : null;
-          if (pvA) parts.push(pvA);
-          else if (!matched && activePlan) parts.push('unplanned (not in the training plan)');
+          // For run sessions flagged as IF artifacts, suppress the load comparison — it will mislead the LLM
+          // into generating "ran long" language even when duration/distance were on target.
+          if (runAdherenceArtifact && discipline === 'run' && matched) {
+            const pName = matched?.name ? String(matched.name) : null;
+            if (pName) parts.push(`planned: "${pName}" — load delta is an intensity-factor calculation artifact, NOT over-volume`);
+          } else {
+            const pvA = matched ? planVsActualLine(matched, w) : null;
+            if (pvA) parts.push(pvA);
+            else if (!matched && activePlan) parts.push('unplanned (not in the training plan)');
+          }
           narrativeFacts.push(`SESSION: ${parts.join(' | ')}`);
         }
 
         // ── Strength exercise summary from workout payloads only ──
+        // Planned vs actual adherence belongs in analyze-strength-workout / workout_facts.
+        // Coach reads what's already computed — no data assembly here.
         const strengthEntries: Array<{ name: string; best_weight: number; best_reps: number; avg_rir: number | null }> = [];
         for (const w of completedNarrativeWorkouts) {
           if (normalizeType((w as any)?.type) !== 'strength') continue;
           const exRaw = (w as any)?.strength_exercises;
           const exArr = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (parseJson(exRaw) || []) : []);
           if (!Array.isArray(exArr)) continue;
+
+          // Pull pre-computed per-exercise adherence from workout_analysis if available
+          const wa = (w as any)?.workout_analysis;
+          const waObj = typeof wa === 'object' ? wa : (typeof wa === 'string' ? (parseJson(wa) || {}) : {});
+          const exerciseAdherence: Record<string, { planned_weight: number | null; planned_reps: number | null; adherence_pct: number | null }> = {};
+          const exAdh = waObj?.strength_facts?.exercises ?? waObj?.exercise_adherence ?? [];
+          if (Array.isArray(exAdh)) {
+            for (const ea of exAdh) {
+              const key = String(ea?.name || ea?.canonical || '').toLowerCase().trim();
+              if (key) exerciseAdherence[key] = {
+                planned_weight: safeNum(ea?.planned_weight) || null,
+                planned_reps: safeNum(ea?.planned_reps) || null,
+                adherence_pct: safeNum(ea?.adherence_pct) || null,
+              };
+            }
+          }
+
           for (const ex of exArr) {
             const sets = Array.isArray(ex?.sets) ? ex.sets : [];
             const weights: number[] = [];
@@ -2162,13 +2292,24 @@ Deno.serve(async (req) => {
               best_weight: bestWeight,
               best_reps: bestReps,
               avg_rir: avgRir,
-            });
+              ...(exerciseAdherence[String(ex?.name || '').toLowerCase().trim()] || {}),
+            } as any);
           }
         }
         if (strengthEntries.length > 0) {
-          const exLines = strengthEntries.slice(0, 10).map((e) => {
-            const rirPart = e.avg_rir != null ? `, avg ${e.avg_rir.toFixed(1)} reps in reserve` : '';
-            return `${e.name}: best ${Math.round(e.best_weight)}${wUnit} × ${Math.round(e.best_reps)}${rirPart}`;
+          const exLines = (strengthEntries as any[]).slice(0, 10).map((e: any) => {
+            const rirPart = e.avg_rir != null ? `, avg ${Number(e.avg_rir).toFixed(1)} RIR` : '';
+            let plannedPart = '';
+            if (e.planned_weight && e.planned_weight > 0) {
+              const weightDiff = e.best_weight - e.planned_weight;
+              const weightStatus = weightDiff > 2
+                ? ` [exceeded plan by ${Math.round(weightDiff)}${wUnit}]`
+                : weightDiff < -2
+                  ? ` [below plan by ${Math.round(Math.abs(weightDiff))}${wUnit}]`
+                  : ' [on target]';
+              plannedPart = ` (planned ${Math.round(e.planned_weight)}${wUnit}${e.planned_reps ? ` × ${Math.round(e.planned_reps)}` : ''})${weightStatus}`;
+            }
+            return `${e.name}: ${Math.round(e.best_weight)}${wUnit} × ${Math.round(e.best_reps)}${rirPart}${plannedPart}`;
           });
           narrativeFacts.push(`STRENGTH EXERCISES THIS WEEK: ${exLines.join('; ')}.`);
         }
@@ -2512,6 +2653,16 @@ ${narrativeFacts.join('\n')}`;
         index: weekIndex,
         intent: weekIntent,
         focus_label: weekFocusLabel,
+        intent_summary: (() => {
+          const map: Record<string, string> = {
+            build:    'Building fitness — add stress, absorb the work.',
+            peak:     'Sharpening — quality over volume, protect your legs.',
+            recovery: 'Recovery week — back off, let the adaptation happen.',
+            taper:    'Tapering — freshen up, race is close.',
+            baseline: 'Establishing your baseline — consistency is the goal.',
+          };
+          return map[weekIntent] ?? null;
+        })(),
       },
       plan: {
         has_active_plan: Boolean(activePlan),
@@ -2550,6 +2701,13 @@ ${narrativeFacts.join('\n')}`;
         acute7_actual_load: acute7Load ?? null,
         chronic28_actual_load: chronic28Load ?? null,
         acwr: acwr ?? null,
+        label: (() => {
+          if (acwr == null) return null;
+          if (acwr < 0.8) return 'build more';
+          if (acwr <= 1.3) return 'balanced';
+          if (acwr <= 1.5) return 'back off';
+          return 'rest now';
+        })(),
         running_acwr: runningAcwr,
         run_only_week_load: athleteSnapshot?.body_response?.load_status?.run_only_week_load ?? null,
         run_only_week_load_pct: athleteSnapshot?.body_response?.load_status?.run_only_week_load_pct ?? null,
@@ -2567,6 +2725,14 @@ ${narrativeFacts.join('\n')}`;
       trends: {
         fitness_direction: fitnessDirection,
         readiness_state: readinessState,
+        readiness_label: (() => {
+          if (readinessState === 'fresh') return 'feeling fresh';
+          if (readinessState === 'overreached') return 'needs rest';
+          if (readinessState === 'fatigued' && v.reason_codes.includes('execution_low')) return 'run quality down';
+          if (readinessState === 'fatigued') return 'carrying fatigue';
+          if (readinessState === 'detrained') return 'undertrained';
+          return null;
+        })(),
         signals: trendSignals,
       },
       details: {

@@ -30,6 +30,8 @@ export interface LiftTrend {
   current1RM: number;
   peak1RM: number;
   trend: number | null;
+  // Most-recent session RIR (null if not logged)
+  latestRir: number | null;
 }
 
 export function useExerciseLog(weeksBack: number = 12) {
@@ -93,6 +95,10 @@ export function useExerciseLog(weeksBack: number = 12) {
           ? Math.round(((current - first) / first) * 1000) / 10
           : null;
 
+        // Latest session = last in sorted order
+        const latestRow = sorted[sorted.length - 1];
+        const latestRir = latestRow.avg_rir ?? null;
+
         return {
           canonical,
           displayName: rows[0].exercise_name,
@@ -100,6 +106,7 @@ export function useExerciseLog(weeksBack: number = 12) {
           current1RM: current,
           peak1RM: peak,
           trend,
+          latestRir,
         };
       })
       .sort((a, b) => b.entries.length - a.entries.length);

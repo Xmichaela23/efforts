@@ -370,11 +370,6 @@ export default function CoachWeekTab() {
   const keySessionsLinked = ws?.glance?.key_sessions_linked ?? 0;
   const showReadiness = ws?.guards?.show_readiness ?? false;
 
-  // Headline + narrative from snapshot; fallback to old system if snapshot missing
-  const headline = coaching?.headline ?? ws?.details?.training_state?.title ?? null;
-  const narrativeText = coaching?.narrative ?? ws?.coach?.narrative ?? null;
-  const nextSessionGuidance = coaching?.next_session_guidance ?? null;
-
   // Load status from snapshot
   const loadStatus = bodyResponse?.load_status ?? null;
 
@@ -484,12 +479,6 @@ export default function CoachWeekTab() {
     : verdictCode === 'undertraining' ? 'border-sky-500/40 bg-gradient-to-br from-sky-500/12 to-sky-900/8'
     : 'border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-emerald-900/5';
 
-  const titleGlow =
-    verdictCode === 'recover_overreaching' ? 'text-red-300'
-    : verdictCode === 'caution_ramping_fast' ? 'text-amber-300'
-    : verdictCode === 'undertraining' ? 'text-sky-300'
-    : 'text-emerald-300';
-
   const hasActivePlan = ws.plan.has_active_plan;
   const gaps = reaction?.key_session_gaps_details ?? [];
 
@@ -559,19 +548,9 @@ export default function CoachWeekTab() {
       {/* ── No-plan state ── */}
       {!hasActivePlan ? (
         <div className="space-y-3">
-          {headline && (
+          {loadStatus && (
             <div className={`rounded-xl border p-4 ${verdictTone}`}>
-              <div className={`text-lg font-semibold ${titleGlow}`} style={{ textShadow: '0 0 12px currentColor' }}>
-                {headline}
-              </div>
-              {narrativeText && (
-                <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
-              )}
-              {loadStatus && (
-                <div className="mt-3">
-                  <SnapshotLoadBar status={loadStatus.status} interpretation={loadStatus.interpretation} acwr={loadStatus.acwr} />
-                </div>
-              )}
+              <SnapshotLoadBar status={loadStatus.status} interpretation={loadStatus.interpretation} acwr={loadStatus.acwr} />
             </div>
           )}
           {loadDriverRows.length > 0 && (
@@ -609,25 +588,6 @@ export default function CoachWeekTab() {
               }`}>
                 <Activity className="w-3 h-3 shrink-0 opacity-70" />
                 {bodySignal.text}
-              </div>
-            )}
-
-            {headline && (
-              <div
-                className={`text-lg font-semibold ${titleGlow}`}
-                style={{ textShadow: '0 0 12px currentColor' }}
-              >
-                {headline}
-              </div>
-            )}
-
-            {narrativeText && (
-              <div className="text-sm text-white/75 mt-2 leading-relaxed">{narrativeText}</div>
-            )}
-
-            {nextSessionGuidance && (
-              <div className="mt-3 text-xs text-white/55 leading-relaxed border-t border-white/10 pt-2">
-                {nextSessionGuidance}
               </div>
             )}
 
