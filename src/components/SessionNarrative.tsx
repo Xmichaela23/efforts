@@ -24,6 +24,19 @@ type NextSession = {
   prescription: string | null;
 };
 
+type RouteHistoryPoint = {
+  date: string;
+  pace_s_per_km: number | null;
+  hr: number | null;
+  is_current: boolean;
+};
+
+type RouteData = {
+  name: string;
+  times_run: number;
+  history: RouteHistoryPoint[];
+};
+
 interface SessionNarrativeProps {
   sessionDetail: {
     workout_id?: string;
@@ -58,6 +71,9 @@ interface SessionNarrativeProps {
     };
     trend?: TrendData | null;
     next_session?: NextSession | null;
+    terrain?: {
+      route?: RouteData | null;
+    } | null;
   } | null;
   hasSessionDetail: boolean;
   noPlannedCompare: boolean;
@@ -159,12 +175,117 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
         </div>
         {hasHr && (
           <div className="flex items-center gap-3 mt-1" style={{ maxWidth: 280 }}>
-            <span className="flex items-center gap-1 text-[9px] text-gray-500">
-              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.6" /></svg>
+            <span className="flex items-center gap-1 text-[10px]" style={{ color }}>
+              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.8" /></svg>
               pace
             </span>
-            <span className="flex items-center gap-1 text-[9px] text-gray-500">
-              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.6" /></svg>
+            <span className="flex items-center gap-1 text-[10px] text-orange-400">
+              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.8" /></svg>
+              hr
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RouteSparkline({ route }: { route: RouteData }) {
+  const pts = route.history.filter((p) => p.pace_s_per_km != null);
+  if (pts.length < 2) return null;
+
+  const paceValues = pts.map((p) => p.pace_s_per_km as number);
+  const maxV = Math.max(...paceValues);
+  const minV = Math.min(...paceValues);
+  const range = maxV - minV || 1;
+
+  const W = 200;
+  const H = 48;
+  const PAD = 4;
+  const plotW = W - PAD * 2;
+  const plotH = H - PAD * 2;
+
+  const coords = pts.map((p, i) => ({
+    x: PAD + (i / (pts.length - 1)) * plotW,
+    // lower pace = faster = better = higher on chart (invert)
+    y: PAD + ((maxV - (p.pace_s_per_km as number)) / range) * plotH,
+    ...p,
+  }));
+
+  const pathD = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x},${c.y}`).join(' ');
+
+  const hrPts = pts.filter((p) => p.hr != null);
+  const hasHr = hrPts.length >= 2;
+  const hrPathD = hasHr ? (() => {
+    const hrVals = pts.map((p) => p.hr as number | null);
+    const validHr = hrVals.filter((v): v is number => v != null);
+    const maxHr = Math.max(...validHr);
+    const minHr = Math.min(...validHr);
+    const hrRange = maxHr - minHr || 1;
+    return pts.map((p, i) => {
+      if (p.hr == null) return null;
+      const x = PAD + (i / (pts.length - 1)) * plotW;
+      const y = PAD + ((p.hr - minHr) / hrRange) * plotH;
+      return { x, y, is_current: p.is_current };
+    });
+  })() : [];
+
+  const hrLineParts: string[] = [];
+  if (hasHr) {
+    let seg = '';
+    for (const c of hrPathD) {
+      if (!c) { seg = ''; continue; }
+      seg += seg === '' ? `M${c.x},${c.y}` : `L${c.x},${c.y}`;
+    }
+    if (seg) hrLineParts.push(seg);
+  }
+
+  const formatPace = (s: number) => {
+    const perMi = Math.round(s * 1.60934);
+    return `${Math.floor(perMi / 60)}:${String(perMi % 60).padStart(2, '0')}/mi`;
+  };
+
+  const currentPt = pts[pts.length - 1];
+  const color = '#9ca3af';
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Route</span>
+        <span className="text-xs text-gray-500">Same route · {route.times_run}×</span>
+      </div>
+      <div className="mt-1 relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
+          <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+          {coords.map((c, i) => (
+            <circle key={i} cx={c.x} cy={c.y} r={c.is_current ? 3.5 : 2}
+              fill={c.is_current ? '#FFD700' : 'rgba(156,163,175,0.5)'}
+              stroke={c.is_current ? '#FFD700' : 'none'} strokeWidth={c.is_current ? 1 : 0} />
+          ))}
+          {hrLineParts.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2"
+              strokeLinecap="round" strokeLinejoin="round" opacity={0.4} />
+          ))}
+          {hasHr && hrPathD.filter((c): c is NonNullable<typeof c> => !!c && c.is_current).map((c, i) => (
+            <circle key={i} cx={c.x} cy={c.y} r={2.5} fill="#fb923c" opacity={0.6} />
+          ))}
+        </svg>
+        <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
+          <span>{pts[0].date.slice(5)}</span>
+          <span className="font-medium text-yellow-400/80">
+            {currentPt.pace_s_per_km != null ? formatPace(currentPt.pace_s_per_km) : ''}
+            {currentPt.hr != null && <span className="text-orange-400/60 ml-1">· {currentPt.hr} bpm</span>}
+            {' '}← today
+          </span>
+        </div>
+        {hasHr && (
+          <div className="flex items-center gap-3 mt-1" style={{ maxWidth: 280 }}>
+            <span className="flex items-center gap-1 text-[10px] text-gray-400">
+              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.8" /></svg>
+              pace
+            </span>
+            <span className="flex items-center gap-1 text-[10px] text-orange-400">
+              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.8" /></svg>
               hr
             </span>
           </div>
@@ -318,6 +439,9 @@ export default function SessionNarrative({
         </div>
       )}
       {trend && <TrendSparkline trend={trend} />}
+      {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (
+        <RouteSparkline route={sd.terrain.route} />
+      )}
       {hasAnalysisDetails && (
         <div className="space-y-1.5">
           {analysisRows.slice(0, 8).map((r, i) => (

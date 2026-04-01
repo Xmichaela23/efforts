@@ -587,7 +587,7 @@ export async function buildWorkoutFactPacketV1(args: {
         };
       }
 
-      const [{ data: segData }, { data: progressData }, { data: routeData }] = await Promise.all([
+      const [{ data: segData }, { data: progressData }, { data: routeMatchRow }] = await Promise.all([
         supabase
           .from('terrain_segments')
           .select('id, sample_count, distance_m, elev_gain_m, avg_grade_pct, metadata')
@@ -600,12 +600,10 @@ export async function buildWorkoutFactPacketV1(args: {
           .order('effort_started_at', { ascending: false })
           .limit(500),
         supabase
-          .from('route_clusters')
-          .select('id, name, sample_count, first_seen_at, last_seen_at')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-          .order('sample_count', { ascending: false })
-          .limit(5),
+          .from('workout_route_match')
+          .select('route_cluster_id')
+          .eq('workout_id', workoutId)
+          .maybeSingle(),
       ]);
 
       const segmentRows = Array.isArray(segData) ? segData : [];
@@ -662,15 +660,41 @@ export async function buildWorkoutFactPacketV1(args: {
 
       comparisons.sort((a, b) => (b.times_seen - a.times_seen) || (Math.abs(Number(b.pace_delta_s?.replace(/[^\d.-]/g, '') || 0)) - Math.abs(Number(a.pace_delta_s?.replace(/[^\d.-]/g, '') || 0))));
 
-      let routeRuns: { name: string; times_run: number; first_seen: string; last_seen: string } | null = null;
-      if (Array.isArray(routeData) && routeData.length > 0) {
-        const best = routeData[0];
-        if (Number(best.sample_count || 0) >= 2) {
+      const matchedClusterId: string | null = (routeMatchRow as any)?.route_cluster_id
+        ? String((routeMatchRow as any).route_cluster_id)
+        : null;
+
+      let routeRuns: { name: string; times_run: number; first_seen: string; last_seen: string; history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }> } | null = null;
+      if (matchedClusterId) {
+        const [{ data: clusterRow }, { data: histRows }] = await Promise.all([
+          supabase
+            .from('route_clusters')
+            .select('id, name, sample_count, first_seen_at, last_seen_at')
+            .eq('id', matchedClusterId)
+            .maybeSingle(),
+          supabase
+            .from('route_progress_metrics')
+            .select('metric_date, avg_pace_sec_per_km, avg_hr_bpm, workout_id')
+            .eq('user_id', userId)
+            .eq('route_cluster_id', matchedClusterId)
+            .order('metric_date', { ascending: true })
+            .limit(10),
+        ]);
+        if (clusterRow && Number((clusterRow as any).sample_count || 0) >= 2) {
+          const history = Array.isArray(histRows)
+            ? histRows.map((r: any) => ({
+                date: String(r.metric_date || '').slice(0, 10),
+                pace_s_per_km: r.avg_pace_sec_per_km != null ? Number(r.avg_pace_sec_per_km) : null,
+                hr: r.avg_hr_bpm != null ? Number(r.avg_hr_bpm) : null,
+                is_current: String(r.workout_id) === workoutId,
+              }))
+            : [];
           routeRuns = {
-            name: String(best.name || 'Regular route'),
-            times_run: Number(best.sample_count),
-            first_seen: String(best.first_seen_at || '').slice(0, 10),
-            last_seen: String(best.last_seen_at || '').slice(0, 10),
+            name: String((clusterRow as any).name || 'Regular route'),
+            times_run: Number((clusterRow as any).sample_count),
+            first_seen: String((clusterRow as any).first_seen_at || '').slice(0, 10),
+            last_seen: String((clusterRow as any).last_seen_at || '').slice(0, 10),
+            history,
           };
         }
       }

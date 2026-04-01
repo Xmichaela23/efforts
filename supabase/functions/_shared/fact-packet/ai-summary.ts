@@ -722,6 +722,9 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
               ? {
                   name: derived.terrain_context.route_runs.name,
                   times_run: derived.terrain_context.route_runs.times_run,
+                  history: Array.isArray((derived.terrain_context.route_runs as any).history)
+                    ? (derived.terrain_context.route_runs as any).history
+                    : [],
                 }
               : null,
           }

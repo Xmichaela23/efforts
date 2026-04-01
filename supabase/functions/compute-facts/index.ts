@@ -786,6 +786,7 @@ async function upsertRouteIntelligence(
       distance_m: features.distance_m,
       elevation_gain_m: features.elevation_gain_m,
       sample_count: 1,
+      is_active: true,
       first_seen_at: nowIso,
       last_seen_at: nowIso,
       metadata: {
@@ -803,13 +804,16 @@ async function upsertRouteIntelligence(
       .single();
     if (createErr) throw createErr;
     cluster = created;
+    console.warn(`[compute-facts] route: created new cluster id=${cluster?.id} name="${cluster?.name}"`);
   } else {
     const meta = parseJsonSafe(cluster.metadata) || {};
     const nextSampleCount = Number(cluster.sample_count || 0) + 1;
+    console.warn(`[compute-facts] route: existing cluster id=${cluster.id} name="${cluster.name}" sample_count=${cluster.sample_count} → ${nextSampleCount}`);
     await supabase
       .from("route_clusters")
       .update({
         sample_count: nextSampleCount,
+        is_active: true,
         last_seen_at: new Date().toISOString(),
         distance_m: Math.round((((toNum(cluster.distance_m) ?? features.distance_m) * (nextSampleCount - 1)) + features.distance_m) / nextSampleCount),
         elevation_gain_m: Math.round((((toNum(cluster.elevation_gain_m) ?? features.elevation_gain_m) * (nextSampleCount - 1)) + features.elevation_gain_m) / nextSampleCount),
