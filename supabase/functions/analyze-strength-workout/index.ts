@@ -2559,13 +2559,26 @@ Deno.serve(async (req) => {
       },
     };
 
+    const strengthFactsExercises = (analysis.exercise_adherence || []).map((ea: any) => {
+      const plannedSets = Array.isArray(ea?.planned?.sets) ? ea.planned.sets : [];
+      const plannedWeight = plannedSets.length > 0 ? (plannedSets[0]?.weight ?? null) : null;
+      const plannedReps = plannedSets.length > 0 ? (plannedSets[0]?.reps ?? null) : null;
+      return {
+        name: ea?.name ?? '',
+        planned_weight: typeof plannedWeight === 'number' ? plannedWeight : null,
+        planned_reps: typeof plannedReps === 'number' ? plannedReps : null,
+        adherence_pct: typeof ea?.adherence?.set_completion === 'number' ? ea.adherence.set_completion : null,
+      };
+    });
+
     const updatePayload = {
       workout_analysis: {
         performance: performance,
         detailed_analysis: detailedAnalysis,
         strengths: [], // Extract from progression_data if needed
         session_state_v1: sessionStateV1,
-        red_flags: [] // Extract from adherence if needed
+        red_flags: [], // Extract from adherence if needed
+        strength_facts: { exercises: strengthFactsExercises }
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()

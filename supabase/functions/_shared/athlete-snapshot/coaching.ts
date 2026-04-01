@@ -31,7 +31,7 @@ export type SessionInterpretationForPrompt = {
 
 export function snapshotToPrompt(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
-  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null },
+  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null; suppressRunLoadSpike?: boolean },
 ): string {
   const lines: string[] = [];
   const { identity: id, plan_position: pp, daily_ledger: ledger, body_response: br, upcoming } = snapshot;
@@ -154,7 +154,11 @@ export function snapshotToPrompt(
   lines.push('## TRAINING LOAD (discipline-separated)');
   const ls = br.load_status;
   if (ls.run_only_week_load_pct != null) {
-    lines.push(`Running volume (runs only): ${ls.run_only_week_load_pct > 0 ? '+' : ''}${ls.run_only_week_load_pct}% vs plan (${ls.run_only_week_load ?? 0} pts actual)${ls.running_acwr != null ? ` | Running ACWR: ${ls.running_acwr.toFixed(2)}` : ''}`);
+    if (opts?.suppressRunLoadSpike) {
+      lines.push(`Running volume (runs only): session was within planned duration/distance — the ${ls.run_only_week_load_pct > 0 ? '+' : ''}${ls.run_only_week_load_pct}% TRIMP delta is an intensity-factor (IF) calculation artifact, NOT over-volume. Do NOT use spike or above-plan language in the headline or body.`);
+    } else {
+      lines.push(`Running volume (runs only): ${ls.run_only_week_load_pct > 0 ? '+' : ''}${ls.run_only_week_load_pct}% vs plan (${ls.run_only_week_load ?? 0} pts actual)${ls.running_acwr != null ? ` | Running ACWR: ${ls.running_acwr.toFixed(2)}` : ''}`);
+    }
   } else if (ls.running_acwr != null) {
     lines.push(`Running ACWR: ${ls.running_acwr.toFixed(2)} (no plan comparison available)`);
   }
@@ -245,19 +249,22 @@ Provide THREE things:
    - Connect to the plan context: "This is week 3 of build — the weights are supposed to feel heavier." or "You're in base phase, so the easy runs matter more than speed right now."
    - Flag anything surprising or worth watching. If nothing is surprising, say so briefly and move on.
 
-3. NEXT SESSION GUIDANCE (1-2 sentences): What to focus on in the next upcoming session, specific to the prescription.
+3. NEXT SESSION GUIDANCE (1-2 sentences): What to focus on in the NEXT UPCOMING session. MUST NOT repeat or rephrase anything from NARRATIVE — if you catch yourself copying sentences, you're doing it wrong. Jump straight to the prescription cue for the next session.
 
 WHAT NOT TO DO:
 - Do NOT list exercises and weights as a recap — the athlete knows what they lifted. But DO compare against the plan when there's a meaningful difference: "bench was 10 lbs above the plan" or "plan called for 2 RIR but you averaged 4."
 - NEVER describe the workout back to them. "Monday's strength session showed..." is useless. Start with the insight.
 - NEVER recap that a session happened. "You completed both sessions" — they know.
+- NEVER repeat content from NARRATIVE in NEXT SESSION GUIDANCE. They are different sections with different purposes.
 
 TONE:
-- Write like a coach who's read the data and is telling the athlete something they can't see themselves.
+- Write like a readout, not a letter. Dry, direct, no emotion. Think instrument panel, not coaching essay.
+- Shortest path to the insight. If the week was unremarkable, say so in one sentence and give guidance.
 - NO hype language. Never use: crushed, smashed, nailed, killed it, beast mode, solid work, great job, strong session, dialed in.
 - NO jargon: TRIMP, z-score, execution score, load points.
+- NO over-explaining. "Barbell rows too light" is enough. Not "suggesting the weight may be too light for the intended stimulus."
 - For RPE: say "felt harder than usual" not "RPE 7/10."
-- For RIR: you MAY cite RIR when comparing planned vs actual strength intensity. "Plan called for 2 RIR, you averaged 4 — good recovery discipline" is useful. But "1.7 RIR" in isolation is not — always compare against the plan or against the athlete's recent average.
+- For RIR: you MAY cite RIR when comparing planned vs actual strength intensity. "Plan called for 2 RIR, you averaged 4 — weight too light" is good. But "1.7 RIR" in isolation is not.
 - For load: use plain language like "ahead of plan" rather than raw percentages. You may mention running ACWR when it's actionable (e.g. above 1.3).
 
 RULES:
@@ -292,7 +299,7 @@ CRITICAL — ACCURACY:
 export async function generateCoaching(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
   _anthropicKey?: string,
-  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null },
+  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null; suppressRunLoadSpike?: boolean },
 ): Promise<Coaching> {
   const prompt = snapshotToPrompt(snapshot, opts);
 
