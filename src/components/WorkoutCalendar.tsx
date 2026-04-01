@@ -656,8 +656,9 @@ export default function WorkoutCalendar({
             const durStr = mins > 0 ? `${mins}:00` : '';
             labelBase = durStr ? `${t} ${durStr}`.trim() : t;
           } else {
-            // For completed workouts or other types, use miles if available
-            labelBase = [t, milesText].filter(Boolean).join(' ');
+            // Strength/mobility have no meaningful distance — just show the type abbreviation
+            const isStrengthLike = /strength|mobility|pilates/i.test(String(w?.type || ''));
+            labelBase = isStrengthLike ? t : [t, milesText].filter(Boolean).join(' ');
           }
         } else {
           // If plannedLabel exists but doesn't have duration for bikes/swims, try to add it
