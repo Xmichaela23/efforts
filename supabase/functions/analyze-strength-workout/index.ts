@@ -634,43 +634,56 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
   let rirAdherence: number | null = null;
   let avgExecutedRIR: number | null = null;
   let rirConsistency: number | null = null;
-  
-  // Get planned RIR (if any)
-  const plannedRIR = plannedSets.find((set: any) => set.rir !== null && set.rir !== undefined);
-  
+
+  // Target RIR: exercise-level target_rir is the source of truth (set by protocol).
+  // Fall back to set-level rir on the first planned set if not present.
+  const exerciseTargetRIR: number | null =
+    typeof planned.target_rir === 'number' ? planned.target_rir
+    : typeof planned.target_rir === 'string' ? Number(planned.target_rir) || null
+    : plannedSets.find((s: any) => s.rir != null)?.rir ?? null;
+
   // Get executed RIR data
   const executedRIRSets = completedSets.filter((set: any) => set.rir !== null && set.rir !== undefined);
-  
+
   if (executedRIRSets.length > 0) {
-    // Calculate average RIR
     avgExecutedRIR = executedRIRSets.reduce((sum: number, set: any) => sum + set.rir, 0) / executedRIRSets.length;
-    
-    // Calculate RIR consistency (standard deviation)
-    const variance = executedRIRSets.reduce((sum: number, set: any) => 
+
+    const variance = executedRIRSets.reduce((sum: number, set: any) =>
       sum + Math.pow(set.rir - avgExecutedRIR!, 2), 0) / executedRIRSets.length;
     rirConsistency = Math.sqrt(variance);
-    
-    // Calculate adherence to planned RIR
-    if (plannedRIR && avgExecutedRIR !== null) {
-      rirAdherence = Math.abs(avgExecutedRIR - plannedRIR.rir);
+
+    if (exerciseTargetRIR !== null) {
+      rirAdherence = Math.round((avgExecutedRIR - exerciseTargetRIR) * 10) / 10;
     }
   }
-  
+
+  // RIR verdict — directional signal, not a score
+  // Positive rirAdherence = more reps in reserve than target = too easy (underloaded)
+  // Negative rirAdherence = fewer reps in reserve than target = too hard (overloaded)
+  let rirVerdict: 'too_easy' | 'on_target' | 'too_hard' | null = null;
+  if (rirAdherence !== null) {
+    if (rirAdherence > 1.5) rirVerdict = 'too_easy';
+    else if (rirAdherence < -1.5) rirVerdict = 'too_hard';
+    else rirVerdict = 'on_target';
+  }
+
   // Calculate volume completion
-  const plannedVolume = plannedSets.reduce((sum: number, set: any) => 
+  const plannedVolume = plannedSets.reduce((sum: number, set: any) =>
     sum + ((set.reps || 0) * (set.weight || 0)), 0);
-  const executedVolume = completedSets.reduce((sum: number, set: any) => 
+  const executedVolume = completedSets.reduce((sum: number, set: any) =>
     sum + ((set.reps || 0) * (set.weight || 0)), 0);
-  
-  const volumeCompletion = plannedVolume > 0 ? 
+
+  const volumeCompletion = plannedVolume > 0 ?
     (executedVolume / plannedVolume) * 100 : 0;
-  
+
   return {
     set_completion: Math.round(setCompletion),
     weight_progression: Math.round(weightProgression * 10) / 10,
-    rir_adherence: rirAdherence as number | null,
-    avg_rir: avgExecutedRIR ? Math.round(avgExecutedRIR * 10) / 10 : null,
-    rir_consistency: rirConsistency ? Math.round(rirConsistency * 10) / 10 : null,
+    target_rir: exerciseTargetRIR,
+    rir_adherence: rirAdherence,
+    rir_verdict: rirVerdict,
+    avg_rir: avgExecutedRIR != null ? Math.round(avgExecutedRIR * 10) / 10 : null,
+    rir_consistency: rirConsistency != null ? Math.round(rirConsistency * 10) / 10 : null,
     rir_sets_count: executedRIRSets.length,
     volume_completion: Math.round(volumeCompletion)
   };
@@ -908,7 +921,9 @@ function generateExerciseBreakdown(
         adherence: {
           set_completion: adherence.set_completion,
           load_adherence: weightScore, // Percentage based on weight difference
+          target_rir: adherence.target_rir,
           rir_adherence: adherence.rir_adherence,
+          rir_verdict: adherence.rir_verdict,
           volume_completion: adherence.volume_completion
         },
         performance_score: Math.round(performanceScore)

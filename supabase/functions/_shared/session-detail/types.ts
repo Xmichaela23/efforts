@@ -193,6 +193,14 @@ export type SessionDetailV1 = {
     has_measured_execution: boolean;
   };
 
+  /** Strength only: per-exercise RIR verdict from analyzer. */
+  strength_rir_summary?: Array<{
+    name: string;
+    target_rir: number;
+    avg_rir: number | null;
+    rir_verdict: 'too_easy' | 'on_target' | 'too_hard' | null;
+  }> | null;
+
   /** Strength only: server-computed deviations. */
   strength_weight_deviation?: {
     direction: 'heavier' | 'lighter' | 'on_target';

@@ -510,6 +510,19 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     strength_weight_deviation: weightDev,
     strength_volume_deviation: volumeDev,
+    strength_rir_summary: (() => {
+      const exerciseAdherence = (wa as any)?.detailed_analysis?.exercise_adherence;
+      if (!Array.isArray(exerciseAdherence)) return null;
+      const withRIR = exerciseAdherence
+        .filter((ea: any) => ea.matched && ea.adherence?.target_rir != null)
+        .map((ea: any) => ({
+          name: String(ea.executed?.name || ea.planned?.name || ''),
+          target_rir: ea.adherence.target_rir as number,
+          avg_rir: ea.adherence.avg_rir != null ? ea.adherence.avg_rir as number : null,
+          rir_verdict: ea.adherence.rir_verdict as 'too_easy' | 'on_target' | 'too_hard' | null,
+        }));
+      return withRIR.length > 0 ? withRIR : null;
+    })(),
     readiness: (() => {
       if (readinessUnavailable || !readinessSnapshot) return null;
       return packageSessionDetailReadiness(readinessSnapshot);
