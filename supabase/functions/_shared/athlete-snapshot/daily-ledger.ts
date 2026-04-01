@@ -201,8 +201,8 @@ export function buildActualSession(row: any, imperial: boolean): ActualSession {
   const distKm = Number(row?.distance) || null;
   const distM = distKm != null ? Math.round(distKm * 1000) : null;
   const avgHr = Number(row?.avg_hr) || Number(row?.average_heartrate) || null;
-  const analysis = typeof row?.workout_analysis === 'object' ? row.workout_analysis : {};
-  const computed = typeof row?.computed === 'object' ? row.computed : {};
+  const analysis = (row?.workout_analysis != null && typeof row.workout_analysis === 'object') ? row.workout_analysis : {};
+  const computed = (row?.computed != null && typeof row.computed === 'object') ? row.computed : {};
 
   let strengthActual: StrengthExerciseActual[] | null = null;
   const exRaw = row?.strength_exercises;

@@ -432,6 +432,77 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
   }
 }
 
+// ---------- Aerobic decoupling (Pa:HR) execution score for runs ----------
+// Mirrors TrainingPeaks methodology: compare pace:HR ratio in first half vs second half.
+// <5% drift = excellent (100), 5-10% = good (80-90), 10-15% = moderate (60-79), >15% = poor (<60).
+// Guards: min 40min moving, steady-state only (skips interval sessions), heat annotation.
+function aerobicDecouplingScore(
+  rows: any[],
+  plannedSteps: any[],
+  avgTempC: number | null,
+): { score: number | null; hot_conditions: boolean } {
+  const none = { score: null, hot_conditions: false };
+  try {
+    // Guard 1: steady-state only — skip if planned has >2 distinct work steps
+    // (intervals, fartlek, tempo repeats mix work+rest and break the first/second-half split)
+    const workSteps = plannedSteps.filter((s: any) => {
+      const role = String(s?.type || s?.kind || s?.role || '').toLowerCase();
+      return !role.includes('rest') && !role.includes('recovery') && !role.includes('warmup') && !role.includes('cooldown');
+    });
+    if (workSteps.length > 2) {
+      console.log(`🔍 [AEROBIC DECOUPLING] Skipping — interval session (${workSteps.length} work steps)`);
+      return none;
+    }
+
+    // Filter to moving samples with HR
+    const valid = rows.filter(r =>
+      typeof r.hr === 'number' && r.hr >= 50 && r.hr <= 220 &&
+      typeof r.v === 'number' && r.v > 0.5
+    );
+    if (valid.length < 20) return none;
+
+    // Guard 2: minimum 40 minutes of moving time
+    const firstT = Number(valid[0]?.t ?? 0);
+    const lastT = Number(valid[valid.length - 1]?.t ?? 0);
+    const movingSeconds = lastT - firstT;
+    if (movingSeconds < 2400) {
+      console.log(`🔍 [AEROBIC DECOUPLING] Skipping — too short (${Math.round(movingSeconds / 60)} min moving, need 40)`);
+      return none;
+    }
+
+    // Skip first 5 minutes — HR lag from warmup distorts first-half ratio
+    const warmupCutoff = firstT + 300;
+    const steady = valid.filter(r => Number(r.t) >= warmupCutoff);
+    if (steady.length < 20) return none;
+
+    const mid = Math.floor(steady.length / 2);
+    const first = steady.slice(0, mid);
+    const second = steady.slice(mid);
+
+    const avgPaceHrRatio = (samples: any[]): number | null => {
+      const avgSpeed = samples.reduce((s: number, r: any) => s + r.v, 0) / samples.length;
+      const avgHr = samples.reduce((s: number, r: any) => s + r.hr, 0) / samples.length;
+      if (avgHr <= 0 || avgSpeed <= 0) return null;
+      return avgSpeed / avgHr;
+    };
+
+    const r1 = avgPaceHrRatio(first);
+    const r2 = avgPaceHrRatio(second);
+    if (r1 == null || r2 == null || r1 <= 0) return none;
+
+    const decouplingPct = ((r1 - r2) / r1) * 100;
+    const score = Math.round(Math.max(0, Math.min(100, 100 - (Math.max(0, decouplingPct - 5) * 4))));
+
+    // Heat flag: >27°C (80°F) — score is real but conditions explain higher drift
+    const hot_conditions = avgTempC != null && avgTempC > 27;
+
+    console.log(`🔍 [AEROBIC DECOUPLING] moving=${Math.round(movingSeconds / 60)}min, decoupling=${decouplingPct.toFixed(1)}%, score=${score}, hot=${hot_conditions}`);
+    return { score, hot_conditions };
+  } catch {
+    return none;
+  }
+}
+
 // ---------- Adherence calculation function ----------
 function calculateExecutionPercentage(plannedStep: any, executedStep: any, overallWorkout?: any, isContinuousWorkout?: boolean, rows?: any[]): number | null {
   if (!executedStep) return null;
@@ -583,7 +654,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w, error: workoutError } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,avg_temperature,weather_data')
       .eq('id', workout_id)
       .maybeSingle();
     try { 
@@ -1306,58 +1377,16 @@ Deno.serve(async (req) => {
     } catch {}
 
       const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
-      // Calculate overall execution score (weighted average of interval adherence percentages)
-      const overallExecutionScore = ((): number | null => {
-        try {
-          console.log(`🔍 [SERVER EXECUTION SCORE] Starting calculation with ${outIntervals.length} total intervals`);
-          
-          const workIntervals = outIntervals.filter((interval: any) => {
-            const kind = String(interval?.kind || '').toLowerCase();
-            return !(kind.includes('rest') || kind.includes('recovery'));
-          });
-          
-          console.log(`🔍 [SERVER EXECUTION SCORE] Found ${workIntervals.length} work intervals out of ${outIntervals.length} total`);
-          
-          if (workIntervals.length === 0) {
-            console.log(`🔍 [SERVER EXECUTION SCORE] No work intervals found, returning null`);
-            return null;
-          }
-          
-          let totalWeighted = 0;
-          let totalWeight = 0;
-          
-          for (const interval of workIntervals) {
-            const adherencePct = interval?.executed?.adherence_percentage;
-            console.log(`🔍 [SERVER EXECUTION SCORE] Interval ${interval?.kind}: adherence=${adherencePct}`);
-            
-            if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) {
-              console.log(`🔍 [SERVER EXECUTION SCORE] Skipping interval ${interval?.kind} - no valid adherence percentage`);
-              continue;
-            }
-            
-            // Weight by duration (longer intervals matter more)
-            const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
-            const weight = Math.max(1, duration);
-            
-            console.log(`🔍 [SERVER EXECUTION SCORE] Added: ${adherencePct}% * ${weight}s = ${adherencePct * weight}, totalWeighted=${totalWeighted}, totalWeight=${totalWeight}`);
-            
-            totalWeighted += adherencePct * weight;
-            totalWeight += weight;
-          }
-          
-          const result = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
-          console.log(`🔍 [SERVER EXECUTION SCORE] Final result: ${result}% (${totalWeighted}/${totalWeight})`);
-          
-          return result;
-        } catch (error) {
-          console.error('Error calculating overall execution score:', error);
-          return null;
-        }
-      })();
+      // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
+      const avgTempC = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
+      const { score: overallExecutionScore, hot_conditions } = sport === 'run'
+        ? aerobicDecouplingScore(rows, plannedSteps, avgTempC)
+        : { score: null, hot_conditions: false };
 
       console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {
         hasExecutionScore: !!overallExecutionScore,
         executionScore: overallExecutionScore,
+        hot_conditions,
         overallKeys: ['duration_s_moving', 'distance_m', 'avg_pace_s_per_mi', 'gap_pace_s_per_mi', 'execution_score']
       });
 
@@ -1370,6 +1399,7 @@ Deno.serve(async (req) => {
           avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
           gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
           execution_score: overallExecutionScore,
+          hot_conditions: hot_conditions || undefined,
           // Rollups
           avg_cadence_spm: ((): number | null => {
             try {
@@ -1497,37 +1527,12 @@ Deno.serve(async (req) => {
       } catch {}
       const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
       
-      // Calculate overall execution score for snap-to-laps
-      const overallExecutionScore = ((): number | null => {
-        try {
-          const workIntervals = snapped.filter((interval: any) => {
-            const kind = String(interval?.kind || '').toLowerCase();
-            return !(kind.includes('rest') || kind.includes('recovery'));
-          });
-          
-          if (workIntervals.length === 0) return null;
-          
-          let totalWeighted = 0;
-          let totalWeight = 0;
-          
-          for (const interval of workIntervals) {
-            const adherencePct = interval?.executed?.adherence_percentage;
-            if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) continue;
-            
-            const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
-            const weight = Math.max(1, duration);
-            
-            totalWeighted += adherencePct * weight;
-            totalWeight += weight;
-          }
-          
-          return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
-        } catch (error) {
-          console.error('Error calculating overall execution score (snap-to-laps):', error);
-          return null;
-        }
-      })();
-      
+      // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
+      const avgTempC2 = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
+      const { score: overallExecutionScore, hot_conditions: hot2 } = sport === 'run'
+        ? aerobicDecouplingScore(rows, plannedSteps, avgTempC2)
+        : { score: null, hot_conditions: false };
+
       const computed = {
         version: COMPUTED_VERSION,
         intervals: snapped,
@@ -1536,7 +1541,8 @@ Deno.serve(async (req) => {
           distance_m: Math.round(overallMeters),
           avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
           gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
-          execution_score: overallExecutionScore
+          execution_score: overallExecutionScore,
+          hot_conditions: hot2 || undefined,
         }
       };
       try { console.error('[compute] mode=snap-to-laps intervals:', snapped.length); } catch {}
@@ -2097,58 +2103,16 @@ Deno.serve(async (req) => {
 
     const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
     
-    // Calculate overall execution score (weighted average of interval adherence percentages)
-    const overallExecutionScore = ((): number | null => {
-      try {
-        console.log(`🔍 [SERVER EXECUTION SCORE] Starting calculation with ${outIntervals.length} total intervals`);
-        
-        const workIntervals = outIntervals.filter((interval: any) => {
-          const kind = String(interval?.kind || '').toLowerCase();
-          return !(kind.includes('rest') || kind.includes('recovery'));
-        });
-        
-        console.log(`🔍 [SERVER EXECUTION SCORE] Found ${workIntervals.length} work intervals out of ${outIntervals.length} total`);
-        
-        if (workIntervals.length === 0) {
-          console.log(`🔍 [SERVER EXECUTION SCORE] No work intervals found, returning null`);
-          return null;
-        }
-        
-        let totalWeighted = 0;
-        let totalWeight = 0;
-        
-        for (const interval of workIntervals) {
-          const adherencePct = interval?.executed?.adherence_percentage;
-          console.log(`🔍 [SERVER EXECUTION SCORE] Interval ${interval?.kind}: adherence=${adherencePct}`);
-          
-          if (typeof adherencePct !== 'number' || !Number.isFinite(adherencePct)) {
-            console.log(`🔍 [SERVER EXECUTION SCORE] Skipping interval ${interval?.kind} - no valid adherence percentage`);
-            continue;
-          }
-          
-          // Weight by duration (longer intervals matter more)
-          const duration = Number(interval?.executed?.duration_s || interval?.planned?.duration_s || 60);
-          const weight = Math.max(1, duration);
-          
-          console.log(`🔍 [SERVER EXECUTION SCORE] Added: ${adherencePct}% * ${weight}s = ${adherencePct * weight}, totalWeighted=${totalWeighted}, totalWeight=${totalWeight}`);
-          
-          totalWeighted += adherencePct * weight;
-          totalWeight += weight;
-        }
-        
-        const result = totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
-        console.log(`🔍 [SERVER EXECUTION SCORE] Final result: ${result}% (${totalWeighted}/${totalWeight})`);
-        
-        return result;
-      } catch (error) {
-        console.error('Error calculating overall execution score:', error);
-        return null;
-      }
-    })();
+    // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
+    const avgTempC3 = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
+    const { score: overallExecutionScore, hot_conditions: hot3 } = sport === 'run'
+      ? aerobicDecouplingScore(rows, plannedSteps, avgTempC3)
+      : { score: null, hot_conditions: false };
 
     console.log('🔍 [SERVER EXECUTION SCORE] About to store computed data:', {
       hasExecutionScore: !!overallExecutionScore,
       executionScore: overallExecutionScore,
+      hot_conditions: hot3,
       overallKeys: ['duration_s_moving', 'distance_m', 'avg_pace_s_per_mi', 'gap_pace_s_per_mi', 'execution_score']
     });
 
@@ -2185,6 +2149,7 @@ Deno.serve(async (req) => {
         gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : existingOverall?.gap_pace_s_per_mi || null,
         max_speed_mps: max_speed_mps != null ? Number(max_speed_mps.toFixed(2)) : existingOverall?.max_speed_mps || null,
         execution_score: overallExecutionScore || existingOverall?.execution_score || null,
+        hot_conditions: hot3 || existingOverall?.hot_conditions || undefined,
         // Preserve any other fields from existing overall
         ...(existingOverall?.duration_s_elapsed ? { duration_s_elapsed: existingOverall.duration_s_elapsed } : {})
       }

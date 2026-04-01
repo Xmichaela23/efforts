@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import React from 'react';
 
 type TrendPoint = {
   date: string;
@@ -156,8 +155,6 @@ export default function SessionNarrative({
   onRecompute,
   recomputeDisabled,
 }: SessionNarrativeProps) {
-  const [analysisDetailsOpen, setAnalysisDetailsOpen] = useState(false);
-
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
   const narrativeText = (typeof sd?.narrative_text === 'string' && sd.narrative_text.trim()) || '';
@@ -270,29 +267,17 @@ export default function SessionNarrative({
         </div>
       )}
       {trend && <TrendSparkline trend={trend} />}
-      {nextSession && <NextUp session={nextSession} />}
       {hasAnalysisDetails && (
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setAnalysisDetailsOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide hover:text-gray-300"
-          >
-            {analysisDetailsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-            Analysis Details
-          </button>
-          {analysisDetailsOpen && (
-          <div className="space-y-1.5">
-            {analysisRows.slice(0, 8).map((r, i) => (
-              <div key={i}>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(r.label ?? '')}</span>
-                <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(r.value ?? '')}</p>
-              </div>
-            ))}
-          </div>
-          )}
+        <div className="space-y-1.5">
+          {analysisRows.slice(0, 8).map((r, i) => (
+            <div key={i}>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(r.label ?? '')}</span>
+              <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(r.value ?? '')}</p>
+            </div>
+          ))}
         </div>
       )}
+      {nextSession && <NextUp session={nextSession} />}
       {!hasNarrative && hasStructuredForRender && (
         <>
           {technicalInsightsForRender.length > 0 && (

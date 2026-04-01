@@ -295,7 +295,7 @@ function buildVerdict(
   if (
     t.min_execution_score_ok != null &&
     reaction.avg_execution_score != null &&
-    reaction.execution_sample_size >= 1 &&
+    reaction.execution_sample_size >= 2 &&
     reaction.avg_execution_score < t.min_execution_score_ok
   ) {
     reason_codes.push('execution_low');
@@ -622,23 +622,14 @@ Deno.serve(async (req) => {
 
     const executionScoreFromWorkout = (wAny: any): number | null => {
       try {
-        // Prefer canonical computed score when present
+        // Single source of truth: computed.overall.execution_score (aerobic decoupling Pa:HR)
+        // Only set for steady-state runs ≥40min with HR data. Returns null for short runs,
+        // interval sessions, strength, cycling — do NOT fall back to pace/adherence metrics
+        // as they measure compliance, not aerobic quality.
         const c = parseJson((wAny as any)?.computed);
         const s1 = safeNum(c?.overall?.execution_score);
         if (s1 != null) return Math.max(0, Math.min(100, s1));
-
-        const wa = parseJson((wAny as any)?.workout_analysis) || {};
-        const s2 =
-          safeNum(wa?.execution_summary?.overall_execution) ??
-          safeNum(wa?.performance?.execution_adherence) ??
-          safeNum(wa?.performance?.pace_adherence) ??
-          safeNum(wa?.performance?.overall_adherence) ??
-          null;
-        if (s2 == null) return null;
-
-        // Normalize 0..1 fractions to 0..100
-        const normalized = s2 > 0 && s2 <= 1 ? s2 * 100 : s2;
-        return Math.max(0, Math.min(100, Math.round(normalized)));
+        return null;
       } catch {
         return null;
       }
