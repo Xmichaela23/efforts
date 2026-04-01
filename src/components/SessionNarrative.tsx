@@ -93,6 +93,38 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
   const arrow = trend.direction === 'improving' ? '↗' : trend.direction === 'declining' ? '↘' : '→';
   const color = trend.direction === 'improving' ? '#34d399' : trend.direction === 'declining' ? '#f87171' : '#9ca3af';
 
+  // HR line — normalize independently, lower HR = higher on chart (same direction as pace improvement)
+  const hrPts = pts.filter((p) => (p as any).avg_hr != null);
+  const hasHr = hrPts.length >= 3;
+  const hrCoords = hasHr ? (() => {
+    const hrVals = pts.map((p) => (p as any).avg_hr as number | null);
+    const validHr = hrVals.filter((v): v is number => v != null);
+    const maxHr = Math.max(...validHr);
+    const minHr = Math.min(...validHr);
+    const hrRange = maxHr - minHr || 1;
+    return pts.map((p, i) => {
+      const hr = (p as any).avg_hr as number | null;
+      return {
+        x: PAD + (i / (pts.length - 1)) * plotW,
+        y: hr != null ? PAD + ((hr - minHr) / hrRange) * plotH : null,
+        hr,
+        is_current: (p as any).is_current,
+      };
+    });
+  })() : [];
+  const hrPathSegments: string[] = [];
+  if (hasHr) {
+    let seg = '';
+    for (const c of hrCoords) {
+      if (c.y == null) { seg = ''; continue; }
+      seg += seg === '' ? `M${c.x},${c.y}` : `L${c.x},${c.y}`;
+    }
+    if (seg) hrPathSegments.push(seg);
+  }
+
+  // HR label for today
+  const todayHr = (pts[pts.length - 1] as any).avg_hr as number | null;
+
   return (
     <div>
       <div className="flex items-center gap-2">
@@ -101,22 +133,29 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
       </div>
       <div className="mt-1 relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
+          {/* Pace line */}
           <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
           {coords.map((c, i) => (
-            <circle
-              key={i}
-              cx={c.x}
-              cy={c.y}
-              r={c.is_current ? 3.5 : 2}
+            <circle key={i} cx={c.x} cy={c.y} r={c.is_current ? 3.5 : 2}
               fill={c.is_current ? color : 'rgba(156,163,175,0.5)'}
-              stroke={c.is_current ? color : 'none'}
-              strokeWidth={c.is_current ? 1 : 0}
-            />
+              stroke={c.is_current ? color : 'none'} strokeWidth={c.is_current ? 1 : 0} />
+          ))}
+          {/* HR line — dashed, muted red, independently scaled */}
+          {hrPathSegments.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke="#f87171" strokeWidth="1" strokeDasharray="3 2"
+              strokeLinecap="round" strokeLinejoin="round" opacity={0.4} />
+          ))}
+          {hasHr && hrCoords.filter((c) => c.y != null && c.is_current).map((c, i) => (
+            <circle key={i} cx={c.x} cy={c.y!} r={2.5} fill="#f87171" opacity={0.6} />
           ))}
         </svg>
         <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
           <span>{pts[0].label}</span>
-          <span className="font-medium" style={{ color }}>{pts[pts.length - 1].label} ← today</span>
+          <span className="font-medium" style={{ color }}>
+            {pts[pts.length - 1].label}
+            {todayHr != null && <span className="text-red-400/50 ml-1">· {todayHr} bpm</span>}
+            {' '}← today
+          </span>
         </div>
       </div>
     </div>

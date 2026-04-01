@@ -376,6 +376,7 @@ export async function buildWorkoutFactPacketV1(args: {
       currentAvgPaceSecPerMi: overallPace != null ? overallPace : null,
       currentAvgHr: avgHr,
       currentHrDriftBpm: hrDriftCurrent,
+      currentTerrainClass: terrain_type !== 'flat' ? terrain_type : null,
     }),
     getPaceTrend(supabase, { userId: String(workout.user_id), workoutTypeKey, count: 8 }),
     getNotableAchievements(supabase, { userId: String(workout.user_id), currentWorkoutId: String(workout.id), workoutTypeKey, lookbackDays: 28 }),

@@ -6,7 +6,7 @@ import type {
   SimilarAssessment,
   TrainingLoadV1,
 } from './types.ts';
-import { coerceNumber, isoDateAddDays, isoWeekStartMonday } from './utils.ts';
+import { classifyTerrain, coerceNumber, isoDateAddDays, isoWeekStartMonday } from './utils.ts';
 
 type SupabaseLike = any;
 
@@ -112,6 +112,15 @@ function getHrDriftBpmFromAnalysis(row: any): number | null {
   return drift != null ? Math.round(drift) : null;
 }
 
+function getElevationGainFt(row: any): number | null {
+  const m = coerceNumber(row?.elevation_gain);
+  return m != null ? m * 3.28084 : null;
+}
+
+function getTerrainClass(row: any): 'flat' | 'rolling' | 'hilly' {
+  return classifyTerrain(getElevationGainFt(row), getOverallDistanceMi(row));
+}
+
 function inferWorkoutTypeKey(row: any): string | null {
   // Prefer analyzer output if available
   const wa = row?.workout_analysis;
@@ -185,9 +194,10 @@ export async function getSimilarWorkoutComparisons(
     currentAvgPaceSecPerMi: number | null;
     currentAvgHr: number | null;
     currentHrDriftBpm: number | null;
+    currentTerrainClass?: 'flat' | 'rolling' | 'hilly' | null;
   }
 ): Promise<VsSimilarV1 & { avg_pace_at_similar_hr: number | null; avg_hr_drift: number | null }> {
-  const { userId, currentWorkoutId, workoutTypeKey, durationMin, currentAvgPaceSecPerMi, currentAvgHr, currentHrDriftBpm } = params;
+  const { userId, currentWorkoutId, workoutTypeKey, durationMin, currentAvgPaceSecPerMi, currentAvgHr, currentHrDriftBpm, currentTerrainClass } = params;
 
   try {
     const end = new Date().toISOString().slice(0, 10);
@@ -209,7 +219,17 @@ export async function getSimilarWorkoutComparisons(
       const d = getOverallDurationMin(r);
       return d != null && d >= bandLo && d <= bandHi;
     });
-    const withMetrics = durationMatch.map((r) => {
+    // Terrain-aware filtering: prefer same terrain class, fall back to full duration pool if < 3 hits.
+    let terrainMatch = durationMatch;
+    if (currentTerrainClass) {
+      const terrainFiltered = durationMatch.filter((r) => getTerrainClass(r) === currentTerrainClass);
+      if (terrainFiltered.length >= 3) {
+        terrainMatch = terrainFiltered;
+      }
+      console.log(`[fact-packet] terrain filter (${currentTerrainClass}): ${durationMatch.length} → ${terrainFiltered.length} (using ${terrainFiltered.length >= 3 ? 'terrain-filtered' : 'unfiltered'} pool)`);
+    }
+
+    const withMetrics = terrainMatch.map((r) => {
       const pace = getOverallPaceSecPerMi(r);
       const hr = getOverallAvgHr(r);
       const drift = getHrDriftBpmFromAnalysis(r);
@@ -218,7 +238,7 @@ export async function getSimilarWorkoutComparisons(
     const filtered = withMetrics.filter((x) => x.pace != null && x.hr != null);
 
     const sample_size = filtered.length;
-    console.log(`[fact-packet] similar workouts funnel: total=${rows.length} → notSelf=${notSelf.length} → completed=${completed.length} → typeMatch=${typeMatch.length} → durationMatch(${bandLo}-${bandHi}min)=${durationMatch.length} → pace+hr=${sample_size} | workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}]`);
+    console.log(`[fact-packet] similar workouts funnel: total=${rows.length} → notSelf=${notSelf.length} → completed=${completed.length} → typeMatch=${typeMatch.length} → durationMatch(${bandLo}-${bandHi}min)=${durationMatch.length} → terrainMatch=${terrainMatch.length} → pace+hr=${sample_size} | workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}]`);
     if (durationMatch.length > 0 && filtered.length < durationMatch.length) {
       const missing = withMetrics.filter(x => x.pace == null || x.hr == null);
       console.log(`[fact-packet] dropped ${missing.length} workouts missing pace/hr:`, missing.slice(0, 3).map(x => ({ id: x.r.id, date: x.r.date, pace: x.pace, hr: x.hr })));
@@ -231,15 +251,21 @@ export async function getSimilarWorkoutComparisons(
       const d = getOverallDurationMin(r);
       return d != null && d >= wideBandLo && d <= wideBandHi;
     });
-    const trendPoolSource = durationMatch.length >= 3
-      ? 'durationMatch'
-      : wideDurationMatch.length >= 3
+    // Apply terrain filter to trend pool as well, with same fallback logic
+    const applyTerrainFilter = (pool: typeof durationMatch) => {
+      if (!currentTerrainClass || pool.length < 3) return pool;
+      const tf = pool.filter((r) => getTerrainClass(r) === currentTerrainClass);
+      return tf.length >= 3 ? tf : pool;
+    };
+    const trendPoolSource = terrainMatch.length >= 3
+      ? 'terrainMatch'
+      : applyTerrainFilter(wideDurationMatch).length >= 3
         ? 'wideDurationMatch'
         : 'typeMatch';
-    const trendPool = trendPoolSource === 'durationMatch'
-      ? durationMatch
+    const trendPool = trendPoolSource === 'terrainMatch'
+      ? terrainMatch
       : trendPoolSource === 'wideDurationMatch'
-        ? wideDurationMatch
+        ? applyTerrainFilter(wideDurationMatch)
         : typeMatch;
     const trendWithPace = trendPool.filter((r) => r.date && getOverallPaceSecPerMi(r) != null);
     console.log(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPace.length}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
