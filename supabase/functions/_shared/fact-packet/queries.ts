@@ -202,7 +202,49 @@ export async function getSimilarWorkoutComparisons(
   try {
     const end = new Date().toISOString().slice(0, 10);
     const start = isoDateAddDays(end, -120);
-    const rows = await fetchRecentWorkouts(supabase, userId, start, end, 60);
+
+    // Fetch recent workouts and segment overlap in parallel
+    const [rows, segmentRouteWorkoutIds] = await Promise.all([
+      fetchRecentWorkouts(supabase, userId, start, end, 60),
+      (async (): Promise<Set<string> | null> => {
+        try {
+          const { data: currentSegMatches } = await supabase
+            .from('workout_segment_match')
+            .select('segment_id')
+            .eq('workout_id', currentWorkoutId)
+            .limit(200);
+          const currentSegIds = Array.from(new Set(
+            (Array.isArray(currentSegMatches) ? currentSegMatches : [])
+              .map((m: any) => String(m?.segment_id || '').trim())
+              .filter(Boolean)
+          ));
+          if (currentSegIds.length === 0) return null;
+          const { data: sharedMatches } = await supabase
+            .from('workout_segment_match')
+            .select('workout_id, segment_id')
+            .in('segment_id', currentSegIds)
+            .neq('workout_id', currentWorkoutId);
+          if (!Array.isArray(sharedMatches) || sharedMatches.length === 0) return null;
+          const overlapCount = new Map<string, number>();
+          for (const m of sharedMatches) {
+            const wid = String(m.workout_id);
+            overlapCount.set(wid, (overlapCount.get(wid) || 0) + 1);
+          }
+          // Require at least 25% segment overlap to qualify as "same route"
+          const minOverlap = Math.max(1, Math.floor(currentSegIds.length * 0.25));
+          const matchedIds = new Set(
+            [...overlapCount.entries()]
+              .filter(([, count]) => count >= minOverlap)
+              .map(([wid]) => wid)
+          );
+          console.warn(`[fact-packet] segment route: currentSegIds=${currentSegIds.length}, minOverlap=${minOverlap}, matchedWorkouts=${matchedIds.size}`);
+          return matchedIds.size > 0 ? matchedIds : null;
+        } catch (e) {
+          console.warn('[fact-packet] segment match fetch failed (non-fatal):', e);
+          return null;
+        }
+      })(),
+    ]);
 
     const bandLo = Math.max(5, Math.round(durationMin * 0.7));
     const bandHi = Math.round(durationMin * 1.3);
@@ -226,10 +268,21 @@ export async function getSimilarWorkoutComparisons(
       if (terrainFiltered.length >= 3) {
         terrainMatch = terrainFiltered;
       }
-      console.log(`[fact-packet] terrain filter (${currentTerrainClass}): ${durationMatch.length} → ${terrainFiltered.length} (using ${terrainFiltered.length >= 3 ? 'terrain-filtered' : 'unfiltered'} pool)`);
+      console.warn(`[fact-packet] terrain filter (${currentTerrainClass}): ${durationMatch.length} → ${terrainFiltered.length} (using ${terrainFiltered.length >= 3 ? 'terrain-filtered' : 'unfiltered'} pool)`);
     }
 
-    const withMetrics = terrainMatch.map((r) => {
+    // Route/segment matching: tightest filter — workouts sharing actual roads/segments.
+    // Falls back to terrainMatch if fewer than 3 qualifying runs.
+    let routeMatch = terrainMatch;
+    if (segmentRouteWorkoutIds && segmentRouteWorkoutIds.size > 0) {
+      const routeFiltered = terrainMatch.filter((r) => segmentRouteWorkoutIds!.has(String(r.id)));
+      if (routeFiltered.length >= 3) {
+        routeMatch = routeFiltered;
+      }
+      console.warn(`[fact-packet] route filter: terrainMatch=${terrainMatch.length} → routeFiltered=${routeFiltered.length} (using ${routeFiltered.length >= 3 ? 'route' : 'terrain'} pool)`);
+    }
+
+    const withMetrics = routeMatch.map((r) => {
       const pace = getOverallPaceSecPerMi(r);
       const hr = getOverallAvgHr(r);
       const drift = getHrDriftBpmFromAnalysis(r);
@@ -238,7 +291,7 @@ export async function getSimilarWorkoutComparisons(
     const filtered = withMetrics.filter((x) => x.pace != null && x.hr != null);
 
     const sample_size = filtered.length;
-    console.log(`[fact-packet] similar workouts funnel: total=${rows.length} → notSelf=${notSelf.length} → completed=${completed.length} → typeMatch=${typeMatch.length} → durationMatch(${bandLo}-${bandHi}min)=${durationMatch.length} → terrainMatch=${terrainMatch.length} → pace+hr=${sample_size} | workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}]`);
+    console.warn(`[fact-packet] similar workouts funnel: total=${rows.length} → notSelf=${notSelf.length} → completed=${completed.length} → typeMatch=${typeMatch.length} → durationMatch(${bandLo}-${bandHi}min)=${durationMatch.length} → terrainMatch=${terrainMatch.length} → routeMatch=${routeMatch.length} → pace+hr=${sample_size} | workoutTypeKey=${workoutTypeKey}, comparableKeys=[${comparableKeys.join(',')}]`);
     if (durationMatch.length > 0 && filtered.length < durationMatch.length) {
       const missing = withMetrics.filter(x => x.pace == null || x.hr == null);
       console.log(`[fact-packet] dropped ${missing.length} workouts missing pace/hr:`, missing.slice(0, 3).map(x => ({ id: x.r.id, date: x.r.date, pace: x.pace, hr: x.hr })));
@@ -257,18 +310,28 @@ export async function getSimilarWorkoutComparisons(
       const tf = pool.filter((r) => getTerrainClass(r) === currentTerrainClass);
       return tf.length >= 3 ? tf : pool;
     };
-    const trendPoolSource = terrainMatch.length >= 3
-      ? 'terrainMatch'
-      : applyTerrainFilter(wideDurationMatch).length >= 3
-        ? 'wideDurationMatch'
-        : 'typeMatch';
-    const trendPool = trendPoolSource === 'terrainMatch'
-      ? terrainMatch
-      : trendPoolSource === 'wideDurationMatch'
-        ? applyTerrainFilter(wideDurationMatch)
-        : typeMatch;
+    const applyRouteFilter = (pool: typeof durationMatch) => {
+      if (!segmentRouteWorkoutIds || segmentRouteWorkoutIds.size === 0 || pool.length < 3) return pool;
+      const rf = pool.filter((r) => segmentRouteWorkoutIds!.has(String(r.id)));
+      return rf.length >= 3 ? rf : pool;
+    };
+    // Trend pool priority: routeMatch > terrainMatch > wideDurationMatch > typeMatch
+    const trendPoolSource = applyRouteFilter(terrainMatch).length >= 3
+      ? 'routeMatch'
+      : terrainMatch.length >= 3
+        ? 'terrainMatch'
+        : applyTerrainFilter(wideDurationMatch).length >= 3
+          ? 'wideDurationMatch'
+          : 'typeMatch';
+    const trendPool = trendPoolSource === 'routeMatch'
+      ? applyRouteFilter(terrainMatch)
+      : trendPoolSource === 'terrainMatch'
+        ? terrainMatch
+        : trendPoolSource === 'wideDurationMatch'
+          ? applyTerrainFilter(wideDurationMatch)
+          : typeMatch;
     const trendWithPace = trendPool.filter((r) => r.date && getOverallPaceSecPerMi(r) != null);
-    console.log(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPace.length}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
+    console.warn(`[fact-packet] trend_points: pool=${trendPoolSource}(${trendPool.length}), withPace=${trendWithPace.length}, wideBand=${wideBandLo}-${wideBandHi}min(${wideDurationMatch.length} hits)`);
     const trend_points = trendWithPace
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .slice(-8)

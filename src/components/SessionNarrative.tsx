@@ -142,18 +142,18 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
           ))}
           {/* HR line — dashed, muted red, independently scaled */}
           {hrPathSegments.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="#f87171" strokeWidth="1" strokeDasharray="3 2"
+            <path key={i} d={d} fill="none" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2"
               strokeLinecap="round" strokeLinejoin="round" opacity={0.4} />
           ))}
           {hasHr && hrCoords.filter((c) => c.y != null && c.is_current).map((c, i) => (
-            <circle key={i} cx={c.x} cy={c.y!} r={2.5} fill="#f87171" opacity={0.6} />
+            <circle key={i} cx={c.x} cy={c.y!} r={2.5} fill="#fb923c" opacity={0.6} />
           ))}
         </svg>
         <div className="flex justify-between text-[10px] text-gray-500 mt-0.5" style={{ maxWidth: 280 }}>
           <span>{pts[0].label}</span>
           <span className="font-medium" style={{ color }}>
             {pts[pts.length - 1].label}
-            {todayHr != null && <span className="text-red-400/50 ml-1">· {todayHr} bpm</span>}
+            {todayHr != null && <span className="text-orange-400/50 ml-1">· {todayHr} bpm</span>}
             {' '}← today
           </span>
         </div>

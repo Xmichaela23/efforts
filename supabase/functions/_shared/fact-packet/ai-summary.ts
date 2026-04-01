@@ -339,6 +339,7 @@ RULES:
 - Connect data across domains: if terrain was hilly AND pace was "slow", say the pace was appropriate for the terrain — don't report them as separate facts.
 - When grade-adjusted pace (GAP) is available, translate it: "Your 11:04 pace was a 10:32 effort on this terrain — the hills cost about 30s/mi."
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
+- When ROUTE data is present, reference it: "on your [route name]" or "on a route you've run N times". When FAMILIAR SEGMENTS data is present and segment_insight_eligible, mention how today's effort on that segment compared to previous runs.
 
 HR DRIFT — USE PACE-NORMALIZED VALUES:
 - The "drift" value is pace-normalized: the expected HR increase from pace changes has been removed. A negative-split run where HR rose because the athlete ran faster will show near-zero drift.
