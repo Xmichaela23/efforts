@@ -153,10 +153,22 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
           <span>{pts[0].label}</span>
           <span className="font-medium" style={{ color }}>
             {pts[pts.length - 1].label}
-            {todayHr != null && <span className="text-orange-400/50 ml-1">· {todayHr} bpm</span>}
+            {todayHr != null && <span className="text-orange-400/60 ml-1">· {todayHr} bpm</span>}
             {' '}← today
           </span>
         </div>
+        {hasHr && (
+          <div className="flex items-center gap-3 mt-1" style={{ maxWidth: 280 }}>
+            <span className="flex items-center gap-1 text-[9px] text-gray-500">
+              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.6" /></svg>
+              pace
+            </span>
+            <span className="flex items-center gap-1 text-[9px] text-gray-500">
+              <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.6" /></svg>
+              hr
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
