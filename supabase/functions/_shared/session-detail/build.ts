@@ -470,10 +470,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         const delta = Math.round(firstHalfAvg - secondHalfAvg);
         const direction = delta > 10 ? 'improving' as const : delta < -10 ? 'declining' as const : 'stable' as const;
         const absDelta = Math.abs(delta);
-        const decliningWord = isEasyLike ? 'easier' : 'slower';
-        const summary = direction === 'stable'
-          ? `Consistent across ${points.length} workouts`
-          : `${absDelta}s/mi ${direction === 'improving' ? 'faster' : decliningWord} over ${points.length} workouts`;
+        const summary = (isEasyLike && direction !== 'stable')
+          ? ''
+          : direction === 'stable'
+            ? `Consistent across ${points.length} workouts`
+            : `${absDelta}s/mi ${direction === 'improving' ? 'faster' : 'slower'} over ${points.length} workouts`;
         return {
           metric_label: 'Pace',
           unit: '/mi',

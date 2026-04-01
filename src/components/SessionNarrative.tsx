@@ -145,7 +145,7 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
     <div>
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Trend</span>
-        <span className="text-xs" style={{ color }}>{arrow} {trend.summary}</span>
+        {trend.summary && <span className="text-xs" style={{ color }}>{arrow} {trend.summary}</span>}
       </div>
       <div className="mt-1 relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxWidth: 280, height: 52 }}>
