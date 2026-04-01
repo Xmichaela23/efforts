@@ -379,7 +379,8 @@ async function writeWorkoutSegmentMatch(
   segmentId: string,
   matchConfidence: number,
 ): Promise<boolean> {
-  // Variant A: common schema with user_id + segment_id
+  // Upsert: minimal columns the schema actually has
+  let errA: any = null;
   try {
     const { error } = await supabase
       .from("workout_segment_match")
@@ -388,12 +389,13 @@ async function writeWorkoutSegmentMatch(
         workout_id: w.id,
         segment_id: segmentId,
         match_confidence: matchConfidence,
-        match_method: "gps_corridor_v1",
-      }, { onConflict: "workout_id,segment_id" });
+      }, { onConflict: "workout_id,segment_id", ignoreDuplicates: true });
     if (!error) return true;
-  } catch {}
+    errA = error;
+  } catch (e) { errA = e; }
 
-  // Variant B: insert without upsert conflict target
+  // Insert fallback — treat duplicate as success
+  let errB: any = null;
   try {
     const { error } = await supabase
       .from("workout_segment_match")
@@ -403,21 +405,15 @@ async function writeWorkoutSegmentMatch(
         segment_id: segmentId,
         match_confidence: matchConfidence,
       });
-    if (!error) return true;
-  } catch {}
+    if (!error || String(error.code) === '23505') return true;
+    errB = error;
+  } catch (e) { errB = e; }
 
-  // Variant C: terrain_segment_id naming
-  try {
-    const { error } = await supabase
-      .from("workout_segment_match")
-      .insert({
-        workout_id: w.id,
-        terrain_segment_id: segmentId,
-        match_confidence: matchConfidence,
-      });
-    if (!error) return true;
-  } catch {}
-
+  console.error("[compute-facts] workout_segment_match write failed:", {
+    segment_id: segmentId,
+    errA: errA?.message ?? errA,
+    errB: errB?.message ?? errB,
+  });
   return false;
 }
 
@@ -575,57 +571,45 @@ async function upsertTerrainIntelligence(
 
         let createdId: string | null = null;
 
-        // Attempt A: schemas that support both fingerprint + polyline_hash
+        // Upsert with fingerprint — if segment already exists, returns existing ID
         try {
           const { data, error } = await supabase
             .from("terrain_segments")
-            .insert({
+            .upsert({
               ...basePayloadMinimal,
               ...geoPayload,
               fingerprint: fp,
               polyline_hash: fp,
-            })
+            }, { onConflict: "user_id,fingerprint" })
             .select("id")
             .single();
           if (error) throw error;
           if (data?.id) createdId = String(data.id);
         } catch (eA) {
-          // Attempt B: schemas that support only polyline_hash
+          // Fallback: upsert without polyline_hash for schemas that only have fingerprint
           try {
             const { data, error } = await supabase
               .from("terrain_segments")
-              .insert({
+              .upsert({
                 ...basePayloadMinimal,
                 ...geoPayload,
-                polyline_hash: fp,
-              })
+                fingerprint: fp,
+              }, { onConflict: "user_id,fingerprint" })
               .select("id")
               .single();
             if (error) throw error;
             if (data?.id) createdId = String(data.id);
           } catch (eB) {
-            // Attempt C: minimal payload for older schemas
-            try {
-              const { data, error } = await supabase
-                .from("terrain_segments")
-                .insert(basePayloadMinimal)
-                .select("id")
-                .single();
-              if (error) throw error;
-              if (data?.id) createdId = String(data.id);
-            } catch (eC) {
-              failedSegmentInserts += 1;
-              lastError = (eC as any)?.message ?? String(eC);
-              console.error("[compute-facts] terrain segment insert failed (all schema variants):", {
-                workout_id: w.id,
-                segment_type: seg.segment_type,
-                distance_m: seg.distance_m,
-                elev_gain_m: seg.elev_gain_m,
-                err_a: (eA as any)?.message ?? String(eA),
-                err_b: (eB as any)?.message ?? String(eB),
-                err_c: (eC as any)?.message ?? String(eC),
-              });
-            }
+            failedSegmentInserts += 1;
+            lastError = (eB as any)?.message ?? String(eB);
+            console.error("[compute-facts] terrain segment upsert failed:", {
+              workout_id: w.id,
+              segment_type: seg.segment_type,
+              distance_m: seg.distance_m,
+              elev_gain_m: seg.elev_gain_m,
+              err_a: (eA as any)?.message ?? String(eA),
+              err_b: (eB as any)?.message ?? String(eB),
+            });
           }
         }
 
@@ -1574,6 +1558,7 @@ serve(async (req: Request) => {
       try {
         const terrainResult = await upsertTerrainIntelligence(supabase, w, runFacts);
         terrainDebug = terrainResult;
+        console.warn(`[compute-facts] terrain: gps_pts=${buildGpsPoints(w).length} extracted=${terrainResult.extracted} matched=${terrainResult.matched} created=${terrainResult.created_segments} failed_inserts=${terrainResult.failed_segment_inserts} last_error=${terrainResult.last_error}`);
         if (runFacts) {
           runFacts.terrain_context = {
             extracted_segments_count: terrainResult.extracted,
