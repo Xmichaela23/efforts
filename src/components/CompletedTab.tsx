@@ -16,7 +16,7 @@ import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
 import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
-import { supabase, getStoredUserId, getStoredUserId } from '../lib/supabase';
+import { supabase, getStoredUserId } from '../lib/supabase';
 import { computeDistanceKm } from '@/utils/workoutDataDerivation';
 import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';

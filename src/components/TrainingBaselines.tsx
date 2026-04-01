@@ -6,7 +6,7 @@ import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS } from '@/lib/context-utils';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface TrainingBaselinesProps {

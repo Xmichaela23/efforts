@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';

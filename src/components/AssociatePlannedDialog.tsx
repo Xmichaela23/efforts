@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 
 type Props = {

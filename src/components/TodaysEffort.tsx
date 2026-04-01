@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';

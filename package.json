@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@capacitor/cli": "^8.0.0",
-    "@capacitor/core": "^8.0.0",
+    "@capacitor/core": "^8.3.0",
     "@capacitor/ios": "^8.0.0",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",
@@ -48,7 +48,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.462.0",
-    "maplibre-gl": "5.7.1",
+    "maplibre-gl": "^5.7.1",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",

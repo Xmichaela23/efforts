@@ -573,7 +573,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           if (tags.includes('long_run')) return 'Long Run';
           if (/tempo/.test(rawDesc)) return 'Tempo';
           if (/(intervals?)/.test(rawDesc) || /(\d+)\s*[x×]\s*(\d+)/.test(rawDesc)) return 'Intervals';
-          return 'Run';
+          if (/easy|recovery|aerobic/.test(rawDesc)) return 'Easy Run';
+          if (/m.?pace|marathon.?pace/.test(rawDesc)) return 'M-Pace Run';
+          if (/long/.test(rawDesc)) return 'Long Run';
+          return null; // no meaningful focus found — fall through to just typeLabel
         }
         if (t === 'swim') {
           if (tags.includes('opt_kind:technique') || /drills|technique/.test(rawDesc)) return 'Technique';
@@ -584,9 +587,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (/sweet\s*spot|\bss\b/.test(rawDesc)) return 'Sweet Spot';
         if (/threshold|tempo|interval/.test(rawDesc)) return 'Quality';
         if (/endurance|long/.test(rawDesc)) return 'Endurance';
-        return 'Planned';
+        return null;
       })();
-      return `${typeLabel} — ${focus}`;
+      return focus ? `${typeLabel} — ${focus}` : typeLabel;
     }
     // Otherwise, prefer the saved workout name if present
     const explicitName = String((workout as any)?.name || '').trim();
@@ -623,9 +626,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (/endurance/.test(raw)) return 'Endurance';
         if (/technique/.test(raw)) return 'Technique';
         if (t === 'strength') return 'Strength';
-        return 'Planned';
+        return null;
       })();
-      return `${typeLabel} — ${focus}`;
+      return focus ? `${typeLabel} — ${focus}` : typeLabel;
     }
 
     const activityType = getWorkoutType();

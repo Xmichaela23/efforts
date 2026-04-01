@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';

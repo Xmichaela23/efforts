@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight, Loader2, Menu } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses, getDisciplineBgClassVariant, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { MobileHeader } from './MobileHeader';

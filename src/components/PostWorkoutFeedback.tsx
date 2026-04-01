@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Activity, Bike, Plus } from 'lucide-react';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';

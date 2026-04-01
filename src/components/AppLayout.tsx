@@ -30,7 +30,7 @@ import Gear from './Gear';
 import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { MobileHeader } from './MobileHeader';
 
 interface AppLayoutProps {

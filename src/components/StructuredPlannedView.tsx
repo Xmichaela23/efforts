@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase, getStoredUserId, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 
