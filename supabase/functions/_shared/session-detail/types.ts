@@ -210,6 +210,15 @@ export type SessionDetailV1 = {
 
   /** Plan-aware load readiness at workout date (null if no session_load / unavailable). */
   readiness?: SessionDetailReadinessV1 | null;
+
+  /** Route history for familiar routes — powers the ROUTE sparkline. */
+  terrain?: {
+    route: {
+      name: string;
+      times_run: number;
+      history: Array<{ date: string; pace_s_per_km: number | null; hr: number | null; is_current: boolean }>;
+    } | null;
+  } | null;
 }
 
 // ── Interval row: fully resolved, ready to render ─────────────────────────

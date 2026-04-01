@@ -486,6 +486,20 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     next_session: nextSession ?? null,
 
+    terrain: (() => {
+      const tc = factPacket?.derived?.terrain_context;
+      if (!tc?.route_runs) return null;
+      const r = tc.route_runs as any;
+      if (!Array.isArray(r.history) || r.history.length < 2) return null;
+      return {
+        route: {
+          name: String(r.name || 'Same route'),
+          times_run: Number(r.times_run || 0),
+          history: r.history,
+        },
+      };
+    })(),
+
     display: {
       show_adherence_chips: showAdherenceChips,
       interval_display_reason: intervalDisplay?.reason ?? null,

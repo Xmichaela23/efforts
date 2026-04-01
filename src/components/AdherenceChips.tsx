@@ -35,6 +35,7 @@ interface AdherenceChipsProps {
     classification?: {
       is_structured_interval?: boolean;
       is_pool_swim?: boolean;
+      is_easy_like?: boolean;
     };
     session_interpretation?: SessionInterpretationV1;
   } | null;
@@ -163,6 +164,8 @@ export default function AdherenceChips({
       ? (isGapAdjusted ? 'Blended interval GAP' : 'Blended interval pace')
       : (isGapAdjusted ? 'Grade-adjusted pace' : 'Pace adherence');
 
+    const showPaceChip = !(sd as any)?.classification?.is_easy_like;
+
     return (
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="mb-2 text-center text-xs text-gray-400">{weekLabel}</div>}
@@ -171,7 +174,7 @@ export default function AdherenceChips({
             {chip('Execution', executionScore,
               performanceAssessment ? `${performanceAssessment} Performance` : 'Overall adherence')}
             {chip('Duration', durationAdherence, 'Time adherence')}
-            {chip(paceChipLabel, paceAdherence, paceChipSubtitle)}
+            {showPaceChip && chip(paceChipLabel, paceAdherence, paceChipSubtitle)}
           </div>
         </div>
         {onNavigateToContext && workoutId && (
