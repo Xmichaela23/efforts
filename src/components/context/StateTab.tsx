@@ -269,24 +269,43 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           </div>
           {/* 7-day load sparkline */}
           {dailyLoad.length > 0 && (
-            <svg width="100%" height="28" viewBox={`0 0 ${dailyLoad.length * 20} 28`} preserveAspectRatio="none" className="mt-1">
-              {dailyLoad.map((d, i) => {
-                const barH = Math.max(2, Math.round((d.load / maxLoad) * 22));
-                return (
-                  <rect
-                    key={d.date}
-                    x={i * 20 + 2}
-                    y={26 - barH}
-                    width={16}
-                    height={barH}
-                    rx={2}
-                    fill={d.load > 0 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}
-                  />
-                );
-              })}
-              {/* ACWR threshold line at ~1.3 = 73% of max scale */}
-              <line x1={0} y1={26 - Math.round(0.73 * 22)} x2="100%" y2={26 - Math.round(0.73 * 22)} stroke="rgba(251,191,36,0.2)" strokeWidth={1} strokeDasharray="3,3" />
-            </svg>
+            <div className="mt-2">
+              {/* bars */}
+              <div className="flex items-end gap-[3px] h-10">
+                {dailyLoad.map((d) => {
+                  const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
+                  const pct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
+                  return (
+                    <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full">
+                      <div
+                        className="w-full rounded-sm transition-all"
+                        style={{
+                          height: `${Math.round(pct * 100)}%`,
+                          minHeight: d.load > 0 ? 4 : 2,
+                          backgroundColor: isToday
+                            ? 'rgba(255,255,255,0.45)'
+                            : d.load > 0
+                            ? 'rgba(255,255,255,0.22)'
+                            : 'rgba(255,255,255,0.05)',
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {/* day labels */}
+              <div className="flex gap-[3px] mt-1">
+                {dailyLoad.map((d) => {
+                  const day = new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' });
+                  const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
+                  return (
+                    <div key={d.date} className="flex-1 text-center">
+                      <span className={`text-[8px] tabular-nums ${isToday ? 'text-white/50' : 'text-white/18'}`}>{day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 
@@ -304,20 +323,28 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                   <div className="flex items-center gap-2">
                     {/* HR drift micro-sparkline */}
                     {s.label === 'Heart rate drift' && hrDriftSeries.length >= 2 && (
-                      <svg width="48" height="16" viewBox={`0 0 ${hrDriftSeries.length * 10} 16`} preserveAspectRatio="none">
+                      <svg width="56" height="22" viewBox={`0 0 ${hrDriftSeries.length * 10} 22`} preserveAspectRatio="none">
+                        {/* zero baseline */}
+                        <line x1={0} y1={11} x2="100%" y2={11} stroke="rgba(255,255,255,0.12)" strokeWidth={0.75} />
                         <polyline
                           points={hrDriftSeries.map((pt, i) => {
                             const x = i * 10 + 5;
-                            const y = 14 - Math.round(((pt.drift_bpm + maxDrift) / (maxDrift * 2)) * 12);
+                            const y = 11 - Math.round((pt.drift_bpm / (maxDrift || 1)) * 9);
                             return `${x},${y}`;
                           }).join(' ')}
                           fill="none"
-                          stroke="rgba(251,146,60,0.5)"
-                          strokeWidth={1.5}
+                          stroke="rgba(251,146,60,0.85)"
+                          strokeWidth={2}
                           strokeLinejoin="round"
+                          strokeLinecap="round"
                         />
-                        {/* zero line */}
-                        <line x1={0} y1={8} x2="100%" y2={8} stroke="rgba(255,255,255,0.08)" strokeWidth={0.5} />
+                        {/* last point dot */}
+                        {(() => {
+                          const last = hrDriftSeries[hrDriftSeries.length - 1];
+                          const x = (hrDriftSeries.length - 1) * 10 + 5;
+                          const y = 11 - Math.round((last.drift_bpm / (maxDrift || 1)) * 9);
+                          return <circle cx={x} cy={y} r={2} fill="rgba(251,146,60,1)" />;
+                        })()}
                       </svg>
                     )}
                     <span className={`text-[11px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
