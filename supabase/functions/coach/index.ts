@@ -1131,14 +1131,43 @@ Deno.serve(async (req) => {
     const chronic28Load = completedRolling.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
 
     // Daily load for sparkline — sum workload_actual per day over the last 7 days
-    const daily_load_7d: Array<{ date: string; load: number }> = (() => {
+    // dominant_type = whichever discipline contributed most load points that day
+    const _normType = (t: any): string => {
+      const s = String(t || '').toLowerCase();
+      if (!s) return 'other';
+      if (s === 'brick' || s.startsWith('brick_') || s.endsWith('_brick')) return 'brick';
+      if (s.includes('run')) return 'run';
+      if (s.includes('bike') || s.includes('ride') || s.includes('cycl')) return 'bike';
+      if (s.includes('swim')) return 'swim';
+      if (s.includes('strength')) return 'strength';
+      if (s.includes('mobility') || s === 'pt') return 'mobility';
+      return s;
+    };
+    const daily_load_7d: Array<{ date: string; load: number; dominant_type: string }> = (() => {
       const byDate = new Map<string, number>();
-      for (let i = 6; i >= 0; i--) byDate.set(addDaysISO(asOfDate, -i), 0);
+      const byDateType = new Map<string, Map<string, number>>();
+      for (let i = 6; i >= 0; i--) {
+        const d = addDaysISO(asOfDate, -i);
+        byDate.set(d, 0);
+        byDateType.set(d, new Map());
+      }
       for (const r of acute7Rows) {
         const d = String(r?.date || '');
-        if (byDate.has(d)) byDate.set(d, (byDate.get(d) || 0) + (safeNum(r?.workload_actual) || 0));
+        if (!byDate.has(d)) continue;
+        const load = safeNum(r?.workload_actual) || 0;
+        byDate.set(d, (byDate.get(d) || 0) + load);
+        const typ = _normType(r?.type);
+        const typeMap = byDateType.get(d)!;
+        typeMap.set(typ, (typeMap.get(typ) || 0) + load);
       }
-      return [...byDate.entries()].map(([date, load]) => ({ date, load }));
+      return [...byDate.entries()].map(([date, load]) => {
+        const typeMap = byDateType.get(date)!;
+        let dominant_type = 'none';
+        if (typeMap.size > 0) {
+          dominant_type = [...typeMap.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        }
+        return { date, load, dominant_type };
+      });
     })();
 
     // Running-weighted ACWR: discount non-running modalities by their fatigue contribution

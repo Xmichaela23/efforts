@@ -265,7 +265,7 @@ export type CoachWeekContextV1 = {
         extra_load: number;
         session_count: number;
       }>;
-      daily_load_7d: Array<{ date: string; load: number }>;
+      daily_load_7d: Array<{ date: string; load: number; dominant_type: string }>;
       hr_drift_series: Array<{ date: string; drift_bpm: number }>;
     };
     trends: {
@@ -366,7 +366,7 @@ export function useCoachWeekContext(date?: string) {
         const sr = adapt.suggestions.find(s => s.type === 'strength_relayout' || s.id === 'strength_relayout');
         if (sr) {
           const wsv = { ...(merged.weekly_state_v1 as CoachWeekContextV1['weekly_state_v1']) };
-          const coach = { ...(wsv.coach || {}) };
+          const coach = { narrative: null, ...(wsv.coach || {}) };
           const base = [...(coach.plan_adaptation_suggestions ?? [])];
           if (!base.some(x => x.code === 'strength_relayout')) {
             coach.plan_adaptation_suggestions = [

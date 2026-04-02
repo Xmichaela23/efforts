@@ -205,8 +205,34 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
     'text-white/45';
 
   const dailyLoad = load.daily_load_7d ?? [];
-
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
+
+  // ── Cross-training signal ─────────────────────────────────────────────────
+  // Surface when non-run load is meaningful (>15% of WTD) so user can see
+  // whether cross-training is adding base or creating recovery load.
+  const crossTrainingLine: { label: string; tone: string } | null = (() => {
+    const byDiscipline = load.by_discipline ?? [];
+    const totalLoad = byDiscipline.reduce((s: number, d: any) => s + (d.actual_load ?? 0), 0);
+    const nonRunLoad = byDiscipline
+      .filter((d: any) => d.discipline !== 'run' && d.discipline !== 'mobility')
+      .reduce((s: number, d: any) => s + (d.actual_load ?? 0), 0);
+    if (totalLoad === 0 || nonRunLoad / totalLoad < 0.15) return null;
+
+    const interference = (data as any)?.interference ?? null;
+    if (interference?.status === 'interference_detected') {
+      return { label: `Cross-training load — ${interference.detail ?? 'interference detected'}`, tone: 'warning' };
+    }
+
+    const runningAcwr = load.running_acwr ?? null;
+    const totalAcwr = load.acwr ?? null;
+    if (totalAcwr != null && runningAcwr != null && totalAcwr > 1.05 && runningAcwr < 1.0) {
+      return { label: 'Cross-training adding base — run load nominal', tone: 'positive' };
+    }
+    if (totalAcwr != null && runningAcwr != null && totalAcwr > 1.2 && runningAcwr > 1.1) {
+      return { label: 'Cross-training adding to overall fatigue load', tone: 'neutral' };
+    }
+    return { label: 'Cross-training contributing to load', tone: 'neutral' };
+  })();
 
   return (
     <div className="pt-1 pb-4">
@@ -259,25 +285,26 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                 <span className="text-[9px] text-white/40 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
                 <span className="text-[9px] tabular-nums text-white/30">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
               </div>
-              {/* bars */}
+              {/* bars — color by dominant discipline */}
               <div className="flex items-end h-8 gap-[2px]">
                 {dailyLoad.map((d) => {
                   const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
                   const pct = d.load > 0 ? Math.max(0.06, d.load / maxLoad) : 0;
+                  const dtype = (d as any).dominant_type ?? 'none';
+                  const barColor = d.load === 0
+                    ? 'rgba(255,255,255,0.06)'
+                    : dtype === 'bike'
+                    ? isToday ? 'rgba(56,189,248,0.75)' : 'rgba(56,189,248,0.40)'   // sky
+                    : dtype === 'swim'
+                    ? isToday ? 'rgba(34,211,238,0.75)' : 'rgba(34,211,238,0.40)'   // cyan
+                    : dtype === 'strength'
+                    ? isToday ? 'rgba(167,139,250,0.70)' : 'rgba(167,139,250,0.35)' // violet
+                    : isToday ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)'; // run/default
                   return (
                     <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
                       <div
                         className="rounded-[2px] transition-all"
-                        style={{
-                          width: 6,
-                          height: `${Math.round(pct * 100)}%`,
-                          minHeight: d.load > 0 ? 3 : 1,
-                          backgroundColor: isToday
-                            ? 'rgba(255,255,255,0.55)'
-                            : d.load > 0
-                            ? 'rgba(255,255,255,0.25)'
-                            : 'rgba(255,255,255,0.06)',
-                        }}
+                        style={{ width: 6, height: `${Math.round(pct * 100)}%`, minHeight: d.load > 0 ? 3 : 1, backgroundColor: barColor }}
                       />
                       <span className={`text-[7px] tabular-nums leading-none ${isToday ? 'text-white/55' : 'text-white/20'}`}>
                         {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
@@ -306,6 +333,16 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                   </div>
                 </div>
               ))}
+              {crossTrainingLine && (
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[11px] text-white/35">Cross-training</span>
+                  <span className={`text-[11px] ${
+                    crossTrainingLine.tone === 'positive' ? 'text-emerald-400/75' :
+                    crossTrainingLine.tone === 'warning' ? 'text-amber-400/75' :
+                    'text-white/45'
+                  }`}>{crossTrainingLine.label.replace(/^Cross-training[^—]*—\s*/, '').replace(/^Cross-training\s+/, '')}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
