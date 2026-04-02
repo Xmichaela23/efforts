@@ -30,18 +30,22 @@ function acwrToGaugePct(v: number): number {
 
 // Horizontal gauge: under | ok zone | high zone | spike
 // Zones as % of total width: under=18%, ok=55%, high=18%, spike=9%
-function AcwrGauge({ value, serverLabel }: { value: number | null; serverLabel: string | null }) {
+function AcwrGauge({ value, serverLabel, readinessState }: { value: number | null; serverLabel: string | null; readinessState: string | null }) {
   if (value == null) return <span className="text-white/25 text-[10px]">—</span>;
   const pos = acwrToGaugePct(value);
-  // Dot color driven by raw ratio position — valid positional data
-  const rawLabel = acwrLabel(value);
+  // Dot color and label both come from server readiness — it has the full reconciled picture
+  // Raw ACWR position is still valid (dot stays where it is), but color follows body state
   const dotColor =
-    rawLabel === 'build more' ? '#38bdf8' :
-    rawLabel === 'balanced'   ? '#34d399' :
-    rawLabel === 'back off'   ? '#fbbf24' :
-                                '#f87171';
-  // Text label comes from server — it has the full reconciled picture
-  const displayLabel = serverLabel ?? rawLabel;
+    readinessState === 'fresh'      ? '#34d399' :
+    readinessState === 'adapting'   ? '#38bdf8' :
+    readinessState === 'normal'     ? '#34d399' :
+    readinessState === 'fatigued'   ? '#fbbf24' :
+    readinessState === 'overreached'? '#f87171' :
+    readinessState === 'detrained'  ? '#38bdf8' :
+    acwrLabel(value) === 'build more' ? '#38bdf8' :
+    acwrLabel(value) === 'balanced'   ? '#34d399' :
+    acwrLabel(value) === 'back off'   ? '#fbbf24' : '#f87171';
+  const displayLabel = serverLabel ?? acwrLabel(value);
 
   return (
     <span className="inline-flex items-center gap-2">
@@ -239,7 +243,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
 
         {/* LOAD */}
         <Row label="LOAD">
-          <AcwrGauge value={acwr} serverLabel={readinessLabel} />
+          <AcwrGauge value={acwr} serverLabel={readinessLabel} readinessState={readiness} />
           {loadStatus?.status && (
             <><Dot /><Chip
               label="run"
