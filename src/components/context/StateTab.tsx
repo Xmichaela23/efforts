@@ -30,39 +30,34 @@ function acwrToGaugePct(v: number): number {
 
 // Horizontal gauge: under | ok zone | high zone | spike
 // Zones as % of total width: under=18%, ok=55%, high=18%, spike=9%
-function AcwrGauge({ value }: { value: number | null }) {
+function AcwrGauge({ value, serverLabel }: { value: number | null; serverLabel: string | null }) {
   if (value == null) return <span className="text-white/25 text-[10px]">—</span>;
   const pos = acwrToGaugePct(value);
-  const label = acwrLabel(value);
+  // Dot color driven by raw ratio position — valid positional data
+  const rawLabel = acwrLabel(value);
   const dotColor =
-    label === 'build more' ? '#38bdf8' :
-    label === 'balanced'   ? '#34d399' :
-    label === 'back off'   ? '#fbbf24' :
-                             '#f87171';
+    rawLabel === 'build more' ? '#38bdf8' :
+    rawLabel === 'balanced'   ? '#34d399' :
+    rawLabel === 'back off'   ? '#fbbf24' :
+                                '#f87171';
+  // Text label comes from server — it has the full reconciled picture
+  const displayLabel = serverLabel ?? rawLabel;
 
   return (
     <span className="inline-flex items-center gap-2">
-      {/* gauge track */}
       <span className="relative inline-flex items-center w-24 h-1.5 rounded-full overflow-visible">
-        {/* zone segments */}
         <span className="absolute inset-0 flex rounded-full overflow-hidden">
           <span className="h-full bg-sky-400/25"    style={{ width: '18%' }} />
           <span className="h-full bg-emerald-400/30" style={{ width: '55%' }} />
           <span className="h-full bg-amber-400/25"  style={{ width: '18%' }} />
           <span className="h-full bg-red-400/20"    style={{ width: '9%' }} />
         </span>
-        {/* marker dot */}
         <span
           className="absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 shadow-md"
-          style={{
-            left: `${pos}%`,
-            backgroundColor: dotColor,
-            boxShadow: `0 0 6px ${dotColor}`,
-          }}
+          style={{ left: `${pos}%`, backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}` }}
         />
       </span>
-      {/* label only — bar already encodes the value visually */}
-      <span className="text-[11px]" style={{ color: dotColor }}>{label}</span>
+      <span className="text-[11px]" style={{ color: dotColor }}>{displayLabel}</span>
     </span>
   );
 }
@@ -244,7 +239,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
 
         {/* LOAD */}
         <Row label="LOAD">
-          <AcwrGauge value={acwr} />
+          <AcwrGauge value={acwr} serverLabel={readinessLabel} />
           {loadStatus?.status && (
             <><Dot /><Chip
               label="run"

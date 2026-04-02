@@ -2665,14 +2665,38 @@ ${narrativeFacts.join('\n')}`;
         intent: weekIntent,
         focus_label: weekFocusLabel,
         intent_summary: (() => {
-          const map: Record<string, string> = {
-            build:    'Building fitness — add stress, absorb the work.',
-            peak:     'Sharpening — quality over volume, protect your legs.',
-            recovery: 'Recovery week — back off, let the adaptation happen.',
-            taper:    'Tapering — freshen up, race is close.',
-            baseline: 'Establishing your baseline — consistency is the goal.',
-          };
-          return map[weekIntent] ?? null;
+          const rs = readinessState;
+          const intent = weekIntent;
+
+          if (intent === 'recovery') {
+            if (rs === 'fresh') return 'Recovery week — you\'re absorbing well, keep it easy.';
+            if (rs === 'fatigued' || rs === 'overreached') return 'Recovery week — you need this. Back off completely.';
+            return 'Recovery week — back off, let the adaptation happen.';
+          }
+          if (intent === 'taper') {
+            if (rs === 'fresh') return 'Tapering — you\'re sharp. Keep sessions crisp, protect your legs.';
+            if (rs === 'fatigued') return 'Tapering — you still need to freshen up. Race week, prioritize rest.';
+            return 'Tapering — freshen up, race is close.';
+          }
+          if (intent === 'peak') {
+            if (rs === 'fresh') return 'Peak week — you\'re sharp and ready. Keep sessions crisp.';
+            if (rs === 'adapting') return 'Peak week — load is high but your body is handling it. Quality over volume.';
+            if (rs === 'fatigued') return 'Ease into peak week — you\'re still absorbing last week\'s load.';
+            if (rs === 'overreached') return 'Hold on peak work — recover first, then sharpen.';
+            return 'Sharpening — quality over volume, protect your legs.';
+          }
+          if (intent === 'build') {
+            if (rs === 'fresh') return 'Building fitness — body is responding well, keep adding stress.';
+            if (rs === 'adapting') return 'Building fitness — load is accumulating, your body is absorbing it.';
+            if (rs === 'fatigued') return 'Building fitness — carry the work, but keep easy days easy.';
+            if (rs === 'overreached') return 'Back off before building more — signs of overreaching.';
+            return 'Building fitness — add stress, absorb the work.';
+          }
+          if (intent === 'baseline') {
+            if (rs === 'fresh') return 'Establishing your baseline — body is ready, stay consistent.';
+            return 'Establishing your baseline — consistency is the goal.';
+          }
+          return null;
         })(),
       },
       plan: {
