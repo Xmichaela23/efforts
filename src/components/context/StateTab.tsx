@@ -357,9 +357,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
               {perLift.map((lt: any) => {
                 const verdictLabel: string = lt.verdict_label ?? '—';
                 const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
-                const isActionable = verdictLabel === 'add weight' || verdictLabel === 'back off weight';
-                const currentWeight = liftWeightMap.get(lt.canonical_name) ?? 0;
-                // Progress bar: e1rm as % of peak, capped at 100%
+                const suggestedWeight: number | null = lt.suggested_weight ?? null;
+                const bestWeight: number | null = lt.best_weight ?? liftWeightMap.get(lt.canonical_name) ?? null;
+                const hasWeightSuggestion = suggestedWeight != null && bestWeight != null && bestWeight > 0;
                 const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
                   ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
                   : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
@@ -370,24 +370,24 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-white/80">{lt.display_name}</span>
                       <span className="relative">
-                        {isActionable ? (
+                        {hasWeightSuggestion ? (
                           <button
                             onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
                             className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80`}
-                          >{verdictLabel}</button>
+                          >{bestWeight} → {suggestedWeight} lbs</button>
                         ) : (
                           <span className={`text-[12px] ${verdictColor}`}>{verdictLabel}</span>
                         )}
                         {adjustingLift === lt.canonical_name && (
                           <StrengthAdjustmentModal
                             exerciseName={lt.display_name}
-                            currentWeight={currentWeight}
-                            nextPlannedWeight={Math.round(currentWeight * 1.025 / 5) * 5 || currentWeight}
+                            currentWeight={bestWeight ?? 0}
+                            nextPlannedWeight={suggestedWeight ?? bestWeight ?? 0}
                             targetRir={lt.rir_current ?? undefined}
                             actualRir={lt.rir_current ?? undefined}
                             planId={wsv.plan.plan_id ?? undefined}
                             isBodyweight={false}
-                            hasPlannedWeight={currentWeight > 0}
+                            hasPlannedWeight={(bestWeight ?? 0) > 0}
                             onClose={() => setAdjustingLift(null)}
                             onSaved={() => { setAdjustingLift(null); refresh(); }}
                           />

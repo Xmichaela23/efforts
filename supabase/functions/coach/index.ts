@@ -27,6 +27,7 @@ import {
   isAcwrFatiguedSignal,
 } from '../_shared/acwr-state.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
+import { canonicalize } from '../_shared/canonicalize.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -1213,6 +1214,47 @@ Deno.serve(async (req) => {
       cardiac_efficiency_sample_size: 0,
     };
 
+    // Per-lift RIR from workout strength_exercises (7d + 28d)
+    const perLiftRir = (() => {
+      const rirByLift7d = new Map<string, number[]>();
+      const rirByLift28d = new Map<string, number[]>();
+      const bestWeightByLift = new Map<string, number>();
+
+      const extractLiftRir = (workouts: any[], target: Map<string, number[]>) => {
+        for (const w of workouts) {
+          if (String(w?.workout_status || '').toLowerCase() !== 'completed') continue;
+          if (String(w?.type || '').toLowerCase() !== 'strength') continue;
+          const exRaw = (w as any)?.strength_exercises;
+          const exArr = Array.isArray(exRaw) ? exRaw : (typeof exRaw === 'string' ? (() => { try { return JSON.parse(exRaw); } catch { return []; } })() : []);
+          if (!Array.isArray(exArr)) continue;
+          for (const ex of exArr) {
+            const canon = canonicalize(String(ex?.name || ''));
+            if (!canon || canon === 'unknown') continue;
+            const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+            for (const s of sets) {
+              if (s.completed === false) continue;
+              const r = typeof s?.rir === 'number' && s.rir >= 0 && s.rir <= 10 ? s.rir : null;
+              if (r != null) {
+                if (!target.has(canon)) target.set(canon, []);
+                target.get(canon)!.push(r);
+              }
+              const wt = Number(s?.weight);
+              if (wt > 0 && wt > (bestWeightByLift.get(canon) ?? 0)) {
+                bestWeightByLift.set(canon, wt);
+              }
+            }
+          }
+        }
+      };
+
+      extractLiftRir(Array.isArray(recentWorkouts) ? recentWorkouts : [], rirByLift7d);
+      extractLiftRir(Array.isArray(normWorkouts) ? normWorkouts : [], rirByLift28d);
+
+      const avgArr = (arr: number[]) => arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null;
+
+      return { rirByLift7d, rirByLift28d, bestWeightByLift, avgArr };
+    })();
+
     const liftSnapshots: StrengthLiftSnapshot[] = (() => {
       try {
         const s1rms = learnedFitness?.strength_1rms;
@@ -1229,9 +1271,10 @@ Deno.serve(async (req) => {
             display_name: LIFT_DISPLAY[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
             current_e1rm: Number(v.value) || null,
             previous_e1rm: null,
-            current_avg_rir: reaction.avg_strength_rir_7d,
-            baseline_avg_rir: norms28d.strength_rir_avg,
+            current_avg_rir: perLiftRir.avgArr(perLiftRir.rirByLift7d.get(key) ?? []) ?? reaction.avg_strength_rir_7d,
+            baseline_avg_rir: perLiftRir.avgArr(perLiftRir.rirByLift28d.get(key) ?? []) ?? norms28d.strength_rir_avg,
             sessions_in_window: Number(v.sample_count ?? 0),
+            best_weight: perLiftRir.bestWeightByLift.get(key) ?? null,
           }));
       } catch { return []; }
     })();

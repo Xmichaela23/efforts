@@ -69,6 +69,10 @@ export type LiftTrend = {
   /** Server-computed plan-intent-aware action label. Client renders verbatim. */
   verdict_label: string;
   verdict_tone: LiftVerdictTone;
+  /** Most recent top working weight logged (lbs/kg). */
+  best_weight: number | null;
+  /** Server-computed next weight when verdict is actionable. Null when no change needed. */
+  suggested_weight: number | null;
 };
 
 export type StrengthResponse = {
@@ -272,6 +276,7 @@ export type StrengthLiftSnapshot = {
   current_avg_rir: number | null;
   baseline_avg_rir: number | null;
   sessions_in_window: number;
+  best_weight: number | null;       // most recent top working weight logged
 };
 
 export type CrossDomainPair = {

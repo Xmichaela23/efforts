@@ -164,6 +164,25 @@ function computeLiftVerdict(
   return { label: 'on track', tone: 'neutral' };
 }
 
+function computeSuggestedWeight(
+  verdict: string,
+  bestWeight: number | null,
+  rir: number | null,
+  canonical: string,
+): number | null {
+  if (bestWeight == null || bestWeight <= 0) return null;
+  const lower = isLowerBody(canonical);
+
+  if (verdict === 'add weight') {
+    const increment = lower ? 10 : 5;
+    return Math.round((bestWeight + increment) / 5) * 5;
+  }
+  if (verdict === 'back off weight') {
+    return Math.round((bestWeight * 0.9) / 5) * 5;
+  }
+  return null;
+}
+
 function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): StrengthResponse {
   const per_lift: LiftTrend[] = lifts.map((l) => {
     const sufficient = l.sessions_in_window >= MIN_SAMPLES_FOR_SIGNAL;
@@ -179,11 +198,13 @@ function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): Str
       : e1rmDelta != null && e1rmDelta <= -3 ? 'declining'
       : 'stable';
 
-    // Rising RIR at same load = adapting (improving); falling RIR = fatiguing (declining)
     const rir_trend: TrendDirection = !sufficient ? 'stable'
       : rirDelta != null && rirDelta >= 0.5 ? 'improving'
       : rirDelta != null && rirDelta <= -0.5 ? 'declining'
       : 'stable';
+
+    const verdict = computeLiftVerdict(l.current_avg_rir, e1rm_trend, weekIntent, l.canonical_name);
+    const best_weight = l.best_weight ?? null;
 
     return {
       canonical_name: l.canonical_name,
@@ -198,9 +219,10 @@ function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): Str
       rir_delta: rirDelta,
       samples: l.sessions_in_window,
       sufficient,
-      ...(({ label, tone }) => ({ verdict_label: label, verdict_tone: tone }))(
-        computeLiftVerdict(l.current_avg_rir, e1rm_trend, weekIntent, l.canonical_name)
-      ),
+      verdict_label: verdict.label,
+      verdict_tone: verdict.tone,
+      best_weight,
+      suggested_weight: computeSuggestedWeight(verdict.label, best_weight, l.current_avg_rir, l.canonical_name),
     };
   });
 
