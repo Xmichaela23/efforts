@@ -2789,12 +2789,11 @@ ${narrativeFacts.join('\n')}`;
         fitness_direction: fitnessDirection,
         readiness_state: readinessState,
         readiness_label: (() => {
-          if (readinessState === 'fresh') return 'feeling fresh';
-          if (readinessState === 'overreached') return 'needs rest';
-          if (readinessState === 'adapting') return 'absorbing load';
-          if (readinessState === 'fatigued' && v.reason_codes.includes('execution_low')) return 'run quality down';
-          if (readinessState === 'fatigued') return 'carrying fatigue';
-          if (readinessState === 'detrained') return 'undertrained';
+          if (readinessState === 'fresh') return 'LOW FATIGUE';
+          if (readinessState === 'overreached') return 'OVERREACHED';
+          if (readinessState === 'adapting') return 'ABSORBING';
+          if (readinessState === 'fatigued') return 'FATIGUED';
+          if (readinessState === 'detrained') return 'DETRAINED';
           return null;
         })(),
         signals: trendSignals,
