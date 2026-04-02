@@ -1522,14 +1522,34 @@ Deno.serve(async (req) => {
 
     const readinessState = (() => {
       const rm = weeklyResponseModel;
+
+      // Overreaching is unconditional — body has crossed a real threshold
       if (v.code === 'recover_overreaching') return 'overreached';
-      if (v.code === 'caution_ramping_fast') return 'fatigued';
-      if (rm.assessment.label === 'overreaching' && !isPlanTransitionPeriod) return 'fatigued';
-      if (isAcwrFatiguedSignal(metrics.acwr, isPlanTransitionPeriod)) return 'fatigued';
+      if (rm.assessment.label === 'overreaching' && !isPlanTransitionPeriod) return 'overreached';
+
+      // Body signals are the primary read: execution, HR drift, RPE, cardiac efficiency
+      const bodySignalsConcerning = rm.assessment.signals_concerning > 0;
+      const bodySignalsImproving = rm.assessment.signals_available >= 2 &&
+        rm.assessment.signals_concerning === 0 &&
+        rm.assessment.label === 'responding';
+
+      // Execution degraded with enough samples — trust that regardless of ACWR
+      if (v.reason_codes.includes('execution_low')) return 'fatigued';
+
+      // ACWR elevated AND body signals confirm it — genuinely fatigued
+      if (isAcwrFatiguedSignal(metrics.acwr, isPlanTransitionPeriod, weekIntent as any) && bodySignalsConcerning) return 'fatigued';
+
+      // ACWR elevated BUT body is handling it fine — adapting to load, not fatigued
+      if (isAcwrFatiguedSignal(metrics.acwr, isPlanTransitionPeriod, weekIntent as any) && bodySignalsImproving) return 'adapting';
+
+      // ACWR elevated with insufficient signal to confirm either way — use caution label only
+      if (v.code === 'caution_ramping_fast' && !bodySignalsImproving) return 'fatigued';
+
       if (isAcwrDetrainedSignal(metrics.acwr)) return 'detrained';
+      if (bodySignalsConcerning) return 'fatigued';
       if (rm.assessment.label === 'responding' && rm.assessment.signals_concerning === 0) return 'fresh';
       return 'normal';
-    })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+    })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
 
     const interference = latestSnapshot?.interference ?? null;
 
@@ -2626,7 +2646,7 @@ ${narrativeFacts.join('\n')}`;
     };
     const trendSignals: NonNullable<NonNullable<CoachWeekContextResponseV1['weekly_state_v1']>['trends']>['signals'] =
       weeklyResponseModel.visible_signals.map(s => ({
-        metric: SIGNAL_METRIC_MAP[s.label] ?? (s.category === 'strength' ? 'strength_reserve' : s.label.toLowerCase().replace(/\s+/g, '_')),
+        metric: (SIGNAL_METRIC_MAP[s.label] ?? (s.category === 'strength' ? 'strength_reserve' : 'execution_quality')) as 'aerobic_efficiency' | 'effort_level' | 'execution_quality' | 'strength_reserve',
         direction: s.trend,
         magnitude: (s.trend !== 'stable' ? 'notable' : 'slight') as 'notable' | 'slight',
         delta: null,
@@ -2719,6 +2739,7 @@ ${narrativeFacts.join('\n')}`;
         readiness_label: (() => {
           if (readinessState === 'fresh') return 'feeling fresh';
           if (readinessState === 'overreached') return 'needs rest';
+          if (readinessState === 'adapting') return 'absorbing load';
           if (readinessState === 'fatigued' && v.reason_codes.includes('execution_low')) return 'run quality down';
           if (readinessState === 'fatigued') return 'carrying fatigue';
           if (readinessState === 'detrained') return 'undertrained';

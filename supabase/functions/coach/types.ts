@@ -226,7 +226,7 @@ export type CoachWeekContextResponseV1 = {
     context_note?: string | null;
   };
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
-  readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+  readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
   interference: {
     aerobic: string;
     structural: string;
@@ -306,7 +306,7 @@ export type CoachWeekContextResponseV1 = {
     };
     trends: {
       fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
-      readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained';
+      readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
       readiness_label: string | null;
       signals: Array<{
         metric: 'aerobic_efficiency' | 'strength_reserve' | 'effort_level' | 'execution_quality';

@@ -85,8 +85,16 @@ export function getAcwrRiskFlag(
 export function isAcwrFatiguedSignal(
   ratio: number | null | undefined,
   isTransitionWindow: boolean = false,
+  weekIntent?: AcwrWeekIntent | null,
 ): boolean {
-  const risk = getAcwrRiskFlag(ratio, isTransitionWindow);
+  if (isTransitionWindow) return false;
+  const v = Number(ratio);
+  if (!Number.isFinite(v)) return false;
+  // In build/peak weeks elevated ACWR is expected — only flag if truly overreaching
+  if (weekIntent === 'build' || weekIntent === 'peak' || weekIntent === 'baseline') {
+    return v > ACWR_RATIO_THRESHOLDS.build_elevated_max;
+  }
+  const risk = getAcwrRiskFlag(ratio, false);
   return risk === 'fast' || risk === 'overreaching';
 }
 

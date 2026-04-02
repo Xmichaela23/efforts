@@ -210,7 +210,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const readiness = trends.readiness_state;
   const readinessColor =
     readiness === 'fresh' ? 'text-emerald-400/75' :
-    readiness === 'fatigued' || readiness === 'overreached' ? 'text-amber-400/75' :
+    readiness === 'adapting' ? 'text-sky-400/70' :
+    readiness === 'overreached' ? 'text-red-400/75' :
+    readiness === 'fatigued' ? 'text-amber-400/75' :
     'text-white/45';
 
   return (
