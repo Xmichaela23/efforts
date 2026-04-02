@@ -5,6 +5,10 @@ interface StrengthPerformanceSummaryProps {
   planned: any | null;
   completed: any | null;
   type: 'strength' | 'mobility';
+  sessionDetail?: Record<string, any> | null;
+  onRecompute?: () => Promise<void>;
+  recomputing?: boolean;
+  recomputeError?: string | null;
 }
 
 const extractExercisesFromComputed = (workout: any) => {
@@ -20,7 +24,7 @@ const extractExercisesFromComputed = (workout: any) => {
       const sets = Number(s?.sets || s?.setsCount || 0);
       const reps = (() => {
         const r = s?.reps || s?.repCount;
-        if (typeof r === 'string') return r;
+        if (typeof r === 'string') return parseInt(r, 10) || 0;
         if (typeof r === 'number') return Math.max(1, Math.round(r));
         return 0;
       })();
@@ -34,7 +38,7 @@ const extractExercisesFromComputed = (workout: any) => {
   }
 };
 
-export default function StrengthPerformanceSummary({ planned, completed, type }: StrengthPerformanceSummaryProps) {
+export default function StrengthPerformanceSummary({ planned, completed, type, sessionDetail, onRecompute, recomputing, recomputeError }: StrengthPerformanceSummaryProps) {
   let plannedExercises = extractExercisesFromComputed(planned);
   
   if (plannedExercises.length === 0) {
@@ -112,15 +116,38 @@ export default function StrengthPerformanceSummary({ planned, completed, type }:
   
   const plannedWorkoutId = (planned as any)?.id || (completed as any)?.planned_id;
   
+  const rirSummary = sessionDetail?.strength_rir_summary ?? null;
+  const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
+
   return (
     <div className="space-y-4">
-      <StrengthCompareTable 
-        planned={plannedExercises} 
-        completed={completedExercises} 
+      <StrengthCompareTable
+        planned={plannedExercises}
+        completed={completedExercises}
+        completedWorkoutRaw={completed}
         planId={planId}
         plannedWorkoutId={plannedWorkoutId}
-        onAdjustmentSaved={() => window.dispatchEvent(new CustomEvent('plan:adjusted'))}
+        rirSummary={rirSummary}
+        workoutId={workoutId}
+        onAdjustmentSaved={() => {
+          window.dispatchEvent(new CustomEvent('plan:adjusted'));
+          onRecompute?.();
+        }}
       />
+      {onRecompute && (
+        <div className="pt-1">
+          {recomputeError && (
+            <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
+          )}
+          <button
+            onClick={onRecompute}
+            disabled={recomputing}
+            className="w-full py-2 text-xs text-white/40 border border-white/10 rounded-lg hover:bg-white/5 hover:text-white/60 transition-colors disabled:opacity-40"
+          >
+            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
+          </button>
+        </div>
+      )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
         <div className="text-sm text-gray-700">
           <div className="font-medium mb-1">Add‑ons</div>

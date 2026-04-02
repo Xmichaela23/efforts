@@ -97,7 +97,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
 
   // Strength and Mobility use dedicated component
   if (type === 'strength' || type === 'mobility') {
-    return <StrengthPerformanceSummary planned={planned} completed={completed} type={type as 'strength' | 'mobility'} />;
+    return <StrengthPerformanceSummary
+      planned={planned}
+      completed={completed}
+      type={type as 'strength' | 'mobility'}
+      sessionDetail={sd}
+      onRecompute={recomputeAnalysis}
+      recomputing={recomputing}
+      recomputeError={recomputeError}
+    />;
   }
 
   // Endurance (run/ride/swim) — all data comes from sd (session_detail_v1)

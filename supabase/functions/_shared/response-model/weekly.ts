@@ -7,6 +7,7 @@
 
 import {
   MIN_SAMPLES_FOR_SIGNAL,
+  type LiftVerdictTone,
   type WeeklySignalInputs,
   type BaselineNorms,
   type StrengthLiftSnapshot,
@@ -124,7 +125,46 @@ function computeEndurance(signals: WeeklySignalInputs, norms: BaselineNorms): En
 // Strength signals
 // ---------------------------------------------------------------------------
 
-function computeStrength(lifts: StrengthLiftSnapshot[]): StrengthResponse {
+const LOWER_BODY_LIFTS = new Set([
+  'back_squat', 'front_squat', 'squat', 'deadlift', 'trap_bar_deadlift',
+  'romanian_deadlift', 'rdl', 'leg_press', 'split_squat', 'lunge', 'hip_thrust',
+]);
+
+function isLowerBody(canonical: string): boolean {
+  return LOWER_BODY_LIFTS.has(canonical.toLowerCase().replace(/\s+/g, '_'));
+}
+
+function computeLiftVerdict(
+  rir: number | null,
+  e1rmTrend: TrendDirection,
+  weekIntent: string,
+  canonical: string,
+): { label: string; tone: LiftVerdictTone } {
+  const lower = isLowerBody(canonical);
+
+  if (weekIntent === 'recovery') return { label: 'lighter this week', tone: 'muted' };
+  if (weekIntent === 'taper') return { label: 'maintain', tone: 'neutral' };
+
+  if (weekIntent === 'peak') {
+    if (lower) return { label: 'hold — peak week', tone: 'neutral' };
+    if (rir != null && rir > 4) return { label: 'add weight', tone: 'action' };
+    return { label: 'hold weight', tone: 'neutral' };
+  }
+
+  // Base / build — progressive overload
+  if (rir == null) {
+    if (e1rmTrend === 'improving') return { label: 'getting stronger', tone: 'positive' };
+    if (e1rmTrend === 'declining') return { label: 'strength slipping', tone: 'caution' };
+    return { label: 'holding steady', tone: 'neutral' };
+  }
+  if (rir < 1) return { label: 'back off weight', tone: 'caution' };
+  const tooLightThreshold = lower ? 4 : 3.5;
+  if (rir > tooLightThreshold) return { label: 'add weight', tone: 'action' };
+  if (e1rmTrend === 'improving') return { label: 'getting stronger', tone: 'positive' };
+  return { label: 'on track', tone: 'neutral' };
+}
+
+function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): StrengthResponse {
   const per_lift: LiftTrend[] = lifts.map((l) => {
     const sufficient = l.sessions_in_window >= MIN_SAMPLES_FOR_SIGNAL;
     const e1rmDelta = (l.current_e1rm != null && l.previous_e1rm != null && l.previous_e1rm > 0)
@@ -158,6 +198,9 @@ function computeStrength(lifts: StrengthLiftSnapshot[]): StrengthResponse {
       rir_delta: rirDelta,
       samples: l.sessions_in_window,
       sufficient,
+      ...(({ label, tone }) => ({ verdict_label: label, verdict_tone: tone }))(
+        computeLiftVerdict(l.current_avg_rir, e1rm_trend, weekIntent, l.canonical_name)
+      ),
     };
   });
 
@@ -535,7 +578,7 @@ export function computeWeeklyResponse(opts: {
   existingAthleteContext?: string | null;
 }): WeeklyResponseState {
   const endurance = computeEndurance(opts.signals, opts.norms);
-  const strength = computeStrength(opts.lifts);
+  const strength = computeStrength(opts.lifts, opts.planContext?.week_intent ?? 'base');
   const cross_domain = computeCrossDomain(opts.crossDomainPairs);
   const load = computeLoad(opts.acwr, opts.weekVsPlanPct, opts.consecutiveTrainingDays, opts.acute7Load, opts.chronic28Load);
   const pc = opts.planContext ?? null;

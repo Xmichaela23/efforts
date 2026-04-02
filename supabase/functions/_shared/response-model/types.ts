@@ -51,6 +51,8 @@ export type EnduranceResponse = {
 // Strength response
 // ---------------------------------------------------------------------------
 
+export type LiftVerdictTone = 'action' | 'caution' | 'positive' | 'neutral' | 'muted';
+
 export type LiftTrend = {
   canonical_name: string;
   display_name: string;
@@ -64,6 +66,9 @@ export type LiftTrend = {
   rir_delta: number | null;
   samples: number;
   sufficient: boolean;
+  /** Server-computed plan-intent-aware action label. Client renders verbatim. */
+  verdict_label: string;
+  verdict_tone: LiftVerdictTone;
 };
 
 export type StrengthResponse = {

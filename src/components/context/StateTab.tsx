@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
+import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -81,53 +82,12 @@ function trendColor(dir: string, tone?: string): string {
   return 'text-white/40';
 }
 
-// Lower-body lifts have meaningful interference with run performance
-const LOWER_BODY_LIFTS = new Set([
-  'back_squat', 'front_squat', 'squat', 'deadlift', 'trap_bar_deadlift',
-  'romanian_deadlift', 'rdl', 'leg_press', 'split_squat', 'lunge', 'hip_thrust',
-]);
-
-function isLowerBody(canonical: string): boolean {
-  return LOWER_BODY_LIFTS.has(canonical.toLowerCase().replace(/\s+/g, '_'));
-}
-
-function liftVerdict(
-  rir: number | null,
-  e1rmTrend: string,
-  weekIntent: string,
-  canonical: string,
-): { label: string; color: string } {
-  const lower = isLowerBody(canonical);
-
-  // Recovery / taper — always reduce load, never add
-  if (weekIntent === 'recovery') {
-    return { label: 'lighter this week', color: 'text-sky-400/60' };
-  }
-  if (weekIntent === 'taper') {
-    return { label: 'maintain', color: 'text-white/40' };
-  }
-
-  // Peak — neural mode: hold weight, lower reps, move fast
-  // Lower body: extra caution due to run interference
-  if (weekIntent === 'peak') {
-    if (lower) return { label: 'hold — peak week', color: 'text-white/40' };
-    // Upper body can still progress in peak if very light
-    if (rir != null && rir > 4) return { label: 'add weight', color: 'text-amber-400/80' };
-    return { label: 'hold weight', color: 'text-white/40' };
-  }
-
-  // Base / build — progressive overload
-  if (rir == null) {
-    if (e1rmTrend === 'improving') return { label: 'getting stronger', color: 'text-emerald-400/75' };
-    if (e1rmTrend === 'declining') return { label: 'strength slipping', color: 'text-amber-400/80' };
-    return { label: 'holding steady', color: 'text-white/40' };
-  }
-  if (rir < 1) return { label: 'back off weight', color: 'text-red-400/80' };
-  // Lower body: slightly more conservative threshold (RIR > 4 not 3.5)
-  const tooLightThreshold = lower ? 4 : 3.5;
-  if (rir > tooLightThreshold) return { label: 'add weight', color: 'text-amber-400/80' };
-  if (e1rmTrend === 'improving') return { label: 'getting stronger', color: 'text-emerald-400/75' };
-  return { label: 'on track', color: 'text-white/45' };
+function verdictToneToColor(tone: string): string {
+  if (tone === 'action')   return 'text-amber-400/80';
+  if (tone === 'caution')  return 'text-red-400/80';
+  if (tone === 'positive') return 'text-emerald-400/75';
+  if (tone === 'muted')    return 'text-sky-400/60';
+  return 'text-white/45';
 }
 
 function loadStatusColor(status: string | undefined): string {
@@ -186,6 +146,7 @@ function Dot() {
 export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const { data, loading, error, refresh } = coachData;
   const { liftTrends } = useExerciseLog(8);
+  const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
 
   if (loading && !data) {
     return (
@@ -225,9 +186,10 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   // ── BODY row — endurance signals only (strength signals go in STRENGTH row) ─
   const visibleSignals = (rm?.visible_signals ?? []).filter((s: any) => s.category === 'endurance');
 
-  // ── STRENGTH row — from exercise_log via useExerciseLog (per-lift RIR) ───
-  // liftTrends already filtered to ≥2 sessions; sort by most sessions, take top 5
-  const topLifts = liftTrends.slice(0, 5);
+  // ── STRENGTH row — server-computed per_lift from response_model ──────────
+  const perLift = (rm?.strength?.per_lift ?? []).filter((l: any) => l.sufficient).slice(0, 5);
+  // Still use liftTrends only for pre-filling the adjustment modal (best_weight)
+  const liftWeightMap = new Map(liftTrends.map(lt => [lt.canonical, lt.entries[lt.entries.length - 1]?.best_weight ?? 0]));
 
   // ── RUN row — from run_session_types_7d ──────────────────────────────────
   const runTypes = (wsv as any).run_session_types_7d as Array<{
@@ -330,20 +292,46 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           </Row>
         )}
 
-        {/* STRENGTH — per-lift from exercise_log */}
+        {/* STRENGTH — server-computed verdicts from response_model.strength.per_lift */}
         <Row label="STRENGTH">
-          {topLifts.length === 0 && (
+          {perLift.length === 0 && (
             <Chip value="no data" valueClass="text-white/25" />
           )}
-          {topLifts.map((lt, i) => {
-            const e1rmTrend = lt.trend != null && lt.trend >= 3 ? 'improving'
-              : lt.trend != null && lt.trend <= -3 ? 'declining'
-              : 'stable';
-            const v = liftVerdict(lt.latestRir, e1rmTrend, week.intent, lt.canonical);
+          {perLift.map((lt: any, i: number) => {
+            const verdictLabel: string = lt.verdict_label ?? '—';
+            const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
+            const isActionable = verdictLabel === 'add weight' || verdictLabel === 'back off weight';
+            const currentWeight = liftWeightMap.get(lt.canonical_name) ?? 0;
             return (
-              <React.Fragment key={lt.canonical}>
+              <React.Fragment key={lt.canonical_name}>
                 {i > 0 && <Dot />}
-                <Chip label={lt.displayName} value={v.label} valueClass={v.color} />
+                <span className="relative inline-flex items-baseline gap-1">
+                  {isActionable ? (
+                    <button
+                      onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
+                      className="inline-flex items-baseline gap-1 hover:opacity-80 transition-opacity"
+                    >
+                      <span className="text-white/30 text-[10px]">{lt.display_name}</span>
+                      <span className={`${verdictColor} underline decoration-dotted underline-offset-2`}>{verdictLabel}</span>
+                    </button>
+                  ) : (
+                    <Chip label={lt.display_name} value={verdictLabel} valueClass={verdictColor} />
+                  )}
+                  {adjustingLift === lt.canonical_name && (
+                    <StrengthAdjustmentModal
+                      exerciseName={lt.display_name}
+                      currentWeight={currentWeight}
+                      nextPlannedWeight={Math.round(currentWeight * 1.025 / 5) * 5 || currentWeight}
+                      targetRir={lt.rir_current ?? undefined}
+                      actualRir={lt.rir_current ?? undefined}
+                      planId={wsv.plan.plan_id ?? undefined}
+                      isBodyweight={false}
+                      hasPlannedWeight={currentWeight > 0}
+                      onClose={() => setAdjustingLift(null)}
+                      onSaved={() => { setAdjustingLift(null); refresh(); }}
+                    />
+                  )}
+                </span>
               </React.Fragment>
             );
           })}
