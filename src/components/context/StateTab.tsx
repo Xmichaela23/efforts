@@ -214,140 +214,218 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
     readiness === 'fatigued' ? 'text-amber-400/75' :
     'text-white/45';
 
+  const dailyLoad = load.daily_load_7d ?? [];
+  const hrDriftSeries = load.hr_drift_series ?? [];
+  const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
+  const maxDrift = Math.max(...hrDriftSeries.map(d => Math.abs(d.drift_bpm)), 1);
+
   return (
     <div className="pt-1 pb-4">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-3 px-0.5">
-        <div className="flex flex-col gap-1">
+      <div className="flex items-start justify-between mb-4 px-0.5">
+        <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline gap-2">
             <span className="text-[10px] font-semibold tracking-widest text-white/50 uppercase">{weekLabel}</span>
             <span className="text-[10px] text-white/20 tabular-nums">{pct}% through</span>
             {readinessLabel && (
-              <span className={`text-[10px] uppercase tracking-wider ${readinessColor}`}>· {readinessLabel}</span>
+              <span className={`text-[10px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
             )}
           </div>
           {intentSummary && (
-            <span className="text-[11px] text-white/45 leading-snug">{intentSummary}</span>
+            <span className="text-[13px] font-medium text-white/70 leading-snug">{intentSummary}</span>
           )}
         </div>
         <button
           onClick={refresh}
-          className="p-1 rounded text-white/20 hover:text-white/45 transition-colors shrink-0"
+          className="p-1 rounded text-white/20 hover:text-white/45 transition-colors shrink-0 mt-0.5"
           aria-label="Refresh"
         >
           <RefreshCw className="w-3 h-3" />
         </button>
       </div>
 
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3">
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
-        {/* LOAD */}
-        <Row label="LOAD">
-          <AcwrGauge value={acwr} serverLabel={readinessLabel} readinessState={readiness} />
-          {loadStatus?.status && (
-            <><Dot /><Chip
-              label="run"
-              value={
-                loadStatus.status === 'on_target' ? 'on track' :
-                loadStatus.status === 'elevated' ? 'a bit high' :
-                loadStatus.status === 'high' ? 'too much' :
-                loadStatus.status === 'under' ? 'build more' :
-                loadStatus.status
-              }
-              valueClass={loadStatusColor(loadStatus.status)}
-            /></>
+        {/* LOAD — full-width gauge + sparkline */}
+        <div className="px-3 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase">LOAD</span>
+            <div className="flex items-center gap-2">
+              <AcwrGauge value={acwr} serverLabel={readinessLabel} readinessState={readiness} />
+              {loadStatus?.status && (
+                <><Dot /><Chip
+                  label="run"
+                  value={
+                    loadStatus.status === 'on_target' ? 'on track' :
+                    loadStatus.status === 'elevated' ? 'a bit high' :
+                    loadStatus.status === 'high' ? 'too much' :
+                    loadStatus.status === 'under' ? 'build more' :
+                    loadStatus.status
+                  }
+                  valueClass={loadStatusColor(loadStatus.status)}
+                /></>
+              )}
+            </div>
+          </div>
+          {/* 7-day load sparkline */}
+          {dailyLoad.length > 0 && (
+            <svg width="100%" height="28" viewBox={`0 0 ${dailyLoad.length * 20} 28`} preserveAspectRatio="none" className="mt-1">
+              {dailyLoad.map((d, i) => {
+                const barH = Math.max(2, Math.round((d.load / maxLoad) * 22));
+                return (
+                  <rect
+                    key={d.date}
+                    x={i * 20 + 2}
+                    y={26 - barH}
+                    width={16}
+                    height={barH}
+                    rx={2}
+                    fill={d.load > 0 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'}
+                  />
+                );
+              })}
+              {/* ACWR threshold line at ~1.3 = 73% of max scale */}
+              <line x1={0} y1={26 - Math.round(0.73 * 22)} x2="100%" y2={26 - Math.round(0.73 * 22)} stroke="rgba(251,191,36,0.2)" strokeWidth={1} strokeDasharray="3,3" />
+            </svg>
           )}
-        </Row>
+        </div>
 
-        {/* BODY — server pre-computed visible_signals */}
-        <Row label="BODY">
-          {visibleSignals.length === 0 && (
-            <Chip value="not enough data" valueClass="text-white/25" />
-          )}
-          {visibleSignals.map((s, i) => (
-            <React.Fragment key={s.label}>
-              {i > 0 && <Dot />}
-              <Chip
-                label={s.label}
-                value={s.detail}
-                valueClass={trendColor(s.trend, s.trend_tone)}
-              />
-            </React.Fragment>
-          ))}
-        </Row>
+        {/* BODY */}
+        <div className="px-3 py-3">
+          <div className="flex items-start gap-3">
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+            <div className="flex-1 space-y-1.5">
+              {visibleSignals.length === 0 && (
+                <Chip value="not enough data" valueClass="text-white/25" />
+              )}
+              {visibleSignals.map((s) => (
+                <div key={s.label} className="flex items-center justify-between">
+                  <span className="text-[11px] text-white/35">{s.label}</span>
+                  <div className="flex items-center gap-2">
+                    {/* HR drift micro-sparkline */}
+                    {s.label === 'Heart rate drift' && hrDriftSeries.length >= 2 && (
+                      <svg width="48" height="16" viewBox={`0 0 ${hrDriftSeries.length * 10} 16`} preserveAspectRatio="none">
+                        <polyline
+                          points={hrDriftSeries.map((pt, i) => {
+                            const x = i * 10 + 5;
+                            const y = 14 - Math.round(((pt.drift_bpm + maxDrift) / (maxDrift * 2)) * 12);
+                            return `${x},${y}`;
+                          }).join(' ')}
+                          fill="none"
+                          stroke="rgba(251,146,60,0.5)"
+                          strokeWidth={1.5}
+                          strokeLinejoin="round"
+                        />
+                        {/* zero line */}
+                        <line x1={0} y1={8} x2="100%" y2={8} stroke="rgba(255,255,255,0.08)" strokeWidth={0.5} />
+                      </svg>
+                    )}
+                    <span className={`text-[11px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-        {/* AERO — run execution scores only; bike/swim hidden until we have execution models */}
+        {/* AERO */}
         {runTypes.some(rt => rt.avg_execution_score != null) && (
-          <Row label="AERO">
-            {runTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => {
-              const effColor = rt.avg_execution_score! >= 80 ? 'text-emerald-400/75'
-                : rt.avg_execution_score! >= 60 ? 'text-white/55'
-                : 'text-amber-400/75';
-              return (
-                <React.Fragment key={rt.type}>
-                  {i > 0 && <Dot />}
-                  <Chip label={rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={effColor} />
-                </React.Fragment>
-              );
-            })}
-          </Row>
+          <div className="px-3 py-3">
+            <Row label="AERO">
+              {runTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => {
+                const effColor = rt.avg_execution_score! >= 80 ? 'text-emerald-400/75'
+                  : rt.avg_execution_score! >= 60 ? 'text-white/55'
+                  : 'text-amber-400/75';
+                return (
+                  <React.Fragment key={rt.type}>
+                    {i > 0 && <Dot />}
+                    <Chip label={rt.type} value={`${Math.round(rt.avg_execution_score!)}% eff`} valueClass={effColor} />
+                  </React.Fragment>
+                );
+              })}
+            </Row>
+          </div>
         )}
 
-        {/* STRENGTH — server-computed verdicts from response_model.strength.per_lift */}
-        <Row label="STRENGTH">
-          {perLift.length === 0 && (
-            <Chip value="no data" valueClass="text-white/25" />
-          )}
-          {perLift.map((lt: any, i: number) => {
-            const verdictLabel: string = lt.verdict_label ?? '—';
-            const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
-            const isActionable = verdictLabel === 'add weight' || verdictLabel === 'back off weight';
-            const currentWeight = liftWeightMap.get(lt.canonical_name) ?? 0;
-            return (
-              <React.Fragment key={lt.canonical_name}>
-                {i > 0 && <Dot />}
-                <span className="relative inline-flex items-baseline gap-1">
-                  {isActionable ? (
-                    <button
-                      onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
-                      className="inline-flex items-baseline gap-1 hover:opacity-80 transition-opacity"
-                    >
-                      <span className="text-white/30 text-[10px]">{lt.display_name}</span>
-                      <span className={`${verdictColor} underline decoration-dotted underline-offset-2`}>{verdictLabel}</span>
-                    </button>
-                  ) : (
-                    <Chip label={lt.display_name} value={verdictLabel} valueClass={verdictColor} />
-                  )}
-                  {adjustingLift === lt.canonical_name && (
-                    <StrengthAdjustmentModal
-                      exerciseName={lt.display_name}
-                      currentWeight={currentWeight}
-                      nextPlannedWeight={Math.round(currentWeight * 1.025 / 5) * 5 || currentWeight}
-                      targetRir={lt.rir_current ?? undefined}
-                      actualRir={lt.rir_current ?? undefined}
-                      planId={wsv.plan.plan_id ?? undefined}
-                      isBodyweight={false}
-                      hasPlannedWeight={currentWeight > 0}
-                      onClose={() => setAdjustingLift(null)}
-                      onSaved={() => { setAdjustingLift(null); refresh(); }}
-                    />
-                  )}
-                </span>
-              </React.Fragment>
-            );
-          })}
-        </Row>
+        {/* STRENGTH */}
+        <div className="px-3 py-3">
+          <div className="flex items-start gap-3">
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
+            <div className="flex-1 space-y-2">
+              {perLift.length === 0 && <Chip value="no data" valueClass="text-white/25" />}
+              {perLift.map((lt: any) => {
+                const verdictLabel: string = lt.verdict_label ?? '—';
+                const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
+                const isActionable = verdictLabel === 'add weight' || verdictLabel === 'back off weight';
+                const currentWeight = liftWeightMap.get(lt.canonical_name) ?? 0;
+                // Progress bar: e1rm as % of peak, capped at 100%
+                const e1rmPct = lt.e1rm_current != null && lt.peak1RM > 0
+                  ? Math.min(100, Math.round((lt.e1rm_current / lt.peak1RM) * 100))
+                  : lt.e1rm_current != null && lt.e1rm_previous != null && lt.e1rm_previous > 0
+                  ? Math.min(100, Math.round((lt.e1rm_current / (lt.e1rm_previous * 1.1)) * 100))
+                  : null;
+                return (
+                  <div key={lt.canonical_name} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-white/50">{lt.display_name}</span>
+                      <span className="relative">
+                        {isActionable ? (
+                          <button
+                            onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
+                            className={`text-[11px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80`}
+                          >{verdictLabel}</button>
+                        ) : (
+                          <span className={`text-[11px] ${verdictColor}`}>{verdictLabel}</span>
+                        )}
+                        {adjustingLift === lt.canonical_name && (
+                          <StrengthAdjustmentModal
+                            exerciseName={lt.display_name}
+                            currentWeight={currentWeight}
+                            nextPlannedWeight={Math.round(currentWeight * 1.025 / 5) * 5 || currentWeight}
+                            targetRir={lt.rir_current ?? undefined}
+                            actualRir={lt.rir_current ?? undefined}
+                            planId={wsv.plan.plan_id ?? undefined}
+                            isBodyweight={false}
+                            hasPlannedWeight={currentWeight > 0}
+                            onClose={() => setAdjustingLift(null)}
+                            onSaved={() => { setAdjustingLift(null); refresh(); }}
+                          />
+                        )}
+                      </span>
+                    </div>
+                    {e1rmPct != null && (
+                      <div className="h-[3px] w-full rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${e1rmPct}%`,
+                            backgroundColor: verdictLabel === 'add weight' ? 'rgba(251,191,36,0.5)' :
+                              verdictLabel === 'back off weight' ? 'rgba(248,113,113,0.4)' :
+                              verdictLabel === 'getting stronger' ? 'rgba(52,211,153,0.4)' :
+                              'rgba(255,255,255,0.15)',
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* NEXT */}
-        <Row label="NEXT">
-          {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/25" />}
-          {nextSessions.map((s, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && <Dot />}
-              <Chip label={fmtDate(s.date)} value={s.name ?? s.type} />
-            </React.Fragment>
-          ))}
-        </Row>
+        <div className="px-3 py-3">
+          <Row label="NEXT">
+            {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/25" />}
+            {nextSessions.map((s, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <Dot />}
+                <Chip label={fmtDate(s.date)} value={s.name ?? s.type} />
+              </React.Fragment>
+            ))}
+          </Row>
+        </div>
       </div>
 
       {wsv.plan.plan_name && (

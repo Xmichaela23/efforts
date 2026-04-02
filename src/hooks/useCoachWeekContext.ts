@@ -265,6 +265,8 @@ export type CoachWeekContextV1 = {
         extra_load: number;
         session_count: number;
       }>;
+      daily_load_7d: Array<{ date: string; load: number }>;
+      hr_drift_series: Array<{ date: string; drift_bpm: number }>;
     };
     trends: {
       fitness_direction: string;

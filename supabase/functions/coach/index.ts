@@ -775,6 +775,21 @@ Deno.serve(async (req) => {
     const avgStrengthRir7d = rirs.length ? Math.round((rirs.reduce((a, b) => a + b, 0) / rirs.length) * 10) / 10 : null;
     const hrDriftAvg = driftBpms.length ? Math.round((driftBpms.reduce((a, b) => a + b, 0) / driftBpms.length) * 10) / 10 : null;
 
+    // HR drift series — last 6 steady-state runs with a drift reading, for sparkline
+    const hr_drift_series: Array<{ date: string; drift_bpm: number }> = (() => {
+      const out: Array<{ date: string; drift_bpm: number }> = [];
+      const sorted = [...(Array.isArray(recentWorkouts) ? recentWorkouts : [])]
+        .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed')
+        .filter((w: any) => String(w?.type || '').toLowerCase() === 'run')
+        .sort((a: any, b: any) => String(a?.date || '').localeCompare(String(b?.date || '')));
+      for (const w of sorted) {
+        if (hrWorkoutTypeFromWorkout(w as any) !== 'steady_state') continue;
+        const d = driftBpmFromWorkout(w as any);
+        if (d != null) out.push({ date: String((w as any)?.date || ''), drift_bpm: d });
+      }
+      return out.slice(-6);
+    })();
+
     // Run session type classification (7d window)
     type RunSessionType = 'easy' | 'z2' | 'long' | 'tempo' | 'progressive' | 'fartlek' | 'intervals' | 'hills' | 'unknown';
     const runTypeFromWorkout = (wAny: any): RunSessionType => {
@@ -1114,6 +1129,17 @@ Deno.serve(async (req) => {
     const acute7Rows = completedRolling.filter((r: any) => String(r?.date) >= acuteStart);
     const acute7Load = acute7Rows.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
     const chronic28Load = completedRolling.reduce((sum: number, r: any) => sum + (safeNum(r?.workload_actual) || 0), 0);
+
+    // Daily load for sparkline — sum workload_actual per day over the last 7 days
+    const daily_load_7d: Array<{ date: string; load: number }> = (() => {
+      const byDate = new Map<string, number>();
+      for (let i = 6; i >= 0; i--) byDate.set(addDaysISO(asOfDate, -i), 0);
+      for (const r of acute7Rows) {
+        const d = String(r?.date || '');
+        if (byDate.has(d)) byDate.set(d, (byDate.get(d) || 0) + (safeNum(r?.workload_actual) || 0));
+      }
+      return [...byDate.entries()].map(([date, load]) => ({ date, load }));
+    })();
 
     // Running-weighted ACWR: discount non-running modalities by their fatigue contribution
     const weightedLoad = (rows: any[]) => rows.reduce((sum: number, r: any) => {
@@ -2756,6 +2782,8 @@ ${narrativeFacts.join('\n')}`;
           extra_load: Number(r.extra_load || 0),
           session_count: Number(r.total_sessions || 0),
         })),
+        daily_load_7d,
+        hr_drift_series,
       },
       trends: {
         fitness_direction: fitnessDirection,
