@@ -267,40 +267,36 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
               )}
             </div>
           </div>
-          {/* 7-day load sparkline */}
+          {/* 7-day load bar chart */}
           {dailyLoad.length > 0 && (
             <div className="mt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] text-white/25 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
+                <span className="text-[9px] tabular-nums text-white/30">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
+              </div>
               {/* bars */}
-              <div className="flex items-end gap-[3px] h-10">
+              <div className="flex items-end h-8 gap-[2px]">
                 {dailyLoad.map((d) => {
                   const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
-                  const pct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
+                  const pct = d.load > 0 ? Math.max(0.06, d.load / maxLoad) : 0;
                   return (
-                    <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full">
+                    <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
                       <div
-                        className="w-full rounded-sm transition-all"
+                        className="rounded-[2px] transition-all"
                         style={{
+                          width: 6,
                           height: `${Math.round(pct * 100)}%`,
-                          minHeight: d.load > 0 ? 4 : 2,
+                          minHeight: d.load > 0 ? 3 : 1,
                           backgroundColor: isToday
-                            ? 'rgba(255,255,255,0.45)'
+                            ? 'rgba(255,255,255,0.55)'
                             : d.load > 0
-                            ? 'rgba(255,255,255,0.22)'
-                            : 'rgba(255,255,255,0.05)',
+                            ? 'rgba(255,255,255,0.25)'
+                            : 'rgba(255,255,255,0.06)',
                         }}
                       />
-                    </div>
-                  );
-                })}
-              </div>
-              {/* day labels */}
-              <div className="flex gap-[3px] mt-1">
-                {dailyLoad.map((d) => {
-                  const day = new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' });
-                  const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
-                  return (
-                    <div key={d.date} className="flex-1 text-center">
-                      <span className={`text-[8px] tabular-nums ${isToday ? 'text-white/50' : 'text-white/18'}`}>{day}</span>
+                      <span className={`text-[7px] tabular-nums leading-none ${isToday ? 'text-white/55' : 'text-white/20'}`}>
+                        {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
+                      </span>
                     </div>
                   );
                 })}
