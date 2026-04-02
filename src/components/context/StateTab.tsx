@@ -3,7 +3,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
-import { getDisciplineColor } from '@/lib/context-utils';
+import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -32,7 +32,7 @@ function acwrToGaugePct(v: number): number {
 // Horizontal gauge: under | ok zone | high zone | spike
 // Zones as % of total width: under=18%, ok=55%, high=18%, spike=9%
 function AcwrGauge({ value, readinessState }: { value: number | null; readinessState: string | null }) {
-  if (value == null) return <span className="text-white/45 text-[10px]">—</span>;
+  if (value == null) return <span className="text-white/55 text-[11px]">—</span>;
   const pos = acwrToGaugePct(value);
   // Dot color and label both come from server readiness — it has the full reconciled picture
   // Raw ACWR position is still valid (dot stays where it is), but color follows body state
@@ -66,29 +66,29 @@ function AcwrGauge({ value, readinessState }: { value: number | null; readinessS
 
 
 function trendColor(dir: string, tone?: string): string {
-  if (tone === 'positive') return 'text-emerald-400/80';
-  if (tone === 'danger') return 'text-red-400/80';
-  if (tone === 'warning') return 'text-amber-400/80';
-  if (dir === 'improving') return 'text-emerald-400/75';
-  if (dir === 'declining') return 'text-amber-400/75';
-  return 'text-white/40';
+  if (tone === 'positive') return 'text-emerald-400/90';
+  if (tone === 'danger') return 'text-red-400/90';
+  if (tone === 'warning') return 'text-amber-400/90';
+  if (dir === 'improving') return 'text-emerald-400/85';
+  if (dir === 'declining') return 'text-amber-400/85';
+  return 'text-white/55';
 }
 
 function verdictToneToColor(tone: string): string {
-  if (tone === 'action')   return 'text-amber-400/80';
-  if (tone === 'caution')  return 'text-red-400/80';
-  if (tone === 'positive') return 'text-emerald-400/75';
-  if (tone === 'muted')    return 'text-sky-400/60';
-  return 'text-white/45';
+  if (tone === 'action')   return 'text-amber-400/90';
+  if (tone === 'caution')  return 'text-red-400/90';
+  if (tone === 'positive') return 'text-emerald-400/85';
+  if (tone === 'muted')    return 'text-sky-400/75';
+  return 'text-white/60';
 }
 
 function loadStatusColor(status: string | undefined): string {
-  if (!status) return 'text-white/30';
-  if (status === 'on_target') return 'text-emerald-400/70';
-  if (status === 'elevated') return 'text-amber-400/70';
-  if (status === 'high') return 'text-red-400/70';
-  if (status === 'under') return 'text-sky-400/70';
-  return 'text-white/50';
+  if (!status) return 'text-white/45';
+  if (status === 'on_target') return 'text-emerald-400/85';
+  if (status === 'elevated') return 'text-amber-400/85';
+  if (status === 'high') return 'text-red-400/85';
+  if (status === 'under') return 'text-sky-400/85';
+  return 'text-white/65';
 }
 
 function weekPct(startDate: string, endDate: string): number {
@@ -110,10 +110,10 @@ function fmtDate(dateStr: string): string {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
-      <div className="flex-1 text-[11px] text-white/70 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+      <div className="flex-1 text-[12px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
         {children}
       </div>
     </div>
@@ -123,14 +123,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Chip({ label, value, valueClass }: { label?: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      {label != null && <span className="text-white/45 text-[10px]">{label}</span>}
-      <span className={valueClass ?? 'text-white/65'}>{value}</span>
+      {label != null && <span className="text-white/60 text-[11px]">{label}</span>}
+      <span className={valueClass ?? 'text-white/80'}>{value}</span>
     </span>
   );
 }
 
 function Dot() {
-  return <span className="text-white/18 select-none">·</span>;
+  return <span className="text-white/30 select-none">·</span>;
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -149,11 +149,11 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   }
 
   if (error || !data) {
-    return <div className="py-8 text-center text-[11px] text-white/30">{error ?? 'No data'}</div>;
+    return <div className="py-8 text-center text-[12px] text-white/50">{error ?? 'No data'}</div>;
   }
 
   const wsv = data.weekly_state_v1;
-  if (!wsv) return <div className="py-8 text-center text-[11px] text-white/30">Loading state…</div>;
+  if (!wsv) return <div className="py-8 text-center text-[12px] text-white/50">Loading state…</div>;
 
   const week = wsv.week;
   const load = wsv.load;
@@ -199,11 +199,11 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const readinessLabel = trends.readiness_label;
   const readiness = trends.readiness_state;
   const readinessColor =
-    readiness === 'fresh' ? 'text-emerald-400/75' :
-    readiness === 'adapting' ? 'text-sky-400/70' :
-    readiness === 'overreached' ? 'text-red-400/75' :
-    readiness === 'fatigued' ? 'text-amber-400/75' :
-    'text-white/45';
+    readiness === 'fresh' ? 'text-emerald-400/90' :
+    readiness === 'adapting' ? 'text-sky-400/85' :
+    readiness === 'overreached' ? 'text-red-400/90' :
+    readiness === 'fatigued' ? 'text-amber-400/90' :
+    'text-white/60';
 
   const dailyLoad = load.daily_load_7d ?? [];
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
@@ -240,19 +240,19 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       <div className="flex items-start justify-between mb-4 px-0.5">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline gap-2">
-            <span className="text-[10px] font-semibold tracking-widest text-white/50 uppercase">{weekLabel}</span>
-            <span className="text-[10px] text-white/55 tabular-nums">{pct}% through</span>
+            <span className="text-[11px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
+            <span className="text-[11px] text-white/65 tabular-nums">{pct}% through</span>
             {readinessLabel && (
-              <span className={`text-[10px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
+              <span className={`text-[11px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
             )}
           </div>
           {intentSummary && (
-            <span className="text-[13px] font-medium text-white/70 leading-snug">{intentSummary}</span>
+            <span className="text-[14px] font-medium text-white/85 leading-snug">{intentSummary}</span>
           )}
         </div>
         <button
           onClick={refresh}
-          className="p-1 rounded text-white/20 hover:text-white/45 transition-colors shrink-0 mt-0.5"
+          className="p-1 rounded text-white/35 hover:text-white/55 transition-colors shrink-0 mt-0.5"
           aria-label="Refresh"
         >
           <RefreshCw className="w-3 h-3" />
@@ -264,11 +264,11 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* LOAD — full-width gauge + sparkline */}
         <div className="px-3 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase">LOAD</span>
+            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
             <div className="flex items-center gap-2">
               <AcwrGauge value={acwr} readinessState={readiness} />
               {loadStatus?.status && (
-                <><Dot /><span className={`text-[13px] font-semibold tracking-tight ${loadStatusColor(loadStatus.status)}`}>{
+                <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadStatusColor(loadStatus.status)}`}>{
                   loadStatus.status === 'on_target' ? 'on track' :
                   loadStatus.status === 'elevated' ? 'a bit high' :
                   loadStatus.status === 'high' ? 'pull back' :
@@ -282,28 +282,28 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           {dailyLoad.length > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] text-white/55 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
-                <span className="text-[9px] tabular-nums text-white/50">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
+                <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
+                <span className="text-[10px] tabular-nums text-white/60">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
               </div>
               {/* bars — color by dominant discipline using app's SPORT_COLORS */}
-              <div className="flex items-end h-8 gap-[2px]">
+              <div className="flex items-end h-10 gap-[3px]">
                 {dailyLoad.map((d) => {
                   const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
-                  const pct = d.load > 0 ? Math.max(0.06, d.load / maxLoad) : 0;
+                  const pct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
                   const dtype = (d as any).dominant_type ?? 'none';
                   const hex = dtype !== 'none' && dtype !== 'other' ? getDisciplineColor(dtype) : null;
                   const barColor = d.load === 0
                     ? 'rgba(255,255,255,0.06)'
                     : hex
-                    ? `${hex}${isToday ? 'cc' : '66'}` // hex + alpha: today=80%, past=40%
+                    ? `rgba(${hexToRgb(hex)}, ${isToday ? 0.92 : 0.7})`
                     : isToday ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)';
                   return (
                     <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
                       <div
                         className="rounded-[2px] transition-all"
-                        style={{ width: 6, height: `${Math.round(pct * 100)}%`, minHeight: d.load > 0 ? 3 : 1, backgroundColor: barColor }}
+                        style={{ width: 8, height: `${Math.round(pct * 100)}%`, minHeight: d.load > 0 ? 4 : 1, backgroundColor: barColor }}
                       />
-                      <span className={`text-[7px] tabular-nums leading-none ${isToday ? 'text-white/55' : 'text-white/20'}`}>
+                      <span className={`text-[9px] tabular-nums leading-none ${isToday ? 'text-white/70' : 'text-white/40'}`}>
                         {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
                       </span>
                     </div>
@@ -317,26 +317,26 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* BODY */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5">
               {visibleSignals.length === 0 && (
-                <Chip value="not enough data" valueClass="text-white/45" />
+                <Chip value="not enough data" valueClass="text-white/55" />
               )}
               {visibleSignals.map((s) => (
                 <div key={s.label} className="flex items-center justify-between">
-                  <span className="text-[11px] text-white/55">{s.label}</span>
+                  <span className="text-[12px] text-white/70">{s.label}</span>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[11px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                    <span className={`text-[12px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
                   </div>
                 </div>
               ))}
               {crossTrainingLine && (
                 <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-[11px] text-white/55">Aerobic cross-training</span>
-                  <span className={`text-[11px] ${
-                    crossTrainingLine.tone === 'positive' ? 'text-emerald-400/80' :
-                    crossTrainingLine.tone === 'warning' ? 'text-amber-400/80' :
-                    'text-white/60'
+                  <span className="text-[12px] text-white/70">Aerobic cross-training</span>
+                  <span className={`text-[12px] ${
+                    crossTrainingLine.tone === 'positive' ? 'text-emerald-400/90' :
+                    crossTrainingLine.tone === 'warning' ? 'text-amber-400/90' :
+                    'text-white/70'
                   }`}>{crossTrainingLine.label}</span>
                 </div>
               )}
@@ -349,9 +349,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           <div className="px-3 py-3">
             <Row label="AERO">
               {runTypes.filter(rt => rt.avg_execution_score != null).map((rt, i) => {
-                const effColor = rt.avg_execution_score! >= 80 ? 'text-emerald-400/75'
-                  : rt.avg_execution_score! >= 60 ? 'text-white/55'
-                  : 'text-amber-400/75';
+                const effColor = rt.avg_execution_score! >= 80 ? 'text-emerald-400/85'
+                  : rt.avg_execution_score! >= 60 ? 'text-white/70'
+                  : 'text-amber-400/85';
                 return (
                   <React.Fragment key={rt.type}>
                     {i > 0 && <Dot />}
@@ -366,9 +366,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* STRENGTH */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
+            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
             <div className="flex-1 space-y-2">
-              {perLift.length === 0 && <Chip value="no data" valueClass="text-white/45" />}
+              {perLift.length === 0 && <Chip value="no data" valueClass="text-white/55" />}
               {perLift.map((lt: any) => {
                 const verdictLabel: string = lt.verdict_label ?? '—';
                 const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
@@ -383,15 +383,15 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                 return (
                   <div key={lt.canonical_name} className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-white/65">{lt.display_name}</span>
+                      <span className="text-[12px] text-white/80">{lt.display_name}</span>
                       <span className="relative">
                         {isActionable ? (
                           <button
                             onClick={() => setAdjustingLift(adjustingLift === lt.canonical_name ? null : lt.canonical_name)}
-                            className={`text-[11px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80`}
+                            className={`text-[12px] ${verdictColor} underline decoration-dotted underline-offset-2 hover:opacity-80`}
                           >{verdictLabel}</button>
                         ) : (
-                          <span className={`text-[11px] ${verdictColor}`}>{verdictLabel}</span>
+                          <span className={`text-[12px] ${verdictColor}`}>{verdictLabel}</span>
                         )}
                         {adjustingLift === lt.canonical_name && (
                           <StrengthAdjustmentModal
@@ -433,7 +433,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* NEXT */}
         <div className="px-3 py-3">
           <Row label="NEXT">
-            {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/45" />}
+            {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/55" />}
             {nextSessions.map((s, i) => (
               <React.Fragment key={i}>
                 {i > 0 && <Dot />}
@@ -445,7 +445,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       </div>
 
       {wsv.plan.plan_name && (
-        <div className="mt-2 px-0.5 text-[9px] text-white/55 uppercase tracking-widest">
+        <div className="mt-2 px-0.5 text-[10px] text-white/60 uppercase tracking-widest">
           {wsv.plan.plan_name}
         </div>
       )}
