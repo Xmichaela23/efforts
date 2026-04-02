@@ -3,6 +3,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
+import { getDisciplineColor } from '@/lib/context-utils';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -208,30 +209,29 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
 
   // ── Cross-training signal ─────────────────────────────────────────────────
-  // Surface when non-run load is meaningful (>15% of WTD) so user can see
-  // whether cross-training is adding base or creating recovery load.
+  // Only show for aerobic cross-training (bike/swim) — strength has its own section.
+  // Surface when >15% of WTD. Don't attribute causality we can't prove — just
+  // show what signals actually say: run load vs total load.
   const crossTrainingLine: { label: string; tone: string } | null = (() => {
     const byDiscipline = load.by_discipline ?? [];
     const totalLoad = byDiscipline.reduce((s: number, d: any) => s + (d.actual_load ?? 0), 0);
-    const nonRunLoad = byDiscipline
-      .filter((d: any) => d.discipline !== 'run' && d.discipline !== 'mobility')
+    const aerobicXtLoad = byDiscipline
+      .filter((d: any) => d.discipline === 'bike' || d.discipline === 'swim')
       .reduce((s: number, d: any) => s + (d.actual_load ?? 0), 0);
-    if (totalLoad === 0 || nonRunLoad / totalLoad < 0.15) return null;
+    if (totalLoad === 0 || aerobicXtLoad / totalLoad < 0.15) return null;
 
+    const pct = Math.round((aerobicXtLoad / totalLoad) * 100);
     const interference = (data as any)?.interference ?? null;
     if (interference?.status === 'interference_detected') {
-      return { label: `Cross-training load — ${interference.detail ?? 'interference detected'}`, tone: 'warning' };
+      return { label: `${pct}% of load — ${interference.detail ?? 'may affect recovery'}`, tone: 'warning' };
     }
 
     const runningAcwr = load.running_acwr ?? null;
     const totalAcwr = load.acwr ?? null;
-    if (totalAcwr != null && runningAcwr != null && totalAcwr > 1.05 && runningAcwr < 1.0) {
-      return { label: 'Cross-training adding base — run load nominal', tone: 'positive' };
+    if (runningAcwr != null && runningAcwr < 0.95 && totalAcwr != null && totalAcwr > 1.0) {
+      return { label: `${pct}% of load — run load nominal, adding aerobic base`, tone: 'positive' };
     }
-    if (totalAcwr != null && runningAcwr != null && totalAcwr > 1.2 && runningAcwr > 1.1) {
-      return { label: 'Cross-training adding to overall fatigue load', tone: 'neutral' };
-    }
-    return { label: 'Cross-training contributing to load', tone: 'neutral' };
+    return { label: `${pct}% of load this week`, tone: 'neutral' };
   })();
 
   return (
@@ -285,21 +285,18 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                 <span className="text-[9px] text-white/40 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
                 <span className="text-[9px] tabular-nums text-white/30">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
               </div>
-              {/* bars — color by dominant discipline */}
+              {/* bars — color by dominant discipline using app's SPORT_COLORS */}
               <div className="flex items-end h-8 gap-[2px]">
                 {dailyLoad.map((d) => {
                   const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
                   const pct = d.load > 0 ? Math.max(0.06, d.load / maxLoad) : 0;
                   const dtype = (d as any).dominant_type ?? 'none';
+                  const hex = dtype !== 'none' && dtype !== 'other' ? getDisciplineColor(dtype) : null;
                   const barColor = d.load === 0
                     ? 'rgba(255,255,255,0.06)'
-                    : dtype === 'bike'
-                    ? isToday ? 'rgba(56,189,248,0.75)' : 'rgba(56,189,248,0.40)'   // sky
-                    : dtype === 'swim'
-                    ? isToday ? 'rgba(34,211,238,0.75)' : 'rgba(34,211,238,0.40)'   // cyan
-                    : dtype === 'strength'
-                    ? isToday ? 'rgba(167,139,250,0.70)' : 'rgba(167,139,250,0.35)' // violet
-                    : isToday ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)'; // run/default
+                    : hex
+                    ? `${hex}${isToday ? 'cc' : '66'}` // hex + alpha: today=80%, past=40%
+                    : isToday ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)';
                   return (
                     <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
                       <div
@@ -335,12 +332,12 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
               ))}
               {crossTrainingLine && (
                 <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-[11px] text-white/35">Cross-training</span>
+                  <span className="text-[11px] text-white/35">Aerobic cross-training</span>
                   <span className={`text-[11px] ${
-                    crossTrainingLine.tone === 'positive' ? 'text-emerald-400/75' :
-                    crossTrainingLine.tone === 'warning' ? 'text-amber-400/75' :
-                    'text-white/45'
-                  }`}>{crossTrainingLine.label.replace(/^Cross-training[^—]*—\s*/, '').replace(/^Cross-training\s+/, '')}</span>
+                    crossTrainingLine.tone === 'positive' ? 'text-emerald-400/80' :
+                    crossTrainingLine.tone === 'warning' ? 'text-amber-400/80' :
+                    'text-white/60'
+                  }`}>{crossTrainingLine.label}</span>
                 </div>
               )}
             </div>
