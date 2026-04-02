@@ -2818,35 +2818,50 @@ ${narrativeFacts.join('\n')}`;
         hr_drift_series,
         cross_training_signal: (() => {
           const byType = training_state.load_ramp.acute7_by_type || [];
-          const totalLoad = byType.reduce((s: number, r: any) => s + Number(r.total_load || 0), 0);
-          if (totalLoad === 0) return null;
-          const primaryTypes = ['run', 'running', 'bike', 'ride', 'cycling', 'swim', 'swimming'];
-          const strengthTypes = ['strength', 'strength_training', 'weight', 'weights'];
-          const aerobicXtLoad = byType
-            .filter((r: any) => {
-              const t = String(r.type || '').toLowerCase();
-              return primaryTypes.includes(t) && !strengthTypes.includes(t);
-            })
-            .reduce((s: number, r: any) => s + Number(r.total_load || 0), 0);
-          const primaryLoad = byType
-            .sort((a: any, b: any) => Number(b.total_load || 0) - Number(a.total_load || 0))[0];
-          const primaryType = String(primaryLoad?.type || '').toLowerCase();
-          const nonPrimaryLoad = totalLoad - Number(primaryLoad?.total_load || 0);
-          const xtPct = nonPrimaryLoad / totalLoad;
-          if (xtPct < 0.15) return null;
+          const activeDisciplines = byType.filter((r: any) => Number(r.total_load || 0) > 0);
+          if (activeDisciplines.length < 2) return null;
 
-          const intrf = interference ?? latestSnapshot?.interference ?? null;
-          const totalAcwr = acwr ?? null;
+          const cd = weeklyResponseModel.cross_domain;
+          const endur = weeklyResponseModel.endurance;
+          const str = weeklyResponseModel.strength;
+          const assess = weeklyResponseModel.assessment;
 
-          if (intrf?.status === 'interference_detected') {
-            return { label: 'Compounding fatigue — both systems loaded', tone: 'warning' };
+          // Cross-domain analysis uses real HR at pace + execution after strength days
+          if (cd.interference_detected) {
+            const hrPattern = cd.patterns.find((p: any) => p.code === 'post_strength_hr_elevated');
+            const execPattern = cd.patterns.find((p: any) => p.code === 'post_strength_pace_reduced');
+            if (hrPattern) {
+              return { label: `HR +${Math.round(hrPattern.data.avg_delta)}bpm after lifting`, tone: 'warning' as const };
+            }
+            if (execPattern) {
+              return { label: 'Execution dips after lower-body days', tone: 'warning' as const };
+            }
+            return { label: 'Interference detected between disciplines', tone: 'warning' as const };
           }
-          if (totalAcwr != null && totalAcwr <= 1.3) {
-            return { label: 'Adding aerobic base without overloading', tone: 'positive' };
+
+          if (cd.patterns.some((p: any) => p.code === 'concurrent_gains')) {
+            return { label: 'Adapting well — no interference', tone: 'positive' as const };
           }
-          if (totalAcwr != null && totalAcwr > 1.3) {
-            return { label: 'Compounding fatigue — both systems loaded', tone: 'warning' };
+
+          // Fall back to body signals: RPE, HR drift, RIR, strength trends, assessment
+          const rpeRising = endur.rpe.sufficient && endur.rpe.trend === 'declining';
+          const driftWorsening = endur.hr_drift.sufficient && endur.hr_drift.trend === 'declining';
+          const strengthFading = str.overall.trend === 'declining';
+          const rirDropping = str.per_lift.some((l: any) =>
+            l.sufficient && l.rir_trend === 'declining' && l.rir_current != null && l.rir_current < 2
+          );
+          const bodyConcerned = assess.signals_concerning > 0;
+
+          const stressSignals = [rpeRising, driftWorsening, strengthFading, rirDropping, bodyConcerned].filter(Boolean).length;
+
+          if (stressSignals >= 2) {
+            return { label: 'Body showing strain across disciplines', tone: 'warning' as const };
           }
+
+          if (stressSignals === 0 && assess.signals_concerning === 0) {
+            return { label: 'Handling combined load well', tone: 'positive' as const };
+          }
+
           return null;
         })(),
       },
