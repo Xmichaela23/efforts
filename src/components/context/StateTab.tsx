@@ -32,7 +32,7 @@ function acwrToGaugePct(v: number): number {
 // Horizontal gauge: under | ok zone | high zone | spike
 // Zones as % of total width: under=18%, ok=55%, high=18%, spike=9%
 function AcwrGauge({ value, readinessState }: { value: number | null; readinessState: string | null }) {
-  if (value == null) return <span className="text-white/25 text-[10px]">—</span>;
+  if (value == null) return <span className="text-white/45 text-[10px]">—</span>;
   const pos = acwrToGaugePct(value);
   // Dot color and label both come from server readiness — it has the full reconciled picture
   // Raw ACWR position is still valid (dot stays where it is), but color follows body state
@@ -110,10 +110,10 @@ function fmtDate(dateStr: string): string {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
-      <div className="flex-1 text-[11px] text-white/60 flex flex-wrap gap-x-3 gap-y-1 leading-none">
+      <div className="flex-1 text-[11px] text-white/70 flex flex-wrap gap-x-3 gap-y-1 leading-none">
         {children}
       </div>
     </div>
@@ -123,7 +123,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Chip({ label, value, valueClass }: { label?: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      {label != null && <span className="text-white/30 text-[10px]">{label}</span>}
+      {label != null && <span className="text-white/45 text-[10px]">{label}</span>}
       <span className={valueClass ?? 'text-white/65'}>{value}</span>
     </span>
   );
@@ -143,7 +143,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-4 h-4 animate-spin text-white/25" />
+        <Loader2 className="w-4 h-4 animate-spin text-white/45" />
       </div>
     );
   }
@@ -241,7 +241,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline gap-2">
             <span className="text-[10px] font-semibold tracking-widest text-white/50 uppercase">{weekLabel}</span>
-            <span className="text-[10px] text-white/35 tabular-nums">{pct}% through</span>
+            <span className="text-[10px] text-white/55 tabular-nums">{pct}% through</span>
             {readinessLabel && (
               <span className={`text-[10px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
             )}
@@ -264,7 +264,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* LOAD — full-width gauge + sparkline */}
         <div className="px-3 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase">LOAD</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase">LOAD</span>
             <div className="flex items-center gap-2">
               <AcwrGauge value={acwr} readinessState={readiness} />
               {loadStatus?.status && (
@@ -282,8 +282,8 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           {dailyLoad.length > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] text-white/40 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
-                <span className="text-[9px] tabular-nums text-white/30">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
+                <span className="text-[9px] text-white/55 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
+                <span className="text-[9px] tabular-nums text-white/50">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
               </div>
               {/* bars — color by dominant discipline using app's SPORT_COLORS */}
               <div className="flex items-end h-8 gap-[2px]">
@@ -317,14 +317,14 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* BODY */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5">
               {visibleSignals.length === 0 && (
-                <Chip value="not enough data" valueClass="text-white/25" />
+                <Chip value="not enough data" valueClass="text-white/45" />
               )}
               {visibleSignals.map((s) => (
                 <div key={s.label} className="flex items-center justify-between">
-                  <span className="text-[11px] text-white/35">{s.label}</span>
+                  <span className="text-[11px] text-white/55">{s.label}</span>
                   <div className="flex items-center gap-2">
                     <span className={`text-[11px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
                   </div>
@@ -332,7 +332,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
               ))}
               {crossTrainingLine && (
                 <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-[11px] text-white/35">Aerobic cross-training</span>
+                  <span className="text-[11px] text-white/55">Aerobic cross-training</span>
                   <span className={`text-[11px] ${
                     crossTrainingLine.tone === 'positive' ? 'text-emerald-400/80' :
                     crossTrainingLine.tone === 'warning' ? 'text-amber-400/80' :
@@ -366,9 +366,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* STRENGTH */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/55 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
             <div className="flex-1 space-y-2">
-              {perLift.length === 0 && <Chip value="no data" valueClass="text-white/25" />}
+              {perLift.length === 0 && <Chip value="no data" valueClass="text-white/45" />}
               {perLift.map((lt: any) => {
                 const verdictLabel: string = lt.verdict_label ?? '—';
                 const verdictColor = verdictToneToColor(lt.verdict_tone ?? 'neutral');
@@ -383,7 +383,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                 return (
                   <div key={lt.canonical_name} className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-white/50">{lt.display_name}</span>
+                      <span className="text-[11px] text-white/65">{lt.display_name}</span>
                       <span className="relative">
                         {isActionable ? (
                           <button
@@ -433,7 +433,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* NEXT */}
         <div className="px-3 py-3">
           <Row label="NEXT">
-            {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/25" />}
+            {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/45" />}
             {nextSessions.map((s, i) => (
               <React.Fragment key={i}>
                 {i > 0 && <Dot />}
@@ -445,7 +445,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       </div>
 
       {wsv.plan.plan_name && (
-        <div className="mt-2 px-0.5 text-[9px] text-white/35 uppercase tracking-widest">
+        <div className="mt-2 px-0.5 text-[9px] text-white/55 uppercase tracking-widest">
           {wsv.plan.plan_name}
         </div>
       )}
