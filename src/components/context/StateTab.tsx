@@ -262,24 +262,32 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                 <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
                 <span className="text-[10px] tabular-nums text-white/60">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
               </div>
-              {/* bars — color by dominant discipline using app's SPORT_COLORS */}
+              {/* bars — stacked by discipline using app's SPORT_COLORS */}
               <div className="flex items-end h-10 gap-[3px]">
                 {dailyLoad.map((d) => {
                   const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
-                  const pct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
-                  const dtype = (d as any).dominant_type ?? 'none';
-                  const hex = dtype !== 'none' && dtype !== 'other' ? getDisciplineColor(dtype) : null;
-                  const barColor = d.load === 0
-                    ? 'rgba(255,255,255,0.06)'
-                    : hex
-                    ? `rgba(${hexToRgb(hex)}, ${isToday ? 0.92 : 0.7})`
-                    : isToday ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)';
+                  const barPct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
+                  const segments = (d as any).by_type as Array<{ type: string; load: number }> | undefined;
+                  const alpha = isToday ? 0.92 : 0.7;
                   return (
                     <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
-                      <div
-                        className="rounded-[2px] transition-all"
-                        style={{ width: 8, height: `${Math.round(pct * 100)}%`, minHeight: d.load > 0 ? 4 : 1, backgroundColor: barColor }}
-                      />
+                      {d.load === 0 ? (
+                        <div className="rounded-[2px]" style={{ width: 8, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+                      ) : (
+                        <div
+                          className="flex flex-col-reverse rounded-[2px] overflow-hidden transition-all"
+                          style={{ width: 8, height: `${Math.round(barPct * 100)}%`, minHeight: 4 }}
+                        >
+                          {(segments && segments.length > 0 ? segments : [{ type: d.dominant_type, load: d.load }]).map((seg, i) => {
+                            const segPct = d.load > 0 ? (seg.load / d.load) * 100 : 0;
+                            const hex = seg.type !== 'none' && seg.type !== 'other' ? getDisciplineColor(seg.type) : null;
+                            const color = hex
+                              ? `rgba(${hexToRgb(hex)}, ${alpha})`
+                              : `rgba(255,255,255, ${isToday ? 0.55 : 0.25})`;
+                            return <div key={`${seg.type}-${i}`} style={{ height: `${segPct}%`, minHeight: 1, backgroundColor: color }} />;
+                          })}
+                        </div>
+                      )}
                       <span className={`text-[9px] tabular-nums leading-none ${isToday ? 'text-white/70' : 'text-white/40'}`}>
                         {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
                       </span>

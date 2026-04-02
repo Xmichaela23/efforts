@@ -1143,7 +1143,7 @@ Deno.serve(async (req) => {
       if (s.includes('mobility') || s === 'pt') return 'mobility';
       return s;
     };
-    const daily_load_7d: Array<{ date: string; load: number; dominant_type: string }> = (() => {
+    const daily_load_7d: Array<{ date: string; load: number; dominant_type: string; by_type: Array<{ type: string; load: number }> }> = (() => {
       const byDate = new Map<string, number>();
       const byDateType = new Map<string, Map<string, number>>();
       for (let i = 6; i >= 0; i--) {
@@ -1163,10 +1163,13 @@ Deno.serve(async (req) => {
       return [...byDate.entries()].map(([date, load]) => {
         const typeMap = byDateType.get(date)!;
         let dominant_type = 'none';
-        if (typeMap.size > 0) {
-          dominant_type = [...typeMap.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        const by_type = [...typeMap.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([type, load]) => ({ type, load }));
+        if (by_type.length > 0) {
+          dominant_type = by_type[0].type;
         }
-        return { date, load, dominant_type };
+        return { date, load, dominant_type, by_type };
       });
     })();
 

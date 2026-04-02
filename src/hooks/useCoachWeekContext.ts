@@ -265,7 +265,7 @@ export type CoachWeekContextV1 = {
         extra_load: number;
         session_count: number;
       }>;
-      daily_load_7d: Array<{ date: string; load: number; dominant_type: string }>;
+      daily_load_7d: Array<{ date: string; load: number; dominant_type: string; by_type?: Array<{ type: string; load: number }> }>;
       hr_drift_series: Array<{ date: string; drift_bpm: number }>;
       cross_training_signal?: { label: string; tone: 'positive' | 'warning' } | null;
     };
