@@ -30,7 +30,7 @@ function acwrToGaugePct(v: number): number {
 
 // Horizontal gauge: under | ok zone | high zone | spike
 // Zones as % of total width: under=18%, ok=55%, high=18%, spike=9%
-function AcwrGauge({ value, serverLabel, readinessState }: { value: number | null; serverLabel: string | null; readinessState: string | null }) {
+function AcwrGauge({ value, readinessState }: { value: number | null; readinessState: string | null }) {
   if (value == null) return <span className="text-white/25 text-[10px]">—</span>;
   const pos = acwrToGaugePct(value);
   // Dot color and label both come from server readiness — it has the full reconciled picture
@@ -45,8 +45,6 @@ function AcwrGauge({ value, serverLabel, readinessState }: { value: number | nul
     acwrLabel(value) === 'build more' ? '#38bdf8' :
     acwrLabel(value) === 'balanced'   ? '#34d399' :
     acwrLabel(value) === 'back off'   ? '#fbbf24' : '#f87171';
-  const displayLabel = serverLabel ?? acwrLabel(value);
-
   return (
     <span className="inline-flex items-center gap-2">
       <span className="relative inline-flex items-center w-24 h-1.5 rounded-full overflow-visible">
@@ -61,16 +59,10 @@ function AcwrGauge({ value, serverLabel, readinessState }: { value: number | nul
           style={{ left: `${pos}%`, backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}` }}
         />
       </span>
-      <span className="text-[11px]" style={{ color: dotColor }}>{displayLabel}</span>
     </span>
   );
 }
 
-function trendIcon(dir: string): string {
-  if (dir === 'improving') return '↑';
-  if (dir === 'declining') return '↓';
-  return '—';
-}
 
 function trendColor(dir: string, tone?: string): string {
   if (tone === 'positive') return 'text-emerald-400/80';
@@ -117,7 +109,7 @@ function fmtDate(dateStr: string): string {
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase w-[72px] shrink-0 pt-0.5">
+      <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase w-[72px] shrink-0 pt-0.5">
         {label}
       </span>
       <div className="flex-1 text-[11px] text-white/60 flex flex-wrap gap-x-3 gap-y-1 leading-none">
@@ -175,12 +167,10 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
 
   // ── WEEK header ──────────────────────────────────────────────────────────
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
-  const phaseLabel = week.focus_label ?? week.intent ?? null;
   const pct = weekPct(week.start_date, week.end_date);
 
   // ── LOAD row ─────────────────────────────────────────────────────────────
   const acwr = load.acwr;
-  const acwrRun = load.running_acwr;
 
   // ── BODY row — endurance signals only (strength signals go in STRENGTH row) ─
   const visibleSignals = (rm?.visible_signals ?? []).filter((s: any) => s.category === 'endurance');
@@ -215,9 +205,8 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
     'text-white/45';
 
   const dailyLoad = load.daily_load_7d ?? [];
-  const hrDriftSeries = load.hr_drift_series ?? [];
+
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
-  const maxDrift = Math.max(...hrDriftSeries.map(d => Math.abs(d.drift_bpm)), 1);
 
   return (
     <div className="pt-1 pb-4">
@@ -226,7 +215,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline gap-2">
             <span className="text-[10px] font-semibold tracking-widest text-white/50 uppercase">{weekLabel}</span>
-            <span className="text-[10px] text-white/20 tabular-nums">{pct}% through</span>
+            <span className="text-[10px] text-white/35 tabular-nums">{pct}% through</span>
             {readinessLabel && (
               <span className={`text-[10px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
             )}
@@ -249,21 +238,17 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* LOAD — full-width gauge + sparkline */}
         <div className="px-3 py-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase">LOAD</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase">LOAD</span>
             <div className="flex items-center gap-2">
-              <AcwrGauge value={acwr} serverLabel={readinessLabel} readinessState={readiness} />
+              <AcwrGauge value={acwr} readinessState={readiness} />
               {loadStatus?.status && (
-                <><Dot /><Chip
-                  label="run"
-                  value={
-                    loadStatus.status === 'on_target' ? 'on track' :
-                    loadStatus.status === 'elevated' ? 'a bit high' :
-                    loadStatus.status === 'high' ? 'too much' :
-                    loadStatus.status === 'under' ? 'build more' :
-                    loadStatus.status
-                  }
-                  valueClass={loadStatusColor(loadStatus.status)}
-                /></>
+                <><Dot /><span className={`text-[13px] font-semibold tracking-tight ${loadStatusColor(loadStatus.status)}`}>{
+                  loadStatus.status === 'on_target' ? 'on track' :
+                  loadStatus.status === 'elevated' ? 'a bit high' :
+                  loadStatus.status === 'high' ? 'pull back' :
+                  loadStatus.status === 'under' ? 'build more' :
+                  loadStatus.status
+                }</span></>
               )}
             </div>
           </div>
@@ -271,7 +256,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           {dailyLoad.length > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] text-white/25 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
+                <span className="text-[9px] text-white/40 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
                 <span className="text-[9px] tabular-nums text-white/30">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
               </div>
               {/* bars */}
@@ -308,7 +293,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* BODY */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5">
               {visibleSignals.length === 0 && (
                 <Chip value="not enough data" valueClass="text-white/25" />
@@ -317,32 +302,6 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                 <div key={s.label} className="flex items-center justify-between">
                   <span className="text-[11px] text-white/35">{s.label}</span>
                   <div className="flex items-center gap-2">
-                    {/* HR drift micro-sparkline */}
-                    {s.label === 'Heart rate drift' && hrDriftSeries.length >= 2 && (
-                      <svg width="56" height="22" viewBox={`0 0 ${hrDriftSeries.length * 10} 22`} preserveAspectRatio="none">
-                        {/* zero baseline */}
-                        <line x1={0} y1={11} x2="100%" y2={11} stroke="rgba(255,255,255,0.12)" strokeWidth={0.75} />
-                        <polyline
-                          points={hrDriftSeries.map((pt, i) => {
-                            const x = i * 10 + 5;
-                            const y = 11 - Math.round((pt.drift_bpm / (maxDrift || 1)) * 9);
-                            return `${x},${y}`;
-                          }).join(' ')}
-                          fill="none"
-                          stroke="rgba(251,146,60,0.85)"
-                          strokeWidth={2}
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                        />
-                        {/* last point dot */}
-                        {(() => {
-                          const last = hrDriftSeries[hrDriftSeries.length - 1];
-                          const x = (hrDriftSeries.length - 1) * 10 + 5;
-                          const y = 11 - Math.round((last.drift_bpm / (maxDrift || 1)) * 9);
-                          return <circle cx={x} cy={y} r={2} fill="rgba(251,146,60,1)" />;
-                        })()}
-                      </svg>
-                    )}
                     <span className={`text-[11px] ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
                   </div>
                 </div>
@@ -373,7 +332,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         {/* STRENGTH */}
         <div className="px-3 py-3">
           <div className="flex items-start gap-3">
-            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/25 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
+            <span className="text-[9px] font-semibold tracking-[0.12em] text-white/40 uppercase pt-0.5 w-[72px] shrink-0">STRENGTH</span>
             <div className="flex-1 space-y-2">
               {perLift.length === 0 && <Chip value="no data" valueClass="text-white/25" />}
               {perLift.map((lt: any) => {
@@ -452,7 +411,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       </div>
 
       {wsv.plan.plan_name && (
-        <div className="mt-2 px-0.5 text-[9px] text-white/18 uppercase tracking-widest">
+        <div className="mt-2 px-0.5 text-[9px] text-white/35 uppercase tracking-widest">
           {wsv.plan.plan_name}
         </div>
       )}
