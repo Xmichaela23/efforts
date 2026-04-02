@@ -208,31 +208,8 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const dailyLoad = load.daily_load_7d ?? [];
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
 
-  // ── Cross-training signal ─────────────────────────────────────────────────
-  // Only show for aerobic cross-training (bike/swim) — strength has its own section.
-  // Surface when >15% of WTD. Don't attribute causality we can't prove — just
-  // show what signals actually say: run load vs total load.
-  const crossTrainingLine: { label: string; tone: string } | null = (() => {
-    const byDiscipline = load.by_discipline ?? [];
-    const totalLoad = byDiscipline.reduce((s: number, d: any) => s + (d.actual_load ?? 0), 0);
-    const aerobicXtLoad = byDiscipline
-      .filter((d: any) => d.discipline === 'bike' || d.discipline === 'swim')
-      .reduce((s: number, d: any) => s + (d.actual_load ?? 0), 0);
-    if (totalLoad === 0 || aerobicXtLoad / totalLoad < 0.15) return null;
-
-    const pct = Math.round((aerobicXtLoad / totalLoad) * 100);
-    const interference = (data as any)?.interference ?? null;
-    if (interference?.status === 'interference_detected') {
-      return { label: `${pct}% of load — ${interference.detail ?? 'may affect recovery'}`, tone: 'warning' };
-    }
-
-    const runningAcwr = load.running_acwr ?? null;
-    const totalAcwr = load.acwr ?? null;
-    if (runningAcwr != null && runningAcwr < 0.95 && totalAcwr != null && totalAcwr > 1.0) {
-      return { label: `${pct}% of load — run load nominal, adding aerobic base`, tone: 'positive' };
-    }
-    return { label: `${pct}% of load this week`, tone: 'neutral' };
-  })();
+  // ── Cross-training signal (server-computed) ──────────────────────────────
+  const crossTrainingSignal = load.cross_training_signal ?? null;
 
   return (
     <div className="pt-1 pb-4">
@@ -330,14 +307,14 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                   </div>
                 </div>
               ))}
-              {crossTrainingLine && (
+              {crossTrainingSignal && (
                 <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-[12px] text-white/70">Aerobic cross-training</span>
+                  <span className="text-[12px] text-white/70">Cross-training</span>
                   <span className={`text-[12px] ${
-                    crossTrainingLine.tone === 'positive' ? 'text-emerald-400/90' :
-                    crossTrainingLine.tone === 'warning' ? 'text-amber-400/90' :
+                    crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
+                    crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
                     'text-white/70'
-                  }`}>{crossTrainingLine.label}</span>
+                  }`}>{crossTrainingSignal.label}</span>
                 </div>
               )}
             </div>

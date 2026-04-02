@@ -267,6 +267,7 @@ export type CoachWeekContextV1 = {
       }>;
       daily_load_7d: Array<{ date: string; load: number; dominant_type: string }>;
       hr_drift_series: Array<{ date: string; drift_bpm: number }>;
+      cross_training_signal?: { label: string; tone: 'positive' | 'warning' } | null;
     };
     trends: {
       fitness_direction: string;

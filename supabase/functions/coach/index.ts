@@ -2813,6 +2813,39 @@ ${narrativeFacts.join('\n')}`;
         })),
         daily_load_7d,
         hr_drift_series,
+        cross_training_signal: (() => {
+          const byType = training_state.load_ramp.acute7_by_type || [];
+          const totalLoad = byType.reduce((s: number, r: any) => s + Number(r.total_load || 0), 0);
+          if (totalLoad === 0) return null;
+          const primaryTypes = ['run', 'running', 'bike', 'ride', 'cycling', 'swim', 'swimming'];
+          const strengthTypes = ['strength', 'strength_training', 'weight', 'weights'];
+          const aerobicXtLoad = byType
+            .filter((r: any) => {
+              const t = String(r.type || '').toLowerCase();
+              return primaryTypes.includes(t) && !strengthTypes.includes(t);
+            })
+            .reduce((s: number, r: any) => s + Number(r.total_load || 0), 0);
+          const primaryLoad = byType
+            .sort((a: any, b: any) => Number(b.total_load || 0) - Number(a.total_load || 0))[0];
+          const primaryType = String(primaryLoad?.type || '').toLowerCase();
+          const nonPrimaryLoad = totalLoad - Number(primaryLoad?.total_load || 0);
+          const xtPct = nonPrimaryLoad / totalLoad;
+          if (xtPct < 0.15) return null;
+
+          const intrf = interference ?? latestSnapshot?.interference ?? null;
+          const totalAcwr = acwr ?? null;
+
+          if (intrf?.status === 'interference_detected') {
+            return { label: 'Compounding fatigue — both systems loaded', tone: 'warning' };
+          }
+          if (totalAcwr != null && totalAcwr <= 1.3) {
+            return { label: 'Adding aerobic base without overloading', tone: 'positive' };
+          }
+          if (totalAcwr != null && totalAcwr > 1.3) {
+            return { label: 'Compounding fatigue — both systems loaded', tone: 'warning' };
+          }
+          return null;
+        })(),
       },
       trends: {
         fitness_direction: fitnessDirection,
