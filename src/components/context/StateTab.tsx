@@ -4,6 +4,7 @@ import type { CoachWeekContextV1, RaceReadinessV1 } from '@/hooks/useCoachWeekCo
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
+import LoadBar from '@/components/LoadBar';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -13,57 +14,6 @@ type CoachDataProp = {
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function acwrLabel(v: number | null): string {
-  if (v == null) return '—';
-  if (v < 0.8) return 'build more';
-  if (v <= 1.3) return 'balanced';
-  if (v <= 1.5) return 'back off';
-  return 'rest now';
-}
-
-// Maps ACWR to 0–100 position on gauge (0.6 → 0%, 1.7 → 100%)
-function acwrToGaugePct(v: number): number {
-  const min = 0.6;
-  const max = 1.7;
-  return Math.min(100, Math.max(0, ((v - min) / (max - min)) * 100));
-}
-
-// Horizontal gauge: under | ok zone | high zone | spike
-// Zones as % of total width: under=18%, ok=55%, high=18%, spike=9%
-function AcwrGauge({ value, readinessState }: { value: number | null; readinessState: string | null }) {
-  if (value == null) return <span className="text-white/55 text-[11px]">—</span>;
-  const pos = acwrToGaugePct(value);
-  // Dot color and label both come from server readiness — it has the full reconciled picture
-  // Raw ACWR position is still valid (dot stays where it is), but color follows body state
-  const dotColor =
-    readinessState === 'fresh'      ? '#34d399' :
-    readinessState === 'adapting'   ? '#38bdf8' :
-    readinessState === 'normal'     ? '#34d399' :
-    readinessState === 'fatigued'   ? '#fbbf24' :
-    readinessState === 'overreached'? '#f87171' :
-    readinessState === 'detrained'  ? '#38bdf8' :
-    acwrLabel(value) === 'build more' ? '#38bdf8' :
-    acwrLabel(value) === 'balanced'   ? '#34d399' :
-    acwrLabel(value) === 'back off'   ? '#fbbf24' : '#f87171';
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className="relative inline-flex items-center w-24 h-1.5 rounded-full overflow-visible">
-        <span className="absolute inset-0 flex rounded-full overflow-hidden">
-          <span className="h-full bg-sky-400/25"    style={{ width: '18%' }} />
-          <span className="h-full bg-emerald-400/30" style={{ width: '55%' }} />
-          <span className="h-full bg-amber-400/25"  style={{ width: '18%' }} />
-          <span className="h-full bg-red-400/20"    style={{ width: '9%' }} />
-        </span>
-        <span
-          className="absolute w-2.5 h-2.5 rounded-full -translate-x-1/2 shadow-md"
-          style={{ left: `${pos}%`, backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}` }}
-        />
-      </span>
-    </span>
-  );
-}
-
 
 function trendColor(dir: string, tone?: string): string {
   if (tone === 'positive') return 'text-emerald-400/90';
@@ -82,14 +32,6 @@ function verdictToneToColor(tone: string): string {
   return 'text-white/60';
 }
 
-function loadStatusColor(status: string | undefined): string {
-  if (!status) return 'text-white/45';
-  if (status === 'on_target') return 'text-emerald-400/85';
-  if (status === 'elevated') return 'text-amber-400/85';
-  if (status === 'high') return 'text-red-400/85';
-  if (status === 'under') return 'text-sky-400/85';
-  return 'text-white/65';
-}
 
 function weekPct(startDate: string, endDate: string): number {
   const now = Date.now();
@@ -282,9 +224,6 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
   const pct = weekPct(week.start_date, week.end_date);
 
-  // ── LOAD row ─────────────────────────────────────────────────────────────
-  const acwr = load.acwr;
-
   // ── BODY row — endurance signals only (strength signals go in STRENGTH row) ─
   const visibleSignals = (rm?.visible_signals ?? []).filter((s: any) => s.category === 'endurance');
 
@@ -317,8 +256,6 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
     readiness === 'fatigued' ? 'text-amber-400/90' :
     'text-white/60';
 
-  const dailyLoad = load.daily_load_7d ?? [];
-  const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
 
   // ── Cross-training signal (server-computed) ──────────────────────────────
   const crossTrainingSignal = load.cross_training_signal ?? null;
@@ -351,65 +288,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
         {/* LOAD — full-width gauge + sparkline */}
-        <div className="px-3 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
-            <div className="flex items-center gap-2">
-              <AcwrGauge value={acwr} readinessState={readiness} />
-              {loadStatus?.status && (
-                <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadStatusColor(loadStatus.status)}`}>{
-                  loadStatus.status === 'on_target' ? 'on track' :
-                  loadStatus.status === 'elevated' ? 'a bit high' :
-                  loadStatus.status === 'high' ? 'pull back' :
-                  loadStatus.status === 'under' ? 'build more' :
-                  loadStatus.status
-                }</span></>
-              )}
-            </div>
-          </div>
-          {/* 7-day load bar chart */}
-          {dailyLoad.length > 0 && (
-            <div className="mt-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
-                <span className="text-[10px] tabular-nums text-white/60">{Math.round(load.wtd_actual_load ?? 0)} pts WTD</span>
-              </div>
-              {/* bars — stacked by discipline using app's SPORT_COLORS */}
-              <div className="flex items-end h-10 gap-[3px]">
-                {dailyLoad.map((d) => {
-                  const isToday = d.date === dailyLoad[dailyLoad.length - 1]?.date;
-                  const barPct = d.load > 0 ? Math.max(0.08, d.load / maxLoad) : 0;
-                  const segments = (d as any).by_type as Array<{ type: string; load: number }> | undefined;
-                  const alpha = isToday ? 0.92 : 0.7;
-                  return (
-                    <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-[2px]">
-                      {d.load === 0 ? (
-                        <div className="rounded-[2px]" style={{ width: 8, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' }} />
-                      ) : (
-                        <div
-                          className="flex flex-col-reverse rounded-[2px] overflow-hidden transition-all"
-                          style={{ width: 8, height: `${Math.round(barPct * 100)}%`, minHeight: 4 }}
-                        >
-                          {(segments && segments.length > 0 ? segments : [{ type: d.dominant_type, load: d.load }]).map((seg, i) => {
-                            const segPct = d.load > 0 ? (seg.load / d.load) * 100 : 0;
-                            const hex = seg.type !== 'none' && seg.type !== 'other' ? getDisciplineColor(seg.type) : null;
-                            const color = hex
-                              ? `rgba(${hexToRgb(hex)}, ${alpha})`
-                              : `rgba(255,255,255, ${isToday ? 0.55 : 0.25})`;
-                            return <div key={`${seg.type}-${i}`} style={{ height: `${segPct}%`, minHeight: 1, backgroundColor: color }} />;
-                          })}
-                        </div>
-                      )}
-                      <span className={`text-[9px] tabular-nums leading-none ${isToday ? 'text-white/70' : 'text-white/40'}`}>
-                        {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+        <LoadBar load={load} loadStatus={loadStatus} readinessState={readiness} />
 
         {/* BODY */}
         <div className="px-3 py-3">

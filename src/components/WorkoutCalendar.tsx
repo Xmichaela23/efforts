@@ -5,12 +5,13 @@ import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePill
 import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
-import { Calendar, CheckCircle, Info, Activity, Bike, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
+import { Activity, Bike, Waves, Dumbbell, Move, CircleDot, type LucideIcon } from 'lucide-react';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
+import LoadBar from '@/components/LoadBar';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -295,9 +296,9 @@ export default function WorkoutCalendar({
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
-  const [workloadTooltipOpen, setWorkloadTooltipOpen] = useState(false);
   const { useImperial } = useAppContext();
   const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts();
+  const coachCtx = useCoachWeekContext();
   
   // Drag and drop state
   const [draggedWorkout, setDraggedWorkout] = useState<any>(null);
@@ -479,7 +480,7 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { items: unifiedItems, weeklyStats, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+  const { items: unifiedItems, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
   // Use mapper - SINGLE SOURCE OF TRUTH
   const unifiedPlanned = unifiedItems
@@ -1306,262 +1307,18 @@ export default function WorkoutCalendar({
         })}
       </div>
         
-      {/* Total Workload - Flex sibling that fills remaining space */}
+      {/* Load bar — from coach context */}
       <div style={{ flexShrink: 0 }}>
         {(() => {
-          // Collect all metrics
-          const metrics: Array<{ label: string; value: string }> = [];
-          
-          // Distance Totals - server-provided
-          if (weeklyStats.distances) {
-            if (weeklyStats.distances.run_meters > 0) {
-              const runValue = useImperial 
-                ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi`
-                : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`;
-              metrics.push({
-                label: 'Run:',
-                value: runValue,
-                isNumeric: true
-              });
-            }
-            if (weeklyStats.distances.swim_meters > 0) {
-              metrics.push({
-                label: 'Swim:',
-                value: useImperial
-                  ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd`
-                  : `${Math.round(weeklyStats.distances.swim_meters)} m`
-              });
-            }
-            if (weeklyStats.distances.cycling_meters > 0) {
-              metrics.push({
-                label: 'Bike:',
-                value: useImperial
-                  ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi`
-                  : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`
-              });
-            }
-          }
-          
-          // Total Volume Load - calculated from strength workouts
-          let totalVolumeLoad = 0;
-          for (const item of unifiedItems) {
-            if (String(item?.type || '').toLowerCase() === 'strength') {
-              const executedExercises = Array.isArray(item?.executed?.strength_exercises) 
-                ? item.executed.strength_exercises 
-                : [];
-              
-              for (const ex of executedExercises) {
-                if (!ex || !Array.isArray(ex.sets)) continue;
-                
-                const isTimeBased = ex.name?.toLowerCase().includes('plank') || 
-                                  ex.name?.toLowerCase().includes('wall sit') ||
-                                  ex.name?.toLowerCase().includes('hold') ||
-                                  ex.sets.some((s: any) => s.duration_seconds && s.duration_seconds > 0 && (!s.reps || s.reps === 0));
-                
-                if (isTimeBased) continue;
-                
-                for (const set of ex.sets) {
-                  if (set.completed === false) continue;
-                  
-                  const weight = Number(set.weight) || 0;
-                  const reps = Number(set.reps) || 0;
-                  
-                  if (weight > 0 && reps > 0) {
-                    totalVolumeLoad += weight * reps;
-                  }
-                }
-              }
-            }
-          }
-          
-          if (totalVolumeLoad > 0) {
-            const strengthValue = `${totalVolumeLoad.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`;
-            metrics.push({
-              label: 'Strength:',
-              value: strengthValue,
-              isNumeric: true
-            });
-          }
-          
-          // Total Pilates/Yoga Hours
-          let totalMinutes = 0;
-          for (const item of unifiedItems) {
-            if (String(item?.type || '').toLowerCase() === 'pilates_yoga') {
-              const secs = resolveMovingSeconds(item);
-              if (secs && secs > 0) {
-                totalMinutes += Math.round(secs / 60);
-              }
-            }
-          }
-          
-          if (totalMinutes > 0) {
-            const hours = Math.floor(totalMinutes / 60);
-            const mins = totalMinutes % 60;
-            const hoursDisplay = hours > 0 
-              ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
-              : `${mins}m`;
-            metrics.push({
-              label: 'Pilates/Yoga:',
-              value: hoursDisplay
-            });
-          }
-          
-          // Total Workout Hours
-          let totalWorkoutMinutes = 0;
-          for (const item of unifiedItems) {
-            const type = String(item?.type || '').toLowerCase();
-            if (type === 'strength' || type === 'mobility') continue;
-            
-            const secs = resolveMovingSeconds(item);
-            if (secs && secs > 0) {
-              totalWorkoutMinutes += Math.round(secs / 60);
-            }
-          }
-          
-          if (totalWorkoutMinutes > 0) {
-            const hours = Math.floor(totalWorkoutMinutes / 60);
-            const mins = totalWorkoutMinutes % 60;
-            const hoursDisplay = hours > 0 
-              ? (mins > 0 ? `${hours}h ${mins}m` : `${hours}h`)
-              : `${mins}m`;
-            metrics.push({
-              label: 'Total:',
-              value: hoursDisplay
-            });
-          }
-          
-          // Mobile fit: keep this block compact so Home doesn't require scrolling
-          const compactMetrics = metrics.filter((m) => {
-            const label = String(m?.label || '').toLowerCase();
-            return (
-              label.includes('run') ||
-              label.includes('swim') ||
-              label.includes('bike') ||
-              label.includes('strength') ||
-              label.includes('total')
-            );
-          });
-
+          const wsv = coachCtx.data?.weekly_state_v1;
+          if (!wsv) return null;
+          const snap = (coachCtx.data as any)?.athlete_snapshot ?? null;
+          const loadStatus = snap?.body_response?.load_status ?? null;
+          const readiness = wsv.trends?.readiness_state ?? null;
           return (
-            // Let the footer absorb extra height so swim/bike lines can fit,
-            // while keeping day row sizing unchanged.
             <div className="pt-3 pb-4 border-t border-white/10">
-              <div className="space-y-3" style={{ fontSize: '0.875rem' }}>
-                {/* Total Workload header */}
-                <div 
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg flex-wrap"
-                  style={{
-                    background: 'radial-gradient(ellipse at center top, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.25) 100%)',
-                    border: '0.5px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: '0 0 0 1px rgba(255,255,255,0.03) inset, 0 2px 8px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  <span className="font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.9rem' }}>Total Workload</span>
-                  <Popover open={workloadTooltipOpen} onOpenChange={setWorkloadTooltipOpen}>
-                    <PopoverTrigger asChild>
-                      <button 
-                        type="button" 
-                        className="inline-flex items-center touch-manipulation"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setWorkloadTooltipOpen(!workloadTooltipOpen);
-                        }}
-                      >
-                        <Info className="w-3 h-3 cursor-pointer" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent side="top" className="max-w-xs p-4" sideOffset={8}>
-                      <div className="text-xs space-y-2">
-                        <div>
-                          <strong>Total Workload</strong>
-                          <br />
-                          Tracks your weekly training stress by combining workout duration and intensity.
-                        </div>
-                        <div>
-                          <strong>How it works:</strong>
-                          <ul className="list-disc list-inside mt-1 space-y-0.5">
-                            <li>Longer workouts = higher workload</li>
-                            <li>Harder efforts = higher workload</li>
-                            <li>Different disciplines use appropriate metrics (pace/power for endurance, weight×reps for strength, RPE for yoga)</li>
-                          </ul>
-                        </div>
-                        <div>
-                          <strong>The numbers:</strong>
-                          <br />
-                          📅 <strong>Planned:</strong> Total scheduled training stress (includes optional workouts)
-                          <br />
-                          ✓ <strong>Completed:</strong> Actual training stress from finished workouts
-                        </div>
-                        <div className="pt-1 border-t border-gray-200">
-                          <strong>Why it matters:</strong> Use this to balance hard weeks (high workload) with recovery weeks (lower workload) and track your training progression over time.
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  {(() => {
-                    const sp = (weeklyStats as any).sessions_planned ?? 0;
-                    const sc = (weeklyStats as any).sessions_completed ?? 0;
-                    const total = sp + sc;
-                    const pct = total > 0 ? Math.round((sc / total) * 100) : null;
-                    return (
-                      <>
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
-                          <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Planned</span>
-                          <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.planned}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <CheckCircle className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255, 255, 255, 0.6)' }} aria-hidden />
-                          <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Done</span>
-                          <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>{weeklyStats.completed}</span>
-                        </div>
-                        {total > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[0.7rem] font-light" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Sessions</span>
-                            <span className="tabular-nums" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.875rem' }}>
-                              {sc}/{total}{pct !== null ? ` · ${pct}%` : ''}
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-                
-                {/* Discipline metrics in 2-col grid to use horizontal space */}
-                {compactMetrics.length > 0 && (
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 pt-1">
-                    {compactMetrics.map((metric, index) => {
-                      const labelLower = String(metric.label || '').toLowerCase();
-                      let disciplineType = '';
-                      if (labelLower.includes('run')) disciplineType = 'run';
-                      else if (labelLower.includes('strength')) disciplineType = 'strength';
-                      else if (labelLower.includes('swim')) disciplineType = 'swim';
-                      else if (labelLower.includes('bike')) disciplineType = 'bike';
-                      else if (labelLower.includes('pilates') || labelLower.includes('yoga') || labelLower.includes('mobility')) disciplineType = 'mobility';
-                      
-                      const labelColor = disciplineType ? getDisciplinePhosphorCore(disciplineType) : 'rgba(255, 255, 255, 0.9)';
-                      
-                      return (
-                        <div key={index} className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-light leading-tight" style={{ color: labelColor, fontSize: '0.82rem' }}>
-                            {metric.label}
-                          </span>
-                          <span 
-                            className="font-light tabular-nums leading-tight truncate"
-                            style={{
-                              color: 'rgba(255, 255, 255, 0.85)',
-                              fontSize: '0.82rem'
-                            }}
-                          >
-                            {metric.value}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
+                <LoadBar load={wsv.load} loadStatus={loadStatus} readinessState={readiness} />
               </div>
             </div>
           );
@@ -1588,64 +1345,6 @@ export default function WorkoutCalendar({
           onSuggestionClick={handleSuggestionClick}
         />
       )}
-    </div>
-  );
-}
-
-// Weekly Workload Total Component
-function WeeklyWorkloadTotal({ weekStart }: { weekStart: string }) {
-  const [completedWorkload, setCompletedWorkload] = useState<number>(0);
-  const [plannedWorkload, setPlannedWorkload] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchWeeklyWorkload = async () => {
-      try {
-        setLoading(true);
-        
-        // Get current user
-        const userId = getStoredUserId();
-        if (!userId) {
-          setCompletedWorkload(0);
-          setPlannedWorkload(0);
-          setLoading(false);
-          return;
-        }
-        
-        const { data, error } = await supabase.functions.invoke('weekly-workload', {
-          body: {
-            user_id: userId,
-            week_start_date: weekStart
-          }
-        });
-
-        if (error) {
-          console.error('Error fetching weekly workload:', error);
-          setCompletedWorkload(0);
-          setPlannedWorkload(0);
-        } else {
-          setCompletedWorkload(data?.total_actual || 0);
-          setPlannedWorkload(data?.total_planned || 0);
-        }
-      } catch (error) {
-        console.error('Error fetching weekly workload:', error);
-        setCompletedWorkload(0);
-        setPlannedWorkload(0);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWeeklyWorkload();
-  }, [weekStart]);
-
-  return (
-    <div className="w-full text-left">
-      <div className="text-xs text-gray-500">Total Workload</div>
-      <div className="text-sm font-medium text-gray-700">
-        {loading ? '...' : `${completedWorkload} / ${plannedWorkload}`}
-      </div>
-      <div className="text-xs text-gray-500">completed / planned</div>
     </div>
   );
 }
