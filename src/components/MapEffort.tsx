@@ -525,6 +525,14 @@ export default function MapEffort({
         // Fade in after first stable frame
         requestAnimationFrame(() => setVisible(true));
       });
+      // Fallback: ensure visibility even if idle never fires (e.g. tile-loading failure)
+      const fallbackTimer = setTimeout(() => {
+        if (!fittedRef.current) {
+          fittedRef.current = true;
+          setVisible(true);
+        }
+      }, 3000);
+      return () => clearTimeout(fallbackTimer);
     } else if (fittedRef.current && savedCameraRef.current && !expanded) {
       // If already fitted, restore saved camera position instead of re-fitting
       // This prevents zoom-out when data updates

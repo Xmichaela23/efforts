@@ -188,8 +188,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     normalize: true,
     version: 'v1'
   });
-  // Prefer updatedWorkoutData (refreshed after changes) > hydratedCompleted (from useWorkoutDetail) > workout (prop)
-  const completedData: any = isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : workout;
+  // Layered merge: workout (scaffolding) < hydratedCompleted (server-computed track/display_metrics) < updatedWorkoutData (fresh scalars).
+  // updatedWorkoutData (raw SELECT *) has no `track` or `display_metrics` columns, so server-computed fields survive the spread.
+  const completedData: any = isCompleted
+    ? { ...(workout || {}), ...(hydratedCompleted || {}), ...(updatedWorkoutData || {}) }
+    : workout;
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {

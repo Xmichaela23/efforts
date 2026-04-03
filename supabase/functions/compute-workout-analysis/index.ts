@@ -1200,6 +1200,14 @@ Deno.serve(async (req) => {
             }
           }
         }
+        if (hasRows && isRide && speed_mps.length > 0) {
+          const validSpeeds = speed_mps.filter((s): s is number =>
+            s !== null && Number.isFinite(s) && s > 0.5 && s < 25 // Realistic cycling speeds: 0.5-25 m/s (~1-56 mph)
+          );
+          if (validSpeeds.length > 0) {
+            bests.max_speed_mps = Math.max(...validSpeeds);
+          }
+        }
         return bests;
       })(),
       power: normalizedPower !== null ? {

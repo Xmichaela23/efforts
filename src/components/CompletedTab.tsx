@@ -583,7 +583,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
     const series = src?.computed?.analysis?.series || null;
     return { track, series } as const;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutIdKey, hydrated?.computed?.analysis?.series, hydrated?.track, workoutData?.computed?.analysis?.series, workoutData?.track]);
+  }, [workoutIdKey, hydrated?.computed?.analysis?.series, hydrated?.track, workoutData?.computed?.analysis?.series, workoutData?.track, hydrated?.gps_track, workoutData?.gps_track]);
 
   // Memoize map props at component level (outside IIFE) to prevent re-renders
   const finalSeries = useMemo(() => 
