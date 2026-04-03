@@ -528,76 +528,21 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   
   // No need to initialize localSelectedMetric here - it's handled in the sub-component
 
-   // Simple check: what fields are actually in workoutData?
   useEffect(() => {
-    if (workoutData && workoutData.gps_track) {
-      if (import.meta.env?.DEV) console.log('📊 workoutData loaded:', workoutData.name, 'GPS:', workoutData.gps_track?.length, 'Sensors:', (Array.isArray((workoutData as any)?.sensor_data?.samples) ? (workoutData as any).sensor_data.samples.length : (workoutData as any)?.sensor_data?.length));
-      
-      // Debug: Check what data we have
-      if (import.meta.env?.DEV) console.log('🔍 CompletedTab workoutData debug:', {
-        hasGpsTrack: !!workoutData.gps_track,
-        gpsTrackLength: workoutData.gps_track?.length,
-        hasSensorData: !!workoutData.sensor_data,
-        sensorDataLength: workoutData.sensor_data?.length,
-        sensorDataKeys: workoutData.sensor_data ? Object.keys(workoutData.sensor_data[0] || {}) : [],
-        workoutDataKeys: Object.keys(workoutData || {})
-      });
-      
-      // Additional debug: Check what we're about to pass to CleanElevationChart
-      if (import.meta.env?.DEV) console.log('🔍 DEBUG - About to pass to CleanElevationChart:', {
-        gpsTrack: workoutData.gps_track?.length,
-        sensorData: (Array.isArray((workoutData as any)?.sensor_data?.samples) ? (workoutData as any).sensor_data.samples.length : (workoutData as any)?.sensor_data?.length),
-        sensorDataType: typeof workoutData.sensor_data,
-        workoutDataKeys: Object.keys(workoutData || {})
-      });
-      
-      setIsLoading(false);
-    } else if (workoutData) {
-      // We have workout data but no GPS track
-      setIsLoading(false);
-    } else {
-      setIsLoading(true);
-    }
+    setIsLoading(!workoutData);
   }, [workoutData]);
 
-  // Memoized derived data keyed by workout id (prevents duplicate heavy work)
-  // Directly use server-provided series; only derive track coords locally for the map
+  // Server provides simplified track + bucketed series (smart server, dumb client)
   const workoutIdKey = String((hydrated as any)?.id || (workoutData as any)?.id || '');
-  const memo = useMemo(() => {
+  const finalSeries = useMemo(() => {
     const src = (hydrated || workoutData) as any;
-    // Prefer server-provided track (smart server, dumb client)
-    let track: [number,number][] = Array.isArray(src?.track) ? src.track : [];
-    if (track.length === 0) {
-      const gpsRaw = src?.gps_track;
-      const gps = Array.isArray(gpsRaw)
-        ? gpsRaw
-        : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-      track = gps
-        .map((p:any)=>{
-          const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
-          const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-          if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-          return null;
-        })
-        .filter(Boolean) as [number,number][];
-    }
-    const series = src?.computed?.analysis?.series || null;
-    return { track, series } as const;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutIdKey, hydrated?.computed?.analysis?.series, hydrated?.track, workoutData?.computed?.analysis?.series, workoutData?.track, hydrated?.gps_track, workoutData?.gps_track]);
+    return src?.display_metrics?.series || src?.computed?.analysis?.series || null;
+  }, [workoutIdKey, (hydrated as any)?.display_metrics?.series, (hydrated as any)?.computed?.analysis?.series, (workoutData as any)?.display_metrics?.series, (workoutData as any)?.computed?.analysis?.series]);
 
-  // Memoize map props at component level (outside IIFE) to prevent re-renders
-  const finalSeries = useMemo(() => 
-    (memo?.series || (hydrated||workoutData)?.computed?.analysis?.series) as any,
-    [memo?.series, hydrated?.computed?.analysis?.series, workoutData?.computed?.analysis?.series]
-  );
-  
   const finalTrack = useMemo(() => {
-    const trackFromMemo = memo?.track;
-    if (trackFromMemo && trackFromMemo.length > 0) return trackFromMemo;
-    // Fallback: server track or gps_track (memo already handles both)
-    return memo?.track ?? [];
-  }, [memo?.track]);
+    const src = (hydrated || workoutData) as any;
+    return Array.isArray(src?.track) && src.track.length > 0 ? src.track : [];
+  }, [workoutIdKey, (hydrated as any)?.track, (workoutData as any)?.track]);
 
   const mapProps = useMemo(() => {
     // Check if data actually changed by comparing array lengths and first/last values
@@ -1949,20 +1894,6 @@ const formatMovingTime = () => {
            }
            return out;
          })();
-         // Build GPS-derived track once (for route and optional elevation fallback)
-         const gpsRaw = (hydrated||workoutData)?.gps_track;
-        const gps = Array.isArray(gpsRaw)
-          ? gpsRaw
-          : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-        const track = gps
-          .map((p:any)=>{
-            const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
-            const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-            if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-            return null;
-          })
-          .filter(Boolean) as [number,number][];
-        
         // Check if this is an indoor/treadmill workout (EffortsViewerMapbox will show placeholder)
         const workout = hydrated || workoutData;
         const isVirtual = isVirtualActivity(workout);

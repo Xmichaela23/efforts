@@ -74,6 +74,75 @@ function decodePolyline(encoded: string, precision = 5): [number, number][] {
   return coordinates;
 }
 
+// --- Adaptive track simplification (Douglas-Peucker, iterative) ---
+const MAX_TRACK_POINTS = 1200;
+
+function perpDist(p: [number, number], a: [number, number], b: [number, number]): number {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  if (dx === 0 && dy === 0) return Math.sqrt((p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2);
+  return Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0]) / Math.sqrt(dx * dx + dy * dy);
+}
+
+function douglasPeucker(pts: [number, number][], tol: number): [number, number][] {
+  if (pts.length <= 2) return pts;
+  const keep = new Uint8Array(pts.length);
+  keep[0] = 1; keep[pts.length - 1] = 1;
+  const stack: [number, number][] = [[0, pts.length - 1]];
+  while (stack.length > 0) {
+    const [s, e] = stack.pop()!;
+    if (e - s <= 1) continue;
+    let mx = 0, mi = s;
+    for (let i = s + 1; i < e; i++) { const d = perpDist(pts[i], pts[s], pts[e]); if (d > mx) { mx = d; mi = i; } }
+    if (mx > tol) { keep[mi] = 1; stack.push([s, mi]); stack.push([mi, e]); }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+
+function simplifyTrack(track: [number, number][]): [number, number][] {
+  if (track.length <= MAX_TRACK_POINTS) return track;
+  const factor = track.length / MAX_TRACK_POINTS;
+  const tol = Math.min(0.0001, Math.max(0.000005, factor * 0.000002));
+  return douglasPeucker(track, tol);
+}
+
+// --- Min/max series bucketing (preserves spikes, keeps arrays aligned) ---
+const MAX_SERIES_POINTS = 800;
+
+function bucketSeries(series: Record<string, any>, maxPts: number): Record<string, any> {
+  const arrKeys = Object.keys(series).filter(k => Array.isArray(series[k]) && series[k].length > 0);
+  if (arrKeys.length === 0) return series;
+  const len = series[arrKeys[0]].length;
+  if (len <= maxPts) return series;
+
+  const numBuckets = Math.floor(maxPts / 2);
+  const bucketSize = len / numBuckets;
+  const primary = ['speed_mps', 'power_w', 'hr_bpm', 'elevation_m']
+    .find(k => arrKeys.includes(k)) || arrKeys.find(k => k !== 'time_s' && k !== 'distance_m') || arrKeys[0];
+
+  const indices: number[] = [0];
+  for (let b = 0; b < numBuckets; b++) {
+    const lo = Math.floor(b * bucketSize);
+    const hi = Math.min(Math.floor((b + 1) * bucketSize), len);
+    if (lo >= hi) continue;
+    let minI = lo, maxI = lo, minV = series[primary][lo] ?? 0, maxV = minV;
+    for (let i = lo; i < hi; i++) {
+      const v = series[primary][i];
+      if (v != null && v < minV) { minV = v; minI = i; }
+      if (v != null && v > maxV) { maxV = v; maxI = i; }
+    }
+    const pair = minI <= maxI ? [minI, maxI] : [maxI, minI];
+    for (const idx of pair) { if (indices[indices.length - 1] !== idx) indices.push(idx); }
+  }
+  if (indices[indices.length - 1] !== len - 1) indices.push(len - 1);
+
+  const out: Record<string, any> = {};
+  for (const k of Object.keys(series)) {
+    if (!Array.isArray(series[k])) { out[k] = series[k]; continue; }
+    out[k] = indices.map(i => series[k][i]);
+  }
+  return out;
+}
+
 function normalizeBasic(w: any) {
   const type = String(w?.type || '').toLowerCase();
   return {
@@ -178,10 +247,8 @@ Deno.serve(async (req) => {
       'updated_at'
     ].join(',');
     const gpsSel = opts.include_gps ? ',gps_track' : '';
-    const sensSel = opts.include_sensors ? ',sensor_data' : '';
-    // workouts table stores pool_length (meters or yards depending on source), not pool_length_m/pool_unit
     const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length' : '';
-    const select = baseSel + gpsSel + sensSel + swimSel;
+    const select = baseSel + gpsSel + swimSel;
 
     let query = supabase.from('workouts').select(select).eq('id', id) as any;
     if (userId) query = query.eq('user_id', userId);
@@ -226,8 +293,8 @@ Deno.serve(async (req) => {
     try { (detail as any).mobility_exercises = (()=>{ try { return typeof row.mobility_exercises === 'string' ? JSON.parse(row.mobility_exercises) : (row.mobility_exercises || null); } catch { return row.mobility_exercises || null; } })(); } catch {}
     try { (detail as any).achievements = (()=>{ try { return typeof row.achievements === 'string' ? JSON.parse(row.achievements) : (row.achievements || null); } catch { return row.achievements || null; } })(); } catch {}
     try { (detail as any).device_info = (()=>{ try { return typeof row.device_info === 'string' ? JSON.parse(row.device_info) : (row.device_info || null); } catch { return row.device_info || null; } })(); } catch {}
+    let gpsTrack: any = null;
     if (opts.include_gps) {
-      let gpsTrack = null;
       try { 
         gpsTrack = typeof row.gps_track === 'string' ? JSON.parse(row.gps_track) : (row.gps_track || null);
       } catch { 
@@ -259,11 +326,7 @@ Deno.serve(async (req) => {
         }
       }
       
-      (detail as any).gps_track = gpsTrack;
-      console.log(`[workout-detail] Final gps_track for workout ${id}: ${gpsTrack ? (Array.isArray(gpsTrack) ? `${gpsTrack.length} points` : 'non-array') : 'null'}`);
-    }
-    if (opts.include_sensors) {
-      try { (detail as any).sensor_data = typeof row.sensor_data === 'string' ? JSON.parse(row.sensor_data) : (row.sensor_data || null); } catch { (detail as any).sensor_data = row.sensor_data || null; }
+      // gps_track stays local — only `track` (simplified) is sent to client
     }
     if (opts.include_swim) {
       try { (detail as any).swim_data = typeof row.swim_data === 'string' ? JSON.parse(row.swim_data) : (row.swim_data || null); } catch { (detail as any).swim_data = row.swim_data || null; }
@@ -347,47 +410,21 @@ Deno.serve(async (req) => {
         };
       });
 
-    // track: canonical [lng,lat][] for CompletedTab (smart server, dumb client)
-    const gpsTrack = (detail as any).gps_track;
-    if (Array.isArray(gpsTrack) && gpsTrack.length > 0) {
-      const track: [number, number][] = gpsTrack
-        .map((p: any) => {
-          const lng = p?.lng ?? p?.longitude ?? p?.longitudeInDegree ?? (Array.isArray(p) ? p[0] : undefined);
-          const lat = p?.lat ?? p?.latitude ?? p?.latitudeInDegree ?? (Array.isArray(p) ? p[1] : undefined);
-          if (Number.isFinite(lng) && Number.isFinite(lat)) return [Number(lng), Number(lat)] as [number, number];
-          return null;
-        })
-        .filter(Boolean) as [number, number][];
-      (detail as any).track = track;
-    } else {
-      (detail as any).track = [];
-    }
-
-    // samples: canonical sensor_data for MobileSummary.buildSamples (smart server, dumb client)
-    const sd = Array.isArray((detail as any).sensor_data?.samples)
-      ? (detail as any).sensor_data.samples
-      : (Array.isArray((detail as any).sensor_data) ? (detail as any).sensor_data : []);
-    const samples: Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> = [];
-    for (const s of sd) {
-      const t = Number((s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ?? s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? samples.length));
-      const hr = (s.heartRate ?? s.heart_rate ?? s.hr ?? s.bpm ?? s.heartRateInBeatsPerMinute);
-      const speedMps = (s.speedMetersPerSecond ?? s.speedInMetersPerSecond ?? s.enhancedSpeedInMetersPerSecond ?? s.currentSpeedInMetersPerSecond ?? s.instantaneousSpeedInMetersPerSecond ?? s.speed_mps ?? s.enhancedSpeed ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined) ?? (typeof s.paceInSecondsPerKilometer === 'number' ? (1000 / s.paceInSecondsPerKilometer) : undefined));
-      const cumMeters = (typeof s.totalDistanceInMeters === 'number' ? s.totalDistanceInMeters : (typeof s.distanceInMeters === 'number' ? s.distanceInMeters : (typeof s.cumulativeDistanceInMeters === 'number' ? s.cumulativeDistanceInMeters : (typeof s.totalDistance === 'number' ? s.totalDistance : (typeof s.distance === 'number' ? s.distance : undefined)))));
-      samples.push({ t: Number.isFinite(t) ? t : samples.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined, cumMeters });
-    }
-    // Merge GPS into samples
-    if (Array.isArray(gpsTrack) && gpsTrack.length > 0) {
-      for (let i = 0; i < gpsTrack.length; i++) {
-        const g: any = gpsTrack[i];
-        const lat = (g?.lat ?? g?.latitude ?? g?.latitudeInDegree ?? (Array.isArray(g) ? g[1] : undefined)) as number | undefined;
-        const lng = (g?.lng ?? g?.longitude ?? g?.longitudeInDegree ?? (Array.isArray(g) ? g[0] : undefined)) as number | undefined;
-        const t = Number((g?.startTimeInSeconds ?? g?.elapsed_s ?? g?.t ?? g?.seconds) || i);
-        if (samples[i]) { samples[i].lat = lat; samples[i].lng = lng; samples[i].t = Number.isFinite(t) ? t : samples[i].t; }
-        else { samples.push({ t: Number.isFinite(t) ? t : i, lat, lng }); }
+    // track: canonical simplified [lng,lat][] — hard guarantee (smart server, dumb client)
+    {
+      let fullTrack: [number, number][] = [];
+      if (Array.isArray(gpsTrack) && gpsTrack.length > 0) {
+        fullTrack = gpsTrack
+          .map((p: any) => {
+            const lng = p?.lng ?? p?.longitude ?? p?.longitudeInDegree ?? (Array.isArray(p) ? p[0] : undefined);
+            const lat = p?.lat ?? p?.latitude ?? p?.latitudeInDegree ?? (Array.isArray(p) ? p[1] : undefined);
+            if (Number.isFinite(lng) && Number.isFinite(lat)) return [Number(lng), Number(lat)] as [number, number];
+            return null;
+          })
+          .filter(Boolean) as [number, number][];
       }
-      samples.sort((a, b) => (a.t || 0) - (b.t || 0));
+      (detail as any).track = simplifyTrack(fullTrack);
     }
-    (detail as any).samples = samples;
 
     // display_metrics: WorkoutDataNormalized for useWorkoutData (smart server, dumb client)
     const d = detail as any;
@@ -427,7 +464,9 @@ Deno.serve(async (req) => {
     const avg_swim_pace_per_100m = Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null;
     const avg_swim_pace_per_100yd = Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null;
     const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
-    (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport: (d?.type || null), series: d?.computed?.analysis?.series || null };
+    const rawSeries = d?.computed?.analysis?.series || null;
+    const series = rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null;
+    (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport: (d?.type || null), series };
 
     // session_detail_v1: server-computed from AthleteSnapshot (smart server, dumb client)
     let sessionDetailV1: any = null;
