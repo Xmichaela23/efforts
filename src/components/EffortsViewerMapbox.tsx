@@ -446,19 +446,6 @@ function medianFilter(arr: (number|null)[], w: number): (number|null)[] {
   return out;
 }
 
-// ---------- Sensor resampling helpers (map irregular sensor samples to chart grid) ----------
-function resampleToGrid(sensorTimes: number[], sensorValues: number[], targetTimes: number[]): number[] {
-  if (!sensorTimes.length || !targetTimes.length) return new Array(targetTimes.length).fill(NaN);
-  const out = new Array(targetTimes.length).fill(NaN);
-  let j = 0;
-  for (let i = 0; i < targetTimes.length; i++) {
-    const t = targetTimes[i];
-    while (j + 1 < sensorTimes.length && Math.abs(sensorTimes[j + 1] - t) <= Math.abs(sensorTimes[j] - t)) j++;
-    out[i] = sensorValues[j];
-  }
-  return out;
-}
-
 /** ---------- Splits ---------- */
 function buildSplit(samples: Sample[], s: number, e: number): Split {
   const S = samples[s], E = samples[e];
@@ -878,57 +865,6 @@ function EffortsViewerMapbox({
   // Show total gain as the value on the Elevation pill when not on ELEV tab
   const gainPillText = useMemo(() => fmtAlt(totalGain_m, useFeet), [totalGain_m, useFeet]);
 
-  // Optional cadence/power series derived from sensor_data and resampled to chart times
-  // TODO: MIGRATION CODE - Remove after backfill of all historical workouts
-  // FALLBACK for historical workouts that don't have data in computed.analysis.series
-  // Once all workouts have been reprocessed with compute-workout-analysis, this entire block can be deleted
-  const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
-  const cadSeriesRaw = useMemo(() => {
-    try {
-      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
-        ? (workoutData as any).sensor_data.samples
-        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
-      const times: number[] = []; const vals: number[] = [];
-      for (let i=0;i<sd.length;i++){
-        const s:any = sd[i]||{};
-        const t = Number(
-          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
-          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
-        );
-        const cad = (s.runCadence ?? s.cadence ?? s.bikeCadence);
-        if (Number.isFinite(t) && Number.isFinite(cad)) { times.push(Number(t)); vals.push(Number(cad)); }
-      }
-      return { times, vals };
-    } catch { return { times: [], vals: [] }; }
-  }, [workoutData]);
-  const pwrSeriesRaw = useMemo(() => {
-    try {
-      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
-        ? (workoutData as any).sensor_data.samples
-        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
-      const times: number[] = []; const vals: number[] = [];
-      for (let i=0;i<sd.length;i++){
-        const s:any = sd[i]||{};
-        const t = Number(
-          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
-          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
-        );
-        const pw = (s.power ?? s.power_w ?? s.watts);
-        if (Number.isFinite(t) && Number.isFinite(pw)) { times.push(Number(t)); vals.push(Number(pw)); }
-      }
-      return { times, vals };
-    } catch { return { times: [], vals: [] }; }
-  }, [workoutData]);
-  const cadSeries = useMemo(() => {
-    if (!targetTimes.length || !cadSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
-    const vals = resampleToGrid(cadSeriesRaw.times, cadSeriesRaw.vals, targetTimes);
-    return vals;
-  }, [cadSeriesRaw, targetTimes]);
-  const pwrSeries = useMemo(() => {
-    if (!targetTimes.length || !pwrSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
-    const vals = resampleToGrid(pwrSeriesRaw.times, pwrSeriesRaw.vals, targetTimes);
-    return vals;
-  }, [pwrSeriesRaw, targetTimes]);
 
   // Outdoor detection (global) — track is the server-provided simplified route
   const isOutdoorGlobal = useMemo(() =>
@@ -999,16 +935,12 @@ function EffortsViewerMapbox({
       const winsorized = winsorize(hr, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Cadence (prefer normalizedSamples, fallback to cadSeries for historical workouts)
     if (tab === "cad") {
-      const cadFromSamples = normalizedSamples.map(s => {
+      const cad = normalizedSamples.map(s => {
         if (Number.isFinite(s.cad_rpm as any)) return Number(s.cad_rpm);
         if (Number.isFinite(s.cad_spm as any)) return Number(s.cad_spm);
         return NaN;
       });
-      const hasDataInSamples = cadFromSamples.some(v => Number.isFinite(v));
-      // TODO: MIGRATION CODE - Remove cadSeries fallback after backfill
-      const cad = hasDataInSamples ? cadFromSamples : (cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
       
       // Mark coasting/invalid values as NaN (cadence < 40 or > 220)
       const validOnly = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
@@ -1051,12 +983,8 @@ function EffortsViewerMapbox({
       const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.0);
       return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Power (prefer normalizedSamples, fallback to pwrSeries for historical workouts)
     if (tab === "pwr") {
-      const pwrFromSamples = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
-      const hasDataInSamples = pwrFromSamples.some(v => Number.isFinite(v));
-      // TODO: MIGRATION CODE - Remove pwrSeries fallback after backfill
-      const pwr = hasDataInSamples ? pwrFromSamples : (pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN));
+      const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
       
       // Remove outliers using z-score before smoothing
       const removeOutliers = (data: number[], threshold: number = 2.5): number[] => {
@@ -1986,7 +1914,7 @@ function EffortsViewerMapbox({
             <Pill 
               label="Power" 
               value={isScrubbing 
-                ? (Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—')
+                ? (Number.isFinite(normalizedSamples[Math.min(idx, normalizedSamples.length-1)]?.power_w) ? `${Math.round(normalizedSamples[Math.min(idx, normalizedSamples.length-1)].power_w!)} W` : '—')
                 : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
               } 
               subValue={isScrubbing ? undefined : "(avg)"}
@@ -2045,10 +1973,12 @@ function EffortsViewerMapbox({
           {/* Cadence */}
           <Pill 
             label="Cadence" 
-            value={isScrubbing
-              ? (Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—')
-              : (getAvgCadence != null ? `${Math.round(getAvgCadence)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—')
-            } 
+            value={(() => {
+              if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—';
+              const samp = normalizedSamples[Math.min(idx, normalizedSamples.length-1)];
+              const v = workoutData?.type === 'ride' ? samp?.cad_rpm : samp?.cad_spm;
+              return Number.isFinite(v) ? `${Math.round(v!)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—';
+            })()} 
             subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="cad"} 
             width={54}
@@ -2060,7 +1990,7 @@ function EffortsViewerMapbox({
             <Pill 
               label="Power" 
               value={isScrubbing
-                ? (Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—')
+                ? (Number.isFinite(normalizedSamples[Math.min(idx, normalizedSamples.length-1)]?.power_w) ? `${Math.round(normalizedSamples[Math.min(idx, normalizedSamples.length-1)].power_w!)} W` : '—')
                 : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
               } 
               subValue={isScrubbing ? undefined : "(avg)"}
