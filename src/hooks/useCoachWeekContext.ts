@@ -1,6 +1,34 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
+export type RaceReadinessV1 = {
+  goal: {
+    name: string;
+    distance: string;
+    target_date: string;
+    weeks_out: number;
+  };
+  predicted_finish_time_seconds: number;
+  predicted_finish_display: string;
+  predicted_race_pace_display: string;
+  target_finish_time_seconds: number | null;
+  target_finish_display: string | null;
+  delta_seconds: number | null;
+  delta_display: string | null;
+  assessment: 'on_track' | 'ahead' | 'behind' | 'well_behind';
+  assessment_message: string;
+  current_vdot: number;
+  plan_vdot: number | null;
+  vdot_delta: number | null;
+  vdot_direction: 'improved' | 'declined' | 'stable';
+  training_signals: Array<{ label: string; value: string; tone: 'positive' | 'neutral' | 'warning' }>;
+  pace_zones: { easy: string; threshold: string; race: string };
+  data_source: 'observed' | 'plan_targets';
+  durability_factor: number;
+  confidence_adjustment_pct: number;
+  drift_delta: number | null;
+};
+
 export type CoachWeekContextV1 = {
   version: 1;
   as_of_date: string;
@@ -193,6 +221,7 @@ export type CoachWeekContextV1 = {
     context_note?: string | null;
   };
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
+  race_readiness?: RaceReadinessV1 | null;
   interference: {
     aerobic: string;
     structural: string;

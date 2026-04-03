@@ -214,6 +214,33 @@ export function formatPace(seconds: number): string {
 }
 
 /**
+ * Reverse-lookup VDOT from a threshold (steady) pace in seconds per mile.
+ * Bridges actual workout data to race predictions: threshold pace -> VDOT -> getTargetTime().
+ * PACE_TABLE steady values decrease as VDOT increases (faster runner = lower sec/mi).
+ */
+export function estimateVdotFromPace(thresholdPaceSecPerMi: number): number | null {
+  if (!Number.isFinite(thresholdPaceSecPerMi) || thresholdPaceSecPerMi <= 0) return null;
+
+  const first = PACE_TABLE[0];
+  const last = PACE_TABLE[PACE_TABLE.length - 1];
+  if (thresholdPaceSecPerMi >= first.paces.steady) return first.vdot;
+  if (thresholdPaceSecPerMi <= last.paces.steady) return last.vdot;
+
+  for (let i = 0; i < PACE_TABLE.length - 1; i++) {
+    const slower = PACE_TABLE[i];
+    const faster = PACE_TABLE[i + 1];
+    if (thresholdPaceSecPerMi <= slower.paces.steady && thresholdPaceSecPerMi >= faster.paces.steady) {
+      const paceRange = slower.paces.steady - faster.paces.steady;
+      if (paceRange === 0) return slower.vdot;
+      const fraction = (slower.paces.steady - thresholdPaceSecPerMi) / paceRange;
+      return Math.round((slower.vdot + fraction * (faster.vdot - slower.vdot)) * 10) / 10;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get projected finish time for a given Effort Score and distance
  * Returns time in seconds
  */

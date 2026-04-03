@@ -38,6 +38,7 @@ import {
 } from '../_shared/response-model/index.ts';
 import { loadGoalContext, type GoalContext } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
+import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
 import {
   buildDailyLedger,
   buildIdentity,
@@ -1666,6 +1667,59 @@ Deno.serve(async (req) => {
       return 'normal';
     })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
 
+    // =========================================================================
+    // Race readiness (VDOT-based, gated on running event goal)
+    // =========================================================================
+    let raceReadiness: RaceReadinessV1 | null = null;
+    try {
+      if (goalContext.primary_event && (goalContext.primary_event.sport === 'run' || goalContext.primary_event.sport === 'running' || !goalContext.primary_event.sport)) {
+        const weeksOutVal = goalContext.upcoming_races.find(r => r.name === goalContext.primary_event!.name)?.weeks_out ?? 0;
+
+        const readinessDrivers: Array<{ label: string; value: string; tone: 'positive' | 'neutral' | 'warning' }> = [];
+        const keyPlanned = reaction.key_sessions_planned;
+        const keyLinked = reaction.key_sessions_linked;
+        if (keyPlanned > 0) {
+          const ratio = keyLinked / keyPlanned;
+          readinessDrivers.push({
+            label: 'Key sessions',
+            value: `${keyLinked}/${keyPlanned} completed`,
+            tone: ratio >= 0.8 ? 'positive' : ratio >= 0.5 ? 'neutral' : 'warning',
+          });
+        }
+
+        const fitDir = fitnessDirection ?? 'stable';
+        readinessDrivers.push({
+          label: 'Fitness trend',
+          value: fitDir,
+          tone: fitDir === 'improving' ? 'positive' : fitDir === 'declining' ? 'warning' : 'neutral',
+        });
+
+        const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
+        const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
+
+        raceReadiness = computeRaceReadiness({
+          learnedFitness: learnedFitness || null,
+          effortPaces: (ub as any)?.effort_paces || null,
+          performanceNumbers: (ub as any)?.performance_numbers || null,
+          primaryEvent: {
+            name: goalContext.primary_event.name,
+            distance: goalContext.primary_event.distance,
+            target_date: goalContext.primary_event.target_date,
+            target_time: goalContext.primary_event.target_time,
+            sport: goalContext.primary_event.sport,
+          },
+          weeksOut: weeksOutVal,
+          weeklyReadinessLabel: readinessState ?? null,
+          readinessDrivers,
+          hrDriftAvgBpm: reaction.hr_drift_avg_bpm,
+          hrDriftNorm28dBpm: norms28d.hr_drift_avg_bpm,
+          easyRunDecouplingPct: easyDecoupling,
+        });
+      }
+    } catch (rrErr: any) {
+      console.warn('[coach] race readiness failed (non-fatal):', rrErr?.message ?? rrErr);
+    }
+
     const interference = latestSnapshot?.interference ?? null;
 
     // Plan adaptation suggestions (Phase 3): deload / add recovery when overreaching or fatigued
@@ -3012,6 +3066,7 @@ ${narrativeFacts.join('\n')}`;
       goal_context: goalContext,
       goal_prediction: goalPrediction,
       athlete_snapshot: athleteSnapshot,
+      race_readiness: raceReadiness,
     };
 
     return new Response(JSON.stringify(response), {

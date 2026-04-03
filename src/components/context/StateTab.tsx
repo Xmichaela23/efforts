@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
+import type { CoachWeekContextV1, RaceReadinessV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
@@ -133,6 +133,117 @@ function Dot() {
   return <span className="text-white/30 select-none">·</span>;
 }
 
+function assessmentColor(a: RaceReadinessV1['assessment']): string {
+  if (a === 'ahead') return 'text-emerald-400/90';
+  if (a === 'on_track') return 'text-emerald-400/85';
+  if (a === 'behind') return 'text-amber-400/90';
+  return 'text-red-400/90';
+}
+
+function assessmentLabel(a: RaceReadinessV1['assessment']): string {
+  if (a === 'ahead') return 'ahead';
+  if (a === 'on_track') return 'on track';
+  if (a === 'behind') return 'stretch';
+  return 'adjust target';
+}
+
+function signalToneColor(tone: string): string {
+  if (tone === 'positive') return 'text-emerald-400/85';
+  if (tone === 'warning') return 'text-amber-400/85';
+  return 'text-white/65';
+}
+
+function RaceSection({ rr }: { rr: RaceReadinessV1 }) {
+  const distLabel = rr.goal.distance.replace(/_/g, ' ');
+  return (
+    <div className="px-3 py-3 space-y-2.5">
+      {/* Header: goal + weeks out */}
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
+        <span className="text-[11px] text-white/55">{rr.goal.name} — {rr.goal.weeks_out}w out</span>
+      </div>
+
+      {/* Predicted finish + delta */}
+      <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">{rr.predicted_finish_display}</span>
+          <span className="text-[11px] text-white/50">{distLabel}</span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          {rr.delta_display && (
+            <span className={`text-[13px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
+              {rr.delta_display}
+            </span>
+          )}
+          <span className={`text-[10px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
+            {assessmentLabel(rr.assessment)}
+          </span>
+        </div>
+      </div>
+
+      {/* Target comparison */}
+      {rr.target_finish_display && (
+        <div className="flex items-baseline gap-2 text-[11px] text-white/55">
+          <span>Target {rr.target_finish_display}</span>
+          <Dot />
+          <span>Race pace {rr.predicted_race_pace_display}</span>
+        </div>
+      )}
+
+      {/* VDOT trend */}
+      <div className="flex items-baseline gap-2 text-[11px]">
+        <span className="text-white/55">VDOT {rr.current_vdot.toFixed(1)}</span>
+        {rr.plan_vdot != null && rr.vdot_delta != null && rr.vdot_direction !== 'stable' && (
+          <>
+            <Dot />
+            <span className={rr.vdot_direction === 'improved' ? 'text-emerald-400/85' : 'text-amber-400/85'}>
+              {rr.vdot_delta > 0 ? '+' : ''}{rr.vdot_delta.toFixed(1)} since plan start
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Assessment message */}
+      <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
+
+      {/* Training signals */}
+      {rr.training_signals.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
+          {rr.training_signals.map((s, i) => (
+            <span key={i} className="text-[11px]">
+              <span className="text-white/50">{s.label}</span>{' '}
+              <span className={signalToneColor(s.tone)}>{s.value}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Pace zones */}
+      <div className="flex items-center gap-3 pt-0.5 text-[10px] text-white/45">
+        <span>Easy {rr.pace_zones.easy}</span>
+        <span>Threshold {rr.pace_zones.threshold}</span>
+        <span>Race {rr.pace_zones.race}</span>
+      </div>
+
+      {/* Modifiers */}
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/35">
+        {rr.data_source === 'plan_targets' && (
+          <span className="italic">Based on plan targets</span>
+        )}
+        {rr.durability_factor < 0.97 && (
+          <span>Durability adj {((1 - rr.durability_factor) * 100).toFixed(1)}%</span>
+        )}
+        {rr.durability_factor >= 1.0 && (
+          <span className="text-emerald-400/40">Durability +{((rr.durability_factor - 1) * 100).toFixed(1)}%</span>
+        )}
+        {rr.confidence_adjustment_pct > 0 && (
+          <span>Confidence adj +{rr.confidence_adjustment_pct.toFixed(1)}%</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
@@ -165,6 +276,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   } | undefined;
   const snap = (data as any)?.athlete_snapshot ?? null;
   const loadStatus = snap?.body_response?.load_status ?? null;
+  const raceReadiness: RaceReadinessV1 | null = (data as any)?.race_readiness ?? null;
 
   // ── WEEK header ──────────────────────────────────────────────────────────
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
@@ -237,6 +349,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       </div>
 
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
+
+        {/* RACE — predicted finish, VDOT trend, pace zones (gated on data) */}
+        {raceReadiness && <RaceSection rr={raceReadiness} />}
 
         {/* LOAD — full-width gauge + sparkline */}
         <div className="px-3 py-3">

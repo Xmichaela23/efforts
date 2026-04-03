@@ -166,6 +166,7 @@ export type CoachWeekContextResponseV1 = {
   response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
   goal_context?: import('../_shared/goal-context.ts').GoalContext;
   goal_prediction?: import('../_shared/goal-predictor/index.ts').GoalPredictionResult;
+  race_readiness?: import('../_shared/race-readiness/index.ts').RaceReadinessV1 | null;
   training_state: {
     // Deterministic, plan-aware topline (frontend should render this verbatim)
     code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';
