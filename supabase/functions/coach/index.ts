@@ -623,13 +623,25 @@ Deno.serve(async (req) => {
 
     const executionScoreFromWorkout = (wAny: any): number | null => {
       try {
-        // Single source of truth: computed.overall.execution_score (aerobic decoupling Pa:HR)
-        // Only set for steady-state runs ≥40min with HR data. Returns null for short runs,
-        // interval sessions, strength, cycling — do NOT fall back to pace/adherence metrics
-        // as they measure compliance, not aerobic quality.
+        // Prefer the analyzer's adherence score (same number the Performance chip shows).
+        // This accounts for terrain, weather, duration, and plan context — so the weekly
+        // "run quality" signal agrees with what each individual run tells the athlete.
+        const wa = parseJson((wAny as any)?.workout_analysis);
+
+        // 1. analyze-running-workout → performance.execution_adherence (plan-aware adherence)
+        const perf = safeNum(wa?.performance?.execution_adherence);
+        if (perf != null && perf > 0) return Math.max(0, Math.min(100, perf));
+
+        // 2. session_state_v1.glance.execution_score (same lineage, set by analyzer)
+        const glance = safeNum(wa?.session_state_v1?.glance?.execution_score);
+        if (glance != null && glance > 0) return Math.max(0, Math.min(100, glance));
+
+        // 3. Legacy fallback: computed.overall.execution_score (raw aerobic decoupling).
+        //    Only used for workouts analyzed before the adherence pipeline existed.
         const c = parseJson((wAny as any)?.computed);
         const s1 = safeNum(c?.overall?.execution_score);
         if (s1 != null) return Math.max(0, Math.min(100, s1));
+
         return null;
       } catch {
         return null;
@@ -673,6 +685,8 @@ Deno.serve(async (req) => {
 
     const driftBpmFromWorkout = (wAny: any): number | null => {
       try {
+        // Prefer analyzer's terrain/weather-adjusted drift (same value the narrative references).
+        // Falls back through older storage paths for pre-migration workouts.
         const wa = parseJson(wAny?.workout_analysis) || {};
         const v =
           wa?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ??
