@@ -514,6 +514,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
           prev.max_speed === next.max_speed &&
           prev.distance === next.distance &&
           prev.computed === next.computed &&
+          prev.track === next.track &&
           prev.rpe === next.rpe &&
           prev.gear_id === next.gear_id) {
         return prev; // No change, return previous reference
@@ -1097,8 +1098,8 @@ const formatMaxSpeed = (speedValue: any): string => {
       label: isRun ? 'Max Pace' : 'Max Speed',
       value: isRun
        ? (Number.isFinite(norm.max_pace_s_per_km as any) && norm.max_pace_s_per_km ? formatPace(norm.max_pace_s_per_km as number, useImperial) : 'N/A')
-      : (Number.isFinite((workoutData as any)?.max_speed as any)
-         ? (() => { const kmh = Number((workoutData as any).max_speed); if (!Number.isFinite(kmh)) return 'N/A'; return useImperial ? `${(kmh*0.621371).toFixed(1)} mph` : `${kmh.toFixed(1)} km/h`; })()
+      : (Number.isFinite(norm.max_speed_mps as any) && norm.max_speed_mps
+         ? (useImperial ? `${(norm.max_speed_mps * 2.23694).toFixed(1)} mph` : `${(norm.max_speed_mps * 3.6).toFixed(1)} km/h`)
          : 'N/A'),
       unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
     },

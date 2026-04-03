@@ -1041,18 +1041,8 @@ export default function MapEffort({
     return () => { try { map.off('idle', onIdle); } catch {} };
   }, [theme, ready, coords]);
 
-  // Simple SVG fallback when no coords
-  if ((coords?.length ?? 0) < 2) {
-    return (
-      <div className={className} style={{ height, opacity: 1 }}>
-        <svg width="100%" height="100%" viewBox="0 0 700 160" style={{ display: 'block', background: '#fff', borderRadius: 12, border: '1px solid #eef2f7' }}>
-          <text x={12} y={22} fill="#94a3b8" fontSize={12}>No route data</text>
-        </svg>
-      </div>
-    );
-  }
-
-  // Enhancement 3 & 4: Render with expansion button and metric overlay
+  // Always render the map div so the MapLibre instance is created on mount.
+  // When coords arrive later (async hydration), the seed/fit effect draws the route.
   return (
     <>
       {/* Map container */}
@@ -1082,8 +1072,8 @@ export default function MapEffort({
           }} 
         />
         
-        {/* Expand button when collapsed (inside container) */}
-        {!expanded && (
+        {/* Expand button when collapsed and route is loaded */}
+        {!expanded && coords.length > 1 && (
           <button
             onTouchEnd={(e) => {
               e.preventDefault();
