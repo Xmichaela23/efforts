@@ -13,7 +13,7 @@ import {
   paceStringToSecondsPerMi,
   secondsToPaceString,
 } from './utils.ts';
-import { getNotableAchievements, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext } from './queries.ts';
+import { getComparableTypeKeys, getNotableAchievements, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext, inferWorkoutTypeKey } from './queries.ts';
 import { assessStimulus } from './stimulus.ts';
 import { identifyPerformanceLimiter } from './limiter.ts';
 import { generateFlagsV1 } from './flags.ts';
@@ -189,6 +189,30 @@ function buildZonesFromLearnedFitness(learnedFitness: any): HrZone[] | null {
   }
 }
 
+/**
+ * Extract a finer workout-intent key from planned_workouts tags / steps_preset.
+ * planned_workouts.type is always the coarse discipline ('run'), so we look at
+ * tags (['hard_run','threshold']) and steps_preset (['cruise_3x1mi_threshold_r60s'])
+ * to distinguish quality sessions from easy runs for comparison cohort selection.
+ */
+function derivePlannedIntentKey(plannedWorkout: any): string | null {
+  if (!plannedWorkout) return null;
+  const tags: string[] = Array.isArray(plannedWorkout.tags) ? plannedWorkout.tags : [];
+  const stepsPreset: string[] = Array.isArray(plannedWorkout.steps_preset) ? plannedWorkout.steps_preset : [];
+
+  const hasTag = (t: string) => tags.includes(t);
+
+  if (hasTag('intervals') || hasTag('vo2max') || hasTag('speed')) return 'intervals';
+  if (hasTag('threshold') || hasTag('tempo')) return 'threshold';
+  if (hasTag('long_run')) return 'long_run';
+  if (hasTag('easy') || hasTag('recovery')) return 'easy';
+
+  if (stepsPreset.some(s => s.startsWith('cruise_') || s.startsWith('interval_'))) return 'intervals';
+  if (stepsPreset.some(s => s.startsWith('tempo_'))) return 'threshold';
+
+  return null;
+}
+
 function deriveWorkoutTypeKey(workout: any): string {
   const wa = workout?.workout_analysis;
   const wt = String(
@@ -334,9 +358,9 @@ export async function buildWorkoutFactPacketV1(args: {
   })();
 
   const workout_type = (() => {
-    const plannedType = plannedWorkout?.workout_type || plannedWorkout?.type || null;
+    const plannedIntent = derivePlannedIntentKey(plannedWorkout);
+    const plannedType = plannedIntent || plannedWorkout?.type || null;
     const analyzerType = deriveWorkoutTypeKey(workout);
-    // Prefer plan type when linked; fallback to analyzer.
     return String(plannedType || classifiedTypeOverride || workoutIntent || analyzerType || 'unknown');
   })();
 
@@ -378,7 +402,7 @@ export async function buildWorkoutFactPacketV1(args: {
       currentHrDriftBpm: hrDriftCurrent,
       currentTerrainClass: terrain_type !== 'flat' ? terrain_type : null,
     }),
-    getPaceTrend(supabase, { userId: String(workout.user_id), workoutTypeKey, count: 8 }),
+    getPaceTrend(supabase, { userId: String(workout.user_id), workoutTypeKey: comparisonTypeKey, count: 8 }),
     getNotableAchievements(supabase, { userId: String(workout.user_id), currentWorkoutId: String(workout.id), workoutTypeKey, lookbackDays: 28 }),
     workout?.date ? getTrainingLoadContext(supabase, { userId: String(workout.user_id), workoutDateIso: String(workout.date) }) : Promise.resolve(null),
   ]);
@@ -681,20 +705,54 @@ export async function buildWorkoutFactPacketV1(args: {
             .limit(10),
         ]);
         if (clusterRow && Number((clusterRow as any).sample_count || 0) >= 2) {
-          const history = Array.isArray(histRows)
+          let history = Array.isArray(histRows)
             ? histRows.map((r: any) => ({
                 date: String(r.metric_date || '').slice(0, 10),
                 pace_s_per_km: r.avg_pace_sec_per_km != null ? Number(r.avg_pace_sec_per_km) : null,
                 hr: r.avg_hr_bpm != null ? Number(r.avg_hr_bpm) : null,
                 is_current: String(r.workout_id) === workoutId,
+                _workout_id: String(r.workout_id || ''),
               }))
             : [];
+
+          // Filter route history to same-intent workouts so the sparkline
+          // doesn't mix easy runs with threshold/interval sessions.
+          const comparableKeys = getComparableTypeKeys(comparisonTypeKey);
+          if (comparableKeys.length > 0 && history.length > 0) {
+            const otherIds = history
+              .filter(h => !h.is_current && h._workout_id)
+              .map(h => h._workout_id);
+            if (otherIds.length > 0) {
+              try {
+                const { data: typeRows } = await supabase
+                  .from('workouts')
+                  .select('id, type, workout_analysis')
+                  .in('id', otherIds);
+                if (Array.isArray(typeRows)) {
+                  const sameIntent = new Set<string>();
+                  for (const r of typeRows) {
+                    const inferred = inferWorkoutTypeKey(r);
+                    if (inferred != null && comparableKeys.includes(inferred)) {
+                      sameIntent.add(String(r.id));
+                    }
+                  }
+                  history = history.filter(h => h.is_current || sameIntent.has(h._workout_id));
+                }
+              } catch (e) {
+                console.warn('[fact-packet] route history type filter failed (non-fatal):', e);
+              }
+            }
+          }
+
+          // Strip internal _workout_id before exposing
+          const cleanHistory = history.map(({ _workout_id, ...rest }) => rest);
+
           routeRuns = {
             name: String((clusterRow as any).name || 'Regular route'),
             times_run: Number((clusterRow as any).sample_count),
             first_seen: String((clusterRow as any).first_seen_at || '').slice(0, 10),
             last_seen: String((clusterRow as any).last_seen_at || '').slice(0, 10),
-            history,
+            history: cleanHistory,
           };
         }
       }

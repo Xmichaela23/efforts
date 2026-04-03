@@ -777,48 +777,80 @@ function buildAnalysisDetailRows(
 
 
   try {
-    const splitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi) ? comp.analysis.events.splits.mi : [];
+    const ie = derived?.interval_execution;
+    const isStructured = typeof ie?.total_steps === 'number' && ie.total_steps > 2;
 
-    const rawSplits = splitsMi.map((s: any) => {
-      const pacePerKm = Number(s?.avgPace_s_per_km);
-      const gapPerKm = Number(s?.avgGapPace_s_per_km);
-      return {
-        mile: Number(s?.n),
-        pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN,
-        gap: Number.isFinite(gapPerKm) && gapPerKm > 0 ? gapPerKm * 1.60934 : NaN,
-      };
-    }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
-
-    if (rawSplits.length >= 2) {
-      const hasGap = gapAdjusted && rawSplits.every((s) => Number.isFinite(s.gap) && s.gap > 0);
-      const splits = hasGap
-        ? rawSplits.map((s) => ({ mile: s.mile, pace: s.gap }))
-        : rawSplits.map((s) => ({ mile: s.mile, pace: s.pace }));
-
-      const mid = Math.ceil(splits.length / 2);
-      const firstHalf = splits.slice(0, mid);
-      const secondHalf = splits.slice(mid);
-      const avg = (arr: typeof splits) => arr.reduce((s, x) => s + x.pace, 0) / arr.length;
-      const firstAvg = avg(firstHalf);
-      const secondAvg = avg(secondHalf);
-      const diff = firstAvg - secondAvg;
-      const absDiff = Math.abs(Math.round(diff));
-      const effortLabel = hasGap ? 'effort' : 'pacing';
-      let pattern: string;
-      if (absDiff <= 15) {
-        pattern = hasGap ? 'Even effort (grade-adjusted)' : 'Even pacing';
-      } else if (diff > 0) {
-        pattern = `Negative split — ${effortLabel} ${absDiff}s/mi faster in second half`;
-      } else {
-        pattern = `Positive split — ${effortLabel} slowed ${absDiff}s/mi${hasGap ? ' (grade-adjusted)' : ''}`;
+    if (isStructured) {
+      // For structured intervals, report work-interval consistency instead
+      // of overall positive/negative split (pace variation is intentional).
+      const workIntervals = intervals.filter((r) => r.interval_type === 'work');
+      if (workIntervals.length >= 2) {
+        const paces = workIntervals
+          .map((r) => r.executed?.actual_pace_sec_per_mi ?? null)
+          .filter((n): n is number => n != null && Number.isFinite(n) && n > 0);
+        if (paces.length >= 2) {
+          const spread = Math.round(Math.max(...paces) - Math.min(...paces));
+          const fmtPace = (s: number) => { const m = Math.floor(s / 60); const sec = Math.round(s % 60); return `${m}:${String(sec).padStart(2, '0')}/mi`; };
+          if (spread <= 10) {
+            rows.push({ label: 'Pacing', value: `Work intervals consistent (${fmtPace(paces[0])}–${fmtPace(paces[paces.length - 1])})` });
+          } else {
+            const firstPace = paces[0];
+            const lastPace = paces[paces.length - 1];
+            const drift = Math.round(lastPace - firstPace);
+            if (drift > 10) {
+              rows.push({ label: 'Pacing', value: `Work intervals faded ${drift}s/mi (${fmtPace(firstPace)} → ${fmtPace(lastPace)})` });
+            } else if (drift < -10) {
+              rows.push({ label: 'Pacing', value: `Work intervals sped up ${Math.abs(drift)}s/mi (${fmtPace(firstPace)} → ${fmtPace(lastPace)})` });
+            } else {
+              rows.push({ label: 'Pacing', value: `Work intervals: ${spread}s/mi spread (${fmtPace(Math.min(...paces))}–${fmtPace(Math.max(...paces))})` });
+            }
+          }
+        }
       }
+    } else {
+      const splitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi) ? comp.analysis.events.splits.mi : [];
 
-      const fastest = rawSplits.reduce((a, b) => a.pace < b.pace ? a : b);
-      const fm = Math.floor(fastest.pace / 60);
-      const fs = Math.round(fastest.pace % 60);
-      const fastestStr = `Fastest: Mile ${fastest.mile} at ${fm}:${String(fs).padStart(2, '0')}/mi`;
+      const rawSplits = splitsMi.map((s: any) => {
+        const pacePerKm = Number(s?.avgPace_s_per_km);
+        const gapPerKm = Number(s?.avgGapPace_s_per_km);
+        return {
+          mile: Number(s?.n),
+          pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN,
+          gap: Number.isFinite(gapPerKm) && gapPerKm > 0 ? gapPerKm * 1.60934 : NaN,
+        };
+      }).filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
 
-      rows.push({ label: 'Pacing', value: `${pattern}. ${fastestStr}` });
+      if (rawSplits.length >= 2) {
+        const hasGap = gapAdjusted && rawSplits.every((s) => Number.isFinite(s.gap) && s.gap > 0);
+        const splits = hasGap
+          ? rawSplits.map((s) => ({ mile: s.mile, pace: s.gap }))
+          : rawSplits.map((s) => ({ mile: s.mile, pace: s.pace }));
+
+        const mid = Math.ceil(splits.length / 2);
+        const firstHalf = splits.slice(0, mid);
+        const secondHalf = splits.slice(mid);
+        const avg = (arr: typeof splits) => arr.reduce((s, x) => s + x.pace, 0) / arr.length;
+        const firstAvg = avg(firstHalf);
+        const secondAvg = avg(secondHalf);
+        const diff = firstAvg - secondAvg;
+        const absDiff = Math.abs(Math.round(diff));
+        const effortLabel = hasGap ? 'effort' : 'pacing';
+        let pattern: string;
+        if (absDiff <= 15) {
+          pattern = hasGap ? 'Even effort (grade-adjusted)' : 'Even pacing';
+        } else if (diff > 0) {
+          pattern = `Negative split — ${effortLabel} ${absDiff}s/mi faster in second half`;
+        } else {
+          pattern = `Positive split — ${effortLabel} slowed ${absDiff}s/mi${hasGap ? ' (grade-adjusted)' : ''}`;
+        }
+
+        const fastest = rawSplits.reduce((a, b) => a.pace < b.pace ? a : b);
+        const fm = Math.floor(fastest.pace / 60);
+        const fs = Math.round(fastest.pace % 60);
+        const fastestStr = `Fastest: Mile ${fastest.mile} at ${fm}:${String(fs).padStart(2, '0')}/mi`;
+
+        rows.push({ label: 'Pacing', value: `${pattern}. ${fastestStr}` });
+      }
     }
   } catch { /* */ }
 

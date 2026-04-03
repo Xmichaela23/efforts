@@ -121,7 +121,7 @@ function getTerrainClass(row: any): 'flat' | 'rolling' | 'hilly' {
   return classifyTerrain(getElevationGainFt(row), getOverallDistanceMi(row));
 }
 
-function inferWorkoutTypeKey(row: any): string | null {
+export function inferWorkoutTypeKey(row: any): string | null {
   // Prefer analyzer output if available
   const wa = row?.workout_analysis;
   const classified = String(wa?.classified_type || '').trim();
@@ -150,7 +150,7 @@ function getDiscipline(key: string | null): string {
   return 'workout';
 }
 
-function getComparableTypeKeys(key: string | null): string[] {
+export function getComparableTypeKeys(key: string | null): string[] {
   if (!key) return [];
   const k = safeLower(key);
   const easyLike = ['recovery', 'easy', 'easy_run', 'steady_state', 'run'];
