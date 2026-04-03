@@ -350,9 +350,6 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
 
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
-        {/* RACE — predicted finish, VDOT trend, pace zones (gated on data) */}
-        {raceReadiness && <RaceSection rr={raceReadiness} />}
-
         {/* LOAD — full-width gauge + sparkline */}
         <div className="px-3 py-3">
           <div className="flex items-center justify-between mb-2">
@@ -529,6 +526,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
             </div>
           </div>
         </div>
+
+        {/* RACE — predicted finish, VDOT trend, pace zones (gated on data) */}
+        {raceReadiness && <RaceSection rr={raceReadiness} />}
 
         {/* NEXT */}
         <div className="px-3 py-3">
