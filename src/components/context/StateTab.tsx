@@ -374,7 +374,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                             exerciseName={lt.display_name}
                             currentWeight={bestWeight ?? 0}
                             nextPlannedWeight={suggestedWeight ?? bestWeight ?? 0}
-                            targetRir={lt.rir_current ?? undefined}
+                            targetRir={(lt as any).rir_target ?? undefined}
                             actualRir={lt.rir_current ?? undefined}
                             planId={wsv.plan.plan_id ?? undefined}
                             isBodyweight={false}

@@ -64,6 +64,8 @@ export type LiftTrend = {
   rir_current: number | null;
   rir_baseline: number | null;
   rir_delta: number | null;
+  /** Protocol-derived target RIR. Null when no protocol context. */
+  rir_target: number | null;
   samples: number;
   sufficient: boolean;
   /** Server-computed plan-intent-aware action label. Client renders verbatim. */
@@ -275,6 +277,8 @@ export type StrengthLiftSnapshot = {
   previous_e1rm: number | null;     // from 4 weeks ago or earliest available
   current_avg_rir: number | null;
   baseline_avg_rir: number | null;
+  /** Protocol-derived target RIR for this lift. Null when protocol is unknown. */
+  target_rir: number | null;
   sessions_in_window: number;
   best_weight: number | null;       // most recent top working weight logged
 };

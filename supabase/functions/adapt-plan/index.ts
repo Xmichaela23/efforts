@@ -32,6 +32,14 @@ import {
   resolveMemoryContextForPlanning,
   type PlanningMemoryContext,
 } from '../_shared/athlete-memory.ts';
+import {
+  resolveProfile,
+  resolvePhaseRule,
+  getTargetRir,
+  isLowerBodyLift,
+  type StrengthProtocolProfile,
+  type PhaseRule,
+} from '../_shared/strength-profiles.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -223,32 +231,47 @@ Deno.serve(async (req) => {
     const suggestions: AdaptationSuggestion[] = [];
 
     // =========================================================================
-    // STRENGTH PROGRESSION SUGGESTIONS
+    // STRENGTH PROGRESSION SUGGESTIONS (protocol-aware, phase-gated)
     // =========================================================================
+    const planCfg = activePlan?.config || {};
+    const profile = resolveProfile(planCfg.strength_protocol);
+    const currentWeek = Number(activePlan?.current_week) || 1;
+    const phaseTag = Array.isArray(planCfg.plan_contract_v1?.phase_by_week)
+      ? planCfg.plan_contract_v1.phase_by_week[currentWeek - 1]
+      : null;
+    const phase = resolvePhaseRule(phaseTag);
+
     const liftGroups = groupByLift(exerciseLogs || []);
 
     for (const [liftName, sessions] of Object.entries(liftGroups)) {
-      if (sessions.length < 3) continue; // MIN_SAMPLES_FOR_SIGNAL
+      if (sessions.length < 3) continue;
 
-      const recent = sessions.slice(-2);
-      const earlier = sessions.slice(0, Math.max(1, sessions.length - 2));
+      const recent = sessions.slice(-3);
+      const earlier = sessions.slice(0, Math.max(1, sessions.length - 3));
 
       const recentAvg1rm = avg(recent.map((s) => s.estimated_1rm));
       const earlierAvg1rm = avg(earlier.map((s) => s.estimated_1rm));
-      const recentAvgRir = avg(recent.map((s) => s.avg_rir).filter((r) => r != null) as number[]);
+      const recentRirs = recent.map((s) => s.avg_rir).filter((r) => r != null) as number[];
+      const recentAvgRir = avg(recentRirs);
 
       if (recentAvg1rm == null || earlierAvg1rm == null || earlierAvg1rm <= 0) continue;
 
       const gainPct = ((recentAvg1rm - earlierAvg1rm) / earlierAvg1rm) * 100;
 
-      // Check if we already have an active adjustment for this lift
       const alreadyAdjusted = (existingAdj || []).some(
         (a) => a.exercise_name.toLowerCase() === liftName.toLowerCase() && a.status === 'active',
       );
       if (alreadyAdjusted) continue;
 
-      // Progression: 1RM up 5%+ AND RIR >= 2 (not grinding)
-      if (gainPct >= 5 && (recentAvgRir == null || recentAvgRir >= 2)) {
+      const targetRir = getTargetRir(profile, liftName);
+      const deviation = recentAvgRir != null ? recentAvgRir - targetRir : null;
+
+      // Progression: e1RM up by protocol threshold AND deviation shows headroom
+      if (
+        phase.allowProgress &&
+        gainPct >= profile.progression.minGainPct * 100 &&
+        (deviation == null || deviation >= profile.progression.minDeviation)
+      ) {
         const baseline1rm = Number(perf[liftName] || perf[liftName.replace(/ /g, '')] || earlierAvg1rm);
         const currentWorkingWeight = roundTo5(baseline1rm * 0.75);
         const suggestedWeight = roundTo5(recentAvg1rm * 0.75);
@@ -264,32 +287,34 @@ Deno.serve(async (req) => {
             suggested_value: suggestedWeight,
             unit: isMetric ? 'kg' : 'lbs',
             confidence: gainPct >= 8 ? 'high' : 'medium',
-            reason: `1RM ${earlierAvg1rm.toFixed(0)} → ${recentAvg1rm.toFixed(0)} (+${gainPct.toFixed(0)}%)${recentAvgRir != null ? `, avg RIR ${recentAvgRir.toFixed(1)}` : ''}`,
+            reason: `1RM ${earlierAvg1rm.toFixed(0)} → ${recentAvg1rm.toFixed(0)} (+${gainPct.toFixed(0)}%)${deviation != null ? `, RIR deviation ${deviation > 0 ? '+' : ''}${deviation.toFixed(1)} vs target ${targetRir}` : ''}`,
           });
         }
       }
 
-      // Deload: RIR trending below 1 (grinding)
-      if (recentAvgRir != null && recentAvgRir < 1 && sessions.length >= 3) {
-        const earlierRir = avg(earlier.map((s) => s.avg_rir).filter((r) => r != null) as number[]);
-        if (earlierRir != null && earlierRir >= 2) {
-          const baseline1rm = Number(perf[liftName] || earlierAvg1rm);
-          const currentWorkingWeight = roundTo5(baseline1rm * 0.75);
-          const suggestedWeight = roundTo5(currentWorkingWeight * 0.9);
+      // Deload: deviation below threshold (adjusted by phase sensitivity)
+      const deloadThreshold = profile.deload.maxDeviation * phase.deloadSensitivity;
+      if (
+        deviation != null &&
+        deviation <= deloadThreshold &&
+        recentRirs.length >= profile.deload.minSessions
+      ) {
+        const baseline1rm = Number(perf[liftName] || earlierAvg1rm);
+        const currentWorkingWeight = roundTo5(baseline1rm * 0.75);
+        const suggestedWeight = roundTo5(currentWorkingWeight * 0.9);
 
-          suggestions.push({
-            id: `str_deload_${liftName.replace(/\s/g, '_').toLowerCase()}`,
-            type: 'strength_deload',
-            title: `Reduce ${liftName} weight`,
-            description: `Your RIR has dropped significantly. A small deload will help you recover.`,
-            exercise: liftName,
-            current_value: currentWorkingWeight,
-            suggested_value: suggestedWeight,
-            unit: isMetric ? 'kg' : 'lbs',
-            confidence: 'medium',
-            reason: `Avg RIR dropped from ${earlierRir.toFixed(1)} to ${recentAvgRir.toFixed(1)}`,
-          });
-        }
+        suggestions.push({
+          id: `str_deload_${liftName.replace(/\s/g, '_').toLowerCase()}`,
+          type: 'strength_deload',
+          title: `Reduce ${liftName} weight`,
+          description: `Your RIR is consistently below target. A small deload will help you recover.`,
+          exercise: liftName,
+          current_value: currentWorkingWeight,
+          suggested_value: suggestedWeight,
+          unit: isMetric ? 'kg' : 'lbs',
+          confidence: 'medium',
+          reason: `RIR deviation ${deviation.toFixed(1)} vs target ${targetRir} (threshold ${deloadThreshold.toFixed(1)})`,
+        });
       }
     }
 
@@ -859,9 +884,11 @@ async function acceptSuggestion(
 // =============================================================================
 // AUTO-ADAPT: Phase 2 automatic adaptations within guardrails
 // =============================================================================
-// Rules:
-// - Strength weights auto-progress when: 1RM up 5%+ AND avg RIR >= 2 for 3+ sessions
-// - Strength weights deload when: avg RIR < 1 for 3+ consecutive sessions
+// Rules (protocol-aware, phase-gated):
+// - Strength progression: e1RM gain >= protocol.minGainPct AND RIR deviation
+//   (actual - target) >= protocol.minDeviation AND phase.allowProgress
+// - Strength deload: RIR deviation <= protocol.maxDeviation * phase.deloadSensitivity
+//   for protocol.minSessions consecutive sessions
 // - Endurance targets update when: learned value differs 7%+ with high confidence
 // - Recovery insertion when: response model says "overreaching" with high confidence
 // =============================================================================
@@ -971,7 +998,15 @@ async function autoAdapt(
     }
   }
 
-  // 2. Strength auto-progression
+  // 2. Strength auto-progression (protocol-aware, phase-gated)
+  const autoCfg = planRow?.config || {};
+  const autoProfile = resolveProfile(autoCfg.strength_protocol);
+  const autoWeek = Number(planRow?.current_week) || 1;
+  const autoPhaseTag = Array.isArray(autoCfg.plan_contract_v1?.phase_by_week)
+    ? autoCfg.plan_contract_v1.phase_by_week[autoWeek - 1]
+    : null;
+  const autoPhase = resolvePhaseRule(autoPhaseTag);
+
   const liftGroups = groupByLift(exerciseLogs || []);
 
   for (const [liftName, sessions] of Object.entries(liftGroups)) {
@@ -993,8 +1028,16 @@ async function autoAdapt(
     if (recentAvg1rm == null || earlierAvg1rm == null || earlierAvg1rm <= 0) continue;
     const gainPct = ((recentAvg1rm - earlierAvg1rm) / earlierAvg1rm) * 100;
 
-    // Auto-progress: consistent improvement + adequate recovery
-    if (gainPct >= 5 && recentRirs.length >= 2 && (recentAvgRir == null || recentAvgRir >= 2)) {
+    const targetRir = getTargetRir(autoProfile, liftName);
+    const deviation = recentAvgRir != null ? recentAvgRir - targetRir : null;
+
+    // Auto-progress: e1RM gain meets protocol threshold + RIR shows headroom + phase allows
+    if (
+      autoPhase.allowProgress &&
+      gainPct >= autoProfile.progression.minGainPct * 100 &&
+      recentRirs.length >= 2 &&
+      (deviation == null || deviation >= autoProfile.progression.minDeviation)
+    ) {
       const factor = recentAvg1rm / earlierAvg1rm;
 
       await supabase.from('plan_adjustments').update({ status: 'expired', updated_at: new Date().toISOString() })
@@ -1006,7 +1049,7 @@ async function autoAdapt(
         exercise_name: liftName,
         adjustment_factor: Math.round(factor * 1000) / 1000,
         applies_from: today,
-        reason: `Auto-progression: 1RM +${gainPct.toFixed(0)}% with RIR ≥ 2`,
+        reason: `Auto-progression: 1RM +${gainPct.toFixed(0)}%, RIR deviation ${deviation != null ? (deviation > 0 ? '+' : '') + deviation.toFixed(1) : 'n/a'} vs target ${targetRir}`,
         status: 'active',
       });
 
@@ -1017,8 +1060,13 @@ async function autoAdapt(
       });
     }
 
-    // Auto-deload: grinding with low RIR
-    if (recentRirs.length >= 3 && recentAvgRir != null && recentAvgRir < 1) {
+    // Auto-deload: deviation below threshold (adjusted by phase sensitivity)
+    const autoDeloadThreshold = autoProfile.deload.maxDeviation * autoPhase.deloadSensitivity;
+    if (
+      deviation != null &&
+      deviation <= autoDeloadThreshold &&
+      recentRirs.length >= autoProfile.deload.minSessions
+    ) {
       await supabase.from('plan_adjustments').update({ status: 'expired', updated_at: new Date().toISOString() })
         .eq('user_id', userId).ilike('exercise_name', liftName).eq('status', 'active');
 
@@ -1028,13 +1076,13 @@ async function autoAdapt(
         exercise_name: liftName,
         adjustment_factor: 0.9,
         applies_from: today,
-        reason: `Auto-deload: avg RIR ${recentAvgRir.toFixed(1)} across 3 sessions`,
+        reason: `Auto-deload: RIR deviation ${deviation.toFixed(1)} vs target ${targetRir} (threshold ${autoDeloadThreshold.toFixed(1)})`,
         status: 'active',
       });
 
       adaptations.push({
         type: 'strength_deload',
-        detail: `${liftName}: weight reduced 10% (avg RIR ${recentAvgRir.toFixed(1)})`,
+        detail: `${liftName}: weight reduced 10% (RIR ${recentAvgRir?.toFixed(1)} vs target ${targetRir})`,
         applied: true,
       });
     }

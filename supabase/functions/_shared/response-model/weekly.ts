@@ -28,6 +28,7 @@ import {
   type WeekHeadline,
 } from './types.ts';
 import { computeCrossDomain } from './cross-domain.ts';
+import { VERDICT_DEVIATION } from '../strength-profiles.ts';
 
 function trend(delta: number | null, worseDirection: 'positive' | 'negative', threshold: number): TrendDirection {
   if (delta == null) return 'stable';
@@ -125,41 +126,38 @@ function computeEndurance(signals: WeeklySignalInputs, norms: BaselineNorms): En
 // Strength signals
 // ---------------------------------------------------------------------------
 
-const LOWER_BODY_LIFTS = new Set([
-  'back_squat', 'front_squat', 'squat', 'deadlift', 'trap_bar_deadlift',
-  'romanian_deadlift', 'rdl', 'leg_press', 'split_squat', 'lunge', 'hip_thrust',
-]);
-
-function isLowerBody(canonical: string): boolean {
-  return LOWER_BODY_LIFTS.has(canonical.toLowerCase().replace(/\s+/g, '_'));
-}
+import { isLowerBodyLift } from '../strength-profiles.ts';
 
 function computeLiftVerdict(
   rir: number | null,
+  targetRir: number | null,
   e1rmTrend: TrendDirection,
   weekIntent: string,
-  canonical: string,
+  _canonical: string,
 ): { label: string; tone: LiftVerdictTone } {
-  const lower = isLowerBody(canonical);
-
   if (weekIntent === 'recovery') return { label: 'lighter this week', tone: 'muted' };
   if (weekIntent === 'taper') return { label: 'maintain', tone: 'neutral' };
 
   if (weekIntent === 'peak') {
+    const lower = isLowerBodyLift(_canonical);
     if (lower) return { label: 'hold — peak week', tone: 'neutral' };
-    if (rir != null && rir > 4) return { label: 'add weight', tone: 'action' };
+    if (rir != null && targetRir != null && (rir - targetRir) >= VERDICT_DEVIATION.ADD_WEIGHT) {
+      return { label: 'add weight', tone: 'action' };
+    }
     return { label: 'hold weight', tone: 'neutral' };
   }
 
-  // Base / build — progressive overload
-  if (rir == null) {
+  // Base / build — deviation from target RIR
+  if (rir == null || targetRir == null) {
     if (e1rmTrend === 'improving') return { label: 'getting stronger', tone: 'positive' };
     if (e1rmTrend === 'declining') return { label: 'strength slipping', tone: 'caution' };
     return { label: 'holding steady', tone: 'neutral' };
   }
-  if (rir < 1) return { label: 'back off weight', tone: 'caution' };
-  const tooLightThreshold = lower ? 4 : 3.5;
-  if (rir > tooLightThreshold) return { label: 'add weight', tone: 'action' };
+
+  const deviation = rir - targetRir;
+
+  if (deviation <= VERDICT_DEVIATION.BACK_OFF) return { label: 'back off weight', tone: 'caution' };
+  if (deviation >= VERDICT_DEVIATION.ADD_WEIGHT) return { label: 'add weight', tone: 'action' };
   if (e1rmTrend === 'improving') return { label: 'getting stronger', tone: 'positive' };
   return { label: 'on track', tone: 'neutral' };
 }
@@ -167,11 +165,10 @@ function computeLiftVerdict(
 function computeSuggestedWeight(
   verdict: string,
   bestWeight: number | null,
-  rir: number | null,
   canonical: string,
 ): number | null {
   if (bestWeight == null || bestWeight <= 0) return null;
-  const lower = isLowerBody(canonical);
+  const lower = isLowerBodyLift(canonical);
 
   if (verdict === 'add weight') {
     const increment = lower ? 10 : 5;
@@ -203,7 +200,7 @@ function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): Str
       : rirDelta != null && rirDelta <= -0.5 ? 'declining'
       : 'stable';
 
-    const verdict = computeLiftVerdict(l.current_avg_rir, e1rm_trend, weekIntent, l.canonical_name);
+    const verdict = computeLiftVerdict(l.current_avg_rir, l.target_rir, e1rm_trend, weekIntent, l.canonical_name);
     const best_weight = l.best_weight ?? null;
 
     return {
@@ -217,12 +214,13 @@ function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: string): Str
       rir_current: l.current_avg_rir,
       rir_baseline: l.baseline_avg_rir,
       rir_delta: rirDelta,
+      rir_target: l.target_rir,
       samples: l.sessions_in_window,
       sufficient,
       verdict_label: verdict.label,
       verdict_tone: verdict.tone,
       best_weight,
-      suggested_weight: computeSuggestedWeight(verdict.label, best_weight, l.current_avg_rir, l.canonical_name),
+      suggested_weight: computeSuggestedWeight(verdict.label, best_weight, l.canonical_name),
     };
   });
 

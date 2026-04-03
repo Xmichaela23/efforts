@@ -36,6 +36,7 @@ import {
   type StrengthLiftSnapshot,
   type CrossDomainPair,
 } from '../_shared/response-model/index.ts';
+import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { loadGoalContext, type GoalContext } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
@@ -1270,6 +1271,8 @@ Deno.serve(async (req) => {
       return { rirByLift7d, rirByLift28d, bestWeightByLift, avgArr };
     })();
 
+    const strengthProfile = resolveProfile(planConfig?.strength_protocol);
+
     const liftSnapshots: StrengthLiftSnapshot[] = (() => {
       try {
         const s1rms = learnedFitness?.strength_1rms;
@@ -1288,6 +1291,7 @@ Deno.serve(async (req) => {
             previous_e1rm: null,
             current_avg_rir: perLiftRir.avgArr(perLiftRir.rirByLift7d.get(key) ?? []) ?? reaction.avg_strength_rir_7d,
             baseline_avg_rir: perLiftRir.avgArr(perLiftRir.rirByLift28d.get(key) ?? []) ?? norms28d.strength_rir_avg,
+            target_rir: getTargetRir(strengthProfile, key),
             sessions_in_window: Number(v.sample_count ?? 0),
             best_weight: perLiftRir.bestWeightByLift.get(key) ?? null,
           }));
