@@ -480,7 +480,7 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { items: unifiedItems, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+  const { items: unifiedItems, weeklyStats, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
   // Use mapper - SINGLE SOURCE OF TRUTH
   const unifiedPlanned = unifiedItems
@@ -1307,19 +1307,55 @@ export default function WorkoutCalendar({
         })}
       </div>
         
-      {/* Load bar — from coach context */}
+      {/* Load bar + discipline totals */}
       <div style={{ flexShrink: 0 }}>
         {(() => {
           const wsv = coachCtx.data?.weekly_state_v1;
-          if (!wsv) return null;
           const snap = (coachCtx.data as any)?.athlete_snapshot ?? null;
           const loadStatus = snap?.body_response?.load_status ?? null;
-          const readiness = wsv.trends?.readiness_state ?? null;
+          const readiness = wsv?.trends?.readiness_state ?? null;
+
+          const metrics: Array<{ label: string; value: string; type: string }> = [];
+          if (weeklyStats.distances) {
+            if (weeklyStats.distances.run_meters > 0)
+              metrics.push({ label: 'Run:', value: useImperial ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi` : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`, type: 'run' });
+            if (weeklyStats.distances.cycling_meters > 0)
+              metrics.push({ label: 'Bike:', value: useImperial ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi` : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`, type: 'bike' });
+            if (weeklyStats.distances.swim_meters > 0)
+              metrics.push({ label: 'Swim:', value: useImperial ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd` : `${Math.round(weeklyStats.distances.swim_meters)} m`, type: 'swim' });
+          }
+          let totalVol = 0;
+          for (const item of unifiedItems) {
+            if (String(item?.type || '').toLowerCase() !== 'strength') continue;
+            for (const ex of (item?.executed?.strength_exercises ?? [])) {
+              if (!ex?.sets) continue;
+              for (const s of ex.sets) {
+                if (s.completed === false) continue;
+                const w = Number(s.weight) || 0, r = Number(s.reps) || 0;
+                if (w > 0 && r > 0) totalVol += w * r;
+              }
+            }
+          }
+          if (totalVol > 0)
+            metrics.push({ label: 'Strength:', value: `${totalVol.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`, type: 'strength' });
+
           return (
-            <div className="pt-3 pb-4 border-t border-white/10">
-              <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
-                <LoadBar load={wsv.load} loadStatus={loadStatus} readinessState={readiness} />
-              </div>
+            <div className="pt-3 pb-4 border-t border-white/10 space-y-2">
+              {wsv && (
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
+                  <LoadBar load={wsv.load} loadStatus={loadStatus} readinessState={readiness} hideDailyBars />
+                </div>
+              )}
+              {metrics.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 px-1">
+                  {metrics.map((m, i) => (
+                    <div key={i} className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-light leading-tight" style={{ color: getDisciplinePhosphorCore(m.type), fontSize: '0.82rem' }}>{m.label}</span>
+                      <span className="font-light tabular-nums leading-tight truncate" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '0.82rem' }}>{m.value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}

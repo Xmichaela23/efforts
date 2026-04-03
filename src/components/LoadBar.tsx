@@ -22,6 +22,7 @@ interface LoadBarProps {
   load: LoadBarData;
   loadStatus: LoadBarStatus | null;
   readinessState: string | null;
+  hideDailyBars?: boolean;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -98,13 +99,13 @@ function Dot() {
 
 // ── LoadBar ──────────────────────────────────────────────────────────────────
 
-export default function LoadBar({ load, loadStatus, readinessState }: LoadBarProps) {
+export default function LoadBar({ load, loadStatus, readinessState, hideDailyBars }: LoadBarProps) {
   const dailyLoad = load.daily_load_7d ?? [];
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
 
   return (
     <div className="px-3 py-3">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
         <div className="flex items-center gap-2">
           <AcwrGauge value={load.acwr} readinessState={readinessState} />
@@ -115,7 +116,7 @@ export default function LoadBar({ load, loadStatus, readinessState }: LoadBarPro
           )}
         </div>
       </div>
-      {dailyLoad.length > 0 && (
+      {!hideDailyBars && dailyLoad.length > 0 && (
         <div className="mt-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] text-white/65 uppercase tracking-[0.08em]">Daily load — last 7 days</span>
