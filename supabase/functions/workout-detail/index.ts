@@ -404,7 +404,16 @@ Deno.serve(async (req) => {
     const avg_speed_kmh = Number.isFinite(d?.metrics?.avg_speed) ? Number(d.metrics.avg_speed) : (Number.isFinite(d?.avg_speed) ? Number(d.avg_speed) : (distKm && durS && durS > 0 ? (distKm / (durS / 3600)) : null));
     const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? avg_speed_kmh / 3.6 : null;
     const avg_pace_s_per_km = Number.isFinite(d?.computed?.overall?.avg_pace_s_per_mi) ? Number(d.computed.overall.avg_pace_s_per_mi) / 1.60934 : (Number.isFinite(d?.avg_pace ?? d?.metrics?.avg_pace) ? Number(d.avg_pace ?? d.metrics.avg_pace) : (avg_speed_kmh && avg_speed_kmh > 0 ? (3600 / avg_speed_kmh) : null));
-    const max_speed_mps = Number.isFinite(d?.computed?.analysis?.bests?.max_speed_mps) ? Number(d.computed.analysis.bests.max_speed_mps) : Number.isFinite(d?.computed?.overall?.max_speed_mps) ? Number(d.computed.overall.max_speed_mps) : (Number.isFinite(d?.max_speed ?? d?.metrics?.max_speed) ? Number(d.max_speed ?? d.metrics.max_speed) / 3.6 : null);
+    let max_speed_mps: number | null = Number.isFinite(d?.computed?.analysis?.bests?.max_speed_mps) ? Number(d.computed.analysis.bests.max_speed_mps) : Number.isFinite(d?.computed?.overall?.max_speed_mps) ? Number(d.computed.overall.max_speed_mps) : (Number.isFinite(d?.max_speed ?? d?.metrics?.max_speed) ? Number(d.max_speed ?? d.metrics.max_speed) / 3.6 : null);
+    // Series-based fallback: derive from speed_mps samples when all other sources are null
+    if (max_speed_mps == null) {
+      const speeds: number[] | undefined = d?.computed?.analysis?.series?.speed_mps;
+      if (Array.isArray(speeds) && speeds.length > 0) {
+        let best = 0;
+        for (const s of speeds) { if (Number.isFinite(s) && s > 0.5 && s < 30 && s > best) best = s; }
+        if (best > 0) max_speed_mps = best;
+      }
+    }
     const max_pace_s_per_km = Number.isFinite(d?.computed?.analysis?.bests?.max_pace_s_per_km) ? Number(d.computed.analysis.bests.max_pace_s_per_km) : (Number.isFinite(d?.metrics?.max_pace ?? d?.max_pace) ? Number(d.metrics?.max_pace ?? d.max_pace) : (max_speed_mps && max_speed_mps > 0 ? (1000 / max_speed_mps) : null));
     const max_cadence_rpm = Number.isFinite(d?.max_cadence ?? d?.max_cycling_cadence ?? d?.max_running_cadence) ? Number(d.max_cadence ?? d.max_cycling_cadence ?? d.max_running_cadence) : null;
     const avg_running_cadence_spm = Number.isFinite(d?.avg_cadence ?? d?.avg_running_cadence ?? d?.avg_run_cadence) ? Number(d.avg_cadence ?? d.avg_running_cadence ?? d.avg_run_cadence) : null;
