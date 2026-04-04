@@ -525,6 +525,79 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick,
   );
 };
 
+/** Same pipeline as chart CAD/PWR tabs — use for scrub pills on any tab. */
+function buildScrubCadenceSeries(normalizedSamples: Sample[], isOutdoorGlobal: boolean): number[] {
+  const cad = normalizedSamples.map(s => {
+    if (Number.isFinite(s.cad_rpm as any)) return Number(s.cad_rpm);
+    if (Number.isFinite(s.cad_spm as any)) return Number(s.cad_spm);
+    return NaN;
+  });
+  const validOnly = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
+  const interpolated: number[] = new Array(validOnly.length).fill(NaN);
+  let lastValid: number | null = null;
+  let lastValidIdx = -1;
+  for (let i = 0; i < validOnly.length; i++) {
+    const v = validOnly[i];
+    if (Number.isFinite(v)) {
+      if (lastValid !== null && lastValidIdx >= 0 && i - lastValidIdx > 1) {
+        const gap = i - lastValidIdx;
+        for (let j = lastValidIdx + 1; j < i; j++) {
+          const t = (j - lastValidIdx) / gap;
+          interpolated[j] = lastValid + t * ((v as number) - lastValid);
+        }
+      }
+      interpolated[i] = v as number;
+      lastValid = v as number;
+      lastValidIdx = i;
+    }
+  }
+  const firstValid = interpolated.find(v => Number.isFinite(v));
+  const lastValidVal = [...interpolated].reverse().find(v => Number.isFinite(v));
+  for (let i = 0; i < interpolated.length; i++) {
+    if (!Number.isFinite(interpolated[i])) {
+      interpolated[i] = i < lastValidIdx ? (firstValid ?? 80) : (lastValidVal ?? 80);
+    }
+  }
+  const wins = winsorize(interpolated, 5, 95);
+  const smoothingWindow = isOutdoorGlobal ? 35 : 40;
+  const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.0);
+  return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
+}
+
+function hasGPSData(workoutData?: any): boolean {
+  if (!workoutData) return false;
+  if (Array.isArray(workoutData.track) && workoutData.track.length > 10) return true;
+  if (((workoutData as any)?.gps_data?.length || 0) > 10) return true;
+  return false;
+}
+
+/** Widen moving-average window so coasting gaps fill like the chart line (y→0). */
+function bridgePowerDisplaySeries(smoothed: number[]): number[] {
+  const staged = smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+  if (!staged.some(Number.isFinite)) return staged;
+  const bridged = nanAwareMovAvg(staged, 25);
+  return bridged.map(v => (Number.isFinite(v) ? Math.max(0, v) : 0));
+}
+
+function buildScrubPowerSeries(normalizedSamples: Sample[], isOutdoorGlobal: boolean, workoutData?: any): number[] {
+  const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
+  const cleaned = pwr.map(v => {
+    if (!Number.isFinite(v)) return NaN;
+    if (v < 0 || v > 2000) return NaN;
+    return v;
+  });
+  if (isOutdoorGlobal) {
+    const wins = winsorize(cleaned as number[], 2, 98);
+    const smoothed = smoothWithOutlierHandling(wins, 15, 2.5);
+    return bridgePowerDisplaySeries(smoothed);
+  }
+  const isIndoor = !hasGPSData(workoutData);
+  const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
+  const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 25 : 20;
+  const wins = winsorize(cleaned as number[], 2, 98);
+  const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
+  return bridgePowerDisplaySeries(smoothed);
+}
 
 /** ---------- Main Component ---------- */
 function EffortsViewerMapbox({
@@ -686,6 +759,19 @@ function EffortsViewerMapbox({
     return out;
   }, [samples, useMiles]);
 
+  const isOutdoorGlobal = useMemo(() =>
+    Array.isArray(trackLngLat) && trackLngLat.length > 1,
+  [trackLngLat]);
+
+  const scrubCadenceSeries = useMemo(
+    () => buildScrubCadenceSeries(normalizedSamples, isOutdoorGlobal),
+    [normalizedSamples, isOutdoorGlobal],
+  );
+  const scrubPowerSeries = useMemo(
+    () => buildScrubPowerSeries(normalizedSamples, isOutdoorGlobal, workoutData),
+    [normalizedSamples, isOutdoorGlobal, workoutData],
+  );
+
   // Default tab: prefer SPEED when speed_mps exists; else PACE when pace exists; else BPM
   const defaultTab: MetricTab = useMemo(() => {
     const hasSpeed = normalizedSamples.some(s => Number.isFinite(s.speed_mps as any));
@@ -785,23 +871,14 @@ function EffortsViewerMapbox({
   const currentSample = getCurrentSample(normalizedSamples, currentDistance);
   const isRide = workoutData?.type === 'ride';
   
-  // For sparse metrics (power/cadence are null during coasting), find nearest non-null value
-  const nearestFinite = (getter: (s: Sample) => number | null | undefined, center: number, radius = 8): number | null => {
-    for (let d = 0; d <= radius; d++) {
-      for (const off of d === 0 ? [0] : [-d, d]) {
-        const i = center + off;
-        if (i >= 0 && i < normalizedSamples.length) {
-          const v = getter(normalizedSamples[i]);
-          if (Number.isFinite(v)) return v as number;
-        }
-      }
-    }
-    return null;
-  };
-  
-  // Format metrics for thumb scrubbing
+  // Format metrics for thumb scrubbing (power aligned with chart PWR series when meter data exists)
   const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps, isRide, useMiles);
-  const currentPower = formatPowerForScrub(currentSample?.power_w);
+  const scrubIdxForPower = Math.min(Math.max(0, idx), Math.max(0, scrubPowerSeries.length - 1));
+  const hasPowerInSeries = scrubPowerSeries.some(Number.isFinite);
+  const powerForScrub = hasPowerInSeries
+    ? (Number.isFinite(scrubPowerSeries[scrubIdxForPower]) ? scrubPowerSeries[scrubIdxForPower] : 0)
+    : currentSample?.power_w;
+  const currentPower = formatPowerForScrub(Number.isFinite(powerForScrub as any) ? (powerForScrub as number) : null);
   const currentHR = formatHRForScrub(currentSample?.hr_bpm);
   const currentGrade = formatGradeForScrub(currentSample?.grade_pct);
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
@@ -879,12 +956,6 @@ function EffortsViewerMapbox({
   // Show total gain as the value on the Elevation pill when not on ELEV tab
   const gainPillText = useMemo(() => fmtAlt(totalGain_m, useFeet), [totalGain_m, useFeet]);
 
-
-  // Outdoor detection (global) — track is the server-provided simplified route
-  const isOutdoorGlobal = useMemo(() =>
-    Array.isArray(trackLngLat) && trackLngLat.length > 1,
-  [trackLngLat]);
-
   // Which raw metric array are we plotting?
   const metricRaw: number[] = useMemo(() => {
     // Elevation (already EMA smoothed when building samples)
@@ -949,101 +1020,11 @@ function EffortsViewerMapbox({
       const winsorized = winsorize(hr, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    if (tab === "cad") {
-      const cad = normalizedSamples.map(s => {
-        if (Number.isFinite(s.cad_rpm as any)) return Number(s.cad_rpm);
-        if (Number.isFinite(s.cad_spm as any)) return Number(s.cad_spm);
-        return NaN;
-      });
-      
-      // Mark coasting/invalid values as NaN (cadence < 40 or > 220)
-      const validOnly = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
-      
-      // Interpolate through coasting gaps to create smooth transitions
-      // This avoids the sharp V-shaped dips when pedaling stops/starts
-      const interpolated: number[] = new Array(validOnly.length).fill(NaN);
-      let lastValid: number | null = null;
-      let lastValidIdx = -1;
-      
-      for (let i = 0; i < validOnly.length; i++) {
-        const v = validOnly[i];
-        if (Number.isFinite(v)) {
-          // Fill gap from last valid to here with linear interpolation
-          if (lastValid !== null && lastValidIdx >= 0 && i - lastValidIdx > 1) {
-            const gap = i - lastValidIdx;
-            for (let j = lastValidIdx + 1; j < i; j++) {
-              const t = (j - lastValidIdx) / gap;
-              interpolated[j] = lastValid + t * (v - lastValid);
-            }
-          }
-          interpolated[i] = v;
-          lastValid = v;
-          lastValidIdx = i;
-        }
-      }
-      
-      // Fill any remaining NaNs at start/end with nearest valid
-      const firstValid = interpolated.find(v => Number.isFinite(v));
-      const lastValidVal = [...interpolated].reverse().find(v => Number.isFinite(v));
-      for (let i = 0; i < interpolated.length; i++) {
-        if (!Number.isFinite(interpolated[i])) {
-          interpolated[i] = i < lastValidIdx ? (firstValid ?? 80) : (lastValidVal ?? 80);
-        }
-      }
-      
-      // Now apply heavy smoothing - cadence needs more than power due to natural variation
-      const wins = winsorize(interpolated, 5, 95);
-      const smoothingWindow = isOutdoorGlobal ? 35 : 40;
-      const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.0);
-      return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
-    }
-    if (tab === "pwr") {
-      const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
-      
-      // Remove outliers using z-score before smoothing
-      const removeOutliers = (data: number[], threshold: number = 2.5): number[] => {
-        const finite = data.filter(Number.isFinite);
-        if (finite.length === 0) return data;
-        const mean = finite.reduce((a, b) => a + b) / finite.length;
-        const stdDev = Math.sqrt(finite.reduce((sq, n) => sq + (n - mean) ** 2, 0) / finite.length);
-        
-        return data.map(val => {
-          if (!Number.isFinite(val)) return val;
-          const zScore = Math.abs((val - mean) / stdDev);
-          return zScore > threshold ? mean : val;
-        });
-      };
-      
-      // Balance smoothing for accurate but readable power display
-      // Filter invalid values first (negative or unreasonably high)
-      const cleaned = pwr.map(v => {
-        if (!Number.isFinite(v)) return NaN;
-        // Power must be >= 0 and reasonable (max 2000W for human power)
-        if (v < 0 || v > 2000) return NaN;
-        return v;
-      });
-      
-      if (isOutdoorGlobal) {
-        // Outdoor rides: moderate smoothing (15 seconds) for cleaner display while preserving real variations
-        // Use winsorization to handle outliers, then smooth
-        const wins = winsorize(cleaned as number[], 2, 98);
-        const smoothed = smoothWithOutlierHandling(wins, 15, 2.5);
-        // Ensure no negative values in final output
-        return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
-      }
-      
-      // Indoor rides: more smoothing for trainer noise
-      const hasGPSTrack = ((workoutData as any)?.gps_data?.length || 0) > 10;
-      const isIndoor = !hasGPSTrack;
-      const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
-      const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 25 : 20;
-      const wins = winsorize(cleaned as number[], 2, 98);
-      const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
-      return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
-    }
+    if (tab === "cad") return scrubCadenceSeries;
+    if (tab === "pwr") return scrubPowerSeries;
     // Default fallback (shouldn't be reached)
     return [];
-  }, [normalizedSamples, tab, distCalc]);
+  }, [normalizedSamples, tab, distCalc, scrubCadenceSeries, scrubPowerSeries]);
 
   // Enhanced domain calculation with robust percentiles and outlier handling
   const yDomain = useMemo<[number, number]>(() => {
@@ -1929,8 +1910,10 @@ function EffortsViewerMapbox({
               label="Power" 
               value={(() => {
                 if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
-                const v = nearestFinite(s => s.power_w, Math.min(idx, normalizedSamples.length - 1));
-                return v != null ? `${Math.round(v)} W` : '—';
+                if (!scrubPowerSeries.some(Number.isFinite)) return '—';
+                const i = Math.min(idx, Math.max(0, scrubPowerSeries.length - 1));
+                const v = scrubPowerSeries[i];
+                return `${Math.round(Number.isFinite(v) ? (v as number) : 0)} W`;
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
@@ -1991,9 +1974,9 @@ function EffortsViewerMapbox({
             value={(() => {
               const unit = workoutData?.type === 'ride' ? ' rpm' : ' spm';
               if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${unit}` : '—';
-              const getter = workoutData?.type === 'ride' ? (s: Sample) => s.cad_rpm : (s: Sample) => s.cad_spm;
-              const v = nearestFinite(getter, Math.min(idx, normalizedSamples.length - 1));
-              return v != null ? `${Math.round(v)}${unit}` : '—';
+              const i = Math.min(idx, Math.max(0, scrubCadenceSeries.length - 1));
+              const v = scrubCadenceSeries[i];
+              return Number.isFinite(v) ? `${Math.round(v as number)}${unit}` : '—';
             })()} 
             subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="cad"} 
@@ -2007,8 +1990,10 @@ function EffortsViewerMapbox({
               label="Power" 
               value={(() => {
                 if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
-                const v = nearestFinite(s => s.power_w, Math.min(idx, normalizedSamples.length - 1));
-                return v != null ? `${Math.round(v)} W` : '—';
+                if (!scrubPowerSeries.some(Number.isFinite)) return '—';
+                const i = Math.min(idx, Math.max(0, scrubPowerSeries.length - 1));
+                const v = scrubPowerSeries[i];
+                return `${Math.round(Number.isFinite(v) ? (v as number) : 0)} W`;
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
