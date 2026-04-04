@@ -785,6 +785,20 @@ function EffortsViewerMapbox({
   const currentSample = getCurrentSample(normalizedSamples, currentDistance);
   const isRide = workoutData?.type === 'ride';
   
+  // For sparse metrics (power/cadence are null during coasting), find nearest non-null value
+  const nearestFinite = (getter: (s: Sample) => number | null | undefined, center: number, radius = 8): number | null => {
+    for (let d = 0; d <= radius; d++) {
+      for (const off of d === 0 ? [0] : [-d, d]) {
+        const i = center + off;
+        if (i >= 0 && i < normalizedSamples.length) {
+          const v = getter(normalizedSamples[i]);
+          if (Number.isFinite(v)) return v as number;
+        }
+      }
+    }
+    return null;
+  };
+  
   // Format metrics for thumb scrubbing
   const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps, isRide, useMiles);
   const currentPower = formatPowerForScrub(currentSample?.power_w);
@@ -1913,10 +1927,11 @@ function EffortsViewerMapbox({
           {workoutData?.type !== 'run' && (
             <Pill 
               label="Power" 
-              value={isScrubbing 
-                ? (Number.isFinite(normalizedSamples[Math.min(idx, normalizedSamples.length-1)]?.power_w) ? `${Math.round(normalizedSamples[Math.min(idx, normalizedSamples.length-1)].power_w!)} W` : '—')
-                : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
-              } 
+              value={(() => {
+                if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
+                const v = nearestFinite(s => s.power_w, Math.min(idx, normalizedSamples.length - 1));
+                return v != null ? `${Math.round(v)} W` : '—';
+              })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
               width={54}
@@ -1974,10 +1989,11 @@ function EffortsViewerMapbox({
           <Pill 
             label="Cadence" 
             value={(() => {
-              if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—';
-              const samp = normalizedSamples[Math.min(idx, normalizedSamples.length-1)];
-              const v = workoutData?.type === 'ride' ? samp?.cad_rpm : samp?.cad_spm;
-              return Number.isFinite(v) ? `${Math.round(v!)}${workoutData?.type==='ride'?' rpm':' spm'}` : '—';
+              const unit = workoutData?.type === 'ride' ? ' rpm' : ' spm';
+              if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${unit}` : '—';
+              const getter = workoutData?.type === 'ride' ? (s: Sample) => s.cad_rpm : (s: Sample) => s.cad_spm;
+              const v = nearestFinite(getter, Math.min(idx, normalizedSamples.length - 1));
+              return v != null ? `${Math.round(v)}${unit}` : '—';
             })()} 
             subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="cad"} 
@@ -1989,10 +2005,11 @@ function EffortsViewerMapbox({
           {workoutData?.type === 'run' && (
             <Pill 
               label="Power" 
-              value={isScrubbing
-                ? (Number.isFinite(normalizedSamples[Math.min(idx, normalizedSamples.length-1)]?.power_w) ? `${Math.round(normalizedSamples[Math.min(idx, normalizedSamples.length-1)].power_w!)} W` : '—')
-                : (getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—')
-              } 
+              value={(() => {
+                if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
+                const v = nearestFinite(s => s.power_w, Math.min(idx, normalizedSamples.length - 1));
+                return v != null ? `${Math.round(v)} W` : '—';
+              })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
               width={54}
