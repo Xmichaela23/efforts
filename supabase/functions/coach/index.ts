@@ -246,6 +246,126 @@ function weekIntentFromContract(planConfig: any, weekIndex: number | null): { in
   return { intent, focus_label };
 }
 
+// ---------------------------------------------------------------------------
+// Reconcile load_status: body-response-aware, plan-position-aware
+// ---------------------------------------------------------------------------
+// Crosses load ratios with direct body signals (HR drift, RPE, execution,
+// RIR) — similar to how Garmin Training Status uses HRV + VO2max trends
+// alongside acute/chronic load. Plan position sets tolerance bands.
+
+type ReconcileLoadInput = {
+  status: 'under' | 'on_target' | 'elevated' | 'high';
+  interpretation: string;
+  running_acwr: number | null;
+};
+type TrendInfo = { trend: string; based_on_sessions: number };
+
+const LOAD_RANK: Record<string, number> = { under: 0, on_target: 1, elevated: 2, high: 3 };
+
+function reconcileLoadStatus(
+  raw: ReconcileLoadInput,
+  bodyTrends: {
+    cardiac: TrendInfo;
+    effort_perception: TrendInfo;
+    run_quality: TrendInfo;
+    strength: TrendInfo;
+  },
+  readiness: string,
+  planPosition: {
+    weekIntent: string;
+    weekIndex: number | null;
+    totalWeeks: number | null;
+    weeksOut: number | null;
+    isPlanTransition: boolean;
+  },
+  unweightedAcwr: number | null,
+  keySessionsNext48h: Array<{ date: string; type: string; category: string }>,
+): { status: 'under' | 'on_target' | 'elevated' | 'high'; interpretation: string } {
+  let status = raw.status;
+  const reasons: string[] = [];
+
+  // ── 1. Read body signals directly ──────────────────────────────────────
+  const decliningSignals: string[] = [];
+  if (bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining')
+    decliningSignals.push('HR drift');
+  if (bodyTrends.effort_perception.based_on_sessions >= 2 && bodyTrends.effort_perception.trend === 'declining')
+    decliningSignals.push('RPE');
+  if (bodyTrends.run_quality.based_on_sessions >= 2 && bodyTrends.run_quality.trend === 'declining')
+    decliningSignals.push('execution');
+  if (bodyTrends.strength.based_on_sessions >= 2 && bodyTrends.strength.trend === 'declining')
+    decliningSignals.push('RIR');
+
+  const nDeclining = decliningSignals.length;
+
+  // ── 2. Plan-position context ───────────────────────────────────────────
+  const { weekIntent, weeksOut, isPlanTransition } = planPosition;
+  const isEasyWeek = ['recovery', 'taper', 'deload'].includes(weekIntent);
+  const isBuildWeek = weekIntent === 'build';
+  const isRaceProximity = weeksOut != null && weeksOut <= 3;
+
+  const escalate = (target: 'on_target' | 'elevated' | 'high', reason: string) => {
+    if (LOAD_RANK[target] > LOAD_RANK[status]) {
+      status = target;
+      reasons.push(reason);
+    }
+  };
+
+  // During plan transition (weeks 1-2), suppress body signal escalation —
+  // baselines are calibrating from the prior cycle. Only readiness floor
+  // (step 3) applies.
+  if (!isPlanTransition) {
+    if (isRaceProximity) {
+      if (nDeclining >= 2) escalate('high', `${decliningSignals.join(' and ')} declining ${weeksOut}w from race`);
+      else if (nDeclining === 1) escalate('elevated', `${decliningSignals[0]} declining ${weeksOut}w from race`);
+    } else if (isEasyWeek) {
+      if (nDeclining >= 2) escalate('high', `${decliningSignals.join(' and ')} declining on ${weekIntent} week`);
+      else if (nDeclining === 1) escalate('elevated', `${decliningSignals[0]} declining on ${weekIntent} week`);
+    } else if (isBuildWeek) {
+      if (nDeclining >= 2) escalate('elevated', `${decliningSignals.join(' and ')} declining during build`);
+      else if (nDeclining === 1 && unweightedAcwr != null && unweightedAcwr >= 1.2)
+        escalate('elevated', `${decliningSignals[0]} declining with ACWR ${unweightedAcwr.toFixed(2)}`);
+    } else {
+      if (nDeclining >= 2) {
+        const target = (unweightedAcwr != null && unweightedAcwr >= 1.2) ? 'high' : 'elevated';
+        escalate(target as 'elevated' | 'high', `${decliningSignals.join(' and ')} declining`);
+      } else if (nDeclining === 1) {
+        escalate('elevated', `${decliningSignals[0]} trending down`);
+      }
+    }
+  }
+
+  // ── 3. Readiness-state floor (failsafe) ────────────────────────────────
+  if (readiness === 'overreached') {
+    escalate('high', 'body signals indicate overreaching');
+  } else if (readiness === 'fatigued') {
+    if (!isEasyWeek || (unweightedAcwr != null && unweightedAcwr >= 1.0)) {
+      escalate('elevated', 'fatigue markers elevated');
+    }
+  }
+
+  // ── 4. Upcoming work: protect key sessions ─────────────────────────────
+  if (nDeclining >= 1 && keySessionsNext48h.length > 0 && !isPlanTransition) {
+    escalate('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
+  }
+
+  // ── 5. Cross-training hidden load ──────────────────────────────────────
+  if (
+    unweightedAcwr != null && unweightedAcwr > 1.3 &&
+    (raw.running_acwr == null || raw.running_acwr < 1.1) &&
+    nDeclining >= 1
+  ) {
+    escalate('elevated', 'cross-training driving total load with body signals declining');
+  }
+
+  // ── Build interpretation ───────────────────────────────────────────────
+  let interpretation = raw.interpretation;
+  if (reasons.length > 0) {
+    interpretation = `${raw.interpretation}. Escalated: ${reasons.join('; ')}`;
+  }
+
+  return { status, interpretation };
+}
+
 function buildVerdict(
   metrics: CoachWeekContextResponseV1['metrics'],
   methodologyId: MethodologyId,
@@ -1858,6 +1978,35 @@ Deno.serve(async (req) => {
         },
         weekIntent,
       );
+
+      // ── Reconcile load_status with body signals + plan context ─────────
+      {
+        const weeksOut = goalContext.upcoming_races?.[0]?.weeks_out ?? null;
+        const next48hEnd = addDaysISO(asOfDate, 2);
+        const keysNext48h = keySessionsRemaining.filter(
+          (s: any) => s.date <= next48hEnd && s.date >= asOfDate
+        );
+        const reconciled = reconcileLoadStatus(
+          {
+            status: snapshotBody.load_status.status,
+            interpretation: snapshotBody.load_status.interpretation,
+            running_acwr: snapshotBody.load_status.running_acwr,
+          },
+          snapshotBody.weekly_trends,
+          readinessState,
+          {
+            weekIntent,
+            weekIndex,
+            totalWeeks: activePlan?.duration_weeks ?? null,
+            weeksOut,
+            isPlanTransition: isPlanTransitionPeriod,
+          },
+          acwr ?? null,
+          keysNext48h,
+        );
+        snapshotBody.load_status.status = reconciled.status;
+        snapshotBody.load_status.interpretation = reconciled.interpretation;
+      }
 
       // Upcoming sessions with full prescription
       const upcomingDays = dailyLedger
