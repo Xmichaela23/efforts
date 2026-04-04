@@ -1053,6 +1053,12 @@ Deno.serve(async (req) => {
         for (let i = 0; i < cadence_spm.length; i++) cadence_spm[i] = null;
       } else if (isRun && !isRide) {
         // Runs/Walks: expose pace_s_per_km and cadence_spm only
+        // Generic `cadence` often lands in cad_rpm in normalizeSamples; promote before clearing rpm
+        for (let i = 0; i < cadence_spm.length; i++) {
+          if (cadence_spm[i] == null && cadence_rpm[i] != null) {
+            cadence_spm[i] = cadence_rpm[i];
+          }
+        }
         for (let i = 0; i < speed_mps.length; i++) speed_mps[i] = null;
         for (let i = 0; i < cadence_rpm.length; i++) cadence_rpm[i] = null;
       }

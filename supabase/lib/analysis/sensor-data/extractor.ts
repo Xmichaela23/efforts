@@ -233,12 +233,16 @@ export function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; 
       );
       const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) || (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) || (typeof s.altitude === 'number' && s.altitude) || undefined;
       const hr = (typeof s.heartRate === 'number' && s.heartRate) || (typeof s.heart_rate === 'number' && s.heart_rate) || (typeof s.heartRateInBeatsPerMinute === 'number' && s.heartRateInBeatsPerMinute) || undefined;
-    const cad_spm = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute) || (typeof s.runCadence === 'number' && s.runCadence) || undefined;
-    // Bike cadence commonly lives in bikeCadenceInRPM/bikeCadence/cadence
+    const genericCad = typeof s.cadence === 'number' && Number.isFinite(s.cadence) ? s.cadence : undefined;
+    const hasBikeCadField = (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM)
+      || (typeof s.bikeCadence === 'number' && s.bikeCadence);
+    // Running SPM: explicit run fields, or generic `cadence` when not a bike row (Strava/Garmin often use one field)
+    const cad_spm = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute)
+      || (typeof s.runCadence === 'number' && s.runCadence)
+      || (!hasBikeCadField && genericCad != null && genericCad >= 65 ? genericCad : undefined);
     const cad_rpm = (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM)
       || (typeof s.bikeCadence === 'number' && s.bikeCadence)
-      || (typeof s.cadence === 'number' && s.cadence)
-      || undefined;
+      || (!hasBikeCadField && genericCad != null && genericCad < 65 && genericCad >= 12 ? genericCad : undefined);
     const power_w = (typeof s.power === 'number' && s.power) || (typeof s.watts === 'number' && s.watts) || undefined;
     const v_mps = (typeof s.speedMetersPerSecond === 'number' && s.speedMetersPerSecond) || (typeof s.v === 'number' && s.v) || undefined;
     out.push({ t: Number.isFinite(t)?t:i, d: Number.isFinite(d)?d:NaN, elev, hr, cad_spm, cad_rpm, power_w, v_mps });
