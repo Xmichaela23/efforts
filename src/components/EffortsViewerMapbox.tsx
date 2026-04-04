@@ -571,14 +571,7 @@ function hasGPSData(workoutData?: any): boolean {
   return false;
 }
 
-/** Widen moving-average window so coasting gaps fill like the chart line (y→0). */
-function bridgePowerDisplaySeries(smoothed: number[]): number[] {
-  const staged = smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
-  if (!staged.some(Number.isFinite)) return staged;
-  const bridged = nanAwareMovAvg(staged, 25);
-  return bridged.map(v => (Number.isFinite(v) ? Math.max(0, v) : 0));
-}
-
+/** Smoothed power for the PWR chart only — NaN stays NaN when coasting / downhill (no fake fill). */
 function buildScrubPowerSeries(normalizedSamples: Sample[], isOutdoorGlobal: boolean, workoutData?: any): number[] {
   const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
   const cleaned = pwr.map(v => {
@@ -589,14 +582,32 @@ function buildScrubPowerSeries(normalizedSamples: Sample[], isOutdoorGlobal: boo
   if (isOutdoorGlobal) {
     const wins = winsorize(cleaned as number[], 2, 98);
     const smoothed = smoothWithOutlierHandling(wins, 15, 2.5);
-    return bridgePowerDisplaySeries(smoothed);
+    return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
   }
   const isIndoor = !hasGPSData(workoutData);
   const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
   const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 25 : 20;
   const wins = winsorize(cleaned as number[], 2, 98);
   const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
-  return bridgePowerDisplaySeries(smoothed);
+  return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+}
+
+function rawPowerAt(samples: Sample[], i: number): number | null {
+  const s = samples[Math.min(Math.max(0, i), Math.max(0, samples.length - 1))];
+  const w = s?.power_w;
+  return Number.isFinite(w as any) ? Number(w) : null;
+}
+
+function rawCadenceAt(samples: Sample[], i: number, isRide: boolean): number | null {
+  const s = samples[Math.min(Math.max(0, i), Math.max(0, samples.length - 1))];
+  if (isRide) {
+    if (Number.isFinite(s?.cad_rpm as any)) return Number(s.cad_rpm);
+    if (Number.isFinite(s?.cad_spm as any)) return Number(s.cad_spm);
+  } else {
+    if (Number.isFinite(s?.cad_spm as any)) return Number(s.cad_spm);
+    if (Number.isFinite(s?.cad_rpm as any)) return Number(s.cad_rpm);
+  }
+  return null;
 }
 
 /** ---------- Main Component ---------- */
@@ -873,12 +884,9 @@ function EffortsViewerMapbox({
   
   // Format metrics for thumb scrubbing (power aligned with chart PWR series when meter data exists)
   const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps, isRide, useMiles);
-  const scrubIdxForPower = Math.min(Math.max(0, idx), Math.max(0, scrubPowerSeries.length - 1));
-  const hasPowerInSeries = scrubPowerSeries.some(Number.isFinite);
-  const powerForScrub = hasPowerInSeries
-    ? (Number.isFinite(scrubPowerSeries[scrubIdxForPower]) ? scrubPowerSeries[scrubIdxForPower] : 0)
-    : currentSample?.power_w;
-  const currentPower = formatPowerForScrub(Number.isFinite(powerForScrub as any) ? (powerForScrub as number) : null);
+  const hasPowerMeter = normalizedSamples.some(s => Number.isFinite(s.power_w as any));
+  const rawPowerIdx = rawPowerAt(normalizedSamples, idx);
+  const currentPower = formatPowerForScrub(hasPowerMeter && rawPowerIdx != null ? rawPowerIdx : null);
   const currentHR = formatHRForScrub(currentSample?.hr_bpm);
   const currentGrade = formatGradeForScrub(currentSample?.grade_pct);
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
@@ -1910,10 +1918,9 @@ function EffortsViewerMapbox({
               label="Power" 
               value={(() => {
                 if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
-                if (!scrubPowerSeries.some(Number.isFinite)) return '—';
-                const i = Math.min(idx, Math.max(0, scrubPowerSeries.length - 1));
-                const v = scrubPowerSeries[i];
-                return `${Math.round(Number.isFinite(v) ? (v as number) : 0)} W`;
+                if (!normalizedSamples.some(s => Number.isFinite(s.power_w as any))) return '—';
+                const w = rawPowerAt(normalizedSamples, idx);
+                return w != null ? `${Math.round(w)} W` : '—';
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
@@ -1973,10 +1980,10 @@ function EffortsViewerMapbox({
             label="Cadence" 
             value={(() => {
               const unit = workoutData?.type === 'ride' ? ' rpm' : ' spm';
+              const isRide = workoutData?.type === 'ride';
               if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${unit}` : '—';
-              const i = Math.min(idx, Math.max(0, scrubCadenceSeries.length - 1));
-              const v = scrubCadenceSeries[i];
-              return Number.isFinite(v) ? `${Math.round(v as number)}${unit}` : '—';
+              const c = rawCadenceAt(normalizedSamples, idx, !!isRide);
+              return c != null ? `${Math.round(c)}${unit}` : '—';
             })()} 
             subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="cad"} 
@@ -1990,10 +1997,9 @@ function EffortsViewerMapbox({
               label="Power" 
               value={(() => {
                 if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
-                if (!scrubPowerSeries.some(Number.isFinite)) return '—';
-                const i = Math.min(idx, Math.max(0, scrubPowerSeries.length - 1));
-                const v = scrubPowerSeries[i];
-                return `${Math.round(Number.isFinite(v) ? (v as number) : 0)} W`;
+                if (!normalizedSamples.some(s => Number.isFinite(s.power_w as any))) return '—';
+                const w = rawPowerAt(normalizedSamples, idx);
+                return w != null ? `${Math.round(w)} W` : '—';
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
