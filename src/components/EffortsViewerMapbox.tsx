@@ -610,6 +610,24 @@ function rawCadenceAt(samples: Sample[], i: number, isRide: boolean): number | n
   return null;
 }
 
+/** Scrub pill: prefer instantaneous raw; else chart-smoothed cadence (raw is sparse after bucketing/downsample). */
+function cadenceAtScrub(
+  samples: Sample[],
+  idx: number,
+  isRide: boolean,
+  chartCadence: number[],
+): number | null {
+  const raw = rawCadenceAt(samples, idx, isRide);
+  if (raw != null) return raw;
+  const hasCadenceData = samples.some(
+    (s) => Number.isFinite(s.cad_spm as any) || Number.isFinite(s.cad_rpm as any),
+  );
+  if (!hasCadenceData || chartCadence.length === 0) return null;
+  const i = Math.min(Math.max(0, idx), Math.max(0, chartCadence.length - 1));
+  const v = chartCadence[i];
+  return Number.isFinite(v) ? Number(v) : null;
+}
+
 /** ---------- Main Component ---------- */
 function EffortsViewerMapbox({
   samples,
@@ -1982,7 +2000,7 @@ function EffortsViewerMapbox({
               const unit = workoutData?.type === 'ride' ? ' rpm' : ' spm';
               const isRide = workoutData?.type === 'ride';
               if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${unit}` : '—';
-              const c = rawCadenceAt(normalizedSamples, idx, !!isRide);
+              const c = cadenceAtScrub(normalizedSamples, idx, !!isRide, scrubCadenceSeries);
               return c != null ? `${Math.round(c)}${unit}` : '—';
             })()} 
             subValue={isScrubbing ? undefined : "(avg)"}
