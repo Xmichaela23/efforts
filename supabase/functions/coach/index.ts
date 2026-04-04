@@ -257,6 +257,7 @@ type ReconcileLoadInput = {
   status: 'under' | 'on_target' | 'elevated' | 'high';
   interpretation: string;
   running_acwr: number | null;
+  actual_vs_planned_pct: number | null;
 };
 type TrendInfo = { trend: string; based_on_sessions: number };
 
@@ -280,6 +281,7 @@ function reconcileLoadStatus(
   },
   unweightedAcwr: number | null,
   keySessionsNext48h: Array<{ date: string; type: string; category: string }>,
+  unplannedLoad: { count: number; totalLoad: number; plannedWeekLoad: number },
 ): { status: 'under' | 'on_target' | 'elevated' | 'high'; interpretation: string } {
   let status = raw.status;
   const reasons: string[] = [];
@@ -312,7 +314,7 @@ function reconcileLoadStatus(
 
   // During plan transition (weeks 1-2), suppress body signal escalation —
   // baselines are calibrating from the prior cycle. Only readiness floor
-  // (step 3) applies.
+  // (step 3) and unplanned load checks still apply.
   if (!isPlanTransition) {
     if (isRaceProximity) {
       if (nDeclining >= 2) escalate('high', `${decliningSignals.join(' and ')} declining ${weeksOut}w from race`);
@@ -348,13 +350,38 @@ function reconcileLoadStatus(
     escalate('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
   }
 
-  // ── 5. Cross-training hidden load ──────────────────────────────────────
-  if (
-    unweightedAcwr != null && unweightedAcwr > 1.3 &&
-    (raw.running_acwr == null || raw.running_acwr < 1.1) &&
-    nDeclining >= 1
-  ) {
-    escalate('elevated', 'cross-training driving total load with body signals declining');
+  // ── 5. Cross-training ACWR gap (no declining signal required) ──────────
+  // If unweighted ACWR is significantly elevated but running ACWR is fine,
+  // cross-training is adding real load the run-centric view misses.
+  if (unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1)) {
+    if (unweightedAcwr > 1.5) {
+      escalate('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
+    } else if (unweightedAcwr > 1.3) {
+      escalate('elevated', `cross-training pushing total ACWR to ${unweightedAcwr.toFixed(2)}`);
+    }
+  }
+
+  // ── 6. Unplanned load magnitude ────────────────────────────────────────
+  // Significant unplanned volume is a stress signal regardless of body
+  // trends — the body hasn't had time to show the impact yet.
+  if (unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad > 0) {
+    const unplannedPct = Math.round((unplannedLoad.totalLoad / unplannedLoad.plannedWeekLoad) * 100);
+    if (unplannedPct > 50) {
+      escalate('high', `unplanned load is ${unplannedPct}% of planned week`);
+    } else if (unplannedPct > 25) {
+      escalate('elevated', `unplanned load is ${unplannedPct}% of planned week`);
+    }
+  }
+  // Fallback: if no plan, use absolute actual_vs_planned_pct (which
+  // compares all-discipline actual vs planned)
+  if (unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad <= 0 && raw.actual_vs_planned_pct != null) {
+    if (raw.actual_vs_planned_pct > 50) escalate('high', `actual load ${raw.actual_vs_planned_pct}% above plan`);
+    else if (raw.actual_vs_planned_pct > 25) escalate('elevated', `actual load ${raw.actual_vs_planned_pct}% above plan`);
+  }
+
+  // Race proximity amplifier: any unplanned load close to race is risky
+  if (isRaceProximity && unplannedLoad.count > 0 && unplannedLoad.totalLoad > 0) {
+    escalate('elevated', `unplanned training ${weeksOut}w from race`);
   }
 
   // ── Build interpretation ───────────────────────────────────────────────
@@ -1986,11 +2013,18 @@ Deno.serve(async (req) => {
         const keysNext48h = keySessionsRemaining.filter(
           (s: any) => s.date <= next48hEnd && s.date >= asOfDate
         );
+        const unplannedWorkouts = (weekWorkouts || []).filter(
+          (w: any) => String(w?.workout_status || '').toLowerCase() === 'completed' && !w?.planned_id
+        );
+        const unplannedTotalLoad = unplannedWorkouts.reduce(
+          (sum: number, w: any) => sum + (Number(w?.workload_actual) || 0), 0
+        );
         const reconciled = reconcileLoadStatus(
           {
             status: snapshotBody.load_status.status,
             interpretation: snapshotBody.load_status.interpretation,
             running_acwr: snapshotBody.load_status.running_acwr,
+            actual_vs_planned_pct: snapshotBody.load_status.actual_vs_planned_pct,
           },
           snapshotBody.weekly_trends,
           readinessState,
@@ -2003,6 +2037,11 @@ Deno.serve(async (req) => {
           },
           acwr ?? null,
           keysNext48h,
+          {
+            count: unplannedWorkouts.length,
+            totalLoad: unplannedTotalLoad,
+            plannedWeekLoad: plannedWtdLoad || 0,
+          },
         );
         snapshotBody.load_status.status = reconciled.status;
         snapshotBody.load_status.interpretation = reconciled.interpretation;
