@@ -216,6 +216,26 @@ export type SessionDetailV1 = {
   /** Structured assessment for all screens. Deterministic, no LLM. */
   session_interpretation?: SessionInterpretation | null;
 
+  /**
+   * Race-readiness assessment for key long runs inside a plan with a race date.
+   * Only populated when: run, plan-linked, long-run-like (≥ 75 min or type includes "long"),
+   * and ≤ 28 days until race. Deterministic, no LLM.
+   */
+  race_readiness?: {
+    days_until_race: number;
+    /** e.g. "Final long run before race" or "2 weeks out — key checkpoint" */
+    headline: string;
+    /** 2-4 structured signals the athlete should know */
+    signals: Array<{
+      domain: 'hr' | 'pace' | 'pacing' | 'conditions' | 'drift' | 'execution';
+      label: string;
+      assessment: 'positive' | 'neutral' | 'caution';
+      detail: string;
+    }>;
+    /** 1-2 sentence plain-language preparedness summary */
+    summary: string;
+  } | null;
+
   /** Plan-aware load readiness at workout date (null if no session_load / unavailable). */
   readiness?: SessionDetailReadinessV1 | null;
 

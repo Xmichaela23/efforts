@@ -369,6 +369,7 @@ PACE vs PRESCRIBED RANGE:
 - Elevated HR at easy pace is a different claim than "ran too hard." The first is physiology; the second is pacing. Do not conflate them.
 
 - When plan context exists, frame the workout's role: "This was your peak long run" or "Easy day — the goal was recovery, not performance."
+- RACE PROXIMITY: When "Days until race" is present and the workout is a long run (≥75 min or type includes "long"), treat this as a race-readiness checkpoint. Assess what HR drift, pacing splits, and conditions tell the athlete about their preparedness — not just "how was this run" but "what does this run say about how ready you are." The closer to race day, the more this matters.
 - Use plain language. Not "positive split of 175s/mi" but "you slowed over the back half — expected on a course that back-loads the climbing."
 - Do not list metrics. Do not use bullet points. Write in connected prose.
 - If nothing interesting happened (easy run, everything on plan, no flags), one sentence is enough: "Clean easy run, no flags."
@@ -415,6 +416,7 @@ function buildUserMessage(dp: any): string {
       ex.pace_vs_range ? `- Pace vs prescribed range: ${ex.pace_vs_range.replace(/_/g, ' ')}` : null,
       ex.assessed_against === 'actual' ? '- Note: assessed against actual execution (no plan targets available)' : null,
       dp.plan?.week_intent ? `- Plan role: ${dp.plan.week_intent}${dp.plan.week_number != null ? `, Week ${dp.plan.week_number}` : ''}${dp.plan.phase ? ` of ${dp.plan.phase} phase` : ''}` : null,
+      dp.plan?.days_until_race ? `- Days until race: ${dp.plan.days_until_race}` : null,
     ].filter(Boolean).join('\n'));
   }
 
@@ -582,6 +584,7 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
           workout_purpose: typeof facts.plan?.workout_purpose === 'string' ? facts.plan.workout_purpose : null,
           week_intent: typeof facts.plan?.week_intent === 'string' ? facts.plan.week_intent : null,
           is_recovery_week: typeof facts.plan?.is_recovery_week === 'boolean' ? facts.plan.is_recovery_week : null,
+          days_until_race: typeof facts.plan?.days_until_race === 'number' && facts.plan.days_until_race > 0 ? facts.plan.days_until_race : null,
         }
       : null,
     conditions: (() => {

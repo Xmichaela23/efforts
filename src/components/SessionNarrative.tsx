@@ -74,6 +74,17 @@ interface SessionNarrativeProps {
     terrain?: {
       route?: RouteData | null;
     } | null;
+    race_readiness?: {
+      days_until_race: number;
+      headline: string;
+      signals: Array<{
+        domain: string;
+        label: string;
+        assessment: 'positive' | 'neutral' | 'caution';
+        detail: string;
+      }>;
+      summary: string;
+    } | null;
   } | null;
   hasSessionDetail: boolean;
   noPlannedCompare: boolean;
@@ -317,6 +328,35 @@ function NextUp({ session }: { session: NextSession }) {
   );
 }
 
+function RaceReadinessBlock({ rr }: { rr: NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'] }) {
+  if (!rr || rr.signals.length === 0) return null;
+  const dotColor = (a: string) =>
+    a === 'positive' ? 'bg-green-400' : a === 'caution' ? 'bg-amber-400' : 'bg-gray-400';
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+          {rr.headline}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {rr.signals.map((s, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <span className={`mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${dotColor(s.assessment)}`} />
+            <div>
+              <span className="text-xs font-medium text-gray-400">{s.label}</span>
+              <p className="text-[13px] text-gray-300 leading-snug">{s.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[13px] text-gray-400 leading-snug pt-1 border-t border-white/5">
+        {rr.summary}
+      </p>
+    </div>
+  );
+}
+
 export default function SessionNarrative({
   sessionDetail: sd,
   hasSessionDetail,
@@ -437,6 +477,9 @@ export default function SessionNarrative({
             })()}
           </div>
         </div>
+      )}
+      {sd?.race_readiness && sd.race_readiness.signals.length > 0 && (
+        <RaceReadinessBlock rr={sd.race_readiness} />
       )}
       {trend && <TrendSparkline trend={trend} />}
       {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (

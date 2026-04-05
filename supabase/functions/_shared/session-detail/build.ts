@@ -554,6 +554,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       planContextSummary: match?.summary ?? null,
       intervals,
     }),
+    race_readiness: buildRaceReadiness({
+      type,
+      hasPlanned,
+      factPacket,
+      executionScore,
+      paceAdherence,
+      durationAdherence,
+      completedTotals,
+      splitsMi,
+      pacingCV,
+    }),
   };
 }
 
@@ -1017,6 +1028,171 @@ function minWorkIntervalPacePct(intervals: SessionDetailV1['intervals']): number
     }
   }
   return min;
+}
+
+// ── Race readiness for key long runs ─────────────────────────────────────────
+function buildRaceReadiness(params: {
+  type: string;
+  hasPlanned: boolean;
+  factPacket: any;
+  executionScore: number | null;
+  paceAdherence: number | null;
+  durationAdherence: number | null;
+  completedTotals: SessionDetailV1['completed_totals'];
+  splitsMi: SessionDetailV1['splits_mi'];
+  pacingCV: number | null;
+}): SessionDetailV1['race_readiness'] {
+  const { type, hasPlanned, factPacket, executionScore, paceAdherence, durationAdherence, completedTotals, splitsMi, pacingCV } = params;
+  if (type !== 'run' || !hasPlanned) return null;
+
+  const facts = factPacket?.facts || {};
+  const derived = factPacket?.derived || {};
+  const daysUntilRace = typeof facts.plan?.days_until_race === 'number' ? facts.plan.days_until_race : null;
+  if (daysUntilRace == null || daysUntilRace <= 0 || daysUntilRace > 28) return null;
+
+  const workoutType = String(facts.workout_type || '').toLowerCase();
+  const durMin = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
+  const isLongEnough = (durMin != null && durMin >= 75) || /long/i.test(workoutType);
+  if (!isLongEnough) return null;
+
+  // Headline
+  const headline =
+    daysUntilRace <= 7 ? 'Final long run before race'
+    : daysUntilRace <= 14 ? '2 weeks out — key checkpoint'
+    : `${Math.round(daysUntilRace / 7)} weeks out — readiness check`;
+
+  const signals: NonNullable<SessionDetailV1['race_readiness']>['signals'] = [];
+
+  // 1. Execution vs plan
+  if (executionScore != null) {
+    const assessment: 'positive' | 'neutral' | 'caution' =
+      executionScore >= 90 ? 'positive' : executionScore >= 75 ? 'neutral' : 'caution';
+    signals.push({
+      domain: 'execution',
+      label: 'Plan execution',
+      assessment,
+      detail: executionScore >= 90
+        ? `Hit plan targets at ${Math.round(executionScore)}% — the fitness to execute race-specific pace is there.`
+        : executionScore >= 75
+          ? `${Math.round(executionScore)}% execution — close to plan; minor drift is common on long runs.`
+          : `${Math.round(executionScore)}% execution — below targets; check if conditions or fatigue contributed.`,
+    });
+  }
+
+  // 2. HR drift (the single most telling signal this close to race)
+  const driftBpm = typeof derived.pace_normalized_drift_bpm === 'number'
+    ? derived.pace_normalized_drift_bpm
+    : (typeof derived.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null);
+  const driftTypical = typeof derived.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
+  if (driftBpm != null && durMin != null) {
+    const expectedMax = durMin >= 150 ? 20 : durMin >= 90 ? 15 : 12;
+    const assessment: 'positive' | 'neutral' | 'caution' =
+      Math.abs(driftBpm) <= expectedMax * 0.7 ? 'positive'
+      : Math.abs(driftBpm) <= expectedMax ? 'neutral'
+      : 'caution';
+    const vs = driftTypical != null
+      ? ` (your typical: +${Math.abs(Math.round(driftTypical))} bpm)`
+      : '';
+    signals.push({
+      domain: 'drift',
+      label: 'Cardiovascular drift',
+      assessment,
+      detail: assessment === 'positive'
+        ? `+${Math.abs(Math.round(driftBpm))} bpm over ${Math.round(durMin)} min${vs} — strong aerobic reserve for race day.`
+        : assessment === 'neutral'
+          ? `+${Math.abs(Math.round(driftBpm))} bpm over ${Math.round(durMin)} min${vs} — normal for this duration.`
+          : `+${Math.abs(Math.round(driftBpm))} bpm over ${Math.round(durMin)} min${vs} — higher than expected; hydration and conditions matter race day.`,
+    });
+  }
+
+  // 3. Pacing discipline (positive/negative split + CV)
+  if (splitsMi.length >= 4) {
+    const half = Math.floor(splitsMi.length / 2);
+    const firstPaces = splitsMi.slice(0, half).filter(s => s.pace_s_per_mi != null).map(s => s.pace_s_per_mi!);
+    const secondPaces = splitsMi.slice(half).filter(s => s.pace_s_per_mi != null).map(s => s.pace_s_per_mi!);
+    if (firstPaces.length > 0 && secondPaces.length > 0) {
+      const avgFirst = firstPaces.reduce((a, b) => a + b, 0) / firstPaces.length;
+      const avgSecond = secondPaces.reduce((a, b) => a + b, 0) / secondPaces.length;
+      const splitDeltaSec = Math.round(avgSecond - avgFirst);
+      const assessment: 'positive' | 'neutral' | 'caution' =
+        splitDeltaSec <= 10 ? 'positive'
+        : splitDeltaSec <= 30 ? 'neutral'
+        : 'caution';
+      const splitLabel = splitDeltaSec <= 5 ? 'Even or negative split' : splitDeltaSec <= 30 ? `Mild positive split (~${splitDeltaSec}s/mi)` : `Positive split (+${splitDeltaSec}s/mi)`;
+      const cvNote = pacingCV != null ? ` CV ${pacingCV.toFixed(1)}%.` : '';
+      signals.push({
+        domain: 'pacing',
+        label: 'Pacing discipline',
+        assessment,
+        detail: assessment === 'positive'
+          ? `${splitLabel} — strong pacing control for race execution.${cvNote}`
+          : assessment === 'neutral'
+            ? `${splitLabel} — acceptable; practice holding back early on race day.${cvNote}`
+            : `${splitLabel} — fading late; race-day pacing strategy should be conservative at the start.${cvNote}`,
+      });
+    }
+  }
+
+  // 4. Conditions (heat, terrain)
+  const wx = facts.weather;
+  const terrain = facts.terrain_type;
+  const elevFt = typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
+  if (wx?.heat_stress_level && wx.heat_stress_level !== 'none') {
+    const tempF = typeof wx.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
+    signals.push({
+      domain: 'conditions',
+      label: 'Heat conditions',
+      assessment: wx.heat_stress_level === 'moderate' || wx.heat_stress_level === 'high' ? 'caution' : 'neutral',
+      detail: tempF != null
+        ? `${wx.heat_stress_level} heat stress at ${tempF}°F — pace typically runs 5-15s/mi slower in heat. If race conditions are cooler, you'll have margin.`
+        : `${wx.heat_stress_level} heat stress — adjust expectations if race-day conditions differ.`,
+    });
+  } else if (terrain && terrain !== 'flat' && elevFt != null && elevFt > 200) {
+    signals.push({
+      domain: 'conditions',
+      label: 'Course terrain',
+      assessment: 'neutral',
+      detail: `${terrain.charAt(0).toUpperCase() + terrain.slice(1)} course with ${elevFt} ft gain — if race course is flatter, pace should come easier.`,
+    });
+  }
+
+  // 5. Pace vs similar runs
+  const vsSim = derived.comparisons?.vs_similar;
+  if (vsSim && typeof vsSim.sample_size === 'number' && vsSim.sample_size >= 2 && vsSim.assessment !== 'insufficient_data') {
+    const pDelta = typeof vsSim.pace_delta_sec === 'number' ? vsSim.pace_delta_sec : null;
+    if (pDelta != null && Math.abs(pDelta) >= 3) {
+      const assessment: 'positive' | 'neutral' | 'caution' =
+        pDelta < -3 ? 'positive' : pDelta > 10 ? 'caution' : 'neutral';
+      signals.push({
+        domain: 'pace',
+        label: 'Pace vs recent long runs',
+        assessment,
+        detail: assessment === 'positive'
+          ? `${Math.abs(Math.round(pDelta))}s/mi faster than your last ${vsSim.sample_size} comparable efforts — fitness is trending up into the race.`
+          : assessment === 'caution'
+            ? `${Math.abs(Math.round(pDelta))}s/mi off recent efforts — could be fatigue, conditions, or deliberate easy effort.`
+            : `In line with recent efforts — consistent and predictable heading into race day.`,
+      });
+    }
+  }
+
+  // Summary
+  const positives = signals.filter(s => s.assessment === 'positive').length;
+  const cautions = signals.filter(s => s.assessment === 'caution').length;
+  let summary: string;
+  if (signals.length === 0) {
+    summary = `${Math.round(daysUntilRace)} days out — this long run is part of the taper window. Focus on how the body responded overall, not individual splits.`;
+  } else if (cautions === 0 && positives >= 2) {
+    summary = `Strong checkpoint ${Math.round(daysUntilRace)} days from race day. HR, pacing, and execution all look solid — the work is done; trust the taper.`;
+  } else if (cautions === 0) {
+    summary = `Solid long run ${Math.round(daysUntilRace)} days out. No red flags — stay the course through taper.`;
+  } else if (cautions >= 2) {
+    summary = `A few signals to note ${Math.round(daysUntilRace)} days out, but this close to the race fitness is mostly banked. Prioritize recovery and review race-day pacing strategy.`;
+  } else {
+    summary = `Mixed signals ${Math.round(daysUntilRace)} days from race day — one area to watch, but the overall picture is workable. Stay disciplined through taper.`;
+  }
+
+  return { days_until_race: daysUntilRace, headline, signals, summary };
 }
 
 function buildSessionInterpretation(params: {
