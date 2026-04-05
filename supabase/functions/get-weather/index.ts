@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
+/** Bump when weather merge/cache semantics change so persisted workout rows refetch */
+const WEATHER_SCHEMA_VERSION = 2;
+
 interface WeatherData {
   temperature: number;
   feels_like?: number;
@@ -13,6 +16,7 @@ interface WeatherData {
   daily_high?: number;
   daily_low?: number;
   timestamp: string;
+  schema_version?: number;
 }
 
 interface WeatherResponse {
@@ -73,12 +77,14 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // 1) Shared cache by geo/day with TTL window - SKIP if force_refresh
+    // 1) Shared cache by geo + UTC hour bucket (day-only keys wrongly reused one hour for all workouts that day)
     const round = (n: number) => Math.round(n * 20) / 20; // ~0.05° buckets (~5.5km)
     const rlat = round(latNum);
     const rlng = round(lngNum);
-    const day = new Date(tsStr).toISOString().slice(0, 10);
-    const cacheKey = `${rlat}:${rlng}:${day}`;
+    const workoutDate = new Date(tsStr);
+    const day = workoutDate.toISOString().slice(0, 10);
+    const hourSlotUtc = workoutDate.toISOString().slice(0, 13); // YYYY-MM-DDTHH
+    const cacheKey = `${rlat}:${rlng}:${hourSlotUtc}`;
     
     if (!skipCache) {
       try {
@@ -89,7 +95,12 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (cached && cached.weather) {
           const exp = cached.expires_at ? new Date(cached.expires_at) : null as any;
-          if (exp && exp.getTime() > Date.now()) {
+          const w = cached.weather as WeatherData;
+          if (
+            exp &&
+            exp.getTime() > Date.now() &&
+            w?.schema_version === WEATHER_SCHEMA_VERSION
+          ) {
             console.log('🌡️ [WEATHER] Returning from shared cache');
             return new Response(JSON.stringify({ weather: cached.weather }), {
               status: 200,
@@ -111,24 +122,31 @@ Deno.serve(async (req) => {
       } catch {}
     }
 
-    // 2) Per-workout cache on workouts.weather_data - SKIP if force_refresh
-    if (!skipCache && workout_id) {
+    // 2) Per-workout cache + device temp (°C from Garmin/Strava) to prefer over reanalysis when present
+    let deviceTempC: number | null = null;
+    if (workout_id) {
       const { data: existing, error: existingErr } = await supabase
         .from('workouts')
-        .select('weather_data')
+        .select('weather_data, avg_temperature')
         .eq('id', workout_id)
         .maybeSingle();
-      if (!existingErr && existing?.weather_data) {
-        console.log('🌡️ [WEATHER] Returning from workout cache');
-        return new Response(JSON.stringify({ weather: existing.weather_data }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-        });
+      if (!existingErr && existing?.avg_temperature != null && Number.isFinite(Number(existing.avg_temperature))) {
+        deviceTempC = Number(existing.avg_temperature);
+      }
+      if (!skipCache && !existingErr && existing?.weather_data) {
+        const cached = existing.weather_data as WeatherData & { schema_version?: number };
+        if (cached?.schema_version === WEATHER_SCHEMA_VERSION) {
+          console.log('🌡️ [WEATHER] Returning from workout cache');
+          return new Response(JSON.stringify({ weather: existing.weather_data }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+        console.log('🌡️ [WEATHER] Workout cache schema stale or missing; refetching');
       }
     }
 
-    // Get weather data from OpenWeatherMap
-    const weatherData = await fetchWeatherData(latNum, lngNum, tsStr);
+    const weatherData = await fetchWeatherData(latNum, lngNum, tsStr, deviceTempC);
     
     if (!weatherData) {
       return new Response(JSON.stringify({ 
@@ -152,7 +170,7 @@ Deno.serve(async (req) => {
       const key = (globalThis as any).__wx_cache_key as string | undefined;
       if (key) {
         const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-        await supabase.from('weather_cache').upsert({ key, lat: latNum, lng: lngNum, day: new Date(tsStr).toISOString().slice(0,10), weather: weatherData, expires_at: expires });
+        await supabase.from('weather_cache').upsert({ key, lat: latNum, lng: lngNum, day, weather: weatherData, expires_at: expires });
       }
     } catch {}
 
@@ -172,19 +190,40 @@ Deno.serve(async (req) => {
   }
 });
 
-async function fetchWeatherData(lat: number, lng: number, timestamp: string): Promise<WeatherData | null> {
+function parseOpenMeteoUtcHourMs(iso: string): number {
+  if (!iso) return NaN;
+  const s = /Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  return Date.parse(s);
+}
+
+function nearestHourlyIndex(hourlyTime: string[], workoutMs: number): number {
+  if (!hourlyTime?.length) return 0;
+  let best = 0;
+  let bestDelta = Infinity;
+  for (let i = 0; i < hourlyTime.length; i++) {
+    const t = parseOpenMeteoUtcHourMs(hourlyTime[i]);
+    if (!Number.isFinite(t)) continue;
+    const delta = Math.abs(t - workoutMs);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      best = i;
+    }
+  }
+  return best;
+}
+
+async function fetchWeatherData(
+  lat: number,
+  lng: number,
+  timestamp: string,
+  deviceTempC: number | null,
+): Promise<WeatherData | null> {
   try {
-    // Use Open-Meteo's FREE historical weather API (no API key needed)
-    // This gives us actual weather at the workout time, not "current" weather
     const workoutDate = new Date(timestamp);
-    const workoutHourUTC = workoutDate.getUTCHours();
-    
-    // IMPORTANT: Use UTC timezone to avoid server/local timezone issues
-    // The workout timestamp is already in UTC, so we match against UTC hours
-    const dateStr = workoutDate.toISOString().slice(0, 10); // YYYY-MM-DD in UTC
-    
-    console.log(`🌡️ [WEATHER] Fetching historical weather for ${dateStr} UTC hour ${workoutHourUTC} at ${lat},${lng}`);
-    console.log(`🌡️ [WEATHER] Workout timestamp: ${timestamp} -> ${workoutDate.toISOString()}`);
+    const workoutMs = workoutDate.getTime();
+    const dateStr = workoutDate.toISOString().slice(0, 10);
+
+    console.log(`🌡️ [WEATHER] Fetching Open-Meteo archive for ${dateStr} at ${lat},${lng} (workout ${workoutDate.toISOString()})`);
     
     // Open-Meteo archive API - free, no key required
     // Use timezone=UTC so all times are in UTC (consistent with our timestamp)
@@ -204,12 +243,8 @@ async function fetchWeatherData(lat: number, lng: number, timestamp: string): Pr
       return null;
     }
     
-    // Match workout UTC hour to Open-Meteo's UTC hours
-    // Open-Meteo with timezone=UTC returns times like "2026-02-01T00:00", "2026-02-01T01:00", etc.
-    // These are indices 0-23 for hours 0-23 UTC
-    const bestIdx = workoutHourUTC;
-    
-    console.log(`🌡️ [WEATHER] Using UTC hour index ${bestIdx}, time in response: ${hourly.time[bestIdx]}`);
+    const bestIdx = nearestHourlyIndex(hourly.time, workoutMs);
+    console.log(`🌡️ [WEATHER] Nearest hourly slot idx ${bestIdx}: ${hourly.time[bestIdx]}`);
     
     const temp = hourly.temperature_2m[bestIdx];
     const feelsLike = hourly.apparent_temperature?.[bestIdx];
@@ -223,10 +258,16 @@ async function fetchWeatherData(lat: number, lng: number, timestamp: string): Pr
     const dailyHigh = temps.length ? Math.round(Math.max(...temps)) : undefined;
     const dailyLow = temps.length ? Math.round(Math.min(...temps)) : undefined;
     
-    console.log(`🌡️ [WEATHER] Open-Meteo result: ${Math.round(temp)}°F (feels like ${Math.round(feelsLike || temp)}°F) at UTC hour ${bestIdx} (high: ${dailyHigh}, low: ${dailyLow})`);
-    
+    let temperature = Math.round(temp ?? 0);
+    if (deviceTempC != null && Number.isFinite(deviceTempC)) {
+      temperature = Math.round(deviceTempC * 9 / 5 + 32);
+      console.log(`🌡️ [WEATHER] Display temp from device avg (°C): ${deviceTempC} → °F ${temperature}; humidity/wind from Open-Meteo slot`);
+    } else {
+      console.log(`🌡️ [WEATHER] Open-Meteo result: ${temperature}°F (feels like ${Math.round(feelsLike || temp)}°F) (high: ${dailyHigh}, low: ${dailyLow})`);
+    }
+
     return {
-      temperature: Math.round(temp ?? 0),
+      temperature,
       feels_like: feelsLike != null ? Math.round(feelsLike) : undefined,
       condition: '—', // Open-Meteo archive doesn't provide condition text
       humidity: Math.round(humidity ?? 0),
@@ -237,7 +278,8 @@ async function fetchWeatherData(lat: number, lng: number, timestamp: string): Pr
       sunset: undefined,
       daily_high: dailyHigh,
       daily_low: dailyLow,
-      timestamp: timestamp
+      timestamp: timestamp,
+      schema_version: WEATHER_SCHEMA_VERSION,
     };
     
   } catch (error) {

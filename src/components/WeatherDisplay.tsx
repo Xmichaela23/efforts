@@ -13,9 +13,12 @@ interface WeatherData {
 interface WeatherDisplayProps {
   weather?: WeatherData | null;
   loading?: boolean;
+  /** Device avg temp from Strava/Garmin in °C (shown as °F) when API has no payload yet */
   fallbackTemperature?: number;
   className?: string;
 }
+
+const celsiusToF = (c: number) => Math.round((c * 9) / 5 + 32);
 
 const WeatherDisplay: React.FC<WeatherDisplayProps> = ({ 
   weather, 
@@ -54,11 +57,11 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
     );
   }
 
-  if (fallbackTemperature) {
+  if (fallbackTemperature != null && Number.isFinite(Number(fallbackTemperature))) {
     return (
       <div className={`flex items-center gap-1 text-sm ${className}`}>
         <span className="text-white/90">
-          {fallbackTemperature}°F
+          {celsiusToF(Number(fallbackTemperature))}°F
         </span>
       </div>
     );
