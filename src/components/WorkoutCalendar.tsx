@@ -297,7 +297,7 @@ export default function WorkoutCalendar({
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
   const { useImperial } = useAppContext();
-  const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts();
+  const { updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts({ fetchWindowedPlanned: false });
   const coachCtx = useCoachWeekContext();
   
   // Drag and drop state

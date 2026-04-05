@@ -8,17 +8,17 @@ type PlannedWorkout = any;
 const toPlannedWorkout = (item: any): PlannedWorkout =>
   item?.planned_workout ?? mapUnifiedItemToPlanned(item);
 
-export const usePlannedWorkouts = () => {
+export type UsePlannedWorkoutsOptions = {
+  /** When false, skip the large windowed `get-week` fetch (e.g. home already loads the week via `useWeekUnified`). Mutations still work. Default true. */
+  fetchWindowedPlanned?: boolean;
+};
+
+export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
+  const fetchWindowedPlanned = options?.fetchWindowedPlanned !== false;
   const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(fetchWindowedPlanned);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
-
-  // Get current user
-  const getCurrentUser = async () => {
-    const userId = getStoredUserId();
-    return user;
-  };
 
   // Fetch all planned workouts for the current user
   const fetchPlannedWorkouts = useCallback(async () => {
@@ -26,7 +26,7 @@ export const usePlannedWorkouts = () => {
       setLoading(true);
       setError(null);
 
-      const user = await getCurrentUser();
+      const userId = getStoredUserId();
       if (!userId) {
         throw new Error('User must be authenticated to fetch planned workouts');
       }
@@ -60,6 +60,7 @@ export const usePlannedWorkouts = () => {
   const { refetch } = useQuery({
     queryKey: ['planned', 'windowed'],
     queryFn: fetchPlannedWorkouts,
+    enabled: fetchWindowedPlanned,
     // longer cache to avoid churn; no refetch on focus/mount
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
@@ -73,7 +74,7 @@ export const usePlannedWorkouts = () => {
     try {
       setError(null);
 
-      const user = await getCurrentUser();
+      const userId = getStoredUserId();
       if (!userId) {
         throw new Error('User must be authenticated to save planned workouts');
       }
@@ -173,7 +174,7 @@ export const usePlannedWorkouts = () => {
     try {
       setError(null);
 
-      const user = await getCurrentUser();
+      const userId = getStoredUserId();
       if (!userId) {
         throw new Error('User must be authenticated to update planned workouts');
       }
@@ -229,7 +230,7 @@ export const usePlannedWorkouts = () => {
     try {
       setError(null);
 
-      const user = await getCurrentUser();
+      const userId = getStoredUserId();
       if (!userId) {
         throw new Error('User must be authenticated to delete planned workouts');
       }
@@ -283,13 +284,14 @@ export const usePlannedWorkouts = () => {
 
   // Refresh when other views broadcast invalidation
   useEffect(() => {
+    if (!fetchWindowedPlanned) return;
     const handler = () => {
       // use refetch to collaborate with React Query cache
       refetch();
     };
     window.addEventListener('planned:invalidate', handler);
     return () => window.removeEventListener('planned:invalidate', handler);
-  }, [refetch, fetchPlannedWorkouts]);
+  }, [refetch, fetchPlannedWorkouts, fetchWindowedPlanned]);
 
   return {
     plannedWorkouts,
