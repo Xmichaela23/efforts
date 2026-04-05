@@ -1820,7 +1820,7 @@ function EffortsViewerMapbox({
           cursorDist_m={distNow}
           totalDist_m={dTotal}
           theme={theme}
-          height={200}
+          height={280}
           
           // Enhancement 4: Pass current metric data for overlay
           currentMetric={{

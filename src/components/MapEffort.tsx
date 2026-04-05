@@ -124,7 +124,8 @@ export default function MapEffort({
   const [expanded, setExpanded] = useState(false);
   const [isManualScrubbing, setIsManualScrubbing] = useState(false);
   const zoomingRef = useRef(false); // Flag to block onResize during zoom operation
-  
+  const lastCollapsedHeightRef = useRef<number | null>(null);
+
   // Segment hover card state (expanded mode only)
   const [hoveredSegment, setHoveredSegment] = useState<{
     segment: SegmentEffort;
@@ -489,6 +490,15 @@ export default function MapEffort({
     };
   }, [onMapReady]);
 
+  // Taller collapsed panel ⇒ fitBounds can zoom in further while still showing the full route
+  useEffect(() => {
+    if (expanded) return;
+    if (lastCollapsedHeightRef.current !== height) {
+      fittedRef.current = false;
+      lastCollapsedHeightRef.current = height;
+    }
+  }, [height, expanded]);
+
   // Seed/fit route once and update data on changes
   useEffect(() => {
     const map = mapRef.current; if (!map || !ready) return;
@@ -517,10 +527,13 @@ export default function MapEffort({
     applyData();
     
     if (!fittedRef.current && has) {
+      try {
+        map.resize();
+      } catch {}
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
       for (const c of valid) b.extend(c);
       // Tight inset so the full loop fills more of the tile (more street detail); still fits entire route.
-      map.fitBounds(b, { padding: 6, maxZoom: 18, duration: 0 });
+      map.fitBounds(b, { padding: 4, maxZoom: 18, duration: 0 });
       fittedRef.current = true;
       try {
         const c = map.getCenter();
@@ -544,7 +557,7 @@ export default function MapEffort({
         map.jumpTo(savedCameraRef.current as any);
       } catch {}
     }
-  }, [coords, ready, theme]);
+  }, [coords, ready, theme, height, expanded]);
 
   // Track if segments have been successfully drawn (to prevent clearing on transient state)
   const segmentsDrawnRef = useRef(false);
