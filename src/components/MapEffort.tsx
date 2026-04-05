@@ -21,7 +21,7 @@ export type MapEffortProps = {
   trackLngLat: [number, number][];
   cursorDist_m: number;
   totalDist_m?: number;
-  theme?: 'outdoor' | 'hybrid' | 'topo';
+  theme?: 'standard' | 'outdoor' | 'hybrid' | 'topo';
   followCursor?: boolean;
   height?: number;
   className?: string;
@@ -68,13 +68,15 @@ const SEGMENT_PR_HALO = 'segment-pr-halo';   // Dark outline under PR so it pops
 const SEGMENT_PR_LINE = 'segment-pr-line';
 const SEGMENT_HIGHLIGHT = 'segment-highlight'; // Red highlight when segment selected from PR card
 
-function styleUrl(theme: 'outdoor' | 'hybrid' | 'topo') {
+function styleUrl(theme: 'standard' | 'outdoor' | 'hybrid' | 'topo') {
   const key = import.meta.env.VITE_MAPTILER_KEY as string | undefined;
   
   const styleMap = {
+    // Strava-like: dense roads + place / neighborhood labels (MapTiler Streets)
+    standard: 'streets-v4',
     outdoor: 'outdoor-v2',
     hybrid: 'hybrid',
-    topo: 'topo-v2'
+    topo: 'topo-v2',
   };
   
   return `https://api.maptiler.com/maps/${styleMap[theme]}/style.json?key=${key || ''}`;
@@ -84,7 +86,7 @@ export default function MapEffort({
   trackLngLat,
   cursorDist_m,
   totalDist_m,
-  theme = 'topo',
+  theme = 'standard',
   followCursor = false,
   height = 160,
   className,
@@ -116,6 +118,8 @@ export default function MapEffort({
   const lastNonEmptyRef = useRef<LngLat[]>([]);
   const [ready, setReady] = useState(false);
   const styleCacheRef = useRef<Record<string, any>>({});
+  /** Tracks last theme we applied via setStyle — avoids re-loading the same style on ready/coords updates (map ctor already has initial theme). */
+  const themeAppliedRef = useRef<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [isManualScrubbing, setIsManualScrubbing] = useState(false);
@@ -144,10 +148,11 @@ export default function MapEffort({
   useEffect(() => {
     const key = (import.meta as any).env?.VITE_MAPTILER_KEY as string | undefined;
     const urls: Record<string, string> = {
+      standard: `https://api.maptiler.com/maps/streets-v4/style.json?key=${key || ''}`,
       outdoor: `https://api.maptiler.com/maps/outdoor/style.json?key=${key || ''}`,
       hybrid: `https://api.maptiler.com/maps/hybrid/style.json?key=${key || ''}`,
     };
-    const needed = ["outdoor", "hybrid"].filter((k) => !styleCacheRef.current[k]);
+    const needed = ['standard', 'outdoor', 'hybrid'].filter((k) => !styleCacheRef.current[k]);
     needed.forEach(async (k) => {
       try { const r = await fetch(urls[k]); if (r.ok) styleCacheRef.current[k] = await r.json(); } catch {}
     });
@@ -515,23 +520,23 @@ export default function MapEffort({
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
       for (const c of valid) b.extend(c);
       // Normal padding for initial fit
-      map.fitBounds(b, { padding: 60, maxZoom: 16, duration: 0 });
+      // Slightly higher maxZoom so streets / place labels resolve (Strava-like density)
+      map.fitBounds(b, { padding: 56, maxZoom: 17, duration: 0 });
+      fittedRef.current = true;
+      try {
+        const c = map.getCenter();
+        savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
+      } catch {}
+      // Same tick as fitBounds — avoids an extra ~32ms of opacity 0 + perceived flash
+      setVisible(true);
       map.once('idle', () => {
-        try { 
-          const c = map.getCenter(); 
-          savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any; 
+        try {
+          const c = map.getCenter();
+          savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
         } catch {}
-        fittedRef.current = true;
-        // Fade in after first stable frame
-        requestAnimationFrame(() => setVisible(true));
       });
-      // Fallback: ensure visibility even if idle never fires (e.g. tile-loading failure)
-      const fallbackTimer = setTimeout(() => {
-        if (!fittedRef.current) {
-          fittedRef.current = true;
-          setVisible(true);
-        }
-      }, 3000);
+      // Fallback if visibility stuck (rare)
+      const fallbackTimer = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(fallbackTimer);
     } else if (fittedRef.current && savedCameraRef.current && !expanded) {
       // If already fitted, restore saved camera position instead of re-fitting
@@ -972,11 +977,18 @@ export default function MapEffort({
     };
   }, [expanded, onScrub, coords.length, dTotal, cursorDist_m]);
 
-  // Theme switching (disabled during expansion to prevent zoom cancellation)
+  // Theme switching only when `theme` changes — not on coords/ready (those used to retrigger setStyle and flash the map).
   useEffect(() => {
     const map = mapRef.current; 
     if (!map || !ready || expanded) return; // Skip during expansion!
-    
+
+    if (themeAppliedRef.current === null) {
+      themeAppliedRef.current = theme;
+      return;
+    }
+    if (themeAppliedRef.current === theme) return;
+
+    themeAppliedRef.current = theme;
     layersAttachedRef.current = false;
     try {
       const cached = styleCacheRef.current[theme];
@@ -988,8 +1000,6 @@ export default function MapEffort({
     } catch (error) {
       console.error('[MapEffort] Error setting style:', error);
     }
-    // Wait for complete render cycle to avoid race condition
-    setVisible(false);
     const onIdle = () => {
       try {
         // Reattach layers first
@@ -1029,17 +1039,15 @@ export default function MapEffort({
           }
         }
         
-        // Restore camera and fade in
+        // Restore camera
         if (savedCameraRef.current && !expanded) map.jumpTo(savedCameraRef.current as any);
-        requestAnimationFrame(() => setVisible(true));
       } catch (error) {
         console.error('[MapEffort] Error in onIdle:', error);
-        requestAnimationFrame(() => setVisible(true));
       }
     };
     map.once('idle', onIdle);
     return () => { try { map.off('idle', onIdle); } catch {} };
-  }, [theme, ready, coords]);
+  }, [theme, ready, expanded]);
 
   // Always render the map div so the MapLibre instance is created on mount.
   // When coords arrive later (async hydration), the seed/fit effect draws the route.
@@ -1066,9 +1074,8 @@ export default function MapEffort({
             overflow: 'hidden', 
             boxShadow: '0 2px 10px rgba(0,0,0,.06)', 
             opacity: visible ? 1 : 0, 
-            transition: 'opacity 180ms ease, height 300ms ease, border-radius 300ms ease',
-            filter: 'contrast(1.12) saturate(1.3) brightness(1.05)',
-            WebkitFilter: 'contrast(1.12) saturate(1.3) brightness(1.05)'
+            // No opacity transition — avoids visible "flash" / double-fade when track loads
+            transition: 'height 300ms ease, border-radius 300ms ease',
           }} 
         />
         

@@ -11,6 +11,27 @@ import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
 
 // Route simplification now happens server-side in workout-detail
 
+const MAP_BASEMAP_STORAGE_KEY = 'efforts_map_basemap';
+
+/** Prefer new key; one-time migrate from `map_theme` (old default `topo` → Standard streets). */
+function readStoredBasemap(): 'standard' | 'outdoor' | 'hybrid' | 'topo' {
+  if (typeof window === 'undefined') return 'standard';
+  try {
+    const cur = window.localStorage.getItem(MAP_BASEMAP_STORAGE_KEY);
+    if (cur === 'standard' || cur === 'hybrid' || cur === 'outdoor' || cur === 'topo') {
+      return cur;
+    }
+    const legacy = window.localStorage.getItem('map_theme');
+    let next: 'standard' | 'outdoor' | 'hybrid' | 'topo' = 'standard';
+    if (legacy === 'hybrid' || legacy === 'outdoor') {
+      next = legacy;
+    }
+    window.localStorage.setItem(MAP_BASEMAP_STORAGE_KEY, next);
+    return next;
+  } catch {
+    return 'standard';
+  }
+}
 
 /** ---------- Types ---------- */
 type Sample = {
@@ -829,12 +850,7 @@ function EffortsViewerMapbox({
     setIdx(newIdx);
   };
 
-  const [theme, setTheme] = useState<'outdoor' | 'hybrid' | 'topo'>(() => {
-    try {
-      const v = typeof window !== 'undefined' ? window.localStorage.getItem('map_theme') : null;
-      return (v === 'hybrid' || v === 'outdoor' || v === 'topo') ? (v as any) : 'topo';
-    } catch { return 'topo'; }
-  });
+  const [theme, setTheme] = useState<'standard' | 'outdoor' | 'hybrid' | 'topo'>(() => readStoredBasemap());
   
   // Segment click state
   const [selectedSegment, setSelectedSegment] = useState<SegmentEffort | null>(null);
@@ -859,8 +875,23 @@ function EffortsViewerMapbox({
   const simplifiedTrackForMap = useMemo(() =>
     Array.isArray(trackLngLat) && trackLngLat.length > 1 ? trackLngLat : [],
   [trackLngLat]);
+
+  /** Don't show treadmill card when we already have a polyline or GPS start (hydration / gps_track vs `track` lag). */
+  const showIndoorPlaceholder = useMemo(() => {
+    if (!workoutData) return false;
+    const hasRenderableTrack = Array.isArray(trackLngLat) && trackLngLat.length > 1;
+    const w = workoutData as any;
+    const startLat = w?.start_position_lat ?? w?.starting_latitude;
+    const hasGpsStart = Number.isFinite(startLat) && Number(startLat) !== 0;
+    if (hasRenderableTrack || hasGpsStart) return false;
+    return isVirtualActivity(workoutData);
+  }, [workoutData, trackLngLat]);
   
-  useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MAP_BASEMAP_STORAGE_KEY, theme);
+    } catch {}
+  }, [theme]);
 
   // Weather data
   const { weather, loading: weatherLoading } = useWeather({
@@ -1565,17 +1596,34 @@ function EffortsViewerMapbox({
             </div>
           )}
         </div>
-        <button
-          onClick={() => setTheme(theme === 'outdoor' ? 'hybrid' : theme === 'hybrid' ? 'topo' : 'outdoor')}
-          className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
+        <select
+          value={theme}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === 'standard' || v === 'hybrid' || v === 'topo' || v === 'outdoor') {
+              setTheme(v);
+            }
+          }}
+          /* appearance: all browsers show all four basemaps (cycle button hid "Standard" for many users). */
+          className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm max-w-[min(42vw,11rem)] [color-scheme:dark]"
           style={{
             fontFamily: 'Inter, sans-serif',
             cursor: 'pointer',
+            WebkitAppearance: 'none',
+            MozAppearance: 'none',
+            appearance: 'none',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.6)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 10px center',
+            paddingRight: 28,
           }}
-          aria-label="Toggle map style"
+          aria-label="Map basemap style"
         >
-          {theme === 'outdoor' ? 'Hybrid' : theme === 'hybrid' ? 'Topo' : 'Outdoor'}
-        </button>
+          <option value="standard">Standard</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="topo">Topo</option>
+          <option value="outdoor">Outdoor</option>
+        </select>
       </div>
 
       {/* PR card - opens when tapping "1 PR" badge */}
@@ -1656,7 +1704,7 @@ function EffortsViewerMapbox({
       })()}
 
       {/* Map (MapLibre) or Indoor/Virtual Activity Placeholder */}
-      {isVirtualActivity(workoutData) ? (
+      {showIndoorPlaceholder ? (
         // Indoor/virtual activity placeholder - no real-world map available
         (() => {
           const workoutType = String((workoutData as any)?.type || '').toLowerCase();

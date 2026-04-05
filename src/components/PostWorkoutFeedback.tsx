@@ -396,7 +396,7 @@ export default function PostWorkoutFeedback({
             trackLngLat={gpsTrack}
             cursorDist_m={null}
             totalDist_m={seriesData?.distance_m?.[seriesData.distance_m.length - 1] || null}
-            theme="topo"
+            theme="standard"
             height={280}
             useMiles={useImperial}
           />

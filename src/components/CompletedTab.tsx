@@ -1916,26 +1916,20 @@ const formatMovingTime = () => {
         const hasTreadmillIndicator = providerSport.includes('treadmill') || isTrainer;
         const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
                                  (workout as any)?.start_position_lat !== 0;
+
+        // Outdoor Strava-style activities: show map immediately while track streams in (avoids "indoor/outdoor" spinner flash)
+        const showMapWhileTrackLoads =
+          hasValidSeries &&
+          hasStartPosition &&
+          !hasTreadmillIndicator &&
+          !isTrainer;
         
         // Consider it virtual if: explicit indicators OR (likely treadmill AND no start position)
         // BUT: don't show placeholder if we're still loading GPS data (prevents flash)
         const shouldShowPlaceholder = !isHydrating && (isVirtual || hasTreadmillIndicator || (isLikelyTreadmill && !hasStartPosition));
         
-        console.log('🗺️ [CompletedTab] Map render check:', {
-          workoutId: (hydrated||workoutData)?.id,
-          hasValidSeries,
-          hasValidTrack,
-          finalSeriesLength: finalSeries?.distance_m?.length || 0,
-          finalTrackLength: finalTrack?.length || 0,
-          hydratedHasSeries: !!hydrated?.computed?.analysis?.series,
-          workoutDataHasSeries: !!workoutData?.computed?.analysis?.series,
-          isVirtual,
-          isLikelyTreadmill,
-          shouldShowPlaceholder
-        });
-        
-        // If still hydrating and no valid track yet, show spinner (prevents "No route data" flash)
-        if (isHydrating && !hasValidTrack) {
+        // Hydration spinner only when we might still be indoor/unknown — not when GPS start is already known
+        if (isHydrating && !hasValidTrack && !showMapWhileTrackLoads) {
           return (
             <div className="mt-6 mb-6 mx-[-16px] flex items-center justify-center" style={{ minHeight: 300 }}>
               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white/30"></div>
