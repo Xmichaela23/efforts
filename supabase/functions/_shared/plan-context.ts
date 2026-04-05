@@ -4,6 +4,19 @@
  */
 import { resolvePlanWeekIndex } from './plan-week.ts';
 
+function computeDaysUntilRace(workoutDateIso: string, config: Record<string, unknown>): number | null {
+  const raceRaw = config.race_date ?? config.raceDate;
+  if (!raceRaw || typeof raceRaw !== 'string') return null;
+  const wPart = String(workoutDateIso).slice(0, 10);
+  const rPart = String(raceRaw).slice(0, 10);
+  const w = new Date(`${wPart}T12:00:00`);
+  const r = new Date(`${rPart}T12:00:00`);
+  if (Number.isNaN(w.getTime()) || Number.isNaN(r.getTime())) return null;
+  const ms = r.getTime() - w.getTime();
+  const days = Math.round(ms / 86400000);
+  return days > 0 ? days : null;
+}
+
 export interface PlanContext {
   hasActivePlan: boolean;
   weekIndex: number | null;
@@ -13,6 +26,8 @@ export interface PlanContext {
   phaseName: string | null;
   weekFocusLabel: string | null;
   planName: string | null;
+  /** Calendar days from workout date to plan race_date (inclusive-ish); null if unknown or race in the past. */
+  daysUntilRace: number | null;
 }
 
 /**
@@ -154,6 +169,8 @@ export async function fetchPlanContextForWorkout(
 
     if (weekIntent === 'unknown') weekIntent = 'build';
 
+    const daysUntilRace = computeDaysUntilRace(workoutDate, config);
+
     return {
       hasActivePlan: true,
       weekIndex,
@@ -163,6 +180,7 @@ export async function fetchPlanContextForWorkout(
       phaseName,
       weekFocusLabel,
       planName: plan.name,
+      daysUntilRace,
     };
   } catch (error) {
     console.error('⚠️ Error fetching plan context:', error);

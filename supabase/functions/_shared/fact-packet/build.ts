@@ -231,7 +231,15 @@ export async function buildWorkoutFactPacketV1(args: {
   supabase: SupabaseLike;
   workout: any;
   plannedWorkout: any | null;
-  planContext: { planName?: string | null; phaseName?: string | null; weekIndex?: number | null; weekIntent?: string | null; isRecoveryWeek?: boolean | null } | null;
+  planContext: {
+    planName?: string | null;
+    phaseName?: string | null;
+    weekIndex?: number | null;
+    weekIntent?: string | null;
+    isRecoveryWeek?: boolean | null;
+    weekFocusLabel?: string | null;
+    daysUntilRace?: number | null;
+  } | null;
   workoutIntent: string | null;
   classifiedTypeOverride?: string | null;
   learnedFitness: any | null; // from user_baselines.learned_fitness
@@ -372,7 +380,9 @@ export async function buildWorkoutFactPacketV1(args: {
       phase: (planContext?.phaseName ? String(planContext.phaseName) : (plannedWorkout?.phase ? String(plannedWorkout.phase) : null)),
       week_focus_label: (planContext as any)?.weekFocusLabel ? String((planContext as any).weekFocusLabel) : null,
       workout_purpose: (plannedWorkout?.focus ? String(plannedWorkout.focus) : (plannedWorkout?.description ? String(plannedWorkout.description) : null)),
-      days_until_race: null,
+      days_until_race: (typeof planContext?.daysUntilRace === 'number' && planContext.daysUntilRace > 0)
+        ? Math.round(planContext.daysUntilRace)
+        : null,
       week_intent: planContext?.weekIntent ? String(planContext.weekIntent) : null,
       is_recovery_week: typeof planContext?.isRecoveryWeek === 'boolean' ? planContext.isRecoveryWeek : null,
     };

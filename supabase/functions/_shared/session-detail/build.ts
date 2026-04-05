@@ -306,6 +306,19 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     swim_pace_per_100_s: completedSwimPer100,
   };
 
+  // Single planned/executed row must match completed_totals (same source as Details / chips).
+  if (type === 'run' && intervals.length === 1 && completedDistM != null && completedDistM > 0) {
+    const row = intervals[0];
+    row.executed = {
+      ...row.executed,
+      distance_m: completedDistM,
+      duration_s: completedDurS ?? row.executed.duration_s,
+      avg_hr: completedTotals.avg_hr ?? row.executed.avg_hr,
+      actual_pace_sec_per_mi: completedTotals.avg_pace_s_per_mi ?? row.executed.actual_pace_sec_per_mi,
+      actual_gap_sec_per_mi: completedTotals.avg_gap_s_per_mi ?? row.executed.actual_gap_sec_per_mi,
+    };
+  }
+
   // ── Week label ─────────────────────────────────────────────────────────────
   const weekLabel = buildWeekLabel(factPacket);
 
@@ -620,6 +633,36 @@ function buildFallbackNarrative(
   const vsSim = derived.comparisons?.vs_similar;
   const typeLabel = type === 'run' ? 'run' : type === 'ride' ? 'ride' : type === 'swim' ? 'swim' : 'workout';
 
+  const durMinForRace = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
+  const daysUntilRace = typeof facts.plan?.days_until_race === 'number' ? facts.plan.days_until_race : null;
+  const workoutTypeKey = String(facts.workout_type || '').toLowerCase();
+  const longRunForRaceFrame =
+    type === 'run' &&
+    hasPlanned &&
+    (workoutTypeKey.includes('long') || (durMinForRace != null && durMinForRace >= 90));
+
+  let raceProximityLead: string | null = null;
+  if (
+    daysUntilRace != null &&
+    daysUntilRace > 0 &&
+    daysUntilRace <= 21 &&
+    longRunForRaceFrame
+  ) {
+    const frame =
+      daysUntilRace <= 7
+        ? 'With race week approaching,'
+        : daysUntilRace <= 14
+          ? 'Inside the final two weeks before your race,'
+          : `With roughly ${daysUntilRace} days until race day,`;
+    const body =
+      executionScore != null && executionScore >= 88
+        ? 'this long run is a useful whole-session checkpoint: execution vs plan is strong, and end-to-end HR behavior matters as much as average pace.'
+        : executionScore != null && executionScore >= 75
+          ? 'treat this as a full-run checkpoint — pace and cardiovascular drift across the entire session show how you’re absorbing volume before the taper.'
+          : 'focus on how you felt and how HR trended across the full run; this close to race day, repeatable fatigue response beats any single mile split.';
+    raceProximityLead = `${frame} ${body}`;
+  }
+
   const sentences: string[] = [];
 
   // Lead: similar-run trend (most interesting insight if available)
@@ -685,6 +728,10 @@ function buildFallbackNarrative(
     sentences.push(`Clean ${typeLabel} — hit plan targets with ${Math.round(executionScore)}% execution. Nothing to flag.`);
   } else if (sentences.length === 0 && hasPlanned && executionScore != null) {
     sentences.push(`Execution came in at ${Math.round(executionScore)}% of plan.`);
+  }
+
+  if (raceProximityLead) {
+    sentences.unshift(raceProximityLead);
   }
 
   return sentences.length >= 1 ? sentences.join(' ') : null;

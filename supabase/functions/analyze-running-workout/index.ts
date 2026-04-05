@@ -434,6 +434,7 @@ Deno.serve(async (req) => {
       isTaperWeek?: boolean;
       hasActivePlan?: boolean;
       planName?: string;
+      daysUntilRace?: number | null;
     } | undefined = undefined;
     
     if (plannedWorkout?.training_plan_id) {
@@ -452,7 +453,8 @@ Deno.serve(async (req) => {
             isRecoveryWeek: planContext.isRecoveryWeek,
             isTaperWeek: planContext.isTaperWeek,
             hasActivePlan: planContext.hasActivePlan,
-            planName: planContext.planName ?? undefined
+            planName: planContext.planName ?? undefined,
+            daysUntilRace: planContext.daysUntilRace,
           };
           console.log('📋 [PLAN CONTEXT EARLY] Fetched for drift analysis:', planContextForDrift);
         }
@@ -1047,7 +1049,8 @@ Deno.serve(async (req) => {
         isRecoveryWeek: planContextForDrift.isRecoveryWeek,
         isTaperWeek: planContextForDrift.isTaperWeek,
         phaseName: planContextForDrift.phaseName,
-        planName: planContextForDrift.planName
+        planName: planContextForDrift.planName,
+        daysUntilRace: planContextForDrift.daysUntilRace ?? null,
       } : undefined,
       historicalDrift: historicalDriftData ? {
         similarWorkouts: historicalDriftData.similarWorkouts || [],
@@ -1866,6 +1869,7 @@ Deno.serve(async (req) => {
               weekIndex: (planContextForFact as any).weekIndex ?? null,
               weekIntent: (planContextForFact as any).weekIntent ?? null,
               isRecoveryWeek: (planContextForFact as any).isRecoveryWeek ?? null,
+              daysUntilRace: (planContextForFact as any).daysUntilRace ?? null,
             }
           : null,
         workoutIntent: (intent as any) || null,
