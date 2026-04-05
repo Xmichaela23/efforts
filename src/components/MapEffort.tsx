@@ -519,9 +519,9 @@ export default function MapEffort({
     if (!fittedRef.current && has) {
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
       for (const c of valid) b.extend(c);
-      // Normal padding for initial fit
-      // Slightly higher maxZoom so streets / place labels resolve (Strava-like density)
-      map.fitBounds(b, { padding: 56, maxZoom: 17, duration: 0 });
+      // Tight inset + full maxZoom: mini-map was too zoomed-out (thick padding vs ~200px height).
+      // maxZoom 18 uses the map cap so street/neighborhood labels show when the bbox allows.
+      map.fitBounds(b, { padding: 14, maxZoom: 18, duration: 0 });
       fittedRef.current = true;
       try {
         const c = map.getCenter();
@@ -791,16 +791,16 @@ export default function MapEffort({
             });
           }
         } else {
-          // COLLAPSED: Tight padding to fill small container (reduced padding for more zoom)
-          const paddingPercent = 0.04; // Reduced from 0.08 to zoom in more
+          // COLLAPSED: match initial route fit — tight inset, max detail for container size
+          const paddingPercent = 0.025;
           map.fitBounds(b, { 
             padding: {
-              top: Math.max(10, containerHeight * paddingPercent),
-              bottom: Math.max(10, containerHeight * paddingPercent),
-              left: Math.max(10, containerWidth * paddingPercent),
-              right: Math.max(10, containerWidth * paddingPercent)
+              top: Math.max(8, containerHeight * paddingPercent),
+              bottom: Math.max(8, containerHeight * paddingPercent),
+              left: Math.max(8, containerWidth * paddingPercent),
+              right: Math.max(8, containerWidth * paddingPercent)
             },
-            maxZoom: 15.5, // Increased from 14.5 to allow more zoom
+            maxZoom: 18,
             duration: 300
           });
         }
