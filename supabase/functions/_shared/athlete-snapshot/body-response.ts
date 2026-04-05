@@ -341,6 +341,12 @@ function makeTrend(
   };
 }
 
+export type DisciplineMaturityInfo = {
+  discipline: string;
+  maturity: 'building' | 'learning' | 'established';
+  sessions_28d: number;
+};
+
 export function buildBodyResponse(
   ledger: LedgerDay[],
   norms: BaselineNorms,
@@ -355,6 +361,7 @@ export function buildBodyResponse(
     detail: string;
   },
   weekIntent?: string | null,
+  disciplineProfiles?: DisciplineMaturityInfo[],
 ): BodyResponse {
   const phase = resolveWeekPhase(weekIntent);
   const easy = isEasyPhase(phase);
@@ -449,7 +456,11 @@ export function buildBodyResponse(
     for (const [t, info] of byType) {
       const w = getRunningFatigueWeight({ type: t });
       const impact = w <= 0.3 ? 'low' : w <= 0.5 ? 'moderate' : 'notable';
-      xParts.push(`${info.count} ${t} (${Math.round(info.load)} pts, ${impact} running impact)`);
+      const dp = disciplineProfiles?.find(p => p.discipline === t || (t === 'ride' && p.discipline === 'bike'));
+      const maturityTag = dp && dp.maturity !== 'established'
+        ? `, ${dp.maturity} — ${dp.sessions_28d} sessions`
+        : '';
+      xParts.push(`${info.count} ${t} (${Math.round(info.load)} pts, ${impact} running impact${maturityTag})`);
     }
     crossTrainingLoadSummary = xParts.join(', ');
   }

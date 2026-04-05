@@ -312,6 +312,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
                   <span className={`text-[12px] ${
                     crossTrainingSignal.tone === 'positive' ? 'text-emerald-400/90' :
                     crossTrainingSignal.tone === 'warning' ? 'text-amber-400/90' :
+                    crossTrainingSignal.tone === 'info' ? 'text-sky-400/85' :
                     'text-white/70'
                   }`}>{crossTrainingSignal.label}</span>
                 </div>

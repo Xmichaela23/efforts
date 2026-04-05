@@ -283,6 +283,7 @@ function reconcileLoadStatus(
   keySessionsNext48h: Array<{ date: string; type: string; category: string }>,
   unplannedLoad: { count: number; totalLoad: number; plannedWeekLoad: number },
   runLoadPct: number | null,
+  discProfiles?: Array<{ discipline: string; maturity: string; acwr: number | null }>,
 ): { status: 'under' | 'on_target' | 'elevated' | 'high'; interpretation: string } {
   const reasons: string[] = [];
 
@@ -359,8 +360,12 @@ function reconcileLoadStatus(
     raise('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
   }
 
-  // Cross-training ACWR gap
-  if (unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1)) {
+  // Cross-training ACWR gap — skip escalation when cross-training disciplines
+  // are still "building" (near-zero chronic baseline makes ACWR meaningless)
+  const crossTrainingEstablished = discProfiles
+    ? discProfiles.some(p => p.discipline !== 'run' && p.maturity !== 'building' && p.acwr != null && p.acwr > 1.3)
+    : true;
+  if (unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1) && crossTrainingEstablished) {
     if (unweightedAcwr > 1.5) {
       raise('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
     } else if (unweightedAcwr > 1.3) {
@@ -1359,6 +1364,96 @@ Deno.serve(async (req) => {
       });
     })();
 
+    // ── Per-discipline profiles ─────────────────────────────────────────
+    type DisciplineMaturity = 'building' | 'learning' | 'established';
+    type DisciplineProfile = {
+      discipline: string;
+      maturity: DisciplineMaturity;
+      sessions_28d: number;
+      sessions_7d: number;
+      norms: {
+        execution_avg: number | null;
+        execution_samples: number;
+        rpe_avg: number | null;
+        rpe_samples: number;
+        hr_drift_avg: number | null;
+        hr_drift_samples: number;
+        rir_avg: number | null;
+        rir_samples: number;
+      };
+      acwr: number | null;
+      acute7_load: number;
+      chronic28_load: number;
+    };
+
+    const disciplineProfiles: DisciplineProfile[] = (() => {
+      const completedNorm = (Array.isArray(normWorkouts) ? normWorkouts : [])
+        .filter((w: any) => String(w?.workout_status || '').toLowerCase() === 'completed');
+      const byDisc = new Map<string, any[]>();
+      for (const w of completedNorm) {
+        const d = _normType((w as any)?.type);
+        if (d === 'other' || d === 'mobility') continue;
+        if (!byDisc.has(d)) byDisc.set(d, []);
+        byDisc.get(d)!.push(w);
+      }
+
+      return Array.from(byDisc.entries()).map(([disc, workouts]) => {
+        const sessions28d = workouts.length;
+        const sessions7d = workouts.filter((w: any) => String(w?.date || '') >= acuteStart).length;
+        const maturity: DisciplineMaturity =
+          sessions28d <= 2 ? 'building' : sessions28d <= 6 ? 'learning' : 'established';
+
+        const execScores: number[] = [];
+        const rpeScores: number[] = [];
+        const driftScores: number[] = [];
+        const rirScores: number[] = [];
+        for (const w of workouts) {
+          if ((w as any)?.planned_id != null) {
+            const ex = executionScoreFromWorkout(w as any);
+            if (ex != null) execScores.push(ex);
+          }
+          const srpe = sessionRpeFromWorkout(w as any);
+          if (srpe != null) rpeScores.push(srpe);
+          if (disc === 'run' && hrWorkoutTypeFromWorkout(w as any) === 'steady_state') {
+            const d = driftBpmFromWorkout(w as any);
+            if (d != null) driftScores.push(d);
+          }
+          if (disc === 'strength') {
+            const r = avgStrengthRirFromWorkout(w as any);
+            if (r != null) rirScores.push(r);
+          }
+        }
+
+        const acute = acute7Rows
+          .filter((r: any) => _normType((r as any)?.type) === disc)
+          .reduce((s: number, r: any) => s + (safeNum(r?.workload_actual) || 0), 0);
+        const chronic = completedRolling
+          .filter((r: any) => _normType((r as any)?.type) === disc)
+          .reduce((s: number, r: any) => s + (safeNum(r?.workload_actual) || 0), 0);
+        const discAcwr = chronic > 0 ? (acute / 7) / (chronic / 28) : null;
+
+        return {
+          discipline: disc,
+          maturity,
+          sessions_28d: sessions28d,
+          sessions_7d: sessions7d,
+          norms: {
+            execution_avg: avg(execScores, 0),
+            execution_samples: execScores.length,
+            rpe_avg: avg(rpeScores, 1),
+            rpe_samples: rpeScores.length,
+            hr_drift_avg: avg(driftScores, 1),
+            hr_drift_samples: driftScores.length,
+            rir_avg: avg(rirScores, 1),
+            rir_samples: rirScores.length,
+          },
+          acwr: discAcwr,
+          acute7_load: acute,
+          chronic28_load: chronic,
+        };
+      });
+    })();
+
     // Running-weighted ACWR: discount non-running modalities by their fatigue contribution
     const weightedLoad = (rows: any[]) => rows.reduce((sum: number, r: any) => {
       const w = getRunningFatigueWeight({ type: String(r?.type || ''), name: String(r?.name || '') });
@@ -2031,6 +2126,7 @@ Deno.serve(async (req) => {
           detail: weeklyResponseModel?.cross_domain?.patterns?.[0]?.description || 'No interference detected.',
         },
         weekIntent,
+        disciplineProfiles.map(p => ({ discipline: p.discipline, maturity: p.maturity, sessions_28d: p.sessions_28d })),
       );
 
       // ── Reconcile load_status with body signals + plan context ─────────
@@ -2070,6 +2166,7 @@ Deno.serve(async (req) => {
             plannedWeekLoad: plannedWtdLoad || 0,
           },
           snapshotBody.load_status.run_only_week_load_pct ?? null,
+          disciplineProfiles.map(p => ({ discipline: p.discipline, maturity: p.maturity, acwr: p.acwr })),
         );
         snapshotBody.load_status.status = reconciled.status;
         snapshotBody.load_status.interpretation = reconciled.interpretation;
@@ -3198,13 +3295,19 @@ ${narrativeFacts.join('\n')}`;
         running_weighted_week_load: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load ?? null,
         running_weighted_week_load_pct: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load_pct ?? null,
         unplanned_summary: athleteSnapshot?.body_response?.load_status?.unplanned_summary ?? null,
-        by_discipline: (training_state.load_ramp.acute7_by_type || []).map((r: any) => ({
-          discipline: String(r.type || 'other'),
-          planned_load: typeof r.linked_load === 'number' ? r.linked_load : null,
-          actual_load: Number(r.total_load || 0),
-          extra_load: Number(r.extra_load || 0),
-          session_count: Number(r.total_sessions || 0),
-        })),
+        by_discipline: (training_state.load_ramp.acute7_by_type || []).map((r: any) => {
+          const disc = String(r.type || 'other');
+          const dp = disciplineProfiles.find(p => p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
+          return {
+            discipline: disc,
+            planned_load: typeof r.linked_load === 'number' ? r.linked_load : null,
+            actual_load: Number(r.total_load || 0),
+            extra_load: Number(r.extra_load || 0),
+            session_count: Number(r.total_sessions || 0),
+            maturity: dp?.maturity ?? null,
+            acwr: dp?.acwr ?? null,
+          };
+        }),
         daily_load_7d,
         hr_drift_series,
         cross_training_signal: (() => {
@@ -3212,12 +3315,36 @@ ${narrativeFacts.join('\n')}`;
           const activeDisciplines = byType.filter((r: any) => Number(r.total_load || 0) > 0);
           if (activeDisciplines.length < 2) return null;
 
+          // Identify building disciplines among active ones
+          const buildingDiscs = activeDisciplines
+            .map((r: any) => {
+              const disc = String(r.type || 'other');
+              const dp = disciplineProfiles.find(p => p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
+              return dp && dp.maturity === 'building' ? dp : null;
+            })
+            .filter(Boolean) as typeof disciplineProfiles;
+
+          // If cross-training disciplines are all still building, show learning message
+          const nonRunActive = activeDisciplines.filter((r: any) => {
+            const d = String(r.type || '').toLowerCase();
+            return !d.includes('run');
+          });
+          const allCrossTrainingBuilding = nonRunActive.length > 0 && nonRunActive.every((r: any) => {
+            const disc = String(r.type || 'other');
+            const dp = disciplineProfiles.find(p => p.discipline === disc || (disc === 'ride' && p.discipline === 'bike') || (disc === 'cycling' && p.discipline === 'bike'));
+            return dp && dp.maturity === 'building';
+          });
+
+          if (allCrossTrainingBuilding && buildingDiscs.length > 0) {
+            const names = buildingDiscs.map(d => `${d.discipline} (${d.sessions_28d} sessions)`).join(', ');
+            return { label: `Building baseline: ${names}`, tone: 'info' as const };
+          }
+
           const cd = weeklyResponseModel.cross_domain;
           const endur = weeklyResponseModel.endurance;
           const str = weeklyResponseModel.strength;
           const assess = weeklyResponseModel.assessment;
 
-          // Cross-domain analysis uses real HR at pace + execution after strength days
           if (cd.interference_detected) {
             const hrPattern = cd.patterns.find((p: any) => p.code === 'post_strength_hr_elevated');
             const execPattern = cd.patterns.find((p: any) => p.code === 'post_strength_pace_reduced');
@@ -3231,10 +3358,13 @@ ${narrativeFacts.join('\n')}`;
           }
 
           if (cd.patterns.some((p: any) => p.code === 'concurrent_gains')) {
+            if (buildingDiscs.length > 0) {
+              const names = buildingDiscs.map(d => d.discipline).join(', ');
+              return { label: `Adapting well — still learning ${names}`, tone: 'positive' as const };
+            }
             return { label: 'Adapting well — no interference', tone: 'positive' as const };
           }
 
-          // Fall back to body signals: RPE, HR drift, RIR, strength trends, assessment
           const rpeRising = endur.rpe.sufficient && endur.rpe.trend === 'declining';
           const driftWorsening = endur.hr_drift.sufficient && endur.hr_drift.trend === 'declining';
           const strengthFading = str.overall.trend === 'declining';
@@ -3250,6 +3380,10 @@ ${narrativeFacts.join('\n')}`;
           }
 
           if (stressSignals === 0 && assess.signals_concerning === 0) {
+            if (buildingDiscs.length > 0) {
+              const names = buildingDiscs.map(d => `${d.discipline} (${d.sessions_28d} sessions)`).join(', ');
+              return { label: `Handling load well — building ${names}`, tone: 'positive' as const };
+            }
             return { label: 'Handling combined load well', tone: 'positive' as const };
           }
 
