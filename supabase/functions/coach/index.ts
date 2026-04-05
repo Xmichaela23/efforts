@@ -282,11 +282,11 @@ function reconcileLoadStatus(
   unweightedAcwr: number | null,
   keySessionsNext48h: Array<{ date: string; type: string; category: string }>,
   unplannedLoad: { count: number; totalLoad: number; plannedWeekLoad: number },
+  runLoadPct: number | null,
 ): { status: 'under' | 'on_target' | 'elevated' | 'high'; interpretation: string } {
-  let status = raw.status;
   const reasons: string[] = [];
 
-  // ── 1. Read body signals directly ──────────────────────────────────────
+  // ── 0. Assess body response quality ────────────────────────────────────
   const decliningSignals: string[] = [];
   if (bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining')
     decliningSignals.push('HR drift');
@@ -299,95 +299,117 @@ function reconcileLoadStatus(
 
   const nDeclining = decliningSignals.length;
 
-  // ── 2. Plan-position context ───────────────────────────────────────────
+  const runBodyOk =
+    (bodyTrends.run_quality.based_on_sessions >= 2 &&
+      (bodyTrends.run_quality.trend === 'stable' || bodyTrends.run_quality.trend === 'improving')) &&
+    !(bodyTrends.cardiac.based_on_sessions >= 2 && bodyTrends.cardiac.trend === 'declining');
+  const excessIsCrossTraining = runLoadPct != null && runLoadPct <= 100;
+
+  // ── 1. Plan-position context ───────────────────────────────────────────
   const { weekIntent, weeksOut, isPlanTransition } = planPosition;
   const isEasyWeek = ['recovery', 'taper', 'deload'].includes(weekIntent);
   const isBuildWeek = weekIntent === 'build';
   const isRaceProximity = weeksOut != null && weeksOut <= 3;
 
-  const escalate = (target: 'on_target' | 'elevated' | 'high', reason: string) => {
-    if (LOAD_RANK[target] > LOAD_RANK[status]) {
-      status = target;
+  // Compute escalation ceiling from raw inputs only (ACWR, body trends,
+  // readiness, plan position). This is independent of the buildBodyResponse
+  // status so de-escalation can't create flicker.
+  let ceiling: 'under' | 'on_target' | 'elevated' | 'high' = 'under';
+
+  const raise = (target: 'on_target' | 'elevated' | 'high', reason: string) => {
+    if (LOAD_RANK[target] > LOAD_RANK[ceiling]) {
+      ceiling = target;
       reasons.push(reason);
     }
   };
 
-  // During plan transition (weeks 1-2), suppress body signal escalation —
-  // baselines are calibrating from the prior cycle. Only readiness floor
-  // (step 3) and unplanned load checks still apply.
+  // Body signal escalation (plan-position-aware)
   if (!isPlanTransition) {
     if (isRaceProximity) {
-      if (nDeclining >= 2) escalate('high', `${decliningSignals.join(' and ')} declining ${weeksOut}w from race`);
-      else if (nDeclining === 1) escalate('elevated', `${decliningSignals[0]} declining ${weeksOut}w from race`);
+      if (nDeclining >= 2) raise('high', `${decliningSignals.join(' and ')} declining ${weeksOut}w from race`);
+      else if (nDeclining === 1) raise('elevated', `${decliningSignals[0]} declining ${weeksOut}w from race`);
     } else if (isEasyWeek) {
-      if (nDeclining >= 2) escalate('high', `${decliningSignals.join(' and ')} declining on ${weekIntent} week`);
-      else if (nDeclining === 1) escalate('elevated', `${decliningSignals[0]} declining on ${weekIntent} week`);
+      if (nDeclining >= 2) raise('high', `${decliningSignals.join(' and ')} declining on ${weekIntent} week`);
+      else if (nDeclining === 1) raise('elevated', `${decliningSignals[0]} declining on ${weekIntent} week`);
     } else if (isBuildWeek) {
-      if (nDeclining >= 2) escalate('elevated', `${decliningSignals.join(' and ')} declining during build`);
+      if (nDeclining >= 2) raise('elevated', `${decliningSignals.join(' and ')} declining during build`);
       else if (nDeclining === 1 && unweightedAcwr != null && unweightedAcwr >= 1.2)
-        escalate('elevated', `${decliningSignals[0]} declining with ACWR ${unweightedAcwr.toFixed(2)}`);
+        raise('elevated', `${decliningSignals[0]} declining with ACWR ${unweightedAcwr.toFixed(2)}`);
     } else {
       if (nDeclining >= 2) {
         const target = (unweightedAcwr != null && unweightedAcwr >= 1.2) ? 'high' : 'elevated';
-        escalate(target as 'elevated' | 'high', `${decliningSignals.join(' and ')} declining`);
+        raise(target as 'elevated' | 'high', `${decliningSignals.join(' and ')} declining`);
       } else if (nDeclining === 1) {
-        escalate('elevated', `${decliningSignals[0]} trending down`);
+        raise('elevated', `${decliningSignals[0]} trending down`);
       }
     }
   }
 
-  // ── 3. Readiness-state floor (failsafe) ────────────────────────────────
+  // Readiness-state floor (failsafe)
   if (readiness === 'overreached') {
-    escalate('high', 'body signals indicate overreaching');
+    raise('high', 'body signals indicate overreaching');
   } else if (readiness === 'fatigued') {
     if (!isEasyWeek || (unweightedAcwr != null && unweightedAcwr >= 1.0)) {
-      escalate('elevated', 'fatigue markers elevated');
+      raise('elevated', 'fatigue markers elevated');
     }
   }
 
-  // ── 4. Upcoming work: protect key sessions ─────────────────────────────
+  // Upcoming work: protect key sessions
   if (nDeclining >= 1 && keySessionsNext48h.length > 0 && !isPlanTransition) {
-    escalate('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
+    raise('elevated', `key session upcoming with ${decliningSignals[0]} declining`);
   }
 
-  // ── 5. Cross-training ACWR gap (no declining signal required) ──────────
-  // If unweighted ACWR is significantly elevated but running ACWR is fine,
-  // cross-training is adding real load the run-centric view misses.
+  // Cross-training ACWR gap
   if (unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1)) {
     if (unweightedAcwr > 1.5) {
-      escalate('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
+      raise('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
     } else if (unweightedAcwr > 1.3) {
-      escalate('elevated', `cross-training pushing total ACWR to ${unweightedAcwr.toFixed(2)}`);
+      raise('elevated', `cross-training pushing total ACWR to ${unweightedAcwr.toFixed(2)}`);
     }
   }
 
-  // ── 6. Unplanned load magnitude ────────────────────────────────────────
-  // Significant unplanned volume is a stress signal regardless of body
-  // trends — the body hasn't had time to show the impact yet.
+  // Unplanned load magnitude
   if (unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad > 0) {
     const unplannedPct = Math.round((unplannedLoad.totalLoad / unplannedLoad.plannedWeekLoad) * 100);
-    if (unplannedPct > 50) {
-      escalate('high', `unplanned load is ${unplannedPct}% of planned week`);
-    } else if (unplannedPct > 25) {
-      escalate('elevated', `unplanned load is ${unplannedPct}% of planned week`);
+    if (runBodyOk && excessIsCrossTraining) {
+      if (unplannedPct > 100) raise('elevated', `unplanned cross-training is ${unplannedPct}% of planned week`);
+    } else {
+      if (unplannedPct > 50) raise('high', `unplanned load is ${unplannedPct}% of planned week`);
+      else if (unplannedPct > 25) raise('elevated', `unplanned load is ${unplannedPct}% of planned week`);
     }
   }
-  // Fallback: if no plan, use absolute actual_vs_planned_pct (which
-  // compares all-discipline actual vs planned)
   if (unplannedLoad.count > 0 && unplannedLoad.plannedWeekLoad <= 0 && raw.actual_vs_planned_pct != null) {
-    if (raw.actual_vs_planned_pct > 50) escalate('high', `actual load ${raw.actual_vs_planned_pct}% above plan`);
-    else if (raw.actual_vs_planned_pct > 25) escalate('elevated', `actual load ${raw.actual_vs_planned_pct}% above plan`);
+    if (raw.actual_vs_planned_pct > 50) raise('high', `actual load ${raw.actual_vs_planned_pct}% above plan`);
+    else if (raw.actual_vs_planned_pct > 25) raise('elevated', `actual load ${raw.actual_vs_planned_pct}% above plan`);
   }
 
-  // Race proximity amplifier: any unplanned load close to race is risky
-  if (isRaceProximity && unplannedLoad.count > 0 && unplannedLoad.totalLoad > 0) {
-    escalate('elevated', `unplanned training ${weeksOut}w from race`);
+  // Race proximity amplifier
+  if (isRaceProximity && unplannedLoad.count > 0 && unplannedLoad.totalLoad > 0 && !excessIsCrossTraining) {
+    raise('elevated', `unplanned training ${weeksOut}w from race`);
+  }
+
+  // ── 2. De-escalation: body handling load well + excess from cross-training
+  // Volume metrics may alarm ("high") but if run quality is stable/improving,
+  // the excess is cross-training, and readiness is fresh/adapting, the actual
+  // risk is lower. Only applies when escalation checks didn't independently
+  // find a reason to be at "high" — ceiling acts as a hard floor.
+  let status = raw.status;
+  if (runBodyOk && excessIsCrossTraining
+    && (readiness === 'fresh' || readiness === 'adapting' || readiness === 'normal')
+    && status === 'high' && LOAD_RANK[ceiling] < LOAD_RANK['high']) {
+    status = 'elevated';
+    reasons.push('body responding well — excess is cross-training, not running');
+  }
+
+  // ── 3. Apply ceiling: escalation wins if raw inputs demand it ──────────
+  if (LOAD_RANK[ceiling] > LOAD_RANK[status]) {
+    status = ceiling;
   }
 
   // ── Build interpretation ───────────────────────────────────────────────
   let interpretation = raw.interpretation;
   if (reasons.length > 0) {
-    interpretation = `${raw.interpretation}. Escalated: ${reasons.join('; ')}`;
+    interpretation = `${raw.interpretation}. ${reasons.join('; ')}`;
   }
 
   return { status, interpretation };
@@ -1465,13 +1487,18 @@ Deno.serve(async (req) => {
             const daysDiff = (new Date(nextDate).getTime() - new Date(strengthDate).getTime()) / 86400000;
             if (daysDiff > 2) break;
             if (daysDiff <= 0) continue;
+            const nextExec = executionScoreFromWorkout(next);
+            // Skip sessions without meaningful execution data (e.g. rides
+            // that return 0 because bike analysis isn't built yet). Including
+            // them would create false interference signals against the run baseline.
+            if (nextExec == null || nextExec <= 0) continue;
             pairs.push({
               strength_date: strengthDate,
               strength_workload: strengthWorkload,
               strength_focus: strengthFocus,
               next_endurance_date: nextDate,
               next_endurance_hr_at_pace: null,
-              next_endurance_execution: executionScoreFromWorkout(next) ?? null,
+              next_endurance_execution: nextExec,
               baseline_hr_at_pace: null,
               baseline_execution: norms28d.execution_score_avg,
             });
@@ -2042,6 +2069,7 @@ Deno.serve(async (req) => {
             totalLoad: unplannedTotalLoad,
             plannedWeekLoad: plannedWtdLoad || 0,
           },
+          snapshotBody.load_status.run_only_week_load_pct ?? null,
         );
         snapshotBody.load_status.status = reconciled.status;
         snapshotBody.load_status.interpretation = reconciled.interpretation;
@@ -2086,6 +2114,24 @@ Deno.serve(async (req) => {
         next_session_guidance: null,
       };
       let earlyRunAdherenceArtifact = false;
+
+      // Detect real non-IF load concerns (unplanned sessions, declining body,
+      // race proximity) that should NOT be suppressed by the IF-artifact heuristic.
+      const hasRealLoadConcerns = (() => {
+        const unplanned = (weekWorkouts || []).filter(
+          (w: any) => String(w?.workout_status || '').toLowerCase() === 'completed' && !w?.planned_id
+        );
+        const unplannedPts = unplanned.reduce((s: number, w: any) => s + (Number(w?.workload_actual) || 0), 0);
+        if (unplannedPts > 50) return true;
+        const epTrend = snapshotBody?.weekly_trends?.effort_perception;
+        if (epTrend?.trend === 'declining' && (epTrend?.based_on_sessions ?? 0) >= 2) return true;
+        const rqTrend = snapshotBody?.weekly_trends?.run_quality;
+        if (rqTrend?.trend === 'declining' && (rqTrend?.based_on_sessions ?? 0) >= 2) return true;
+        const raceWeeksOut = goalContext.upcoming_races?.[0]?.weeks_out;
+        if (raceWeeksOut != null && raceWeeksOut <= 3 && acwr != null && acwr > 1.3) return true;
+        return false;
+      })();
+
       if (anthropicKey) {
         try {
           // Build session interpretations from persisted session_detail_v1 (chronological).
@@ -2213,7 +2259,7 @@ Deno.serve(async (req) => {
           coaching = await generateCoaching(partialSnapshot, anthropicKey, {
             sessionInterpretations,
             longitudinalBlock: adaptationBlock,
-            suppressRunLoadSpike: earlyRunAdherenceArtifact,
+            suppressRunLoadSpike: earlyRunAdherenceArtifact && !hasRealLoadConcerns,
           });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
@@ -2225,7 +2271,10 @@ Deno.serve(async (req) => {
       // Patch load bar when run load delta is an IF calculation artifact.
       // The bar reads body_response.load_status — without this patch it shows
       // the elevated dot and "68% above plan" text even when the narrative is correct.
-      if (earlyRunAdherenceArtifact && athleteSnapshot?.body_response?.load_status) {
+      // Skip the override when real non-IF load sources exist (unplanned sessions,
+      // declining body signals, race proximity escalation) — those concerns are
+      // genuine even when individual run durations/distances hit the plan.
+      if (earlyRunAdherenceArtifact && !hasRealLoadConcerns && athleteSnapshot?.body_response?.load_status) {
         const ls = athleteSnapshot.body_response.load_status;
         const crossTrainingNote = ls.cross_training_load_summary ? ` Cross-training: ${ls.cross_training_load_summary}` : '';
         athleteSnapshot = {
@@ -3028,6 +3077,45 @@ ${narrativeFacts.join('\n')}`;
         intent_summary: (() => {
           const rs = readinessState;
           const intent = weekIntent;
+          const ls = athleteSnapshot?.body_response?.load_status?.status;
+          const lsData = athleteSnapshot?.body_response?.load_status;
+          const bodyTrends = athleteSnapshot?.body_response?.weekly_trends;
+          const weeksOutVal = goalContext.upcoming_races?.[0]?.weeks_out ?? null;
+
+          // Body response quality: are run signals positive despite load?
+          const runBodyOk = bodyTrends
+            && (bodyTrends.run_quality?.trend === 'stable' || bodyTrends.run_quality?.trend === 'improving')
+            && bodyTrends.run_quality?.based_on_sessions >= 2;
+          // Is the excess load primarily cross-training (not running)?
+          const runLoadPct = lsData?.run_only_week_load_pct;
+          const excessIsCrossTraining = runLoadPct != null && runLoadPct <= 100;
+
+          // Build plan-aware context string
+          const posLabel = weeksOutVal != null ? `${weeksOutVal}w from race` : null;
+
+          // When load is high, surface load composition + body response
+          if (ls === 'high') {
+            if (runBodyOk && excessIsCrossTraining) {
+              // Running is fine, excess is from cross-training
+              const ctNote = posLabel ? ` ${posLabel} — keep run sessions on plan.` : ' Keep run sessions on plan.';
+              if (intent === 'peak' || intent === 'taper') return `Extra cross-training is adding load.${ctNote}`;
+              if (intent === 'recovery') return 'Recovery week — cross-training is adding load. Keep it easy.';
+              return `Cross-training pushing total load high.${ctNote}`;
+            }
+            // Running itself is elevated + body showing strain
+            if (intent === 'peak' || intent === 'taper') {
+              const pos = posLabel ? ` ${posLabel}` : '';
+              return `Load is elevated${pos} — protect recovery now.`;
+            }
+            if (intent === 'recovery') return 'Recovery week — but load is still elevated. Rest fully.';
+            return 'Load is high — back off and recover before your next key session.';
+          }
+          if (ls === 'elevated' && (intent === 'peak' || intent === 'taper')) {
+            if (runBodyOk && excessIsCrossTraining) {
+              return 'Peak week — running is on plan. Watch cross-training volume.';
+            }
+            return 'Peak week — load is creeping up. Keep it controlled, protect your legs.';
+          }
 
           if (intent === 'recovery') {
             if (rs === 'fresh') return 'Recovery week — you\'re absorbing well, keep it easy.';
@@ -3172,10 +3260,13 @@ ${narrativeFacts.join('\n')}`;
         fitness_direction: fitnessDirection,
         readiness_state: readinessState,
         readiness_label: (() => {
-          if (readinessState === 'fresh') return 'LOW FATIGUE';
+          const ls = athleteSnapshot?.body_response?.load_status?.status;
           if (readinessState === 'overreached') return 'OVERREACHED';
-          if (readinessState === 'adapting') return 'ABSORBING';
           if (readinessState === 'fatigued') return 'FATIGUED';
+          if (ls === 'high') return 'HIGH LOAD';
+          if (ls === 'elevated' && readinessState === 'fresh') return 'WATCH LOAD';
+          if (readinessState === 'fresh') return 'LOW FATIGUE';
+          if (readinessState === 'adapting') return 'ABSORBING';
           if (readinessState === 'detrained') return 'DETRAINED';
           return null;
         })(),
