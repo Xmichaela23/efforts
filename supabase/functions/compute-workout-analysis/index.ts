@@ -1193,17 +1193,13 @@ Deno.serve(async (req) => {
     zones: {},
       bests: (() => {
         const bests: any = {};
-        // Calculate max pace (fastest = minimum seconds per km) from series speed data
-        // Use raw speed_mps array (before smoothing) to get true fastest pace
-        if (hasRows && isRun && speed_mps.length > 0) {
-          const validSpeeds = speed_mps.filter((s): s is number => 
-            s !== null && Number.isFinite(s) && s > 0.5 && s < 10 // Realistic running speeds: 0.5-10 m/s
+        // Runs: max pace from pace_s_per_km — speed_mps is nulled for series before this block
+        if (hasRows && isRun && pace_s_per_km_fixed.length > 0) {
+          const validPaces = pace_s_per_km_fixed.filter((p): p is number =>
+            p !== null && Number.isFinite(p) && p >= 90 && p <= 3600 // ~1:30/km … 60:00/km
           );
-          if (validSpeeds.length > 0) {
-            const maxSpeedMps = Math.max(...validSpeeds); // Fastest speed
-            if (maxSpeedMps > 0) {
-              bests.max_pace_s_per_km = Math.round(1000 / maxSpeedMps); // Convert m/s to s/km
-            }
+          if (validPaces.length > 0) {
+            bests.max_pace_s_per_km = Math.round(Math.min(...validPaces)); // fastest = min s/km
           }
         }
         if (hasRows && isRide && speed_mps.length > 0) {
