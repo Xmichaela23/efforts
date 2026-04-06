@@ -68,6 +68,9 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+/** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. primary_race_readiness). */
+const COACH_PAYLOAD_VERSION = 2;
+
 function toISODate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -693,7 +696,9 @@ Deno.serve(async (req) => {
       const ageMs = Date.now() - new Date(cacheRow.generated_at).getTime();
       const isStaleByAge = ageMs > 24 * 60 * 60 * 1000;
       const isInvalidated = cacheRow.invalidated_at != null;
-      if (!isStaleByAge && !isInvalidated) {
+      const cachedVer = Number((cacheRow.payload as { coach_payload_version?: number })?.coach_payload_version ?? 0);
+      const versionOk = cachedVer >= COACH_PAYLOAD_VERSION;
+      if (!isStaleByAge && !isInvalidated && versionOk) {
         return new Response(JSON.stringify(cacheRow.payload), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Coach-Cache': 'hit' },
@@ -3692,6 +3697,7 @@ ${narrativeFacts.join('\n')}`;
       athlete_snapshot: athleteSnapshot,
       race_readiness: raceReadiness,
       primary_race_readiness,
+      coach_payload_version: COACH_PAYLOAD_VERSION,
     };
 
     // ── Cache write (service_role so INSERT RLS passes; await so isolate does not exit first)

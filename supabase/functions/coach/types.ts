@@ -69,6 +69,8 @@ export type CoachWeekContextRequestV1 = {
 
 export type CoachWeekContextResponseV1 = {
   version: 1;
+  /** Server-only cache invalidation: bump in coach/index when new top-level fields ship. */
+  coach_payload_version?: number;
   as_of_date: string; // YYYY-MM-DD
   week_start_date: string; // YYYY-MM-DD
   week_end_date: string; // YYYY-MM-DD

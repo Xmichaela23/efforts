@@ -31,6 +31,8 @@ export type RaceReadinessV1 = {
 
 export type CoachWeekContextV1 = {
   version: 1;
+  /** Present on fresh coach responses; old coach_cache rows omit this. */
+  coach_payload_version?: number;
   as_of_date: string;
   week_start_date: string;
   week_end_date: string;
@@ -456,13 +458,18 @@ export function useCoachWeekContext(date?: string) {
         .eq('user_id', userId)
         .maybeSingle()
     ).then(({ data: row }) => {
-      if (row?.payload) {
-        setData(row.payload as CoachWeekContextV1);
+      const p = row?.payload as CoachWeekContextV1 | undefined;
+      const cacheVer = Number(p?.coach_payload_version ?? 0);
+      // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate so we don't flash pre-primary_race_readiness payloads.
+      const MIN_CACHE_PAYLOAD_VERSION = 2;
+      if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
+        setData(p);
         hasCachedData.current = true;
-        // 2. Revalidate in background — coach function handles staleness check server-side
         runPipeline(true);
+      } else if (p) {
+        // Stale schema: go straight to coach (edge will also miss cache until recomputed)
+        runPipeline(false);
       } else {
-        // No cache — show spinner and fetch normally
         runPipeline(false);
       }
     }).catch(() => runPipeline(false));
