@@ -691,7 +691,7 @@ Deno.serve(async (req) => {
           readinessUnavailable,
         });
       } catch (snapErr: any) {
-        console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr);
+        console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr, snapErr?.stack || '');
       }
       snapshot_latency_ms = Math.round(performance.now() - t0);
       if (snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
