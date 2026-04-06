@@ -350,22 +350,28 @@ function extractJsonObject(text: string): string | null {
   return body.slice(start, end + 1);
 }
 
-function parseRaceReadinessLlmResponse(text: string | null): SessionRaceReadinessLlmV1 | null {
+/** Remove accidental snake_case key references like "(conditions_heat_flag)" from model copy. */
+function stripSnakeCaseKeyParens(s: string): string {
+  const t = String(s || '').replace(/\s*\([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)+\)/gi, ' ');
+  return t.replace(/\s{2,}/g, ' ').trim();
+}
+
+function parseRaceReadinessLlmResponse(text: string | null | undefined): SessionRaceReadinessLlmV1 | null {
   if (!text) return null;
   const jsonStr = extractJsonObject(text);
   if (!jsonStr) return null;
   try {
     const o = JSON.parse(jsonStr) as Record<string, unknown>;
-    const headline = String(o.headline || '').trim();
-    const verdict = String(o.verdict || '').trim();
-    const tactical_instruction = String(o.tactical_instruction || '').trim();
-    const projection = String(o.projection || '').trim();
-    const taper_guidance = String(o.taper_guidance || '').trim();
+    const headline = stripSnakeCaseKeyParens(String(o.headline || '').trim());
+    const verdict = stripSnakeCaseKeyParens(String(o.verdict || '').trim());
+    const tactical_instruction = stripSnakeCaseKeyParens(String(o.tactical_instruction || '').trim());
+    const projection = stripSnakeCaseKeyParens(String(o.projection || '').trim());
+    const taper_guidance = stripSnakeCaseKeyParens(String(o.taper_guidance || '').trim());
     const flagRaw = o.flag;
     const flag =
       flagRaw === null || flagRaw === undefined || String(flagRaw).toLowerCase() === 'null'
         ? null
-        : String(flagRaw).trim() || null;
+        : stripSnakeCaseKeyParens(String(flagRaw).trim()) || null;
     if (!headline || !verdict || !tactical_instruction || !projection || !taper_guidance) return null;
     return { headline, verdict, tactical_instruction, flag, projection, taper_guidance };
   } catch {
@@ -385,32 +391,46 @@ export function raceReadinessDeterministicFallback(
       ? String(facts.race_name).trim()
       : 'your race';
   const dist = facts.distance_miles;
-  const dur = facts.duration_minutes;
-  const bits: string[] = [];
-  bits.push(`${days} days from ${raceLabel}`);
-  if (typeof dist === 'number') bits.push(`${dist} mi in the legs`);
-  else if (typeof dur === 'number') bits.push(`${Math.round(dur)} minutes on feet`);
-  const exec = facts.execution_score;
-  if (typeof exec === 'number') bits.push(`execution vs plan about ${Math.round(exec)}%`);
-  const verdict = bits.join('; ') + '. Use pacing and heart-rate rows above as the primary readiness read.';
   const heat = facts.conditions_heat_flag === true;
-  const heatNote = typeof facts.conditions_heat_note === 'string' ? facts.conditions_heat_note : '';
+  const heatNote = typeof facts.conditions_heat_note === 'string' ? facts.conditions_heat_note.trim() : '';
   const drift = typeof facts.hr_drift_bpm === 'number' ? facts.hr_drift_bpm : null;
   const typ = typeof facts.typical_hr_drift_bpm === 'number' ? facts.typical_hr_drift_bpm : null;
-  let tactical_instruction =
-    'Race day: open using the same controlled effort you held mid-run today; let course and weather dictate when to press.';
-  if (drift != null && typ != null) {
-    tactical_instruction = `HR drift +${Math.round(drift)} bpm vs your typical +${Math.round(typ)} bpm`;
-    if (heat) {
-      tactical_instruction += heatNote
-        ? ` — ${heatNote}`
-        : ' — heat was a factor (conditions_heat_flag); cooler race morning should feel easier at the same HR.';
-    }
-    tactical_instruction += ' Hold the first third conservative relative to that baseline.';
-  }
+  const avgHrF = typeof facts.avg_hr === 'number' ? Math.round(facts.avg_hr) : null;
   const split = facts.pacing_split_seconds_per_mile;
+  const elev = typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
+  const ep = typeof facts.elevation_profile === 'string' ? String(facts.elevation_profile) : null;
+  const coachBits: string[] = [];
+  if (drift != null && typ != null) {
+    coachBits.push(
+      `Drift +${Math.round(drift)} bpm vs your typical +${Math.round(typ)} bpm is a solid aerobic read`,
+    );
+  }
+  if (avgHrF != null) coachBits.push(`${avgHrF} bpm average`);
   if (typeof split === 'number' && Math.abs(split) >= 5) {
-    tactical_instruction += ` Pacing shifted ${split > 0 ? '+' : ''}${split}s/mi second half vs first — use that discipline pattern on race day.`;
+    coachBits.push(
+      split > 0
+        ? `you slowed about +${Math.round(split)}s/mi in the second half`
+        : `you picked it up ~${Math.round(Math.abs(split))}s/mi in the second half`,
+    );
+  }
+  if (elev != null && ep) coachBits.push(`${ep} terrain (~${elev} ft gain)`);
+  if (heat && heatNote) coachBits.push(heatNote);
+  else if (heat) coachBits.push('it was warm enough to tax the back half');
+  const verdict =
+    (coachBits.length ? coachBits.join(' — ') + '. ' : '') +
+    `You're on track with ${days} days until ${raceLabel}.`;
+  let tactical_instruction =
+    'On race day, start a touch easier than you think for the first few miles, then let effort build if everything feels right.';
+  if (drift != null && typ != null) {
+    tactical_instruction = `You held +${Math.round(drift)} bpm drift versus your usual +${Math.round(typ)} — keep the first third of ${raceLabel} controlled; lungs and legs should feel easier if the morning is cooler.`;
+    if (heat && heatNote) {
+      tactical_instruction += ` ${heatNote}`;
+    } else if (heat) {
+      tactical_instruction += ' Heat added cost today; at a cooler gun you can afford the same HR at slightly truer pace early.';
+    }
+  }
+  if (typeof split === 'number' && Math.abs(split) >= 5) {
+    tactical_instruction += ` Use today’s +${Math.round(split)}s/mi fade pattern as a reminder not to overreach when the course or weather bites.`;
   }
   const planTaper = facts.plan_has_taper === true;
   const nextN = typeof facts.next_session_name === 'string' ? facts.next_session_name : '';
@@ -421,8 +441,14 @@ export function raceReadinessDeterministicFallback(
   if (planTaper && (nextN || nextP)) {
     taper_guidance += ` Next on plan: ${nextN}${nextP ? ` — ${nextP.slice(0, 120)}` : ''}. Optional sessions are fine to skip if you feel flat.`;
   }
+  const headline =
+    drift != null && typ != null && drift < typ
+      ? `${days} days out — drift beat your typical in tough conditions`
+      : typeof dist === 'number'
+        ? `${days} days out — ${dist} mi long run checked off`
+        : `${days} days out — long work toward ${raceLabel}`;
   return {
-    headline: `${days} days out — key long run in the bank`,
+    headline,
     verdict,
     tactical_instruction,
     flag: null,
@@ -437,9 +463,13 @@ export function raceReadinessDeterministicFallback(
 export async function generateSessionRaceReadinessLlm(
   facts: Record<string, unknown>,
 ): Promise<SessionRaceReadinessLlmV1 | null> {
-  const systemPrompt = `You are a performance coach writing race readiness JSON for an athlete.
-Write in a direct, specific, unsentimental style. Reason only from the FACTS object — do not invent numbers or dates.
-If a fact is missing, do not guess; omit that angle. Output valid JSON only — no markdown, no preamble.`;
+  const systemPrompt = `You are an experienced endurance coach. Your job is to produce one JSON object whose string values sound like you are speaking directly to the athlete after studying their long run.
+
+CRITICAL — OUTPUT HYGIENE: Never put fact field names, JSON keys, snake_case identifiers, or technical labels in any string you write. Do not write things like "(conditions_heat_flag)" or "pacing_split_seconds_per_mile". Reason from the numeric values and plain-language ideas only. Say "it peaked near 80°F", not the key name.
+
+Use only numbers and relationships that appear in DATA. Do not invent stats, dates, or race details. If something is missing, omit that thread instead of guessing.
+
+Output: valid JSON only. No markdown fences, no preamble, no commentary outside the JSON.`;
 
   const dtr = facts.days_to_race;
   const rname = facts.race_name;
@@ -447,48 +477,45 @@ If a fact is missing, do not guess; omit that angle. Output valid JSON only — 
   const racePart =
     typeof rname === 'string' && String(rname).trim() ? String(rname).trim() : 'the race';
 
-  const userPrompt = `You are a performance coach writing a race readiness assessment for an athlete ${daysPart} days out from ${racePart}.
+  const userPrompt = `You are an experienced endurance coach. An athlete just finished a long run about ${daysPart} days before ${racePart}. Write a race readiness assessment that reads like a smart coach who actually looked at the numbers — not a system summarizing a form.
 
-Reason from the specific data. Do not write generic training advice. Every sentence should connect directly to a number or condition in the facts below.
-
-FACTS:
+DATA (for your eyes only — do not echo key names in your answer):
 ${JSON.stringify(facts, null, 2)}
 
-REASONING INSTRUCTIONS:
+HOW TO REASON:
 
-1. VERDICT: Connect today's session specifically to race day. Reason about:
-   - Was HR drift better or worse than typical, and WHY (consider temp: if conditions_heat_flag is true, heat is a factor — strip the heat tax and assess underlying fitness)
-   - If conditions_temp_end_f or conditions_temp_peak_f is much higher than conditions_temp_start_f (>8°F delta), heat load was concentrated in the final miles — discount late-run HR rise and pace fade when judging fitness; use conditions_heat_note if present
-   - Pacing: positive split (pacing_split_seconds_per_mile > 0) means second half slower — tie to heat, hills (elevation_profile / elevation_gain_ft), discipline, or fatigue. What does it predict for race execution?
-   - If conditions_heat_flag is true, explicitly note heat and what the performance means adjusted for that context
-   - What does this run predict about race day performance?
+Heart rate: Compare average HR, drift, and typical drift if both exist. If drift is lower than their typical, say plainly that it is a fitness / execution signal. If it was hot (use the temperature values or any described ramp from start to peak), strip the heat tax: late-run HR in rising heat is expected, not automatic loss of fitness. What does the HR story say about aerobic capacity right now?
 
-2. TACTICAL_INSTRUCTION: One specific, actionable race-day instruction derived from today's data. Reference actual numbers from FACTS where possible.
+Pace: If they slowed (positive split in the data), say so with the actual magnitude. Was it explainable by heat, rolling or hilly terrain, or discipline — vs unexplained collapse? What should they take away for race execution?
 
-3. FLAG: One honest concern if the data supports it. Be specific. If none, return null — do not invent.
+Conditions: If the temperature at the end or peak is much higher than at the start, heat was back-loaded and the hardest miles were the hottest — that reframes late fade. Cooler race morning usually means easier early hours — connect that to ${racePart}.
 
-4. PROJECTION: Estimate finish time or pace range from today's effort, adjusted for likely race conditions (cooler temps, course_profile if present). Brief reasoning.
+Race day: Tie the threads together for ${racePart} specifically. What does today predict? What should they do the same or differently?
 
-5. TAPER_GUIDANCE:
-   - If plan_has_taper is true AND current_phase suggests taper (or plan_has_taper true): Do NOT say "cut volume" — the plan handles load. Give session-specific guidance for the window before race: what to protect (sleep, fueling, short intensity touch if any), what to avoid (new fatigue/soreness). Reference next_session_name / next_session_prescription when present for optional work.
-   - If the athlete showed strain today, note that skipping optional upcoming work can be correct — use next session fields by name.
-   - Frame as how to execute the taper already in the plan, not prescribing a new taper.
+Taper: If their plan already includes taper structure, do not tell them to "cut volume" generically. Say what to protect (sleep, fuel, short sharp work if any) and what optional pieces to skip if tired. Name the actual next session if the data includes it.
 
-Respond with this exact JSON structure — no preamble, no markdown:
+OUTPUT RULES:
+- Second person ("you", "your").
+- Cite real numbers from DATA (+7 bpm, 15 mi, 37 s/mi, °F, etc.) — never cite field names.
+- No filler ("great job", "keep it up", "as you prepare").
+- If there is no honest concern, "flag" must be null.
+- "projection" must include brief reasoning, not only a time.
+
+Respond with this exact JSON shape — string values only where shown, flag may be null:
 {
-  "headline": "short, specific — days to race and one key finding",
-  "verdict": "2-4 sentences. Reason from data to race prediction. No filler.",
-  "tactical_instruction": "one race-day instruction with numbers from FACTS where possible",
-  "flag": "specific concern or null",
-  "projection": "finish time or pace range with brief reasoning",
-  "taper_guidance": "2-3 sentences for this athlete and upcoming sessions — not generic volume advice"
+  "headline": "specific, include at least one concrete number or comparison",
+  "verdict": "3-4 sentences: coach reasoning tying HR + pace + conditions to race day",
+  "tactical_instruction": "one race-day instruction grounded in today's numbers",
+  "flag": "one real concern if the data supports it, otherwise null",
+  "projection": "finish or pace estimate with brief reasoning from today's data",
+  "taper_guidance": "2-3 sentences specific to the next ~two weeks — not generic advice"
 }`;
 
   const raw = await callLLM({
     system: systemPrompt,
     user: userPrompt,
     maxTokens: 1100,
-    temperature: 0.2,
+    temperature: 0.28,
     model: 'sonnet',
   });
   if (raw == null || raw === '') {
