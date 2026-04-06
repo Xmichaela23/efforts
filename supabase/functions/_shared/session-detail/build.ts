@@ -718,16 +718,21 @@ function buildFallbackNarrative(
   if (driftExpFb === 'pace_driven' && driftBpm != null && Math.abs(driftBpm) >= 5) {
     sentences.push(`HR rose ${Math.abs(Math.round(driftBpm))} bpm — proportional to the pace increase, not cardiovascular drift.`);
   } else if (driftSignalFb != null && Math.abs(driftSignalFb) >= 3) {
+    // Match buildAnalysisDetailRows: only compare to "typical" when baseline is meaningful (not 0 / noise).
+    const typMeaningful = driftTyp != null && Math.abs(driftTyp) >= 1;
     if (driftExpFb === 'terrain_driven' && terrain) {
       sentences.push(`HR drifted ${Math.abs(Math.round(driftSignalFb))} bpm, consistent with the ${terrain} terrain.`);
-    } else if (driftTyp != null && Math.abs(driftSignalFb) - Math.abs(driftTyp) <= 3) {
+    } else if (typMeaningful && Math.abs(driftSignalFb) - Math.abs(driftTyp) <= 3) {
       sentences.push(`HR drift was normal for this effort — no red flags.`);
-    } else if (driftSignalFb > 0 && driftTyp != null && Math.abs(driftSignalFb) > Math.abs(driftTyp) + 3) {
-      sentences.push(`HR drifted +${Math.abs(Math.round(driftSignalFb))} bpm, more than your typical +${Math.abs(Math.round(driftTyp))}.`);
+    } else if (driftSignalFb > 0 && typMeaningful && Math.abs(driftSignalFb) > Math.abs(driftTyp) + 3) {
+      sentences.push(`HR drifted +${Math.abs(Math.round(driftSignalFb))} bpm, more than your typical +${Math.round(Math.abs(driftTyp))}.`);
     } else if (durMinFb != null) {
       const expectedMax = durMinFb >= 150 ? 20 : durMinFb >= 90 ? 15 : durMinFb >= 60 ? 12 : 8;
-      if (Math.abs(driftSignalFb) <= expectedMax) {
+      const absDr = Math.abs(driftSignalFb);
+      if (absDr <= expectedMax) {
         sentences.push(`HR drift ${Math.abs(Math.round(driftSignalFb))} bpm — normal for a ${Math.round(durMinFb)}-minute run.`);
+      } else if (!typMeaningful) {
+        sentences.push(`HR drift ${Math.abs(Math.round(driftSignalFb))} bpm over ${Math.round(durMinFb)} min — a bit high for this duration; conditions and fueling matter.`);
       }
     }
   }
