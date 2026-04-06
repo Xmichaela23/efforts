@@ -510,7 +510,7 @@ CRITICAL — OUTPUT HYGIENE: Never put fact field names, JSON keys, snake_case i
 
 Use only numbers and relationships that appear in DATA. Do not invent stats, dates, or race details. If something is missing, omit that thread instead of guessing.
 
-In "projection", never treat today's run elevation as the race course: only tie race-day terrain to DATA when the plan includes a course profile (see user instructions).
+Today's elevation describes this workout's terrain load (use for fitness / drift / pace reads). Never treat it as the race course unless the plan course profile is in DATA (see user instructions).
 
 Output: valid JSON only. No markdown fences, no preamble, no commentary outside the JSON.`;
 
@@ -537,7 +537,9 @@ Conditions: If the temperature at the end or peak is much higher than at the sta
 
 Race day: Tie the threads together for ${racePart} specifically. What does today predict? What should they do the same or differently?
 
-COURSE PROFILE RULE (applies especially to "projection"): Only reference race course elevation, net gain/loss, or profile (rolling, hilly, net downhill, etc.) in "projection" if DATA includes a plan course profile — the course_profile object (from the plan config). If course_profile is absent or empty, do not compare the race to today's route: base "projection" on temperature delta between today's conditions and likely race morning, plus today's HR, pace, and drift. Today's elevation_gain_ft and elevation_profile describe this workout only, not ${racePart}'s course — never use them as a stand-in for race terrain (e.g. do not say "similarly rolling (545 ft gain)" unless that figure is explicitly race course data in course_profile).
+Today's route vs ${racePart} (both matter, different roles): Today's elevation gain and terrain profile in DATA reflect the terrain load that shaped this session's drift and pace — reference them when reasoning about fitness and execution under real hills. Do not imply they describe ${racePart}'s course unless DATA includes a plan course profile (course_profile). Without course_profile, keep race-day terrain out of verdict and tactical copy too — not only projection.
+
+COURSE PROFILE RULE (applies especially to "projection"): Only reference race course elevation, net gain/loss, or profile (rolling, hilly, net downhill, etc.) as ${racePart}'s course if DATA includes course_profile from the plan config. If course_profile is absent or empty, do not compare the race to today's route in projection: base "projection" on temperature delta between today's conditions and likely race morning, plus today's HR, pace, and drift. Never use today's elevation_gain_ft or elevation_profile as a stand-in for race terrain (e.g. do not say "similarly rolling (545 ft gain)" for the marathon unless that figure is explicitly race data inside course_profile).
 
 Taper: If their plan already includes taper structure, do not tell them to "cut volume" generically. Say what to protect (sleep, fuel, short sharp work if any) and what optional pieces to skip if tired. Name the actual next session if the data includes it.
 
