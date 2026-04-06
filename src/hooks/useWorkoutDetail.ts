@@ -146,13 +146,22 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   // and caused a write-back loop (workout-detail writes session_detail_v1 →
   // realtime fires workouts:invalidate → refetch → write-back → loop).
   useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
     const detailHandler = () => {
       try {
         queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
+        // Second pass: analyze-running-workout may return before the row merge is visible to the next read.
+        if (t) clearTimeout(t);
+        t = setTimeout(() => {
+          try {
+            queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
+          } catch {}
+        }, 750);
       } catch {}
     };
     window.addEventListener('workout-detail:invalidate', detailHandler);
     return () => {
+      if (t) clearTimeout(t);
       window.removeEventListener('workout-detail:invalidate', detailHandler);
     };
   }, [queryClient]);
