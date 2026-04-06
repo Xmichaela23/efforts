@@ -91,6 +91,23 @@ function elevationProfileLabel(
   return elevFt == null && !t ? null : 'rolling';
 }
 
+/**
+ * Race distance in miles for finish-time math when the plan goal names a standard event.
+ * Null when unknown (ultra, custom, or unlabeled) — LLM must not invent 26.2.
+ */
+function inferTargetRaceDistanceMiles(goalLabel: string | null | undefined): number | null {
+  const s = String(goalLabel || '').toLowerCase();
+  if (!s.trim()) return null;
+  if (/\bhalf\b/.test(s) && /\bmarathon\b/.test(s)) return 13.1;
+  if (/\bhalf\b/.test(s) && !/\bfull\b/.test(s)) return 13.1;
+  if (/\b13\.1\b/.test(s)) return 13.1;
+  if (/\bmarathon\b|\bfull\s+marathon\b|\b26\.2\b|\b42\.?195\b/.test(s)) return 26.2;
+  if (/\b10\s*k\b|\b10k\b|\b6\.2\b/.test(s)) return 6.21371192;
+  if (/\b5\s*k\b|\b5k\b|\b3\.1\b/.test(s)) return 3.10685596;
+  if (/\bultra\b|\b50k\b|\b100k\b|\b50\s*mile\b/i.test(s)) return null;
+  return null;
+}
+
 function isLongRunLike(
   workoutTypeKey: string,
   plannedName: string | null,
@@ -300,11 +317,14 @@ export function buildSessionRaceReadinessFacts(params: {
         }
       : null;
 
+  const targetRaceDistanceMiles = inferTargetRaceDistanceMiles(pc.goalProfileOrDistance);
+
   const out: Record<string, unknown> = {
     days_to_race: pc.daysUntilRace,
     race_date: pc.raceDateIso,
     race_name: pc.raceName ?? pc.planName,
     race_type: pc.goalProfileOrDistance,
+    target_race_distance_miles: targetRaceDistanceMiles,
     course_profile: pc.courseProfileJson,
     workout_date: sd.date,
     distance_miles: distanceMiles,
@@ -512,6 +532,8 @@ Use only numbers and relationships that appear in DATA. Do not invent stats, dat
 
 Today's elevation describes this workout's terrain load (use for fitness / drift / pace reads). Never treat it as the race course unless the plan course profile is in DATA (see user instructions).
 
+If DATA includes target_race_distance_miles, finish-time estimates must agree with per-mile pace × that distance (see user instructions).
+
 Output: valid JSON only. No markdown fences, no preamble, no commentary outside the JSON.`;
 
   const dtr = facts.days_to_race;
@@ -533,9 +555,11 @@ HR DRIFT CONTEXT (pipeline — use when interpreting "controlled drift"): hr_dri
 
 Pace: If they slowed (positive split in the data), say so with the actual magnitude. Was it explainable by heat, rolling or hilly terrain, or discipline — vs unexplained collapse? What should they take away for race execution?
 
-Conditions: If the temperature at the end or peak is much higher than at the start, heat was back-loaded and the hardest miles were the hottest — that reframes late fade. Cooler race morning usually means easier early hours — connect that to ${racePart}.
+Conditions: If the temperature at the end or peak is much higher than at the start, heat was back-loaded and the hardest miles were the hottest — that reframes late fade. When DATA also suggests late climbing (e.g. rolling/hilly elevation_profile, meaningful elevation_gain_ft, hr_drift_explanation "terrain_driven", or positive terrain_contribution_bpm), treat final miles as carrying both heat and grade stress together — not heat alone. Cooler race morning usually means easier early hours — connect that to ${racePart}.
 
 Race day: Tie the threads together for ${racePart} specifically. What does today predict? What should they do the same or differently?
+
+PROJECTION / FINISH TIME SANITY: If DATA includes target_race_distance_miles (e.g. 26.2 for a marathon), any finish-time range you give must match your stated average pace per mile within ~5 minutes — compute: total minutes ≈ (pace minutes per mile) × (race miles). Example: ~10:45/mi for 26.2 mi is about 4h 42m, not 2h 45m. If target_race_distance_miles is null, do not assume 26.2; give pace guidance or a wide honest range and avoid precise finish clocks unless target_race_goal_finish_clock is on file.
 
 Today's route vs ${racePart} (both matter, different roles): Today's elevation gain and terrain profile in DATA reflect the terrain load that shaped this session's drift and pace — reference them when reasoning about fitness and execution under real hills. Do not imply they describe ${racePart}'s course unless DATA includes a plan course profile (course_profile). Without course_profile, keep race-day terrain out of verdict and tactical copy too — not only projection.
 
@@ -548,7 +572,7 @@ OUTPUT RULES:
 - Cite real numbers from DATA (+7 bpm, 15 mi, 37 s/mi, °F, etc.) — never cite field names.
 - No filler ("great job", "keep it up", "as you prepare").
 - If there is no honest concern, "flag" must be null.
-- "projection" must include brief reasoning, not only a time — and must follow COURSE PROFILE RULE above (no today's-elevation-as-race-proxy).
+- "projection" must include brief reasoning, not only a time — and must follow COURSE PROFILE RULE above (no today's-elevation-as-race-proxy). Pace × target_race_distance_miles must match any finish clock you state (±~5 min).
 
 Respond with this exact JSON shape — string values only where shown, flag may be null:
 {
