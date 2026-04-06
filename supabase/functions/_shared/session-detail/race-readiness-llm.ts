@@ -469,6 +469,8 @@ CRITICAL — OUTPUT HYGIENE: Never put fact field names, JSON keys, snake_case i
 
 Use only numbers and relationships that appear in DATA. Do not invent stats, dates, or race details. If something is missing, omit that thread instead of guessing.
 
+In "projection", never treat today's run elevation as the race course: only tie race-day terrain to DATA when the plan includes a course profile (see user instructions).
+
 Output: valid JSON only. No markdown fences, no preamble, no commentary outside the JSON.`;
 
   const dtr = facts.days_to_race;
@@ -492,6 +494,8 @@ Conditions: If the temperature at the end or peak is much higher than at the sta
 
 Race day: Tie the threads together for ${racePart} specifically. What does today predict? What should they do the same or differently?
 
+COURSE PROFILE RULE (applies especially to "projection"): Only reference race course elevation, net gain/loss, or profile (rolling, hilly, net downhill, etc.) in "projection" if DATA includes a plan course profile — the course_profile object (from the plan config). If course_profile is absent or empty, do not compare the race to today's route: base "projection" on temperature delta between today's conditions and likely race morning, plus today's HR, pace, and drift. Today's elevation_gain_ft and elevation_profile describe this workout only, not ${racePart}'s course — never use them as a stand-in for race terrain (e.g. do not say "similarly rolling (545 ft gain)" unless that figure is explicitly race course data in course_profile).
+
 Taper: If their plan already includes taper structure, do not tell them to "cut volume" generically. Say what to protect (sleep, fuel, short sharp work if any) and what optional pieces to skip if tired. Name the actual next session if the data includes it.
 
 OUTPUT RULES:
@@ -499,7 +503,7 @@ OUTPUT RULES:
 - Cite real numbers from DATA (+7 bpm, 15 mi, 37 s/mi, °F, etc.) — never cite field names.
 - No filler ("great job", "keep it up", "as you prepare").
 - If there is no honest concern, "flag" must be null.
-- "projection" must include brief reasoning, not only a time.
+- "projection" must include brief reasoning, not only a time — and must follow COURSE PROFILE RULE above (no today's-elevation-as-race-proxy).
 
 Respond with this exact JSON shape — string values only where shown, flag may be null:
 {
@@ -507,7 +511,7 @@ Respond with this exact JSON shape — string values only where shown, flag may 
   "verdict": "3-4 sentences: coach reasoning tying HR + pace + conditions to race day",
   "tactical_instruction": "one race-day instruction grounded in today's numbers",
   "flag": "one real concern if the data supports it, otherwise null",
-  "projection": "finish or pace estimate with brief reasoning from today's data",
+  "projection": "finish or pace estimate with brief reasoning; race terrain only if course_profile in DATA — else temp + HR/pace only",
   "taper_guidance": "2-3 sentences specific to the next ~two weeks — not generic advice"
 }`;
 
