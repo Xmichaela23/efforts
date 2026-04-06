@@ -56,7 +56,7 @@ function isRunningSessionForRaceReadiness(sessionNormType: string, workoutTypeKe
 export function raceReadinessGateSkipReason(params: {
   sessionNormType: string;
   workoutTypeKey: string;
-  plannedId: string | null;
+  planId: string | null;
   raceDateIso: string | null;
   daysUntilRace: number | null;
   distanceMiles: number | null;
@@ -66,7 +66,7 @@ export function raceReadinessGateSkipReason(params: {
   if (!isRunningSessionForRaceReadiness(params.sessionNormType, params.workoutTypeKey)) {
     return `not_run_session(norm=${params.sessionNormType},facts_type=${params.workoutTypeKey})`;
   }
-  if (!params.plannedId) return 'no_planned_id';
+  if (!params.planId) return 'no_plan_id';
   if (!params.raceDateIso) return 'no_race_date';
   if (params.daysUntilRace == null || params.daysUntilRace <= 0) return 'race_past_or_unknown_days';
   // Many plans taper earlier than three weeks out — keep window wide enough to match product taper UX.
@@ -82,7 +82,7 @@ export function raceReadinessGateSkipReason(params: {
 export function gateSessionRaceReadinessLlm(params: {
   sessionNormType: string;
   workoutTypeKey: string;
-  plannedId: string | null;
+  planId: string | null;
   raceDateIso: string | null;
   daysUntilRace: number | null;
   distanceMiles: number | null;
@@ -333,7 +333,7 @@ export async function trySessionRaceReadinessLlm(params: {
   const gateParams = {
     sessionNormType: String(sd.type || '').toLowerCase(),
     workoutTypeKey,
-    plannedId: sd.plan_context?.planned_id ?? null,
+    planId: pc.plan_id ?? null,
     raceDateIso: pc.raceDateIso,
     daysUntilRace: pc.daysUntilRace,
     distanceMiles: distMi,

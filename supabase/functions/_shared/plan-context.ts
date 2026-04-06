@@ -112,6 +112,7 @@ export async function fetchPlanRaceMetaForWorkout(
     if (!fields.raceDateIso || fields.daysUntilRace == null || fields.daysUntilRace <= 0) return null;
     return {
       hasActivePlan: true,
+      plan_id: String(planId),
       weekIndex: null,
       weekIntent: 'unknown',
       isRecoveryWeek: false,
@@ -129,6 +130,8 @@ export async function fetchPlanRaceMetaForWorkout(
 
 export interface PlanContext {
   hasActivePlan: boolean;
+  /** `plans.id` for the context row (required for race readiness gate when planned_workout link is absent). */
+  plan_id: string | null;
   weekIndex: number | null;
   weekIntent: 'build' | 'recovery' | 'taper' | 'peak' | 'baseline' | 'unknown';
   isRecoveryWeek: boolean;
@@ -291,6 +294,7 @@ export async function fetchPlanContextForWorkout(
 
     return {
       hasActivePlan: true,
+      plan_id: plan.id != null ? String(plan.id) : null,
       weekIndex,
       weekIntent,
       isRecoveryWeek,
