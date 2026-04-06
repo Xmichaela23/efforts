@@ -10,14 +10,16 @@ export type WorkoutDetailOptions = {
   resolution?: 'low' | 'high';
   normalize?: boolean;
   version?: string;
+  /** When true, fetches `session_detail_v1` (Performance tab) in a second request. */
+  fetchSessionDetail?: boolean;
 };
 
 export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
   const [hasSession, setHasSession] = useState(false);
+  const fetchSessionDetail = !!opts?.fetchSessionDetail;
 
-  // Check for active session
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -32,8 +34,6 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
   const isUuid = (v?: string | null) => !!v && /[0-9a-fA-F-]{36}/.test(v);
 
-  // Rich row from list context (GPS/sensors) — used only until workout-detail returns.
-  // PR-1: We always call workout-detail anyway so session_detail_v1 is never skipped.
   const contextPreview = useMemo(() => {
     try {
       if (!id || !Array.isArray(workouts)) return null;
@@ -48,8 +48,8 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     }
   }, [id, workouts]);
 
-  // Stable key for options to avoid refetch loops from new object identity each render
   const optsKey = useMemo(() => JSON.stringify({
+    scope: 'workout',
     include_gps: opts?.include_gps !== false,
     include_sensors: opts?.include_sensors === true,
     include_swim: opts?.include_swim !== false,
@@ -65,15 +65,11 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     opts?.version,
   ]);
 
-  const query = useQuery({
+  const workoutQuery = useQuery({
     queryKey: ['workout-detail', id, optsKey],
     enabled: !!id && isUuid(id) && hasSession,
     queryFn: async () => {
-      // Build normalized options once
       const normalized = JSON.parse(optsKey || '{}');
-
-      // Smart server, dumb client: server handles analysis computation
-      // Get current session for auth
       const userId = getStoredUserId();
       if (!userId) throw new Error('Session expired - please log in again');
       const accessToken = (() => {
@@ -82,22 +78,17 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
           return raw ? (JSON.parse(raw) as any)?.access_token ?? '' : '';
         } catch { return ''; }
       })();
-      
-      const body = { id, ...normalized } as any;
-      console.log('[useWorkoutDetail] Calling workout-detail for:', id, 'with options:', normalized);
+
       const { data, error } = await supabase.functions.invoke('workout-detail', {
-        body,
+        body: { id, ...normalized, scope: 'workout' },
         headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
       if (error) throw error;
       const remote = (data as any)?.workout || null;
-      const sessionDetailV1 = (data as any)?.session_detail_v1 || null;
-
       if (!remote) throw new Error('Workout not found');
 
-      // Merge with base row from context to preserve scalars and GPS/sensors if edge omitted them
       let merged: any;
       try {
         const base = Array.isArray(workouts) ? (workouts as any[]).find((x: any) => String(x?.id || '') === String(id)) : null;
@@ -133,24 +124,52 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         merged = remote;
       }
 
-      return { workout: merged, session_detail_v1: sessionDetailV1 };
+      return { workout: merged };
     },
-    staleTime: 60_000, // 60s — workout details don't change unless explicitly recomputed
-    gcTime: 6 * 60 * 60 * 1000, // 6 hours
+    staleTime: 60_000,
+    gcTime: 6 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
 
-  // Allow external invalidation — only respond to workout-detail-specific events.
-  // NOT workouts:invalidate — that fires on every list change / realtime update
-  // and caused a write-back loop (workout-detail writes session_detail_v1 →
-  // realtime fires workouts:invalidate → refetch → write-back → loop).
+  // Session query: `enabled` tracks Performance tab. Toggling away before resolve aborts the
+  // in-flight request (expected); that is not a refetch loop—no cache write on cancel. After a
+  // successful fetch, staleTime keeps data fresh while disabled so re-opening Performance does
+  // not refetch until stale (invalidation still busts cache via shared workout-detail prefix).
+  const sessionQuery = useQuery({
+    queryKey: ['workout-detail', id, 'session_detail'],
+    enabled: !!id && isUuid(id) && hasSession && fetchSessionDetail,
+    queryFn: async () => {
+      const userId = getStoredUserId();
+      if (!userId) throw new Error('Session expired - please log in again');
+      const accessToken = (() => {
+        try {
+          const raw = localStorage.getItem('sb-yyriamwvtvzlkumqrvpm-auth-token');
+          return raw ? (JSON.parse(raw) as any)?.access_token ?? '' : '';
+        } catch { return ''; }
+      })();
+
+      const { data, error } = await supabase.functions.invoke('workout-detail', {
+        body: { id, scope: 'session_detail' },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (error) throw error;
+      const sessionDetailV1 = (data as any)?.session_detail_v1 || null;
+      return { session_detail_v1: sessionDetailV1 };
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 6 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined;
     const detailHandler = () => {
       try {
         queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
-        // Second pass: analyze-running-workout may return before the row merge is visible to the next read.
         if (t) clearTimeout(t);
         t = setTimeout(() => {
           try {
@@ -167,22 +186,24 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   }, [queryClient]);
 
   const stableWorkout = useMemo(() => {
-    const fromQuery = (query.data as any)?.workout ?? null;
+    const fromQuery = (workoutQuery.data as any)?.workout ?? null;
     if (fromQuery) return { ...fromQuery };
     const preview = contextPreview as any;
     return preview ? { ...preview } : null;
-  }, [id, contextPreview, query.data]);
+  }, [id, contextPreview, workoutQuery.data]);
 
   const sessionDetailV1 = useMemo(() => {
-    return (query.data as any)?.session_detail_v1 ?? null;
-  }, [query.data]);
+    return (sessionQuery.data as any)?.session_detail_v1 ?? null;
+  }, [sessionQuery.data]);
 
   return {
     workout: stableWorkout,
     session_detail_v1: sessionDetailV1,
-    loading: query.isFetching || query.isPending,
-    error: (query.error as any)?.message || null,
+    loading: workoutQuery.isFetching || workoutQuery.isPending,
+    sessionDetailLoading: fetchSessionDetail && (sessionQuery.isFetching || sessionQuery.isPending),
+    error:
+      (workoutQuery.error as any)?.message ||
+      (fetchSessionDetail ? (sessionQuery.error as any)?.message : null) ||
+      null,
   };
 }
-
-

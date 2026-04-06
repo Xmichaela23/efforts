@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
@@ -10,10 +11,12 @@ type MobileSummaryProps = {
   planned: any | null;
   completed: any | null;
   session_detail_v1?: Record<string, any> | null;
+  /** True while `scope=session_detail` workout-detail request is in flight */
+  sessionDetailLoading?: boolean;
   onNavigateToContext?: (workoutId: string) => void;
 };
 
-export default function MobileSummary({ planned, completed, session_detail_v1, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
+export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
 
   const sd = session_detail_v1;
@@ -97,6 +100,13 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
 
   // Strength and Mobility use dedicated component
   if (type === 'strength' || type === 'mobility') {
+    if (sessionDetailLoading && !sd) {
+      return (
+        <div className="flex justify-center py-8" aria-busy="true" aria-label="Loading performance data">
+          <Loader2 className="h-6 w-6 animate-spin text-white/40" />
+        </div>
+      );
+    }
     return <StrengthPerformanceSummary
       planned={planned}
       completed={completed}
@@ -112,7 +122,11 @@ export default function MobileSummary({ planned, completed, session_detail_v1, h
 
   return (
     <div className="w-full">
-      {/* Source line removed per UI request */}
+      {sessionDetailLoading && !hasSessionDetail && (
+        <div className="flex justify-center py-8" aria-busy="true" aria-label="Loading performance data">
+          <Loader2 className="h-6 w-6 animate-spin text-white/40" />
+        </div>
+      )}
 
       <AdherenceChips
         sessionDetail={sd}

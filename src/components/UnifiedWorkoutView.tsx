@@ -212,13 +212,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
-  const { workout: hydratedCompleted, session_detail_v1: sessionDetailV1, loading: detailLoading } = useWorkoutDetail(isCompleted ? wid : undefined, {
+  const { workout: hydratedCompleted, session_detail_v1: sessionDetailV1, loading: detailLoading, sessionDetailLoading } = useWorkoutDetail(isCompleted ? wid : undefined, {
     include_gps: true,
     include_sensors: true,
     include_swim: true,
     resolution: 'high',
     normalize: true,
-    version: 'v1'
+    version: 'v1',
+    fetchSessionDetail: isCompleted && activeTab === 'summary',
   });
   // Layered merge: workout (scaffolding) < hydratedCompleted (server-computed track/display_metrics) < updatedWorkoutData (fresh scalars).
   // updatedWorkoutData (raw SELECT *) has no `track` or `display_metrics` columns, so server-computed fields survive the spread.
@@ -1294,6 +1295,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)}
                   completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
                   session_detail_v1={sessionDetailV1Merged}
+                  sessionDetailLoading={!!sessionDetailLoading}
                   onNavigateToContext={onNavigateToContext}
                 />
               </div>

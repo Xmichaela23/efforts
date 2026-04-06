@@ -594,9 +594,12 @@ Deno.serve(async (req) => {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
       global: { headers: { Authorization: req.headers.get('Authorization')! } },
     });
+    // coach_cache upsert requires INSERT; RLS only allows that for service_role. A user JWT in
+    // `global.headers.Authorization` would make PostgREST act as `authenticated`, so upsert fails silently.
+    const supabaseService = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     // ── Cache read (stale-while-revalidate) ───────────────────────────────────
-    const { data: cacheRow } = await supabase
+    const { data: cacheRow } = await supabaseService
       .from('coach_cache')
       .select('payload, generated_at, invalidated_at')
       .eq('user_id', userId)
@@ -3588,14 +3591,16 @@ ${narrativeFacts.join('\n')}`;
       race_readiness: raceReadiness,
     };
 
-    // ── Cache write (fire and forget) ────────────────────────────────────────
-    supabase
-      .from('coach_cache')
-      .upsert(
+    // ── Cache write (service_role so INSERT RLS passes; await so isolate does not exit first)
+    try {
+      const { error: cacheWriteErr } = await supabaseService.from('coach_cache').upsert(
         { user_id: userId, payload: response, generated_at: new Date().toISOString(), invalidated_at: null },
         { onConflict: 'user_id' }
-      )
-      .catch((e: unknown) => console.warn('[coach] cache write failed:', (e as any)?.message || e));
+      );
+      if (cacheWriteErr) console.warn('[coach] cache write failed:', cacheWriteErr.message);
+    } catch (e: unknown) {
+      console.warn('[coach] cache write failed:', (e as any)?.message || e);
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     return new Response(JSON.stringify(response), {

@@ -26,6 +26,386 @@ type DetailOptions = {
   version?: string; // response schema version; default v1
 };
 
+/** workout = map/readouts only; session_detail = Performance contract + LLM; full = both (omit scope for backward compat). */
+type WorkoutDetailScope = 'workout' | 'session_detail' | 'full';
+
+const SNAPSHOT_LATENCY_WARN_MS = 200;
+
+function parseScope(body: Record<string, unknown>): WorkoutDetailScope {
+  const s = String(body?.scope || '').toLowerCase();
+  if (s === 'workout' || s === 'session_detail') return s;
+  return 'full';
+}
+
+/**
+ * JSON + scalar fields needed for session_detail_v1 pipeline (no GPS/track/display_metrics).
+ */
+function buildDetailCoreForSession(row: any): { detail: any; processingComplete: boolean } {
+  const detail = normalizeBasic(row);
+  try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
+  try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
+  try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
+  try {
+    let se = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })();
+    if (Array.isArray(se) && se.length > 0) {
+      se = se.map((exercise: any, index: number) => ({
+        id: exercise.id || `temp-${index}`,
+        name: exercise.name || '',
+        sets: Array.isArray(exercise.sets)
+          ? exercise.sets.map((set: any) => ({
+              reps: Number((set?.reps as any) ?? 0) || 0,
+              weight: Number((set?.weight as any) ?? 0) || 0,
+              rir: typeof set?.rir === 'number' ? set.rir : undefined,
+              completed: Boolean(set?.completed)
+            }))
+          : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
+        reps: Number(exercise.reps || 0) || 0,
+        weight: Number(exercise.weight || 0) || 0,
+        notes: exercise.notes || '',
+        weightMode: exercise.weightMode || 'same'
+      }));
+    }
+    (detail as any).strength_exercises = se;
+  } catch {}
+  try { (detail as any).mobility_exercises = (()=>{ try { return typeof row.mobility_exercises === 'string' ? JSON.parse(row.mobility_exercises) : (row.mobility_exercises || null); } catch { return row.mobility_exercises || null; } })(); } catch {}
+  try { (detail as any).achievements = (()=>{ try { return typeof row.achievements === 'string' ? JSON.parse(row.achievements) : (row.achievements || null); } catch { return row.achievements || null; } })(); } catch {}
+  try { (detail as any).device_info = (()=>{ try { return typeof row.device_info === 'string' ? JSON.parse(row.device_info) : (row.device_info || null); } catch { return row.device_info || null; } })(); } catch {}
+  (detail as any).rpe = row.rpe ?? null;
+  (detail as any).gear_id = row.gear_id ?? null;
+  let meta: Record<string, unknown> = {};
+  try {
+    meta = row.workout_metadata != null
+      ? (typeof row.workout_metadata === 'string' ? JSON.parse(row.workout_metadata) : row.workout_metadata)
+      : {};
+  } catch { meta = {}; }
+  if (meta.session_rpe == null && row.rpe != null) meta = { ...meta, session_rpe: row.rpe };
+  (detail as any).workout_metadata = meta;
+  try { (detail as any).swim_data = typeof row.swim_data === 'string' ? JSON.parse(row.swim_data) : (row.swim_data || null); } catch { (detail as any).swim_data = row.swim_data || null; }
+  (detail as any).number_of_active_lengths = row.number_of_active_lengths ?? null;
+  (detail as any).pool_length = row.pool_length ?? null;
+
+  const hasSeries = (computed: any) => {
+    try {
+      const s = computed?.analysis?.series || null;
+      const n = Array.isArray(s?.distance_m) ? s.distance_m.length : 0;
+      const nt = Array.isArray(s?.time_s) ? s.time_s.length : (Array.isArray(s?.time) ? s.time.length : 0);
+      return n > 1 && nt > 1;
+    } catch { return false; }
+  };
+  const processingComplete = hasSeries((detail as any).computed);
+  return { detail, processingComplete };
+}
+
+async function runSessionDetailPipelineAndPersist(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  id: string,
+  row: any,
+  detail: any,
+): Promise<{ sessionDetailV1: any | null; snapshot_latency_ms: number | null }> {
+  let sessionDetailV1: any = null;
+  let snapshot_latency_ms: number | null = null;
+  if (!userId || String(row?.workout_status || '').toLowerCase() !== 'completed') {
+    return { sessionDetailV1: null, snapshot_latency_ms: null };
+  }
+  const t0 = performance.now();
+  try {
+    const workoutDate = String(row?.date || '').slice(0, 10);
+    const weekStartDate = weekStartOf(workoutDate, 'mon');
+    const weekEndDate = addDaysISO(weekStartDate, 6);
+    const asOfDate = workoutDate;
+
+    let readinessSnapshot: ReadinessSnapshotV1 | null = null;
+    let readinessUnavailable = false;
+    const readinessP = buildReadiness(supabase, userId, new Date(workoutDate))
+      .then((r) => {
+        readinessSnapshot = r;
+      })
+      .catch((reErr: unknown) => {
+        readinessUnavailable = true;
+        console.warn(
+          '[session_detail_v1] readiness unavailable, using legacy load context:',
+          reErr instanceof Error ? reErr.message : reErr,
+        );
+      });
+
+    const [plannedRes, weekWorkoutsRes] = await Promise.all([
+      supabase
+        .from('planned_workouts')
+        .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id')
+        .eq('user_id', userId)
+        .gte('date', weekStartDate)
+        .lte('date', weekEndDate),
+      supabase
+        .from('workouts')
+        .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,moving_time,duration,distance,avg_heart_rate,strength_exercises')
+        .eq('user_id', userId)
+        .gte('date', weekStartDate)
+        .lte('date', weekEndDate),
+      readinessP,
+    ]);
+
+    const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
+    const weekWorkoutsRaw = Array.isArray(weekWorkoutsRes?.data) ? weekWorkoutsRes.data : [];
+    const weekWorkouts = weekWorkoutsRaw
+      .map((w: any) => {
+        let wa = w?.workout_analysis;
+        if (typeof wa === 'string') try { wa = JSON.parse(wa); } catch { wa = null; }
+        return {
+          ...w,
+          workout_analysis: wa,
+          __local_date: String(w?.date || '').slice(0, 10),
+          avg_hr: w?.avg_hr ?? w?.avg_heart_rate,
+          average_heartrate: w?.average_heartrate ?? w?.avg_heart_rate,
+        };
+      })
+      .filter((w: any) => {
+        const d = String(w?.__local_date || '');
+        return d >= weekStartDate && d <= asOfDate && String(w?.workout_status || '').toLowerCase() === 'completed';
+      });
+
+    const isImperial = true;
+    const dailyLedger = buildDailyLedger({
+      weekStartDate,
+      weekEndDate,
+      asOfDate,
+      plannedRows,
+      workoutRows: weekWorkouts,
+      imperial: isImperial,
+    });
+
+    const snapshotNorms = {
+      easy_hr_at_pace: null,
+      threshold_pace_sec_per_mi: null,
+      avg_execution_score: null,
+      avg_rpe: null,
+      avg_hr_drift_bpm: null,
+      avg_decoupling_pct: null,
+      avg_rir: null,
+    };
+
+    const bodyResponse = buildBodyResponse(
+      dailyLedger,
+      snapshotNorms,
+      isImperial,
+      { actual_vs_planned_pct: null, acwr: null, running_acwr: null },
+      { interference: false, detail: 'No interference detected.' },
+    );
+
+    const ledgerDay = dailyLedger.find((d) => d.date === workoutDate) ?? null;
+    const actualSession = ledgerDay?.actual.find((a) => a.workout_id === id) ?? null;
+    let match = ledgerDay?.matches.find((m) => m.workout_id === id) ?? null;
+    let plannedSession = match?.planned_id
+      ? ledgerDay?.planned.find((p) => p.planned_id === match.planned_id) ?? null
+      : null;
+    const sessionObs = bodyResponse.session_signals.find((o) => o.workout_id === id);
+    const observations = sessionObs?.observations ?? [];
+
+    const wa = (detail as any).workout_analysis || {};
+    const narrativeText =
+      wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null;
+
+    const rowPlannedId =
+      row?.planned_id != null && String(row.planned_id).length > 0 ? String(row.planned_id) : '';
+    const effectivePlannedId = (match?.planned_id ? String(match.planned_id) : '') || rowPlannedId;
+
+    let attachPlannedRaw: any = null;
+    if (effectivePlannedId && (!plannedSession || !match || !match.planned_id)) {
+      attachPlannedRaw =
+        plannedRows.find((r: any) => String(r?.id) === String(effectivePlannedId)) ?? null;
+      if (!attachPlannedRaw) {
+        const { data: pr } = await supabase
+          .from('planned_workouts')
+          .select(
+            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
+          )
+          .eq('user_id', userId)
+          .eq('id', effectivePlannedId)
+          .maybeSingle();
+        attachPlannedRaw = pr ?? null;
+      }
+      if (attachPlannedRaw) {
+        if (!plannedSession) {
+          plannedSession = buildPlannedSession(attachPlannedRaw, isImperial);
+        }
+        if (!match || !match.planned_id) {
+          const t = String(plannedSession?.type || row?.type || '').toLowerCase();
+          const isStrength =
+            t.includes('strength') || t === 'weight_training' || t === 'weights';
+          match = {
+            planned_id: effectivePlannedId,
+            workout_id: id,
+            endurance_quality: isStrength ? null : 'followed',
+            strength_quality: isStrength ? 'followed' : null,
+            summary: plannedSession?.prescription
+              ? `Linked to plan — ${String(plannedSession.prescription).slice(0, 120)}`
+              : 'Linked to planned session',
+          };
+        }
+      }
+    }
+
+    const plannedId = match?.planned_id ?? null;
+    let plannedRowRaw: any = null;
+    if (plannedId) {
+      let raw =
+        attachPlannedRaw && String(attachPlannedRaw?.id) === String(plannedId)
+          ? attachPlannedRaw
+          : plannedRows.find((r: any) => String(r?.id) === String(plannedId));
+      if (!raw) {
+        const { data: pr } = await supabase
+          .from('planned_workouts')
+          .select(
+            'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
+          )
+          .eq('user_id', userId)
+          .eq('id', plannedId)
+          .maybeSingle();
+        raw = pr ?? null;
+      }
+      if (raw) {
+        let se = raw?.strength_exercises;
+        if (typeof se === 'string') try { se = JSON.parse(se); } catch { se = null; }
+        plannedRowRaw = { ...raw, strength_exercises: se };
+      }
+    }
+
+    const compStrength = (detail as any).strength_exercises ?? row?.strength_exercises;
+    const compStrengthArr = Array.isArray(compStrength) ? compStrength : (typeof compStrength === 'string' ? (() => { try { return JSON.parse(compStrength); } catch { return null; } })() : null);
+
+    let nextPlanned = plannedRows
+      .filter((p: any) => String(p?.date || '') > workoutDate)
+      .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
+
+    if (!nextPlanned) {
+      const dayAfter = addDaysISO(workoutDate, 1);
+      const lookAhead = addDaysISO(workoutDate, 14);
+      const { data: upcoming } = await supabase
+        .from('planned_workouts')
+        .select('id,date,type,name,description')
+        .eq('user_id', userId)
+        .gte('date', dayAfter)
+        .lte('date', lookAhead)
+        .order('date', { ascending: true })
+        .limit(1);
+      if (upcoming && upcoming.length > 0) nextPlanned = upcoming[0];
+    }
+
+    const nextSession = nextPlanned ? {
+      name: String(nextPlanned.name || nextPlanned.type || 'Workout'),
+      date: String(nextPlanned.date || '').slice(0, 10) || null,
+      type: nextPlanned.type ? String(nextPlanned.type) : null,
+      prescription: nextPlanned.description
+        ? String(nextPlanned.description).slice(0, 160)
+        : nextPlanned.rendered_description
+          ? String(nextPlanned.rendered_description).slice(0, 160)
+          : null,
+    } : null;
+
+    let planCtxForSession: PlanContext | null = null;
+    try {
+      let tpId =
+        plannedRowRaw?.training_plan_id ??
+        attachPlannedRaw?.training_plan_id ??
+        null;
+      const hasPlanLink = !!(match?.planned_id || effectivePlannedId);
+      if (!tpId && userId && hasPlanLink) {
+        const activePid = await fetchActivePlanId(supabase, userId);
+        if (activePid) {
+          tpId = activePid;
+          console.warn(
+            '[session_detail_v1] plan context: resolved plans.id from active plan (planned row missing training_plan_id)',
+          );
+        }
+      }
+      if (userId && tpId && workoutDate) {
+        planCtxForSession = await fetchPlanContextForWorkout(
+          supabase,
+          userId,
+          String(tpId),
+          workoutDate,
+        );
+        if (!planCtxForSession) {
+          planCtxForSession = await fetchPlanRaceMetaForWorkout(
+            supabase,
+            userId,
+            String(tpId),
+            workoutDate,
+          );
+          if (planCtxForSession) {
+            console.warn(
+              '[session_detail_v1] plan context: race-meta fallback (full week context unavailable)',
+            );
+          }
+        }
+      }
+    } catch (durErr: unknown) {
+      console.warn(
+        '[session_detail_v1] plan context fetch failed:',
+        durErr instanceof Error ? durErr.message : durErr,
+      );
+    }
+
+    sessionDetailV1 = buildSessionDetailV1({
+      workoutId: id,
+      workoutDate,
+      workoutType: row?.type ?? 'other',
+      workoutName: row?.name ?? null,
+      ledgerDay,
+      actualSession,
+      match,
+      plannedSession,
+      plannedRowRaw,
+      completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
+      observations,
+      workoutAnalysis: wa,
+      narrativeText,
+      loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
+      completedComputed: (detail as any).computed ?? null,
+      completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
+      nextSession,
+      readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
+      readinessUnavailable,
+    });
+
+    if (sessionDetailV1 && planCtxForSession) {
+      try {
+        const rrLlm = await trySessionRaceReadinessLlm({
+          sessionDetail: sessionDetailV1,
+          workoutAnalysis: wa,
+          planContext: planCtxForSession,
+          row: row as Record<string, unknown>,
+        });
+        if (rrLlm) sessionDetailV1.race_readiness = rrLlm;
+      } catch (rrErr: unknown) {
+        console.warn(
+          '[race_readiness_llm] skipped:',
+          rrErr instanceof Error ? rrErr.message : rrErr,
+        );
+      }
+    }
+  } catch (snapErr: any) {
+    console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr, snapErr?.stack || '');
+  }
+  snapshot_latency_ms = Math.round(performance.now() - t0);
+  if (snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
+    console.warn(`[workout-detail] session_detail snapshot build took ${snapshot_latency_ms}ms (>= ${SNAPSHOT_LATENCY_WARN_MS}ms)`);
+  }
+
+  if (sessionDetailV1) {
+    try {
+      await supabase.rpc('merge_session_detail_v1_into_workout_analysis', {
+        p_workout_id: id,
+        p_session_detail_v1: sessionDetailV1,
+      });
+    } catch (persistErr: any) {
+      console.warn('[workout-detail] session_detail_v1 persist failed (non-fatal):', persistErr?.message || persistErr);
+    }
+  }
+
+  return { sessionDetailV1, snapshot_latency_ms };
+}
+
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -210,6 +590,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(()=>({}));
     const id = String(body?.id || '').trim();
+    const scope = parseScope(body);
     const opts: DetailOptions = {
       include_gps: body?.include_gps !== false,
       include_sensors: body?.include_sensors !== false,
@@ -233,7 +614,7 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-    // Select minimal set plus optional blobs
+    // Select minimal set plus optional blobs (shared column list)
     const baseSel = [
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed','workout_analysis',
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
@@ -253,6 +634,33 @@ Deno.serve(async (req) => {
       // Timestamp for processing trigger deduplication
       'updated_at'
     ].join(',');
+
+    if (scope === 'session_detail') {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length';
+      let qSd = supabase.from('workouts').select(selectSd).eq('id', id) as any;
+      qSd = qSd.eq('user_id', userId);
+      const { data: rowSd, error: errSd } = await qSd.maybeSingle();
+      if (errSd) throw errSd;
+      if (!rowSd) {
+        return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const { detail: dSd, processingComplete: pcSd } = buildDetailCoreForSession(rowSd);
+      const { sessionDetailV1: sdV1, snapshot_latency_ms: latMs } = await runSessionDetailPipelineAndPersist(
+        supabase,
+        userId,
+        id,
+        rowSd,
+        dSd,
+      );
+      const out: Record<string, unknown> = { processing_complete: pcSd };
+      if (sdV1) out.session_detail_v1 = sdV1;
+      if (latMs != null && latMs >= SNAPSHOT_LATENCY_WARN_MS) out.snapshot_latency_ms = latMs;
+      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const gpsSel = opts.include_gps ? ',gps_track' : '';
     const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length' : '';
     const select = baseSel + gpsSel + swimSel;
@@ -475,309 +883,20 @@ Deno.serve(async (req) => {
     const series = rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null;
     (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport: (d?.type || null), series };
 
-    // session_detail_v1: server-computed from AthleteSnapshot (smart server, dumb client)
-    let sessionDetailV1: any = null;
-    let snapshot_latency_ms: number | null = null;
-    const SNAPSHOT_LATENCY_WARN_MS = 200;
-
-    if (userId && String(row?.workout_status || '').toLowerCase() === 'completed') {
-      const t0 = performance.now();
-      try {
-        const workoutDate = String(row?.date || '').slice(0, 10);
-        const weekStartDate = weekStartOf(workoutDate, 'mon');
-        const weekEndDate = addDaysISO(weekStartDate, 6);
-        const asOfDate = workoutDate;
-
-        let readinessSnapshot: ReadinessSnapshotV1 | null = null;
-        let readinessUnavailable = false;
-        const readinessP = buildReadiness(supabase, userId, new Date(workoutDate))
-          .then((r) => {
-            readinessSnapshot = r;
-          })
-          .catch((reErr: unknown) => {
-            readinessUnavailable = true;
-            console.warn(
-              '[session_detail_v1] readiness unavailable, using legacy load context:',
-              reErr instanceof Error ? reErr.message : reErr,
-            );
-          });
-
-        const [plannedRes, weekWorkoutsRes] = await Promise.all([
-          supabase
-            .from('planned_workouts')
-            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id')
-            .eq('user_id', userId)
-            .gte('date', weekStartDate)
-            .lte('date', weekEndDate),
-          supabase
-            .from('workouts')
-            .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,moving_time,duration,distance,avg_heart_rate,strength_exercises')
-            .eq('user_id', userId)
-            .gte('date', weekStartDate)
-            .lte('date', weekEndDate),
-          readinessP,
-        ]);
-
-        const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
-        const weekWorkoutsRaw = Array.isArray(weekWorkoutsRes?.data) ? weekWorkoutsRes.data : [];
-        const weekWorkouts = weekWorkoutsRaw
-          .map((w: any) => {
-            let wa = w?.workout_analysis;
-            if (typeof wa === 'string') try { wa = JSON.parse(wa); } catch { wa = null; }
-            return {
-              ...w,
-              workout_analysis: wa,
-              __local_date: String(w?.date || '').slice(0, 10),
-              avg_hr: w?.avg_hr ?? w?.avg_heart_rate,
-              average_heartrate: w?.average_heartrate ?? w?.avg_heart_rate,
-            };
-          })
-          .filter((w: any) => {
-            const d = String(w?.__local_date || '');
-            return d >= weekStartDate && d <= asOfDate && String(w?.workout_status || '').toLowerCase() === 'completed';
-          });
-
-        const isImperial = true;
-        const dailyLedger = buildDailyLedger({
-          weekStartDate,
-          weekEndDate,
-          asOfDate,
-          plannedRows,
-          workoutRows: weekWorkouts,
-          imperial: isImperial,
-        });
-
-        const snapshotNorms = {
-          easy_hr_at_pace: null,
-          threshold_pace_sec_per_mi: null,
-          avg_execution_score: null,
-          avg_rpe: null,
-          avg_hr_drift_bpm: null,
-          avg_decoupling_pct: null,
-          avg_rir: null,
-        };
-
-        const bodyResponse = buildBodyResponse(
-          dailyLedger,
-          snapshotNorms,
-          isImperial,
-          { actual_vs_planned_pct: null, acwr: null, running_acwr: null },
-          { interference: false, detail: 'No interference detected.' },
-        );
-
-        const ledgerDay = dailyLedger.find((d) => d.date === workoutDate) ?? null;
-        const actualSession = ledgerDay?.actual.find((a) => a.workout_id === id) ?? null;
-        let match = ledgerDay?.matches.find((m) => m.workout_id === id) ?? null;
-        let plannedSession = match?.planned_id
-          ? ledgerDay?.planned.find((p) => p.planned_id === match.planned_id) ?? null
-          : null;
-        const sessionObs = bodyResponse.session_signals.find((o) => o.workout_id === id);
-        const observations = sessionObs?.observations ?? [];
-
-        const wa = (detail as any).workout_analysis || {};
-        const narrativeText =
-          wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null;
-
-        const rowPlannedId =
-          row?.planned_id != null && String(row.planned_id).length > 0 ? String(row.planned_id) : '';
-        const effectivePlannedId = (match?.planned_id ? String(match.planned_id) : '') || rowPlannedId;
-
-        /** Raw row loaded when ledger omitted match/planned (e.g. manual attach / cross-day) */
-        let attachPlannedRaw: any = null;
-        if (effectivePlannedId && (!plannedSession || !match || !match.planned_id)) {
-          attachPlannedRaw =
-            plannedRows.find((r: any) => String(r?.id) === String(effectivePlannedId)) ?? null;
-          if (!attachPlannedRaw) {
-            const { data: pr } = await supabase
-              .from('planned_workouts')
-              .select(
-                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
-              )
-              .eq('user_id', userId)
-              .eq('id', effectivePlannedId)
-              .maybeSingle();
-            attachPlannedRaw = pr ?? null;
-          }
-          if (attachPlannedRaw) {
-            if (!plannedSession) {
-              plannedSession = buildPlannedSession(attachPlannedRaw, isImperial);
-            }
-            if (!match || !match.planned_id) {
-              const t = String(plannedSession?.type || row?.type || '').toLowerCase();
-              const isStrength =
-                t.includes('strength') || t === 'weight_training' || t === 'weights';
-              match = {
-                planned_id: effectivePlannedId,
-                workout_id: id,
-                endurance_quality: isStrength ? null : 'followed',
-                strength_quality: isStrength ? 'followed' : null,
-                summary: plannedSession?.prescription
-                  ? `Linked to plan — ${String(plannedSession.prescription).slice(0, 120)}`
-                  : 'Linked to planned session',
-              };
-            }
-          }
-        }
-
-        const plannedId = match?.planned_id ?? null;
-        let plannedRowRaw: any = null;
-        if (plannedId) {
-          let raw =
-            attachPlannedRaw && String(attachPlannedRaw?.id) === String(plannedId)
-              ? attachPlannedRaw
-              : plannedRows.find((r: any) => String(r?.id) === String(plannedId));
-          if (!raw) {
-            const { data: pr } = await supabase
-              .from('planned_workouts')
-              .select(
-                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
-              )
-              .eq('user_id', userId)
-              .eq('id', plannedId)
-              .maybeSingle();
-            raw = pr ?? null;
-          }
-          if (raw) {
-            let se = raw?.strength_exercises;
-            if (typeof se === 'string') try { se = JSON.parse(se); } catch { se = null; }
-            plannedRowRaw = { ...raw, strength_exercises: se };
-          }
-        }
-
-        const compStrength = (detail as any).strength_exercises ?? row?.strength_exercises;
-        const compStrengthArr = Array.isArray(compStrength) ? compStrength : (typeof compStrength === 'string' ? (() => { try { return JSON.parse(compStrength); } catch { return null; } })() : null);
-
-        let nextPlanned = plannedRows
-          .filter((p: any) => String(p?.date || '') > workoutDate)
-          .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)))[0] ?? null;
-
-        if (!nextPlanned) {
-          const dayAfter = addDaysISO(workoutDate, 1);
-          const lookAhead = addDaysISO(workoutDate, 14);
-          const { data: upcoming } = await supabase
-            .from('planned_workouts')
-            .select('id,date,type,name,description')
-            .eq('user_id', userId)
-            .gte('date', dayAfter)
-            .lte('date', lookAhead)
-            .order('date', { ascending: true })
-            .limit(1);
-          if (upcoming && upcoming.length > 0) nextPlanned = upcoming[0];
-        }
-
-        const nextSession = nextPlanned ? {
-          name: String(nextPlanned.name || nextPlanned.type || 'Workout'),
-          date: String(nextPlanned.date || '').slice(0, 10) || null,
-          type: nextPlanned.type ? String(nextPlanned.type) : null,
-          prescription: nextPlanned.description
-            ? String(nextPlanned.description).slice(0, 160)
-            : nextPlanned.rendered_description
-              ? String(nextPlanned.rendered_description).slice(0, 160)
-              : null,
-        } : null;
-
-        let planCtxForSession: PlanContext | null = null;
-        try {
-          let tpId =
-            plannedRowRaw?.training_plan_id ??
-            attachPlannedRaw?.training_plan_id ??
-            null;
-          const hasPlanLink = !!(match?.planned_id || effectivePlannedId);
-          if (!tpId && userId && hasPlanLink) {
-            const activePid = await fetchActivePlanId(supabase, userId);
-            if (activePid) {
-              tpId = activePid;
-              console.warn(
-                '[session_detail_v1] plan context: resolved plans.id from active plan (planned row missing training_plan_id)',
-              );
-            }
-          }
-          if (userId && tpId && workoutDate) {
-            planCtxForSession = await fetchPlanContextForWorkout(
-              supabase,
-              userId,
-              String(tpId),
-              workoutDate,
-            );
-            if (!planCtxForSession) {
-              planCtxForSession = await fetchPlanRaceMetaForWorkout(
-                supabase,
-                userId,
-                String(tpId),
-                workoutDate,
-              );
-              if (planCtxForSession) {
-                console.warn(
-                  '[session_detail_v1] plan context: race-meta fallback (full week context unavailable)',
-                );
-              }
-            }
-          }
-        } catch (durErr: unknown) {
-          console.warn(
-            '[session_detail_v1] plan context fetch failed:',
-            durErr instanceof Error ? durErr.message : durErr,
-          );
-        }
-
-        sessionDetailV1 = buildSessionDetailV1({
-          workoutId: id,
-          workoutDate,
-          workoutType: row?.type ?? 'other',
-          workoutName: row?.name ?? null,
-          ledgerDay,
-          actualSession,
-          match,
-          plannedSession,
-          plannedRowRaw,
-          completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
-          observations,
-          workoutAnalysis: wa,
-          narrativeText,
-          loadStatus: bodyResponse?.load_status ? { status: bodyResponse.load_status.status, interpretation: bodyResponse.load_status.interpretation } : null,
-          completedComputed: (detail as any).computed ?? null,
-          completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
-          nextSession,
-          readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
-          readinessUnavailable,
-        });
-
-        if (sessionDetailV1 && planCtxForSession) {
-          try {
-            const rrLlm = await trySessionRaceReadinessLlm({
-              sessionDetail: sessionDetailV1,
-              workoutAnalysis: wa,
-              planContext: planCtxForSession,
-              row: row as Record<string, unknown>,
-            });
-            if (rrLlm) sessionDetailV1.race_readiness = rrLlm;
-          } catch (rrErr: unknown) {
-            console.warn(
-              '[race_readiness_llm] skipped:',
-              rrErr instanceof Error ? rrErr.message : rrErr,
-            );
-          }
-        }
-      } catch (snapErr: any) {
-        console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr, snapErr?.stack || '');
-      }
-      snapshot_latency_ms = Math.round(performance.now() - t0);
-      if (snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
-        console.warn(`[workout-detail] session_detail snapshot build took ${snapshot_latency_ms}ms (>= ${SNAPSHOT_LATENCY_WARN_MS}ms)`);
-      }
-
-      // Write-through: persist session_detail_v1 into workout_analysis (atomic merge, no read-modify-write race)
-      if (sessionDetailV1) {
-        try {
-          await supabase.rpc('merge_session_detail_v1_into_workout_analysis', {
-            p_workout_id: id,
-            p_session_detail_v1: sessionDetailV1,
-          });
-        } catch (persistErr: any) {
-          console.warn('[workout-detail] session_detail_v1 persist failed (non-fatal):', persistErr?.message || persistErr);
-        }
-      }
+    if (scope === 'workout') {
+      return new Response(JSON.stringify({
+        workout: detail,
+        processing_complete: processingComplete,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    const { sessionDetailV1, snapshot_latency_ms } = await runSessionDetailPipelineAndPersist(
+      supabase,
+      userId || '',
+      id,
+      row,
+      detail,
+    );
 
     const responsePayload: Record<string, unknown> = {
       workout: detail,
