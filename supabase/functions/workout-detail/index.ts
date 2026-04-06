@@ -7,7 +7,11 @@ import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
-import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
+import {
+  fetchPlanContextForWorkout,
+  fetchPlanRaceMetaForWorkout,
+  type PlanContext,
+} from '../_shared/plan-context.ts';
 import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
@@ -684,6 +688,19 @@ Deno.serve(async (req) => {
               String(tpId),
               workoutDate,
             );
+            if (!planCtxForSession) {
+              planCtxForSession = await fetchPlanRaceMetaForWorkout(
+                supabase,
+                userId,
+                String(tpId),
+                workoutDate,
+              );
+              if (planCtxForSession) {
+                console.warn(
+                  '[session_detail_v1] plan context: race-meta fallback (full week context unavailable)',
+                );
+              }
+            }
           }
         } catch (durErr: unknown) {
           console.warn(

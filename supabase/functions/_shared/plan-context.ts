@@ -17,6 +17,101 @@ function computeDaysUntilRace(workoutDateIso: string, config: Record<string, unk
   return days > 0 ? days : null;
 }
 
+/** Race-day fields from plan config only (no week index / start_date required). */
+function extractPlanRaceFieldsFromConfig(
+  workoutDate: string,
+  config: Record<string, unknown>,
+): Pick<
+  PlanContext,
+  | 'daysUntilRace'
+  | 'raceDateIso'
+  | 'raceName'
+  | 'goalProfileOrDistance'
+  | 'courseProfileJson'
+  | 'targetFinishTimeSeconds'
+> {
+  const daysUntilRace = computeDaysUntilRace(workoutDate, config);
+  const raceRaw = config.race_date ?? config.raceDate;
+  const raceDateIso =
+    raceRaw && typeof raceRaw === 'string' ? String(raceRaw).slice(0, 10) : null;
+  const raceName =
+    typeof config.race_name === 'string' ? String(config.race_name) : null;
+  const goalProfileOrDistance =
+    typeof config.goal_profile === 'string'
+      ? String(config.goal_profile)
+      : typeof config.distance_key === 'string'
+        ? String(config.distance_key)
+        : typeof config.event_type === 'string'
+          ? String(config.event_type)
+          : null;
+  let courseProfileJson: string | null = null;
+  try {
+    const cp = config.course_profile;
+    if (cp && typeof cp === 'object') {
+      courseProfileJson = JSON.stringify(cp).slice(0, 500);
+    } else if (typeof cp === 'string' && cp.trim()) {
+      courseProfileJson = cp.trim().slice(0, 500);
+    }
+  } catch {
+    /* */
+  }
+  const targetFinishTimeSeconds =
+    typeof config.target_finish_time_seconds === 'number' &&
+    Number.isFinite(config.target_finish_time_seconds)
+      ? Math.round(config.target_finish_time_seconds)
+      : null;
+
+  return {
+    daysUntilRace,
+    raceDateIso,
+    raceName,
+    goalProfileOrDistance,
+    courseProfileJson,
+    targetFinishTimeSeconds,
+  };
+}
+
+/**
+ * Minimal plan context for race date / goal fields when full week resolution fails
+ * (missing start_date, week index out of range, etc.). Does not populate weekIntent / phase.
+ */
+export async function fetchPlanRaceMetaForWorkout(
+  supabase: any,
+  userId: string,
+  planId: string,
+  workoutDate: string,
+): Promise<PlanContext | null> {
+  try {
+    const { data: plan } = await supabase
+      .from('plans')
+      .select('name, config')
+      .eq('id', planId)
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!plan) return null;
+    const config = (plan.config || {}) as Record<string, unknown>;
+    const raceRaw = config.race_date ?? config.raceDate;
+    if (!raceRaw || typeof raceRaw !== 'string') return null;
+    const fields = extractPlanRaceFieldsFromConfig(workoutDate, config);
+    if (!fields.raceDateIso || fields.daysUntilRace == null || fields.daysUntilRace <= 0) return null;
+    return {
+      hasActivePlan: true,
+      weekIndex: null,
+      weekIntent: 'unknown',
+      isRecoveryWeek: false,
+      isTaperWeek: false,
+      phaseName: null,
+      weekFocusLabel: null,
+      planName: plan.name ?? null,
+      ...fields,
+    };
+  } catch (e) {
+    console.warn('[plan-context] fetchPlanRaceMetaForWorkout:', e);
+    return null;
+  }
+}
+
 export interface PlanContext {
   hasActivePlan: boolean;
   weekIndex: number | null;
@@ -177,36 +272,7 @@ export async function fetchPlanContextForWorkout(
 
     if (weekIntent === 'unknown') weekIntent = 'build';
 
-    const daysUntilRace = computeDaysUntilRace(workoutDate, config);
-    const raceRaw = config.race_date ?? config.raceDate;
-    const raceDateIso =
-      raceRaw && typeof raceRaw === 'string' ? String(raceRaw).slice(0, 10) : null;
-    const raceName =
-      typeof (config as Record<string, unknown>).race_name === 'string'
-        ? String((config as Record<string, unknown>).race_name)
-        : null;
-    const c = config as Record<string, unknown>;
-    const goalProfileOrDistance =
-      typeof c.goal_profile === 'string'
-        ? String(c.goal_profile)
-        : typeof c.distance_key === 'string'
-          ? String(c.distance_key)
-          : typeof c.event_type === 'string'
-            ? String(c.event_type)
-            : null;
-    let courseProfileJson: string | null = null;
-    try {
-      const cp = c.course_profile;
-      if (cp && typeof cp === 'object') {
-        courseProfileJson = JSON.stringify(cp).slice(0, 500);
-      } else if (typeof cp === 'string' && cp.trim()) {
-        courseProfileJson = cp.trim().slice(0, 500);
-      }
-    } catch { /* */ }
-    const targetFinishTimeSeconds =
-      typeof c.target_finish_time_seconds === 'number' && Number.isFinite(c.target_finish_time_seconds)
-        ? Math.round(c.target_finish_time_seconds)
-        : null;
+    const raceFields = extractPlanRaceFieldsFromConfig(workoutDate, config as Record<string, unknown>);
 
     return {
       hasActivePlan: true,
@@ -217,12 +283,7 @@ export async function fetchPlanContextForWorkout(
       phaseName,
       weekFocusLabel,
       planName: plan.name,
-      daysUntilRace,
-      raceDateIso,
-      raceName,
-      goalProfileOrDistance,
-      courseProfileJson,
-      targetFinishTimeSeconds,
+      ...raceFields,
     };
   } catch (error) {
     console.error('⚠️ Error fetching plan context:', error);

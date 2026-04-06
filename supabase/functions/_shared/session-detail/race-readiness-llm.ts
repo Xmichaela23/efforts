@@ -42,8 +42,45 @@ function isLongRunLike(
   return false;
 }
 
+/** Norm type + fact workout_type: allow Garmin-style "endurance" runs, exclude obvious non-run sports. */
+function isRunningSessionForRaceReadiness(sessionNormType: string, workoutTypeKey: string): boolean {
+  const nt = String(sessionNormType || '').toLowerCase().trim();
+  const wtk = String(workoutTypeKey || '').toLowerCase();
+  if (/\b(bike|biking|cycling|cycle|ride|riding|swim|swimming|row|kayak)\b/.test(wtk)) return false;
+  if (nt === 'run') return true;
+  if (nt === 'endurance') return true;
+  if (/run|jog|treadmill|trail/.test(wtk)) return true;
+  return false;
+}
+
+export function raceReadinessGateSkipReason(params: {
+  sessionNormType: string;
+  workoutTypeKey: string;
+  plannedId: string | null;
+  raceDateIso: string | null;
+  daysUntilRace: number | null;
+  distanceMiles: number | null;
+  durationMinutes: number | null;
+  isLongRunLike: boolean;
+}): string | null {
+  if (!isRunningSessionForRaceReadiness(params.sessionNormType, params.workoutTypeKey)) {
+    return `not_run_session(norm=${params.sessionNormType},facts_type=${params.workoutTypeKey})`;
+  }
+  if (!params.plannedId) return 'no_planned_id';
+  if (!params.raceDateIso) return 'no_race_date';
+  if (params.daysUntilRace == null || params.daysUntilRace <= 0) return 'race_past_or_unknown_days';
+  if (params.daysUntilRace > 21) return `outside_window_days=${params.daysUntilRace}`;
+  const longEnough =
+    (params.distanceMiles != null && params.distanceMiles >= 10) ||
+    (params.durationMinutes != null && params.durationMinutes >= 90);
+  if (!longEnough) return 'distance_duration_short';
+  if (!params.isLongRunLike) return 'not_long_run_like';
+  return null;
+}
+
 export function gateSessionRaceReadinessLlm(params: {
-  sessionType: string;
+  sessionNormType: string;
+  workoutTypeKey: string;
   plannedId: string | null;
   raceDateIso: string | null;
   daysUntilRace: number | null;
@@ -51,18 +88,7 @@ export function gateSessionRaceReadinessLlm(params: {
   durationMinutes: number | null;
   isLongRunLike: boolean;
 }): boolean {
-  if (params.sessionType !== 'run') return false;
-  if (!params.plannedId) return false;
-  if (!params.raceDateIso) return false;
-  if (params.daysUntilRace == null || params.daysUntilRace <= 0 || params.daysUntilRace > 21) {
-    return false;
-  }
-  const longEnough =
-    (params.distanceMiles != null && params.distanceMiles >= 10) ||
-    (params.durationMinutes != null && params.durationMinutes >= 90);
-  if (!longEnough) return false;
-  if (!params.isLongRunLike) return false;
-  return true;
+  return raceReadinessGateSkipReason(params) === null;
 }
 
 export function buildSessionRaceReadinessFacts(params: {
@@ -235,9 +261,12 @@ Respond with this exact JSON structure (all string fields; flag may be null):
     temperature: 0.2,
     model: 'sonnet',
   });
+  if (raw == null || raw === '') {
+    console.warn('[race_readiness_llm] callLLM returned empty — check ANTHROPIC_API_KEY / credits / model');
+  }
   const parsed = parseRaceReadinessLlmResponse(raw);
-  if (!parsed) {
-    console.warn('[race_readiness_llm] empty or invalid LLM response');
+  if (!parsed && raw) {
+    console.warn('[race_readiness_llm] empty or invalid LLM response (parse failed)');
   }
   return parsed;
 }
@@ -267,17 +296,19 @@ export async function trySessionRaceReadinessLlm(params: {
 
   const longRun = isLongRunLike(workoutTypeKey, plannedName, plannedRx, distMi);
 
-  if (
-    !gateSessionRaceReadinessLlm({
-      sessionType: String(sd.type || '').toLowerCase(),
-      plannedId: sd.plan_context?.planned_id ?? null,
-      raceDateIso: pc.raceDateIso,
-      daysUntilRace: pc.daysUntilRace,
-      distanceMiles: distMi,
-      durationMinutes: durMin,
-      isLongRunLike: longRun,
-    })
-  ) {
+  const gateParams = {
+    sessionNormType: String(sd.type || '').toLowerCase(),
+    workoutTypeKey,
+    plannedId: sd.plan_context?.planned_id ?? null,
+    raceDateIso: pc.raceDateIso,
+    daysUntilRace: pc.daysUntilRace,
+    distanceMiles: distMi,
+    durationMinutes: durMin,
+    isLongRunLike: longRun,
+  };
+  const skip = raceReadinessGateSkipReason(gateParams);
+  if (skip) {
+    console.warn('[race_readiness_llm] gate_skip:', skip);
     return null;
   }
 
