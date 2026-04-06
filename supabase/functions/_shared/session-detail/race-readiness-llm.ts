@@ -188,12 +188,36 @@ export function buildSessionRaceReadinessFacts(params: {
   const avgHr = sd.completed_totals?.avg_hr ?? row.avg_heart_rate ?? row.metrics?.avg_heart_rate ?? null;
   const maxHr = row.max_heart_rate ?? row.metrics?.max_heart_rate ?? null;
 
+  const hra = (wa as any)?.granular_analysis?.heart_rate_analysis as
+    | { hr_drift_bpm?: number; terrain_contribution_bpm?: number }
+    | undefined;
+
+  /** Terrain-adjusted late-minus-early HR from this run's GPS (analyzer); before pace-normalization story. */
+  const hrDriftTerrainAdjusted =
+    typeof derived.hr_drift_bpm === 'number'
+      ? derived.hr_drift_bpm
+      : typeof hra?.hr_drift_bpm === 'number'
+        ? hra.hr_drift_bpm
+        : null;
+
+  const paceNormalizedDriftBpm =
+    typeof derived.pace_normalized_drift_bpm === 'number' ? derived.pace_normalized_drift_bpm : null;
+
+  const terrainContributionBpm =
+    typeof derived.terrain_contribution_bpm === 'number'
+      ? derived.terrain_contribution_bpm
+      : typeof hra?.terrain_contribution_bpm === 'number'
+        ? hra.terrain_contribution_bpm
+        : null;
+
   const hrDrift =
-    typeof derived.pace_normalized_drift_bpm === 'number'
-      ? derived.pace_normalized_drift_bpm
+    typeof paceNormalizedDriftBpm === 'number'
+      ? paceNormalizedDriftBpm
       : typeof derived.hr_drift_bpm === 'number'
         ? derived.hr_drift_bpm
-        : (wa as any)?.granular_analysis?.heart_rate_analysis?.hr_drift_bpm ?? null;
+        : typeof hra?.hr_drift_bpm === 'number'
+          ? hra.hr_drift_bpm
+          : null;
 
   const typicalHrDrift =
     typeof derived.hr_drift_typical === 'number' && Math.abs(derived.hr_drift_typical) >= 1
@@ -208,7 +232,7 @@ export function buildSessionRaceReadinessFacts(params: {
   const gapAdjusted = !!(sd.execution?.gap_adjusted ?? perf?.gap_adjusted);
   const splitFacts = computeMileSplitRaceFacts(wa, derived as Record<string, unknown>, gapAdjusted);
 
-  const driftExplanation =
+  const hrDriftExplanation =
     typeof derived.drift_explanation === 'string' ? String(derived.drift_explanation) : null;
   const pacingSpeedupsNote =
     derived.pacing_pattern && typeof (derived.pacing_pattern as any).speedups_note === 'string'
@@ -289,10 +313,22 @@ export function buildSessionRaceReadinessFacts(params: {
     avg_hr: typeof avgHr === 'number' ? Math.round(avgHr) : avgHr,
     max_hr: typeof maxHr === 'number' ? Math.round(maxHr) : maxHr,
     hr_drift_bpm: typeof hrDrift === 'number' ? Math.round(hrDrift * 10) / 10 : hrDrift,
+    hr_drift_bpm_terrain_adjusted:
+      typeof hrDriftTerrainAdjusted === 'number'
+        ? Math.round(hrDriftTerrainAdjusted * 10) / 10
+        : null,
+    pace_normalized_drift_bpm:
+      typeof paceNormalizedDriftBpm === 'number'
+        ? Math.round(paceNormalizedDriftBpm * 10) / 10
+        : null,
+    terrain_contribution_bpm:
+      typeof terrainContributionBpm === 'number'
+        ? Math.round(terrainContributionBpm * 10) / 10
+        : null,
+    hr_drift_explanation: hrDriftExplanation,
     typical_hr_drift_bpm:
       typeof typicalHrDrift === 'number' ? Math.round(typicalHrDrift * 10) / 10 : null,
     hr_drift_vs_typical: hrDriftVsTypical,
-    drift_explanation: driftExplanation,
     pacing_split: pacingSplit,
     pacing_split_seconds_per_mile: splitFacts.pacing_split_seconds_per_mile,
     fastest_mile: splitFacts.fastest_mile,
@@ -395,6 +431,8 @@ export function raceReadinessDeterministicFallback(
   const heatNote = typeof facts.conditions_heat_note === 'string' ? facts.conditions_heat_note.trim() : '';
   const drift = typeof facts.hr_drift_bpm === 'number' ? facts.hr_drift_bpm : null;
   const typ = typeof facts.typical_hr_drift_bpm === 'number' ? facts.typical_hr_drift_bpm : null;
+  const driftWhy =
+    typeof facts.hr_drift_explanation === 'string' ? String(facts.hr_drift_explanation).trim() : '';
   const avgHrF = typeof facts.avg_hr === 'number' ? Math.round(facts.avg_hr) : null;
   const split = facts.pacing_split_seconds_per_mile;
   const elev = typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
@@ -404,6 +442,9 @@ export function raceReadinessDeterministicFallback(
     coachBits.push(
       `Drift +${Math.round(drift)} bpm vs your typical +${Math.round(typ)} bpm is a solid aerobic read`,
     );
+    if (driftWhy === 'terrain_driven') {
+      coachBits.push('late climbing factored into that picture — the pipeline already terrain-adjusted the HR story');
+    }
   }
   if (avgHrF != null) coachBits.push(`${avgHrF} bpm average`);
   if (typeof split === 'number' && Math.abs(split) >= 5) {
@@ -487,6 +528,8 @@ ${JSON.stringify(facts, null, 2)}
 HOW TO REASON:
 
 Heart rate: Compare average HR, drift, and typical drift if both exist. If drift is lower than their typical, say plainly that it is a fitness / execution signal. If it was hot (use the temperature values or any described ramp from start to peak), strip the heat tax: late-run HR in rising heat is expected, not automatic loss of fitness. What does the HR story say about aerobic capacity right now?
+
+HR DRIFT CONTEXT (pipeline — use when interpreting "controlled drift"): hr_drift_bpm is the primary aerobic signal: when pace_normalized_drift_bpm is present, hr_drift_bpm matches it (HR change after accounting for intentional pace shift across the run). Otherwise hr_drift_bpm is terrain-adjusted HR drift from this activity's GPS (early vs late grade). hr_drift_bpm_terrain_adjusted is the analyzer's late-minus-early HR after that terrain adjustment (when present). terrain_contribution_bpm is how much raw HR change was attributed to hillier late terrain before that step. hr_drift_explanation classifies the story: "terrain_driven" means late hills largely explain the HR pattern; "cardiac_drift" is aerobic decoupling after pace/terrain accounting; "pace_driven" means HR tracked a deliberate pace change; "mixed" is several factors. When you say their drift was controlled or their aerobic system held steady, ground it in hr_drift_explanation and these fields — not only the magnitude.
 
 Pace: If they slowed (positive split in the data), say so with the actual magnitude. Was it explainable by heat, rolling or hilly terrain, or discipline — vs unexplained collapse? What should they take away for race execution?
 
