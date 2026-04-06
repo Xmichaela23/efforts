@@ -1343,7 +1343,7 @@ export default function WorkoutCalendar({
             <div className="pt-3 pb-4 border-t border-white/10 space-y-2">
               {wsv && (
                 <div className="rounded-xl border border-white/[0.07] bg-white/[0.025]">
-                  <LoadBar load={wsv.load} loadStatus={loadStatus} readinessState={readiness} hideDailyBars />
+                  <LoadBar load={wsv.load} loadStatus={loadStatus} readinessState={readiness} weekIntent={wsv?.week?.intent} hideDailyBars />
                 </div>
               )}
               {metrics.length > 0 && (
