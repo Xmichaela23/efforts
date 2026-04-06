@@ -197,7 +197,15 @@ Deno.serve(async (req) => {
           }
         }
         console.log(`🌡️ [WEATHER] Using timestamp: ${workoutTimestamp}`);
-        
+
+        const durationSecondsForWeather = (() => {
+          const comp = Number(workout?.computed?.overall?.duration_s_moving);
+          if (Number.isFinite(comp) && comp >= 60) return Math.round(comp);
+          const mv = Number(workout?.moving_time);
+          if (!Number.isFinite(mv) || mv <= 0) return null;
+          return mv < 1000 ? Math.round(mv * 60) : Math.round(mv);
+        })();
+
         const weatherResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-weather`, {
           method: 'POST',
           headers: {
@@ -209,7 +217,8 @@ Deno.serve(async (req) => {
             lng: workout.start_position_long,
             timestamp: workoutTimestamp,
             workout_id: workout_id,
-            force_refresh: forceWeatherFetch  // Skip all caches when force refresh requested
+            force_refresh: forceWeatherFetch, // Skip all caches when force refresh requested
+            duration_seconds: durationSecondsForWeather,
           })
         });
         if (weatherResp.ok) {

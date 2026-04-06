@@ -225,14 +225,37 @@ export function buildSessionRaceReadinessFacts(params: {
     : null;
   const heartRateSummary = hrRow?.value != null ? String(hrRow.value) : null;
 
-  const wx = facts.weather;
-  const conditionsTempF =
-    wx && typeof wx.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
+  const wx = facts.weather as Record<string, unknown> | null | undefined;
+  const conditionsTempAvg =
+    wx && typeof wx.temperature_f === 'number' ? Math.round(wx.temperature_f as number) : null;
+  const conditionsTempStart =
+    wx && typeof wx.temp_start_f === 'number' ? Math.round(wx.temp_start_f as number) : null;
+  const conditionsTempEnd =
+    wx && typeof wx.temp_end_f === 'number' ? Math.round(wx.temp_end_f as number) : null;
+  const conditionsTempPeak =
+    wx && typeof wx.temp_peak_f === 'number'
+      ? Math.round(wx.temp_peak_f as number)
+      : conditionsTempAvg;
+  const conditionsHeatFlag = conditionsTempPeak != null ? conditionsTempPeak >= 70 : null;
+  let conditionsHeatNote: string | null = null;
+  if (
+    conditionsTempStart != null &&
+    conditionsTempPeak != null &&
+    conditionsTempPeak - conditionsTempStart >= 8
+  ) {
+    conditionsHeatNote =
+      `Started ~${conditionsTempStart}°F; conditions peaked near ${conditionsTempPeak}°F during the session — heat load was heavier toward the final miles.`;
+  } else if (
+    conditionsTempStart != null &&
+    conditionsTempEnd != null &&
+    conditionsTempPeak != null
+  ) {
+    conditionsHeatNote = `Temps ~${conditionsTempStart}°F → ~${conditionsTempEnd}°F (peak ~${conditionsTempPeak}°F).`;
+  }
   const elevFt =
     typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
   const terrainType = typeof facts.terrain_type === 'string' ? facts.terrain_type : null;
   const elevationProfile = elevationProfileLabel(elevFt, terrainType);
-  const conditionsHeatFlag = conditionsTempF != null ? conditionsTempF >= 70 : null;
 
   const rpeRaw = (row as any)?.rpe;
   const rpe = typeof rpeRaw === 'number' && Number.isFinite(rpeRaw) ? Math.round(rpeRaw * 10) / 10 : null;
@@ -277,8 +300,12 @@ export function buildSessionRaceReadinessFacts(params: {
     fastest_mile_pace_sec_per_mi: splitFacts.fastest_mile_pace_sec_per_mi,
     pacing_speedups_note: pacingSpeedupsNote,
     heart_rate_row_summary: heartRateSummary,
-    conditions_temp_f: conditionsTempF,
+    conditions_temp_f: conditionsTempAvg,
+    conditions_temp_start_f: conditionsTempStart,
+    conditions_temp_end_f: conditionsTempEnd,
+    conditions_temp_peak_f: conditionsTempPeak,
     conditions_heat_flag: conditionsHeatFlag,
+    conditions_heat_note: conditionsHeatNote,
     elevation_gain_ft: elevFt,
     elevation_profile: elevationProfile,
     terrain_type: terrainType,
@@ -287,6 +314,7 @@ export function buildSessionRaceReadinessFacts(params: {
     current_phase: pc.current_phase,
     next_session_name: nextSessionName,
     next_session_prescription: nextSessionPrescription,
+    next_session_description: nextSessionPrescription,
     execution_score: sd.execution?.execution_score ?? perf.execution_adherence ?? null,
     pace_adherence_pct: sd.execution?.pace_adherence ?? perf.pace_adherence ?? null,
     duration_adherence_pct: sd.execution?.duration_adherence ?? perf.duration_adherence ?? null,
@@ -366,13 +394,18 @@ export function raceReadinessDeterministicFallback(
   if (typeof exec === 'number') bits.push(`execution vs plan about ${Math.round(exec)}%`);
   const verdict = bits.join('; ') + '. Use pacing and heart-rate rows above as the primary readiness read.';
   const heat = facts.conditions_heat_flag === true;
+  const heatNote = typeof facts.conditions_heat_note === 'string' ? facts.conditions_heat_note : '';
   const drift = typeof facts.hr_drift_bpm === 'number' ? facts.hr_drift_bpm : null;
   const typ = typeof facts.typical_hr_drift_bpm === 'number' ? facts.typical_hr_drift_bpm : null;
   let tactical_instruction =
     'Race day: open using the same controlled effort you held mid-run today; let course and weather dictate when to press.';
   if (drift != null && typ != null) {
     tactical_instruction = `HR drift +${Math.round(drift)} bpm vs your typical +${Math.round(typ)} bpm`;
-    if (heat) tactical_instruction += ' — heat was a factor (see conditions_heat_flag), so race morning cool weather should feel easier at the same HR.';
+    if (heat) {
+      tactical_instruction += heatNote
+        ? ` — ${heatNote}`
+        : ' — heat was a factor (conditions_heat_flag); cooler race morning should feel easier at the same HR.';
+    }
     tactical_instruction += ' Hold the first third conservative relative to that baseline.';
   }
   const split = facts.pacing_split_seconds_per_mile;
@@ -425,6 +458,7 @@ REASONING INSTRUCTIONS:
 
 1. VERDICT: Connect today's session specifically to race day. Reason about:
    - Was HR drift better or worse than typical, and WHY (consider temp: if conditions_heat_flag is true, heat is a factor — strip the heat tax and assess underlying fitness)
+   - If conditions_temp_end_f or conditions_temp_peak_f is much higher than conditions_temp_start_f (>8°F delta), heat load was concentrated in the final miles — discount late-run HR rise and pace fade when judging fitness; use conditions_heat_note if present
    - Pacing: positive split (pacing_split_seconds_per_mile > 0) means second half slower — tie to heat, hills (elevation_profile / elevation_gain_ft), discipline, or fatigue. What does it predict for race execution?
    - If conditions_heat_flag is true, explicitly note heat and what the performance means adjusted for that context
    - What does this run predict about race day performance?

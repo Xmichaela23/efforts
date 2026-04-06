@@ -38,7 +38,13 @@ export type WorkoutSegmentV1 = {
 };
 
 export type WeatherV1 = {
+  /** Session-representative temp: avg over workout window when available, else point reading. */
   temperature_f: number;
+  /** Open-Meteo hourly temps (°F) across workout window — null when unknown / device-only. */
+  temp_start_f?: number | null;
+  temp_end_f?: number | null;
+  temp_peak_f?: number | null;
+  temp_avg_f?: number | null;
   humidity_pct: number;
   dew_point_f: number;
   heat_stress_level: HeatStressLevel;

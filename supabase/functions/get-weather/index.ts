@@ -1,10 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 /** Bump when weather merge/cache semantics change so persisted workout rows refetch */
-const WEATHER_SCHEMA_VERSION = 2;
+const WEATHER_SCHEMA_VERSION = 3;
 
 interface WeatherData {
+  /** Representative temp for the session: avg over [start, end] when duration provided, else start-hour slot. */
   temperature: number;
+  /** Open-Meteo temps (°F) at workout start hour, end hour, and max in between — when duration_seconds was sent. */
+  temperature_start_f?: number;
+  temperature_end_f?: number;
+  temperature_peak_f?: number;
+  temperature_avg_f?: number;
   feels_like?: number;
   condition: string;
   humidity: number;
@@ -44,7 +50,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { lat, lng, timestamp, workout_id, force_refresh } = await req.json();
+    const body = await req.json();
+    const { lat, lng, timestamp, workout_id, force_refresh } = body;
+    const durationSecondsRaw = body.duration_seconds;
+    const durationSeconds =
+      durationSecondsRaw != null && Number.isFinite(Number(durationSecondsRaw))
+        ? Math.min(6 * 3600, Math.max(0, Math.round(Number(durationSecondsRaw))))
+        : null;
 
     // Validate inputs strictly
     const latNum = Number(lat);
@@ -84,7 +96,11 @@ Deno.serve(async (req) => {
     const workoutDate = new Date(tsStr);
     const day = workoutDate.toISOString().slice(0, 10);
     const hourSlotUtc = workoutDate.toISOString().slice(0, 13); // YYYY-MM-DDTHH
-    const cacheKey = `${rlat}:${rlng}:${hourSlotUtc}`;
+    const durBucket =
+      durationSeconds != null && durationSeconds >= 60
+        ? Math.min(86400, Math.round(durationSeconds / 300) * 300)
+        : 0;
+    const cacheKey = `${rlat}:${rlng}:${hourSlotUtc}:d${durBucket}`;
     
     if (!skipCache) {
       try {
@@ -146,7 +162,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const weatherData = await fetchWeatherData(latNum, lngNum, tsStr, deviceTempC);
+    const weatherData = await fetchWeatherData(latNum, lngNum, tsStr, deviceTempC, durationSeconds);
     
     if (!weatherData) {
       return new Response(JSON.stringify({ 
@@ -217,17 +233,25 @@ async function fetchWeatherData(
   lng: number,
   timestamp: string,
   deviceTempC: number | null,
+  durationSeconds: number | null,
 ): Promise<WeatherData | null> {
   try {
     const workoutDate = new Date(timestamp);
     const workoutMs = workoutDate.getTime();
     const dateStr = workoutDate.toISOString().slice(0, 10);
+    const endMs =
+      durationSeconds != null && durationSeconds >= 60 ? workoutMs + durationSeconds * 1000 : workoutMs;
+    const endDateStr = new Date(endMs).toISOString().slice(0, 10);
+    const rangeStart = dateStr <= endDateStr ? dateStr : endDateStr;
+    const rangeEnd = dateStr >= endDateStr ? dateStr : endDateStr;
 
-    console.log(`🌡️ [WEATHER] Fetching Open-Meteo archive for ${dateStr} at ${lat},${lng} (workout ${workoutDate.toISOString()})`);
-    
+    console.log(
+      `🌡️ [WEATHER] Fetching Open-Meteo archive ${rangeStart}..${rangeEnd} at ${lat},${lng} (workout ${workoutDate.toISOString()} dur_s=${durationSeconds ?? 'n/a'})`,
+    );
+
     // Open-Meteo archive API - free, no key required
     // Use timezone=UTC so all times are in UTC (consistent with our timestamp)
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${dateStr}&end_date=${dateStr}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${rangeStart}&end_date=${rangeEnd}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
     
     const resp = await fetch(url);
     if (!resp.ok) {
@@ -243,31 +267,82 @@ async function fetchWeatherData(
       return null;
     }
     
-    const bestIdx = nearestHourlyIndex(hourly.time, workoutMs);
-    console.log(`🌡️ [WEATHER] Nearest hourly slot idx ${bestIdx}: ${hourly.time[bestIdx]}`);
-    
+    const startIdx = nearestHourlyIndex(hourly.time, workoutMs);
+    const endIdx = nearestHourlyIndex(hourly.time, endMs);
+    const lo = Math.min(startIdx, endIdx);
+    const hi = Math.max(startIdx, endIdx);
+    const windowTemps: number[] = [];
+    for (let i = lo; i <= hi; i++) {
+      const t = hourly.temperature_2m[i];
+      if (t != null && Number.isFinite(Number(t))) windowTemps.push(Number(t));
+    }
+    const tempAtStart = hourly.temperature_2m[startIdx];
+    const tempAtEnd = hourly.temperature_2m[endIdx];
+    const tempStartRounded = tempAtStart != null ? Math.round(tempAtStart) : null;
+    const tempEndRounded = tempAtEnd != null ? Math.round(tempAtEnd) : null;
+    const tempPeakRounded =
+      windowTemps.length > 0 ? Math.round(Math.max(...windowTemps)) : tempStartRounded;
+    const tempAvgRounded =
+      windowTemps.length > 0
+        ? Math.round(windowTemps.reduce((a, b) => a + b, 0) / windowTemps.length)
+        : tempStartRounded;
+
+    console.log(
+      `🌡️ [WEATHER] Hourly window idx ${lo}-${hi} (${hourly.time[startIdx]} → ${hourly.time[endIdx]}): start ${tempStartRounded}°F end ${tempEndRounded}°F peak ${tempPeakRounded}°F avg ${tempAvgRounded}°F`,
+    );
+
+    const bestIdx = startIdx;
     const temp = hourly.temperature_2m[bestIdx];
     const feelsLike = hourly.apparent_temperature?.[bestIdx];
     const humidity = hourly.relative_humidity_2m?.[bestIdx];
     const windSpeed = hourly.wind_speed_10m?.[bestIdx];
     const windDir = hourly.wind_direction_10m?.[bestIdx];
     const precip = hourly.precipitation?.[bestIdx];
-    
-    // Get daily high/low from the full day's data
+
+    // Get daily high/low from the full response
     const temps = hourly.temperature_2m.filter((t: number | null) => t != null);
     const dailyHigh = temps.length ? Math.round(Math.max(...temps)) : undefined;
     const dailyLow = temps.length ? Math.round(Math.min(...temps)) : undefined;
-    
+
     let temperature = Math.round(temp ?? 0);
+    let temperature_start_f: number | undefined;
+    let temperature_end_f: number | undefined;
+    let temperature_peak_f: number | undefined;
+    let temperature_avg_f: number | undefined;
+
     if (deviceTempC != null && Number.isFinite(deviceTempC)) {
       temperature = Math.round(deviceTempC * 9 / 5 + 32);
+      temperature_start_f = temperature;
+      temperature_end_f = temperature;
+      temperature_peak_f = temperature;
+      temperature_avg_f = temperature;
       console.log(`🌡️ [WEATHER] Display temp from device avg (°C): ${deviceTempC} → °F ${temperature}; humidity/wind from Open-Meteo slot`);
+    } else if (
+      durationSeconds != null &&
+      durationSeconds >= 60 &&
+      tempStartRounded != null &&
+      tempEndRounded != null &&
+      tempPeakRounded != null &&
+      tempAvgRounded != null
+    ) {
+      temperature = tempAvgRounded;
+      temperature_start_f = tempStartRounded;
+      temperature_end_f = tempEndRounded;
+      temperature_peak_f = tempPeakRounded;
+      temperature_avg_f = tempAvgRounded;
+      console.log(
+        `🌡️ [WEATHER] Session window temps °F: avg=${temperature} start=${temperature_start_f} end=${temperature_end_f} peak=${temperature_peak_f}`,
+      );
     } else {
-      console.log(`🌡️ [WEATHER] Open-Meteo result: ${temperature}°F (feels like ${Math.round(feelsLike || temp)}°F) (high: ${dailyHigh}, low: ${dailyLow})`);
+      console.log(`🌡️ [WEATHER] Open-Meteo point: ${temperature}°F (feels like ${Math.round(feelsLike || temp)}°F) (high: ${dailyHigh}, low: ${dailyLow})`);
     }
 
     return {
       temperature,
+      temperature_start_f,
+      temperature_end_f,
+      temperature_peak_f,
+      temperature_avg_f,
       feels_like: feelsLike != null ? Math.round(feelsLike) : undefined,
       condition: '—', // Open-Meteo archive doesn't provide condition text
       humidity: Math.round(humidity ?? 0),

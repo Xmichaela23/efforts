@@ -156,8 +156,17 @@ function deriveWeather(workout: any): WeatherV1 | null {
     return null;
   }
   const dew = deriveDewPointF(tempF, humidity);
+  const ts = coerceNumber(weatherData?.temperature_start_f);
+  const te = coerceNumber(weatherData?.temperature_end_f);
+  const tp = coerceNumber(weatherData?.temperature_peak_f);
+  const ta = coerceNumber(weatherData?.temperature_avg_f ?? weatherData?.temperature);
+  const rangeKnown = ts != null && te != null && tp != null;
   return {
-    temperature_f: tempF,
+    temperature_f: ta != null ? Math.round(ta) : tempF,
+    temp_start_f: rangeKnown ? Math.round(ts!) : deviceTempF != null ? tempF : null,
+    temp_end_f: rangeKnown ? Math.round(te!) : deviceTempF != null ? tempF : null,
+    temp_peak_f: rangeKnown ? Math.round(tp!) : deviceTempF != null ? tempF : null,
+    temp_avg_f: ta != null ? Math.round(ta) : null,
     humidity_pct: Math.round(humidity),
     dew_point_f: dew,
     heat_stress_level: getHeatStressLevel(dew),
