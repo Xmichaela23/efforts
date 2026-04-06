@@ -2929,6 +2929,25 @@ Deno.serve(async (req) => {
                     ? 'ramping fast'
                     : 'in the optimal zone';
           narrativeFacts.push(`Training volume ratio (this week vs last 4 weeks): ${metrics.acwr.toFixed(2)} — ${acwrLabel}.`);
+
+          // Taper/race-proximity ACWR reframe — the LLM must not normalize 1.0+ as "fine" during taper
+          if ((weekIntent === 'taper' || weekIntent === 'peak') && goalContext.primary_event) {
+            const raceWkOut = goalContext.upcoming_races.find(r => r.name === goalContext.primary_event!.name)?.weeks_out ?? null;
+            const raceName_ = goalContext.primary_event.name;
+            if (raceWkOut != null && raceWkOut <= 21) {
+              const acwrVal = metrics.acwr ?? null;
+              const acwrNote = acwrVal != null
+                ? (acwrVal >= 1.1
+                  ? `ACWR ${acwrVal.toFixed(2)} means last week's load is still in the system — this is not "optimal" during taper, it means the unloading hasn't fully happened yet.`
+                  : acwrVal < 0.85
+                  ? `ACWR ${acwrVal.toFixed(2)} — load has dropped well, the body is freshening.`
+                  : `ACWR ${acwrVal.toFixed(2)} — load is coming down appropriately.`)
+                : '';
+              narrativeFacts.push(
+                `TAPER CONTEXT (${raceWkOut}w to ${raceName_}): The goal is to arrive at the start line fresh — NOT to maintain or build. ${acwrNote} Do NOT frame elevated ACWR as appropriate or optimal during taper. If ACWR is above 1.0, note that load is still elevated and will continue to drop. "Not too fresh" is the wrong message here — fresh is exactly the goal.`
+              );
+            }
+          }
         }
 
         // Body response vs baseline
