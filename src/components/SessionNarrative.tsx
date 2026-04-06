@@ -75,15 +75,11 @@ interface SessionNarrativeProps {
       route?: RouteData | null;
     } | null;
     race_readiness?: {
-      days_until_race: number;
       headline: string;
-      signals: Array<{
-        domain: string;
-        label: string;
-        assessment: 'positive' | 'neutral' | 'caution';
-        detail: string;
-      }>;
-      summary: string;
+      verdict: string;
+      tactical_instruction: string;
+      flag: string | null;
+      projection: string;
     } | null;
   } | null;
   hasSessionDetail: boolean;
@@ -328,35 +324,38 @@ function NextUp({ session }: { session: NextSession }) {
   );
 }
 
+function isLlmRaceReadinessShape(
+  rr: NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'],
+): rr is NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'] {
+  return !!rr && typeof (rr as { verdict?: string }).verdict === 'string';
+}
+
 function RaceReadinessBlock({ rr }: { rr: NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'] }) {
-  if (!rr || (!rr.summary && rr.signals.length === 0)) return null;
-  const dotColor = (a: string) =>
-    a === 'positive' ? 'bg-green-400' : a === 'caution' ? 'bg-amber-400' : 'bg-gray-400';
+  if (!isLlmRaceReadinessShape(rr) || !String(rr.headline || '').trim()) return null;
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-          {rr.headline}
-        </span>
+    <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-3 space-y-3">
+      <div>
+        <span className="text-[10px] font-semibold text-amber-200/90 uppercase tracking-wide">Race readiness</span>
+        <p className="text-sm font-semibold text-gray-100 mt-1 leading-snug">{rr.headline}</p>
       </div>
-      {rr.signals.length > 0 && (
-        <div className="space-y-2">
-          {rr.signals.map((s, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className={`mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0 ${dotColor(s.assessment)}`} />
-              <div>
-                <span className="text-xs font-medium text-gray-400">{s.label}</span>
-                <p className="text-[13px] text-gray-300 leading-snug">{s.detail}</p>
-              </div>
-            </div>
-          ))}
+      {!!String(rr.verdict || '').trim() && (
+        <p className="text-sm text-gray-300 leading-relaxed">{rr.verdict}</p>
+      )}
+      {!!String(rr.tactical_instruction || '').trim() && (
+        <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
+          <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Race day</span>
+          <p className="text-sm text-gray-100 mt-0.5 leading-snug">{rr.tactical_instruction}</p>
         </div>
       )}
-      {rr.summary ? (
-        <p className={`text-[13px] text-gray-400 leading-snug ${rr.signals.length > 0 ? 'pt-1 border-t border-white/5' : ''}`}>
-          {rr.summary}
-        </p>
-      ) : null}
+      {rr.flag != null && String(rr.flag).trim() !== '' && (
+        <div className="rounded-md border border-amber-400/30 bg-amber-500/10 px-2.5 py-2">
+          <span className="text-[10px] font-medium text-amber-200/90 uppercase tracking-wide">Flag</span>
+          <p className="text-sm text-amber-100/95 mt-0.5 leading-snug">{rr.flag}</p>
+        </div>
+      )}
+      {!!String(rr.projection || '').trim() && (
+        <p className="text-xs text-gray-400 leading-relaxed border-t border-white/10 pt-2">{rr.projection}</p>
+      )}
     </div>
   );
 }
@@ -482,13 +481,6 @@ export default function SessionNarrative({
           </div>
         </div>
       )}
-      {sd?.race_readiness &&
-        (sd.race_readiness.signals.length > 0 ||
-          !!String(sd.race_readiness.summary || '').trim() ||
-          (typeof sd.race_readiness.days_until_race === 'number' &&
-            !!String(sd.race_readiness.headline || '').trim())) && (
-        <RaceReadinessBlock rr={sd.race_readiness} />
-      )}
       {trend && <TrendSparkline trend={trend} />}
       {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (
         <RouteSparkline route={sd.terrain.route} />
@@ -502,6 +494,9 @@ export default function SessionNarrative({
             </div>
           ))}
         </div>
+      )}
+      {sd?.race_readiness && isLlmRaceReadinessShape(sd.race_readiness) && (
+        <RaceReadinessBlock rr={sd.race_readiness} />
       )}
       {nextSession && <NextUp session={nextSession} />}
       {!hasNarrative && hasStructuredForRender && (

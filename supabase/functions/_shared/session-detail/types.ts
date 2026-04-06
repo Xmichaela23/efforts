@@ -48,6 +48,15 @@ export type StrengthMatchQuality =
   | 'on_target' | 'under_intensity' | 'over_intensity'
   | 'followed' | 'dialed_back' | 'pushed_hard' | 'modified' | 'skipped' | 'unplanned';
 
+/** LLM output for Performance race-readiness block (strict JSON contract). */
+export type SessionRaceReadinessLlmV1 = {
+  headline: string;
+  verdict: string;
+  tactical_instruction: string;
+  flag: string | null;
+  projection: string;
+};
+
 export type SessionDetailV1 = {
   version: 1;
   generated_at: string;
@@ -217,24 +226,11 @@ export type SessionDetailV1 = {
   session_interpretation?: SessionInterpretation | null;
 
   /**
-   * Race-readiness assessment for key long runs inside a plan with a race date.
-   * Only populated when: run, plan-linked, long-run-like (≥ 75 min or type includes "long"),
-   * and ≤ 28 days until race. Deterministic, no LLM.
+   * LLM race-readiness narrative for key long runs near plan race day.
+   * Populated only when gated (run, linked plan, race_date, ≤21d, long-run-like, ≥10 mi or ≥90 min).
+   * Null if LLM unavailable or call fails.
    */
-  race_readiness?: {
-    days_until_race: number;
-    /** e.g. "Final long run before race" or "2 weeks out — key checkpoint" */
-    headline: string;
-    /** 2-4 structured signals the athlete should know */
-    signals: Array<{
-      domain: 'hr' | 'pace' | 'pacing' | 'conditions' | 'drift' | 'execution';
-      label: string;
-      assessment: 'positive' | 'neutral' | 'caution';
-      detail: string;
-    }>;
-    /** 1-2 sentence plain-language preparedness summary */
-    summary: string;
-  } | null;
+  race_readiness?: SessionRaceReadinessLlmV1 | null;
 
   /** Plan-aware load readiness at workout date (null if no session_load / unavailable). */
   readiness?: SessionDetailReadinessV1 | null;

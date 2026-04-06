@@ -28,6 +28,14 @@ export interface PlanContext {
   planName: string | null;
   /** Calendar days from workout date to plan race_date (inclusive-ish); null if unknown or race in the past. */
   daysUntilRace: number | null;
+  /** ISO date string YYYY-MM-DD from plan config when set. */
+  raceDateIso: string | null;
+  raceName: string | null;
+  /** e.g. goal_profile, distance_key — best-effort label for LLM context. */
+  goalProfileOrDistance: string | null;
+  /** Truncated JSON or string course profile from plan config. */
+  courseProfileJson: string | null;
+  targetFinishTimeSeconds: number | null;
 }
 
 /**
@@ -170,6 +178,35 @@ export async function fetchPlanContextForWorkout(
     if (weekIntent === 'unknown') weekIntent = 'build';
 
     const daysUntilRace = computeDaysUntilRace(workoutDate, config);
+    const raceRaw = config.race_date ?? config.raceDate;
+    const raceDateIso =
+      raceRaw && typeof raceRaw === 'string' ? String(raceRaw).slice(0, 10) : null;
+    const raceName =
+      typeof (config as Record<string, unknown>).race_name === 'string'
+        ? String((config as Record<string, unknown>).race_name)
+        : null;
+    const c = config as Record<string, unknown>;
+    const goalProfileOrDistance =
+      typeof c.goal_profile === 'string'
+        ? String(c.goal_profile)
+        : typeof c.distance_key === 'string'
+          ? String(c.distance_key)
+          : typeof c.event_type === 'string'
+            ? String(c.event_type)
+            : null;
+    let courseProfileJson: string | null = null;
+    try {
+      const cp = c.course_profile;
+      if (cp && typeof cp === 'object') {
+        courseProfileJson = JSON.stringify(cp).slice(0, 500);
+      } else if (typeof cp === 'string' && cp.trim()) {
+        courseProfileJson = cp.trim().slice(0, 500);
+      }
+    } catch { /* */ }
+    const targetFinishTimeSeconds =
+      typeof c.target_finish_time_seconds === 'number' && Number.isFinite(c.target_finish_time_seconds)
+        ? Math.round(c.target_finish_time_seconds)
+        : null;
 
     return {
       hasActivePlan: true,
@@ -181,6 +218,11 @@ export async function fetchPlanContextForWorkout(
       weekFocusLabel,
       planName: plan.name,
       daysUntilRace,
+      raceDateIso,
+      raceName,
+      goalProfileOrDistance,
+      courseProfileJson,
+      targetFinishTimeSeconds,
     };
   } catch (error) {
     console.error('⚠️ Error fetching plan context:', error);

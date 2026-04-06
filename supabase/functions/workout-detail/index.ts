@@ -7,7 +7,8 @@ import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
-import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
+import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
+import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 
@@ -670,26 +671,23 @@ Deno.serve(async (req) => {
               : null,
         } : null;
 
-        let daysUntilRaceForSession: number | null = null;
+        let planCtxForSession: PlanContext | null = null;
         try {
           const tpId =
             plannedRowRaw?.training_plan_id ??
             attachPlannedRaw?.training_plan_id ??
             null;
           if (userId && tpId && workoutDate) {
-            const pc = await fetchPlanContextForWorkout(
+            planCtxForSession = await fetchPlanContextForWorkout(
               supabase,
               userId,
               String(tpId),
               workoutDate,
             );
-            if (pc && typeof pc.daysUntilRace === 'number' && pc.daysUntilRace > 0) {
-              daysUntilRaceForSession = Math.round(pc.daysUntilRace);
-            }
           }
         } catch (durErr: unknown) {
           console.warn(
-            '[session_detail_v1] days_until_race from plan failed:',
+            '[session_detail_v1] plan context fetch failed:',
             durErr instanceof Error ? durErr.message : durErr,
           );
         }
@@ -714,8 +712,24 @@ Deno.serve(async (req) => {
           nextSession,
           readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
           readinessUnavailable,
-          daysUntilRace: daysUntilRaceForSession,
         });
+
+        if (sessionDetailV1 && planCtxForSession) {
+          try {
+            const rrLlm = await trySessionRaceReadinessLlm({
+              sessionDetail: sessionDetailV1,
+              workoutAnalysis: wa,
+              planContext: planCtxForSession,
+              row: row as Record<string, unknown>,
+            });
+            if (rrLlm) sessionDetailV1.race_readiness = rrLlm;
+          } catch (rrErr: unknown) {
+            console.warn(
+              '[race_readiness_llm] skipped:',
+              rrErr instanceof Error ? rrErr.message : rrErr,
+            );
+          }
+        }
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr, snapErr?.stack || '');
       }

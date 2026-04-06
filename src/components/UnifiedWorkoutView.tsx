@@ -34,7 +34,11 @@ const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPl
   return workout;
 };
 
-/** Prefer edge `session_detail_v1`; merge `race_readiness` from persisted workout_analysis when the detail query is stale (e.g. right after recompute). */
+function isPersistedLlmRaceReadiness(rr: unknown): boolean {
+  return !!rr && typeof rr === 'object' && typeof (rr as { verdict?: string }).verdict === 'string';
+}
+
+/** Prefer edge `session_detail_v1`; merge LLM `race_readiness` from persisted workout_analysis when the detail query is stale (e.g. right after recompute). */
 function mergeSessionDetailRaceReadiness(
   fromEdge: Record<string, unknown> | null | undefined,
   workoutAnalysis: unknown,
@@ -49,10 +53,11 @@ function mergeSessionDetailRaceReadiness(
     embedded && typeof embedded === 'object'
       ? (embedded as { race_readiness?: unknown }).race_readiness
       : null;
+  const rrEmbOk = isPersistedLlmRaceReadiness(rrEmb) ? rrEmb : null;
   if (fromEdge && typeof fromEdge === 'object') {
     const rrEdge = (fromEdge as { race_readiness?: unknown }).race_readiness;
-    if (!rrEdge && rrEmb) {
-      return { ...fromEdge, race_readiness: rrEmb } as Record<string, unknown>;
+    if (!rrEdge && rrEmbOk) {
+      return { ...fromEdge, race_readiness: rrEmbOk } as Record<string, unknown>;
     }
     return fromEdge as Record<string, unknown>;
   }
