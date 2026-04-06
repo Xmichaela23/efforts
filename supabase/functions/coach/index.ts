@@ -2950,7 +2950,7 @@ Deno.serve(async (req) => {
                 ? ` Recent sessions driving this load: ${recentSessions.map((s: any) => `${s.date} ${s.type}${s.name ? ` "${s.name}"` : ''} (${Math.round(s.workload_actual)} pts)`).join(', ')}.`
                 : '';
               narrativeFacts.push(
-                `TAPER CONTEXT (${raceWkOut}w to ${raceName_}): The goal is to arrive at the start line FRESH — not to maintain or build. ${acwrNote}${recentLine} DO NOT use "performance phase" language. DO NOT say ACWR is appropriate or optimal if it is above 1.0 during taper. The load from last week is still in the system and will clear — that is the point of taper. If no sessions are completed yet this week, that is expected taper behavior, not a problem to fix.`
+                `TAPER CONTEXT (${raceWkOut}w to ${raceName_}): The goal is to arrive at the start line FRESH — not to maintain or build. ${acwrNote}${recentLine} We are already IN the taper — do not frame it as "heading into" anything. DO NOT say ACWR is appropriate or optimal if it is above 1.0 during taper. The load from last week is still in the system and will clear — that is the point of taper. If no sessions are completed yet this week, that is expected taper behavior, not a problem to fix.`
               );
             }
           }
