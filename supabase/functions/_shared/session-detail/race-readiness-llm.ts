@@ -69,7 +69,8 @@ export function raceReadinessGateSkipReason(params: {
   if (!params.plannedId) return 'no_planned_id';
   if (!params.raceDateIso) return 'no_race_date';
   if (params.daysUntilRace == null || params.daysUntilRace <= 0) return 'race_past_or_unknown_days';
-  if (params.daysUntilRace > 21) return `outside_window_days=${params.daysUntilRace}`;
+  // Many plans taper earlier than three weeks out — keep window wide enough to match product taper UX.
+  if (params.daysUntilRace > 28) return `outside_window_days=${params.daysUntilRace}`;
   const longEnough =
     (params.distanceMiles != null && params.distanceMiles >= 10) ||
     (params.durationMinutes != null && params.durationMinutes >= 90);
@@ -231,6 +232,39 @@ function parseRaceReadinessLlmResponse(text: string | null): SessionRaceReadines
   }
 }
 
+/** When the LLM is unavailable or returns invalid JSON, still surface a structured block from FACTS-only copy. */
+export function raceReadinessDeterministicFallback(
+  facts: Record<string, unknown>,
+): SessionRaceReadinessLlmV1 | null {
+  const d = facts.days_to_race;
+  const days = typeof d === 'number' && d > 0 ? d : null;
+  if (days == null) return null;
+  const raceLabel =
+    typeof facts.race_name === 'string' && String(facts.race_name).trim()
+      ? String(facts.race_name).trim()
+      : 'your race';
+  const dist = facts.distance_miles;
+  const dur = facts.duration_minutes;
+  const bits: string[] = [];
+  bits.push(`${days} days from ${raceLabel}`);
+  if (typeof dist === 'number') bits.push(`${dist} mi in the legs`);
+  else if (typeof dur === 'number') bits.push(`${Math.round(dur)} minutes on feet`);
+  const exec = facts.execution_score;
+  if (typeof exec === 'number') bits.push(`execution vs plan about ${Math.round(exec)}%`);
+  const verdict = bits.join('; ') + '. Use pacing and heart-rate rows above as the primary readiness read.';
+  return {
+    headline: `${days} days out — key long run in the bank`,
+    verdict,
+    tactical_instruction:
+      'Through taper: cut volume, keep intensity touches short, sleep and fuel consistently race week.',
+    flag: null,
+    projection:
+      typeof facts.target_race_goal_finish_clock === 'string'
+        ? `Goal finish on file: ${facts.target_race_goal_finish_clock}. Treat today as workload confirmation, not a race predictor.`
+        : 'No goal finish time on file — set a target in the plan or pace off recent long-run effort.',
+  };
+}
+
 export async function generateSessionRaceReadinessLlm(
   facts: Record<string, unknown>,
 ): Promise<SessionRaceReadinessLlmV1 | null> {
@@ -313,5 +347,11 @@ export async function trySessionRaceReadinessLlm(params: {
   }
 
   const packet = buildSessionRaceReadinessFacts(params);
-  return await generateSessionRaceReadinessLlm(packet);
+  const llm = await generateSessionRaceReadinessLlm(packet);
+  if (llm) return llm;
+  const fb = raceReadinessDeterministicFallback(packet);
+  if (fb) {
+    console.warn('[race_readiness_llm] using deterministic fallback (LLM empty or parse failed)');
+  }
+  return fb;
 }

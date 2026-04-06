@@ -75,6 +75,21 @@ function extractPlanRaceFieldsFromConfig(
  * Minimal plan context for race date / goal fields when full week resolution fails
  * (missing start_date, week index out of range, etc.). Does not populate weekIntent / phase.
  */
+/** Single active plan id for the user (plans.status = active). */
+export async function fetchActivePlanId(supabase: any, userId: string): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('plans')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle();
+    return data?.id ? String(data.id) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPlanRaceMetaForWorkout(
   supabase: any,
   userId: string,

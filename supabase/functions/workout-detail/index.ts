@@ -8,6 +8,7 @@ import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapsh
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
 import {
+  fetchActivePlanId,
   fetchPlanContextForWorkout,
   fetchPlanRaceMetaForWorkout,
   type PlanContext,
@@ -677,10 +678,20 @@ Deno.serve(async (req) => {
 
         let planCtxForSession: PlanContext | null = null;
         try {
-          const tpId =
+          let tpId =
             plannedRowRaw?.training_plan_id ??
             attachPlannedRaw?.training_plan_id ??
             null;
+          const hasPlanLink = !!(match?.planned_id || effectivePlannedId);
+          if (!tpId && userId && hasPlanLink) {
+            const activePid = await fetchActivePlanId(supabase, userId);
+            if (activePid) {
+              tpId = activePid;
+              console.warn(
+                '[session_detail_v1] plan context: resolved plans.id from active plan (planned row missing training_plan_id)',
+              );
+            }
+          }
           if (userId && tpId && workoutDate) {
             planCtxForSession = await fetchPlanContextForWorkout(
               supabase,
