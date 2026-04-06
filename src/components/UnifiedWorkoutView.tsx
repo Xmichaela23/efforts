@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, ListCollapse, List } from 'lucide-react';
@@ -34,6 +34,33 @@ const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPl
   return workout;
 };
 
+/** Prefer edge `session_detail_v1`; merge `race_readiness` from persisted workout_analysis when the detail query is stale (e.g. right after recompute). */
+function mergeSessionDetailRaceReadiness(
+  fromEdge: Record<string, unknown> | null | undefined,
+  workoutAnalysis: unknown,
+): Record<string, unknown> | null {
+  let wa: any = workoutAnalysis;
+  if (typeof wa === 'string') {
+    try { wa = JSON.parse(wa); } catch { wa = null; }
+  }
+  const embedded =
+    wa && typeof wa === 'object' ? (wa as { session_detail_v1?: unknown }).session_detail_v1 : null;
+  const rrEmb =
+    embedded && typeof embedded === 'object'
+      ? (embedded as { race_readiness?: unknown }).race_readiness
+      : null;
+  if (fromEdge && typeof fromEdge === 'object') {
+    const rrEdge = (fromEdge as { race_readiness?: unknown }).race_readiness;
+    if (!rrEdge && rrEmb) {
+      return { ...fromEdge, race_readiness: rrEmb } as Record<string, unknown>;
+    }
+    return fromEdge as Record<string, unknown>;
+  }
+  if (embedded && typeof embedded === 'object') {
+    return embedded as Record<string, unknown>;
+  }
+  return null;
+}
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -193,6 +220,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const completedData: any = isCompleted
     ? { ...(workout || {}), ...(hydratedCompleted || {}), ...(updatedWorkoutData || {}) }
     : workout;
+
+  const workoutAnalysisForSessionMerge =
+    (updatedWorkoutData as { workout_analysis?: unknown } | null)?.workout_analysis ??
+    (hydratedCompleted as { workout_analysis?: unknown } | null)?.workout_analysis ??
+    (workout as { workout_analysis?: unknown })?.workout_analysis;
+  const sessionDetailV1Merged = useMemo(
+    () => mergeSessionDetailRaceReadiness(sessionDetailV1, workoutAnalysisForSessionMerge),
+    [sessionDetailV1, workoutAnalysisForSessionMerge],
+  );
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {
@@ -1252,7 +1288,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 <MobileSummary
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)}
                   completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
-                  session_detail_v1={sessionDetailV1}
+                  session_detail_v1={sessionDetailV1Merged}
                   onNavigateToContext={onNavigateToContext}
                 />
               </div>
@@ -1294,7 +1330,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           <StrengthCompletedView 
                             workoutData={completedData}
                             plannedWorkout={linkedPlanned}
-                            session_detail_v1={sessionDetailV1}
+                            session_detail_v1={sessionDetailV1Merged}
                           />
                           {assocOpen && (
                             <AssociatePlannedDialog

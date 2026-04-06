@@ -483,7 +483,10 @@ export default function SessionNarrative({
         </div>
       )}
       {sd?.race_readiness &&
-        (sd.race_readiness.signals.length > 0 || !!String(sd.race_readiness.summary || '').trim()) && (
+        (sd.race_readiness.signals.length > 0 ||
+          !!String(sd.race_readiness.summary || '').trim() ||
+          (typeof sd.race_readiness.days_until_race === 'number' &&
+            !!String(sd.race_readiness.headline || '').trim())) && (
         <RaceReadinessBlock rr={sd.race_readiness} />
       )}
       {trend && <TrendSparkline trend={trend} />}

@@ -159,7 +159,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   }
 
   const assessedAgainst = factPacket?.derived?.execution?.assessed_against ?? null;
-  const hasPlanned = !!plannedSession && !!match?.planned_id;
+  /** Any link to a planned row — ledger can expose match.planned_id before planned hydrate is present. */
+  const hasPlanned = !!match?.planned_id;
   const planModified = assessedAgainst === 'actual';
   const allZero =
     (executionScore ?? 0) === 0 &&
