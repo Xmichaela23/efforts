@@ -3214,6 +3214,33 @@ ${narrativeFacts.join('\n')}`;
             return 'Peak week — load is creeping up. Keep it controlled, protect your legs.';
           }
 
+          // ── Race-aware overrides (≤21 days out) ─────────────────────────
+          const raceNameForSummary = goalContext?.primary_event?.name ?? activePlan?.name ?? null;
+          if (weeksOutVal != null && weeksOutVal <= 21 && raceNameForSummary) {
+            const projection = raceReadiness?.predicted_finish_display ?? null;
+            const source = raceReadiness?.data_source ?? 'plan_targets';
+            const sourceLabel = source === 'observed' ? 'from recent runs' : 'based on plan targets';
+
+            if (intent === 'taper') {
+              if (projection) {
+                return `${weeksOutVal}w to ${raceNameForSummary} — ${projection} ${sourceLabel}. Protect the legs, keep touches sharp.`;
+              }
+              if (rs === 'fresh') return `${weeksOutVal}w to ${raceNameForSummary} — fitness is banked. Taper means protecting what you've built, not adding to it.`;
+              if (rs === 'fatigued') return `${weeksOutVal}w to ${raceNameForSummary} — you still need to freshen up. Race is close, prioritize rest.`;
+              return `${weeksOutVal}w to ${raceNameForSummary} — freshen up, protect your legs.`;
+            }
+            if (intent === 'build') {
+              return `${weeksOutVal}w to ${raceNameForSummary} — final build. Every session should leave you recovered by race morning.`;
+            }
+            if (intent === 'recovery') {
+              return `${weeksOutVal}w to ${raceNameForSummary} — recovery is the work right now. Don't add stress.`;
+            }
+            if (intent === 'peak') {
+              if (rs === 'fresh') return `${weeksOutVal}w to ${raceNameForSummary} — you're sharp. Keep sessions crisp, the work is done.`;
+              return `${weeksOutVal}w to ${raceNameForSummary} — peak week. Quality over volume, protect your legs.`;
+            }
+          }
+
           if (intent === 'recovery') {
             if (rs === 'fresh') return 'Recovery week — you\'re absorbing well, keep it easy.';
             if (rs === 'fatigued' || rs === 'overreached') return 'Recovery week — you need this. Back off completely.';

@@ -246,6 +246,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
 
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
+  const weekNarrative = wsv.coach?.narrative ?? null;
   const trends = wsv.trends;
   const readinessLabel = trends.readiness_label;
   const readiness = trends.readiness_state;
@@ -274,6 +275,9 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
           </div>
           {intentSummary && (
             <span className="text-[14px] font-medium text-white/85 leading-snug">{intentSummary}</span>
+          )}
+          {weekNarrative && (
+            <span className="text-[12px] text-white/50 leading-snug">{weekNarrative}</span>
           )}
         </div>
         <button

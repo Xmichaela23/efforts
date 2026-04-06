@@ -245,6 +245,7 @@ export function computeRaceReadiness(input: RaceReadinessInput): RaceReadinessV1
   const assessmentMessage = buildAssessmentMessage(
     assessment, predictedDisplay, distLabel, targetTimeSec, racePaceSecPerMi,
     resolved.source, vdotDirection, vdotDelta, durabilityFactor,
+    input.readinessDrivers ?? [], input.weeksOut,
   );
 
   const currentPaces = getPacesFromScore(currentVdot);
@@ -292,9 +293,10 @@ function buildAssessmentMessage(
   vdotDirection: RaceReadinessV1['vdot_direction'],
   vdotDelta: number | null,
   durabilityFactor: number,
+  trainingSignals: Array<{ label: string; value: string; tone: string }>,
+  weeksOut: number | null,
 ): string {
   const paceNote = racePaceSecPerMi != null ? ` at ${formatPace(racePaceSecPerMi)}/mi` : '';
-  const sourceNote = dataSource === 'plan_targets' ? ' Based on plan targets, not observed workout data.' : '';
   const trendNote = vdotDirection === 'improved' && vdotDelta != null
     ? ` Your fitness has improved (+${vdotDelta} VDOT) since starting your plan.`
     : vdotDirection === 'declined' && vdotDelta != null
@@ -306,24 +308,42 @@ function buildAssessmentMessage(
     ? ' Your aerobic durability is strong — your body is holding pace well under load.'
     : '';
 
+  // Signal-enriched source note
+  const positiveSignals = trainingSignals.filter(s => s.tone === 'positive').map(s => s.label);
+  const warningSignals = trainingSignals.filter(s => s.tone === 'warning').map(s => s.label);
+  const watchNote = warningSignals.length > 0 ? ` Watch: ${warningSignals[0]}.` : '';
+
+  let sourceNote: string;
+  if (dataSource === 'observed') {
+    sourceNote = positiveSignals.length > 0
+      ? ` Fitness confirmed by recent runs: ${positiveSignals.slice(0, 2).join(', ')}.`
+      : '';
+  } else {
+    sourceNote = positiveSignals.length > 0
+      ? ` Based on plan targets. Recent signals are positive: ${positiveSignals.slice(0, 2).join(', ')}.`
+      : ' Based on plan targets, not observed workout data.';
+  }
+
   switch (assessment) {
     case 'ahead':
-      return `Your current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. You're meaningfully ahead of your target — keep the consistency going.${trendNote}${durabilityNote}${sourceNote}`;
-    case 'on_track':
-      return `Your current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. You're tracking close to your target.${trendNote}${durabilityNote}${sourceNote}`;
+      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Ahead of target — keep the consistency going.${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
+    case 'on_track': {
+      const weeksNote = weeksOut != null ? ` ${weeksOut}w out.` : '';
+      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Tracking close to target.${weeksNote}${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
+    }
     case 'behind': {
       const targetDisplay = targetTimeSec != null ? formatFinishTime(targetTimeSec) : null;
       const adjustNote = targetDisplay
-        ? ` Consider adjusting your target toward ${predictedDisplay} for a stronger race, or focus key sessions on closing the gap.`
+        ? ` Consider adjusting target toward ${predictedDisplay}, or focus key sessions on closing the gap.`
         : '';
-      return `Your current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Your target is ambitious — the data suggests you'd race more comfortably at this pace.${adjustNote}${trendNote}${durabilityNote}${sourceNote}`;
+      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Target is ambitious — data suggests a more comfortable race at this pace.${adjustNote}${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
     }
     case 'well_behind': {
       const targetDisplay = targetTimeSec != null ? formatFinishTime(targetTimeSec) : null;
       const adjustNote = targetDisplay
-        ? ` We recommend targeting ${predictedDisplay} instead of ${targetDisplay}. Going out at target pace risks hitting the wall.`
+        ? ` Recommend targeting ${predictedDisplay} instead of ${targetDisplay}. Going out at target pace risks the wall.`
         : '';
-      return `Your current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}.${adjustNote}${trendNote}${durabilityNote}${sourceNote}`;
+      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}.${adjustNote}${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
     }
   }
 }
