@@ -1544,7 +1544,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 >
                   <span aria-hidden="true" style={lampStyle(contextActive)} />
                   <span aria-hidden="true" className={sigilClass('context', contextActive)} />
-                  <span className={labelClass}>Context</span>
+                  <span className={labelClass}>State</span>
                 </Button>
                 <Button
                   onClick={() => {
