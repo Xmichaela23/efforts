@@ -80,6 +80,8 @@ interface SessionNarrativeProps {
       tactical_instruction: string;
       flag: string | null;
       projection: string;
+      /** Present on newer server payloads; omit on older cached session_detail_v1. */
+      taper_guidance?: string;
     } | null;
   } | null;
   hasSessionDetail: boolean;
@@ -355,6 +357,12 @@ function RaceReadinessBlock({ rr }: { rr: NonNullable<SessionNarrativeProps['ses
       )}
       {!!String(rr.projection || '').trim() && (
         <p className="text-xs text-gray-400 leading-relaxed border-t border-white/10 pt-2">{rr.projection}</p>
+      )}
+      {!!String(rr.taper_guidance || '').trim() && (
+        <div className="rounded-md border border-sky-500/25 bg-sky-500/[0.07] px-2.5 py-2">
+          <span className="text-[10px] font-medium text-sky-200/90 uppercase tracking-wide">Taper</span>
+          <p className="text-sm text-gray-200 mt-0.5 leading-relaxed">{String(rr.taper_guidance).trim()}</p>
+        </div>
       )}
     </div>
   );

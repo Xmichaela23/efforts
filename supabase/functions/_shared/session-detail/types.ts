@@ -55,6 +55,8 @@ export type SessionRaceReadinessLlmV1 = {
   tactical_instruction: string;
   flag: string | null;
   projection: string;
+  /** Taper execution guidance (not a volume prescription when plan already tapers). */
+  taper_guidance: string;
 };
 
 export type SessionDetailV1 = {
@@ -227,7 +229,7 @@ export type SessionDetailV1 = {
 
   /**
    * LLM race-readiness narrative for key long runs near plan race day.
-   * Populated only when gated (run, linked plan, race_date, ≤21d, long-run-like, ≥10 mi or ≥90 min).
+   * Populated only when gated (run, plan id + race_date, window, long-run-like, ≥10 mi or ≥90 min).
    * Null if LLM unavailable or call fails.
    */
   race_readiness?: SessionRaceReadinessLlmV1 | null;

@@ -4,6 +4,14 @@
  */
 import { resolvePlanWeekIndex } from './plan-week.ts';
 
+function planConfigHasTaperPhase(config: Record<string, unknown>): boolean {
+  const phases = config.phases;
+  if (!phases || typeof phases !== 'object') return false;
+  return Object.keys(phases as Record<string, unknown>).some((k) =>
+    String(k).toLowerCase().includes('taper'),
+  );
+}
+
 function computeDaysUntilRace(workoutDateIso: string, config: Record<string, unknown>): number | null {
   const raceRaw = config.race_date ?? config.raceDate;
   if (!raceRaw || typeof raceRaw !== 'string') return null;
@@ -110,6 +118,7 @@ export async function fetchPlanRaceMetaForWorkout(
     if (!raceRaw || typeof raceRaw !== 'string') return null;
     const fields = extractPlanRaceFieldsFromConfig(workoutDate, config);
     if (!fields.raceDateIso || fields.daysUntilRace == null || fields.daysUntilRace <= 0) return null;
+    const hasTaper = planConfigHasTaperPhase(config);
     return {
       hasActivePlan: true,
       plan_id: String(planId),
@@ -120,6 +129,8 @@ export async function fetchPlanRaceMetaForWorkout(
       phaseName: null,
       weekFocusLabel: null,
       planName: plan.name ?? null,
+      has_taper_phase: hasTaper,
+      current_phase: hasTaper ? 'taper_phase_in_plan' : null,
       ...fields,
     };
   } catch (e) {
@@ -149,6 +160,10 @@ export interface PlanContext {
   /** Truncated JSON or string course profile from plan config. */
   courseProfileJson: string | null;
   targetFinishTimeSeconds: number | null;
+  /** True when plan config includes a taper phase or current context is taper week. */
+  has_taper_phase: boolean;
+  /** Resolved phase label: config phase name, week intent, or null when unknown. */
+  current_phase: string | null;
 }
 
 /**
@@ -291,6 +306,21 @@ export async function fetchPlanContextForWorkout(
     if (weekIntent === 'unknown') weekIntent = 'build';
 
     const raceFields = extractPlanRaceFieldsFromConfig(workoutDate, config as Record<string, unknown>);
+    const cfg = config as Record<string, unknown>;
+    const hasTaper =
+      planConfigHasTaperPhase(cfg) ||
+      isTaperWeek ||
+      (weekFocusLabel != null && String(weekFocusLabel).toLowerCase().includes('taper'));
+    const currentPhase =
+      phaseName != null && String(phaseName).trim()
+        ? String(phaseName)
+        : isTaperWeek || weekIntent === 'taper'
+          ? 'taper'
+          : weekIntent !== 'unknown' && weekIntent !== 'build'
+            ? weekIntent
+            : weekFocusLabel != null && String(weekFocusLabel).trim()
+              ? String(weekFocusLabel)
+              : null;
 
     return {
       hasActivePlan: true,
@@ -302,6 +332,8 @@ export async function fetchPlanContextForWorkout(
       phaseName,
       weekFocusLabel,
       planName: plan.name,
+      has_taper_phase: hasTaper,
+      current_phase: currentPhase,
       ...raceFields,
     };
   } catch (error) {

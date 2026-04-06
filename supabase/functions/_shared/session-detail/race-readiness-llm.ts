@@ -22,6 +22,75 @@ function fmtFinishClock(sec: number): string {
   return `${mi}:${String(s).padStart(2, '0')}`;
 }
 
+/** Aligns with session-detail/build.ts mile-split pacing row (non-structured intervals only). */
+function computeMileSplitRaceFacts(
+  wa: Record<string, unknown> | null | undefined,
+  derived: Record<string, unknown> | undefined,
+  gapAdjusted: boolean,
+): {
+  pacing_split_seconds_per_mile: number | null;
+  fastest_mile: number | null;
+  fastest_mile_pace_sec_per_mi: number | null;
+  fastest_mile_pace: string | null;
+} {
+  const empty = {
+    pacing_split_seconds_per_mile: null as number | null,
+    fastest_mile: null as number | null,
+    fastest_mile_pace_sec_per_mi: null as number | null,
+    fastest_mile_pace: null as string | null,
+  };
+  const ie = derived?.interval_execution as { total_steps?: number } | undefined;
+  if (typeof ie?.total_steps === 'number' && ie.total_steps > 2) return empty;
+  const comp = (wa as any)?.computed;
+  const splitsMi: any[] = Array.isArray(comp?.analysis?.events?.splits?.mi) ? comp.analysis.events.splits.mi : [];
+  const rawSplits = splitsMi
+    .map((s: any) => {
+      const pacePerKm = Number(s?.avgPace_s_per_km);
+      const gapPerKm = Number(s?.avgGapPace_s_per_km);
+      return {
+        mile: Number(s?.n),
+        pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN,
+        gap: Number.isFinite(gapPerKm) && gapPerKm > 0 ? gapPerKm * 1.60934 : NaN,
+      };
+    })
+    .filter((s) => Number.isFinite(s.mile) && s.mile > 0 && Number.isFinite(s.pace) && s.pace > 0);
+  if (rawSplits.length < 2) return empty;
+  const hasGap = gapAdjusted && rawSplits.every((s) => Number.isFinite(s.gap) && s.gap > 0);
+  const splits = hasGap
+    ? rawSplits.map((s) => ({ mile: s.mile, pace: s.gap as number }))
+    : rawSplits.map((s) => ({ mile: s.mile, pace: s.pace }));
+  const mid = Math.ceil(splits.length / 2);
+  const firstHalf = splits.slice(0, mid);
+  const secondHalf = splits.slice(mid);
+  const avg = (arr: typeof splits) => arr.reduce((s, x) => s + x.pace, 0) / arr.length;
+  const firstAvg = avg(firstHalf);
+  const secondAvg = avg(secondHalf);
+  const pacing_split_seconds_per_mile = Math.round((secondAvg - firstAvg) * 10) / 10;
+  const fastest = rawSplits.reduce((a, b) => (a.pace < b.pace ? a : b));
+  const fm = Math.floor(fastest.pace / 60);
+  const fs = Math.round(fastest.pace % 60);
+  return {
+    pacing_split_seconds_per_mile,
+    fastest_mile: fastest.mile,
+    fastest_mile_pace_sec_per_mi: Math.round(fastest.pace * 10) / 10,
+    fastest_mile_pace: `${fm}:${String(fs).padStart(2, '0')}/mi`,
+  };
+}
+
+function elevationProfileLabel(
+  elevFt: number | null,
+  terrainType: string | null,
+): 'rolling' | 'flat' | 'hilly' | null {
+  if (elevFt != null && elevFt >= 1200) return 'hilly';
+  if (elevFt != null && elevFt <= 100) return 'flat';
+  const t = String(terrainType || '').toLowerCase();
+  if (/mountain|steep|hilly|aggressive|alpine/.test(t)) return 'hilly';
+  if (/flat|track|treadmill/.test(t)) return 'flat';
+  if (elevFt != null) return 'rolling';
+  if (/rolling|undulat|mixed/.test(t)) return 'rolling';
+  return elevFt == null && !t ? null : 'rolling';
+}
+
 function isLongRunLike(
   workoutTypeKey: string,
   plannedName: string | null,
@@ -131,6 +200,21 @@ export function buildSessionRaceReadinessFacts(params: {
       ? derived.hr_drift_typical
       : null;
 
+  const hrDriftVsTypical =
+    typeof hrDrift === 'number' && typeof typicalHrDrift === 'number'
+      ? Math.round((hrDrift - typicalHrDrift) * 10) / 10
+      : null;
+
+  const gapAdjusted = !!(sd.execution?.gap_adjusted ?? perf?.gap_adjusted);
+  const splitFacts = computeMileSplitRaceFacts(wa, derived as Record<string, unknown>, gapAdjusted);
+
+  const driftExplanation =
+    typeof derived.drift_explanation === 'string' ? String(derived.drift_explanation) : null;
+  const pacingSpeedupsNote =
+    derived.pacing_pattern && typeof (derived.pacing_pattern as any).speedups_note === 'string'
+      ? String((derived.pacing_pattern as any).speedups_note)
+      : null;
+
   const pacingRow = Array.isArray(sd.analysis_details?.rows)
     ? sd.analysis_details!.rows!.find((r) => String(r.label || '').toLowerCase() === 'pacing')
     : null;
@@ -147,6 +231,16 @@ export function buildSessionRaceReadinessFacts(params: {
   const elevFt =
     typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
   const terrainType = typeof facts.terrain_type === 'string' ? facts.terrain_type : null;
+  const elevationProfile = elevationProfileLabel(elevFt, terrainType);
+  const conditionsHeatFlag = conditionsTempF != null ? conditionsTempF >= 70 : null;
+
+  const rpeRaw = (row as any)?.rpe;
+  const rpe = typeof rpeRaw === 'number' && Number.isFinite(rpeRaw) ? Math.round(rpeRaw * 10) / 10 : null;
+
+  const ns = sd.next_session;
+  const nextSessionName = ns && typeof ns.name === 'string' ? ns.name : null;
+  const nextSessionPrescription =
+    ns && typeof ns.prescription === 'string' && ns.prescription.trim() ? ns.prescription : null;
 
   const similarRuns =
     vsSim && typeof vsSim.sample_size === 'number'
@@ -174,14 +268,32 @@ export function buildSessionRaceReadinessFacts(params: {
     hr_drift_bpm: typeof hrDrift === 'number' ? Math.round(hrDrift * 10) / 10 : hrDrift,
     typical_hr_drift_bpm:
       typeof typicalHrDrift === 'number' ? Math.round(typicalHrDrift * 10) / 10 : null,
+    hr_drift_vs_typical: hrDriftVsTypical,
+    drift_explanation: driftExplanation,
     pacing_split: pacingSplit,
+    pacing_split_seconds_per_mile: splitFacts.pacing_split_seconds_per_mile,
+    fastest_mile: splitFacts.fastest_mile,
+    fastest_mile_pace: splitFacts.fastest_mile_pace,
+    fastest_mile_pace_sec_per_mi: splitFacts.fastest_mile_pace_sec_per_mi,
+    pacing_speedups_note: pacingSpeedupsNote,
     heart_rate_row_summary: heartRateSummary,
     conditions_temp_f: conditionsTempF,
+    conditions_heat_flag: conditionsHeatFlag,
     elevation_gain_ft: elevFt,
+    elevation_profile: elevationProfile,
     terrain_type: terrainType,
+    rpe,
+    plan_has_taper: pc.has_taper_phase,
+    current_phase: pc.current_phase,
+    next_session_name: nextSessionName,
+    next_session_prescription: nextSessionPrescription,
     execution_score: sd.execution?.execution_score ?? perf.execution_adherence ?? null,
     pace_adherence_pct: sd.execution?.pace_adherence ?? perf.pace_adherence ?? null,
     duration_adherence_pct: sd.execution?.duration_adherence ?? perf.duration_adherence ?? null,
+    target_finish_time_seconds:
+      pc.targetFinishTimeSeconds != null && pc.targetFinishTimeSeconds > 0
+        ? pc.targetFinishTimeSeconds
+        : null,
     target_race_goal_finish_clock:
       pc.targetFinishTimeSeconds != null && pc.targetFinishTimeSeconds > 0
         ? fmtFinishClock(pc.targetFinishTimeSeconds)
@@ -220,13 +332,14 @@ function parseRaceReadinessLlmResponse(text: string | null): SessionRaceReadines
     const verdict = String(o.verdict || '').trim();
     const tactical_instruction = String(o.tactical_instruction || '').trim();
     const projection = String(o.projection || '').trim();
+    const taper_guidance = String(o.taper_guidance || '').trim();
     const flagRaw = o.flag;
     const flag =
       flagRaw === null || flagRaw === undefined || String(flagRaw).toLowerCase() === 'null'
         ? null
         : String(flagRaw).trim() || null;
-    if (!headline || !verdict || !tactical_instruction || !projection) return null;
-    return { headline, verdict, tactical_instruction, flag, projection };
+    if (!headline || !verdict || !tactical_instruction || !projection || !taper_guidance) return null;
+    return { headline, verdict, tactical_instruction, flag, projection, taper_guidance };
   } catch {
     return null;
   }
@@ -252,46 +365,95 @@ export function raceReadinessDeterministicFallback(
   const exec = facts.execution_score;
   if (typeof exec === 'number') bits.push(`execution vs plan about ${Math.round(exec)}%`);
   const verdict = bits.join('; ') + '. Use pacing and heart-rate rows above as the primary readiness read.';
+  const heat = facts.conditions_heat_flag === true;
+  const drift = typeof facts.hr_drift_bpm === 'number' ? facts.hr_drift_bpm : null;
+  const typ = typeof facts.typical_hr_drift_bpm === 'number' ? facts.typical_hr_drift_bpm : null;
+  let tactical_instruction =
+    'Race day: open using the same controlled effort you held mid-run today; let course and weather dictate when to press.';
+  if (drift != null && typ != null) {
+    tactical_instruction = `HR drift +${Math.round(drift)} bpm vs your typical +${Math.round(typ)} bpm`;
+    if (heat) tactical_instruction += ' — heat was a factor (see conditions_heat_flag), so race morning cool weather should feel easier at the same HR.';
+    tactical_instruction += ' Hold the first third conservative relative to that baseline.';
+  }
+  const split = facts.pacing_split_seconds_per_mile;
+  if (typeof split === 'number' && Math.abs(split) >= 5) {
+    tactical_instruction += ` Pacing shifted ${split > 0 ? '+' : ''}${split}s/mi second half vs first — use that discipline pattern on race day.`;
+  }
+  const planTaper = facts.plan_has_taper === true;
+  const nextN = typeof facts.next_session_name === 'string' ? facts.next_session_name : '';
+  const nextP = typeof facts.next_session_prescription === 'string' ? facts.next_session_prescription : '';
+  let taper_guidance = planTaper
+    ? 'Your plan already structures taper — do not add extra volume. Protect sleep, normal fueling, and any short race-pace touches only if legs feel fresh.'
+    : 'Keep recovery between hard days honest; avoid stacking fatigue this close to the race.';
+  if (planTaper && (nextN || nextP)) {
+    taper_guidance += ` Next on plan: ${nextN}${nextP ? ` — ${nextP.slice(0, 120)}` : ''}. Optional sessions are fine to skip if you feel flat.`;
+  }
   return {
     headline: `${days} days out — key long run in the bank`,
     verdict,
-    tactical_instruction:
-      'Through taper: cut volume, keep intensity touches short, sleep and fuel consistently race week.',
+    tactical_instruction,
     flag: null,
     projection:
       typeof facts.target_race_goal_finish_clock === 'string'
         ? `Goal finish on file: ${facts.target_race_goal_finish_clock}. Treat today as workload confirmation, not a race predictor.`
         : 'No goal finish time on file — set a target in the plan or pace off recent long-run effort.',
+    taper_guidance,
   };
 }
 
 export async function generateSessionRaceReadinessLlm(
   facts: Record<string, unknown>,
 ): Promise<SessionRaceReadinessLlmV1 | null> {
-  const systemPrompt = `You are a performance coach analyzing a long training run to assess race readiness.
-You write in a direct, specific, unsentimental style — no filler, no cheerleading.
-You reason only from the FACTS object provided. Do not invent numbers, dates, or metrics not present in FACTS.
-If a field is missing, do not guess — omit reference to it.
-Respond only with valid JSON matching the schema in the user message — no markdown, no prose outside JSON.`;
+  const systemPrompt = `You are a performance coach writing race readiness JSON for an athlete.
+Write in a direct, specific, unsentimental style. Reason only from the FACTS object — do not invent numbers or dates.
+If a fact is missing, do not guess; omit that angle. Output valid JSON only — no markdown, no preamble.`;
 
-  const userPrompt = `Analyze this long run and produce a race readiness assessment.
+  const dtr = facts.days_to_race;
+  const rname = facts.race_name;
+  const daysPart = typeof dtr === 'number' ? String(dtr) : 'unknown';
+  const racePart =
+    typeof rname === 'string' && String(rname).trim() ? String(rname).trim() : 'the race';
+
+  const userPrompt = `You are a performance coach writing a race readiness assessment for an athlete ${daysPart} days out from ${racePart}.
+
+Reason from the specific data. Do not write generic training advice. Every sentence should connect directly to a number or condition in the facts below.
 
 FACTS:
 ${JSON.stringify(facts, null, 2)}
 
-Respond with this exact JSON structure (all string fields; flag may be null):
+REASONING INSTRUCTIONS:
+
+1. VERDICT: Connect today's session specifically to race day. Reason about:
+   - Was HR drift better or worse than typical, and WHY (consider temp: if conditions_heat_flag is true, heat is a factor — strip the heat tax and assess underlying fitness)
+   - Pacing: positive split (pacing_split_seconds_per_mile > 0) means second half slower — tie to heat, hills (elevation_profile / elevation_gain_ft), discipline, or fatigue. What does it predict for race execution?
+   - If conditions_heat_flag is true, explicitly note heat and what the performance means adjusted for that context
+   - What does this run predict about race day performance?
+
+2. TACTICAL_INSTRUCTION: One specific, actionable race-day instruction derived from today's data. Reference actual numbers from FACTS where possible.
+
+3. FLAG: One honest concern if the data supports it. Be specific. If none, return null — do not invent.
+
+4. PROJECTION: Estimate finish time or pace range from today's effort, adjusted for likely race conditions (cooler temps, course_profile if present). Brief reasoning.
+
+5. TAPER_GUIDANCE:
+   - If plan_has_taper is true AND current_phase suggests taper (or plan_has_taper true): Do NOT say "cut volume" — the plan handles load. Give session-specific guidance for the window before race: what to protect (sleep, fueling, short intensity touch if any), what to avoid (new fatigue/soreness). Reference next_session_name / next_session_prescription when present for optional work.
+   - If the athlete showed strain today, note that skipping optional upcoming work can be correct — use next session fields by name.
+   - Frame as how to execute the taper already in the plan, not prescribing a new taper.
+
+Respond with this exact JSON structure — no preamble, no markdown:
 {
-  "headline": "one sentence, e.g. '14 days out — fitness confirmed, execution clean'",
-  "verdict": "2-3 sentences connecting today's data specifically to the upcoming race date in FACTS. Use only FACTS.",
-  "tactical_instruction": "one specific, actionable instruction for race day based on FACTS",
-  "flag": "one honest concern if one exists, otherwise null. Be specific.",
-  "projection": "pace or time range estimate grounded in FACTS only; if insufficient data, say what is missing"
+  "headline": "short, specific — days to race and one key finding",
+  "verdict": "2-4 sentences. Reason from data to race prediction. No filler.",
+  "tactical_instruction": "one race-day instruction with numbers from FACTS where possible",
+  "flag": "specific concern or null",
+  "projection": "finish time or pace range with brief reasoning",
+  "taper_guidance": "2-3 sentences for this athlete and upcoming sessions — not generic volume advice"
 }`;
 
   const raw = await callLLM({
     system: systemPrompt,
     user: userPrompt,
-    maxTokens: 900,
+    maxTokens: 1100,
     temperature: 0.2,
     model: 'sonnet',
   });
