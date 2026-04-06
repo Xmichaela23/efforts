@@ -222,6 +222,15 @@ export type CoachWeekContextV1 = {
   };
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
   race_readiness?: RaceReadinessV1 | null;
+  /** State tab KEY RUN — most recent ≥12mi run with Performance race_readiness */
+  primary_race_readiness?: {
+    workout_id: string;
+    workout_date: string;
+    distance_miles: number;
+    headline: string;
+    tactical_instruction: string;
+    projection: string;
+  } | null;
   interference: {
     aerobic: string;
     structural: string;

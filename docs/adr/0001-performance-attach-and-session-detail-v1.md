@@ -93,7 +93,8 @@ This avoids: *“I executed the workout well but scored 72 because I did it Satu
 
 - Cursor rule: `.cursor/rules/performance-session-contract.mdc` (day-to-day enforcement).
 - Related audits: `docs/SMART_SERVER_DUMB_CLIENT_AUDIT.md`, `docs/PERFORMANCE_SCREEN_AUDIT.md`.
-- Persistence: `session_detail_v1` merged into `workout_analysis` via atomic RPC after `workout-detail` build (see migrations for `merge_session_detail_v1_into_workout_analysis`).
+- Persistence: `session_detail_v1` merged into `workout_analysis` via atomic RPC after `workout-detail` build (see migrations for `merge_session_detail_v1_into_workout_analysis`). The merge also sets **`session_detail_updated_at`** (JSONB sibling) for staleness.
+- **`scope=session_detail`** may **serve the persisted blob** when not stale (vs workout row `updated_at`, optional `recomputed_at`, 24h TTL); **`force_refresh`** (body or query) runs the full pipeline. Client sets `force_refresh` after `workout-detail:invalidate` so recomputes are not masked by the fast path.
 
 ---
 

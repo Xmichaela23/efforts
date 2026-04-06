@@ -13,6 +13,8 @@ type CoachDataProp = {
   refresh: () => void;
 };
 
+type PrimaryRaceReadinessRow = NonNullable<CoachWeekContextV1['primary_race_readiness']>;
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function trendColor(dir: string, tone?: string): string {
@@ -95,7 +97,15 @@ function signalToneColor(tone: string): string {
   return 'text-white/65';
 }
 
-function RaceSection({ rr }: { rr: RaceReadinessV1 }) {
+function RaceSection({
+  rr,
+  primaryRaceReadiness,
+  onOpenKeyRun,
+}: {
+  rr: RaceReadinessV1;
+  primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
+  onOpenKeyRun?: (workoutId: string) => void;
+}) {
   const distLabel = rr.goal.distance.replace(/_/g, ' ');
   return (
     <div className="px-3 py-3 space-y-2.5">
@@ -148,6 +158,31 @@ function RaceSection({ rr }: { rr: RaceReadinessV1 }) {
       {/* Assessment message */}
       <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
 
+      {/* KEY RUN — primary long-run race readiness (single signal; full block on Performance) */}
+      {primaryRaceReadiness && onOpenKeyRun && (
+        <button
+          type="button"
+          onClick={() => onOpenKeyRun(primaryRaceReadiness.workout_id)}
+          className="w-full text-left rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 space-y-2.5 mt-1 active:opacity-90"
+        >
+          <span className="text-[10px] font-medium text-white/45 uppercase tracking-wide">Key run</span>
+          <p className="text-[11px] text-white/50 tabular-nums">
+            {fmtDate(primaryRaceReadiness.workout_date)} · {primaryRaceReadiness.distance_miles}mi
+          </p>
+          <p className="text-[13px] font-semibold text-white/90 leading-snug">{primaryRaceReadiness.headline}</p>
+          {!!String(primaryRaceReadiness.tactical_instruction || '').trim() && (
+            <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
+              <span className="text-[10px] font-medium text-white/45 uppercase tracking-wide">Race day</span>
+              <p className="text-[12px] text-white/85 mt-0.5 leading-snug">{primaryRaceReadiness.tactical_instruction}</p>
+            </div>
+          )}
+          {!!String(primaryRaceReadiness.projection || '').trim() && (
+            <p className="text-[11px] text-white/45 leading-relaxed">{primaryRaceReadiness.projection}</p>
+          )}
+          <span className="text-[11px] font-normal text-white/40">View full analysis →</span>
+        </button>
+      )}
+
       {/* Training signals */}
       {rr.training_signals.length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
@@ -188,7 +223,15 @@ function RaceSection({ rr }: { rr: RaceReadinessV1 }) {
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
-export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
+export default function StateTab({
+  coachData,
+  onClose,
+  onSelectWorkout,
+}: {
+  coachData: CoachDataProp;
+  onClose?: () => void;
+  onSelectWorkout?: (workout: any) => void;
+}) {
   const { data, loading, error, refresh } = coachData;
   const { liftTrends } = useExerciseLog(8);
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
@@ -219,6 +262,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
   const snap = (data as any)?.athlete_snapshot ?? null;
   const loadStatus = snap?.body_response?.load_status ?? null;
   const raceReadiness: RaceReadinessV1 | null = (data as any)?.race_readiness ?? null;
+  const primaryRaceReadiness: PrimaryRaceReadinessRow | null = data?.primary_race_readiness ?? null;
 
   // ── WEEK header ──────────────────────────────────────────────────────────
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
@@ -412,7 +456,20 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
         </div>
 
         {/* RACE — predicted finish, VDOT trend, pace zones (gated on data) */}
-        {raceReadiness && <RaceSection rr={raceReadiness} />}
+        {raceReadiness && (
+          <RaceSection
+            rr={raceReadiness}
+            primaryRaceReadiness={primaryRaceReadiness}
+            onOpenKeyRun={
+              onSelectWorkout
+                ? (workoutId) => {
+                    onClose?.();
+                    onSelectWorkout({ id: workoutId, workout_status: 'completed', type: 'run' });
+                  }
+                : undefined
+            }
+          />
+        )}
 
         {/* NEXT */}
         <div className="px-3 py-3">

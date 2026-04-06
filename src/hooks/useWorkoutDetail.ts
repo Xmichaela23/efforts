@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
@@ -14,11 +14,30 @@ export type WorkoutDetailOptions = {
   fetchSessionDetail?: boolean;
 };
 
+/** Persisted Performance payload (merge_session_detail_v1_into_workout_analysis). */
+export function extractSessionDetailV1FromWorkout(w: unknown): Record<string, unknown> | null {
+  if (!w || typeof w !== 'object') return null;
+  let wa = (w as { workout_analysis?: unknown }).workout_analysis;
+  if (typeof wa === 'string') {
+    try {
+      wa = JSON.parse(wa);
+    } catch {
+      return null;
+    }
+  }
+  if (!wa || typeof wa !== 'object') return null;
+  const sd = (wa as { session_detail_v1?: unknown }).session_detail_v1;
+  if (!sd || typeof sd !== 'object') return null;
+  return sd as Record<string, unknown>;
+}
+
 export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
   const [hasSession, setHasSession] = useState(false);
   const fetchSessionDetail = !!opts?.fetchSessionDetail;
+  /** Next session_detail invoke skips server fast path (recompute / attach / invalidate). */
+  const forceSessionDetailRefreshRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -124,6 +143,11 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         merged = remote;
       }
 
+      const emb = extractSessionDetailV1FromWorkout(merged);
+      if (emb && id) {
+        queryClient.setQueryData(['workout-detail', id, 'session_detail'], { session_detail_v1: emb });
+      }
+
       return { workout: merged };
     },
     staleTime: 60_000,
@@ -149,8 +173,15 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         } catch { return ''; }
       })();
 
+      const forceRefresh = forceSessionDetailRefreshRef.current;
+      forceSessionDetailRefreshRef.current = false;
+
       const { data, error } = await supabase.functions.invoke('workout-detail', {
-        body: { id, scope: 'session_detail' },
+        body: {
+          id,
+          scope: 'session_detail',
+          ...(forceRefresh ? { force_refresh: true } : {}),
+        },
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -169,6 +200,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     let t: ReturnType<typeof setTimeout> | undefined;
     const detailHandler = () => {
       try {
+        forceSessionDetailRefreshRef.current = true;
         queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
         if (t) clearTimeout(t);
         t = setTimeout(() => {
@@ -192,15 +224,28 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     return preview ? { ...preview } : null;
   }, [id, contextPreview, workoutQuery.data]);
 
+  const embeddedSessionDetail = useMemo(
+    () => extractSessionDetailV1FromWorkout(stableWorkout),
+    [stableWorkout],
+  );
+
   const sessionDetailV1 = useMemo(() => {
-    return (sessionQuery.data as any)?.session_detail_v1 ?? null;
-  }, [sessionQuery.data]);
+    const fromEdge = (sessionQuery.data as { session_detail_v1?: unknown })?.session_detail_v1;
+    if (fromEdge != null && typeof fromEdge === 'object') return fromEdge as Record<string, unknown>;
+    return embeddedSessionDetail;
+  }, [sessionQuery.data, embeddedSessionDetail]);
+
+  const haveSessionForUi = sessionDetailV1 != null;
+  const sessionDetailLoading =
+    fetchSessionDetail &&
+    !haveSessionForUi &&
+    (sessionQuery.isPending || sessionQuery.isFetching);
 
   return {
     workout: stableWorkout,
     session_detail_v1: sessionDetailV1,
     loading: workoutQuery.isFetching || workoutQuery.isPending,
-    sessionDetailLoading: fetchSessionDetail && (sessionQuery.isFetching || sessionQuery.isPending),
+    sessionDetailLoading,
     error:
       (workoutQuery.error as any)?.message ||
       (fetchSessionDetail ? (sessionQuery.error as any)?.message : null) ||

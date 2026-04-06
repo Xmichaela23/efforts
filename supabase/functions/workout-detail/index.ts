@@ -37,6 +37,79 @@ function parseScope(body: Record<string, unknown>): WorkoutDetailScope {
   return 'full';
 }
 
+function parseAnalysisFromWorkoutRow(row: any): Record<string, unknown> {
+  const raw = row?.workout_analysis;
+  if (raw == null) return {};
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  return {};
+}
+
+function msFromTimestampField(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v).trim();
+  if (!s) return null;
+  const t = new Date(s).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * Persisted session_detail_v1 is stale → run full snapshot + LLM pipeline.
+ * `session_detail_updated_at` is set by merge_session_detail_v1_into_workout_analysis (JSONB on workouts).
+ */
+function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analysis: Record<string, unknown>): boolean {
+  const sessionDetail = analysis?.session_detail_v1;
+  if (!sessionDetail || typeof sessionDetail !== 'object') return true;
+
+  const writtenMs =
+    msFromTimestampField(analysis.session_detail_updated_at) ??
+    msFromTimestampField(analysis.updated_at);
+  if (writtenMs == null) return true;
+
+  const rec = analysis.recomputed_at;
+  if (rec != null) {
+    const recMs = msFromTimestampField(rec);
+    if (recMs != null && recMs > writtenMs) return true;
+  }
+
+  const wUa = workoutRow?.updated_at;
+  if (wUa != null) {
+    const wMs = msFromTimestampField(wUa);
+    if (wMs != null && wMs > writtenMs) return true;
+  }
+
+  const ageMs = Date.now() - writtenMs;
+  if (ageMs > 24 * 60 * 60 * 1000) return true;
+
+  return false;
+}
+
+function processingCompleteFromWorkoutRow(row: any): boolean {
+  let comp = row?.computed;
+  if (typeof comp === 'string') {
+    try {
+      comp = JSON.parse(comp);
+    } catch {
+      comp = null;
+    }
+  }
+  try {
+    const s = comp?.analysis?.series || null;
+    const n = Array.isArray(s?.distance_m) ? s.distance_m.length : 0;
+    const nt = Array.isArray(s?.time_s) ? s.time_s.length : (Array.isArray(s?.time) ? s.time.length : 0);
+    return n > 1 && nt > 1;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * JSON + scalar fields needed for session_detail_v1 pipeline (no GPS/track/display_metrics).
  */
@@ -639,6 +712,14 @@ Deno.serve(async (req) => {
       if (!userId) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+      let urlForceRefresh = false;
+      try {
+        urlForceRefresh = new URL(req.url).searchParams.get('force_refresh') === 'true';
+      } catch {
+        /* ignore bad URL */
+      }
+      const forceRefresh = body?.force_refresh === true || urlForceRefresh;
+
       const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length';
       let qSd = supabase.from('workouts').select(selectSd).eq('id', id) as any;
       qSd = qSd.eq('user_id', userId);
@@ -647,6 +728,33 @@ Deno.serve(async (req) => {
       if (!rowSd) {
         return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
+      const analysisSd = parseAnalysisFromWorkoutRow(rowSd);
+      if (!forceRefresh && !isSessionDetailStale(rowSd, analysisSd)) {
+        const sd = analysisSd.session_detail_v1;
+        console.log('[workout-detail] session_detail fast path: serving persisted session_detail_v1');
+        const pcFast = processingCompleteFromWorkoutRow(rowSd);
+        const cachedAt = analysisSd.session_detail_updated_at ?? analysisSd.updated_at;
+        const outFast: Record<string, unknown> = {
+          session_detail_v1: sd,
+          processing_complete: pcFast,
+          _cache_hit: true,
+          _cached_at: cachedAt != null ? String(cachedAt) : null,
+        };
+        const headersFast: Record<string, string> = {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'X-Session-Detail-Cache': 'hit',
+        };
+        return new Response(JSON.stringify(outFast), { headers: headersFast });
+      }
+
+      if (forceRefresh) {
+        console.log('[workout-detail] session_detail force_refresh — running full pipeline');
+      } else {
+        console.log('[workout-detail] session_detail stale or missing — running full pipeline');
+      }
+
       const { detail: dSd, processingComplete: pcSd } = buildDetailCoreForSession(rowSd);
       const { sessionDetailV1: sdV1, snapshot_latency_ms: latMs } = await runSessionDetailPipelineAndPersist(
         supabase,
@@ -655,10 +763,15 @@ Deno.serve(async (req) => {
         rowSd,
         dSd,
       );
-      const out: Record<string, unknown> = { processing_complete: pcSd };
+      const out: Record<string, unknown> = { processing_complete: pcSd, _cache_hit: false };
       if (sdV1) out.session_detail_v1 = sdV1;
       if (latMs != null && latMs >= SNAPSHOT_LATENCY_WARN_MS) out.snapshot_latency_ms = latMs;
-      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const headersOut: Record<string, string> = {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'X-Session-Detail-Cache': 'miss',
+      };
+      return new Response(JSON.stringify(out), { headers: headersOut });
     }
 
     const gpsSel = opts.include_gps ? ',gps_track' : '';

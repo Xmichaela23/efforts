@@ -86,6 +86,90 @@ function addDaysISO(iso: string, deltaDays: number): string {
   return toISODate(base);
 }
 
+type PrimaryRaceReadinessPayload = NonNullable<CoachWeekContextResponseV1['primary_race_readiness']>;
+
+function parseWorkoutAnalysisJson(raw: unknown): Record<string, unknown> {
+  if (raw == null) return {};
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  return {};
+}
+
+/**
+ * Most recent completed run ≥12 mi with `session_detail_v1.race_readiness` (verdict present).
+ * Window: from 21 weeks before race through as_of_date.
+ */
+async function pickPrimaryRaceReadinessWorkout(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  raceDateYmd: string,
+  asOfDate: string,
+): Promise<PrimaryRaceReadinessPayload | null> {
+  const raceDay = raceDateYmd.slice(0, 10);
+  const windowStart = addDaysISO(raceDay, -(21 * 7));
+
+  const { data, error } = await supabase
+    .from('workouts')
+    .select('id,date,timestamp,type,workout_status,workout_analysis')
+    .eq('user_id', userId)
+    .eq('workout_status', 'completed')
+    .gte('date', windowStart)
+    .lte('date', asOfDate)
+    .limit(80);
+
+  if (error) throw error;
+  const rows = Array.isArray(data) ? data : [];
+
+  const sorted = [...rows].sort((a: any, b: any) => {
+    const da = String(a?.date || '').slice(0, 10);
+    const db = String(b?.date || '').slice(0, 10);
+    if (da !== db) return db.localeCompare(da);
+    const ta = new Date(a?.timestamp || `${da}T23:59:59`).getTime();
+    const tb = new Date(b?.timestamp || `${db}T23:59:59`).getTime();
+    return tb - ta;
+  });
+
+  for (const w of sorted) {
+    const wtype = String((w as any)?.type || '').toLowerCase();
+    if (wtype !== 'run') continue;
+
+    const wa = parseWorkoutAnalysisJson((w as any)?.workout_analysis);
+    const sd = wa.session_detail_v1;
+    if (!sd || typeof sd !== 'object') continue;
+    const sdObj = sd as Record<string, unknown>;
+    const rr = sdObj.race_readiness;
+    if (!rr || typeof rr !== 'object') continue;
+    const verdict = String((rr as { verdict?: string }).verdict || '').trim();
+    if (!verdict) continue;
+
+    const ct = sdObj.completed_totals as Record<string, unknown> | undefined;
+    const distMRaw = ct?.distance_m;
+    const distM = distMRaw != null && Number.isFinite(Number(distMRaw)) ? Number(distMRaw) : null;
+    const distMi = distM != null ? distM / 1609.344 : null;
+    if (distMi == null || distMi < 12) continue;
+
+    const headline = String((rr as { headline?: string }).headline || '').trim();
+    if (!headline) continue;
+
+    return {
+      workout_id: String((w as any).id),
+      workout_date: String((w as any).date || '').slice(0, 10),
+      distance_miles: Math.round(distMi * 10) / 10,
+      headline,
+      tactical_instruction: String((rr as { tactical_instruction?: string }).tactical_instruction || '').trim(),
+      projection: String((rr as { projection?: string }).projection || '').trim(),
+    };
+  }
+
+  return null;
+}
+
 function weekdayFromISODate(iso: string): string {
   const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   try {
@@ -2046,6 +2130,21 @@ Deno.serve(async (req) => {
       console.warn('[coach] race readiness failed (non-fatal):', rrErr?.message ?? rrErr);
     }
 
+    let primary_race_readiness: CoachWeekContextResponseV1['primary_race_readiness'] = null;
+    try {
+      const weeksOutGate =
+        goalContext.upcoming_races.find((r) => r.name === goalContext.primary_event?.name)?.weeks_out ?? null;
+      const pe = goalContext.primary_event;
+      const raceIso = pe?.target_date ? String(pe.target_date).slice(0, 10) : '';
+      const sport = String(pe?.sport || '').toLowerCase();
+      const runish = Boolean(pe && (sport === 'run' || sport === 'running' || !pe.sport));
+      if (weeksOutGate != null && weeksOutGate <= 21 && raceIso && runish) {
+        primary_race_readiness = await pickPrimaryRaceReadinessWorkout(supabase, userId, raceIso, asOfDate);
+      }
+    } catch (prrErr: any) {
+      console.warn('[coach] primary_race_readiness failed (non-fatal):', prrErr?.message ?? prrErr);
+    }
+
     const interference = latestSnapshot?.interference ?? null;
 
     // Plan adaptation suggestions (Phase 3): deload / add recovery when overreaching or fatigued
@@ -3300,6 +3399,9 @@ ${narrativeFacts.join('\n')}`;
             const sourceLabel = source === 'observed' ? 'from recent runs' : 'based on plan targets';
 
             if (intent === 'taper') {
+              if (primary_race_readiness) {
+                return `${weeksOutVal}w to ${raceNameForSummary} — key run locked in. Protect what you've built.`;
+              }
               if (projection) {
                 return `${weeksOutVal}w to ${raceNameForSummary} — ${projection} ${sourceLabel}. Protect the legs, keep sessions crisp.`;
               }
@@ -3589,6 +3691,7 @@ ${narrativeFacts.join('\n')}`;
       goal_prediction: goalPrediction,
       athlete_snapshot: athleteSnapshot,
       race_readiness: raceReadiness,
+      primary_race_readiness,
     };
 
     // ── Cache write (service_role so INSERT RLS passes; await so isolate does not exit first)

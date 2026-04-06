@@ -7,7 +7,7 @@ interface ContextTabsProps {
   onSelectWorkout?: (workout: any) => void;
 }
 
-const ContextTabs: React.FC<ContextTabsProps> = () => {
+const ContextTabs: React.FC<ContextTabsProps> = ({ onClose, onSelectWorkout }) => {
   const coachData = useCoachWeekContext();
 
   return (
@@ -22,7 +22,7 @@ const ContextTabs: React.FC<ContextTabsProps> = () => {
         <div aria-hidden="true" className="instrument-divider" />
 
         <div className="flex-1 overflow-y-auto min-h-0 px-1 pb-1">
-          <StateTab coachData={coachData} />
+          <StateTab coachData={coachData} onClose={onClose} onSelectWorkout={onSelectWorkout} />
         </div>
       </div>
     </div>

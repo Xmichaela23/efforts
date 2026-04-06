@@ -167,6 +167,15 @@ export type CoachWeekContextResponseV1 = {
   goal_context?: import('../_shared/goal-context.ts').GoalContext;
   goal_prediction?: import('../_shared/goal-predictor/index.ts').GoalPredictionResult;
   race_readiness?: import('../_shared/race-readiness/index.ts').RaceReadinessV1 | null;
+  /** Most recent ≥12mi run with session_detail_v1.race_readiness (State tab KEY RUN); null when gated or none. */
+  primary_race_readiness?: {
+    workout_id: string;
+    workout_date: string;
+    distance_miles: number;
+    headline: string;
+    tactical_instruction: string;
+    projection: string;
+  } | null;
   training_state: {
     // Deterministic, plan-aware topline (frontend should render this verbatim)
     code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';
