@@ -491,15 +491,20 @@ export function raceReadinessDeterministicFallback(
   const fastestMilePace =
     typeof facts.fastest_mile_pace === 'string' ? String(facts.fastest_mile_pace).trim() : '';
   const avgPaceStr = typeof facts.avg_pace === 'string' ? String(facts.avg_pace).trim() : '';
+  const distN = typeof dist === 'number' && dist > 0 ? dist : null;
+  const earlyMilesLabel =
+    distN != null && distN < 12 ? 'the first 2–3 miles' : distN != null && distN < 16 ? 'the first 3–4 miles' : 'the first 5 miles';
 
   let tactical_instruction = '';
   if (fastestMile != null && fastestMilePace) {
     tactical_instruction =
-      `Your fastest mile today was mile ${Math.round(fastestMile)} at ${fastestMilePace} — stay slower than that effort for the first 5 miles at ${raceLabel} so you don't repeat today's fade.`;
+      `Your fastest mile today was mile ${Math.round(fastestMile)} at ${fastestMilePace} — stay slower than that effort through ${earlyMilesLabel} at ${raceLabel} so you don't repeat today's fade.`;
   } else if (avgPaceStr) {
-    tactical_instruction = `You averaged ${avgPaceStr} today — use that as an early ceiling for the first third at ${raceLabel} if you want the same aerobic control you showed here.`;
+    const thirdLabel =
+      distN != null && distN >= 18 ? 'roughly the first third of the race' : earlyMilesLabel;
+    tactical_instruction = `You averaged ${avgPaceStr} today — use that as an early ceiling for ${thirdLabel} at ${raceLabel} if you want the same aerobic control you showed here.`;
   } else if (avgHrF != null && drift != null && typ != null) {
-    tactical_instruction = `You held ~${avgHrF} bpm average with +${Math.round(drift)} bpm drift vs your typical +${Math.round(typ)} — cap early effort at a similar HR at ${raceLabel} until mile 5, then reassess.`;
+    tactical_instruction = `You held ~${avgHrF} bpm average with +${Math.round(drift)} bpm drift vs your typical +${Math.round(typ)} — cap early effort at a similar HR at ${raceLabel} through ${earlyMilesLabel}, then reassess.`;
   } else if (drift != null && typ != null) {
     tactical_instruction = `You held +${Math.round(drift)} bpm drift versus your usual +${Math.round(typ)} — keep the first third of ${raceLabel} controlled; lungs and legs should feel easier if the morning is cooler.`;
     if (heat && heatNote) {
@@ -508,7 +513,7 @@ export function raceReadinessDeterministicFallback(
       tactical_instruction += ' Heat added cost today; at a cooler gun you can afford the same HR at slightly truer pace early.';
     }
   } else if (avgHrF != null) {
-    tactical_instruction = `You averaged ${avgHrF} bpm today — treat that as your early-race HR anchor for the first 5 miles at ${raceLabel}, then let pace follow if breathing stays easy.`;
+    tactical_instruction = `You averaged ${avgHrF} bpm today — treat that as your early-race HR anchor through ${earlyMilesLabel} at ${raceLabel}, then let pace follow if breathing stays easy.`;
   } else {
     tactical_instruction = `With ${days} days to ${raceLabel}, run the first 2–3 miles ~15–20 s/mi slower than race goal pace feels, then build only if everything feels easy.`;
   }
@@ -556,7 +561,7 @@ Today's elevation describes this workout's terrain load (use for fitness / drift
 
 If DATA includes target_race_distance_miles, finish-time estimates must agree with per-mile pace × that distance (see user instructions).
 
-tactical_instruction must include at least one concrete number from today's DATA (pace clock, bpm, mile number, °F, or split seconds). Purely generic pacing advice with no numbers is invalid (see user instructions).
+tactical_instruction must include numbers that appear in today's DATA only — never copy placeholder or example numbers from the instructions (see user instructions).
 
 Output: valid JSON only. No markdown fences, no preamble, no commentary outside the JSON.`;
 
@@ -591,25 +596,25 @@ COURSE PROFILE RULE (applies especially to "projection"): Only reference race co
 
 Taper: If their plan already includes taper structure, do not tell them to "cut volume" generically. Say what to protect (sleep, fuel, short sharp work if any) and what optional pieces to skip if tired. Name the actual next session if the data includes it.
 
-TACTICAL_INSTRUCTION (mandatory): One race-day line that includes at least one concrete number from today's DATA — pace (e.g. 10:32/mi, 11:07), HR (e.g. 137 bpm, +7 drift vs +12 typical), a mile marker, °F, or +37 s/mi style split. Do not ship generic intent-only tactics.
+TACTICAL_INSTRUCTION (mandatory): One race-day line tied to this session's DATA only. Use whatever anchors exist in DATA: fastest_mile + fastest_mile_pace, avg_pace, hr_drift_bpm vs typical_hr_drift_bpm, avg_hr, pacing_split_seconds_per_mile, temps, distance_miles — combine them so the athlete gets a concrete guardrail (pace ceiling, HR ceiling, or early-mile discipline vs a split they actually ran). Vary the wording run to run; do not reuse canned phrases from week to week if the numbers change.
 
-Good example: "Your fastest mile today was mile 7 at 10:32 — if you're running faster than 10:45 in the first 5 miles at ${racePart} you're going out too hot."
+Shape (illustrative — substitute values ONLY from DATA, never from this prompt): "Your fastest mile was mile [N] at [pace from DATA] — don't run faster than [X] in the early miles at ${racePart}." OR "You averaged [avg_pace] / [avg_hr] bpm — use that as an early cap at ${racePart}." If fastest_mile is missing, use avg_pace or HR; if those are missing, use drift vs typical + duration.
 
-Bad example (do not do this): "Start conservatively and let your second half benefit from your fitness."
+Bad (reject): generic intent with no digits from DATA, or any numbers that are not in DATA for this workout.
 
 OUTPUT RULES:
 - Second person ("you", "your").
 - Cite real numbers from DATA (+7 bpm, 15 mi, 37 s/mi, °F, etc.) — never cite field names.
 - No filler ("great job", "keep it up", "as you prepare").
 - If there is no honest concern, "flag" must be null.
-- "tactical_instruction" must satisfy TACTICAL_INSTRUCTION above (at least one digit-backed metric from today).
+- "tactical_instruction" must satisfy TACTICAL_INSTRUCTION above: digits must reflect this session's DATA, not example numbers from the prompt.
 - "projection" must include brief reasoning, not only a time — and must follow COURSE PROFILE RULE above (no today's-elevation-as-race-proxy). Pace × target_race_distance_miles must match any finish clock you state (±~5 min).
 
 Respond with this exact JSON shape — string values only where shown, flag may be null:
 {
   "headline": "specific, include at least one concrete number or comparison",
   "verdict": "3-4 sentences: coach reasoning tying HR + pace + conditions to race day",
-  "tactical_instruction": "one sentence with ≥1 number from today (pace, HR, mile, °F, or s/mi) — see TACTICAL_INSTRUCTION",
+  "tactical_instruction": "one sentence; every number must appear in DATA for this workout — see TACTICAL_INSTRUCTION",
   "flag": "one real concern if the data supports it, otherwise null",
   "projection": "finish or pace estimate with brief reasoning; race terrain only if course_profile in DATA — else temp + HR/pace only",
   "taper_guidance": "2-3 sentences specific to the next ~two weeks — not generic advice"
