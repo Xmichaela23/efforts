@@ -3278,7 +3278,7 @@ ${narrativeFacts.join('\n')}`;
 
             if (intent === 'taper') {
               if (projection) {
-                return `${weeksOutVal}w to ${raceNameForSummary} — ${projection} ${sourceLabel}. Protect the legs, keep touches sharp.`;
+                return `${weeksOutVal}w to ${raceNameForSummary} — ${projection} ${sourceLabel}. Protect the legs, keep sessions crisp.`;
               }
               if (rs === 'fresh') return `${weeksOutVal}w to ${raceNameForSummary} — fitness is banked. Taper means protecting what you've built, not adding to it.`;
               if (rs === 'fatigued') return `${weeksOutVal}w to ${raceNameForSummary} — you still need to freshen up. Race is close, prioritize rest.`;
