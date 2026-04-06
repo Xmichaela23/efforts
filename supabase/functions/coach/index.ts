@@ -1967,6 +1967,36 @@ Deno.serve(async (req) => {
           tone: fitDir === 'improving' ? 'positive' : fitDir === 'declining' ? 'warning' : 'neutral',
         });
 
+        // HR drift vs 28d norm
+        if (reaction.hr_drift_avg_bpm != null && norms28d.hr_drift_avg_bpm != null && reaction.hr_drift_sample_size >= 2) {
+          const driftDelta = reaction.hr_drift_avg_bpm - norms28d.hr_drift_avg_bpm;
+          readinessDrivers.push({
+            label: 'Cardiac drift',
+            value: `${reaction.hr_drift_avg_bpm > 0 ? '+' : ''}${reaction.hr_drift_avg_bpm.toFixed(1)} bpm`,
+            tone: driftDelta <= -1 ? 'positive' : driftDelta >= 3 ? 'warning' : 'neutral',
+          });
+        }
+
+        // RPE vs 28d norm
+        if (reaction.avg_session_rpe_7d != null && norms28d.session_rpe_avg != null && reaction.rpe_sample_size_7d >= 2) {
+          const rpeDelta = reaction.avg_session_rpe_7d - norms28d.session_rpe_avg;
+          readinessDrivers.push({
+            label: 'Perceived effort',
+            value: `${reaction.avg_session_rpe_7d.toFixed(1)} RPE`,
+            tone: rpeDelta <= -0.4 ? 'positive' : rpeDelta >= 0.4 ? 'warning' : 'neutral',
+          });
+        }
+
+        // Execution score vs 28d norm
+        if (reaction.avg_execution_score != null && norms28d.execution_score_avg != null && reaction.execution_sample_size >= 2) {
+          const execDelta = reaction.avg_execution_score - norms28d.execution_score_avg;
+          readinessDrivers.push({
+            label: 'Execution',
+            value: `${Math.round(reaction.avg_execution_score)}%`,
+            tone: execDelta >= 3 ? 'positive' : execDelta <= -5 ? 'warning' : 'neutral',
+          });
+        }
+
         const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
         const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
 

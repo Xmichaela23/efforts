@@ -95,7 +95,9 @@ function formatDelta(deltaSeconds: number): string {
 function resolveThresholdPaceSecPerMi(input: RaceReadinessInput): { pace: number; source: 'observed' | 'plan_targets' } | null {
   const lf = input.learnedFitness;
   if (lf?.run_threshold_pace_sec_per_km != null) {
-    const secPerKm = Number(lf.run_threshold_pace_sec_per_km);
+    // LearnedMetric is stored as { value, confidence, ... } — extract .value if object
+    const raw = lf.run_threshold_pace_sec_per_km;
+    const secPerKm = Number(typeof raw === 'object' && raw !== null ? (raw as any).value : raw);
     if (Number.isFinite(secPerKm) && secPerKm > 0) {
       return { pace: secPerKm * KM_TO_MI, source: 'observed' };
     }
