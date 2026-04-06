@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export type RaceReadinessV1 = {
@@ -355,11 +355,14 @@ export function useCoachWeekContext(date?: string) {
   const focusDate = date || new Date().toLocaleDateString('en-CA');
   const [data, setData] = useState<CoachWeekContextV1 | null>(null);
   const [loading, setLoading] = useState(false);
+  const [revalidating, setRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasCachedData = useRef(false);
 
-  const fetchCoach = useCallback(async () => {
+  const runPipeline = useCallback(async (isBackground: boolean) => {
     try {
-      setLoading(true);
+      if (isBackground) setRevalidating(true);
+      else setLoading(true);
       setError(null);
 
       const userId = getStoredUserId();
@@ -421,16 +424,41 @@ export function useCoachWeekContext(date?: string) {
 
       setData(merged);
     } catch (e: any) {
-      setError(e?.message || String(e));
+      if (!isBackground) setError(e?.message || String(e));
     } finally {
-      setLoading(false);
+      if (isBackground) setRevalidating(false);
+      else setLoading(false);
     }
   }, [focusDate]);
 
-  useEffect(() => {
-    fetchCoach();
-  }, [fetchCoach]);
+  const fetchCoach = useCallback(() => runPipeline(false), [runPipeline]);
 
-  return { data, loading, error, refresh: fetchCoach };
+  useEffect(() => {
+    hasCachedData.current = false;
+
+    const userId = getStoredUserId();
+    if (!userId) { runPipeline(false); return; }
+
+    // 1. Read DB cache immediately — serve stale data with no spinner
+    Promise.resolve(
+      supabase
+        .from('coach_cache')
+        .select('payload')
+        .eq('user_id', userId)
+        .maybeSingle()
+    ).then(({ data: row }) => {
+      if (row?.payload) {
+        setData(row.payload as CoachWeekContextV1);
+        hasCachedData.current = true;
+        // 2. Revalidate in background — coach function handles staleness check server-side
+        runPipeline(true);
+      } else {
+        // No cache — show spinner and fetch normally
+        runPipeline(false);
+      }
+    }).catch(() => runPipeline(false));
+  }, [focusDate]); // eslint-disable-line
+
+  return { data, loading, revalidating, error, refresh: fetchCoach };
 }
 

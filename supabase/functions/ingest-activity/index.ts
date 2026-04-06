@@ -1461,6 +1461,16 @@ Deno.serve(async (req)=>{
           console.error('[ingest-activity] Failed to invalidate block cache:', cacheErr);
         }
 
+        // Invalidate coach cache so next State tab open triggers a fresh pipeline run
+        try {
+          await supabase
+            .from('coach_cache')
+            .update({ invalidated_at: new Date().toISOString() })
+            .eq('user_id', userId);
+        } catch (coachCacheErr) {
+          console.error('[ingest-activity] Failed to invalidate coach cache:', coachCacheErr);
+        }
+
         // Generate details chat/context for completed workouts (fire-and-forget background processing)
         // Note: analyze-running-workout will now have planned_id available (deterministic ordering)
         if (workoutStatus === 'completed' && workoutType) {

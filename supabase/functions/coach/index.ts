@@ -595,6 +595,26 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: req.headers.get('Authorization')! } },
     });
 
+    // ── Cache read (stale-while-revalidate) ───────────────────────────────────
+    const { data: cacheRow } = await supabase
+      .from('coach_cache')
+      .select('payload, generated_at, invalidated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (cacheRow?.payload) {
+      const ageMs = Date.now() - new Date(cacheRow.generated_at).getTime();
+      const isStaleByAge = ageMs > 24 * 60 * 60 * 1000;
+      const isInvalidated = cacheRow.invalidated_at != null;
+      if (!isStaleByAge && !isInvalidated) {
+        return new Response(JSON.stringify(cacheRow.payload), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Coach-Cache': 'hit' },
+        });
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const allActivePlans = await loadAllActivePlans(supabase, userId);
     const activePlan = pickPrimaryPlan(allActivePlans);
     const secondaryPlans = allActivePlans.filter(p => p.id !== activePlan?.id);
@@ -3567,6 +3587,16 @@ ${narrativeFacts.join('\n')}`;
       athlete_snapshot: athleteSnapshot,
       race_readiness: raceReadiness,
     };
+
+    // ── Cache write (fire and forget) ────────────────────────────────────────
+    supabase
+      .from('coach_cache')
+      .upsert(
+        { user_id: userId, payload: response, generated_at: new Date().toISOString(), invalidated_at: null },
+        { onConflict: 'user_id' }
+      )
+      .catch((e: unknown) => console.warn('[coach] cache write failed:', (e as any)?.message || e));
+    // ─────────────────────────────────────────────────────────────────────────
 
     return new Response(JSON.stringify(response), {
       status: 200,

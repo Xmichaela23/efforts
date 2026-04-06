@@ -1266,6 +1266,11 @@ export const useWorkouts = () => {
           .catch(() => {});
       } catch {}
 
+      // Invalidate coach cache so State tab revalidates after new workout
+      void supabase.from('coach_cache')
+        .update({ invalidated_at: new Date().toISOString() })
+        .eq('user_id', newWorkout.user_id);
+
       // Refresh athlete memory after strength workouts so 1RM rules stay current.
       // Runs after compute-facts with a small delay to let exercise_log settle.
       if (newWorkout.type === 'strength' && newWorkout.workout_status === 'completed') {
@@ -1519,6 +1524,11 @@ export const useWorkouts = () => {
         (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: id } } as any)
           .catch(() => {});
       } catch {}
+
+      // Invalidate coach cache so State tab revalidates after workout edit
+      void supabase.from('coach_cache')
+        .update({ invalidated_at: new Date().toISOString() })
+        .eq('user_id', data.user_id);
 
       // Refresh athlete memory after strength workout edits
       if (String(data.type || '').toLowerCase() === 'strength' && data.workout_status === 'completed') {
