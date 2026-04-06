@@ -22,6 +22,7 @@ interface LoadBarProps {
   load: LoadBarData;
   loadStatus: LoadBarStatus | null;
   readinessState: string | null;
+  weekIntent?: string | null;
   hideDailyBars?: boolean;
 }
 
@@ -99,7 +100,8 @@ function Dot() {
 
 // ── LoadBar ──────────────────────────────────────────────────────────────────
 
-export default function LoadBar({ load, loadStatus, readinessState, hideDailyBars }: LoadBarProps) {
+export default function LoadBar({ load, loadStatus, readinessState, weekIntent, hideDailyBars }: LoadBarProps) {
+  const isTaperOrPeak = weekIntent === 'taper' || weekIntent === 'peak';
   const dailyLoad = load.daily_load_7d ?? [];
   const maxLoad = Math.max(...dailyLoad.map(d => d.load), 1);
 
@@ -109,7 +111,7 @@ export default function LoadBar({ load, loadStatus, readinessState, hideDailyBar
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">LOAD</span>
         <div className="flex items-center gap-2">
           <AcwrGauge value={load.acwr} readinessState={readinessState} />
-          {loadStatus?.status && (
+          {loadStatus?.status && !(isTaperOrPeak && loadStatus.status === 'under') && (
             <><Dot /><span className={`text-[14px] font-semibold tracking-tight ${loadStatusColor(loadStatus.status)}`}>
               {loadStatusLabel(loadStatus.status)}
             </span></>

@@ -2943,8 +2943,14 @@ Deno.serve(async (req) => {
                   ? `ACWR ${acwrVal.toFixed(2)} — load has dropped well, the body is freshening.`
                   : `ACWR ${acwrVal.toFixed(2)} — load is coming down appropriately.`)
                 : '';
+              // Surface recent key sessions (up to 3 from acute7 window) so the LLM
+              // knows what drove the ACWR — e.g. yesterday's long run.
+              const recentSessions = (training_state.load_ramp.top_sessions_acute7 || []).slice(0, 3);
+              const recentLine = recentSessions.length > 0
+                ? ` Recent sessions driving this load: ${recentSessions.map((s: any) => `${s.date} ${s.type}${s.name ? ` "${s.name}"` : ''} (${Math.round(s.workload_actual)} pts)`).join(', ')}.`
+                : '';
               narrativeFacts.push(
-                `TAPER CONTEXT (${raceWkOut}w to ${raceName_}): The goal is to arrive at the start line fresh — NOT to maintain or build. ${acwrNote} Do NOT frame elevated ACWR as appropriate or optimal during taper. If ACWR is above 1.0, note that load is still elevated and will continue to drop. "Not too fresh" is the wrong message here — fresh is exactly the goal.`
+                `TAPER CONTEXT (${raceWkOut}w to ${raceName_}): The goal is to arrive at the start line FRESH — not to maintain or build. ${acwrNote}${recentLine} DO NOT use "performance phase" language. DO NOT say ACWR is appropriate or optimal if it is above 1.0 during taper. The load from last week is still in the system and will clear — that is the point of taper. If no sessions are completed yet this week, that is expected taper behavior, not a problem to fix.`
               );
             }
           }

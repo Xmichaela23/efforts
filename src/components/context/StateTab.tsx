@@ -292,7 +292,7 @@ export default function StateTab({ coachData }: { coachData: CoachDataProp }) {
       <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] divide-y divide-white/[0.055]">
 
         {/* LOAD — full-width gauge + sparkline */}
-        <LoadBar load={load} loadStatus={loadStatus} readinessState={readiness} />
+        <LoadBar load={load} loadStatus={loadStatus} readinessState={readiness} weekIntent={week.intent} />
 
         {/* BODY */}
         <div className="px-3 py-3">
