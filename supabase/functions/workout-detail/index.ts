@@ -7,6 +7,7 @@ import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
+import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 
@@ -498,7 +499,7 @@ Deno.serve(async (req) => {
         const [plannedRes, weekWorkoutsRes] = await Promise.all([
           supabase
             .from('planned_workouts')
-            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines')
+            .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id')
             .eq('user_id', userId)
             .gte('date', weekStartDate)
             .lte('date', weekEndDate),
@@ -584,7 +585,7 @@ Deno.serve(async (req) => {
             const { data: pr } = await supabase
               .from('planned_workouts')
               .select(
-                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines',
+                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
               )
               .eq('user_id', userId)
               .eq('id', effectivePlannedId)
@@ -623,7 +624,7 @@ Deno.serve(async (req) => {
             const { data: pr } = await supabase
               .from('planned_workouts')
               .select(
-                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines',
+                'id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id',
               )
               .eq('user_id', userId)
               .eq('id', plannedId)
@@ -669,6 +670,30 @@ Deno.serve(async (req) => {
               : null,
         } : null;
 
+        let daysUntilRaceForSession: number | null = null;
+        try {
+          const tpId =
+            plannedRowRaw?.training_plan_id ??
+            attachPlannedRaw?.training_plan_id ??
+            null;
+          if (userId && tpId && workoutDate) {
+            const pc = await fetchPlanContextForWorkout(
+              supabase,
+              userId,
+              String(tpId),
+              workoutDate,
+            );
+            if (pc && typeof pc.daysUntilRace === 'number' && pc.daysUntilRace > 0) {
+              daysUntilRaceForSession = Math.round(pc.daysUntilRace);
+            }
+          }
+        } catch (durErr: unknown) {
+          console.warn(
+            '[session_detail_v1] days_until_race from plan failed:',
+            durErr instanceof Error ? durErr.message : durErr,
+          );
+        }
+
         sessionDetailV1 = buildSessionDetailV1({
           workoutId: id,
           workoutDate,
@@ -689,6 +714,7 @@ Deno.serve(async (req) => {
           nextSession,
           readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
           readinessUnavailable,
+          daysUntilRace: daysUntilRaceForSession,
         });
       } catch (snapErr: any) {
         console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr, snapErr?.stack || '');

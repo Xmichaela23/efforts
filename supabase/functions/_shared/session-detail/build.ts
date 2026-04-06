@@ -86,6 +86,8 @@ export type SessionDetailInput = {
   readinessSnapshot?: ReadinessSnapshotV1 | null;
   /** True when buildReadiness threw — keep legacy load context. */
   readinessUnavailable?: boolean;
+  /** Calendar days to plan race (active plan); preferred over stale fact_packet for race_readiness. */
+  daysUntilRace?: number | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -109,6 +111,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     nextSession,
     readinessSnapshot,
     readinessUnavailable,
+    daysUntilRace: daysUntilRaceFromPlan,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -564,6 +567,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       completedTotals,
       splitsMi,
       pacingCV,
+      daysUntilRaceFromPlan,
+      plannedSession,
     }),
   };
 }
@@ -1041,18 +1046,59 @@ function buildRaceReadiness(params: {
   completedTotals: SessionDetailV1['completed_totals'];
   splitsMi: SessionDetailV1['splits_mi'];
   pacingCV: number | null;
+  daysUntilRaceFromPlan: number | null | undefined;
+  plannedSession: PlannedSession | null;
 }): SessionDetailV1['race_readiness'] {
-  const { type, hasPlanned, factPacket, executionScore, paceAdherence, durationAdherence, completedTotals, splitsMi, pacingCV } = params;
+  const {
+    type,
+    hasPlanned,
+    factPacket,
+    executionScore,
+    paceAdherence,
+    durationAdherence,
+    completedTotals,
+    splitsMi,
+    pacingCV,
+    daysUntilRaceFromPlan,
+    plannedSession,
+  } = params;
   if (type !== 'run' || !hasPlanned) return null;
 
   const facts = factPacket?.facts || {};
   const derived = factPacket?.derived || {};
-  const daysUntilRace = typeof facts.plan?.days_until_race === 'number' ? facts.plan.days_until_race : null;
+  const fromFacts = typeof facts.plan?.days_until_race === 'number' ? facts.plan.days_until_race : null;
+  const fromPlan =
+    typeof daysUntilRaceFromPlan === 'number' && daysUntilRaceFromPlan > 0
+      ? Math.round(daysUntilRaceFromPlan)
+      : null;
+  const daysUntilRace = fromPlan ?? fromFacts;
   if (daysUntilRace == null || daysUntilRace <= 0 || daysUntilRace > 28) return null;
 
   const workoutType = String(facts.workout_type || '').toLowerCase();
-  const durMin = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
-  const isLongEnough = (durMin != null && durMin >= 75) || /long/i.test(workoutType);
+  const durMinFacts = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
+  const durMinCompleted =
+    typeof completedTotals?.duration_s === 'number' && completedTotals.duration_s > 0
+      ? completedTotals.duration_s / 60
+      : null;
+  const distMiCompleted =
+    typeof completedTotals?.distance_m === 'number' && completedTotals.distance_m > 0
+      ? completedTotals.distance_m / 1609.34
+      : null;
+  const plannedText = [plannedSession?.name, plannedSession?.prescription]
+    .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    .join(' ')
+    .toLowerCase();
+  const plannedLooksKeyLong =
+    /long\s*run|marathon\s*prep|marathon\s*long|last\s*long|mlr|progression\s*long|endurance\s*long|20\+?\s*m|32\+?\s*k/i.test(
+      plannedText,
+    );
+  const durMin = durMinFacts ?? durMinCompleted;
+  const isLongEnough =
+    (durMinFacts != null && durMinFacts >= 75) ||
+    (durMinCompleted != null && durMinCompleted >= 75) ||
+    (distMiCompleted != null && distMiCompleted >= 12.5) ||
+    /long/i.test(workoutType) ||
+    plannedLooksKeyLong;
   if (!isLongEnough) return null;
 
   // Headline
