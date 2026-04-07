@@ -733,6 +733,22 @@ export async function trySessionRaceReadinessLlm(params: {
   supabase?: any;
   userId?: string | null;
 }): Promise<SessionRaceReadinessLlmV1 | null> {
+  try {
+    return await trySessionRaceReadinessLlmImpl(params);
+  } catch (e) {
+    console.warn('[race_readiness_llm] unexpected error (suppress):', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+async function trySessionRaceReadinessLlmImpl(params: {
+  sessionDetail: SessionDetailV1;
+  workoutAnalysis: Record<string, unknown> | null;
+  planContext: PlanContext;
+  row: Record<string, unknown>;
+  supabase?: any;
+  userId?: string | null;
+}): Promise<SessionRaceReadinessLlmV1 | null> {
   const sd = params.sessionDetail;
   const wa = params.workoutAnalysis;
   const pc = params.planContext;
@@ -808,3 +824,4 @@ export async function trySessionRaceReadinessLlm(params: {
   }
   return fb;
 }
+

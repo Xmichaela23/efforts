@@ -46,6 +46,26 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
   const recomputeAnalysis = async () => {
     const workoutId = String(sd?.workout_id || (completed as any)?.id || '');
     if (!workoutId) return;
+
+    const formatInvokeError = async (err: unknown, step: string): Promise<string> => {
+      const base = (err as { message?: string })?.message || String(err);
+      const ctx = (err as { context?: { json?: () => Promise<unknown> } })?.context;
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          const body = (await ctx.json()) as { error?: string } | string | null;
+          if (body && typeof body === 'object' && typeof (body as { error?: string }).error === 'string') {
+            return `${step}: ${(body as { error: string }).error}`;
+          }
+          if (body != null && typeof body === 'object') {
+            return `${step}: ${JSON.stringify(body).slice(0, 400)}`;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      return `${step}: ${base}`;
+    };
+
     try {
       setRecomputing(true);
       setRecomputeError(null);
@@ -64,16 +84,22 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       const computeRes = await supabase.functions.invoke('compute-workout-analysis', {
         body: { workout_id: workoutId },
       });
-      if (computeRes.error) console.warn('[recompute] compute-workout-analysis error:', computeRes.error);
-      else console.log('[recompute] compute-workout-analysis ok');
+      if (computeRes.error) {
+        console.warn('[recompute] compute-workout-analysis error:', computeRes.error);
+        throw await formatInvokeError(computeRes.error, 'compute-workout-analysis');
+      }
+      console.log('[recompute] compute-workout-analysis ok');
 
       // Step 1b: session_load + facts (readiness / LOAD context); omitted before caused empty session_load after recompute
       console.log('[recompute] Step 1b: compute-facts for', workoutId);
       const factsRes = await supabase.functions.invoke('compute-facts', {
         body: { workout_id: workoutId },
       });
-      if (factsRes.error) console.warn('[recompute] compute-facts error:', factsRes.error);
-      else console.log('[recompute] compute-facts ok');
+      if (factsRes.error) {
+        console.warn('[recompute] compute-facts error:', factsRes.error);
+        throw await formatInvokeError(factsRes.error, 'compute-facts');
+      }
+      console.log('[recompute] compute-facts ok');
 
       // Step 2: Run the discipline-specific analysis (builds fact packet, narrative, etc.)
       console.log('[recompute] Step 2:', fnName, 'for', workoutId);
@@ -82,15 +108,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       });
       if (analyzeRes.error) {
         console.error('[recompute]', fnName, 'error:', analyzeRes.error);
-        throw analyzeRes.error;
+        throw await formatInvokeError(analyzeRes.error, fnName);
       }
       console.log('[recompute]', fnName, 'ok, data:', typeof analyzeRes.data === 'object' ? JSON.stringify(analyzeRes.data).slice(0, 200) : analyzeRes.data);
 
       // Invalidate workout-detail cache so session_detail_v1 is rebuilt
       try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-    } catch (e: any) {
-      setRecomputeError(e?.message || String(e));
+    } catch (e: unknown) {
+      setRecomputeError(typeof e === 'string' ? e : (e as Error)?.message || String(e));
     } finally {
       setRecomputing(false);
     }

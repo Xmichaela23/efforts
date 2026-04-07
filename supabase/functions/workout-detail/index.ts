@@ -169,6 +169,28 @@ function buildDetailCoreForSession(row: any): { detail: any; processingComplete:
   return { detail, processingComplete };
 }
 
+/** Keep session_detail under edge time limits: omit race_readiness if LLM + DB gate runs long. */
+const RACE_READINESS_BUDGET_MS = 42_000;
+
+function raceReadinessWithBudget<T>(p: Promise<T | null>): Promise<T | null> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => {
+      console.warn(
+        `[workout-detail] race_readiness_llm exceeded ${RACE_READINESS_BUDGET_MS}ms — omitting block`,
+      );
+      resolve(null);
+    }, RACE_READINESS_BUDGET_MS);
+    p.then((v) => {
+      clearTimeout(t);
+      resolve(v);
+    }).catch((e) => {
+      clearTimeout(t);
+      console.warn('[workout-detail] race_readiness_llm rejected:', e instanceof Error ? e.message : e);
+      resolve(null);
+    });
+  });
+}
+
 async function runSessionDetailPipelineAndPersist(
   supabase: ReturnType<typeof createClient>,
   userId: string,
@@ -443,14 +465,16 @@ async function runSessionDetailPipelineAndPersist(
 
     if (sessionDetailV1 && planCtxForSession) {
       try {
-        const rrLlm = await trySessionRaceReadinessLlm({
-          sessionDetail: sessionDetailV1,
-          workoutAnalysis: wa,
-          planContext: planCtxForSession,
-          row: row as Record<string, unknown>,
-          supabase,
-          userId,
-        });
+        const rrLlm = await raceReadinessWithBudget(
+          trySessionRaceReadinessLlm({
+            sessionDetail: sessionDetailV1,
+            workoutAnalysis: wa,
+            planContext: planCtxForSession,
+            row: row as Record<string, unknown>,
+            supabase,
+            userId,
+          }),
+        );
         if (rrLlm) sessionDetailV1.race_readiness = rrLlm;
       } catch (rrErr: unknown) {
         console.warn(
