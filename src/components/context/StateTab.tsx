@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type { CoachWeekContextV1, RaceReadinessV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
+import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
+import CourseStrategyModal from '@/components/CourseStrategyModal';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -92,10 +94,20 @@ function RaceSection({
   rr,
   primaryRaceReadiness,
   onOpenKeyRun,
+  resolvedGoalId,
+  courseRow,
+  courseBusy,
+  onAddCourse,
+  onViewStrategy,
 }: {
   rr: RaceReadinessV1;
   primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
   onOpenKeyRun?: (workoutId: string) => void;
+  resolvedGoalId: string | null;
+  courseRow: { id: string; name: string } | null;
+  courseBusy: boolean;
+  onAddCourse: () => void;
+  onViewStrategy: () => void;
 }) {
   const distLabel = rr.goal.distance.replace(/_/g, ' ');
   return (
@@ -148,6 +160,30 @@ function RaceSection({
 
       {/* Assessment message */}
       <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
+
+      {resolvedGoalId && (
+        <div className="pt-0.5">
+          {courseBusy ? (
+            <p className="text-[11px] text-white/40">Working on course…</p>
+          ) : courseRow ? (
+            <button
+              type="button"
+              onClick={onViewStrategy}
+              className="w-full text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 py-1"
+            >
+              View terrain strategy → <span className="text-white/40">{courseRow.name}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onAddCourse}
+              className="w-full text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 py-1"
+            >
+              Add course for terrain strategy based on your data →
+            </button>
+          )}
+        </div>
+      )}
 
       {/* KEY RUN — primary long-run race readiness (single signal; full block on Performance) */}
       {primaryRaceReadiness && onOpenKeyRun && (
@@ -226,6 +262,12 @@ export default function StateTab({
   const { data, loading, error, refresh } = coachData;
   const { liftTrends } = useExerciseLog(8);
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
+  const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
+  const [stateCourseRow, setStateCourseRow] = useState<{ id: string; name: string } | null>(null);
+  const [courseBusy, setCourseBusy] = useState(false);
+  const [strategyModalOpen, setStrategyModalOpen] = useState(false);
+  const [strategyCourseId, setStrategyCourseId] = useState<string | null>(null);
+  const stateCourseFileRef = useRef<HTMLInputElement>(null);
 
   if (loading && !data) {
     return (
@@ -254,6 +296,76 @@ export default function StateTab({
   const loadStatus = snap?.body_response?.load_status ?? null;
   const raceReadiness: RaceReadinessV1 | null = (data as any)?.race_readiness ?? null;
   const primaryRaceReadiness: PrimaryRaceReadinessRow | null = data?.primary_race_readiness ?? null;
+
+  useEffect(() => {
+    if (!raceReadiness) {
+      setResolvedGoalId(null);
+      setStateCourseRow(null);
+      return;
+    }
+    const uid = getStoredUserId();
+    if (!uid) return;
+    let cancelled = false;
+    (async () => {
+      const { data: goalsRows } = await supabase
+        .from('goals')
+        .select('id, name, status, target_time, sport')
+        .eq('user_id', uid)
+        .eq('status', 'active');
+      const g = (goalsRows || []).find(
+        (x: { name?: string; sport?: string | null }) =>
+          String(x.name || '') === raceReadiness.goal.name && String(x.sport || '').toLowerCase() === 'run',
+      ) as { id: string } | undefined;
+      if (!g || cancelled) {
+        if (!cancelled) {
+          setResolvedGoalId(null);
+          setStateCourseRow(null);
+        }
+        return;
+      }
+      if (!cancelled) setResolvedGoalId(g.id);
+      const { data: rc } = await supabase.from('race_courses').select('id, name').eq('goal_id', g.id).maybeSingle();
+      if (cancelled) return;
+      if (rc?.id) setStateCourseRow({ id: rc.id as string, name: String(rc.name || 'Course') });
+      else setStateCourseRow(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [raceReadiness]);
+
+  async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !resolvedGoalId) return;
+    const { data: gRow } = await supabase.from('goals').select('target_time, name').eq('id', resolvedGoalId).maybeSingle();
+    if (gRow?.target_time == null || !Number.isFinite(Number(gRow.target_time))) {
+      window.alert('Set a target finish time on your race goal first (Goals tab).');
+      return;
+    }
+    setCourseBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('name', `${String(gRow.name || 'Race')} course`);
+      fd.append('goal_id', resolvedGoalId);
+      const { data: up, error: upErr } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
+      if (upErr || !up?.course_id) {
+        window.alert(upErr?.message || 'Upload failed');
+        return;
+      }
+      const { error: stErr } = await invokeFunction('course-strategy', { course_id: up.course_id });
+      if (stErr) {
+        window.alert(stErr.message || 'Strategy failed');
+        return;
+      }
+      setStateCourseRow({ id: up.course_id, name: `${String(gRow.name || 'Race')} course` });
+      setStrategyCourseId(up.course_id);
+      setStrategyModalOpen(true);
+    } finally {
+      setCourseBusy(false);
+    }
+  }
 
   // ── WEEK header ──────────────────────────────────────────────────────────
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
@@ -449,6 +561,16 @@ export default function StateTab({
           <RaceSection
             rr={raceReadiness}
             primaryRaceReadiness={primaryRaceReadiness}
+            resolvedGoalId={resolvedGoalId}
+            courseRow={stateCourseRow}
+            courseBusy={courseBusy}
+            onAddCourse={() => stateCourseFileRef.current?.click()}
+            onViewStrategy={() => {
+              if (stateCourseRow?.id) {
+                setStrategyCourseId(stateCourseRow.id);
+                setStrategyModalOpen(true);
+              }
+            }}
             onOpenKeyRun={
               onSelectWorkout
                 ? (workoutId) => {
@@ -479,6 +601,22 @@ export default function StateTab({
           {wsv.plan.plan_name}
         </div>
       )}
+
+      <input
+        ref={stateCourseFileRef}
+        type="file"
+        accept=".gpx,application/gpx+xml,.xml"
+        className="hidden"
+        onChange={handleStateCourseFile}
+      />
+      <CourseStrategyModal
+        open={strategyModalOpen}
+        courseId={strategyCourseId}
+        onClose={() => {
+          setStrategyModalOpen(false);
+          setStrategyCourseId(null);
+        }}
+      />
     </div>
   );
 }

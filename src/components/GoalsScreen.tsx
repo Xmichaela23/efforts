@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Target, Calendar, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
-import { supabase, invokeFunction, getStoredUserId } from '@/lib/supabase';
+import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
+import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
 
 // Local alias so existing call-sites inside this file don't need renaming
@@ -82,6 +83,81 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [calFiveKPace, setCalFiveKPace] = useState('');
   const [calSaving, setCalSaving] = useState(false);
   const [goalFlowError, setGoalFlowError] = useState<string | null>(null);
+
+  const [courseByGoal, setCourseByGoal] = useState<
+    Record<string, { id: string; name: string; strategy_updated_at: string | null }>
+  >({});
+  const [strategyModalOpen, setStrategyModalOpen] = useState(false);
+  const [strategyModalCourseId, setStrategyModalCourseId] = useState<string | null>(null);
+  const [courseUploadBusy, setCourseUploadBusy] = useState<string | null>(null);
+  const [pendingCourseGoalId, setPendingCourseGoalId] = useState<string | null>(null);
+  const goalsCourseFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const uid = readStoredUserId();
+    if (!uid) return;
+    (async () => {
+      const { data } = await supabase
+        .from('race_courses')
+        .select('id, name, goal_id, strategy_updated_at')
+        .eq('user_id', uid);
+      const m: Record<string, { id: string; name: string; strategy_updated_at: string | null }> = {};
+      for (const r of data || []) {
+        const gid = r.goal_id as string | null;
+        if (gid) {
+          m[gid] = {
+            id: r.id as string,
+            name: String(r.name || 'Course'),
+            strategy_updated_at: (r.strategy_updated_at as string) ?? null,
+          };
+        }
+      }
+      setCourseByGoal(m);
+    })();
+  }, [goals, expandedGoalId]);
+
+  async function handleGoalsCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    const gid = pendingCourseGoalId;
+    setPendingCourseGoalId(null);
+    if (!file || !gid) return;
+    const goal = goals.find((g) => g.id === gid);
+    if (!goal) return;
+    if (goal.target_time == null || !Number.isFinite(Number(goal.target_time))) {
+      window.alert('Set a target finish time on this goal first.');
+      return;
+    }
+    setCourseUploadBusy(gid);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('name', `${goal.name} course`);
+      fd.append('goal_id', gid);
+      const { data, error } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
+      if (error || !data?.course_id) {
+        window.alert(error?.message || 'Upload failed');
+        return;
+      }
+      const { error: stErr } = await invokeFunction('course-strategy', { course_id: data.course_id });
+      if (stErr) {
+        window.alert(stErr.message || 'Strategy generation failed');
+        return;
+      }
+      setCourseByGoal((prev) => ({
+        ...prev,
+        [gid]: {
+          id: data.course_id,
+          name: `${goal.name} course`,
+          strategy_updated_at: new Date().toISOString(),
+        },
+      }));
+      setStrategyModalCourseId(data.course_id);
+      setStrategyModalOpen(true);
+    } finally {
+      setCourseUploadBusy(null);
+    }
+  }
 
   // Clear stale error whenever the event form opens so a previous failed attempt
   // doesn't show error text before the user has done anything.
@@ -602,6 +678,40 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           {buildError?.goalId === goal.id && <p className="mt-1 text-xs text-red-400/70">{buildError.message}</p>}
         </div>
 
+        {isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
+          <div className="mt-3 ml-[44px] border-t border-white/[0.06] pt-3 space-y-2">
+            <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Course</span>
+            {goal.target_time == null || !Number.isFinite(Number(goal.target_time)) ? (
+              <p className="text-[11px] text-amber-400/75 leading-snug">
+                Set a target finish time on this goal to generate mile-by-mile terrain pacing.
+              </p>
+            ) : courseByGoal[goal.id] ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStrategyModalCourseId(courseByGoal[goal.id].id);
+                  setStrategyModalOpen(true);
+                }}
+                className="text-left text-[12px] text-sky-400/85 hover:text-sky-300/90"
+              >
+                View terrain strategy →
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={courseUploadBusy === goal.id}
+                onClick={() => {
+                  setPendingCourseGoalId(goal.id);
+                  goalsCourseFileRef.current?.click();
+                }}
+                className="text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 disabled:opacity-40"
+              >
+                {courseUploadBusy === goal.id ? 'Uploading…' : 'Add course for terrain strategy →'}
+              </button>
+            )}
+          </div>
+        )}
+
         {isExpanded && (
           <div className="mt-3 ml-[44px] flex items-center gap-2 pt-3 border-t border-white/[0.06]">
             <button onClick={() => handleTogglePause(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:bg-white/[0.06] hover:text-white/70 transition-all">
@@ -871,6 +981,22 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           </button>
         )}
       </div>
+
+      <input
+        ref={goalsCourseFileRef}
+        type="file"
+        accept=".gpx,application/gpx+xml,.xml"
+        className="hidden"
+        onChange={handleGoalsCourseFile}
+      />
+      <CourseStrategyModal
+        open={strategyModalOpen}
+        courseId={strategyModalCourseId}
+        onClose={() => {
+          setStrategyModalOpen(false);
+          setStrategyModalCourseId(null);
+        }}
+      />
     </div>
   );
 

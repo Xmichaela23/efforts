@@ -17,6 +17,8 @@ export interface Goal {
   status: 'active' | 'completed' | 'cancelled' | 'paused';
   training_prefs: Record<string, any>;
   notes: string | null;
+  /** Target finish time in seconds (event goals), from DB */
+  target_time?: number | null;
   created_at: string;
   updated_at: string;
 }

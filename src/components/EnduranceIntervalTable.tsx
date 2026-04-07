@@ -70,7 +70,6 @@ type EnduranceIntervalTableProps = {
   hasSessionDetail: boolean;
   useImperial: boolean;
   noPlannedCompare: boolean;
-  onNavigateToContext?: (workoutId: string) => void;
 };
 
 export default function EnduranceIntervalTable({
@@ -78,7 +77,6 @@ export default function EnduranceIntervalTable({
   hasSessionDetail,
   useImperial,
   noPlannedCompare,
-  onNavigateToContext,
 }: EnduranceIntervalTableProps) {
   const [showAllIntervals, setShowAllIntervals] = useState(false);
 

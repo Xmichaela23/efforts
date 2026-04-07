@@ -42,7 +42,6 @@ interface AdherenceChipsProps {
   hasSessionDetail: boolean;
   noPlannedCompare: boolean;
   hideTopAdherence?: boolean;
-  onNavigateToContext?: (workoutId: string) => void;
 }
 
 export default function AdherenceChips({
@@ -50,7 +49,6 @@ export default function AdherenceChips({
   hasSessionDetail,
   noPlannedCompare,
   hideTopAdherence,
-  onNavigateToContext,
 }: AdherenceChipsProps) {
   try {
     if (!hasSessionDetail || !sd) return null;
@@ -77,7 +75,6 @@ export default function AdherenceChips({
     if (!anyVal) return null;
 
     const weekLabel = sd.plan_context?.week_label ?? null;
-    const workoutId = sd.workout_id;
     const sportType = String(sd.type || '').toLowerCase();
     const isRide = /ride|bike|cycling/i.test(sportType);
     const isSwim = /swim/i.test(sportType);
@@ -132,9 +129,6 @@ export default function AdherenceChips({
               {chip('Duration', durationAdherence, durationDelta != null ? fmtDeltaTime(durationDelta) : '—')}
             </div>
           </div>
-          {onNavigateToContext && workoutId && (
-            <ViewContextLink workoutId={workoutId} onClick={onNavigateToContext} />
-          )}
         </div>
       );
     }
@@ -151,9 +145,6 @@ export default function AdherenceChips({
               {chip('Duration', durationAdherence, durationDelta != null ? fmtDeltaTime(durationDelta) : '—')}
             </div>
           </div>
-          {onNavigateToContext && workoutId && (
-            <ViewContextLink workoutId={workoutId} onClick={onNavigateToContext} />
-          )}
         </div>
       );
     }
@@ -177,23 +168,7 @@ export default function AdherenceChips({
             {showPaceChip && chip(paceChipLabel, paceAdherence, paceChipSubtitle)}
           </div>
         </div>
-        {onNavigateToContext && workoutId && (
-          <ViewContextLink workoutId={workoutId} onClick={onNavigateToContext} />
-        )}
       </div>
     );
   } catch { return null; }
-}
-
-function ViewContextLink({ workoutId, onClick }: { workoutId: string; onClick: (id: string) => void }) {
-  return (
-    <div className="text-center mb-2">
-      <button
-        onClick={() => onClick(workoutId)}
-        className="text-sm text-gray-200 hover:text-white transition-colors underline underline-offset-2"
-      >
-        View context
-      </button>
-    </div>
-  );
 }

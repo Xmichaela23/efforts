@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
-import { Plus, Waves, Bike, Activity, Dumbbell, Move, CircleDot, X } from 'lucide-react';
+import { Plus, Waves, Bike, Activity, Dumbbell, Move, CircleDot, X, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Movement threshold in pixels - if touch moves more than this, it's a swipe, not a tap
@@ -22,6 +22,7 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
     { type: 'log-run', label: 'Log Run', icon: Activity },
     { type: 'log-ride', label: 'Log Ride', icon: Bike },
     { type: 'log-swim', label: 'Log Swim', icon: Waves },
+    { type: 'upload-course', label: 'Upload Course', icon: MapPin },
     { type: 'log-mobility', label: 'Log Mobility', icon: Move },
     { type: 'log-pilates-yoga', label: 'Log Pilates/Yoga', icon: CircleDot },
   ];

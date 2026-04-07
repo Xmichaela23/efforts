@@ -13,10 +13,9 @@ type MobileSummaryProps = {
   session_detail_v1?: Record<string, any> | null;
   /** True while `scope=session_detail` workout-detail request is in flight */
   sessionDetailLoading?: boolean;
-  onNavigateToContext?: (workoutId: string) => void;
 };
 
-export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence, onNavigateToContext }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
+export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
   const { useImperial } = useAppContext();
 
   const sd = session_detail_v1;
@@ -159,7 +158,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         hasSessionDetail={hasSessionDetail}
         noPlannedCompare={noPlannedCompare}
         hideTopAdherence={hideTopAdherence}
-        onNavigateToContext={onNavigateToContext}
       />
 
 
@@ -170,7 +168,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         hasSessionDetail={hasSessionDetail}
         useImperial={useImperial}
         noPlannedCompare={noPlannedCompare}
-        onNavigateToContext={onNavigateToContext}
       />
       {!sd?.classification?.is_pool_swim && (
         <SessionNarrative

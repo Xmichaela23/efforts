@@ -117,3 +117,44 @@ export async function invokeFunction<T = unknown>(
 
   return { data: json as T, error: null };
 }
+
+/** Edge function POST with multipart body (e.g. GPX upload). Do not set Content-Type — browser sets boundary. */
+export async function invokeFunctionFormData<T = unknown>(
+  fnName: string,
+  formData: FormData,
+): Promise<{ data: T | null; error: { message: string; code?: string } | null }> {
+  const token = (() => {
+    try {
+      const projectRef = supabaseUrl.split('//')[1].split('.')[0];
+      const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { access_token?: string };
+        if (parsed?.access_token) return parsed.access_token;
+      }
+    } catch { /* fall through */ }
+    return supabaseKey;
+  })();
+
+  let res: Response;
+  try {
+    res = await fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: supabaseKey,
+      },
+      body: formData,
+    });
+  } catch (fetchErr: unknown) {
+    const msg = fetchErr instanceof Error ? fetchErr.message : 'network error';
+    return { data: null, error: { message: `[fetch] ${msg}` } };
+  }
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = (json as { error?: string })?.error ?? `HTTP ${res.status}`;
+    const code = (json as { error_code?: string })?.error_code;
+    return { data: null, error: { message, code } };
+  }
+  return { data: json as T, error: null };
+}

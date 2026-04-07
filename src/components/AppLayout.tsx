@@ -809,15 +809,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setContextFocusWorkoutId(null);
   };
 
-  const handleNavigateToContext = (workoutId: string) => {
-    // Close workout detail view
-    setSelectedWorkout(null);
-    setActiveTab('summary');
-    // Set focus workout and open context
-    setContextFocusWorkoutId(workoutId);
-    setShowContext(true);
-  };
-
   const handleBackToDashboard = () => {
     const comingFromPlanBuilder = showPlanBuilder;
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
@@ -1127,6 +1118,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           setShowStrengthLogger(true);
         }
       })();
+    } else if (type === 'upload-course') {
+      setShowGoals(true);
     } else {
       setShowBuilder(true);
     }
@@ -1256,7 +1249,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             onUpdateWorkout={handleUpdateWorkout}
             onClose={handleBackToDashboard}
             onDelete={handleDeleteWorkout}
-            onNavigateToContext={handleNavigateToContext}
             onAddGear={() => setShowGear(true)}
             origin="today"
             initialTab={activeTab as any}
