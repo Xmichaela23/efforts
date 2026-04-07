@@ -1,14 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, RefreshCw } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-} from 'recharts';
 import { invokeFunction } from '@/lib/supabase';
 
 const ZONE_STROKE: Record<string, string> = {
@@ -102,6 +94,134 @@ interface CourseStrategyModalProps {
   onClose: () => void;
   /** Coach `race_readiness.predicted_finish_time_seconds` when this course is for that race goal. */
   predictedFinishTimeSeconds?: number | null;
+}
+
+const ELEV_CHART_W = 800;
+const ELEV_CHART_H = 220;
+
+/** SVG elevation (Recharts multi-Line + per-series data was dropping short segments on device). */
+function CourseElevationBySegments({
+  fullSeries,
+  maxMi,
+  displayGroups,
+}: {
+  fullSeries: { mi: number; ft: number }[];
+  maxMi: number;
+  displayGroups: CourseDetailPayload['display_groups'];
+}) {
+  const ml = 44;
+  const mr = 12;
+  const mt = 10;
+  const mb = 26;
+  const iw = ELEV_CHART_W - ml - mr;
+  const ih = ELEV_CHART_H - mt - mb;
+  const fts = fullSeries.map((p) => p.ft);
+  const ftMin = Math.min(...fts);
+  const ftMax = Math.max(...fts);
+  const ftSpan = Math.max(ftMax - ftMin, 1);
+  const xOf = (mi: number) => ml + (mi / maxMi) * iw;
+  const yOf = (ft: number) => mt + ih - ((ft - ftMin) / ftSpan) * ih;
+
+  const baselinePts = fullSeries.map((p) => `${xOf(p.mi)},${yOf(p.ft)}`).join(' ');
+  const xGrid = [0, 0.25, 0.5, 0.75, 1].map((t) => maxMi * t);
+  const yGrid = [0, 0.25, 0.5, 0.75, 1].map((t) => ftMin + ftSpan * t);
+
+  const xTickMis = [0, maxMi / 2, maxMi];
+  const yTickFts = [ftMin, ftMin + ftSpan / 2, ftMax];
+
+  const sortedGroups = [...displayGroups].sort((a, b) => a.start_mi - b.start_mi);
+
+  const fmtMi = (mi: number) => (Math.abs(mi - Math.round(mi)) < 0.05 ? String(Math.round(mi)) : mi.toFixed(1));
+
+  return (
+    <svg
+      viewBox={`0 0 ${ELEV_CHART_W} ${ELEV_CHART_H}`}
+      className="h-[220px] w-full min-w-[800px]"
+      role="img"
+      aria-label="Elevation by segment effort"
+    >
+      {yGrid.map((ft) => (
+        <line
+          key={`h-${ft}`}
+          x1={ml}
+          y1={yOf(ft)}
+          x2={ELEV_CHART_W - mr}
+          y2={yOf(ft)}
+          stroke="rgba(255,255,255,0.06)"
+          strokeDasharray="3 3"
+        />
+      ))}
+      {xGrid.map((mi) => (
+        <line
+          key={`v-${mi}`}
+          x1={xOf(mi)}
+          y1={mt}
+          x2={xOf(mi)}
+          y2={mt + ih}
+          stroke="rgba(255,255,255,0.06)"
+          strokeDasharray="3 3"
+        />
+      ))}
+
+      <polyline fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={1} points={baselinePts} />
+
+      {sortedGroups.map((g) => {
+        const pts = segmentChartPoints(fullSeries, g.start_mi, g.end_mi);
+        if (pts.length < 2) return null;
+        const points = pts.map((p) => `${xOf(p.mi)},${yOf(p.ft)}`).join(' ');
+        return (
+          <polyline
+            key={g.id}
+            fill="none"
+            stroke={zoneStroke(g.effort_zone)}
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            points={points}
+          />
+        );
+      })}
+
+      {yTickFts.map((ft) => (
+        <text
+          key={`yl-${ft}`}
+          x={ml - 6}
+          y={yOf(ft) + 3}
+          textAnchor="end"
+          fill="rgba(255,255,255,0.42)"
+          fontSize={10}
+        >
+          {Math.round(ft)}
+        </text>
+      ))}
+      <text
+        x={12}
+        y={mt + ih / 2}
+        dominantBaseline="middle"
+        textAnchor="middle"
+        fill="rgba(255,255,255,0.32)"
+        fontSize={10}
+        transform={`rotate(-90 12 ${mt + ih / 2})`}
+      >
+        ft
+      </text>
+
+      {xTickMis.map((mi) => (
+        <text key={`x-${mi}`} x={xOf(mi)} y={ELEV_CHART_H - 8} textAnchor="middle" fill="rgba(255,255,255,0.42)" fontSize={10}>
+          {fmtMi(mi)}
+        </text>
+      ))}
+      <text
+        x={ELEV_CHART_W - mr - 2}
+        y={ELEV_CHART_H - 8}
+        textAnchor="end"
+        fill="rgba(255,255,255,0.32)"
+        fontSize={10}
+      >
+        mi
+      </text>
+    </svg>
+  );
 }
 
 export default function CourseStrategyModal({
@@ -251,56 +371,11 @@ export default function CourseStrategyModal({
 
         {fullSeries.length > 0 && (
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2 overflow-x-auto">
-            <div style={{ minWidth: 800, height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={fullSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis
-                    type="number"
-                    dataKey="mi"
-                    domain={[0, maxMi]}
-                    stroke="rgba(255,255,255,0.25)"
-                    tick={{ fill: 'rgba(255,255,255,0.45)', fontSize: 10 }}
-                    label={{ value: 'mi', position: 'insideBottomRight', fill: 'rgba(255,255,255,0.35)', fontSize: 10 }}
-                  />
-                  <YAxis
-                    dataKey="ft"
-                    stroke="rgba(255,255,255,0.25)"
-                    tick={{ fill: 'rgba(255,255,255,0.45)', fontSize: 10 }}
-                    width={44}
-                    label={{ value: 'ft', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.35)', fontSize: 10 }}
-                  />
-                  <Line
-                    type="linear"
-                    dataKey="ft"
-                    stroke="rgba(255,255,255,0.08)"
-                    strokeWidth={1}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  {[...(payload?.display_groups ?? [])]
-                    .sort((a, b) => a.start_mi - b.start_mi)
-                    .map((g) => {
-                      const pts = segmentChartPoints(fullSeries, g.start_mi, g.end_mi);
-                      if (pts.length < 2) return null;
-                      const stroke = zoneStroke(g.effort_zone);
-                      return (
-                        <Line
-                          key={g.id}
-                          data={pts}
-                          type="linear"
-                          dataKey="ft"
-                          stroke={stroke}
-                          strokeWidth={2.5}
-                          dot={false}
-                          isAnimationActive={false}
-                          name={g.label}
-                        />
-                      );
-                    })}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <CourseElevationBySegments
+              fullSeries={fullSeries}
+              maxMi={maxMi}
+              displayGroups={payload?.display_groups ?? []}
+            />
             <div className="mt-2 flex flex-wrap gap-3 px-1 text-[10px] text-white/45">
               {(['conservative', 'cruise', 'caution', 'push'] as const).map((z) => (
                 <span key={z} className="inline-flex items-center gap-1 capitalize">
