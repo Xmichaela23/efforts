@@ -115,9 +115,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           setActiveTab('planned');
         }
       } else if (selectedWorkout.workout_status === 'completed') {
-        // Always go to completed/details tab - handleEditEffort already set this,
-        // and UnifiedWorkoutView will show the summary tab trigger if there's linked planned data
-        setActiveTab('completed');
+        // Endurance completed: Performance tab (session_detail / analysis). handleEditEffort sets this too;
+        // Details remains one tap away.
+        setActiveTab('summary');
       } else {
         // A) Planned workout -> Planned tab
         setActiveTab('planned');
