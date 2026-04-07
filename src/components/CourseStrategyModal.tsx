@@ -125,23 +125,23 @@ export default function CourseStrategyModal({
       className="fixed inset-0 z-[100] flex flex-col bg-[#0a0a0b] overflow-auto"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-[#0a0a0b]/95 px-4 py-3 backdrop-blur-md">
-        <div className="min-w-0">
+      <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-white/10 bg-[#0a0a0b]/95 px-4 py-3 backdrop-blur-md">
+        <div className="min-w-0 flex-1 pr-1">
           <p className="truncate text-sm font-medium text-white/90">{payload?.course.name ?? 'Course strategy'}</p>
           {payload?.course.goal_time && (
             <div className="space-y-0.5">
-              <p className="text-[11px] text-white/45">
+              <p className="text-[11px] text-white/45 truncate" title={`${payload.course.goal_time_source === 'predicted' ? 'Predicted finish' : 'Race target'} ${payload.course.goal_time}`}>
                 {payload.course.goal_time_source === 'predicted'
-                  ? <>Predicted finish <span className="text-white/70">{payload.course.goal_time}</span> (from current fitness)</>
-                  : <>Race target <span className="text-white/70">{payload.course.goal_time}</span></>}
+                  ? <>Predicted <span className="text-white/70">{payload.course.goal_time}</span> · current fitness</>
+                  : <>Target <span className="text-white/70">{payload.course.goal_time}</span></>}
               </p>
               {payload.course.plan_target_time && (
-                <p className="text-[10px] text-white/35">Plan build target {payload.course.plan_target_time}</p>
+                <p className="text-[10px] text-white/35 truncate">Plan {payload.course.plan_target_time}</p>
               )}
             </div>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
           <button
             type="button"
             onClick={() => void load({ silent: true })}
