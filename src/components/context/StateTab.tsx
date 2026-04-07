@@ -35,15 +35,6 @@ function verdictToneToColor(tone: string): string {
 }
 
 
-function weekPct(startDate: string, endDate: string): number {
-  const now = Date.now();
-  const start = new Date(startDate + 'T00:00:00').getTime();
-  const end = new Date(endDate + 'T23:59:59').getTime();
-  if (now <= start) return 0;
-  if (now >= end) return 100;
-  return Math.round(((now - start) / (end - start)) * 100);
-}
-
 function fmtDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
@@ -266,7 +257,6 @@ export default function StateTab({
 
   // ── WEEK header ──────────────────────────────────────────────────────────
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
-  const pct = weekPct(week.start_date, week.end_date);
 
   // ── BODY row — endurance signals only (strength signals go in STRENGTH row) ─
   const visibleSignals = (rm?.visible_signals ?? []).filter((s: any) => s.category === 'endurance');
@@ -310,9 +300,8 @@ export default function StateTab({
       {/* ── Header ── */}
       <div className="flex items-start justify-between mb-4 px-0.5">
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-[11px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
-            <span className="text-[11px] text-white/65 tabular-nums">{pct}% through</span>
             {readinessLabel && (
               <span className={`text-[11px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
             )}
