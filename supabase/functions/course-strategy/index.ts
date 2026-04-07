@@ -1,6 +1,6 @@
 /**
  * course-strategy — rebuild geometry, call LLM, persist strategy on course_segments.
- * POST JSON: { course_id: string }
+ * POST JSON: { course_id: string } — paces to plan/goal target only (not predicted finish).
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callLLM } from '../_shared/llm.ts';
@@ -17,6 +17,7 @@ import {
   materializeSegmentRows,
   geometryToPromptSegments,
   alignCoachingCuesWithGeometry,
+  applyClimbPaceFloorToDisplayGroups,
   parsePaceToSecPerMi,
   fmtPaceClock,
   fmtFinishClock,
@@ -25,7 +26,7 @@ import {
   type SnapshotForHash,
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
-import { parseClientPredictedFinishSeconds, resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -82,7 +83,7 @@ Athlete profile:
 - Goal finish time: ${params.goalTime} (${params.impliedAvg}/mi average)
 
 Instructions:
-1. Group adjacent segments of similar terrain into display groups (target 5-8 groups for a marathon, proportionally fewer for shorter races).
+1. Group adjacent segments of similar terrain into display groups. For a full marathon, target about 7 groups (roughly 6–9); scale down for shorter races. Do not merge distinct terrain episodes—if geometry separates a steep descent from different rolling flats, keep separate display groups rather than one mega-segment.
 2. For each display group, assign:
    - display_group_id (1-indexed)
    - segment_orders: array of segment_order values in this group
@@ -96,6 +97,7 @@ Instructions:
 3. Ground every coaching_cue in the segment list: if ANY segment in that display group has terrain_type "climb" or clearly positive elevation_change_ft, you must not describe the whole group as only "flat" or "flat terrain"—mention the rise (even briefly, e.g. "short climb to the line").
 4. Net downhill groups can still have a small finishing bump; check the last segments in the group before calling the finish "flat".
 5. Pacing vs terrain: if a display group includes any climb terrain or meaningful net elevation gain in the segment list, set pace bounds at least as conservative as an equivalent flat section (usually a few sec/mi slower on the slow bound, not faster splits "because push")—runners slow on uphills; HR may sit at the upper end of the band. Descent-heavy groups may allow slightly quicker bounds where appropriate.
+6. Effort zones: long gentle net-downhill sections are often "cruise" (easy rhythm). Use "caution" for steep descents, technical drops, and for late-race segments (mile ~18+) that are flat or rolling after many miles of sustained descent—leg fatigue dominates even when grade looks easy, so prefer "caution" over "cruise" for those late flats/rollers unless segments clearly show easy fresh terrain.
 
 Rules: target_pace_slow_sec_per_mi >= target_pace_fast_sec_per_mi. HR realistic vs max. Weighted pace vs goal is guidance only.
 
@@ -118,11 +120,9 @@ Deno.serve(async (req) => {
   }
 
   let courseId = '';
-  let predictedFinishSec: number | null = null;
   try {
     const body = await req.json() as Record<string, unknown>;
     courseId = String(body.course_id || '');
-    predictedFinishSec = parseClientPredictedFinishSeconds(body.predicted_finish_time_seconds);
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -155,8 +155,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Goal not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
+  /** Strategy paces to plan/goal target only; predicted finish is for display in course-detail. */
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
-  const goalTimeSec = predictedFinishSec ?? planGoalSec;
+  const goalTimeSec = planGoalSec;
   if (goalTimeSec == null) {
     return new Response(
       JSON.stringify({
@@ -331,6 +332,7 @@ Deno.serve(async (req) => {
 
   const groups = (parsed as { display_groups: LlmDisplayGroup[] }).display_groups;
   alignCoachingCuesWithGeometry(groups, geometry);
+  applyClimbPaceFloorToDisplayGroups(groups, geometry, implied);
   let rows: Record<string, unknown>[];
   try {
     rows = materializeSegmentRows(geometry, groups);

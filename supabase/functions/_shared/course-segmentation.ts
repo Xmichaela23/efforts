@@ -24,7 +24,8 @@ export type GeometrySegment = {
 const MI_M = 1609.344;
 const WINDOW_M = 0.25 * MI_M;
 const MIN_SEG_M = 0.5 * MI_M;
-const MAX_SEG_M = 5 * MI_M;
+/** Cap segment length so geometry stays granular enough for LLM grouping (~3 mi). */
+const MAX_SEG_M = 3 * MI_M;
 const ROLLING_SAMPLE_M = 1 * MI_M;
 const GRADE_CLIMB = 2;
 const GRADE_DESCENT = -2;

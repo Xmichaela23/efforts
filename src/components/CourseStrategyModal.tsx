@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, RefreshCw } from 'lucide-react';
+import { X, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import { invokeFunction } from '@/lib/supabase';
 import { EffortsWordmark } from '@/components/EffortsButton';
 
@@ -97,7 +97,8 @@ export type CourseDetailPayload = {
     strategy_updated_at: string | null;
     strategy_stale: boolean;
     has_strategy: boolean;
-    elevation_profile: [number, number][];
+    /** [mi, ft] pairs from API, or legacy `{ distance_m, elevation_m }` rows (client normalizes). */
+    elevation_profile: unknown[];
   };
   display_groups: Array<{
     id: number;
@@ -121,38 +122,96 @@ interface CourseStrategyModalProps {
   predictedFinishTimeSeconds?: number | null;
 }
 
-const ELEV_CHART_W = 800;
-const ELEV_CHART_H = 220;
+const EMPTY_DISPLAY_GROUPS: CourseDetailPayload['display_groups'] = [];
 
-/** SVG elevation (Recharts multi-Line + per-series data was dropping short segments on device). */
+const SVG_W = 800;
+/** Plot area height (elevation curve only). */
+const PLOT_IH = 182;
+const MT = 10;
+const MILE_STRIP = 36;
+const SVG_H = MT + PLOT_IH + MILE_STRIP + 10;
+const ML = 44;
+const MR = 12;
+const MI_M = 1609.344;
+const FT_PER_M = 3.28084;
+
+/**
+ * Normalize API payload to chart series. Supports [mi, ft] from course-detail or legacy { distance_m, elevation_m } rows.
+ */
+function normalizeElevationChartSeries(raw: CourseDetailPayload['course']['elevation_profile'] | undefined): { mi: number; ft: number }[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  const out: { mi: number; ft: number }[] = [];
+  for (const row of raw) {
+    if (Array.isArray(row) && row.length >= 2) {
+      const mi = Number(row[0]);
+      const y = Number(row[1]);
+      if (Number.isFinite(mi) && Number.isFinite(y)) out.push({ mi, ft: y });
+      continue;
+    }
+    if (row && typeof row === 'object' && !Array.isArray(row)) {
+      const o = row as Record<string, unknown>;
+      const dm = Number(o.distance_m);
+      const em = Number(o.elevation_m);
+      if (Number.isFinite(dm) && Number.isFinite(em)) {
+        out.push({ mi: dm / MI_M, ft: em * FT_PER_M });
+      }
+    }
+  }
+  out.sort((a, b) => a.mi - b.mi);
+  return out;
+}
+
+/** SVG elevation (custom SVG; avoids Recharts dropping short segment series on device). */
 function CourseElevationBySegments({
   fullSeries,
   maxMi,
   displayGroups,
+  focusedGroupId,
+  pixelWidth,
 }: {
   fullSeries: { mi: number; ft: number }[];
   maxMi: number;
   displayGroups: CourseDetailPayload['display_groups'];
+  /** When set, draws a band for this display group (tap-to-focus). */
+  focusedGroupId: number | null;
+  /** Fixed CSS width in px (expanded scroll mode); omit for fluid 100% width. */
+  pixelWidth?: number;
 }) {
-  const ml = 44;
-  const mr = 12;
-  const mt = 10;
-  const mb = 26;
-  const iw = ELEV_CHART_W - ml - mr;
-  const ih = ELEV_CHART_H - mt - mb;
-  const fts = fullSeries.map((p) => p.ft);
-  const ftMin = Math.min(...fts);
-  const ftMax = Math.max(...fts);
+  const iw = SVG_W - ML - MR;
+  const ih = PLOT_IH;
+  const mt = MT;
+  const plotBottom = mt + ih;
+  const mileLineY0 = plotBottom + 2;
+  const mileLineY1 = plotBottom + 8;
+  const mileTextY = plotBottom + 22;
+
+  const fts = fullSeries.map((p) => p.ft).filter((v) => Number.isFinite(v));
+  if (fts.length === 0) return null;
+  let ftMin = Math.min(...fts);
+  let ftMax = Math.max(...fts);
+  if (!Number.isFinite(ftMin) || !Number.isFinite(ftMax)) return null;
+  const rawSpan = ftMax - ftMin;
+  const pad = Math.max(rawSpan * 0.04, rawSpan < 30 ? 15 : 5);
+  ftMin -= pad;
+  ftMax += pad;
   const ftSpan = Math.max(ftMax - ftMin, 1);
-  const xOf = (mi: number) => ml + (mi / maxMi) * iw;
+  const xOf = (mi: number) => ML + (mi / maxMi) * iw;
   const yOf = (ft: number) => mt + ih - ((ft - ftMin) / ftSpan) * ih;
 
   const baselinePts = fullSeries.map((p) => `${xOf(p.mi)},${yOf(p.ft)}`).join(' ');
-  const xGrid = [0, 0.25, 0.5, 0.75, 1].map((t) => maxMi * t);
   const yGrid = [0, 0.25, 0.5, 0.75, 1].map((t) => ftMin + ftSpan * t);
-
-  const xTickMis = [0, maxMi / 2, maxMi];
   const yTickFts = [ftMin, ftMin + ftSpan / 2, ftMax];
+
+  const intMiles = Math.min(200, Math.max(0, Math.floor(maxMi + 1e-6)));
+  const mileMarks: { atMi: number; label: string }[] = [];
+  for (let m = 0; m <= intMiles; m++) mileMarks.push({ atMi: m, label: String(m) });
+  if (maxMi - intMiles > 0.08) {
+    mileMarks.push({ atMi: maxMi, label: maxMi.toFixed(1) });
+  }
+
+  const focused = focusedGroupId != null ? displayGroups.find((g) => g.id === focusedGroupId) : null;
+  const hx0 = focused ? xOf(focused.start_mi) : 0;
+  const hx1 = focused ? xOf(focused.end_mi) : 0;
 
   /** Long segments drawn first (underneath); short caution/push on top so cruise does not cover them. */
   const paintOrder = [...displayGroups].sort((a, b) => {
@@ -162,40 +221,42 @@ function CourseElevationBySegments({
     return a.start_mi - b.start_mi;
   });
 
-  const fmtMi = (mi: number) => (Math.abs(mi - Math.round(mi)) < 0.05 ? String(Math.round(mi)) : mi.toFixed(1));
-
   const strokeWidthForSpan = (spanMi: number) =>
     spanMi < 1.2 ? 5.5 : spanMi < 3 ? 4.5 : 3.5;
 
   return (
     <svg
-      viewBox={`0 0 ${ELEV_CHART_W} ${ELEV_CHART_H}`}
-      className="h-[220px] w-full min-w-[800px]"
+      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      width={pixelWidth ?? '100%'}
+      height={pixelWidth != null ? Math.round((pixelWidth * SVG_H) / SVG_W) : undefined}
+      preserveAspectRatio="xMidYMid meet"
+      className={pixelWidth != null ? 'max-w-none shrink-0' : 'h-auto w-full max-h-[min(42vh,280px)]'}
       role="img"
       aria-label="Elevation by segment effort"
     >
       {yGrid.map((ft) => (
         <line
           key={`h-${ft}`}
-          x1={ml}
+          x1={ML}
           y1={yOf(ft)}
-          x2={ELEV_CHART_W - mr}
+          x2={SVG_W - MR}
           y2={yOf(ft)}
           stroke="rgba(255,255,255,0.06)"
           strokeDasharray="3 3"
         />
       ))}
-      {xGrid.map((mi) => (
-        <line
-          key={`v-${mi}`}
-          x1={xOf(mi)}
-          y1={mt}
-          x2={xOf(mi)}
-          y2={mt + ih}
-          stroke="rgba(255,255,255,0.06)"
-          strokeDasharray="3 3"
+
+      {focused && hx1 > hx0 && (
+        <rect
+          x={hx0}
+          y={mt}
+          width={hx1 - hx0}
+          height={ih}
+          fill={zoneStroke(focused.effort_zone)}
+          opacity={0.14}
+          pointerEvents="none"
         />
-      ))}
+      )}
 
       <polyline fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={1} points={baselinePts} />
 
@@ -220,7 +281,7 @@ function CourseElevationBySegments({
       {yTickFts.map((ft) => (
         <text
           key={`yl-${ft}`}
-          x={ml - 6}
+          x={ML - 6}
           y={yOf(ft) + 3}
           textAnchor="end"
           fill="rgba(255,255,255,0.42)"
@@ -241,17 +302,38 @@ function CourseElevationBySegments({
         ft
       </text>
 
-      {xTickMis.map((mi) => (
-        <text key={`x-${mi}`} x={xOf(mi)} y={ELEV_CHART_H - 8} textAnchor="middle" fill="rgba(255,255,255,0.42)" fontSize={10}>
-          {fmtMi(mi)}
-        </text>
-      ))}
+      <line
+        x1={ML}
+        y1={plotBottom}
+        x2={SVG_W - MR}
+        y2={plotBottom}
+        stroke="rgba(255,255,255,0.12)"
+        strokeWidth={1}
+      />
+
+      {mileMarks.map((mk, i) => {
+        const xm = xOf(Math.min(mk.atMi, maxMi));
+        const mInt = Math.round(mk.atMi);
+        const showLabel =
+          maxMi <= 18 ? true : mk.atMi >= maxMi - 0.01 ? true : mInt % 2 === 0 || mk.atMi === 0;
+        return (
+          <g key={`mi-${mk.atMi}-${i}`}>
+            <line x1={xm} y1={mileLineY0} x2={xm} y2={mileLineY1} stroke="rgba(255,255,255,0.35)" strokeWidth={1} />
+            {showLabel && (
+              <text x={xm} y={mileTextY} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize={9}>
+                {mk.label}
+              </text>
+            )}
+          </g>
+        );
+      })}
+
       <text
-        x={ELEV_CHART_W - mr - 2}
-        y={ELEV_CHART_H - 8}
+        x={SVG_W - MR - 2}
+        y={mileTextY + 2}
         textAnchor="end"
         fill="rgba(255,255,255,0.32)"
-        fontSize={10}
+        fontSize={9}
       >
         mi
       </text>
@@ -270,6 +352,9 @@ export default function CourseStrategyModal({
   const [refetching, setRefetching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [chartExpanded, setChartExpanded] = useState(false);
+  const [focusedGroupId, setFocusedGroupId] = useState<number | null>(null);
+  const chartScrollRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!courseId) return;
@@ -296,18 +381,22 @@ export default function CourseStrategyModal({
     if (!open) {
       setPayload(null);
       setErr(null);
+      setChartExpanded(false);
+      setFocusedGroupId(null);
     }
   }, [open, courseId, load]);
+
+  useEffect(() => {
+    if (focusedGroupId == null) return;
+    const t = window.setTimeout(() => setFocusedGroupId(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [focusedGroupId]);
 
   const runStrategy = async () => {
     if (!courseId) return;
     setUpdating(true);
     setErr(null);
-    const body: Record<string, unknown> = { course_id: courseId };
-    if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
-      body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
-    }
-    const { error } = await invokeFunction('course-strategy', body);
+    const { error } = await invokeFunction('course-strategy', { course_id: courseId });
     setUpdating(false);
     if (error) {
       setErr(error.message);
@@ -318,11 +407,61 @@ export default function CourseStrategyModal({
 
   const busy = loading || refetching || updating;
 
+  const fullSeries = normalizeElevationChartSeries(payload?.course?.elevation_profile);
+  const maxMi = payload?.course?.distance_mi ?? Math.max(0.1, ...fullSeries.map((d) => d.mi));
+  const displayGroups = payload?.display_groups ?? EMPTY_DISPLAY_GROUPS;
+  const expandedChartPixelW = Math.round(Math.max(720, Math.min(2000, maxMi * 52)));
+
+  const focusSegmentOnChart = useCallback(
+    (g: CourseDetailPayload['display_groups'][0]) => {
+      setFocusedGroupId(g.id);
+      requestAnimationFrame(() => {
+        const el = chartScrollRef.current;
+        if (!el || !chartExpanded || maxMi <= 0) return;
+        const centerFrac = (g.start_mi + g.end_mi) / 2 / maxMi;
+        const target = centerFrac * el.scrollWidth - el.clientWidth / 2;
+        el.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+      });
+    },
+    [chartExpanded, maxMi],
+  );
+
+  useEffect(() => {
+    if (!chartExpanded || focusedGroupId == null || maxMi <= 0) return;
+    const g = displayGroups.find((x) => x.id === focusedGroupId);
+    if (!g) return;
+    const id = requestAnimationFrame(() => {
+      const el = chartScrollRef.current;
+      if (!el) return;
+      const centerFrac = (g.start_mi + g.end_mi) / 2 / maxMi;
+      const target = centerFrac * el.scrollWidth - el.clientWidth / 2;
+      el.scrollLeft = Math.max(0, target);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [chartExpanded, focusedGroupId, maxMi, displayGroups]);
+
   if (!open || !courseId) return null;
 
-  const profile = payload?.course.elevation_profile ?? [];
-  const fullSeries = profile.map(([mi, ft]) => ({ mi, ft }));
-  const maxMi = payload?.course.distance_mi ?? Math.max(0.1, ...fullSeries.map((d) => d.mi));
+  const elevationChartSvg =
+    fullSeries.length > 0 ? (
+      <CourseElevationBySegments
+        fullSeries={fullSeries}
+        maxMi={maxMi}
+        displayGroups={displayGroups}
+        focusedGroupId={focusedGroupId}
+      />
+    ) : null;
+
+  const elevationChartSvgExpanded =
+    fullSeries.length > 0 ? (
+      <CourseElevationBySegments
+        fullSeries={fullSeries}
+        maxMi={maxMi}
+        displayGroups={displayGroups}
+        focusedGroupId={focusedGroupId}
+        pixelWidth={expandedChartPixelW}
+      />
+    ) : null;
 
   // Portal to document.body so stacking is above .mobile-header (z-50); fixed inside
   // .mobile-main-content would trap z-index below the global header wordmark.
@@ -435,12 +574,24 @@ export default function CourseStrategyModal({
         )}
 
         {fullSeries.length > 0 && (
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2 overflow-x-auto">
-            <CourseElevationBySegments
-              fullSeries={fullSeries}
-              maxMi={maxMi}
-              displayGroups={payload?.display_groups ?? []}
-            />
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+            <div className="mb-1 flex items-center justify-between gap-2 px-1">
+              <p className="text-[10px] text-white/40">Full course · tap a segment card to highlight</p>
+              <button
+                type="button"
+                onClick={() => setChartExpanded(true)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-sky-400/90 hover:bg-white/10 hover:text-sky-300"
+                aria-label="Expand elevation chart"
+              >
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                Expand
+              </button>
+            </div>
+            {elevationChartSvg ?? (
+              <p className="px-2 py-6 text-center text-[12px] text-white/45">
+                Elevation data missing or invalid for charting.
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap gap-3 px-1 text-[10px] text-white/45">
               {(['conservative', 'cruise', 'caution', 'push'] as const).map((z) => (
                 <span key={z} className="inline-flex items-center gap-1 capitalize">
@@ -451,15 +602,30 @@ export default function CourseStrategyModal({
             </div>
           </div>
         )}
+        {!loading && payload && fullSeries.length === 0 && (
+          <p className="text-[12px] text-white/45">No elevation profile loaded for this course.</p>
+        )}
 
         {(payload?.display_groups ?? []).length > 0 && (
           <div className="space-y-3 pb-8">
             {payload!.display_groups.map((g) => {
               const z = zoneStroke(g.effort_zone);
+              const focused = focusedGroupId === g.id;
               return (
                 <div
                   key={g.id}
-                  className="rounded-xl border pl-3 pr-3 py-2.5 shadow-sm"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => focusSegmentOnChart(g)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      focusSegmentOnChart(g);
+                    }
+                  }}
+                  className={`rounded-xl border pl-3 pr-3 py-2.5 shadow-sm cursor-pointer transition-[box-shadow,opacity] active:opacity-95 outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                    focused ? 'ring-2 ring-white/35' : ''
+                  }`}
                   style={{
                     marginLeft: g.tier === 1 ? 12 : 0,
                     borderLeftWidth: 4,
@@ -480,6 +646,45 @@ export default function CourseStrategyModal({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {chartExpanded && elevationChartSvgExpanded && (
+          <div
+            role="presentation"
+            className="fixed inset-0 z-[10001] flex flex-col bg-black/92 backdrop-blur-sm"
+            style={{
+              paddingTop: 'env(safe-area-inset-top)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
+            onClick={() => setChartExpanded(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Expanded elevation chart"
+              className="flex min-h-0 flex-1 flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+                <span className="text-[13px] font-medium text-white/85">Course elevation</span>
+                <button
+                  type="button"
+                  onClick={() => setChartExpanded(false)}
+                  className="rounded-full p-2 text-white/55 hover:bg-white/10 hover:text-white/85"
+                  aria-label="Collapse chart"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="shrink-0 px-4 pt-2 text-[11px] text-white/45">Scroll horizontally · tap segment cards to jump</p>
+              <div
+                ref={chartScrollRef}
+                className="min-h-0 flex-1 overflow-x-auto overflow-y-auto px-3 py-4 flex items-center"
+              >
+                {elevationChartSvgExpanded}
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -363,23 +363,12 @@ export default function StateTab({
         }
       }
     }
-    if (paceTargetSec == null && raceReadiness && String(gRow?.name || '') === String(raceReadiness.goal.name)) {
-      const sec = raceReadiness.predicted_finish_time_seconds;
-      if (Number.isFinite(sec) && sec > 0) paceTargetSec = sec;
-    }
     if (paceTargetSec == null) {
       window.alert(
-        'No race target time found. Link a plan with a build-time race target, or set a target on the goal (Goals tab).',
+        'No race target time found. Link a plan with a build-time race target, or set a target on the goal (Goals tab). Strategy paces to that target—not the coach predicted finish.',
       );
       return;
     }
-    const coachPredSec =
-      raceReadiness &&
-      String(gRow?.name || '') === String(raceReadiness.goal.name) &&
-      Number.isFinite(raceReadiness.predicted_finish_time_seconds) &&
-      raceReadiness.predicted_finish_time_seconds > 0
-        ? raceReadiness.predicted_finish_time_seconds
-        : null;
     setCourseBusy(true);
     try {
       const fd = new FormData();
@@ -391,9 +380,7 @@ export default function StateTab({
         window.alert(upErr?.message || 'Upload failed');
         return;
       }
-      const stBody: Record<string, unknown> = { course_id: up.course_id };
-      if (coachPredSec != null) stBody.predicted_finish_time_seconds = coachPredSec;
-      const { error: stErr } = await invokeFunction('course-strategy', stBody);
+      const { error: stErr } = await invokeFunction('course-strategy', { course_id: up.course_id });
       if (stErr) {
         window.alert(stErr.message || 'Strategy failed');
         return;
