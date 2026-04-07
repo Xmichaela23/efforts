@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, RefreshCw } from 'lucide-react';
 import {
   LineChart,
@@ -120,9 +121,11 @@ export default function CourseStrategyModal({
   const fullSeries = profile.map(([mi, ft]) => ({ mi, ft }));
   const maxMi = payload?.course.distance_mi ?? Math.max(0.1, ...fullSeries.map((d) => d.mi));
 
-  return (
+  // Portal to document.body so stacking is above .mobile-header (z-50); fixed inside
+  // .mobile-main-content would trap z-index below the global header wordmark.
+  const modal = (
     <div
-      className="fixed inset-0 z-[100] flex flex-col bg-[#0a0a0b] overflow-auto"
+      className="fixed inset-0 z-[10000] flex flex-col bg-[#0a0a0b] overflow-auto"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-white/10 bg-[#0a0a0b]/95 px-4 py-3 backdrop-blur-md">
@@ -282,4 +285,7 @@ export default function CourseStrategyModal({
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(modal, document.body);
 }
