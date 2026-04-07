@@ -142,7 +142,7 @@ export default function CourseStrategyModal({ open, courseId, onClose }: CourseS
 
         {!payload?.course.has_strategy && !loading && courseId && (
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 space-y-2 text-[13px] text-white/60">
-            <p>No strategy yet. Requires a linked goal with target finish time.</p>
+            <p>No strategy yet. Needs a race target from your goal or linked plan (same as plan build).</p>
             <button
               type="button"
               disabled={updating}

@@ -6,6 +6,7 @@ import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
+import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 
 type CoachDataProp = {
@@ -339,9 +340,33 @@ export default function StateTab({
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !resolvedGoalId) return;
+    const uid = getStoredUserId();
     const { data: gRow } = await supabase.from('goals').select('target_time, name').eq('id', resolvedGoalId).maybeSingle();
-    if (gRow?.target_time == null || !Number.isFinite(Number(gRow.target_time))) {
-      window.alert('Set a target finish time on your race goal first (Goals tab).');
+    let planRows: { config?: Record<string, unknown> }[] | null = null;
+    if (uid) {
+      const { data } = await supabase
+        .from('plans')
+        .select('config')
+        .eq('user_id', uid)
+        .eq('goal_id', resolvedGoalId)
+        .order('updated_at', { ascending: false })
+        .limit(5);
+      planRows = data;
+    }
+    let paceTargetSec = resolveEventTargetTimeSeconds({ target_time: gRow?.target_time ?? null }, null);
+    if (paceTargetSec == null) {
+      for (const p of planRows || []) {
+        const t = resolveEventTargetTimeSeconds({}, (p as { config?: Record<string, unknown> }).config ?? null);
+        if (t != null) {
+          paceTargetSec = t;
+          break;
+        }
+      }
+    }
+    if (paceTargetSec == null) {
+      window.alert(
+        'No race target time found. Link a plan with a build-time race target, or set a target on the goal (Goals tab).',
+      );
       return;
     }
     setCourseBusy(true);

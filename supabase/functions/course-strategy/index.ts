@@ -24,6 +24,7 @@ import {
   type SnapshotForHash,
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
+import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -138,13 +139,24 @@ Deno.serve(async (req) => {
 
   const { data: goal } = await supabase
     .from('goals')
-    .select('id, target_time, distance, name')
+    .select('id, distance, name')
     .eq('id', course.goal_id)
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (!goal || goal.target_time == null || !Number.isFinite(Number(goal.target_time))) {
-    return new Response(JSON.stringify({ error: 'Goal needs a target finish time (target_time) for pacing' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+  if (!goal) {
+    return new Response(JSON.stringify({ error: 'Goal not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+
+  const goalTimeSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
+  if (goalTimeSec == null) {
+    return new Response(
+      JSON.stringify({
+        error:
+          'No race target time found. Set a target on the goal, or ensure your linked plan has target_time / marathon_target_seconds from plan build.',
+      }),
+      { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } },
+    );
   }
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);
@@ -217,7 +229,6 @@ Deno.serve(async (req) => {
   };
   const snapHash = await hashAthleteSnapshot(snapshot);
 
-  const goalTimeSec = Number(goal.target_time);
   const distMi = goalDistanceMi(goal.distance as string);
   const implied = impliedAvgPaceSecPerMi(goalTimeSec, distMi);
 

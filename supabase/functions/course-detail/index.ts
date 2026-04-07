@@ -11,8 +11,10 @@ import {
   hashAthleteSnapshot,
   fmtPaceClock,
   parsePaceToSecPerMi,
+  fmtFinishClock,
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
+import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -145,16 +147,8 @@ Deno.serve(async (req) => {
 
   let goalTimeStr: string | null = null;
   if (course.goal_id) {
-    const { data: g } = await supabase.from('goals').select('target_time').eq('id', course.goal_id).maybeSingle();
-    const ts = g?.target_time != null ? Number(g.target_time) : null;
-    if (ts != null && Number.isFinite(ts)) {
-      const h = Math.floor(ts / 3600);
-      const mi = Math.floor((ts % 3600) / 60);
-      const s = Math.round(ts % 60);
-      goalTimeStr = h > 0
-        ? `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-        : `${mi}:${String(s).padStart(2, '0')}`;
-    }
+    const ts = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
+    if (ts != null) goalTimeStr = fmtFinishClock(ts);
   }
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);

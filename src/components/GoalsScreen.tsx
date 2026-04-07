@@ -6,6 +6,7 @@ import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
+import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 
 // Local alias so existing call-sites inside this file don't need renaming
 const readStoredUserId = getStoredUserId;
@@ -138,8 +139,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     if (!file || !gid) return;
     const goal = goals.find((g) => g.id === gid);
     if (!goal) return;
-    if (goal.target_time == null || !Number.isFinite(Number(goal.target_time))) {
-      window.alert('Set a target finish time on this goal first.');
+    const linked = plansByGoalId.get(gid);
+    const paceTargetSec = resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
+    if (paceTargetSec == null) {
+      window.alert(
+        'No race target time found. Use a plan built with a marathon/race target, or set a target finish time on this goal.',
+      );
       return;
     }
     setCourseUploadBusy(gid);
@@ -627,6 +632,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const TypeIcon = getGoalTypeIcon(goal.goal_type);
     const SportIcon = getSportIcon(goal.sport);
     const linkedPlan = plansByGoalId.get(goal.id);
+    const paceTargetSec = resolveEventTargetTimeSeconds(goal, linkedPlan?.config as Record<string, unknown> | undefined);
     const isExpanded = expandedGoalId === goal.id;
 
     return (
@@ -647,7 +653,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 <div className="mt-1 flex items-center gap-2 text-sm text-white/50">
                   <Calendar className="h-3.5 w-3.5" />
                   <span>{format(new Date(goal.target_date + 'T12:00:00'), 'MMM d, yyyy')}</span>
-                  <span className="text-white/30">{differenceInWeeks(new Date(goal.target_date + 'T12:00:00'), new Date())} weeks away</span>
+                  <span className="text-white/30">
+                    {(() => {
+                      const w = differenceInWeeks(new Date(goal.target_date + 'T12:00:00'), new Date());
+                      return w === 1 ? '1 week away' : `${w} weeks away`;
+                    })()}
+                  </span>
                 </div>
               )}
               {goal.goal_type === 'capacity' && (
@@ -701,7 +712,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 if (courseByGoal[goal.id]) {
                   setStrategyModalCourseId(courseByGoal[goal.id].id);
                   setStrategyModalOpen(true);
-                } else if (goal.target_time != null && Number.isFinite(Number(goal.target_time))) {
+                } else if (paceTargetSec != null) {
                   setPendingCourseGoalId(goal.id);
                   goalsCourseFileRef.current?.click();
                 } else {
@@ -722,9 +733,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         {isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
           <div className="mt-3 ml-[44px] border-t border-white/[0.06] pt-3 space-y-2">
             <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Course</span>
-            {goal.target_time == null || !Number.isFinite(Number(goal.target_time)) ? (
+            {paceTargetSec == null ? (
               <p className="text-[11px] text-amber-400/75 leading-snug">
-                Set a target finish time on this goal to generate mile-by-mile terrain pacing.
+                No race target found for pacing. Link a plan built with a race target time, or set a target finish time on this goal.
               </p>
             ) : courseByGoal[goal.id] ? (
               <button
