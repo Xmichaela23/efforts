@@ -15,6 +15,8 @@ interface GoalsScreenProps {
   onSelectPlan?: (planId: string) => void;
   onViewAllPlans?: () => void;
   onPlanBuilt?: () => void;
+  /** Increment when opening Goals from FAB "Upload course" — expands first active run event goal. */
+  expandRunEventForCourseNonce?: number;
   currentPlans?: Array<{ id: string; name: string; currentWeek?: number; status: string; goal_id?: string | null; config?: any; plan_type?: string }>;
   completedPlans?: Array<{ id: string; name: string; status: string; goal_id?: string | null }>;
 }
@@ -60,6 +62,7 @@ function inferSportFromPlanConfig(config: any, planType?: string): string {
 
 const GoalsScreen: React.FC<GoalsScreenProps> = ({
   onClose, onSelectPlan, onViewAllPlans, onPlanBuilt,
+  expandRunEventForCourseNonce = 0,
   currentPlans = [], completedPlans = [],
 }) => {
   const navigate = useNavigate();
@@ -115,6 +118,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       setCourseByGoal(m);
     })();
   }, [goals, expandedGoalId]);
+
+  useEffect(() => {
+    if (!expandRunEventForCourseNonce) return;
+    const runEvent = goals.find(
+      (g) =>
+        g.status === 'active' &&
+        g.goal_type === 'event' &&
+        (g.sport || '').toLowerCase() === 'run',
+    );
+    if (runEvent) setExpandedGoalId(runEvent.id);
+  }, [expandRunEventForCourseNonce, goals]);
 
   async function handleGoalsCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -677,6 +691,33 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           })()}
           {buildError?.goalId === goal.id && <p className="mt-1 text-xs text-red-400/70">{buildError.message}</p>}
         </div>
+
+        {!isExpanded && goal.status === 'active' && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
+          <div className="ml-[44px] mt-2">
+            <button
+              type="button"
+              disabled={courseUploadBusy === goal.id}
+              onClick={() => {
+                if (courseByGoal[goal.id]) {
+                  setStrategyModalCourseId(courseByGoal[goal.id].id);
+                  setStrategyModalOpen(true);
+                } else if (goal.target_time != null && Number.isFinite(Number(goal.target_time))) {
+                  setPendingCourseGoalId(goal.id);
+                  goalsCourseFileRef.current?.click();
+                } else {
+                  setExpandedGoalId(goal.id);
+                }
+              }}
+              className="text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 disabled:opacity-40"
+            >
+              {courseByGoal[goal.id]
+                ? 'View terrain strategy →'
+                : courseUploadBusy === goal.id
+                  ? 'Uploading…'
+                  : 'Add terrain course (GPX) →'}
+            </button>
+          </div>
+        )}
 
         {isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
           <div className="mt-3 ml-[44px] border-t border-white/[0.06] pt-3 space-y-2">

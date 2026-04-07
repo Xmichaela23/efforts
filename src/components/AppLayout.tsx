@@ -87,6 +87,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const checkingFeedbackRef = useRef(false); // Prevent concurrent checks
   const [plansMenuOpen, setPlansMenuOpen] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
+  const [goalsCourseUploadNonce, setGoalsCourseUploadNonce] = useState(0);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -1119,6 +1120,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         }
       })();
     } else if (type === 'upload-course') {
+      setGoalsCourseUploadNonce((n) => n + 1);
       setShowGoals(true);
     } else {
       setShowBuilder(true);
@@ -1276,6 +1278,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           ) : showGoals ? (
             <div className="pt-4 h-full">
               <GoalsScreen
+                expandRunEventForCourseNonce={goalsCourseUploadNonce}
                 onClose={handleBackToDashboard}
                 onSelectPlan={(planId) => {
                   setShowGoals(false);
