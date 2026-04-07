@@ -269,33 +269,7 @@ export default function StateTab({
   const [strategyCourseId, setStrategyCourseId] = useState<string | null>(null);
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
 
-  if (loading && !data) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-4 h-4 animate-spin text-white/45" />
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return <div className="py-8 text-center text-[12px] text-white/50">{error ?? 'No data'}</div>;
-  }
-
-  const wsv = data.weekly_state_v1;
-  if (!wsv) return <div className="py-8 text-center text-[12px] text-white/50">Loading state…</div>;
-
-  const week = wsv.week;
-  const load = wsv.load;
-  const rm = (wsv as any).response_model as {
-    visible_signals: Array<{ label: string; trend: string; trend_tone: string; detail: string; samples: number }>;
-    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };
-    endurance: unknown;
-    assessment: { label: string; signals_concerning: number };
-  } | undefined;
-  const snap = (data as any)?.athlete_snapshot ?? null;
-  const loadStatus = snap?.body_response?.load_status ?? null;
-  const raceReadiness: RaceReadinessV1 | null = (data as any)?.race_readiness ?? null;
-  const primaryRaceReadiness: PrimaryRaceReadinessRow | null = data?.primary_race_readiness ?? null;
+  const raceReadiness = (data as { race_readiness?: RaceReadinessV1 | null } | null)?.race_readiness ?? null;
 
   useEffect(() => {
     if (!raceReadiness) {
@@ -333,6 +307,33 @@ export default function StateTab({
       cancelled = true;
     };
   }, [raceReadiness]);
+
+  if (loading && !data) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-4 h-4 animate-spin text-white/45" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return <div className="py-8 text-center text-[12px] text-white/50">{error ?? 'No data'}</div>;
+  }
+
+  const wsv = data.weekly_state_v1;
+  if (!wsv) return <div className="py-8 text-center text-[12px] text-white/50">Loading state…</div>;
+
+  const week = wsv.week;
+  const load = wsv.load;
+  const rm = (wsv as any).response_model as {
+    visible_signals: Array<{ label: string; trend: string; trend_tone: string; detail: string; samples: number }>;
+    strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };
+    endurance: unknown;
+    assessment: { label: string; signals_concerning: number };
+  } | undefined;
+  const snap = (data as any)?.athlete_snapshot ?? null;
+  const loadStatus = snap?.body_response?.load_status ?? null;
+  const primaryRaceReadiness: PrimaryRaceReadinessRow | null = data?.primary_race_readiness ?? null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
