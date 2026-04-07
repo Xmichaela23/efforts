@@ -17,7 +17,8 @@
     "seed:insert": "npx tsx scripts/insert-seed-exercises.ts",
     "backfill:exercise-ids": "npx tsx scripts/backfill-exercise-ids.ts",
     "cap:sync": "cap sync ios",
-    "ios": "npm run build && cap sync ios"
+    "ios": "npm run build && cap sync ios",
+    "ios:open": "npm run ios && open ios/App/App.xcodeproj"
   },
   "dependencies": {
     "@capacitor/cli": "^8.0.0",

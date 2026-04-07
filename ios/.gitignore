@@ -1,6 +1,7 @@
 App/build
 App/Pods
 App/output
+# Web UI lives here only after: (repo root) npm run build && npx cap sync ios — not committed.
 App/App/public
 DerivedData
 xcuserdata
