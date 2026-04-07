@@ -27,6 +27,17 @@ async function getUser(supabase: ReturnType<typeof createClient>, authHeader: st
   return { user, err: null };
 }
 
+function pgErr(e: { message?: string; details?: string; hint?: string; code?: string } | null): string {
+  if (!e) return 'Insert failed';
+  const parts = [e.message, e.details, e.hint].filter((x) => x && String(x).trim());
+  const s = parts.join(' — ');
+  if (!s) return 'Insert failed';
+  if (e.code === '42P01' || /does not exist/i.test(s)) {
+    return `${s} (Apply the course migration: race_courses / course_segments on your Supabase project.)`;
+  }
+  return s;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') {
@@ -75,9 +86,11 @@ Deno.serve(async (req) => {
     if (ge || !g || g.user_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Invalid goal_id' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
-    const { data: existing } = await supabase.from('race_courses').select('id').eq('goal_id', goalId).maybeSingle();
-    if (existing?.id) {
-      await supabase.from('race_courses').delete().eq('id', existing.id);
+    // Clear any existing row for this goal (unique partial index on goal_id) — check delete errors.
+    const { error: delErr } = await supabase.from('race_courses').delete().eq('goal_id', goalId);
+    if (delErr) {
+      console.error('[course-upload] delete existing by goal_id', delErr);
+      return new Response(JSON.stringify({ error: pgErr(delErr) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
   }
 
@@ -88,6 +101,9 @@ Deno.serve(async (req) => {
   const smoothed = smoothElevation(raw, 2);
   const { gain_m, loss_m } = elevationGainLossM(smoothed);
   const totalM = smoothed[smoothed.length - 1].distance_m;
+  if (!Number.isFinite(totalM) || totalM <= 0 || !Number.isFinite(gain_m) || !Number.isFinite(loss_m)) {
+    return new Response(JSON.stringify({ error: 'Invalid course geometry (distance/elevation)' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
   const segments = segmentCourseFromProfile(smoothed);
   const elevationJson = profileToJson(smoothed);
 
@@ -107,8 +123,8 @@ Deno.serve(async (req) => {
     .single();
 
   if (insErr || !course) {
-    console.error('[course-upload] insert', insErr);
-    return new Response(JSON.stringify({ error: insErr?.message || 'Insert failed' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+    console.error('[course-upload] insert', JSON.stringify(insErr ?? {}));
+    return new Response(JSON.stringify({ error: pgErr(insErr) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
   const courseId = course.id as string;
@@ -127,9 +143,9 @@ Deno.serve(async (req) => {
   if (rows.length > 0) {
     const { error: segErr } = await supabase.from('course_segments').insert(rows);
     if (segErr) {
-      console.error('[course-upload] segments', segErr);
+      console.error('[course-upload] segments', JSON.stringify(segErr));
       await supabase.from('race_courses').delete().eq('id', courseId);
-      return new Response(JSON.stringify({ error: segErr.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: pgErr(segErr) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
   }
 
