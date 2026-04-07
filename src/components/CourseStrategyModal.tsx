@@ -154,9 +154,18 @@ function CourseElevationBySegments({
   const xTickMis = [0, maxMi / 2, maxMi];
   const yTickFts = [ftMin, ftMin + ftSpan / 2, ftMax];
 
-  const sortedGroups = [...displayGroups].sort((a, b) => a.start_mi - b.start_mi);
+  /** Long segments drawn first (underneath); short caution/push on top so cruise does not cover them. */
+  const paintOrder = [...displayGroups].sort((a, b) => {
+    const da = a.end_mi - a.start_mi;
+    const db = b.end_mi - b.start_mi;
+    if (db !== da) return db - da;
+    return a.start_mi - b.start_mi;
+  });
 
   const fmtMi = (mi: number) => (Math.abs(mi - Math.round(mi)) < 0.05 ? String(Math.round(mi)) : mi.toFixed(1));
+
+  const strokeWidthForSpan = (spanMi: number) =>
+    spanMi < 1.2 ? 5.5 : spanMi < 3 ? 4.5 : 3.5;
 
   return (
     <svg
@@ -190,16 +199,17 @@ function CourseElevationBySegments({
 
       <polyline fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={1} points={baselinePts} />
 
-      {sortedGroups.map((g) => {
+      {paintOrder.map((g) => {
         const pts = segmentChartPoints(fullSeries, g.start_mi, g.end_mi);
         if (pts.length < 2) return null;
         const points = pts.map((p) => `${xOf(p.mi)},${yOf(p.ft)}`).join(' ');
+        const span = g.end_mi - g.start_mi;
         return (
           <polyline
             key={g.id}
             fill="none"
             stroke={zoneStroke(g.effort_zone)}
-            strokeWidth={3}
+            strokeWidth={strokeWidthForSpan(span)}
             strokeLinecap="round"
             strokeLinejoin="round"
             points={points}
@@ -318,10 +328,10 @@ export default function CourseStrategyModal({
   // .mobile-main-content would trap z-index below the global header wordmark.
   const modal = (
     <div
-      className="fixed inset-0 z-[10000] flex flex-col bg-[#0a0a0b] overflow-hidden"
+      className="fixed left-0 right-0 top-0 z-[10000] flex flex-col bg-[#0a0a0b] overflow-hidden"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        bottom: 'calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra))',
       }}
     >
       <header
@@ -393,7 +403,7 @@ export default function CourseStrategyModal({
       </header>
 
       <div
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4 max-w-3xl mx-auto w-full"
+        className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-6 space-y-4 max-w-3xl mx-auto w-full"
         style={{
           paddingLeft: 'max(1rem, env(safe-area-inset-left))',
           paddingRight: 'max(1rem, env(safe-area-inset-right))',
