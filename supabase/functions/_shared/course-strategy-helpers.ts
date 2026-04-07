@@ -214,6 +214,36 @@ export function geometryToPromptSegments(geoms: GeometrySegment[]): Record<strin
   }));
 }
 
+/**
+ * LLM cues sometimes say "flat" for a whole group while GPX-derived segments include a bump.
+ * Nudge copy when geometry shows meaningful rise (still ≤80 chars for validation).
+ */
+export function alignCoachingCuesWithGeometry(groups: LlmDisplayGroup[], geometry: GeometrySegment[]): void {
+  const flatWording = /\bflat (terrain|finish|stretch|miles)\b|\bon flat\b|\bonly flat\b/i;
+  for (const dg of groups) {
+    const subs = geometry.filter((g) => dg.segment_orders.includes(g.segment_order));
+    if (subs.length === 0) continue;
+    let cue = String(dg.coaching_cue || '').trim();
+    if (!cue || !flatWording.test(cue)) continue;
+    const climbLabeled = subs.some((s) => s.terrain_type === 'climb');
+    const chunkRise = subs.some((s) => s.elevation_change_m >= 3);
+    const totalRiseM = subs.reduce((a, s) => a + Math.max(0, s.elevation_change_m), 0);
+    if (!climbLabeled && !chunkRise && totalRiseM < 6) continue;
+    const suffix = ' Small rise—stay smooth.';
+    if (cue.length + suffix.length <= 80) {
+      dg.coaching_cue = (cue + suffix).slice(0, 80);
+      continue;
+    }
+    dg.coaching_cue = cue
+      .replace(/\bflat terrain\b/gi, 'rolling terrain')
+      .replace(/\bflat finish\b/gi, 'strong finish')
+      .replace(/\bflat stretch\b/gi, 'late miles')
+      .replace(/\bflat miles\b/gi, 'these miles')
+      .replace(/\bon flat\b/gi, 'over small rises')
+      .slice(0, 80);
+  }
+}
+
 export function impliedAvgPaceSecPerMi(goalTimeSec: number, distanceMi: number): number {
   if (distanceMi <= 0.1) return 600;
   return goalTimeSec / distanceMi;

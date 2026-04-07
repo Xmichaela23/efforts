@@ -16,6 +16,7 @@ import {
   validateLlmResponse,
   materializeSegmentRows,
   geometryToPromptSegments,
+  alignCoachingCuesWithGeometry,
   parsePaceToSecPerMi,
   fmtPaceClock,
   fmtFinishClock,
@@ -91,6 +92,9 @@ Instructions:
    - target_pace_fast_sec_per_mi: faster bound (lower number)
    - target_hr_low, target_hr_high
    - coaching_cue: max 80 chars, imperative, reference terrain
+
+3. Ground every coaching_cue in the segment list: if ANY segment in that display group has terrain_type "climb" or clearly positive elevation_change_ft, you must not describe the whole group as only "flat" or "flat terrain"—mention the rise (even briefly, e.g. "short climb to the line").
+4. Net downhill groups can still have a small finishing bump; check the last segments in the group before calling the finish "flat".
 
 Rules: target_pace_slow_sec_per_mi >= target_pace_fast_sec_per_mi. HR realistic vs max. Weighted pace vs goal is guidance only.
 
@@ -325,6 +329,7 @@ Deno.serve(async (req) => {
   }
 
   const groups = (parsed as { display_groups: LlmDisplayGroup[] }).display_groups;
+  alignCoachingCuesWithGeometry(groups, geometry);
   let rows: Record<string, unknown>[];
   try {
     rows = materializeSegmentRows(geometry, groups);
