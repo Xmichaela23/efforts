@@ -25,6 +25,9 @@ export type CourseDetailPayload = {
     elevation_gain_ft: number;
     elevation_loss_ft: number;
     goal_time: string | null;
+    /** When set, header shows predicted vs plan-target copy from coach race_readiness. */
+    goal_time_source?: 'predicted' | 'plan' | null;
+    plan_target_time?: string | null;
     strategy_updated_at: string | null;
     strategy_stale: boolean;
     has_strategy: boolean;
@@ -48,9 +51,16 @@ interface CourseStrategyModalProps {
   open: boolean;
   courseId: string | null;
   onClose: () => void;
+  /** Coach `race_readiness.predicted_finish_time_seconds` when this course is for that race goal. */
+  predictedFinishTimeSeconds?: number | null;
 }
 
-export default function CourseStrategyModal({ open, courseId, onClose }: CourseStrategyModalProps) {
+export default function CourseStrategyModal({
+  open,
+  courseId,
+  onClose,
+  predictedFinishTimeSeconds = null,
+}: CourseStrategyModalProps) {
   const [payload, setPayload] = useState<CourseDetailPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -60,7 +70,11 @@ export default function CourseStrategyModal({ open, courseId, onClose }: CourseS
     if (!courseId) return;
     setLoading(true);
     setErr(null);
-    const { data, error } = await invokeFunction<CourseDetailPayload>('course-detail', { course_id: courseId });
+    const body: Record<string, unknown> = { course_id: courseId };
+    if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
+      body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
+    }
+    const { data, error } = await invokeFunction<CourseDetailPayload>('course-detail', body);
     setLoading(false);
     if (error) {
       setErr(error.message);
@@ -68,7 +82,7 @@ export default function CourseStrategyModal({ open, courseId, onClose }: CourseS
       return;
     }
     setPayload(data);
-  }, [courseId]);
+  }, [courseId, predictedFinishTimeSeconds]);
 
   useEffect(() => {
     if (open && courseId) void load();
@@ -82,7 +96,11 @@ export default function CourseStrategyModal({ open, courseId, onClose }: CourseS
     if (!courseId) return;
     setUpdating(true);
     setErr(null);
-    const { error } = await invokeFunction('course-strategy', { course_id: courseId });
+    const body: Record<string, unknown> = { course_id: courseId };
+    if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
+      body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
+    }
+    const { error } = await invokeFunction('course-strategy', body);
     setUpdating(false);
     if (error) {
       setErr(error.message);
@@ -108,7 +126,16 @@ export default function CourseStrategyModal({ open, courseId, onClose }: CourseS
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-white/90">{payload?.course.name ?? 'Course strategy'}</p>
           {payload?.course.goal_time && (
-            <p className="text-[11px] text-white/45">Target {payload.course.goal_time}</p>
+            <div className="space-y-0.5">
+              <p className="text-[11px] text-white/45">
+                {payload.course.goal_time_source === 'predicted'
+                  ? <>Predicted finish <span className="text-white/70">{payload.course.goal_time}</span> (from current fitness)</>
+                  : <>Race target <span className="text-white/70">{payload.course.goal_time}</span></>}
+              </p>
+              {payload.course.plan_target_time && (
+                <p className="text-[10px] text-white/35">Plan build target {payload.course.plan_target_time}</p>
+              )}
+            </div>
           )}
         </div>
         <button

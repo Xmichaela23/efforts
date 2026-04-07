@@ -24,7 +24,7 @@ import {
   type SnapshotForHash,
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
-import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { parseClientPredictedFinishSeconds, resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -113,9 +113,11 @@ Deno.serve(async (req) => {
   }
 
   let courseId = '';
+  let predictedFinishSec: number | null = null;
   try {
-    const body = await req.json();
+    const body = await req.json() as Record<string, unknown>;
     courseId = String(body.course_id || '');
+    predictedFinishSec = parseClientPredictedFinishSeconds(body.predicted_finish_time_seconds);
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -148,7 +150,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Goal not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  const goalTimeSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
+  const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
+  const goalTimeSec = predictedFinishSec ?? planGoalSec;
   if (goalTimeSec == null) {
     return new Response(
       JSON.stringify({

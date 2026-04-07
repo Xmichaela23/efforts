@@ -1,4 +1,14 @@
 /**
+ * Optional client-supplied finish time from coach `race_readiness.predicted_finish_time_seconds`.
+ * Bounded to avoid abuse; server still requires course ownership.
+ */
+export function parseClientPredictedFinishSeconds(raw: unknown): number | null {
+  const n = typeof raw === 'number' ? raw : raw != null ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n < 600 || n > 86400) return null;
+  return Math.round(n);
+}
+
+/**
  * Race target seconds for pacing: prefer goals.target_time, else linked plan config
  * (matches coach/index.ts: target_time, marathon_target_seconds).
  */

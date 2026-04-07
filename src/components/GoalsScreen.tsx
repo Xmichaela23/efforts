@@ -7,6 +7,7 @@ import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } fro
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
+import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 
 // Local alias so existing call-sites inside this file don't need renaming
 const readStoredUserId = getStoredUserId;
@@ -68,6 +69,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 }) => {
   const navigate = useNavigate();
   const { useImperial } = useAppContext();
+  const coachWeek = useCoachWeekContext();
   const { goals, loading, addGoal, deleteGoal, updateGoal, refreshGoals } = useGoals();
 
   const [showAddGoal, setShowAddGoal] = useState(false);
@@ -140,10 +142,20 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const goal = goals.find((g) => g.id === gid);
     if (!goal) return;
     const linked = plansByGoalId.get(gid);
-    const paceTargetSec = resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
+    const rr = coachWeek.data?.race_readiness;
+    const coachPred =
+      rr &&
+      String(goal.name) === String(rr.goal.name) &&
+      (goal.sport || '').toLowerCase() === 'run' &&
+      Number.isFinite(rr.predicted_finish_time_seconds) &&
+      rr.predicted_finish_time_seconds > 0
+        ? rr.predicted_finish_time_seconds
+        : null;
+    const paceTargetSec =
+      coachPred ?? resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
     if (paceTargetSec == null) {
       window.alert(
-        'No race target time found. Use a plan built with a marathon/race target, or set a target finish time on this goal.',
+        'No race target time found. Use a plan built with a marathon/race target, set a target on this goal, or open State when coach shows race readiness for this goal.',
       );
       return;
     }
@@ -158,7 +170,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         window.alert(error?.message || 'Upload failed');
         return;
       }
-      const { error: stErr } = await invokeFunction('course-strategy', { course_id: data.course_id });
+      const stBody: Record<string, unknown> = { course_id: data.course_id };
+      if (coachPred != null) stBody.predicted_finish_time_seconds = coachPred;
+      const { error: stErr } = await invokeFunction('course-strategy', stBody);
       if (stErr) {
         window.alert(stErr.message || 'Strategy generation failed');
         return;
@@ -308,6 +322,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     for (const p of currentPlans) if (p.goal_id) map.set(p.goal_id, p);
     return map;
   }, [currentPlans]);
+
+  const predictedFinishForStrategyModal = useMemo(() => {
+    if (!strategyModalCourseId) return null;
+    const gid = Object.keys(courseByGoal).find((id) => courseByGoal[id]?.id === strategyModalCourseId);
+    if (!gid) return null;
+    const goal = goals.find((g) => g.id === gid);
+    const rr = coachWeek.data?.race_readiness;
+    if (!goal || !rr) return null;
+    if (String(goal.name) !== String(rr.goal.name)) return null;
+    if ((goal.sport || '').toLowerCase() !== 'run') return null;
+    const sec = rr.predicted_finish_time_seconds;
+    return Number.isFinite(sec) && sec > 0 ? sec : null;
+  }, [strategyModalCourseId, courseByGoal, goals, coachWeek.data?.race_readiness]);
 
   // Only active plans not linked to any goal
   const activeUnlinkedPlans = useMemo(
@@ -632,7 +659,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const TypeIcon = getGoalTypeIcon(goal.goal_type);
     const SportIcon = getSportIcon(goal.sport);
     const linkedPlan = plansByGoalId.get(goal.id);
-    const paceTargetSec = resolveEventTargetTimeSeconds(goal, linkedPlan?.config as Record<string, unknown> | undefined);
+    const rrCard = coachWeek.data?.race_readiness;
+    const coachPredCard =
+      rrCard &&
+      String(goal.name) === String(rrCard.goal.name) &&
+      (goal.sport || '').toLowerCase() === 'run' &&
+      Number.isFinite(rrCard.predicted_finish_time_seconds) &&
+      rrCard.predicted_finish_time_seconds > 0
+        ? rrCard.predicted_finish_time_seconds
+        : null;
+    const paceTargetSec =
+      coachPredCard ?? resolveEventTargetTimeSeconds(goal, linkedPlan?.config as Record<string, unknown> | undefined);
     const isExpanded = expandedGoalId === goal.id;
 
     return (
@@ -1044,6 +1081,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       <CourseStrategyModal
         open={strategyModalOpen}
         courseId={strategyModalCourseId}
+        predictedFinishTimeSeconds={predictedFinishForStrategyModal}
         onClose={() => {
           setStrategyModalOpen(false);
           setStrategyModalCourseId(null);

@@ -14,7 +14,7 @@ import {
   fmtFinishClock,
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
-import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { parseClientPredictedFinishSeconds, resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -105,10 +105,12 @@ Deno.serve(async (req) => {
 
   let courseId: string | null = null;
   let goalId: string | null = null;
+  let predictedFinishSec: number | null = null;
   try {
-    const body = await req.json();
+    const body = await req.json() as Record<string, unknown>;
     courseId = body.course_id ? String(body.course_id) : null;
     goalId = body.goal_id ? String(body.goal_id) : null;
+    predictedFinishSec = parseClientPredictedFinishSeconds(body.predicted_finish_time_seconds);
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -145,11 +147,21 @@ Deno.serve(async (req) => {
   const rows = Array.isArray(segs) ? segs : [];
   const hasStrategy = rows.some((r) => r.effort_zone != null && r.target_pace_slow_sec_per_mi != null);
 
-  let goalTimeStr: string | null = null;
+  let planGoalSec: number | null = null;
   if (course.goal_id) {
-    const ts = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
-    if (ts != null) goalTimeStr = fmtFinishClock(ts);
+    planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
   }
+  const primarySec = predictedFinishSec ?? planGoalSec;
+  const goalTimeStr = primarySec != null ? fmtFinishClock(primarySec) : null;
+  const goalTimeSource: 'predicted' | 'plan' | null = primarySec == null
+    ? null
+    : predictedFinishSec != null
+    ? 'predicted'
+    : 'plan';
+  const planTargetTimeStr =
+    predictedFinishSec != null && planGoalSec != null && planGoalSec !== predictedFinishSec
+      ? fmtFinishClock(planGoalSec)
+      : null;
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);
   const smoothed = smoothElevation(rawProfile, 2);
@@ -257,6 +269,8 @@ Deno.serve(async (req) => {
       elevation_gain_ft: Math.round(Number(course.elevation_gain_m) * FT_PER_M),
       elevation_loss_ft: Math.round(Number(course.elevation_loss_m) * FT_PER_M),
       goal_time: goalTimeStr,
+      goal_time_source: goalTimeSource,
+      plan_target_time: planTargetTimeStr,
       strategy_updated_at: course.strategy_updated_at,
       strategy_stale: strategyStale,
       has_strategy: hasStrategy,
