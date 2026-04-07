@@ -448,6 +448,8 @@ async function runSessionDetailPipelineAndPersist(
           workoutAnalysis: wa,
           planContext: planCtxForSession,
           row: row as Record<string, unknown>,
+          supabase,
+          userId,
         });
         if (rrLlm) sessionDetailV1.race_readiness = rrLlm;
       } catch (rrErr: unknown) {

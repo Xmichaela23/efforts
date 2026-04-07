@@ -1,5 +1,5 @@
 /**
- * LLM race readiness for session_detail_v1 — long runs near plan race day.
+ * LLM race readiness for session_detail_v1 — only for 28-day block peak runs (≥12 mi, longest in window).
  * Uses shared callLLM (model from env / llm.ts). On failure returns null.
  */
 import { callLLM } from '../llm.ts';
@@ -7,6 +7,83 @@ import type { PlanContext } from '../plan-context.ts';
 import type { SessionDetailV1, SessionRaceReadinessLlmV1 } from './types.ts';
 
 const MI = 1609.34;
+
+function addDaysIsoYmd(iso: string, deltaDays: number): string {
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map((x) => parseInt(x, 10));
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  dt.setDate(dt.getDate() + deltaDays);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function parseWorkoutAnalysisField(raw: unknown): Record<string, unknown> {
+  if (raw == null) return {};
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  return {};
+}
+
+/** Best-effort miles for prior-run comparison (session_detail_v1 preferred, then row distance km). */
+function extractDistanceMilesFromWorkoutRow(w: Record<string, unknown>): number | null {
+  const wa = parseWorkoutAnalysisField(w.workout_analysis);
+  const sdv = wa.session_detail_v1 as Record<string, unknown> | undefined;
+  const ct = sdv?.completed_totals as Record<string, unknown> | undefined;
+  const dm = ct?.distance_m;
+  if (typeof dm === 'number' && dm > 0) return Math.round((dm / MI) * 100) / 100;
+  const distKm = w.distance;
+  if (typeof distKm === 'number' && distKm > 0) return Math.round(((distKm * 1000) / MI) * 100) / 100;
+  return null;
+}
+
+/**
+ * Max distance (mi) among completed runs in [sessionDate-28d, sessionDate], excluding this workout.
+ * Limited to 20 rows (recent first). On error, returns 0 (fail open for gate).
+ */
+async function fetchLongestPriorRunDistanceMiles(
+  supabase: any,
+  userId: string,
+  sessionDateYmd: string,
+  currentWorkoutId: string,
+): Promise<number> {
+  try {
+    const end = String(sessionDateYmd).slice(0, 10);
+    const start = addDaysIsoYmd(end, -28);
+    const curId = String(currentWorkoutId);
+    const { data, error } = await supabase
+      .from('workouts')
+      .select('id, date, type, workout_analysis, distance')
+      .eq('user_id', userId)
+      .eq('workout_status', 'completed')
+      .gte('date', start)
+      .lte('date', end)
+      .order('date', { ascending: false })
+      .limit(20);
+    if (error) {
+      console.warn('[race_readiness_llm] prior_long_runs query error (fail open):', error.message);
+      return 0;
+    }
+    let maxMiles = 0;
+    for (const w of Array.isArray(data) ? data : []) {
+      const row = w as Record<string, unknown>;
+      if (String(row.id || '') === curId) continue;
+      if (String(row.type || '').toLowerCase() !== 'run') continue;
+      const mi = extractDistanceMilesFromWorkoutRow(row);
+      if (mi != null && mi > maxMiles) maxMiles = mi;
+    }
+    return maxMiles;
+  } catch (e) {
+    console.warn('[race_readiness_llm] prior_long_runs exception (fail open):', e);
+    return 0;
+  }
+}
 
 function fmtPaceSecPerMi(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -124,7 +201,7 @@ function isLongRunLike(
   ) {
     return true;
   }
-  if (distMi != null && distMi >= 12.5) return true;
+  if (distMi != null && distMi >= 12) return true;
   return false;
 }
 
@@ -158,8 +235,8 @@ export function raceReadinessGateSkipReason(params: {
   // Many plans taper earlier than three weeks out — keep window wide enough to match product taper UX.
   if (params.daysUntilRace > 28) return `outside_window_days=${params.daysUntilRace}`;
   const longEnough =
-    (params.distanceMiles != null && params.distanceMiles >= 10) ||
-    (params.durationMinutes != null && params.durationMinutes >= 90);
+    (params.distanceMiles != null && params.distanceMiles >= 12) ||
+    (params.distanceMiles == null && params.durationMinutes != null && params.durationMinutes >= 90);
   if (!longEnough) return 'distance_duration_short';
   if (!params.isLongRunLike) return 'not_long_run_like';
   return null;
@@ -183,8 +260,10 @@ export function buildSessionRaceReadinessFacts(params: {
   workoutAnalysis: Record<string, unknown> | null;
   planContext: PlanContext;
   row: Record<string, unknown>;
+  /** Set only after 28d block-peak gate passes */
+  blockPeakMeta?: { longest_prior_distance_miles: number } | null;
 }): Record<string, unknown> {
-  const { sessionDetail: sd, workoutAnalysis: wa, planContext: pc, row } = params;
+  const { sessionDetail: sd, workoutAnalysis: wa, planContext: pc, row, blockPeakMeta } = params;
   const fp = (wa as any)?.fact_packet_v1 || (wa as any)?.session_state_v1?.details?.fact_packet_v1;
   const facts = fp?.facts || {};
   const derived = fp?.derived || {};
@@ -366,8 +445,12 @@ export function buildSessionRaceReadinessFacts(params: {
     elevation_profile: elevationProfile,
     terrain_type: terrainType,
     rpe,
-    plan_has_taper: pc.has_taper_phase,
-    current_phase: pc.current_phase,
+    ...(blockPeakMeta
+      ? {
+          is_block_peak_run: true,
+          longest_prior_distance_miles: blockPeakMeta.longest_prior_distance_miles,
+        }
+      : {}),
     next_session_name: nextSessionName,
     next_session_prescription: nextSessionPrescription,
     next_session_description: nextSessionPrescription,
@@ -444,6 +527,7 @@ function parseRaceReadinessLlmResponse(text: string | null | undefined): Session
 /** When the LLM is unavailable or returns invalid JSON, still surface a structured block from FACTS-only copy. */
 export function raceReadinessDeterministicFallback(
   facts: Record<string, unknown>,
+  planCtx?: PlanContext | null,
 ): SessionRaceReadinessLlmV1 | null {
   const d = facts.days_to_race;
   const days = typeof d === 'number' && d > 0 ? d : null;
@@ -520,7 +604,7 @@ export function raceReadinessDeterministicFallback(
   if (typeof split === 'number' && Math.abs(split) >= 5) {
     tactical_instruction += ` You faded +${Math.round(split)}s/mi second half today — don't chase early pace that sets up the same pattern.`;
   }
-  const planTaper = facts.plan_has_taper === true;
+  const planTaper = planCtx?.has_taper_phase === true;
   const nextN = typeof facts.next_session_name === 'string' ? facts.next_session_name : '';
   const nextP = typeof facts.next_session_prescription === 'string' ? facts.next_session_prescription : '';
   let taper_guidance = planTaper
@@ -596,6 +680,8 @@ COURSE PROFILE RULE (applies especially to "projection"): Only reference race co
 
 Taper: If their plan already includes taper structure, do not tell them to "cut volume" generically. Say what to protect (sleep, fuel, short sharp work if any) and what optional pieces to skip if tired. Name the actual next session if the data includes it.
 
+BLOCK PEAK (when DATA includes is_block_peak_run true): This run is the longest effort in the past 28 days — it is the definitive fitness checkpoint for this training block. Write the tactical instruction as the authoritative race-day number. It will be surfaced as the primary signal on the athlete's race overview screen and should reflect peak readiness, not a routine session read.
+
 TACTICAL_INSTRUCTION (mandatory): One race-day line tied to this session's DATA only. Use whatever anchors exist in DATA: fastest_mile + fastest_mile_pace, avg_pace, hr_drift_bpm vs typical_hr_drift_bpm, avg_hr, pacing_split_seconds_per_mile, temps, distance_miles — combine them so the athlete gets a concrete guardrail (pace ceiling, HR ceiling, or early-mile discipline vs a split they actually ran). Vary the wording run to run; do not reuse canned phrases from week to week if the numbers change.
 
 Shape (illustrative — substitute values ONLY from DATA, never from this prompt): "Your fastest mile was mile [N] at [pace from DATA] — don't run faster than [X] in the early miles at ${racePart}." OR "You averaged [avg_pace] / [avg_hr] bpm — use that as an early cap at ${racePart}." If fastest_mile is missing, use avg_pace or HR; if those are missing, use drift vs typical + duration.
@@ -644,6 +730,8 @@ export async function trySessionRaceReadinessLlm(params: {
   workoutAnalysis: Record<string, unknown> | null;
   planContext: PlanContext;
   row: Record<string, unknown>;
+  supabase?: any;
+  userId?: string | null;
 }): Promise<SessionRaceReadinessLlmV1 | null> {
   const sd = params.sessionDetail;
   const wa = params.workoutAnalysis;
@@ -680,10 +768,41 @@ export async function trySessionRaceReadinessLlm(params: {
     return null;
   }
 
-  const packet = buildSessionRaceReadinessFacts(params);
+  if (distMi == null || distMi < 12) {
+    console.warn('[race_readiness_llm] gate_skip: below_12mi_block_peak_threshold', { distMi });
+    return null;
+  }
+
+  const sessionDate = String(sd.date || '').slice(0, 10);
+  const wid = String((params.row as { id?: string }).id || '');
+  let longestPrior = 0;
+  if (params.supabase && params.userId && wid && sessionDate) {
+    longestPrior = await fetchLongestPriorRunDistanceMiles(
+      params.supabase,
+      String(params.userId),
+      sessionDate,
+      wid,
+    );
+  } else {
+    console.warn('[race_readiness_llm] prior_long_runs skipped (no supabase/userId/row id) — fail open longestPrior=0');
+  }
+
+  const isBlockPeak = distMi >= 12 && distMi >= longestPrior;
+  if (!isBlockPeak) {
+    console.warn('[race_readiness_llm] gate_skip: not_block_peak', {
+      current: distMi,
+      longest_prior: longestPrior,
+    });
+    return null;
+  }
+
+  const packet = buildSessionRaceReadinessFacts({
+    ...params,
+    blockPeakMeta: { longest_prior_distance_miles: longestPrior },
+  });
   const llm = await generateSessionRaceReadinessLlm(packet);
   if (llm) return llm;
-  const fb = raceReadinessDeterministicFallback(packet);
+  const fb = raceReadinessDeterministicFallback(packet, pc);
   if (fb) {
     console.warn('[race_readiness_llm] using deterministic fallback (LLM empty or parse failed)');
   }
