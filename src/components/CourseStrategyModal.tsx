@@ -18,6 +18,54 @@ const ZONE_STROKE: Record<string, string> = {
   push: 'rgb(239, 68, 68)',
 };
 
+/** Elevation at arbitrary mile (chart series is sorted by mi). */
+function interpolateFtAtMi(series: { mi: number; ft: number }[], mi: number): number {
+  if (series.length === 0) return 0;
+  if (mi <= series[0].mi) return series[0].ft;
+  const last = series[series.length - 1];
+  if (mi >= last.mi) return last.ft;
+  let lo = 0;
+  let hi = series.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (series[mid].mi <= mi) lo = mid;
+    else hi = mid;
+  }
+  const a = series[lo];
+  const b = series[hi];
+  const t = (mi - a.mi) / Math.max(1e-9, b.mi - a.mi);
+  return a.ft + t * (b.ft - a.ft);
+}
+
+/**
+ * Polyline for one display segment: always includes interpolated endpoints at start_mi / end_mi
+ * so short segments (e.g. 1 mi caution) still draw even when the downsampled profile has no inner points.
+ */
+function segmentChartPoints(
+  series: { mi: number; ft: number }[],
+  startMi: number,
+  endMi: number,
+): { mi: number; ft: number }[] {
+  if (!(endMi > startMi)) return [];
+  const inner = series.filter((p) => p.mi > startMi && p.mi < endMi);
+  const pts: { mi: number; ft: number }[] = [
+    { mi: startMi, ft: interpolateFtAtMi(series, startMi) },
+    ...inner,
+    { mi: endMi, ft: interpolateFtAtMi(series, endMi) },
+  ];
+  const out: { mi: number; ft: number }[] = [];
+  for (const p of pts) {
+    if (out.length === 0 || Math.abs(out[out.length - 1].mi - p.mi) > 1e-6) out.push(p);
+    else out[out.length - 1] = p;
+  }
+  return out;
+}
+
+function zoneStroke(effortZone: string): string {
+  const k = String(effortZone || '').toLowerCase();
+  return ZONE_STROKE[k] ?? 'rgba(255,255,255,0.35)';
+}
+
 export type CourseDetailPayload = {
   course: {
     id: string;
@@ -223,31 +271,33 @@ export default function CourseStrategyModal({
                     label={{ value: 'ft', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.35)', fontSize: 10 }}
                   />
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey="ft"
-                    stroke="rgba(255,255,255,0.12)"
+                    stroke="rgba(255,255,255,0.08)"
                     strokeWidth={1}
                     dot={false}
                     isAnimationActive={false}
                   />
-                  {(payload?.display_groups ?? []).map((g) => {
-                    const pts = fullSeries.filter((p) => p.mi >= g.start_mi && p.mi <= g.end_mi);
-                    if (pts.length === 0) return null;
-                    const stroke = ZONE_STROKE[g.effort_zone] ?? 'rgba(255,255,255,0.35)';
-                    return (
-                      <Line
-                        key={g.id}
-                        data={pts}
-                        type="monotone"
-                        dataKey="ft"
-                        stroke={stroke}
-                        strokeWidth={2}
-                        dot={false}
-                        isAnimationActive={false}
-                        name={g.label}
-                      />
-                    );
-                  })}
+                  {[...(payload?.display_groups ?? [])]
+                    .sort((a, b) => a.start_mi - b.start_mi)
+                    .map((g) => {
+                      const pts = segmentChartPoints(fullSeries, g.start_mi, g.end_mi);
+                      if (pts.length < 2) return null;
+                      const stroke = zoneStroke(g.effort_zone);
+                      return (
+                        <Line
+                          key={g.id}
+                          data={pts}
+                          type="linear"
+                          dataKey="ft"
+                          stroke={stroke}
+                          strokeWidth={2.5}
+                          dot={false}
+                          isAnimationActive={false}
+                          name={g.label}
+                        />
+                      );
+                    })}
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -273,7 +323,7 @@ export default function CourseStrategyModal({
                 <p className="text-[13px] font-medium text-white/88">{g.label}</p>
                 <p
                   className="mt-1 font-mono text-[11px]"
-                  style={{ color: ZONE_STROKE[g.effort_zone] ?? 'rgba(255,255,255,0.55)' }}
+                  style={{ color: zoneStroke(g.effort_zone) }}
                 >
                   {g.pace_range} · {g.hr_range}
                 </p>
