@@ -2,12 +2,27 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, RefreshCw } from 'lucide-react';
 import { invokeFunction } from '@/lib/supabase';
+import { EffortsWordmark } from '@/components/EffortsButton';
 
 const ZONE_STROKE: Record<string, string> = {
   conservative: 'rgb(34, 197, 94)',
   cruise: 'rgb(59, 130, 246)',
   caution: 'rgb(234, 179, 8)',
   push: 'rgb(239, 68, 68)',
+};
+
+const ZONE_BG: Record<string, string> = {
+  conservative: 'rgba(34, 197, 94, 0.09)',
+  cruise: 'rgba(59, 130, 246, 0.09)',
+  caution: 'rgba(234, 179, 8, 0.1)',
+  push: 'rgba(239, 68, 68, 0.09)',
+};
+
+const ZONE_BORDER_SOFT: Record<string, string> = {
+  conservative: 'rgba(34, 197, 94, 0.28)',
+  cruise: 'rgba(59, 130, 246, 0.28)',
+  caution: 'rgba(234, 179, 8, 0.32)',
+  push: 'rgba(239, 68, 68, 0.28)',
 };
 
 /** Elevation at arbitrary mile (chart series is sorted by mi). */
@@ -56,6 +71,16 @@ function segmentChartPoints(
 function zoneStroke(effortZone: string): string {
   const k = String(effortZone || '').toLowerCase();
   return ZONE_STROKE[k] ?? 'rgba(255,255,255,0.35)';
+}
+
+function zoneBg(effortZone: string): string {
+  const k = String(effortZone || '').toLowerCase();
+  return ZONE_BG[k] ?? 'rgba(255,255,255,0.04)';
+}
+
+function zoneBorderSoft(effortZone: string): string {
+  const k = String(effortZone || '').toLowerCase();
+  return ZONE_BORDER_SOFT[k] ?? 'rgba(255,255,255,0.1)';
 }
 
 export type CourseDetailPayload = {
@@ -293,57 +318,87 @@ export default function CourseStrategyModal({
   // .mobile-main-content would trap z-index below the global header wordmark.
   const modal = (
     <div
-      className="fixed inset-0 z-[10000] flex flex-col bg-[#0a0a0b] overflow-auto"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed inset-0 z-[10000] flex flex-col bg-[#0a0a0b] overflow-hidden"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
     >
-      <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-white/10 bg-[#0a0a0b]/95 px-4 py-3 backdrop-blur-md">
-        <div className="min-w-0 flex-1 pr-1">
-          <p className="truncate text-sm font-medium text-white/90">{payload?.course.name ?? 'Course strategy'}</p>
-          {payload?.course.goal_time && (
-            <div className="space-y-0.5">
-              <p className="text-[11px] text-white/45 truncate" title={`${payload.course.goal_time_source === 'predicted' ? 'Predicted finish' : 'Race target'} ${payload.course.goal_time}`}>
-                {payload.course.goal_time_source === 'predicted'
-                  ? <>Predicted <span className="text-white/70">{payload.course.goal_time}</span> · current fitness</>
-                  : <>Target <span className="text-white/70">{payload.course.goal_time}</span></>}
-              </p>
-              {payload.course.plan_target_time && (
-                <p className="text-[10px] text-white/35 truncate">Plan {payload.course.plan_target_time}</p>
-              )}
-            </div>
-          )}
+      <header
+        className="shrink-0 border-b border-white/10 bg-[#0a0a0b]/95 backdrop-blur-md"
+        style={{
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        }}
+      >
+        <div className="flex justify-center pt-1 pb-0.5">
+          <EffortsWordmark size={30} />
         </div>
-        <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
-          <button
-            type="button"
-            onClick={() => void load({ silent: true })}
-            disabled={busy || !courseId}
-            className="rounded-full p-2 text-white/45 hover:bg-white/10 hover:text-white/75 disabled:opacity-35"
-            aria-label="Reload chart and pacing from server"
-          >
-            <RefreshCw className={`h-5 w-5 ${refetching ? 'animate-spin' : ''}`} />
-          </button>
-          {payload?.course.has_strategy && (
+        <div className="flex items-start justify-between gap-2 pb-3 pt-1">
+          <div className="min-w-0 flex-1 pr-2">
+            <p className="truncate text-sm font-medium text-white/90">{payload?.course.name ?? 'Course strategy'}</p>
+            {payload?.course.goal_time && (
+              <div className="space-y-0.5">
+                <p
+                  className="text-[11px] text-white/55 leading-snug"
+                  title={`${payload.course.goal_time_source === 'predicted' ? 'Predicted finish' : 'Race target'} ${payload.course.goal_time}`}
+                >
+                  {payload.course.goal_time_source === 'predicted' ? (
+                    <>
+                      Predicted <span className="text-white/80">{payload.course.goal_time}</span>
+                      <span className="text-white/40"> · current fitness</span>
+                    </>
+                  ) : (
+                    <>
+                      Target <span className="text-white/80">{payload.course.goal_time}</span>
+                    </>
+                  )}
+                </p>
+                {payload.course.plan_target_time && (
+                  <p className="text-[10px] text-white/40">Plan {payload.course.plan_target_time}</p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
-              onClick={() => void runStrategy()}
-              disabled={busy}
-              className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-sky-400/90 hover:bg-white/10 hover:text-sky-300/95 disabled:opacity-35"
+              onClick={() => void load({ silent: true })}
+              disabled={busy || !courseId}
+              className="rounded-full p-2 text-white/55 hover:bg-white/10 hover:text-white/85 disabled:opacity-35"
+              aria-label="Reload chart and pacing from server"
             >
-              {updating ? 'Rebuilding…' : 'Rebuild'}
+              <RefreshCw className={`h-5 w-5 ${refetching ? 'animate-spin' : ''}`} />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white/80"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+            {payload?.course.has_strategy && (
+              <button
+                type="button"
+                onClick={() => void runStrategy()}
+                disabled={busy}
+                className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-sky-400 hover:bg-white/10 hover:text-sky-300 disabled:opacity-35"
+              >
+                {updating ? 'Rebuilding…' : 'Rebuild'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-2 text-white/55 hover:bg-white/10 hover:text-white/85"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 px-4 py-4 space-y-4 max-w-3xl mx-auto w-full">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4 max-w-3xl mx-auto w-full"
+        style={{
+          paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        }}
+      >
         {loading && <p className="text-sm text-white/50">Loading…</p>}
         {err && <p className="text-sm text-red-400/90">{err}</p>}
 
@@ -389,22 +444,32 @@ export default function CourseStrategyModal({
 
         {(payload?.display_groups ?? []).length > 0 && (
           <div className="space-y-3 pb-8">
-            {payload!.display_groups.map((g) => (
-              <div
-                key={g.id}
-                className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5"
-                style={{ marginLeft: g.tier === 1 ? 12 : 0 }}
-              >
-                <p className="text-[13px] font-medium text-white/88">{g.label}</p>
-                <p
-                  className="mt-1 font-mono text-[11px]"
-                  style={{ color: zoneStroke(g.effort_zone) }}
+            {payload!.display_groups.map((g) => {
+              const z = zoneStroke(g.effort_zone);
+              return (
+                <div
+                  key={g.id}
+                  className="rounded-xl border pl-3 pr-3 py-2.5 shadow-sm"
+                  style={{
+                    marginLeft: g.tier === 1 ? 12 : 0,
+                    borderLeftWidth: 4,
+                    borderLeftColor: z,
+                    backgroundColor: zoneBg(g.effort_zone),
+                    borderColor: zoneBorderSoft(g.effort_zone),
+                    borderRightWidth: 1,
+                    borderTopWidth: 1,
+                    borderBottomWidth: 1,
+                    borderStyle: 'solid',
+                  }}
                 >
-                  {g.pace_range} · {g.hr_range}
-                </p>
-                {!!g.cue && <p className="mt-1 text-[12px] text-white/50 leading-snug">{g.cue}</p>}
-              </div>
-            ))}
+                  <p className="text-[13px] font-medium text-white/90">{g.label}</p>
+                  <p className="mt-1 font-mono text-[11px] font-medium" style={{ color: z }}>
+                    {g.pace_range} · {g.hr_range}
+                  </p>
+                  {!!g.cue && <p className="mt-1 text-[12px] text-white/55 leading-snug">{g.cue}</p>}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
