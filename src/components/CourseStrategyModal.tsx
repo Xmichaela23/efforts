@@ -63,22 +63,25 @@ export default function CourseStrategyModal({
 }: CourseStrategyModalProps) {
   const [payload, setPayload] = useState<CourseDetailPayload | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refetching, setRefetching] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!courseId) return;
-    setLoading(true);
+    if (opts?.silent) setRefetching(true);
+    else setLoading(true);
     setErr(null);
     const body: Record<string, unknown> = { course_id: courseId };
     if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
       body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
     }
     const { data, error } = await invokeFunction<CourseDetailPayload>('course-detail', body);
-    setLoading(false);
+    if (opts?.silent) setRefetching(false);
+    else setLoading(false);
     if (error) {
       setErr(error.message);
-      setPayload(null);
+      if (!opts?.silent) setPayload(null);
       return;
     }
     setPayload(data);
@@ -106,10 +109,10 @@ export default function CourseStrategyModal({
       setErr(error.message);
       return;
     }
-    await load();
+    await load({ silent: true });
   };
 
-  const handleUpdateStrategy = () => void runStrategy();
+  const busy = loading || refetching || updating;
 
   if (!open || !courseId) return null;
 
@@ -138,14 +141,35 @@ export default function CourseStrategyModal({
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white/80"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => void load({ silent: true })}
+            disabled={busy || !courseId}
+            className="rounded-full p-2 text-white/45 hover:bg-white/10 hover:text-white/75 disabled:opacity-35"
+            aria-label="Reload chart and pacing from server"
+          >
+            <RefreshCw className={`h-5 w-5 ${refetching ? 'animate-spin' : ''}`} />
+          </button>
+          {payload?.course.has_strategy && (
+            <button
+              type="button"
+              onClick={() => void runStrategy()}
+              disabled={busy}
+              className="rounded-full px-2.5 py-1.5 text-[11px] font-medium text-sky-400/90 hover:bg-white/10 hover:text-sky-300/95 disabled:opacity-35"
+            >
+              {updating ? 'Rebuilding…' : 'Rebuild'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white/80"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-4 max-w-3xl mx-auto w-full">
@@ -153,17 +177,10 @@ export default function CourseStrategyModal({
         {err && <p className="text-sm text-red-400/90">{err}</p>}
 
         {payload?.course.strategy_stale && payload.course.has_strategy && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100/90">
-            <span>Strategy may be outdated vs your latest training data.</span>
-            <button
-              type="button"
-              disabled={updating}
-              onClick={() => void handleUpdateStrategy()}
-              className="inline-flex items-center gap-1 rounded-lg bg-white/15 px-2 py-1 text-[11px] font-medium hover:bg-white/20 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3 w-3 ${updating ? 'animate-spin' : ''}`} />
-              Update
-            </button>
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100/90">
+            <span>Strategy may be outdated vs your latest training data. Use </span>
+            <span className="font-medium text-white/85">Rebuild</span>
+            <span> above to regenerate pacing.</span>
           </div>
         )}
 
