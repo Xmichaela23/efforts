@@ -1,5 +1,5 @@
 /**
- * Client-side: same precedence as course-strategy / coach (goal row, then plan config).
+ * Client-side: goal row, then plan config. course-strategy prefers coach predicted when the client passes it, with plan as fallback and cap.
  */
 export function resolveEventTargetTimeSeconds(
   goal: { target_time?: number | null },

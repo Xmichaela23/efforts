@@ -363,9 +363,16 @@ export default function StateTab({
         }
       }
     }
-    if (paceTargetSec == null) {
+    const coachPredSec =
+      raceReadiness &&
+      String(gRow?.name || '') === String(raceReadiness.goal.name) &&
+      Number.isFinite(raceReadiness.predicted_finish_time_seconds) &&
+      raceReadiness.predicted_finish_time_seconds > 0
+        ? raceReadiness.predicted_finish_time_seconds
+        : null;
+    if (paceTargetSec == null && coachPredSec == null) {
       window.alert(
-        'No race target time found. Link a plan with a build-time race target, or set a target on the goal (Goals tab). Strategy paces to that target—not the coach predicted finish.',
+        'No pacing target: set a race target on the goal or plan, or open State when coach shows a predicted finish for this goal.',
       );
       return;
     }
@@ -380,7 +387,9 @@ export default function StateTab({
         window.alert(upErr?.message || 'Upload failed');
         return;
       }
-      const { error: stErr } = await invokeFunction('course-strategy', { course_id: up.course_id });
+      const stBody: Record<string, unknown> = { course_id: up.course_id };
+      if (coachPredSec != null) stBody.predicted_finish_time_seconds = coachPredSec;
+      const { error: stErr } = await invokeFunction('course-strategy', stBody);
       if (stErr) {
         window.alert(stErr.message || 'Strategy failed');
         return;

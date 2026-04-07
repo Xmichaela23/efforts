@@ -1,6 +1,7 @@
 /**
  * course-strategy — rebuild geometry, call LLM, persist strategy on course_segments.
- * POST JSON: { course_id: string } — paces to plan/goal target only (not predicted finish).
+ * POST JSON: { course_id: string, predicted_finish_time_seconds?: number }
+ * Paces to coach predicted finish when provided; falls back to plan goal. If predicted is faster than plan, caps at plan.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callLLM } from '../_shared/llm.ts';
@@ -26,7 +27,10 @@ import {
   type SnapshotForHash,
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
-import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import {
+  parseClientPredictedFinishSeconds,
+  resolveGoalTargetTimeSeconds,
+} from '../_shared/resolve-goal-target-time.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -68,6 +72,7 @@ function buildPrompt(params: {
   longRun: string;
   goalTime: string;
   impliedAvg: string;
+  pacingContextLines: string;
 }): string {
   return `You are a running coach building a race-day pacing strategy.
 
@@ -80,7 +85,8 @@ Athlete profile:
 - HR zones: ${params.zones}
 - Max HR: ${params.maxHr}
 - Recent long run: ${params.longRun}
-- Goal finish time: ${params.goalTime} (${params.impliedAvg}/mi average)
+- Race pacing target (anchor all pace bands to this finish time and implied average pace): ${params.goalTime} (${params.impliedAvg}/mi average)
+${params.pacingContextLines}
 
 Instructions:
 1. Group adjacent segments of similar terrain into display groups. For a full marathon, target about 7 groups (roughly 6–9); scale down for shorter races. Do not merge distinct terrain episodes—if geometry separates a steep descent from different rolling flats, keep separate display groups rather than one mega-segment.
@@ -105,6 +111,20 @@ Return ONLY valid JSON, no markdown:
 {"display_groups":[{"display_group_id":1,"segment_orders":[1,2],"display_label":"Mi 0–2 · start","effort_zone":"conservative","target_pace_slow_sec_per_mi":680,"target_pace_fast_sec_per_mi":640,"target_hr_low":130,"target_hr_high":145,"coaching_cue":"Start easy on early climbs"}]}`;
 }
 
+/** Lower seconds = faster finish. Predicted primary; if predicted faster than plan, cap at plan. */
+function resolveStrategyPacingSeconds(
+  predictedSec: number | null,
+  planSec: number | null,
+): { goalTimeSec: number | null; cappedAtPlan: boolean } {
+  if (predictedSec != null && planSec != null) {
+    if (predictedSec < planSec) return { goalTimeSec: planSec, cappedAtPlan: true };
+    return { goalTimeSec: predictedSec, cappedAtPlan: false };
+  }
+  if (predictedSec != null) return { goalTimeSec: predictedSec, cappedAtPlan: false };
+  if (planSec != null) return { goalTimeSec: planSec, cappedAtPlan: false };
+  return { goalTimeSec: null, cappedAtPlan: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') {
@@ -120,9 +140,11 @@ Deno.serve(async (req) => {
   }
 
   let courseId = '';
+  let predictedSec: number | null = null;
   try {
     const body = await req.json() as Record<string, unknown>;
     courseId = String(body.course_id || '');
+    predictedSec = parseClientPredictedFinishSeconds(body.predicted_finish_time_seconds);
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -155,17 +177,33 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Goal not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  /** Strategy paces to plan/goal target only; predicted finish is for display in course-detail. */
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
-  const goalTimeSec = planGoalSec;
+  const { goalTimeSec, cappedAtPlan } = resolveStrategyPacingSeconds(predictedSec, planGoalSec);
   if (goalTimeSec == null) {
     return new Response(
       JSON.stringify({
         error:
-          'No race target time found. Set a target on the goal, or ensure your linked plan has target_time / marathon_target_seconds from plan build.',
+          'No pacing target: pass predicted_finish_time_seconds from the client, or set a goal/plan race target as fallback.',
       }),
       { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } },
     );
+  }
+
+  let pacingContextLines = '';
+  if (planGoalSec != null) {
+    pacingContextLines += `- Stated aspirational plan goal: ${fmtFinishClock(planGoalSec)}`;
+    if (predictedSec != null) {
+      if (cappedAtPlan) {
+        pacingContextLines +=
+          " (current fitness projects faster than this; pacing caps at the athlete's stated plan-do not pace faster).\n";
+      } else {
+        pacingContextLines +=
+          ` (faster than current ${fmtFinishClock(goalTimeSec)} pacing target—bands reflect sustainable fitness, not this aspirational time).\n`;
+      }
+    } else pacingContextLines += '.\n';
+  } else if (predictedSec != null) {
+    pacingContextLines +=
+      '- No separate plan goal on file; pacing follows current fitness projection only.\n';
   }
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);
@@ -252,6 +290,7 @@ Deno.serve(async (req) => {
       : 'no recent long run in data',
     goalTime: fmtFinishClock(goalTimeSec),
     impliedAvg: fmtPaceClock(implied),
+    pacingContextLines: pacingContextLines.trimEnd(),
   });
 
   const ph = await promptHash(prompt);

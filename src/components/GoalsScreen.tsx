@@ -142,10 +142,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const goal = goals.find((g) => g.id === gid);
     if (!goal) return;
     const linked = plansByGoalId.get(gid);
+    const rr = coachWeek.data?.race_readiness;
+    const coachPred =
+      rr &&
+      String(goal.name) === String(rr.goal.name) &&
+      (goal.sport || '').toLowerCase() === 'run' &&
+      Number.isFinite(rr.predicted_finish_time_seconds) &&
+      rr.predicted_finish_time_seconds > 0
+        ? rr.predicted_finish_time_seconds
+        : null;
     const paceTargetSec = resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
-    if (paceTargetSec == null) {
+    if (paceTargetSec == null && coachPred == null) {
       window.alert(
-        'No race target time found. Set a target on this goal or use a plan built with a marathon/race target. Strategy paces to that target—not the coach predicted finish.',
+        'No pacing target: set a race target on this goal or plan, or ensure coach shows a predicted finish for this goal.',
       );
       return;
     }
@@ -160,7 +169,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         window.alert(error?.message || 'Upload failed');
         return;
       }
-      const { error: stErr } = await invokeFunction('course-strategy', { course_id: data.course_id });
+      const stBody: Record<string, unknown> = { course_id: data.course_id };
+      if (coachPred != null) stBody.predicted_finish_time_seconds = coachPred;
+      const { error: stErr } = await invokeFunction('course-strategy', stBody);
       if (stErr) {
         window.alert(stErr.message || 'Strategy generation failed');
         return;

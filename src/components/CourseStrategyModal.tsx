@@ -396,7 +396,11 @@ export default function CourseStrategyModal({
     if (!courseId) return;
     setUpdating(true);
     setErr(null);
-    const { error } = await invokeFunction('course-strategy', { course_id: courseId });
+    const body: Record<string, unknown> = { course_id: courseId };
+    if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
+      body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
+    }
+    const { error } = await invokeFunction('course-strategy', body);
     setUpdating(false);
     if (error) {
       setErr(error.message);
