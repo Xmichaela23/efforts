@@ -1,6 +1,8 @@
 /** Stable codes stored on `planned_workouts.skip_reason` — coach / analytics consume as-is. */
 export const SKIP_SESSION_REASONS = [
   { code: 'tired', label: 'Tired / low energy' },
+  /** Training-load signal (e.g. day after long or hard) — distinct from same-day low energy. */
+  { code: 'fatigued', label: 'Fatigued / training load' },
   { code: 'sick', label: 'Sick or injury' },
   { code: 'travel', label: 'Travel' },
   { code: 'work', label: 'Work / schedule' },

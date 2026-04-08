@@ -715,6 +715,7 @@ export default function CoachWeekTab() {
                           style={{ colorScheme: 'dark' }}
                         >
                           <option value="" className="bg-neutral-900">Select reason…</option>
+                          <option value="fatigued" className="bg-neutral-900">Fatigued / training load</option>
                           <option value="sick" className="bg-neutral-900">Sick</option>
                           <option value="travel" className="bg-neutral-900">Travel</option>
                           <option value="rest" className="bg-neutral-900">Rest</option>
@@ -741,6 +742,7 @@ export default function CoachWeekTab() {
                           style={{ colorScheme: 'dark' }}
                         >
                           <option value="" className="bg-neutral-900">Select reason…</option>
+                          <option value="fatigued" className="bg-neutral-900">Fatigued / training load</option>
                           <option value="sick" className="bg-neutral-900">Sick</option>
                           <option value="travel" className="bg-neutral-900">Travel</option>
                           <option value="rest" className="bg-neutral-900">Rest</option>

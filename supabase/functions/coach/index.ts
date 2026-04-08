@@ -2837,13 +2837,36 @@ Deno.serve(async (req) => {
           if (name) return `${dayLabel}: "${name}" (${g.type})`;
           return `${dayLabel}: ${g.type}`;
         };
+        // Humanize skip_reason codes for FACTS (LLM reads prose; keeps training-load vs same-day tired distinct).
+        const SKIP_REASON_NARRATIVE: Record<string, string> = {
+          tired: 'tired / low energy (same-day)',
+          fatigued: 'fatigued from training load (e.g. after long or hard session — interpret as load signal, not lack of discipline)',
+          sick: 'sick or injury',
+          travel: 'travel',
+          work: 'work or schedule',
+          weather: 'weather',
+          motivation: 'motivation / not feeling it',
+          other: 'other',
+          rest: 'rest (athlete-chosen)',
+          life: 'life circumstances',
+          swapped: 'swapped or rescheduled',
+        };
+        const humanizeSkipReason = (code: unknown): string => {
+          const c = String(code ?? '').trim().toLowerCase();
+          if (!c) return 'no tag';
+          return SKIP_REASON_NARRATIVE[c] || String(code).trim();
+        };
         if (gapsWithReasons.length > 0) {
           const lines = gapsWithReasons.map((g: any) => {
-            const parts = [`${missedSessionLabel(g)}: ${g.skip_reason || 'no tag'}`];
+            const reasonText = humanizeSkipReason(g.skip_reason);
+            const parts = [`${missedSessionLabel(g)}: ${reasonText}`];
             if (g.skip_note) parts.push(`(${g.skip_note})`);
             return parts.join(' ');
           });
-          narrativeFacts.push(`MISSED SESSION REASONS (athlete-provided — these are the ONLY days to reference as missed): ${lines.join('; ')}.`);
+          narrativeFacts.push(
+            `MISSED SESSION REASONS (athlete-provided — these are the ONLY days to reference as missed). ` +
+              `Reason phrases below are canonical; "fatigued" means accumulated training stress / recovery need, not generic laziness: ${lines.join('; ')}.`,
+          );
         } else if (allGaps.length > 0) {
           // Gaps without reasons — still provide day names so Claude doesn't invent them
           const lines = allGaps.map((g: any) => missedSessionLabel(g));
@@ -2866,6 +2889,10 @@ Deno.serve(async (req) => {
               'If only one run session was missed, say one run session was missed even if a strength session was also missed the same day.',
           );
         }
+
+        narrativeFacts.push(
+          'ATHLETE PHYSIOLOGY & SUBJECTIVE INPUTS: SESSION lines include session effort (1–10), feeling when logged, execution percent, and — when present in file — aerobic profile, cardiac drift (bpm, first vs second half), and pace/HR decoupling percent on steady runs. Weekly summaries and run-mix lines compare to this athlete’s norms. Missed-session reasons are explicit athlete input; reconcile skips (especially fatigued/tired) with effort and drift rather than dismissing them.',
+        );
 
         // ── Soft-match: pair every completed workout with its planned session ──
         // Uses hard link (planned_id) first, then falls back to date+type match.
@@ -2942,9 +2969,25 @@ Deno.serve(async (req) => {
           const wl = safeNum((w as any)?.workload_actual);
           if (wl != null) parts.push(`${Math.round(wl)} pts load`);
           const rpe = rpeFromWorkout(w);
-          if (rpe != null) parts.push(`RPE ${rpe}/10`);
+          if (rpe != null) parts.push(`session effort ${rpe}/10 (1–10)`);
           const feeling = feelingFromWorkout(w);
           if (feeling) parts.push(`feeling: ${feeling}`);
+          const hrProf = hrWorkoutTypeFromWorkout(w);
+          if (hrProf && (discipline === 'run' || discipline === 'bike' || discipline === 'walk')) {
+            parts.push(`aerobic profile: ${hrProf.replace(/_/g, ' ')}`);
+          }
+          const driftW = driftBpmFromWorkout(w);
+          if (driftW != null && (discipline === 'run' || discipline === 'bike' || discipline === 'walk')) {
+            const sign = driftW > 0 ? '+' : '';
+            parts.push(`cardiac drift ${sign}${Number(driftW).toFixed(1)} bpm`);
+          }
+          if (discipline === 'run' && hrProf === 'steady_state') {
+            try {
+              const waSess = parseJson((w as any)?.workout_analysis) || {};
+              const decSess = safeNum(waSess?.granular_analysis?.heart_rate_analysis?.summary?.decouplingPct);
+              if (decSess != null) parts.push(`pace/HR decoupling ~${Math.round(decSess)}%`);
+            } catch { /* ignore */ }
+          }
           const ex = executionScoreFromWorkout(w);
           if (ex != null) parts.push(`execution ${Math.round(ex)}%`);
           const matched = softMatchPlanned(w);
@@ -2959,6 +3002,29 @@ Deno.serve(async (req) => {
             else if (!matched && activePlan) parts.push('unplanned (not in the training plan)');
           }
           narrativeFacts.push(`SESSION: ${parts.join(' | ')}`);
+        }
+
+        if (Array.isArray(hr_drift_series) && hr_drift_series.length > 0) {
+          const ser = hr_drift_series
+            .map((x) => `${String(x.date).slice(0, 10)} ${x.drift_bpm >= 0 ? '+' : ''}${x.drift_bpm}`)
+            .join(', ');
+          narrativeFacts.push(`Recent steady-run cardiac drift sequence (oldest to newest, bpm): ${ser}.`);
+        }
+
+        if (Array.isArray(runSessionTypes7d) && runSessionTypes7d.length > 0) {
+          const mix = runSessionTypes7d.map((rt: any) => {
+            const bits: string[] = [`${rt.type_label} ×${rt.sample_size}`];
+            if (rt.avg_hr_drift_bpm != null) {
+              const d = rt.avg_hr_drift_bpm;
+              bits.push(`avg cardiac drift ${d > 0 ? '+' : ''}${d} bpm`);
+            }
+            if (rt.avg_decoupling_pct != null && rt.type !== 'intervals' && rt.type !== 'hills') {
+              bits.push(`avg decoupling ~${rt.avg_decoupling_pct}%`);
+            }
+            if (rt.efficiency_label) bits.push(String(rt.efficiency_label));
+            return bits.join(', ');
+          });
+          narrativeFacts.push(`Run mix and aerobic response (last 7 days): ${mix.join(' | ')}.`);
         }
 
         // ── Strength exercise summary from workout payloads only ──
@@ -3124,11 +3190,39 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Body response vs baseline
-        if (reaction.avg_execution_score != null) narrativeFacts.push(`Average execution score: ${reaction.avg_execution_score}% (baseline: ${baselines.norms_28d.execution_score_avg ?? '?'}%).`);
-        if (reaction.avg_session_rpe_7d != null) narrativeFacts.push(`Average perceived effort: ${reaction.avg_session_rpe_7d}/10 (baseline: ${baselines.norms_28d.session_rpe_avg ?? '?'}/10).`);
-        if (reaction.avg_strength_rir_7d != null) narrativeFacts.push(`Average strength reps in reserve: ${reaction.avg_strength_rir_7d} (baseline: ${baselines.norms_28d.strength_rir_avg ?? '?'}).`);
-        if (reaction.hr_drift_avg_bpm != null) narrativeFacts.push(`Average cardiac drift: ${reaction.hr_drift_avg_bpm} bpm (baseline: ${baselines.norms_28d.hr_drift_avg_bpm ?? '?'} bpm).`);
+        // Body response vs baseline (counts so the model knows how much data sits behind each number)
+        if (reaction.avg_execution_score != null) {
+          const nEx = reaction.execution_sample_size ?? 0;
+          narrativeFacts.push(
+            `Average execution score: ${reaction.avg_execution_score}% (this athlete’s typical ${baselines.norms_28d.execution_score_avg ?? '?'}%) — from ${nEx} plan-linked session(s) this week.`,
+          );
+        }
+        if (reaction.avg_session_rpe_7d != null) {
+          const nRpe = reaction.rpe_sample_size_7d ?? 0;
+          narrativeFacts.push(
+            `Average session effort (1–10): ${reaction.avg_session_rpe_7d} vs typical ${baselines.norms_28d.session_rpe_avg ?? '?'} — from ${nRpe} session(s) with effort logged in the last 7 days.`,
+          );
+        } else if ((reaction.rpe_sample_size_7d ?? 0) > 0) {
+          narrativeFacts.push(
+            `Session effort was logged on ${reaction.rpe_sample_size_7d} day(s) in the last 7 days (average not stable yet).`,
+          );
+        }
+        if (reaction.avg_strength_rir_7d != null) {
+          const nRir = reaction.rir_sample_size_7d ?? 0;
+          narrativeFacts.push(
+            `Average strength reps in reserve: ${reaction.avg_strength_rir_7d} (typical ${baselines.norms_28d.strength_rir_avg ?? '?'}) — from ${nRir} strength session(s).`,
+          );
+        }
+        if (reaction.hr_drift_avg_bpm != null) {
+          const nDr = reaction.hr_drift_sample_size ?? 0;
+          narrativeFacts.push(
+            `Average cardiac drift on steady aerobic runs this week: ${reaction.hr_drift_avg_bpm} bpm vs typical ${baselines.norms_28d.hr_drift_avg_bpm ?? '?'} bpm — from ${nDr} qualifying run(s).`,
+          );
+        } else if ((reaction.hr_drift_sample_size ?? 0) > 0) {
+          narrativeFacts.push(
+            `Cardiac drift was measured on ${reaction.hr_drift_sample_size} run(s) this week; week average not computed.`,
+          );
+        }
 
         // Per-discipline execution breakdown
         const execByDiscipline: Record<string, number[]> = {};

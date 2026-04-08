@@ -38,9 +38,6 @@ export default function SkipSessionReasonPanel({
 
   return (
     <div className="space-y-4 px-1">
-      <p className="text-[13px] text-white/55 leading-snug">
-        Optional — sharing why helps your coach interpret the week (you can skip this).
-      </p>
       {otherSelected ? (
         <div className="space-y-3">
           <label className="block text-[11px] font-medium uppercase tracking-wider text-white/45">
