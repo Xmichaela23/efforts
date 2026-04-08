@@ -118,8 +118,6 @@ interface CourseStrategyModalProps {
   open: boolean;
   courseId: string | null;
   onClose: () => void;
-  /** Coach `race_readiness.predicted_finish_time_seconds` when this course is for that race goal. */
-  predictedFinishTimeSeconds?: number | null;
 }
 
 const EMPTY_DISPLAY_GROUPS: CourseDetailPayload['display_groups'] = [];
@@ -345,7 +343,6 @@ export default function CourseStrategyModal({
   open,
   courseId,
   onClose,
-  predictedFinishTimeSeconds = null,
 }: CourseStrategyModalProps) {
   const [payload, setPayload] = useState<CourseDetailPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -361,11 +358,7 @@ export default function CourseStrategyModal({
     if (opts?.silent) setRefetching(true);
     else setLoading(true);
     setErr(null);
-    const body: Record<string, unknown> = { course_id: courseId };
-    if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
-      body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
-    }
-    const { data, error } = await invokeFunction<CourseDetailPayload>('course-detail', body);
+    const { data, error } = await invokeFunction<CourseDetailPayload>('course-detail', { course_id: courseId });
     if (opts?.silent) setRefetching(false);
     else setLoading(false);
     if (error) {
@@ -374,7 +367,7 @@ export default function CourseStrategyModal({
       return;
     }
     setPayload(data);
-  }, [courseId, predictedFinishTimeSeconds]);
+  }, [courseId]);
 
   useEffect(() => {
     if (open && courseId) void load();
@@ -396,11 +389,7 @@ export default function CourseStrategyModal({
     if (!courseId) return;
     setUpdating(true);
     setErr(null);
-    const body: Record<string, unknown> = { course_id: courseId };
-    if (predictedFinishTimeSeconds != null && Number.isFinite(predictedFinishTimeSeconds)) {
-      body.predicted_finish_time_seconds = predictedFinishTimeSeconds;
-    }
-    const { error } = await invokeFunction('course-strategy', body);
+    const { error } = await invokeFunction('course-strategy', { course_id: courseId });
     setUpdating(false);
     if (error) {
       setErr(error.message);

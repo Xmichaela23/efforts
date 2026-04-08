@@ -1,6 +1,7 @@
 /**
  * course-detail — presentation payload for dumb client (chart + display groups).
  * POST JSON: { course_id?: string, goal_id?: string }
+ * Predicted finish comes from goals.race_readiness_projection (coach) or server VDOT fallback — not from the client.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import {
@@ -14,7 +15,8 @@ import {
   fmtFinishClock,
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
-import { parseClientPredictedFinishSeconds, resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { resolveCanonicalPredictedFinishSeconds } from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -105,12 +107,10 @@ Deno.serve(async (req) => {
 
   let courseId: string | null = null;
   let goalId: string | null = null;
-  let predictedFinishSec: number | null = null;
   try {
     const body = await req.json() as Record<string, unknown>;
     courseId = body.course_id ? String(body.course_id) : null;
     goalId = body.goal_id ? String(body.goal_id) : null;
-    predictedFinishSec = parseClientPredictedFinishSeconds(body.predicted_finish_time_seconds);
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -151,6 +151,27 @@ Deno.serve(async (req) => {
   if (course.goal_id) {
     planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
   }
+
+  let predictedFinishSec: number | null = null;
+  if (course.goal_id) {
+    const { data: gPred } = await supabase
+      .from('goals')
+      .select('name, distance, target_date, target_time, sport, race_readiness_projection')
+      .eq('id', course.goal_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (gPred) {
+      predictedFinishSec = await resolveCanonicalPredictedFinishSeconds(supabase, user.id, {
+        name: String(gPred.name || ''),
+        distance: gPred.distance != null ? String(gPred.distance) : null,
+        target_date: gPred.target_date != null ? String(gPred.target_date) : null,
+        target_time: gPred.target_time != null ? Number(gPred.target_time) : null,
+        sport: gPred.sport != null ? String(gPred.sport) : null,
+        race_readiness_projection: gPred.race_readiness_projection,
+      });
+    }
+  }
+
   const primarySec = predictedFinishSec ?? planGoalSec;
   const goalTimeStr = primarySec != null ? fmtFinishClock(primarySec) : null;
   const goalTimeSource: 'predicted' | 'plan' | null = primarySec == null

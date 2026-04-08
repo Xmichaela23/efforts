@@ -1,6 +1,5 @@
 /**
- * Optional client-supplied finish time from coach `race_readiness.predicted_finish_time_seconds`.
- * Bounded to avoid abuse; server still requires course ownership.
+ * Parse bounded finish seconds (used for goals.race_readiness_projection and internal checks).
  */
 export function parseClientPredictedFinishSeconds(raw: unknown): number | null {
   const n = typeof raw === 'number' ? raw : raw != null ? Number(raw) : NaN;

@@ -1,5 +1,6 @@
 /**
- * Client-side: goal row, then plan config. course-strategy prefers coach predicted when the client passes it, with plan as fallback and cap.
+ * Client-side: goal row, then plan config. course-strategy uses coach predicted when the client passes it;
+ * the edge function also computes the same VDOT projection server-side if omitted. Plan time is fallback/context only.
  */
 export function resolveEventTargetTimeSeconds(
   goal: { target_time?: number | null },

@@ -2135,6 +2135,26 @@ Deno.serve(async (req) => {
       console.warn('[coach] race readiness failed (non-fatal):', rrErr?.message ?? rrErr);
     }
 
+    // Persist projection so course-detail / course-strategy use the same finish time as State (SSoT).
+    if (raceReadiness && goalContext.primary_event?.id) {
+      try {
+        const { error: projErr } = await supabase
+          .from('goals')
+          .update({
+            race_readiness_projection: {
+              predicted_finish_time_seconds: raceReadiness.predicted_finish_time_seconds,
+              predicted_finish_display: raceReadiness.predicted_finish_display,
+              updated_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', goalContext.primary_event.id)
+          .eq('user_id', userId);
+        if (projErr) console.warn('[coach] race_readiness_projection update failed:', projErr.message);
+      } catch (e: any) {
+        console.warn('[coach] race_readiness_projection update exception:', e?.message ?? e);
+      }
+    }
+
     let primary_race_readiness: CoachWeekContextResponseV1['primary_race_readiness'] = null;
     try {
       const weeksOutGate =

@@ -71,6 +71,12 @@ This avoids: *“I executed the workout well but scored 72 because I did it Satu
 - **Coach / weekly** narrative may consume **persisted** `session_detail_v1` (and related interpretations) to **synthesize** the week; it does **not** replace the per-workout Performance contract.
 - **Daily ledger** and `planned_id`-aware matching remain the factual spine for “what happened which day” at the week level; Performance remains **one workout, one contract**.
 
+### 7. Course terrain strategy — predicted finish (SSoT)
+
+- **State** shows `race_readiness` from coach (server-computed). **Terrain strategy** (`course-detail`, `course-strategy`) must use the **same** projected finish when pacing segments, not a second client-supplied number.
+- Coach persists `goals.race_readiness_projection` when it computes primary-event race readiness; course edge functions **read that column first**, then fall back to a baseline-only VDOT projection if missing.
+- The **client does not pass** `predicted_finish_time_seconds` into course APIs; it only renders server payloads.
+
 ---
 
 ## Consequences

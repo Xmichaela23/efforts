@@ -372,7 +372,7 @@ export default function StateTab({
         : null;
     if (paceTargetSec == null && coachPredSec == null) {
       window.alert(
-        'No pacing target: set a race target on the goal or plan, or open State when coach shows a predicted finish for this goal.',
+        'No pacing target yet: set a race target on the goal or plan, or load State once so coach can save a finish projection (then try again).',
       );
       return;
     }
@@ -387,9 +387,7 @@ export default function StateTab({
         window.alert(upErr?.message || 'Upload failed');
         return;
       }
-      const stBody: Record<string, unknown> = { course_id: up.course_id };
-      if (coachPredSec != null) stBody.predicted_finish_time_seconds = coachPredSec;
-      const { error: stErr } = await invokeFunction('course-strategy', stBody);
+      const { error: stErr } = await invokeFunction('course-strategy', { course_id: up.course_id });
       if (stErr) {
         window.alert(stErr.message || 'Strategy failed');
         return;
@@ -647,7 +645,6 @@ export default function StateTab({
       <CourseStrategyModal
         open={strategyModalOpen}
         courseId={strategyCourseId}
-        predictedFinishTimeSeconds={raceReadiness?.predicted_finish_time_seconds ?? null}
         onClose={() => {
           setStrategyModalOpen(false);
           setStrategyCourseId(null);

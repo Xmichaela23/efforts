@@ -1,7 +1,8 @@
 /**
  * course-strategy — rebuild geometry, call LLM, persist strategy on course_segments.
- * POST JSON: { course_id: string, predicted_finish_time_seconds?: number }
- * Paces to coach predicted finish when provided; falls back to plan goal. If predicted is faster than plan, caps at plan.
+ * POST JSON: { course_id: string }
+ * Paces to current-fitness projection when available (client or server-computed race_readiness);
+ * plan/goal time is context only. Falls back to plan goal if no projection can be computed.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callLLM } from '../_shared/llm.ts';
@@ -27,10 +28,8 @@ import {
   type SnapshotForHash,
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
-import {
-  parseClientPredictedFinishSeconds,
-  resolveGoalTargetTimeSeconds,
-} from '../_shared/resolve-goal-target-time.ts';
+import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { resolveCanonicalPredictedFinishSeconds } from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -105,24 +104,10 @@ Instructions:
 5. Pacing vs terrain: if a display group includes any climb terrain or meaningful net elevation gain in the segment list, set pace bounds at least as conservative as an equivalent flat section (usually a few sec/mi slower on the slow bound, not faster splits "because push")—runners slow on uphills; HR may sit at the upper end of the band. Descent-heavy groups may allow slightly quicker bounds where appropriate.
 6. Effort zones: long gentle net-downhill sections are often "cruise" (easy rhythm). Use "caution" for steep descents, technical drops, and for late-race segments (mile ~18+) that are flat or rolling after many miles of sustained descent—leg fatigue dominates even when grade looks easy, so prefer "caution" over "cruise" for those late flats/rollers unless segments clearly show easy fresh terrain.
 
-Rules: target_pace_slow_sec_per_mi >= target_pace_fast_sec_per_mi. HR realistic vs max. Weighted pace vs goal is guidance only.
+Rules: target_pace_slow_sec_per_mi >= target_pace_fast_sec_per_mi. HR realistic vs max. Across all display groups, distance-weighted pace must imply a finish time within ~3 minutes of the race pacing target (same as ${params.goalTime}); do not pace implicitly to a faster aspirational plan time if a slower fitness-based target was given in context.
 
 Return ONLY valid JSON, no markdown:
 {"display_groups":[{"display_group_id":1,"segment_orders":[1,2],"display_label":"Mi 0–2 · start","effort_zone":"conservative","target_pace_slow_sec_per_mi":680,"target_pace_fast_sec_per_mi":640,"target_hr_low":130,"target_hr_high":145,"coaching_cue":"Start easy on early climbs"}]}`;
-}
-
-/** Lower seconds = faster finish. Predicted primary; if predicted faster than plan, cap at plan. */
-function resolveStrategyPacingSeconds(
-  predictedSec: number | null,
-  planSec: number | null,
-): { goalTimeSec: number | null; cappedAtPlan: boolean } {
-  if (predictedSec != null && planSec != null) {
-    if (predictedSec < planSec) return { goalTimeSec: planSec, cappedAtPlan: true };
-    return { goalTimeSec: predictedSec, cappedAtPlan: false };
-  }
-  if (predictedSec != null) return { goalTimeSec: predictedSec, cappedAtPlan: false };
-  if (planSec != null) return { goalTimeSec: planSec, cappedAtPlan: false };
-  return { goalTimeSec: null, cappedAtPlan: false };
 }
 
 Deno.serve(async (req) => {
@@ -140,11 +125,9 @@ Deno.serve(async (req) => {
   }
 
   let courseId = '';
-  let predictedSec: number | null = null;
   try {
     const body = await req.json() as Record<string, unknown>;
     courseId = String(body.course_id || '');
-    predictedSec = parseClientPredictedFinishSeconds(body.predicted_finish_time_seconds);
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -168,7 +151,7 @@ Deno.serve(async (req) => {
 
   const { data: goal } = await supabase
     .from('goals')
-    .select('id, distance, name')
+    .select('id, distance, name, target_date, target_time, sport, race_readiness_projection')
     .eq('id', course.goal_id)
     .eq('user_id', user.id)
     .maybeSingle();
@@ -178,32 +161,37 @@ Deno.serve(async (req) => {
   }
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
-  const { goalTimeSec, cappedAtPlan } = resolveStrategyPacingSeconds(predictedSec, planGoalSec);
+
+  const predictedSec = await resolveCanonicalPredictedFinishSeconds(supabase, user.id, {
+    name: String(goal.name || ''),
+    distance: goal.distance != null ? String(goal.distance) : null,
+    target_date: goal.target_date != null ? String(goal.target_date) : null,
+    target_time: goal.target_time != null ? Number(goal.target_time) : null,
+    sport: goal.sport != null ? String(goal.sport) : null,
+    race_readiness_projection: goal.race_readiness_projection,
+  });
+
+  const goalTimeSec = predictedSec ?? planGoalSec;
   if (goalTimeSec == null) {
     return new Response(
       JSON.stringify({
         error:
-          'No pacing target: pass predicted_finish_time_seconds from the client, or set a goal/plan race target as fallback.',
+          'No pacing target: set a goal/plan race target, or ensure baselines support a fitness-based finish projection.',
       }),
       { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } },
     );
   }
 
   let pacingContextLines = '';
-  if (planGoalSec != null) {
-    pacingContextLines += `- Stated aspirational plan goal: ${fmtFinishClock(planGoalSec)}`;
-    if (predictedSec != null) {
-      if (cappedAtPlan) {
-        pacingContextLines +=
-          " (current fitness projects faster than this; pacing caps at the athlete's stated plan-do not pace faster).\n";
-      } else {
-        pacingContextLines +=
-          ` (faster than current ${fmtFinishClock(goalTimeSec)} pacing target—bands reflect sustainable fitness, not this aspirational time).\n`;
-      }
-    } else pacingContextLines += '.\n';
+  if (predictedSec != null && planGoalSec != null && predictedSec !== planGoalSec) {
+    pacingContextLines =
+      `- Pace anchor (current-fitness finish projection): ${fmtFinishClock(predictedSec)} — segment bands must aggregate to this finish time, not the plan time.\n` +
+      `- Stated plan / goal target (aspirational): ${fmtFinishClock(planGoalSec)}.\n`;
   } else if (predictedSec != null) {
-    pacingContextLines +=
-      '- No separate plan goal on file; pacing follows current fitness projection only.\n';
+    pacingContextLines = `- Pace anchor: current-fitness finish projection ${fmtFinishClock(predictedSec)}.\n`;
+  } else if (planGoalSec != null) {
+    pacingContextLines =
+      `- No fitness projection computed; pace anchor is the stated goal/plan time: ${fmtFinishClock(planGoalSec)}.\n`;
   }
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);

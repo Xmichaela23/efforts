@@ -154,7 +154,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const paceTargetSec = resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
     if (paceTargetSec == null && coachPred == null) {
       window.alert(
-        'No pacing target: set a race target on this goal or plan, or ensure coach shows a predicted finish for this goal.',
+        'No pacing target yet: set a race target on this goal or plan, or open Goals/Home after coach loads so your finish projection is saved — then try again.',
       );
       return;
     }
@@ -169,9 +169,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         window.alert(error?.message || 'Upload failed');
         return;
       }
-      const stBody: Record<string, unknown> = { course_id: data.course_id };
-      if (coachPred != null) stBody.predicted_finish_time_seconds = coachPred;
-      const { error: stErr } = await invokeFunction('course-strategy', stBody);
+      const { error: stErr } = await invokeFunction('course-strategy', { course_id: data.course_id });
       if (stErr) {
         window.alert(stErr.message || 'Strategy generation failed');
         return;
@@ -321,19 +319,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     for (const p of currentPlans) if (p.goal_id) map.set(p.goal_id, p);
     return map;
   }, [currentPlans]);
-
-  const predictedFinishForStrategyModal = useMemo(() => {
-    if (!strategyModalCourseId) return null;
-    const gid = Object.keys(courseByGoal).find((id) => courseByGoal[id]?.id === strategyModalCourseId);
-    if (!gid) return null;
-    const goal = goals.find((g) => g.id === gid);
-    const rr = coachWeek.data?.race_readiness;
-    if (!goal || !rr) return null;
-    if (String(goal.name) !== String(rr.goal.name)) return null;
-    if ((goal.sport || '').toLowerCase() !== 'run') return null;
-    const sec = rr.predicted_finish_time_seconds;
-    return Number.isFinite(sec) && sec > 0 ? sec : null;
-  }, [strategyModalCourseId, courseByGoal, goals, coachWeek.data?.race_readiness]);
 
   // Only active plans not linked to any goal
   const activeUnlinkedPlans = useMemo(
@@ -1080,7 +1065,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       <CourseStrategyModal
         open={strategyModalOpen}
         courseId={strategyModalCourseId}
-        predictedFinishTimeSeconds={predictedFinishForStrategyModal}
         onClose={() => {
           setStrategyModalOpen(false);
           setStrategyModalCourseId(null);
