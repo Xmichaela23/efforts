@@ -17,6 +17,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { isWatchConnectivityAvailable, sendWorkoutToWatch, convertToWatchWorkout } from '@/services/watchConnectivity';
+import SkipSessionReasonPanel from '@/components/planned/SkipSessionReasonPanel';
+import { skipReasonLabel } from '@/lib/skip-session-reasons';
 
 // Component for expandable workout cards with fixed height
 const WorkoutCardExpandable: React.FC<{
@@ -117,7 +119,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
   const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
+  const [skippingSession, setSkippingSession] = useState(false);
+  const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip'>('detail');
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!selectedPlannedWorkout) setPlannedDrawerStep('detail');
+  }, [selectedPlannedWorkout]);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -423,7 +431,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // Also update planned_workouts status
         const { error: updateError } = await supabase
           .from('planned_workouts')
-          .update({ workout_status: 'completed' })
+          .update({ workout_status: 'completed', skip_reason: null, skip_note: null })
           .eq('id', workout.id)
           .eq('user_id', userId);
         
@@ -443,7 +451,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // For non-run/ride workouts, just update planned_workouts status
         const { error } = await supabase
           .from('planned_workouts')
-          .update({ workout_status: 'completed' })
+          .update({ workout_status: 'completed', skip_reason: null, skip_note: null })
           .eq('id', workout.id)
           .eq('user_id', userId);
         
@@ -461,6 +469,37 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       toast({ title: 'Error', description: 'Failed to mark workout as complete', variant: 'destructive' });
     } finally {
       setMarkingComplete(false);
+    }
+  };
+
+  const handleApplySkip = async (workout: any, reason: string | null, note: string | null) => {
+    const userId = getStoredUserId();
+    if (!userId || !workout?.id) {
+      toast({ title: 'Error', description: 'Please log in to skip a session', variant: 'destructive' });
+      return;
+    }
+    setSkippingSession(true);
+    try {
+      const patch = {
+        workout_status: 'skipped' as const,
+        skip_reason: reason && reason.trim() ? reason.trim() : null,
+        skip_note: note && note.trim() ? note.trim() : null,
+      };
+      const { error } = await supabase.from('planned_workouts').update(patch).eq('id', workout.id).eq('user_id', userId);
+      if (error) throw error;
+      toast({ title: 'Session skipped', variant: 'default' });
+      setSelectedPlannedWorkout(null);
+      setPlannedDrawerStep('detail');
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+    } catch (err: any) {
+      toast({
+        title: 'Could not skip session',
+        description: err?.message || 'Try again',
+        variant: 'destructive',
+      });
+    } finally {
+      setSkippingSession(false);
     }
   };
   
@@ -608,7 +647,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const activated = dateWorkoutsMemo.filter((w:any)=> !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
     const optionals = dateWorkoutsMemo.filter((w:any)=> Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'));
     setDisplayWorkouts([...activated, ...optionals]);
-  }, [unifiedItems.length, activeDate]); // Use stable dependencies - length and date
+  }, [dateWorkoutsMemo, activeDate]);
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
     .replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '')
@@ -1331,7 +1370,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {displayWorkouts.map((workout) => {
                 const workoutType = workout.type || workout.workout_type || '';
                 const isCompleted = workout.workout_status === 'completed';
-                const isPlanned = workout.workout_status === 'planned';
+                const isSkipped = String(workout.workout_status || '').toLowerCase() === 'skipped';
+                const isPlannedRow = !isCompleted;
                 const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
                 const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
                 const pillRgb = getDisciplineColorRgb(workoutType);
@@ -1393,6 +1433,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return getDisplaySport(workout);
                 })();
 
+                const skipSubtitle = (() => {
+                  if (!isSkipped) return null;
+                  const label = skipReasonLabel(workout.skip_reason);
+                  const note = typeof workout.skip_note === 'string' && workout.skip_note.trim() ? workout.skip_note.trim() : '';
+                  if (label && note) return `${label} — ${note.length > 48 ? `${note.slice(0, 48)}…` : note}`;
+                  if (note) return note.length > 56 ? `${note.slice(0, 56)}…` : note;
+                  return label;
+                })();
+
                 return (
                   <button
                     key={workout.id}
@@ -1402,6 +1451,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       ...phosphorPill.style,
                       borderRadius: '10px',
                       padding: '0.52rem 0.78rem',
+                      opacity: isSkipped ? 0.72 : 1,
                       // Filled (completed) should read like backlit phosphor glass, not fog:
                       // reduce blur radius ~30% on filled state only.
                       ...(isCompleted
@@ -1439,12 +1489,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                            inset 0 0 0 0.5px rgba(255,255,255,0.08)`,
                       borderWidth: '0.5px',
                       transform: 'translateZ(0)',
-                      cursor: isPlanned ? 'pointer' : 'pointer',
+                      cursor: 'pointer',
                     }}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (isPlanned) {
+                      if (isPlannedRow) {
                         setSelectedPlannedWorkout(workout);
                         return;
                       }
@@ -1480,7 +1530,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       </div>
 
                       {/* Right side: planned duration OR import attribution (completed) */}
-                      {isPlanned ? (() => {
+                      {isPlannedRow ? (() => {
                         const sec = resolveMovingSeconds(workout);
                         if (Number.isFinite(sec as any) && (sec as number) > 0) {
                           const mins = Math.round((sec as number) / 60);
@@ -1528,6 +1578,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       ) : null}
                     </div>
 
+                    {isSkipped && (
+                      <div
+                        className="mt-1 text-[11px] font-light leading-snug"
+                        style={{ color: 'rgba(255,255,255,0.42)' }}
+                      >
+                        Skipped{skipSubtitle ? ` · ${skipSubtitle}` : ''}
+                      </div>
+                    )}
+
                     {/* Completed endurance details + import attribution */}
                     {showEnduranceDetails && (
                       <div className="mt-2">
@@ -1567,57 +1626,86 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
 
       {/* Planned Workout Bottom Sheet */}
-      <Drawer open={!!selectedPlannedWorkout} onOpenChange={(open) => !open && setSelectedPlannedWorkout(null)}>
+      <Drawer
+        open={!!selectedPlannedWorkout}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedPlannedWorkout(null);
+            setPlannedDrawerStep('detail');
+          }
+        }}
+      >
         <DrawerContent 
           className="bg-black/90 backdrop-blur-xl border-white/20"
           style={{ maxHeight: '85vh' }}
         >
           <DrawerHeader className="text-left">
-            <DrawerTitle className="text-white font-light tracking-wide text-lg">
-              {(() => {
-                const w = selectedPlannedWorkout;
-                if (!w) return 'Planned Workout';
-                const type = String(w.type || w.workout_type || '').toLowerCase();
-                const name = w.name || w.title || '';
-                if (name && name.toLowerCase() !== type) return name;
-                return type.charAt(0).toUpperCase() + type.slice(1);
-              })()}
-            </DrawerTitle>
-            <DrawerDescription className="text-white/60 font-light">
-              {(() => {
-                const desc = selectedPlannedWorkout?.rendered_description || selectedPlannedWorkout?.description || 'No description available';
-                if (/strides/i.test(desc)) {
-                  const parts = desc.split(/(strides)/i);
-                  return (
-                    <span>
-                      {parts.map((part, idx) => {
-                        if (/^strides$/i.test(part)) {
-                          return (
-                            <TooltipProvider key={idx}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="underline decoration-dotted cursor-help">{part}</span>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs text-sm p-3 bg-gray-800 text-white border border-gray-700 rounded-lg shadow-lg">
-                                  <p className="font-semibold mb-1">What are Strides?</p>
-                                  <p>Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          );
-                        }
-                        return <span key={idx}>{part}</span>;
-                      })}
-                    </span>
-                  );
-                }
-                return desc;
-              })()}
-            </DrawerDescription>
+            {plannedDrawerStep === 'skip' ? (
+              <>
+                <DrawerTitle className="text-white font-light tracking-wide text-lg">Skip this session?</DrawerTitle>
+                <DrawerDescription className="text-white/55 font-light text-[13px]">
+                  Optional — sharing why helps your coach interpret the week. You can skip without sharing.
+                </DrawerDescription>
+              </>
+            ) : (
+              <>
+                <DrawerTitle className="text-white font-light tracking-wide text-lg">
+                  {(() => {
+                    const w = selectedPlannedWorkout;
+                    if (!w) return 'Planned Workout';
+                    const type = String(w.type || w.workout_type || '').toLowerCase();
+                    const name = w.name || w.title || '';
+                    if (name && name.toLowerCase() !== type) return name;
+                    return type.charAt(0).toUpperCase() + type.slice(1);
+                  })()}
+                </DrawerTitle>
+                <DrawerDescription className="text-white/60 font-light">
+                  {(() => {
+                    const w = selectedPlannedWorkout;
+                    const sheetSkipped = w && String(w.workout_status || '').toLowerCase() === 'skipped';
+                    if (sheetSkipped) {
+                      const label = skipReasonLabel(w.skip_reason);
+                      const note = typeof w.skip_note === 'string' && w.skip_note.trim() ? w.skip_note.trim() : '';
+                      const parts = ['Skipped'];
+                      if (label) parts.push(label);
+                      if (note) parts.push(note);
+                      return parts.join(' · ');
+                    }
+                    const desc = w?.rendered_description || w?.description || 'No description available';
+                    if (/strides/i.test(desc)) {
+                      const parts = desc.split(/(strides)/i);
+                      return (
+                        <span>
+                          {parts.map((part, idx) => {
+                            if (/^strides$/i.test(part)) {
+                              return (
+                                <TooltipProvider key={idx}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="underline decoration-dotted cursor-help">{part}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs text-sm p-3 bg-gray-800 text-white border border-gray-700 rounded-lg shadow-lg">
+                                      <p className="font-semibold mb-1">What are Strides?</p>
+                                      <p>Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            }
+                            return <span key={idx}>{part}</span>;
+                          })}
+                        </span>
+                      );
+                    }
+                    return desc;
+                  })()}
+                </DrawerDescription>
+              </>
+            )}
           </DrawerHeader>
           
           <div className="px-4 pb-4 overflow-y-auto" style={{ maxHeight: '50vh' }}>
-            {selectedPlannedWorkout && (
+            {selectedPlannedWorkout && plannedDrawerStep === 'detail' && (
               <PlannedWorkoutSummary 
                 workout={selectedPlannedWorkout} 
                 baselines={baselines as any} 
@@ -1651,6 +1739,33 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             }}
           >
             <div className="flex flex-col gap-3 w-full">
+              {(() => {
+                const w = selectedPlannedWorkout;
+                const sheetSkipped = w && String(w.workout_status || '').toLowerCase() === 'skipped';
+                if (plannedDrawerStep === 'skip' && w) {
+                  return (
+                    <SkipSessionReasonPanel
+                      sessionTitle={String(w.name || w.rendered_description || w.description || 'Session')}
+                      busy={skippingSession}
+                      onBack={() => setPlannedDrawerStep('detail')}
+                      onSkipWithoutReason={() => handleApplySkip(w, null, null)}
+                      onConfirmSkip={(r, n) => handleApplySkip(w, r, n)}
+                    />
+                  );
+                }
+                if (sheetSkipped && w) {
+                  return (
+                    <button
+                      type="button"
+                      className="w-full px-4 py-3 rounded-xl font-medium tracking-wide text-white border border-white/15 bg-white/[0.04]"
+                      onClick={() => setSelectedPlannedWorkout(null)}
+                    >
+                      Close
+                    </button>
+                  );
+                }
+                return (
+                  <>
               {/* Logger shortcut (Strength/Mobility/Pilates-Yoga) */}
               {selectedPlannedWorkout && (() => {
                 const raw = String(selectedPlannedWorkout.type || selectedPlannedWorkout.workout_type || '').toLowerCase();
@@ -1710,6 +1825,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   </button>
                 );
               })()}
+
+              <button
+                type="button"
+                disabled={skippingSession || markingComplete}
+                onClick={() => setPlannedDrawerStep('skip')}
+                className="w-full py-2.5 rounded-xl text-[13px] font-light text-white/45 border border-white/12 hover:text-white/60 hover:border-white/18 disabled:opacity-40"
+              >
+                Skip session…
+              </button>
 
               {/* Top row: Start on Phone and Send to Garmin - side by side with yellow outlines */}
               <div className="flex gap-2 w-full">
@@ -1835,6 +1959,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   );
                 })()}
               </div>
+                  </>
+                );
+              })()}
             </div>
           </DrawerFooter>
         </DrawerContent>

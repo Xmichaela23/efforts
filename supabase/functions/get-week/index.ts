@@ -422,7 +422,7 @@ Deno.serve(async (req)=>{
     let plannedRows = null;
     let pErr = null;
     try {
-      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,workload_planned,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,workload_planned,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
         ascending: true
       }).order('created_at', {
         ascending: true
@@ -435,7 +435,7 @@ Deno.serve(async (req)=>{
       pErr = e1;
       // Fallback for schemas without completed_workout_id or created_at
       try {
-        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
           ascending: true
         }).order('id', {
           ascending: true
@@ -499,7 +499,7 @@ Deno.serve(async (req)=>{
         });
         // Reload planned rows that were adjusted (best-effort, limited scope) so UI sees cooldown immediately
         try {
-          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
             ascending: true
           }).order('created_at', {
             ascending: true
@@ -562,6 +562,7 @@ Deno.serve(async (req)=>{
       const date = String(w.date).slice(0, 10);
       const type = String(w.type).toLowerCase();
       // planned
+      let plannedSourceRow = null;
       let planned = w.planned_data || null;
       if (!planned) {
         // prefer attached plan via planned_id; else same-day type
@@ -571,6 +572,7 @@ Deno.serve(async (req)=>{
         }
         if (!p) p = plannedByKey.get(`${date}|${type}`) || null;
         if (p) {
+          plannedSourceRow = p;
           console.log('get-week: Processing planned workout:', {
             id: p.id,
             date: p.date,
@@ -645,7 +647,10 @@ Deno.serve(async (req)=>{
             friendly_summary: p?.friendly_summary ?? null,
             rendered_description: p?.rendered_description ?? null,
             brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
-            brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null
+            brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
+            workout_status: p.workout_status ?? null,
+            skip_reason: p.skip_reason ?? null,
+            skip_note: p.skip_note ?? null
           };
           // Debug: Log the processed planned data
           console.log('get-week: Processed planned data:', {
@@ -744,6 +749,9 @@ Deno.serve(async (req)=>{
       const hasExecuted = !!(cmp && (Array.isArray(cmp?.intervals) && cmp.intervals.length > 0 || cmp?.overall)) || hasStrengthEx;
       const rawStatus = String(w?.workout_status || '').toLowerCase();
       let status = rawStatus || (hasExecuted ? 'completed' : planned ? 'planned' : null);
+      if (plannedSourceRow && String(plannedSourceRow.workout_status || '').toLowerCase() === 'skipped' && status !== 'completed') {
+        status = 'skipped';
+      }
       try {
         if (String(type) === 'strength') {
           const exLen = Array.isArray(executed?.strength_exercises) ? executed.strength_exercises.length : 0;
@@ -917,14 +925,17 @@ Deno.serve(async (req)=>{
           friendly_summary: p?.friendly_summary ?? null,
           rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
-          brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null
+          brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
+          workout_status: p.workout_status ?? null,
+          skip_reason: p.skip_reason ?? null,
+          skip_note: p.skip_note ?? null
         };
-        // Planned-only items must always be 'planned' since no workouts row exists for this date/type
+        const rowStatus = String(p.workout_status || '').toLowerCase() === 'skipped' ? 'skipped' : 'planned';
         const it = {
           id: String(p.id),
           date: String(p.date).slice(0, 10),
           type: String(p.type).toLowerCase(),
-          status: 'planned',
+          status: rowStatus,
           planned,
           executed: null,
           // Workload data from database (single source of truth)
@@ -985,13 +996,17 @@ Deno.serve(async (req)=>{
           friendly_summary: p?.friendly_summary ?? null,
           rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
-          brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null
+          brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
+          workout_status: p.workout_status ?? null,
+          skip_reason: p.skip_reason ?? null,
+          skip_note: p.skip_note ?? null
         };
+        const rowStatus2 = String(p.workout_status || '').toLowerCase() === 'skipped' ? 'skipped' : 'planned';
         const it = {
           id: String(p.id),
           date: String(p.date).slice(0, 10),
           type: String(p.type).toLowerCase(),
-          status: 'planned',
+          status: rowStatus2,
           planned,
           executed: null,
           // Workload data from database (single source of truth)
@@ -1335,6 +1350,8 @@ Deno.serve(async (req)=>{
         description: p.description ?? null,
         rendered_description: p.rendered_description ?? p.description ?? null,
         workout_status: (item.status || p.workout_status || 'planned'),
+        skip_reason: p.skip_reason ?? null,
+        skip_note: p.skip_note ?? null,
         computed: (Array.isArray(p.steps) && p.steps.length > 0) ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null } : null,
         steps_preset: p.steps_preset ?? null,
         total_duration_seconds: p.total_duration_seconds ?? null,

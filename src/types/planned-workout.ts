@@ -12,6 +12,8 @@ export interface PlannedWorkout {
   date: string;
   type: string;
   workout_status: 'planned' | 'completed' | 'skipped';
+  skip_reason?: string | null;
+  skip_note?: string | null;
   
   // Name and description
   name: string | null;

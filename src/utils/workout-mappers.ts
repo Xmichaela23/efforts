@@ -17,16 +17,18 @@ import { PlannedWorkout } from '@/types/planned-workout';
 export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
   const planned = item.planned || {};
   
-  // This function is only called when item.planned exists (filtered at call site)
-  // So workout_status is ALWAYS 'planned' for items mapped by this function
-  const workoutStatus = 'planned';
-  
+  const rawSt = String(item.status || planned.workout_status || 'planned').toLowerCase();
+  const workoutStatus: PlannedWorkout['workout_status'] =
+    rawSt === 'skipped' ? 'skipped' : rawSt === 'completed' ? 'completed' : 'planned';
+
   return {
     // Core identifiers
     id: planned.id || item.id,
     date: item.date,
     type: item.type || planned.type,
-    workout_status: workoutStatus as PlannedWorkout['workout_status'],
+    workout_status: workoutStatus,
+    skip_reason: planned.skip_reason ?? null,
+    skip_note: planned.skip_note ?? null,
     
     // Name and description
     name: planned.name || null,
