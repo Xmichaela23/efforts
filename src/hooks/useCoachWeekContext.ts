@@ -370,8 +370,12 @@ export function useCoachWeekContext(date?: string) {
   const [revalidating, setRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasCachedData = useRef(false);
+  /** Avoid overlapping foreground coach+adapt calls (double-tap refresh). */
+  const foregroundPipelineBusy = useRef(false);
 
   const runPipeline = useCallback(async (isBackground: boolean) => {
+    if (!isBackground && foregroundPipelineBusy.current) return;
+    if (!isBackground) foregroundPipelineBusy.current = true;
     try {
       if (isBackground) setRevalidating(true);
       else setLoading(true);
@@ -440,6 +444,7 @@ export function useCoachWeekContext(date?: string) {
     } finally {
       if (isBackground) setRevalidating(false);
       else setLoading(false);
+      if (!isBackground) foregroundPipelineBusy.current = false;
     }
   }, [focusDate]);
 

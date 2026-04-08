@@ -14,6 +14,7 @@ type CoachDataProp = {
   loading: boolean;
   error: string | null;
   refresh: () => void;
+  revalidating?: boolean;
 };
 
 type PrimaryRaceReadinessRow = NonNullable<CoachWeekContextV1['primary_race_readiness']>;
@@ -260,7 +261,8 @@ export default function StateTab({
   onClose?: () => void;
   onSelectWorkout?: (workout: any) => void;
 }) {
-  const { data, loading, error, refresh } = coachData;
+  const { data, loading, error, refresh, revalidating } = coachData;
+  const coachBusy = loading || Boolean(revalidating);
   const { liftTrends } = useExerciseLog(8);
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
@@ -486,11 +488,13 @@ export default function StateTab({
           )}
         </div>
         <button
-          onClick={refresh}
-          className="p-1 rounded text-white/35 hover:text-white/55 transition-colors shrink-0 mt-0.5"
-          aria-label="Refresh"
+          type="button"
+          onClick={() => refresh()}
+          disabled={coachBusy}
+          className="min-h-[44px] min-w-[44px] -mr-1 flex items-center justify-center rounded-lg text-white/40 hover:text-white/65 hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors shrink-0 touch-manipulation relative z-10"
+          aria-label={coachBusy ? 'Refreshing coach data' : 'Refresh'}
         >
-          <RefreshCw className="w-3 h-3" />
+          <RefreshCw className={`w-4 h-4 ${coachBusy ? 'animate-spin' : ''}`} />
         </button>
       </div>
 

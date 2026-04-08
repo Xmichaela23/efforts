@@ -8,6 +8,18 @@ interface PullToRefreshProps {
 
 // Minimal, dependency‑free pull‑to‑refresh for PWA
 // Works when the page is scrolled to the very top; on pull ≥ threshold, triggers onRefresh
+const INTERACTIVE_SELECTORS =
+  'button, a[href], input, textarea, select, [role="button"], [role="tab"], [data-pull-refresh-ignore]';
+
+// Nested scroll containers often leave document.scrollingElement at scrollTop 0; pulling must never
+// steal gestures that started on real controls (e.g. State tab refresh) or touchmove preventDefault
+// will suppress the synthetic click on mobile.
+const touchTargetIsInteractive = (target: EventTarget | null): boolean => {
+  const el = target instanceof Element ? target : null;
+  if (!el) return false;
+  return Boolean(el.closest(INTERACTIVE_SELECTORS));
+};
+
 const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thresholdPx = 70 }) => {
   const startYRef = useRef<number | null>(null);
   const pullingRef = useRef(false);
@@ -18,6 +30,11 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
     const el = document.scrollingElement || document.documentElement;
 
     const onTouchStart = (e: TouchEvent) => {
+      if (touchTargetIsInteractive(e.target)) {
+        startYRef.current = null;
+        pullingRef.current = false;
+        return;
+      }
       if ((el?.scrollTop || 0) <= 0 && !refreshing) {
         startYRef.current = e.touches[0].clientY;
         pullingRef.current = true;
