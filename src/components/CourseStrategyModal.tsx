@@ -652,49 +652,76 @@ export default function CourseStrategyModal({
             })}
           </div>
         )}
-
-        {chartExpanded && elevationChartSvgExpanded && (
-          <div
-            role="presentation"
-            className="fixed inset-0 z-[10001] flex flex-col bg-black/92 backdrop-blur-sm"
-            style={{
-              paddingTop: 'env(safe-area-inset-top)',
-              paddingBottom: 'env(safe-area-inset-bottom)',
-            }}
-            onClick={() => setChartExpanded(false)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Expanded elevation chart"
-              className="flex min-h-0 flex-1 flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
-                <span className="text-[13px] font-medium text-white/85">Course elevation</span>
-                <button
-                  type="button"
-                  onClick={() => setChartExpanded(false)}
-                  className="rounded-full p-2 text-white/55 hover:bg-white/10 hover:text-white/85"
-                  aria-label="Collapse chart"
-                >
-                  <Minimize2 className="h-5 w-5" />
-                </button>
-              </div>
-              <p className="shrink-0 px-4 pt-2 text-[11px] text-white/45">Scroll horizontally · tap segment cards to jump</p>
-              <div
-                ref={chartScrollRef}
-                className="min-h-0 flex-1 overflow-x-auto overflow-y-auto px-3 py-4 flex items-center"
-              >
-                {elevationChartSvgExpanded}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 
+  // Expanded chart must be portaled to body (sibling to the modal), not nested under overflow-y-auto /
+  // overflow-hidden — on iOS/Capacitor that clips or mispositions fixed UI and the dismiss control.
+  const expandedChartOverlay =
+    chartExpanded && elevationChartSvgExpanded ? (
+      <div
+        role="presentation"
+        className="fixed inset-0 z-[10002] flex flex-col bg-black/92 backdrop-blur-sm"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+        onClick={() => setChartExpanded(false)}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expanded elevation chart"
+          className="flex min-h-0 min-w-0 flex-1 flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 py-2.5"
+            style={{
+              paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
+              paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+            }}
+          >
+            <span className="min-w-0 truncate text-[13px] font-medium text-white/85">Course elevation</span>
+            <button
+              type="button"
+              onClick={() => setChartExpanded(false)}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full py-2 pl-3 pr-3 text-white/80 hover:bg-white/10"
+              aria-label="Done"
+            >
+              <Minimize2 className="h-5 w-5 shrink-0" aria-hidden />
+              <span className="text-[13px] font-medium">Done</span>
+            </button>
+          </div>
+          <p
+            className="shrink-0 pt-2 text-[11px] text-white/45"
+            style={{
+              paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
+              paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+            }}
+          >
+            Scroll horizontally · tap segment cards to jump
+          </p>
+          <div
+            ref={chartScrollRef}
+            className="min-h-0 flex-1 overflow-x-auto overflow-y-auto px-3 py-4 flex items-center"
+            style={{
+              paddingLeft: 'max(0.75rem, env(safe-area-inset-left, 0px))',
+              paddingRight: 'max(0.75rem, env(safe-area-inset-right, 0px))',
+            }}
+          >
+            {elevationChartSvgExpanded}
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   if (typeof document === 'undefined') return null;
-  return createPortal(modal, document.body);
+  return (
+    <>
+      {createPortal(modal, document.body)}
+      {expandedChartOverlay ? createPortal(expandedChartOverlay, document.body) : null}
+    </>
+  );
 }
