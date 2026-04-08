@@ -165,14 +165,19 @@ Deno.serve(async (req) => {
       console.warn('[course-detail] goals select for projection', gPredErr.message);
     } else if (gPred) {
       const gr = gPred as Record<string, unknown>;
-      predictedFinishSec = await resolveCanonicalPredictedFinishSeconds(supabase, user.id, {
-        name: String(gr.name || ''),
-        distance: gr.distance != null ? String(gr.distance) : null,
-        target_date: gr.target_date != null ? String(gr.target_date) : null,
-        target_time: gr.target_time != null ? Number(gr.target_time) : null,
-        sport: gr.sport != null ? String(gr.sport) : null,
-        race_readiness_projection: gr.race_readiness_projection,
-      });
+      predictedFinishSec = await resolveCanonicalPredictedFinishSeconds(
+        supabase,
+        user.id,
+        {
+          name: String(gr.name || ''),
+          distance: gr.distance != null ? String(gr.distance) : null,
+          target_date: gr.target_date != null ? String(gr.target_date) : null,
+          target_time: gr.target_time != null ? Number(gr.target_time) : null,
+          sport: gr.sport != null ? String(gr.sport) : null,
+          race_readiness_projection: gr.race_readiness_projection,
+        },
+        String(course.goal_id),
+      );
     }
   }
 

@@ -1,7 +1,8 @@
 /**
- * Canonical race finish projection for course pacing:
- * 1) goals.race_readiness_projection — written by coach (same computeRaceReadiness as State tab)
- * 2) Fallback: computeRaceReadiness from baselines only (no weekly HR drift / decoupling)
+ * Canonical race finish projection for course pacing (same numbers State shows):
+ * 1) goals.race_readiness_projection — written when coach runs
+ * 2) coach_cache.payload — last coach response (what State tab SWR serves); use when goal_id matches primary_event
+ * 3) Baseline-only computeRaceReadiness (no weekly reaction signals — last resort)
  *
  * Clients must not send predicted_finish_time_seconds; course-detail / course-strategy use this only.
  */
@@ -25,15 +26,46 @@ function parseGoalRaceReadinessProjection(raw: unknown): number | null {
 }
 
 /**
- * Prefer coach-persisted projection (matches State race_readiness), else baseline-only VDOT projection.
+ * State tab reads from coach_cache (stale-while-revalidate). Use the same payload so terrain pacing
+ * matches the RACE block without relying on a goals column migration.
+ */
+async function readPredictedFinishFromCoachCache(
+  supabase: any,
+  userId: string,
+  courseGoalId: string,
+): Promise<number | null> {
+  const { data: row } = await supabase
+    .from('coach_cache')
+    .select('payload')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const payload = row?.payload as Record<string, unknown> | null | undefined;
+  if (!payload) return null;
+
+  const gc = payload.goal_context as Record<string, unknown> | undefined;
+  const primary = gc?.primary_event as { id?: string } | undefined;
+  if (!primary?.id || String(primary.id) !== String(courseGoalId)) return null;
+
+  const rr = payload.race_readiness as Record<string, unknown> | null | undefined;
+  if (!rr) return null;
+  return parseClientPredictedFinishSeconds(rr.predicted_finish_time_seconds);
+}
+
+/**
+ * @param courseGoalId — goals.id for this race course (match coach primary_event).
  */
 export async function resolveCanonicalPredictedFinishSeconds(
   supabase: any,
   userId: string,
   goal: GoalRowForPrediction,
+  courseGoalId: string,
 ): Promise<number | null> {
-  const fromCoach = parseGoalRaceReadinessProjection(goal.race_readiness_projection);
-  if (fromCoach != null) return fromCoach;
+  const fromGoalRow = parseGoalRaceReadinessProjection(goal.race_readiness_projection);
+  if (fromGoalRow != null) return fromGoalRow;
+
+  const fromCache = await readPredictedFinishFromCoachCache(supabase, userId, courseGoalId);
+  if (fromCache != null) return fromCache;
+
   return resolveServerPredictedFinishSeconds(supabase, userId, goal);
 }
 

@@ -170,14 +170,19 @@ Deno.serve(async (req) => {
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
 
-  const predictedSec = await resolveCanonicalPredictedFinishSeconds(supabase, user.id, {
-    name: String(goal.name || ''),
-    distance: goal.distance != null ? String(goal.distance) : null,
-    target_date: goal.target_date != null ? String(goal.target_date) : null,
-    target_time: goal.target_time != null ? Number(goal.target_time) : null,
-    sport: goal.sport != null ? String(goal.sport) : null,
-    race_readiness_projection: (goal as Record<string, unknown>).race_readiness_projection,
-  });
+  const predictedSec = await resolveCanonicalPredictedFinishSeconds(
+    supabase,
+    user.id,
+    {
+      name: String(goal.name || ''),
+      distance: goal.distance != null ? String(goal.distance) : null,
+      target_date: goal.target_date != null ? String(goal.target_date) : null,
+      target_time: goal.target_time != null ? Number(goal.target_time) : null,
+      sport: goal.sport != null ? String(goal.sport) : null,
+      race_readiness_projection: (goal as Record<string, unknown>).race_readiness_projection,
+    },
+    String(course.goal_id),
+  );
 
   const goalTimeSec = predictedSec ?? planGoalSec;
   if (goalTimeSec == null) {
