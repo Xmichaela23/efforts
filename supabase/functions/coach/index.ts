@@ -2673,7 +2673,8 @@ Deno.serve(async (req) => {
           if (totalWeeks) planLine += ` (${totalWeeks} weeks total)`;
           planLine += `, currently in week ${weekNum}`;
           if (intentStr) planLine += ` which is a ${intentStr} week`;
-          planLine += '.';
+          planLine +=
+            '. Plan phase (taper / peak / build / recovery / baseline) is defined by the plan contract (PlanContractV1); do not rename it or infer it only from training volume or missed sessions.';
           narrativeFacts.push(planLine);
 
           // Multi-event: surface each secondary active plan with its own race date + phase
@@ -2792,8 +2793,9 @@ Deno.serve(async (req) => {
                 : 'on target';
 
           narrativeFacts.push(
-            `Weekly load (TRIMP): planned ${Math.round(plannedWtdLoad)} pts, actual ${Math.round(actualWtdLoad)} pts` +
-            ` (${loadDeltaPct > 0 ? '+' : ''}${loadDeltaPct}% vs plan) — ${loadLabel}.`
+            `Weekly TRIMP load (ALL DISCIPLINES combined, week-to-date through today): planned ${Math.round(plannedWtdLoad)} pts, actual ${Math.round(actualWtdLoad)} pts` +
+            ` (${loadDeltaPct > 0 ? '+' : ''}${loadDeltaPct}% vs plan) — ${loadLabel}. ` +
+            'Do not label this figure "running load" unless you are clearly tying it to run SESSION lines; a missed strength session alone does not explain a shortfall in this combined number.',
           );
         }
         if (routeInsightLine) narrativeFacts.push(routeInsightLine);
@@ -2845,6 +2847,23 @@ Deno.serve(async (req) => {
           // Gaps without reasons — still provide day names so Claude doesn't invent them
           const lines = allGaps.map((g: any) => missedSessionLabel(g));
           narrativeFacts.push(`MISSED SESSIONS (no reason provided — state these as missed without guessing why): ${lines.join('; ')}.`);
+        }
+
+        if (allGaps.length > 0) {
+          const discCounts = new Map<string, number>();
+          for (const g of allGaps) {
+            const d = normalizeType(g?.type);
+            discCounts.set(d, (discCounts.get(d) || 0) + 1);
+          }
+          const summary = [...discCounts.entries()]
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([d, n]) => `${d}: ${n}`)
+            .join('; ');
+          narrativeFacts.push(
+            `MISSED_KEY_SESSIONS_BY_DISCIPLINE: ${summary}. ` +
+              'When you mention misses, separate disciplines: do not say "both running sessions" or blame "running load" on a strength miss unless FACTS show multiple run misses. ' +
+              'If only one run session was missed, say one run session was missed even if a strength session was also missed the same day.',
+          );
         }
 
         // ── Soft-match: pair every completed workout with its planned session ──
@@ -3189,6 +3208,12 @@ NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reason
 SUBJECTIVE / "FELT" LANGUAGE: Do not say a run "felt tired", "felt heavy", "felt off", etc. unless a SESSION line includes a feeling: field, session RPE, or MISSED SESSIONS include an athlete note. When you cite execution, stick to what FACTS list.
 
 SESSION NAMES: For missed or upcoming key sessions, use the exact strings under MISSED SESSIONS or STILL UPCOMING (including quoted planned names). Do not substitute colloquial labels (e.g. "strides", "tempo") unless that exact word appears there or in the prescription text.
+
+DISCIPLINE-SAFE MISSES: When MISSED_KEY_SESSIONS_BY_DISCIPLINE is in FACTS, respect its per-discipline counts. Do not imply multiple run sessions were missed unless the run count there is greater than one. Do not blame a combined TRIMP shortfall on "running" alone when the only run miss is a single session and strength (or another discipline) also has misses the same day.
+
+LOAD SCOPE: The "Weekly TRIMP load (ALL DISCIPLINES combined...)" line is not run-specific. For running load vs plan, cite run SESSION lines or the per-discipline load FACTS — keep your wording consistent with those sources.
+
+PHASE vs VOLUME: Sentence 1 must follow plan week intent from FACTS (PlanContractV1). Do not rename the phase (e.g. call taper "build") and do not infer phase only from how much was skipped this week.
 
 NUMBERS: Do not invent percentages. Percent signs in your answer must trace to explicit FACTS (weekly load vs plan, SESSION execution %, intensity split, route progress, or STRENGTH→RUN CROSS-DOMAIN). For leg-day effects on runs, only cite STRENGTH→RUN CROSS-DOMAIN when present; otherwise describe the week without a numeric interference claim.
 
