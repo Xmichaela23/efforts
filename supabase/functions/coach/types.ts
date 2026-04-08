@@ -65,6 +65,9 @@ export type KeySessionItem = {
 export type CoachWeekContextRequestV1 = {
   user_id: string;
   date?: string; // YYYY-MM-DD (defaults to today)
+  timezone?: string;
+  /** When true, bypass coach_cache read so narrative and metrics recompute (e.g. State refresh). */
+  skip_cache?: boolean;
 };
 
 export type CoachWeekContextResponseV1 = {

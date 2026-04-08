@@ -69,7 +69,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. primary_race_readiness). */
-const COACH_PAYLOAD_VERSION = 3;
+const COACH_PAYLOAD_VERSION = 4;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -666,6 +666,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = (await req.json().catch(() => ({}))) as Partial<CoachWeekContextRequestV1>;
+    const skipCache = Boolean(payload?.skip_cache);
     const userId = String(payload?.user_id || '');
     if (!userId) {
       return new Response(JSON.stringify({ error: 'user_id is required' }), {
@@ -692,7 +693,7 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (cacheRow?.payload) {
+    if (cacheRow?.payload && !skipCache) {
       const ageMs = Date.now() - new Date(cacheRow.generated_at).getTime();
       const isStaleByAge = ageMs > 24 * 60 * 60 * 1000;
       const isInvalidated = cacheRow.invalidated_at != null;
