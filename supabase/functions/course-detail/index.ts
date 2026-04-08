@@ -154,20 +154,24 @@ Deno.serve(async (req) => {
 
   let predictedFinishSec: number | null = null;
   if (course.goal_id) {
-    const { data: gPred } = await supabase
+    // select('*') avoids failing when race_readiness_projection column is not migrated yet.
+    const { data: gPred, error: gPredErr } = await supabase
       .from('goals')
-      .select('name, distance, target_date, target_time, sport, race_readiness_projection')
+      .select('*')
       .eq('id', course.goal_id)
       .eq('user_id', user.id)
       .maybeSingle();
-    if (gPred) {
+    if (gPredErr) {
+      console.warn('[course-detail] goals select for projection', gPredErr.message);
+    } else if (gPred) {
+      const gr = gPred as Record<string, unknown>;
       predictedFinishSec = await resolveCanonicalPredictedFinishSeconds(supabase, user.id, {
-        name: String(gPred.name || ''),
-        distance: gPred.distance != null ? String(gPred.distance) : null,
-        target_date: gPred.target_date != null ? String(gPred.target_date) : null,
-        target_time: gPred.target_time != null ? Number(gPred.target_time) : null,
-        sport: gPred.sport != null ? String(gPred.sport) : null,
-        race_readiness_projection: gPred.race_readiness_projection,
+        name: String(gr.name || ''),
+        distance: gr.distance != null ? String(gr.distance) : null,
+        target_date: gr.target_date != null ? String(gr.target_date) : null,
+        target_time: gr.target_time != null ? Number(gr.target_time) : null,
+        sport: gr.sport != null ? String(gr.sport) : null,
+        race_readiness_projection: gr.race_readiness_projection,
       });
     }
   }

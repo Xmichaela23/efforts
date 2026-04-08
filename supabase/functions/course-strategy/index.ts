@@ -149,13 +149,21 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Link this course to a goal before generating strategy' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  const { data: goal } = await supabase
+  // Use select('*') so we still load the goal if race_readiness_projection column is not migrated yet.
+  const { data: goal, error: gErr } = await supabase
     .from('goals')
-    .select('id, distance, name, target_date, target_time, sport, race_readiness_projection')
+    .select('*')
     .eq('id', course.goal_id)
     .eq('user_id', user.id)
     .maybeSingle();
 
+  if (gErr) {
+    console.error('[course-strategy] goals select', gErr);
+    return new Response(JSON.stringify({ error: gErr.message || 'Goal lookup failed' }), {
+      status: 500,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
   if (!goal) {
     return new Response(JSON.stringify({ error: 'Goal not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -168,7 +176,7 @@ Deno.serve(async (req) => {
     target_date: goal.target_date != null ? String(goal.target_date) : null,
     target_time: goal.target_time != null ? Number(goal.target_time) : null,
     sport: goal.sport != null ? String(goal.sport) : null,
-    race_readiness_projection: goal.race_readiness_projection,
+    race_readiness_projection: (goal as Record<string, unknown>).race_readiness_projection,
   });
 
   const goalTimeSec = predictedSec ?? planGoalSec;
