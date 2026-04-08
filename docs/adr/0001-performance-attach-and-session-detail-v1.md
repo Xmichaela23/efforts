@@ -74,7 +74,7 @@ This avoids: *“I executed the workout well but scored 72 because I did it Satu
 ### 7. Course terrain strategy — predicted finish (SSoT)
 
 - **State** shows `race_readiness` from coach (server-computed). **Terrain strategy** (`course-detail`, `course-strategy`) must use the **same** projected finish when pacing segments, not a second client-supplied number.
-- Resolution order on the server: (1) `goals.race_readiness_projection` when present, (2) **`coach_cache.payload.race_readiness`** when `goal_context.primary_event.id` matches the course’s `goal_id` (same payload State SWR uses), (3) baseline-only VDOT projection if neither is available.
+- Resolution order on the server: (1) `goals.race_readiness_projection` when present, (2) **`coach_cache.payload.race_readiness`** when `goal_context.primary_event.id` matches the course’s `goal_id` (same payload State SWR uses), (3) **stated plan / goal race target** from `resolveGoalTargetTimeSeconds`, (4) baseline-only VDOT only if no plan target exists.
 - The **client does not pass** `predicted_finish_time_seconds` into course APIs; it only renders server payloads.
 
 ---

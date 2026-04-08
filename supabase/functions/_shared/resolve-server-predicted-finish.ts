@@ -1,8 +1,9 @@
 /**
- * Canonical race finish projection for course pacing (same numbers State shows):
+ * Pace anchor for terrain strategy (single server resolver):
  * 1) goals.race_readiness_projection — written when coach runs
- * 2) coach_cache.payload — last coach response (what State tab SWR serves); use when goal_id matches primary_event
- * 3) Baseline-only computeRaceReadiness (no weekly reaction signals — last resort)
+ * 2) coach_cache.payload.race_readiness — same as State tab when primary_event matches this course goal
+ * 3) User plan / goal race target (resolveGoalTargetTimeSeconds) — borrow stated plan estimate
+ * 4) Baseline-only VDOT computeRaceReadiness — only if no plan target exists
  *
  * Clients must not send predicted_finish_time_seconds; course-detail / course-strategy use this only.
  */
@@ -51,22 +52,40 @@ async function readPredictedFinishFromCoachCache(
   return parseClientPredictedFinishSeconds(rr.predicted_finish_time_seconds);
 }
 
+export type PaceAnchorKind = 'coach_readiness' | 'plan_target' | 'baseline_vdot';
+
+export type PaceAnchorResult = {
+  seconds: number;
+  kind: PaceAnchorKind;
+};
+
 /**
- * @param courseGoalId — goals.id for this race course (match coach primary_event).
+ * @param planTargetSec — goal.target_time or linked plan config (already resolved).
+ * @param courseGoalId — goals.id for this race course (match coach primary_event for cache).
  */
-export async function resolveCanonicalPredictedFinishSeconds(
+export async function resolvePaceAnchorForCourse(
   supabase: any,
   userId: string,
   goal: GoalRowForPrediction,
   courseGoalId: string,
-): Promise<number | null> {
+  planTargetSec: number | null,
+): Promise<PaceAnchorResult | null> {
   const fromGoalRow = parseGoalRaceReadinessProjection(goal.race_readiness_projection);
-  if (fromGoalRow != null) return fromGoalRow;
+  if (fromGoalRow != null) return { seconds: fromGoalRow, kind: 'coach_readiness' };
 
   const fromCache = await readPredictedFinishFromCoachCache(supabase, userId, courseGoalId);
-  if (fromCache != null) return fromCache;
+  if (fromCache != null) return { seconds: fromCache, kind: 'coach_readiness' };
 
-  return resolveServerPredictedFinishSeconds(supabase, userId, goal);
+  const pt =
+    planTargetSec != null && Number.isFinite(planTargetSec) && planTargetSec > 0
+      ? Math.round(planTargetSec)
+      : null;
+  if (pt != null) return { seconds: pt, kind: 'plan_target' };
+
+  const vdot = await resolveServerPredictedFinishSeconds(supabase, userId, goal);
+  if (vdot != null) return { seconds: vdot, kind: 'baseline_vdot' };
+
+  return null;
 }
 
 function parseLearnedFitness(raw: unknown): Record<string, unknown> | null {

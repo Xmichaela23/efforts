@@ -29,7 +29,7 @@ import {
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
-import { resolveCanonicalPredictedFinishSeconds } from '../_shared/resolve-server-predicted-finish.ts';
+import { resolvePaceAnchorForCourse } from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
 
-  const predictedSec = await resolveCanonicalPredictedFinishSeconds(
+  const anchor = await resolvePaceAnchorForCourse(
     supabase,
     user.id,
     {
@@ -182,10 +182,10 @@ Deno.serve(async (req) => {
       race_readiness_projection: (goal as Record<string, unknown>).race_readiness_projection,
     },
     String(course.goal_id),
+    planGoalSec,
   );
 
-  const goalTimeSec = predictedSec ?? planGoalSec;
-  if (goalTimeSec == null) {
+  if (anchor == null) {
     return new Response(
       JSON.stringify({
         error:
@@ -195,16 +195,21 @@ Deno.serve(async (req) => {
     );
   }
 
+  const goalTimeSec = anchor.seconds;
+
   let pacingContextLines = '';
-  if (predictedSec != null && planGoalSec != null && predictedSec !== planGoalSec) {
+  if (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) {
     pacingContextLines =
-      `- Pace anchor (current-fitness finish projection): ${fmtFinishClock(predictedSec)} — segment bands must aggregate to this finish time, not the plan time.\n` +
+      `- Pace anchor (current-fitness finish projection): ${fmtFinishClock(anchor.seconds)} — segment bands must aggregate to this finish time, not the plan time.\n` +
       `- Stated plan / goal target (aspirational): ${fmtFinishClock(planGoalSec)}.\n`;
-  } else if (predictedSec != null) {
-    pacingContextLines = `- Pace anchor: current-fitness finish projection ${fmtFinishClock(predictedSec)}.\n`;
-  } else if (planGoalSec != null) {
+  } else if (anchor.kind === 'coach_readiness') {
+    pacingContextLines = `- Pace anchor: current-fitness finish projection ${fmtFinishClock(anchor.seconds)}.\n`;
+  } else if (anchor.kind === 'plan_target') {
     pacingContextLines =
-      `- No fitness projection computed; pace anchor is the stated goal/plan time: ${fmtFinishClock(planGoalSec)}.\n`;
+      `- Pace anchor: stated plan / goal race target ${fmtFinishClock(anchor.seconds)} (no coach fitness projection for this goal in cache).\n`;
+  } else {
+    pacingContextLines =
+      `- Pace anchor: baseline fitness projection ${fmtFinishClock(anchor.seconds)} (no coach cache match and no plan target in goal/plan config).\n`;
   }
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);

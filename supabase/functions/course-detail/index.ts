@@ -1,7 +1,7 @@
 /**
  * course-detail — presentation payload for dumb client (chart + display groups).
  * POST JSON: { course_id?: string, goal_id?: string }
- * Predicted finish comes from goals.race_readiness_projection (coach) or server VDOT fallback — not from the client.
+ * Finish time for header: coach projection / coach_cache (State parity), else plan target, else baseline VDOT — not from the client.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import {
@@ -16,7 +16,7 @@ import {
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
-import { resolveCanonicalPredictedFinishSeconds } from '../_shared/resolve-server-predicted-finish.ts';
+import { resolvePaceAnchorForCourse } from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -152,7 +152,10 @@ Deno.serve(async (req) => {
     planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
   }
 
-  let predictedFinishSec: number | null = null;
+  let primarySec: number | null = null;
+  let goalTimeSource: 'predicted' | 'plan' | null = null;
+  let planTargetTimeStr: string | null = null;
+
   if (course.goal_id) {
     // select('*') avoids failing when race_readiness_projection column is not migrated yet.
     const { data: gPred, error: gPredErr } = await supabase
@@ -165,7 +168,7 @@ Deno.serve(async (req) => {
       console.warn('[course-detail] goals select for projection', gPredErr.message);
     } else if (gPred) {
       const gr = gPred as Record<string, unknown>;
-      predictedFinishSec = await resolveCanonicalPredictedFinishSeconds(
+      const anchor = await resolvePaceAnchorForCourse(
         supabase,
         user.id,
         {
@@ -177,21 +180,25 @@ Deno.serve(async (req) => {
           race_readiness_projection: gr.race_readiness_projection,
         },
         String(course.goal_id),
+        planGoalSec,
       );
+      if (anchor) {
+        primarySec = anchor.seconds;
+        goalTimeSource = anchor.kind === 'plan_target' ? 'plan' : 'predicted';
+        if (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) {
+          planTargetTimeStr = fmtFinishClock(planGoalSec);
+        }
+      }
     }
   }
 
-  const primarySec = predictedFinishSec ?? planGoalSec;
+  if (primarySec == null && planGoalSec != null) {
+    primarySec = planGoalSec;
+    goalTimeSource = 'plan';
+    planTargetTimeStr = null;
+  }
+
   const goalTimeStr = primarySec != null ? fmtFinishClock(primarySec) : null;
-  const goalTimeSource: 'predicted' | 'plan' | null = primarySec == null
-    ? null
-    : predictedFinishSec != null
-    ? 'predicted'
-    : 'plan';
-  const planTargetTimeStr =
-    predictedFinishSec != null && planGoalSec != null && planGoalSec !== predictedFinishSec
-      ? fmtFinishClock(planGoalSec)
-      : null;
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);
   const smoothed = smoothElevation(rawProfile, 2);
