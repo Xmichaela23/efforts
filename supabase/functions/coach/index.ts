@@ -69,7 +69,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. primary_race_readiness). */
-const COACH_PAYLOAD_VERSION = 2;
+const COACH_PAYLOAD_VERSION = 3;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2117,6 +2117,7 @@ Deno.serve(async (req) => {
           effortPaces: (ub as any)?.effort_paces || null,
           performanceNumbers: (ub as any)?.performance_numbers || null,
           primaryEvent: {
+            id: goalContext.primary_event.id,
             name: goalContext.primary_event.name,
             distance: goalContext.primary_event.distance,
             target_date: goalContext.primary_event.target_date,

@@ -42,7 +42,7 @@ export async function loadGoalContext(
 ): Promise<GoalContext> {
   const { data: rows } = await supabase
     .from('goals')
-    .select('id, name, goal_type, target_date, sport, distance, priority, target_metric, target_value, current_value, training_prefs')
+    .select('id, name, goal_type, target_date, sport, distance, priority, target_metric, target_value, current_value, target_time, training_prefs')
     .eq('user_id', userId)
     .eq('status', 'active')
     .order('target_date', { ascending: true, nullsFirst: false });

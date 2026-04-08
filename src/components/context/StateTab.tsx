@@ -281,25 +281,41 @@ export default function StateTab({
     const uid = getStoredUserId();
     if (!uid) return;
     let cancelled = false;
+    const goalIdFromCoach = raceReadiness.goal.id?.trim() || null;
+
     (async () => {
-      const { data: goalsRows } = await supabase
-        .from('goals')
-        .select('id, name, status, target_time, sport')
-        .eq('user_id', uid)
-        .eq('status', 'active');
-      const g = (goalsRows || []).find(
-        (x: { name?: string; sport?: string | null }) =>
-          String(x.name || '') === raceReadiness.goal.name && String(x.sport || '').toLowerCase() === 'run',
-      ) as { id: string } | undefined;
-      if (!g || cancelled) {
+      let goalId: string | null = goalIdFromCoach;
+
+      if (!goalId) {
+        const { data: goalsRows, error: goalsErr } = await supabase
+          .from('goals')
+          .select('id, name, status, sport')
+          .eq('user_id', uid)
+          .eq('status', 'active');
+        if (goalsErr) {
+          console.warn('[StateTab] goals lookup failed:', goalsErr.message);
+          if (!cancelled) {
+            setResolvedGoalId(null);
+            setStateCourseRow(null);
+          }
+          return;
+        }
+        const g = (goalsRows || []).find(
+          (x: { name?: string; sport?: string | null }) =>
+            String(x.name || '') === raceReadiness.goal.name && String(x.sport || '').toLowerCase() === 'run',
+        ) as { id: string } | undefined;
+        goalId = g?.id ?? null;
+      }
+
+      if (!goalId || cancelled) {
         if (!cancelled) {
           setResolvedGoalId(null);
           setStateCourseRow(null);
         }
         return;
       }
-      if (!cancelled) setResolvedGoalId(g.id);
-      const { data: rc } = await supabase.from('race_courses').select('id, name').eq('goal_id', g.id).maybeSingle();
+      if (!cancelled) setResolvedGoalId(goalId);
+      const { data: rc } = await supabase.from('race_courses').select('id, name').eq('goal_id', goalId).maybeSingle();
       if (cancelled) return;
       if (rc?.id) setStateCourseRow({ id: rc.id as string, name: String(rc.name || 'Course') });
       else setStateCourseRow(null);
@@ -307,7 +323,12 @@ export default function StateTab({
     return () => {
       cancelled = true;
     };
-  }, [raceReadiness]);
+  }, [
+    raceReadiness?.goal?.id,
+    raceReadiness?.goal?.name,
+    raceReadiness?.goal?.weeks_out,
+    raceReadiness ? 1 : 0,
+  ]);
 
   if (loading && !data) {
     return (
@@ -341,7 +362,7 @@ export default function StateTab({
     e.target.value = '';
     if (!file || !resolvedGoalId) return;
     const uid = getStoredUserId();
-    const { data: gRow } = await supabase.from('goals').select('target_time, name').eq('id', resolvedGoalId).maybeSingle();
+    const { data: gRow } = await supabase.from('goals').select('name').eq('id', resolvedGoalId).maybeSingle();
     let planRows: { config?: Record<string, unknown> }[] | null = null;
     if (uid) {
       const { data } = await supabase
@@ -353,7 +374,12 @@ export default function StateTab({
         .limit(5);
       planRows = data;
     }
-    let paceTargetSec = resolveEventTargetTimeSeconds({ target_time: gRow?.target_time ?? null }, null);
+    let paceTargetSec =
+      raceReadiness?.target_finish_time_seconds != null &&
+      Number.isFinite(raceReadiness.target_finish_time_seconds) &&
+      raceReadiness.target_finish_time_seconds > 0
+        ? raceReadiness.target_finish_time_seconds
+        : null;
     if (paceTargetSec == null) {
       for (const p of planRows || []) {
         const t = resolveEventTargetTimeSeconds({}, (p as { config?: Record<string, unknown> }).config ?? null);
@@ -365,7 +391,8 @@ export default function StateTab({
     }
     const coachPredSec =
       raceReadiness &&
-      String(gRow?.name || '') === String(raceReadiness.goal.name) &&
+      (raceReadiness.goal.id === resolvedGoalId ||
+        String(gRow?.name || '') === String(raceReadiness.goal.name)) &&
       Number.isFinite(raceReadiness.predicted_finish_time_seconds) &&
       raceReadiness.predicted_finish_time_seconds > 0
         ? raceReadiness.predicted_finish_time_seconds
@@ -380,7 +407,7 @@ export default function StateTab({
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('name', `${String(gRow.name || 'Race')} course`);
+      fd.append('name', `${String(gRow?.name || raceReadiness?.goal?.name || 'Race')} course`);
       fd.append('goal_id', resolvedGoalId);
       const { data: up, error: upErr } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
       if (upErr || !up?.course_id) {
@@ -392,7 +419,7 @@ export default function StateTab({
         window.alert(stErr.message || 'Strategy failed');
         return;
       }
-      setStateCourseRow({ id: up.course_id, name: `${String(gRow.name || 'Race')} course` });
+      setStateCourseRow({ id: up.course_id, name: `${String(gRow?.name || raceReadiness?.goal?.name || 'Race')} course` });
       setStrategyCourseId(up.course_id);
       setStrategyModalOpen(true);
     } finally {

@@ -6,6 +6,8 @@ import { estimateVdotFromPace, getTargetTime, getPacesFromScore, formatPace } fr
 
 export interface RaceReadinessV1 {
   goal: {
+    /** Primary event goal row id when known (coach); avoids client goals list fetch. */
+    id: string | null;
     name: string;
     distance: string;
     target_date: string;
@@ -37,6 +39,7 @@ export interface RaceReadinessInput {
   effortPaces: Record<string, any> | null;
   performanceNumbers: Record<string, any> | null;
   primaryEvent: {
+    id?: string | null;
     name: string;
     distance: string | null;
     target_date: string | null;
@@ -254,6 +257,7 @@ export function computeRaceReadiness(input: RaceReadinessInput): RaceReadinessV1
 
   return {
     goal: {
+      id: event.id ?? null,
       name: event.name,
       distance: event.distance,
       target_date: event.target_date,

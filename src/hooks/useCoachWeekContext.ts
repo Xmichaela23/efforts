@@ -3,6 +3,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 
 export type RaceReadinessV1 = {
   goal: {
+    id?: string | null;
     name: string;
     distance: string;
     target_date: string;
@@ -461,7 +462,7 @@ export function useCoachWeekContext(date?: string) {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
       // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate so we don't flash pre-primary_race_readiness payloads.
-      const MIN_CACHE_PAYLOAD_VERSION = 2;
+      const MIN_CACHE_PAYLOAD_VERSION = 3;
       if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;
