@@ -3300,7 +3300,9 @@ PLAN VS ACTUAL: Session-level gaps (duration, distance, load execution) belong i
 
 NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reasons. Otherwise, state what happened without speculation. Only explain causes when the athlete explicitly provided them.
 
-SKIP TAGS → TRAINING IMPACT: Skip reasons (fatigued, tired, travel, etc.) are context for load and recovery — use them to judge the week, not to narrate. In prose, emphasize what the miss does to the plan or phase (which session type or slot is exposed, whether what remains still supports the goal, what to protect or hit next) rather than dwelling on or repeating why they skipped. At most one short clause if it sharpens the story; avoid therapy-tone acknowledgment of the tag.
+SKIP TAGS → TRAINING IMPACT: Skip reasons (fatigued, tired, travel, etc.) are context for load and recovery — use them to judge the week, not to repeat the label. Emphasize consequences for the block (what slot is thin, what still protects the goal, what to do next). At most one short clause naming the reason if it sharpens the story; avoid empty validation of the tag.
+
+PHASE-ALIGNED RESTRAINT (general sensitivity): Whenever FACTS together imply (a) taper, recovery, sharpening, or similar week intent from the plan contract, (b) a miss with fatigue/load-type athlete context (see MISSED SESSION REASONS), and (c) completed sessions afterward that are on prescription and read easy in SESSION lines (effort, execution, drift as given), you may frame that combination as a **sound body read** for the phase — e.g. pulling volume when legs were heavy before a race, then executing the next easy pieces cleanly. Prefer that framing over a neutral "skipped but then completed" ledger tone. When this pattern fits, do **not** let "below plan" aggregate volume be the lead story; freshness and phase fit come first, volume vs plan second or omitted if it undercuts the phase story. Apply whenever those signals co-occur in FACTS, not as a one-off about specific calendar days.
 
 SUBJECTIVE / "FELT" LANGUAGE: Do not say a run "felt tired", "felt heavy", "felt off", etc. unless a SESSION line includes a feeling: field, session RPE, or MISSED SESSIONS include an athlete note. When you cite execution, stick to what FACTS list.
 
@@ -3310,7 +3312,7 @@ DISCIPLINE-SAFE MISSES: When MISSED_KEY_SESSIONS_BY_DISCIPLINE is in FACTS, resp
 
 LOAD SCOPE: The "Weekly TRIMP load (ALL DISCIPLINES combined...)" line is not run-specific. For running load vs plan, cite run SESSION lines or the per-discipline load FACTS — keep your wording consistent with those sources.
 
-PHASE vs VOLUME: Sentence 1 must follow plan week intent from FACTS (PlanContractV1). Do not rename the phase (e.g. call taper "build") and do not infer phase only from how much was skipped this week.
+PHASE vs VOLUME: Sentence 1 must follow plan week intent from FACTS (PlanContractV1). Do not rename the phase (e.g. call taper "build") and do not infer phase only from how much was skipped this week. During taper/recovery intent, a strategic miss plus clean easy follow-up is often **correct** for the phase — weight that in interpretation (see PHASE-ALIGNED RESTRAINT) rather than defaulting to volume shortfall as the main takeaway.
 
 NUMBERS: Do not invent percentages. Percent signs in your answer must trace to explicit FACTS (weekly load vs plan, SESSION execution %, intensity split, route progress, or STRENGTH→RUN CROSS-DOMAIN). For leg-day effects on runs, only cite STRENGTH→RUN CROSS-DOMAIN when present; otherwise describe the week without a numeric interference claim.
 
