@@ -321,12 +321,28 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
     }, 1500);
   };
 
+  const panelClass =
+    'rounded-2xl border-2 border-white/20 bg-white/[0.05] px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-xl';
+  const fieldClass =
+    'h-9 border-2 border-white/20 bg-white/[0.08] text-sm text-white/90 placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-0 rounded-xl';
+  const selectContentClass =
+    'z-[200] border-2 border-white/30 bg-[#1a1a2e] text-white shadow-xl backdrop-blur-xl';
+
   if (!isInitialized) {
     return (
-      <div className="min-h-screen pb-24">
-        <div className="bg-white pb-2 mb-2">
-          <div className="flex items-center w-full">
-            <h1 className="text-xl font-medium text-gray-700">Loading...</h1>
+      <div
+        className="fixed inset-0 z-[40] flex flex-col"
+        style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}
+      >
+        <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
+        <div className="px-4 pt-2">
+          <div className={panelClass}>
+            <h1 className="text-xl font-medium text-white/90" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Loading…
+            </h1>
+            <p className="mt-1 text-xs font-light text-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Preparing your session
+            </p>
           </div>
         </div>
       </div>
@@ -334,33 +350,39 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   }
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Header */}
-      <div className="bg-white pb-2 mb-2">
-        <div className="flex items-center justify-between w-full px-3">
-          <h1 className="text-xl font-medium text-gray-700">
-            {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
-          </h1>
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="h-7 px-1.5 py-0.5 text-xs text-gray-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 cursor-pointer focus:bg-blue-100 focus:border-blue-300 transition-colors"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          />
-        </div>
-      </div>
+    <div
+      className="fixed inset-0 z-[40] flex flex-col"
+      style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}
+    >
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
 
-      {/* Main content container */}
-      <div className="space-y-2 w-full pb-3 px-3">
-        {/* REQUIRED SECTION */}
-        <div className="bg-white">
-          <div className="p-2">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Session Details</h3>
-            
-            {/* Duration */}
+        <div className="mx-auto w-full max-w-lg space-y-3 px-3">
+          <div className={panelClass}>
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-xl font-medium text-white/90" style={{ fontFamily: 'Inter, sans-serif' }}>
+                {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
+              </h1>
+              <Input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="h-8 shrink-0 rounded-full border-2 border-white/20 bg-white/[0.08] px-2 py-1 text-xs text-white/90 hover:border-white/30 focus-visible:border-white/35 focus-visible:ring-0"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              />
+            </div>
+            <p className="mt-1 text-xs font-light text-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Session RPE and type match how workload is calculated
+            </p>
+          </div>
+
+          <div className={panelClass}>
+            <h3 className="mb-3 text-sm font-medium text-white/80" style={{ fontFamily: 'Inter, sans-serif' }}>
+              Session details
+            </h3>
+
             <div className="mb-3">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Duration</Label>
+              <Label className="mb-2 block text-xs font-medium text-white/60">Duration</Label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -368,19 +390,18 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                   max="240"
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className="h-9 text-center text-sm border-gray-300 flex-1"
+                  className={`${fieldClass} max-w-[120px] text-center`}
                   style={{ fontSize: '16px' }}
                   placeholder="60"
                 />
-                <span className="text-sm text-gray-600">minutes</span>
+                <span className="text-sm text-white/55">minutes</span>
               </div>
             </div>
 
-            {/* RPE - CRITICAL FIELD */}
             <div className="mb-3">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                RPE (1-10)
-                <span className="text-xs text-gray-500 ml-1">How hard did this session feel overall?</span>
+              <Label className="mb-2 block text-xs font-medium text-white/60">
+                RPE (1–10)
+                <span className="ml-1 font-light text-white/45">Overall effort for this session</span>
               </Label>
               <div className="space-y-2">
                 <input
@@ -389,29 +410,28 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                   max="10"
                   value={sessionRPE}
                   onChange={(e) => setSessionRPE(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20 accent-white"
                 />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Easy</span>
+                  <span className="text-xs text-white/45">Easy</span>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-gray-900">{sessionRPE}</div>
-                    <div className="text-xs text-gray-500">{getRPELabel(sessionRPE)}</div>
+                    <div className="text-lg font-semibold text-white/95">{sessionRPE}</div>
+                    <div className="text-xs text-white/50">{getRPELabel(sessionRPE)}</div>
                   </div>
-                  <span className="text-xs text-gray-500">Maximal</span>
+                  <span className="text-xs text-white/45">Maximal</span>
                 </div>
               </div>
             </div>
 
-            {/* Session Type */}
-            <div className="mb-3">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">Session Type</Label>
+            <div className="mb-1">
+              <Label className="mb-2 block text-xs font-medium text-white/60">Session type</Label>
               <Select value={sessionType} onValueChange={(value: PilatesYogaSessionType) => setSessionType(value)}>
-                <SelectTrigger className="h-9 text-sm border-gray-300">
-                  <SelectValue placeholder="Select..." />
+                <SelectTrigger className={`${fieldClass} h-10 w-full`}>
+                  <SelectValue placeholder="Select…" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                  {SESSION_TYPES.map(type => (
-                    <SelectItem key={type.value} value={type.value}>
+                <SelectContent className={selectContentClass}>
+                  {SESSION_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value} className="focus:bg-white/15">
                       {type.label}
                     </SelectItem>
                   ))}
@@ -419,36 +439,36 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
               </Select>
             </div>
           </div>
-        </div>
 
-        {/* OPTIONAL SECTION - Collapsible */}
-        <div className="bg-white">
-          <div className="p-2">
+          <div className={panelClass}>
             <button
+              type="button"
               onClick={() => setShowOptionalFields(!showOptionalFields)}
-              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
+              className="flex w-full items-center justify-between text-sm font-medium text-white/80 hover:text-white"
             >
-              <span>Additional Info (Optional)</span>
-              {showOptionalFields ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
+              <span>Additional info (optional)</span>
+              {showOptionalFields ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
-            
+
             {showOptionalFields && (
-              <div className="space-y-3 pt-2">
-                {/* Session Feeling */}
+              <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Session Feeling</Label>
-                  <Select value={sessionFeeling} onValueChange={(value: SessionFeeling) => setSessionFeeling(value)}>
-                    <SelectTrigger className="h-9 text-sm border-gray-300">
-                      <SelectValue placeholder="Select..." />
+                  <Label className="mb-2 block text-xs font-medium text-white/60">Session feeling</Label>
+                  <Select
+                    value={sessionFeeling || '__none__'}
+                    onValueChange={(value: string) =>
+                      setSessionFeeling(value === '__none__' ? '' : (value as SessionFeeling))
+                    }
+                  >
+                    <SelectTrigger className={`${fieldClass} h-10 w-full`}>
+                      <SelectValue placeholder="Optional" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                      <SelectItem value="">None</SelectItem>
-                      {SESSION_FEELINGS.map(feeling => (
-                        <SelectItem key={feeling.value} value={feeling.value}>
+                    <SelectContent className={selectContentClass}>
+                      <SelectItem value="__none__" className="focus:bg-white/15">
+                        None
+                      </SelectItem>
+                      {SESSION_FEELINGS.map((feeling) => (
+                        <SelectItem key={feeling.value} value={feeling.value} className="focus:bg-white/15">
                           {feeling.label}
                         </SelectItem>
                       ))}
@@ -456,17 +476,23 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                   </Select>
                 </div>
 
-                {/* Environment */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Environment</Label>
-                  <Select value={environment} onValueChange={(value: Environment) => setEnvironment(value)}>
-                    <SelectTrigger className="h-9 text-sm border-gray-300">
-                      <SelectValue placeholder="Select..." />
+                  <Label className="mb-2 block text-xs font-medium text-white/60">Environment</Label>
+                  <Select
+                    value={environment || '__none__'}
+                    onValueChange={(value: string) =>
+                      setEnvironment(value === '__none__' ? '' : (value as Environment))
+                    }
+                  >
+                    <SelectTrigger className={`${fieldClass} h-10 w-full`}>
+                      <SelectValue placeholder="Optional" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                      <SelectItem value="">None</SelectItem>
-                      {ENVIRONMENTS.map(env => (
-                        <SelectItem key={env.value} value={env.value}>
+                    <SelectContent className={selectContentClass}>
+                      <SelectItem value="__none__" className="focus:bg-white/15">
+                        None
+                      </SelectItem>
+                      {ENVIRONMENTS.map((env) => (
+                        <SelectItem key={env.value} value={env.value} className="focus:bg-white/15">
                           {env.label}
                         </SelectItem>
                       ))}
@@ -474,76 +500,66 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                   </Select>
                 </div>
 
-                {/* Heated - Only show if yoga session */}
                 {isYogaSession && (
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="is-heated"
                       checked={isHeated}
                       onCheckedChange={(checked) => setIsHeated(checked === true)}
+                      className="border-white/40 data-[state=checked]:bg-white/20"
                     />
-                    <Label htmlFor="is-heated" className="cursor-pointer text-sm text-gray-700">
-                      Heated/Hot Room
+                    <Label htmlFor="is-heated" className="cursor-pointer text-sm text-white/75">
+                      Heated / hot room
                     </Label>
                   </div>
                 )}
 
-                {/* Instructor/Studio */}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Instructor/Studio</Label>
+                  <Label className="mb-2 block text-xs font-medium text-white/60">Instructor (optional)</Label>
                   <Input
                     value={instructor}
                     onChange={(e) => setInstructor(e.target.value)}
-                    placeholder="e.g., Sarah Johnson"
-                    className="h-9 text-sm border-gray-300"
+                    placeholder="e.g. Sarah Johnson"
+                    className={fieldClass}
                   />
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* FOCUS AREAS - Optional */}
-        <div className="bg-white">
-          <div className="p-2">
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">Focus Areas (Optional)</Label>
+          <div className={panelClass}>
+            <Label className="mb-2 block text-xs font-medium text-white/60">Focus areas (optional)</Label>
             <div className="grid grid-cols-2 gap-2">
-              {FOCUS_AREAS.map(area => (
+              {FOCUS_AREAS.map((area) => (
                 <div key={area.value} className="flex items-center space-x-2">
                   <Checkbox
                     id={`focus-${area.value}`}
                     checked={focusAreas.includes(area.value)}
                     onCheckedChange={() => toggleFocusArea(area.value)}
+                    className="border-white/40 data-[state=checked]:bg-white/20"
                   />
-                  <Label htmlFor={`focus-${area.value}`} className="cursor-pointer text-sm text-gray-700">
+                  <Label htmlFor={`focus-${area.value}`} className="cursor-pointer text-sm text-white/75">
                     {area.label}
                   </Label>
                 </div>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* STUDIO/TEACHER - Optional */}
-        <div className="bg-white">
-          <div className="p-2">
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">Studio/Teacher (Optional)</Label>
-            
-            {/* Studio/Teacher Name */}
+          <div className={panelClass}>
+            <Label className="mb-2 block text-xs font-medium text-white/60">Studio / teacher (optional)</Label>
             <div className="mb-3">
               <Input
                 value={studioName}
                 onChange={(e) => setStudioName(e.target.value)}
-                placeholder="e.g., CorePower Yoga, Sarah Johnson"
-                className="h-9 text-sm border-gray-300"
+                placeholder="e.g. CorePower Yoga"
+                className={fieldClass}
               />
             </div>
-
-            {/* Teacher Rating */}
             <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                Teacher Rating (1-10)
-                <span className="text-xs text-gray-500 ml-1">How would you rate this teacher?</span>
+              <Label className="mb-2 block text-xs font-medium text-white/60">
+                Teacher rating (1–10)
+                <span className="ml-1 font-light text-white/45">Optional</span>
               </Label>
               <div className="space-y-2">
                 <input
@@ -552,61 +568,61 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                   max="10"
                   value={teacherRating}
                   onChange={(e) => setTeacherRating(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20 accent-white"
                 />
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Poor</span>
+                  <span className="text-xs text-white/45">Poor</span>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-gray-900">{teacherRating}</div>
-                    <div className="text-xs text-gray-500">{getTeacherRatingLabel(teacherRating)}</div>
+                    <div className="text-lg font-semibold text-white/95">{teacherRating}</div>
+                    <div className="text-xs text-white/50">{getTeacherRatingLabel(teacherRating)}</div>
                   </div>
-                  <span className="text-xs text-gray-500">Excellent</span>
+                  <span className="text-xs text-white/45">Excellent</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* NOTES - Optional */}
-        <div className="bg-white">
-          <div className="p-2">
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">Notes (Optional)</Label>
+          <div className={panelClass}>
+            <Label className="mb-2 block text-xs font-medium text-white/60">Notes (optional)</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="How did the session feel? Any modifications or observations?"
+              placeholder="Modifications, highlights, anything you want to remember"
               rows={4}
-              className="text-sm border-gray-300"
+              className={`${fieldClass} min-h-[100px] resize-y`}
             />
           </div>
         </div>
       </div>
 
-      {/* Fixed bottom save action (text-only per design) */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
-        <button 
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[45] border-t border-white/15 bg-black/50 px-4 py-3 backdrop-blur-xl"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+      >
+        <button
+          type="button"
           onClick={saveWorkout}
           disabled={!sessionType || duration <= 0 || sessionRPE < 1 || sessionRPE > 10 || isSaving || isSaved}
-          className="w-full h-12 text-base font-medium text-black hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-12 w-full rounded-full border-2 border-white/25 bg-white/[0.08] text-base font-medium text-white/90 transition-colors hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-45"
+          style={{ fontFamily: 'Inter, sans-serif' }}
         >
           Save
         </button>
       </div>
 
-      {/* Loading/Success Overlay */}
       {(isSaving || isSaved) && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md mx-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="mx-4 max-w-md rounded-2xl border-2 border-white/25 bg-[#1a1a2e]/95 p-8 shadow-xl backdrop-blur-xl">
             {isSaving ? (
               <div className="flex flex-col items-center justify-center">
-                <Loader2 className="h-12 w-12 text-blue-600 animate-spin mb-4" />
-                <p className="text-lg font-medium text-gray-900">Saving workout...</p>
-                <p className="text-sm text-gray-500 mt-2">(you don't need to stay here while loading)</p>
+                <Loader2 className="mb-4 h-12 w-12 animate-spin text-white/80" />
+                <p className="text-lg font-medium text-white/90">Saving workout…</p>
+                <p className="mt-2 text-sm text-white/50">You can leave this screen; it will finish in the background</p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center">
-                <CheckCircle className="h-12 w-12 text-green-600 mb-4" />
-                <p className="text-lg font-medium text-gray-900">Saved!</p>
+                <CheckCircle className="mb-4 h-12 w-12 text-emerald-400" />
+                <p className="text-lg font-medium text-white/90">Saved</p>
               </div>
             )}
           </div>

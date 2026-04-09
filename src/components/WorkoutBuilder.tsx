@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move, ArrowLeft, Sparkles } from 'lucide-react';
+import { Clock, Trash2, Check, ChevronRight, Move, ArrowLeft, Sparkles } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
@@ -12,6 +12,39 @@ import StrengthExerciseBuilder, { StrengthExercise } from './StrengthExerciseBui
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { PlannedWorkout } from '@/types/planned-workout';
+
+type BuilderDiscipline = 'run' | 'ride' | 'swim' | 'strength' | 'mobility' | 'pilates_yoga';
+
+/** Map Log FAB types (log-run, …) and plain disciplines to stored workout type. */
+function normalizeBuilderDisciplineType(raw: string): BuilderDiscipline | '' {
+  const t = String(raw || '').toLowerCase();
+  if (t === 'log-run') return 'run';
+  if (t === 'log-ride') return 'ride';
+  if (t === 'log-swim') return 'swim';
+  if (t === 'run' || t === 'ride' || t === 'swim' || t === 'strength' || t === 'mobility' || t === 'pilates_yoga') {
+    return t;
+  }
+  return '';
+}
+
+function planScreenTitle(type: string): string {
+  switch (type) {
+    case 'run':
+      return 'Plan Run';
+    case 'ride':
+      return 'Plan Ride';
+    case 'swim':
+      return 'Plan Swim';
+    case 'strength':
+      return 'Plan Strength';
+    case 'mobility':
+      return 'Plan Mobility';
+    case 'pilates_yoga':
+      return 'Plan Pilates / Yoga';
+    default:
+      return 'Plan Workout';
+  }
+}
 
 interface WorkoutBuilderProps {
   onClose: () => void;
@@ -49,9 +82,10 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return getLocalDateString();
   };
 
+  const normalizedInitialType = normalizeBuilderDisciplineType(initialType || '');
   const [formData, setFormData] = useState({
     name: '',
-    type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' | 'mobility' | 'pilates_yoga' : ''),
+    type: (existingWorkout?.type as BuilderDiscipline | '') || normalizedInitialType || ('' as const),
     date: getInitialDate(),
     description: '',
     userComments: '',
@@ -131,10 +165,12 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   }, [existingWorkout, initialDate]);
 
   useEffect(() => {
-    if (initialType && initialType !== '') {
-      setFormData(prev => ({ ...prev, type: initialType as any }));
+    if (existingWorkout) return;
+    const n = normalizeBuilderDisciplineType(initialType || '');
+    if (n) {
+      setFormData(prev => ({ ...prev, type: n }));
     }
-  }, [initialType]);
+  }, [initialType, existingWorkout]);
 
   // Default swim pool based on user units when creating a new swim
   useEffect(() => {
@@ -222,13 +258,16 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     // Otherwise, just clear the form
     if (!confirm('Clear all workout data and start fresh?')) return;
 
+    const clearedType = normalizeBuilderDisciplineType(initialType || '') || 'run';
     setFormData({
       name: '',
-      type: 'run',
+      type: clearedType,
       date: initialDate || getLocalDateString(),
       description: '',
       userComments: '',
-      completedManually: false
+      completedManually: false,
+      pool_unit: null as any,
+      pool_length_m: null as any
     });
 
     setRunIntervals([]);
@@ -394,219 +433,265 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div
+      className="fixed inset-0 z-[40] flex flex-col"
+      style={{
+        background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)',
+      }}
+    >
       {showSaveOptions && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 z-50 flex items-center gap-4">
-          <Check className="h-5 w-5" />
+        <div className="fixed top-[calc(var(--header-h,64px)+env(safe-area-inset-top,0px)+12px)] left-1/2 z-[60] flex -translate-x-1/2 items-center gap-3 rounded-xl border-2 border-white/25 bg-[#1a1a2e]/95 px-5 py-3 text-sm text-white/90 shadow-lg backdrop-blur-xl">
+          <Check className="h-5 w-5 text-emerald-400" />
           <span>{currentWorkout ? 'Planned workout updated' : 'Planned workout saved'}</span>
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-3 py-2">
-        <div className="flex justify-between items-center mb-1">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleBackClick}
-              variant="ghost"
-              className="flex items-center gap-2 p-0 h-auto text-muted-foreground hover:text-black"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              {getBackButtonText()}
-            </Button>
-          </div>
-          
-          <Input
-            type="date"
-            value={formData.date}
-            onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-            className="min-h-[44px] bg-transparent w-auto border-none shadow-none focus:border-none focus:ring-0 focus:outline-none"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          />
-        </div>
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain pb-28"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
 
-        {(formData.type === 'run' || formData.type === 'ride') && (
-          <div className="flex justify-end items-center gap-2 mb-1">
-            <Label htmlFor="units" className="text-sm font-medium text-muted-foreground">
-              Imperial
-            </Label>
-            <Switch
-              id="units"
-              checked={!useImperial}
-              onCheckedChange={toggleUnits}
-              className="data-[state=checked]:bg-black data-[state=unchecked]:bg-gray-200"
-            />
-            <Label htmlFor="units" className="text-sm font-medium text-muted-foreground">
-              Metric
-            </Label>
-          </div>
-        )}
-
-        <div className="space-y-1">
-          <div className="p-2 pt-1">
-            <div className="flex items-center gap-4 mb-3">
+        <div className="mx-auto w-full max-w-7xl space-y-3 px-3">
+          <div className="relative rounded-2xl border-2 border-white/20 bg-white/[0.05] px-4 pb-3 pt-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <Button
+                  onClick={handleBackClick}
+                  variant="ghost"
+                  className="h-auto shrink-0 p-0 text-white/70 hover:bg-transparent hover:text-white"
+                >
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  <span className="text-sm font-light">{getBackButtonText()}</span>
+                </Button>
+                <div className="min-w-0">
+                  <h1 className="text-xl font-medium text-white/90" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {planScreenTitle(formData.type)}
+                  </h1>
+                  <p className="text-xs font-light text-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    Structure and save a planned session on your calendar
+                  </p>
+                </div>
+              </div>
               <Input
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Focus"
-                className="border-gray-300 min-h-[44px] flex-1"
-                style={{fontFamily: 'Inter, sans-serif'}}
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
+                className="h-8 shrink-0 rounded-full border-2 border-white/20 bg-white/[0.08] px-2 py-1 text-xs text-white/90 hover:border-white/30 focus:border-white/35 focus-visible:ring-0"
+                style={{ fontFamily: 'Inter, sans-serif' }}
               />
-              {/* FIXED: Use proper PlanBuilder instead of local modal */}
-              <Button
-                onClick={() => {
-                  if (onOpenPlanBuilder) {
-                    onOpenPlanBuilder();
-                  } else {
-                    console.warn('onOpenPlanBuilder not provided');
-                  }
-                }}
-                variant="ghost"
-                className="text-gray-600 hover:text-black flex items-center gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                Build me a plan
-              </Button>
-              <button
-                onClick={handleTrashClick}
-                className="text-gray-400 hover:text-red-500 transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              {formData.type === 'strength' && (
-                <div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowNotes(!showNotes)}
-                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground mb-2"
-                    >
-                      <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes ? 'rotate-90' : ''}`} />
-                      Notes
-                    </button>
-
-                    {showNotes && (
-                      <Textarea
-                        value={formData.userComments}
-                        onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
-                        placeholder=""
-                        rows={2}
-                        className="border-gray-300 min-h-[44px]"
-                        style={{fontFamily: 'Inter, sans-serif'}}
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-              <div>
-                <div className="relative">
-                  <div
-                    className={`min-h-[44px] w-full text-sm text-foreground p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
-                    style={{fontFamily: 'Inter, sans-serif'}}
-                  >
-                    {generateWorkoutDescription()}
-                  </div>
-                  {formData.type !== 'strength' && formData.type !== 'mobility' && formData.type !== 'pilates_yoga' && (
-                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-muted-foreground text-sm">
-                      <Clock className="h-3 w-3" />
-                      <span>Total Time: {formatTime(calculateTotalTime())}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
 
-          <div className="p-2 pt-0">
-            {formData.type === 'run' && (
-              <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
-            )}
-            {formData.type === 'ride' && (
-              <RideIntervalBuilder intervals={rideIntervals} onChange={setRideIntervals} isMetric={isMetric} />
-            )}
-            {formData.type === 'swim' && (
-              <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
-            )}
-            {formData.type === 'swim' && (
-              <div className="mt-4 border-t pt-3">
-                <Label className="text-sm font-medium text-muted-foreground mb-2 block">Pool setting</Label>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: 'yd', pool_length_m: 22.86 }))}
-                    className={`border rounded px-3 py-2 text-left ${formData.pool_unit==='yd' && Math.abs((formData.pool_length_m||0)-22.86)<0.01 ? 'border-black' : 'border-gray-300'}`}
-                  >25 Yard Pool</button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: 'm', pool_length_m: 25.0 }))}
-                    className={`border rounded px-3 py-2 text-left ${formData.pool_unit==='m' && Math.abs((formData.pool_length_m||0)-25.0)<0.01 ? 'border-black' : 'border-gray-300'}`}
-                  >25 Meter Pool</button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: 'm', pool_length_m: 50.0 }))}
-                    className={`border rounded px-3 py-2 text-left ${formData.pool_unit==='m' && Math.abs((formData.pool_length_m||0)-50.0)<0.01 ? 'border-black' : 'border-gray-300'}`}
-                  >50 Meter Pool</button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: null as any, pool_length_m: null as any }))}
-                    className={`border rounded px-3 py-2 text-left ${!formData.pool_unit ? 'border-black' : 'border-gray-300'}`}
-                  >Unspecified (device determines)</button>
-                </div>
-                <div className="text-xs text-muted-foreground mt-2">Preview: {formData.pool_unit==='yd' ? 'yards' : formData.pool_unit==='m' ? 'meters' : 'device default'} headers on device</div>
-              </div>
-            )}
-            {formData.type === 'strength' && (
-              <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
-            )}
-            {formData.type === 'mobility' && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Move className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-lg font-medium mb-2">Mobility Session</p>
-                <p className="text-sm">Track your mobility and flexibility work</p>
-              </div>
-            )}
-            {formData.type === 'pilates_yoga' && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Move className="h-12 w-12 mx-auto mb-4 text-purple-400" />
-                <p className="text-lg font-medium mb-2">Pilates/Yoga Session</p>
-                <p className="text-sm">Track your pilates and yoga sessions</p>
-              </div>
-            )}
-          </div>
-
-          {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility' || formData.type === 'pilates_yoga') && (
-            <div className="bg-gray-50 p-2">
-              <p className="text-sm text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                {generateWorkoutDescription()}
-              </p>
-              {calculateTotalTime() > 0 && (
-                <p className="text-xs text-muted-foreground mt-1" style={{fontFamily: 'Inter, sans-serif'}}>
-                  Total Time: {formatTime(calculateTotalTime())}
-                </p>
-              )}
+          {(formData.type === 'run' || formData.type === 'ride') && (
+            <div className="flex items-center justify-end gap-2 px-1">
+              <Label htmlFor="units" className="text-sm font-light text-white/60">
+                Imperial
+              </Label>
+              <Switch
+                id="units"
+                checked={!useImperial}
+                onCheckedChange={toggleUnits}
+                className="data-[state=checked]:bg-white/40 data-[state=unchecked]:bg-white/15"
+              />
+              <Label htmlFor="units" className="text-sm font-light text-white/60">
+                Metric
+              </Label>
             </div>
           )}
-        </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
-          <Button
-            onClick={() => handleSave(false)}
-            variant="clean"
-            className="w-full h-12 text-muted-foreground hover:text-foreground"
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 600,
-              fontSize: '15px'
-            }}
-          >
-            Save Planned Workout
-          </Button>
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.35)]">
+            <div className="space-y-1">
+              <div className="p-2 pt-3">
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Focus"
+                    className="min-h-[44px] flex-1 border-gray-300"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  />
+                  <Button
+                    onClick={() => {
+                      if (onOpenPlanBuilder) {
+                        onOpenPlanBuilder();
+                      } else {
+                        console.warn('onOpenPlanBuilder not provided');
+                      }
+                    }}
+                    variant="ghost"
+                    className="flex items-center gap-2 text-gray-600 hover:text-black"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Build me a plan
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={handleTrashClick}
+                    className="text-gray-400 transition-colors hover:text-red-500"
+                    title="Clear or delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {formData.type === 'strength' && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotes(!showNotes)}
+                        className="mb-2 flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronRight
+                          className={`h-4 w-4 transform transition-transform ${showNotes ? 'rotate-90' : ''}`}
+                        />
+                        Notes
+                      </button>
+
+                      {showNotes && (
+                        <Textarea
+                          value={formData.userComments}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, userComments: e.target.value }))}
+                          placeholder=""
+                          rows={2}
+                          className="min-h-[44px] border-gray-300"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                        />
+                      )}
+                    </div>
+                  )}
+                  <div>
+                    <div className="relative">
+                      <div
+                        className={`min-h-[44px] w-full p-3 text-sm text-foreground ${formData.type === 'strength' ? '' : 'pb-8'}`}
+                        style={{ fontFamily: 'Inter, sans-serif' }}
+                      >
+                        {generateWorkoutDescription()}
+                      </div>
+                      {formData.type !== 'strength' &&
+                        formData.type !== 'mobility' &&
+                        formData.type !== 'pilates_yoga' && (
+                          <div className="absolute bottom-2 right-3 flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>Total Time: {formatTime(calculateTotalTime())}</span>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-2 pb-3 pt-0">
+                {formData.type === 'run' && (
+                  <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
+                )}
+                {formData.type === 'ride' && (
+                  <RideIntervalBuilder intervals={rideIntervals} onChange={setRideIntervals} isMetric={isMetric} />
+                )}
+                {formData.type === 'swim' && (
+                  <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
+                )}
+                {formData.type === 'swim' && (
+                  <div className="mt-4 border-t border-gray-200 pt-3">
+                    <Label className="mb-2 block text-sm font-medium text-muted-foreground">Pool setting</Label>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, pool_unit: 'yd', pool_length_m: 22.86 }))}
+                        className={`rounded border px-3 py-2 text-left ${formData.pool_unit === 'yd' && Math.abs((formData.pool_length_m || 0) - 22.86) < 0.01 ? 'border-black' : 'border-gray-300'}`}
+                      >
+                        25 Yard Pool
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, pool_unit: 'm', pool_length_m: 25.0 }))}
+                        className={`rounded border px-3 py-2 text-left ${formData.pool_unit === 'm' && Math.abs((formData.pool_length_m || 0) - 25.0) < 0.01 ? 'border-black' : 'border-gray-300'}`}
+                      >
+                        25 Meter Pool
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, pool_unit: 'm', pool_length_m: 50.0 }))}
+                        className={`rounded border px-3 py-2 text-left ${formData.pool_unit === 'm' && Math.abs((formData.pool_length_m || 0) - 50.0) < 0.01 ? 'border-black' : 'border-gray-300'}`}
+                      >
+                        50 Meter Pool
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({ ...prev, pool_unit: null as any, pool_length_m: null as any }))
+                        }
+                        className={`rounded border px-3 py-2 text-left ${!formData.pool_unit ? 'border-black' : 'border-gray-300'}`}
+                      >
+                        Unspecified (device determines)
+                      </button>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Preview:{' '}
+                      {formData.pool_unit === 'yd'
+                        ? 'yards'
+                        : formData.pool_unit === 'm'
+                          ? 'meters'
+                          : 'device default'}{' '}
+                      headers on device
+                    </div>
+                  </div>
+                )}
+                {formData.type === 'strength' && (
+                  <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
+                )}
+                {formData.type === 'mobility' && (
+                  <div className="py-8 text-center text-muted-foreground">
+                    <Move className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                    <p className="mb-2 text-lg font-medium">Mobility Session</p>
+                    <p className="text-sm">Use Log Mobility from the + menu to record a completed mobility session.</p>
+                  </div>
+                )}
+                {formData.type === 'pilates_yoga' && (
+                  <div className="py-8 text-center text-muted-foreground">
+                    <Move className="mx-auto mb-4 h-12 w-12 text-purple-400" />
+                    <p className="mb-2 text-lg font-medium">Pilates / Yoga</p>
+                    <p className="text-sm">Use Log Pilates/Yoga from the + menu to record a completed class or practice.</p>
+                  </div>
+                )}
+              </div>
+
+              {(runIntervals.length > 0 ||
+                rideIntervals.length > 0 ||
+                swimIntervals.length > 0 ||
+                strengthExercises.length > 0 ||
+                formData.type === 'mobility' ||
+                formData.type === 'pilates_yoga') && (
+                <div className="border-t border-gray-100 bg-gray-50 p-3">
+                  <p className="text-sm text-foreground" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    {generateWorkoutDescription()}
+                  </p>
+                  {calculateTotalTime() > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground" style={{ fontFamily: 'Inter, sans-serif' }}>
+                      Total Time: {formatTime(calculateTotalTime())}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        
-        <div className="h-16"></div>
-      </main>
+      </div>
+
+      <div
+        className="fixed bottom-0 left-0 right-0 z-[45] border-t border-white/15 bg-black/50 px-4 py-3 backdrop-blur-xl"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+      >
+        <Button
+          onClick={() => handleSave(false)}
+          variant="ghost"
+          className="h-12 w-full rounded-full border-2 border-white/25 bg-white/[0.08] text-base font-medium text-white/90 hover:bg-white/[0.12] hover:text-white"
+          style={{ fontFamily: 'Inter, sans-serif' }}
+        >
+          Save planned workout
+        </Button>
+      </div>
     </div>
   );
 }
