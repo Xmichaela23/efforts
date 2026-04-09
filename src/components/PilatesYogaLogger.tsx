@@ -322,9 +322,9 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   };
 
   const panelClass =
-    'rounded-2xl border-2 border-white/20 bg-white/[0.05] px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-xl';
+    'min-w-0 overflow-hidden rounded-2xl border-2 border-white/20 bg-white/[0.05] px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-xl';
   const fieldClass =
-    'h-9 border-2 border-white/20 bg-white/[0.08] text-sm text-white/90 placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-0 rounded-xl';
+    'min-h-[44px] h-11 border-2 border-white/20 bg-white/[0.08] text-sm text-white/90 placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-0 rounded-xl';
   const selectContentClass =
     'z-[200] border-2 border-white/30 bg-[#1a1a2e] text-white shadow-xl backdrop-blur-xl';
 
@@ -354,24 +354,41 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
       className="fixed inset-0 z-[40] flex flex-col"
       style={{ background: 'linear-gradient(to bottom, #27272a, #18181b, #000000)' }}
     >
-      <div className="flex-1 overflow-y-auto overscroll-contain pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
         <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
 
-        <div className="mx-auto w-full max-w-lg space-y-3 px-3">
+        <div className="mx-auto w-full min-w-0 max-w-lg space-y-3 px-3 pb-4">
           <div className={panelClass}>
-            <div className="flex items-center justify-between gap-2">
-              <h1 className="text-xl font-medium text-white/90" style={{ fontFamily: 'Inter, sans-serif' }}>
-                {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
-              </h1>
+            <h1
+              className="text-lg font-medium leading-snug text-white/90 sm:text-xl"
+              style={{ fontFamily: 'Inter, sans-serif', wordBreak: 'break-word' }}
+            >
+              {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Pilates/Yoga'}
+            </h1>
+            <div className="mt-3 space-y-1.5">
+              <Label
+                htmlFor="pilates-performed-date"
+                className="block text-xs font-medium text-white/55"
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                Performed date
+              </Label>
               <Input
+                id="pilates-performed-date"
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-8 shrink-0 rounded-full border-2 border-white/20 bg-white/[0.08] px-2 py-1 text-xs text-white/90 hover:border-white/30 focus-visible:border-white/35 focus-visible:ring-0"
+                className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border-2 border-white/20 bg-white/[0.08] px-3 text-sm text-white/90 hover:border-white/30 focus-visible:border-white/35 focus-visible:ring-0 sm:max-w-[220px]"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               />
             </div>
-            <p className="mt-1 text-xs font-light text-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <p className="mt-2 text-xs font-light leading-relaxed text-white/50" style={{ fontFamily: 'Inter, sans-serif' }}>
               Session RPE and type match how workload is calculated
             </p>
           </div>
@@ -383,14 +400,14 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
 
             <div className="mb-3">
               <Label className="mb-2 block text-xs font-medium text-white/60">Duration</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Input
                   type="number"
                   min="1"
                   max="240"
                   value={duration}
                   onChange={(e) => setDuration(Number(e.target.value))}
-                  className={`${fieldClass} max-w-[120px] text-center`}
+                  className={`${fieldClass} w-[7.5rem] min-w-0 text-center`}
                   style={{ fontSize: '16px' }}
                   placeholder="60"
                 />
@@ -404,21 +421,27 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                 <span className="ml-1 font-light text-white/45">Overall effort for this session</span>
               </Label>
               <div className="space-y-2">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={sessionRPE}
-                  onChange={(e) => setSessionRPE(Number(e.target.value))}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20 accent-white"
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-white/45">Easy</span>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold text-white/95">{sessionRPE}</div>
+                <div className="flex min-h-[44px] items-center py-1">
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={sessionRPE}
+                    onChange={(e) => setSessionRPE(Number(e.target.value))}
+                    className="h-3 w-full min-w-0 cursor-pointer appearance-none rounded-lg bg-white/20 accent-white"
+                    aria-valuemin={1}
+                    aria-valuemax={10}
+                    aria-valuenow={sessionRPE}
+                    aria-label="Session RPE"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="shrink-0 text-xs text-white/45">Easy</span>
+                  <div className="min-w-0 text-center">
+                    <div className="text-xl font-semibold tabular-nums text-white/95">{sessionRPE}</div>
                     <div className="text-xs text-white/50">{getRPELabel(sessionRPE)}</div>
                   </div>
-                  <span className="text-xs text-white/45">Maximal</span>
+                  <span className="shrink-0 text-xs text-white/45">Maximal</span>
                 </div>
               </div>
             </div>
@@ -426,7 +449,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
             <div className="mb-1">
               <Label className="mb-2 block text-xs font-medium text-white/60">Session type</Label>
               <Select value={sessionType} onValueChange={(value: PilatesYogaSessionType) => setSessionType(value)}>
-                <SelectTrigger className={`${fieldClass} h-10 w-full`}>
+                <SelectTrigger className={`${fieldClass} h-11 w-full min-w-0`}>
                   <SelectValue placeholder="Select…" />
                 </SelectTrigger>
                 <SelectContent className={selectContentClass}>
@@ -460,7 +483,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                       setSessionFeeling(value === '__none__' ? '' : (value as SessionFeeling))
                     }
                   >
-                    <SelectTrigger className={`${fieldClass} h-10 w-full`}>
+                    <SelectTrigger className={`${fieldClass} w-full min-w-0`}>
                       <SelectValue placeholder="Optional" />
                     </SelectTrigger>
                     <SelectContent className={selectContentClass}>
@@ -484,7 +507,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                       setEnvironment(value === '__none__' ? '' : (value as Environment))
                     }
                   >
-                    <SelectTrigger className={`${fieldClass} h-10 w-full`}>
+                    <SelectTrigger className={`${fieldClass} w-full min-w-0`}>
                       <SelectValue placeholder="Optional" />
                     </SelectTrigger>
                     <SelectContent className={selectContentClass}>
@@ -529,16 +552,19 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
 
           <div className={panelClass}>
             <Label className="mb-2 block text-xs font-medium text-white/60">Focus areas (optional)</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-x-2 gap-y-2.5">
               {FOCUS_AREAS.map((area) => (
-                <div key={area.value} className="flex items-center space-x-2">
+                <div key={area.value} className="flex min-w-0 items-center gap-2">
                   <Checkbox
                     id={`focus-${area.value}`}
                     checked={focusAreas.includes(area.value)}
                     onCheckedChange={() => toggleFocusArea(area.value)}
-                    className="border-white/40 data-[state=checked]:bg-white/20"
+                    className="size-5 shrink-0 border-white/40 data-[state=checked]:bg-white/20"
                   />
-                  <Label htmlFor={`focus-${area.value}`} className="cursor-pointer text-sm text-white/75">
+                  <Label
+                    htmlFor={`focus-${area.value}`}
+                    className="min-w-0 cursor-pointer text-sm leading-tight text-white/75"
+                  >
                     {area.label}
                   </Label>
                 </div>
@@ -562,21 +588,24 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                 <span className="ml-1 font-light text-white/45">Optional</span>
               </Label>
               <div className="space-y-2">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={teacherRating}
-                  onChange={(e) => setTeacherRating(Number(e.target.value))}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20 accent-white"
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-white/45">Poor</span>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold text-white/95">{teacherRating}</div>
+                <div className="flex min-h-[44px] items-center py-1">
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={teacherRating}
+                    onChange={(e) => setTeacherRating(Number(e.target.value))}
+                    className="h-3 w-full min-w-0 cursor-pointer appearance-none rounded-lg bg-white/20 accent-white"
+                    aria-label="Teacher rating"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="shrink-0 text-xs text-white/45">Poor</span>
+                  <div className="min-w-0 text-center">
+                    <div className="text-xl font-semibold tabular-nums text-white/95">{teacherRating}</div>
                     <div className="text-xs text-white/50">{getTeacherRatingLabel(teacherRating)}</div>
                   </div>
-                  <span className="text-xs text-white/45">Excellent</span>
+                  <span className="shrink-0 text-xs text-white/45">Excellent</span>
                 </div>
               </div>
             </div>

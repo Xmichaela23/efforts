@@ -30,7 +30,7 @@ export function MobileHeader({
   showBackButton = false, 
   onBack,
   menuItems,
-  wordmarkSize = 36,
+  wordmarkSize = 40,
   onLogout,
   onTrainingBaselinesClick,
   onConnectionsClick,
@@ -83,10 +83,10 @@ export function MobileHeader({
 
   return (
     <header className="mobile-header">
-      <div className="w-full">
-        <div className="flex items-center justify-between h-16 w-full">
+      <div className="relative w-full">
+        <div className="relative flex h-16 w-full items-center">
           {/* Left: Menu */}
-          <div className="flex items-center pl-4 w-12">
+          <div className="relative z-10 flex flex-1 items-center justify-start pl-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -125,13 +125,17 @@ export function MobileHeader({
             </DropdownMenu>
           </div>
 
-          {/* Center: Wordmark - centered, lowered 6px for optical alignment with vertical dots */}
-          <div className="flex-1 flex justify-center items-center" style={{ marginTop: '6px' }}>
+          {/* Center: Wordmark — true viewport center so wide Back doesn’t pull the logo */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 flex h-16 items-center justify-center"
+            style={{ paddingTop: '6px' }}
+            aria-hidden
+          >
             <EffortsWordmark size={wordmarkSize} />
           </div>
 
           {/* Right: Custom content or back button */}
-          <div className="w-12 pr-4 flex justify-end">
+          <div className="relative z-10 flex flex-1 items-center justify-end gap-2 pr-4 pl-2">
             {rightContent || (showBackButton && onBack && (
               <Button
                 onClick={onBack}
