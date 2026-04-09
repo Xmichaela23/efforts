@@ -3,6 +3,10 @@ import { supabase } from '@/lib/supabase';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import AppLayout from './AppLayout';
+import { AuthScreenLayout } from './AuthScreenLayout';
+import { EffortsWordmark } from './EffortsButton';
+
+const AUTH_DISCIPLINES = ['run', 'strength', 'ride', 'pilates', 'swim'] as const;
 
 const AuthWrapper: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -57,45 +61,47 @@ const AuthWrapper: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-lg text-foreground">Loading...</div>
-      </div>
+      <AuthScreenLayout>
+        <p className="text-sm font-medium tracking-wide text-zinc-400">Loading…</p>
+      </AuthScreenLayout>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-4">
-        <div className="w-full max-w-md space-y-4">
-          {showRegister ? (
-            <RegisterForm
-              onSuccess={() => setShowRegister(false)}
-              onSwitchToLogin={() => setShowRegister(false)}
-            />
-          ) : (
-            <LoginForm
-              onSwitchToRegister={() => setShowRegister(true)}
-            />
-          )}
-        </div>
-      </div>
+      <AuthScreenLayout>
+        {showRegister ? (
+          <RegisterForm
+            onSuccess={() => setShowRegister(false)}
+            onSwitchToLogin={() => setShowRegister(false)}
+          />
+        ) : (
+          <LoginForm onSwitchToRegister={() => setShowRegister(true)} />
+        )}
+      </AuthScreenLayout>
     );
   }
 
   if (user && approved === false) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-white text-center">
-        <div className="text-xl font-medium mb-2">You're almost in!</div>
-        <div className="text-gray-600 text-sm">
-          Your account is pending approval. We'll notify you as soon as it's ready.
+      <AuthScreenLayout>
+        <div className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-zinc-950/75 px-8 py-10 text-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset,0_24px_80px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl">
+          <div className="flex justify-center [&_svg]:drop-shadow-[0_0_28px_rgba(255,215,0,0.15)]">
+            <EffortsWordmark size={44} activeDisciplines={[...AUTH_DISCIPLINES]} />
+          </div>
+          <div className="text-lg font-medium text-white">You&apos;re almost in!</div>
+          <p className="text-sm text-zinc-400">
+            Your account is pending approval. We&apos;ll notify you as soon as it&apos;s ready.
+          </p>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-sm font-semibold text-amber-400 hover:text-amber-300 hover:underline"
+          >
+            Log out
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="mt-6 text-sm text-blue-600 hover:text-blue-700"
-        >
-          Log out
-        </button>
-      </div>
+      </AuthScreenLayout>
     );
   }
 
