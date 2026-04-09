@@ -9,6 +9,57 @@
 import type { AthleteSnapshot, LedgerDay, PlannedSession, Coaching } from './types.ts';
 import { callLLM } from '../llm.ts';
 
+const SKIP_TAG_FOR_PROMPT: Record<string, string> = {
+  fatigued: 'fatigued / training load',
+  tired: 'tired / low energy',
+  sick: 'sick or injury',
+  travel: 'travel',
+  work: 'work or schedule',
+  weather: 'weather',
+  motivation: 'not feeling it',
+  other: 'other',
+  rest: 'rest',
+  life: 'life',
+  swapped: 'swapped',
+};
+
+function formatAthleteSkipLine(p: PlannedSession): string {
+  const parts: string[] = [];
+  const tag = String(p.skip_reason || '').trim().toLowerCase();
+  if (tag) parts.push(SKIP_TAG_FOR_PROMPT[tag] || tag.replace(/_/g, ' '));
+  const note = p.skip_note?.trim();
+  if (note) parts.push(note.length > 100 ? `${note.slice(0, 100)}…` : note);
+  return parts.length ? ` — athlete: ${parts.join(' · ')}` : '';
+}
+
+/** Deterministic counts for the coaching model — no multi-week claims. */
+function skipPatternSummaryFromLedger(ledger: LedgerDay[]): string | null {
+  let n = 0;
+  let fatigueTagged = 0;
+  let withReason = 0;
+  for (const day of ledger) {
+    if (!day.is_past) continue;
+    for (const m of day.matches) {
+      const isSkip = m.endurance_quality === 'skipped' || m.strength_quality === 'skipped';
+      if (!isSkip) continue;
+      const p = day.planned.find((x) => x.planned_id === m.planned_id);
+      if (!p) continue;
+      n++;
+      const sr = String(p.skip_reason || '').trim().toLowerCase();
+      if (sr === 'fatigued' || sr === 'tired') fatigueTagged++;
+      if (sr) withReason++;
+    }
+  }
+  if (n === 0) return null;
+  const bits = [`${n} planned session(s) missed on past days this week`];
+  if (withReason) bits.push(`${withReason} with a logged skip reason`);
+  if (fatigueTagged) bits.push(`${fatigueTagged} tagged fatigue/load`);
+  bits.push(
+    'Few misses in taper/recovery/sharpening with easy follow-through often match the phase; a heavy miss count this week with a race approaching may warrant plan adjustment or a more realistic goal — use judgment from this summary plus phase and race proximity, not cheerleading (this block is this week only).',
+  );
+  return bits.join('. ') + '.';
+}
+
 // ---------------------------------------------------------------------------
 // Session interpretations: what the athlete already saw (from session_detail_v1)
 // ---------------------------------------------------------------------------
@@ -121,7 +172,9 @@ export function snapshotToPrompt(
       } else if (p && !a) {
         if (day.is_past) {
           lines.push(`  PLANNED: ${p.prescription}`);
-          lines.push(`  RESULT: skipped`);
+          const st = String(p.planned_workout_status || '').toLowerCase();
+          const skippedLabel = st === 'skipped' ? 'skipped (logged in app)' : 'skipped';
+          lines.push(`  RESULT: ${skippedLabel}${formatAthleteSkipLine(p)}`);
         } else {
           lines.push(`  PLANNED: ${p.prescription} — upcoming`);
         }
@@ -129,6 +182,13 @@ export function snapshotToPrompt(
         lines.push(`  UNPLANNED: ${a.name} — ${formatActual(a)}`);
       }
     }
+  }
+
+  const skipPat = skipPatternSummaryFromLedger(ledger);
+  if (skipPat) {
+    lines.push('');
+    lines.push('=== SKIP PATTERN (this week, deterministic) ===');
+    lines.push(skipPat);
   }
 
   // --- BODY RESPONSE ---
@@ -270,7 +330,7 @@ TONE:
 RULES:
 - The ledger is truth. If ACTUAL exists, it happened. Never contradict it.
 - If SESSION INTERPRETATIONS are provided, those are what the athlete already saw. Your job is to SYNTHESIZE them into a weekly arc — connect the dots across sessions, spot the weekly pattern, frame guidance. Do NOT re-interpret or contradict the session-level narrative or plan_adherence. Build on top of it.
-- THIS WEEK ONLY. Your scope is the current week's ledger. Do not make multi-week trend claims ("consistency remains problematic", "you keep skipping", "this is becoming a pattern"). If a session was skipped this week, state it plainly as a this-week fact — do not frame it as part of a longer pattern.
+- THIS WEEK ONLY for history you cannot see. Do not invent multi-week streaks. You MAY use the SKIP PATTERN line when present — it summarizes this week only. If it shows many misses or low completion while a race is soon, you may say the plan or goal timing may need a rethink (plain language). If it shows few misses aligned with taper/recovery intent and follow-up sessions were easy/clean, you may frame that as a good phase read — without repeating skip labels at length.
 - "upcoming" sessions haven't happened — never call them missed.
 - If RUNNING volume is high (running ACWR > 1.3 or running volume > 130% of plan), suggest dialing back remaining run sessions. Cross-training load does not count toward running volume.
 - If a race is coming up, anchor advice to that timeline.
@@ -284,6 +344,11 @@ DISCIPLINE-SEPARATED LOAD — "running load" means actual running volume only. C
 - Running ACWR is the primary fatigue signal. It includes cross-modal fatigue weights (rides contribute ~60%, swims ~20%), so it can be elevated even when pure running volume is on target. If so, explain the source.
 - Only recommend recovery adjustments when RUNNING-SPECIFIC ACWR > 1.3 or running volume exceeds plan by > 30%.
 - When unplanned sessions are present, name the discipline and note whether they matter for running fatigue. "An unplanned easy ride adds some aerobic fatigue but no running-specific stress" is coaching. "1 extra session" without context is not.
+
+SKIPS — BE SMART (not binary):
+- Aligned: taper/recovery/sharpening week + athlete fatigue/load context on RESULT lines + remaining completed work matches easy intent → protect freshness is often correct; headline/narrative can reflect that (sound judgment, not hype).
+- Concerning: SKIP PATTERN shows multiple missed planned sessions this week, or key quality repeatedly missing while race is close, or completion is clearly behind with no life/illness context → say plainly that continuing as-is may not serve the goal; suggest prioritizing what still matters, easing the plan, or revisiting goal timing. Do not pretend that pattern is fine.
+- Impact over labels: say what the week lost or preserved for the block; do not performatively "acknowledge" every skip reason.
 
 CRITICAL — ACCURACY:
 - The PLAN POSITION section tells you the exact week number and phase. ONLY use those values. Never invent or guess a week number or phase name. If it says "week 3, phase: build" then it is week 3 build. Not "Week 1 Speed." Not anything else.

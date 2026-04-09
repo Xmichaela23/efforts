@@ -118,6 +118,10 @@ export type PlannedSession = {
   distance_meters: number | null;
   load_planned: number | null;
   strength_prescription: StrengthExercisePrescription[] | null;
+  /** From planned_workouts.workout_status */
+  planned_workout_status?: string | null;
+  skip_reason?: string | null;
+  skip_note?: string | null;
 };
 
 export type ActualSession = {

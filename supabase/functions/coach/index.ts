@@ -2890,6 +2890,26 @@ Deno.serve(async (req) => {
           );
         }
 
+        const ksComp = reaction.key_sessions_completion_ratio;
+        const primaryWeeksOut = goalContext.primary_event
+          ? (goalContext.upcoming_races.find((r) => r.name === goalContext.primary_event!.name)?.weeks_out ?? null)
+          : null;
+        if (allGaps.length > 0 || (ksComp != null && ksComp < 1)) {
+          const fatigueSkipCount = allGaps.filter((g: any) => {
+            const c = String(g?.skip_reason ?? '').trim().toLowerCase();
+            return c === 'fatigued' || c === 'tired';
+          }).length;
+          const ratioStr = ksComp != null ? `${Math.round(ksComp * 100)}%` : 'n/a';
+          const wi = String(weekIntent || 'unknown');
+          const weeksStr = primaryWeeksOut != null ? `Primary goal ~${primaryWeeksOut} week(s) out.` : '';
+          narrativeFacts.push(
+            `SKIP PATTERN (this week only — do not infer longer streaks): ${allGaps.length} key session gap(s); ` +
+              `${gapsWithReasons.length} with athlete skip reason; ${fatigueSkipCount} tagged fatigue/load. ` +
+              `Key-session completion ratio: ${ratioStr}. Plan week intent: ${wi}. ${weeksStr} ` +
+              'Few misses with taper/recovery/sharpening intent and fatigue context often match smart phase execution; several key misses or a low completion ratio while a race is soon may warrant discussing easing the plan or adjusting goal timing — combine with SESSION and physiology FACTS, not labels alone.',
+          );
+        }
+
         narrativeFacts.push(
           'ATHLETE PHYSIOLOGY & SUBJECTIVE INPUTS: SESSION lines include session effort (1–10), feeling when logged, execution percent, and — when present in file — aerobic profile, cardiac drift (bpm, first vs second half), and pace/HR decoupling percent on steady runs. Weekly summaries and run-mix lines compare to this athlete’s norms. Missed-session reasons inform load/recovery — combine with drift and effort to judge impact on the plan (what was missed, what remains, phase stakes); athlete-facing copy should emphasize training consequences over repeating skip tags.',
         );
@@ -3313,6 +3333,8 @@ DISCIPLINE-SAFE MISSES: When MISSED_KEY_SESSIONS_BY_DISCIPLINE is in FACTS, resp
 LOAD SCOPE: The "Weekly TRIMP load (ALL DISCIPLINES combined...)" line is not run-specific. For running load vs plan, cite run SESSION lines or the per-discipline load FACTS — keep your wording consistent with those sources.
 
 PHASE vs VOLUME: Sentence 1 must follow plan week intent from FACTS (PlanContractV1). Do not rename the phase (e.g. call taper "build") and do not infer phase only from how much was skipped this week. During taper/recovery intent, a strategic miss plus clean easy follow-up is often **correct** for the phase — weight that in interpretation (see PHASE-ALIGNED RESTRAINT) rather than defaulting to volume shortfall as the main takeaway.
+
+SKIP PATTERN: When the SKIP PATTERN line appears in FACTS, use it for this-week-only judgment — aligned strategic misses near a race in taper/recovery vs a pile-up of key misses or a weak key-session completion ratio with the goal close. Do not stretch it into multi-week habit language unless the athlete explicitly said so elsewhere in FACTS.
 
 NUMBERS: Do not invent percentages. Percent signs in your answer must trace to explicit FACTS (weekly load vs plan, SESSION execution %, intensity split, route progress, or STRENGTH→RUN CROSS-DOMAIN). For leg-day effects on runs, only cite STRENGTH→RUN CROSS-DOMAIN when present; otherwise describe the week without a numeric interference claim.
 

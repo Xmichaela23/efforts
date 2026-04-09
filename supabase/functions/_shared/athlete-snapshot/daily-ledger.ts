@@ -168,6 +168,10 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
     }
   }
 
+  const skipReason = row?.skip_reason != null && String(row.skip_reason).trim() ? String(row.skip_reason).trim() : null;
+  const skipNote = row?.skip_note != null && String(row.skip_note).trim() ? String(row.skip_note).trim() : null;
+  const pws = String(row?.workout_status || '').trim().toLowerCase() || null;
+
   return {
     planned_id: String(row?.id || ''),
     type: normType(row?.type),
@@ -177,6 +181,9 @@ export function buildPlannedSession(row: any, imperial: boolean): PlannedSession
     distance_meters: distM,
     load_planned: Number(row?.workload_planned) || null,
     strength_prescription: strengthRx,
+    planned_workout_status: pws,
+    skip_reason: skipReason,
+    skip_note: skipNote,
   };
 }
 
