@@ -2865,7 +2865,7 @@ Deno.serve(async (req) => {
           });
           narrativeFacts.push(
             `MISSED SESSION REASONS (athlete-provided — these are the ONLY days to reference as missed). ` +
-              `Reason phrases below are canonical; "fatigued" means accumulated training stress / recovery need, not generic laziness: ${lines.join('; ')}.`,
+              `Use reasons to infer load/recovery context; in narrative, stress impact on the week or block over restating labels. Canonical phrases: ${lines.join('; ')}.`,
           );
         } else if (allGaps.length > 0) {
           // Gaps without reasons — still provide day names so Claude doesn't invent them
@@ -2891,7 +2891,7 @@ Deno.serve(async (req) => {
         }
 
         narrativeFacts.push(
-          'ATHLETE PHYSIOLOGY & SUBJECTIVE INPUTS: SESSION lines include session effort (1–10), feeling when logged, execution percent, and — when present in file — aerobic profile, cardiac drift (bpm, first vs second half), and pace/HR decoupling percent on steady runs. Weekly summaries and run-mix lines compare to this athlete’s norms. Missed-session reasons are explicit athlete input; reconcile skips (especially fatigued/tired) with effort and drift rather than dismissing them.',
+          'ATHLETE PHYSIOLOGY & SUBJECTIVE INPUTS: SESSION lines include session effort (1–10), feeling when logged, execution percent, and — when present in file — aerobic profile, cardiac drift (bpm, first vs second half), and pace/HR decoupling percent on steady runs. Weekly summaries and run-mix lines compare to this athlete’s norms. Missed-session reasons inform load/recovery — combine with drift and effort to judge impact on the plan (what was missed, what remains, phase stakes); athlete-facing copy should emphasize training consequences over repeating skip tags.',
         );
 
         // ── Soft-match: pair every completed workout with its planned session ──
@@ -3299,6 +3299,8 @@ SESSION INVENTORY: Forbidden in sentences 1–3. In sentence 4, at most one name
 PLAN VS ACTUAL: Session-level gaps (duration, distance, load execution) belong in sentence 3 or 4 only when they illuminate the phase/goal story or the next action — not as an opening recap. The athlete already sees the schedule; prioritize meaning over restatement.
 
 NEVER GUESS WHY: If the facts include athlete-provided reasons, use those reasons. Otherwise, state what happened without speculation. Only explain causes when the athlete explicitly provided them.
+
+SKIP TAGS → TRAINING IMPACT: Skip reasons (fatigued, tired, travel, etc.) are context for load and recovery — use them to judge the week, not to narrate. In prose, emphasize what the miss does to the plan or phase (which session type or slot is exposed, whether what remains still supports the goal, what to protect or hit next) rather than dwelling on or repeating why they skipped. At most one short clause if it sharpens the story; avoid therapy-tone acknowledgment of the tag.
 
 SUBJECTIVE / "FELT" LANGUAGE: Do not say a run "felt tired", "felt heavy", "felt off", etc. unless a SESSION line includes a feeling: field, session RPE, or MISSED SESSIONS include an athlete note. When you cite execution, stick to what FACTS list.
 
