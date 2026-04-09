@@ -322,7 +322,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
   };
 
   const panelClass =
-    'min-w-0 overflow-hidden rounded-2xl border-2 border-white/20 bg-white/[0.05] px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-xl';
+    'min-w-0 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.05] px-3 py-3 shadow-lg shadow-black/25 backdrop-blur-xl';
   const fieldClass =
     'min-h-[44px] h-11 border-2 border-white/20 bg-white/[0.08] text-sm text-white/90 placeholder:text-white/35 focus-visible:border-white/35 focus-visible:ring-0 rounded-xl';
   const selectContentClass =
@@ -358,7 +358,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{
           WebkitOverflowScrolling: 'touch',
-          paddingBottom: 'calc(7.5rem + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'calc(9rem + env(safe-area-inset-bottom, 0px))',
         }}
       >
         <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
@@ -384,7 +384,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border-2 border-white/20 bg-white/[0.08] px-3 text-sm text-white/90 hover:border-white/30 focus-visible:border-white/35 focus-visible:ring-0 sm:max-w-[220px]"
+                className="pilates-date-native box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-white/20 bg-white/[0.08] px-3 text-sm text-white/90 hover:border-white/30 focus-visible:border-white/30 focus-visible:ring-0 sm:max-w-[240px]"
                 style={{ fontFamily: 'Inter, sans-serif' }}
               />
             </div>

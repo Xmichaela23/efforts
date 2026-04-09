@@ -914,6 +914,13 @@
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
   }
+
+  /* WKWebView / Safari: keep type=date from painting wider than its box */
+  input.pilates-date-native {
+    color-scheme: dark;
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 
 /* Logo pulse animation - slow, rhythmic heartbeat */
