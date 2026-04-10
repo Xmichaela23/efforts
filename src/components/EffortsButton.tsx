@@ -9,6 +9,13 @@ interface EffortsWordmarkProps {
   size?: number;
   className?: string;
   activeDisciplines?: string[]; // e.g., ['run', 'strength'] for today's active disciplines
+  /** False = no tilt/mouse parallax (use in MobileHeader — gyro drift separates cascade layers). */
+  enableParallax?: boolean;
+  /**
+   * False = single white “e” + fforts only (no colored cascade). Use in MobileHeader — the stack
+   * reads like a glitch at small sizes.
+   */
+  showCascade?: boolean;
 }
 
 /**
@@ -236,10 +243,16 @@ const shuffleArray = <T,>(array: T[]): T[] => {
   return shuffled;
 };
 
-export function EffortsWordmark({ size = 48, className = "", activeDisciplines = [] }: EffortsWordmarkProps) {
+export function EffortsWordmark({
+  size = 48,
+  className = '',
+  activeDisciplines = [],
+  enableParallax = true,
+  showCascade = true,
+}: EffortsWordmarkProps) {
   const uniqueId = React.useId().replace(/:/g, '');
   const fontFamily = "'Rajdhani', 'Orbitron', system-ui, sans-serif";
-  const circleSize = size * 2.4; // larger circle for breathing room
+  const circleSize = showCascade ? size * 2.4 : size * 1.35;
   const containerRef = React.useRef<HTMLDivElement>(null);
   
   // Parallax state
@@ -273,6 +286,11 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
   
   // Parallax effect - device orientation for mobile, mouse for desktop
   React.useEffect(() => {
+    if (!enableParallax) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
     const handleDeviceOrientation = (e: DeviceOrientationEvent) => {
       if (e.gamma !== null && e.beta !== null) {
         // Normalize device orientation to parallax values - increased sensitivity
@@ -281,7 +299,7 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
         setParallax({ x: Math.max(-3, Math.min(3, x)), y: Math.max(-3, Math.min(3, y)) });
       }
     };
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
@@ -291,23 +309,21 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
       const y = ((e.clientY - centerY) / rect.height) * 6; // -3 to 3 (increased from -2 to 2)
       setParallax({ x: Math.max(-3, Math.min(3, x)), y: Math.max(-3, Math.min(3, y)) });
     };
-    
+
     const handleMouseLeave = () => {
       setParallax({ x: 0, y: 0 });
     };
-    
-    // Try device orientation first (mobile)
+
     if (window.DeviceOrientationEvent) {
       window.addEventListener('deviceorientation', handleDeviceOrientation as EventListener);
     }
-    
-    // Mouse parallax for desktop
+
     const container = containerRef.current;
     if (container) {
       container.addEventListener('mousemove', handleMouseMove);
       container.addEventListener('mouseleave', handleMouseLeave);
     }
-    
+
     return () => {
       window.removeEventListener('deviceorientation', handleDeviceOrientation as EventListener);
       if (container) {
@@ -315,8 +331,8 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
         container.removeEventListener('mouseleave', handleMouseLeave);
       }
     };
-  }, []);
-  
+  }, [enableParallax]);
+
   // Parallax multipliers for each cascade layer (deeper = more movement)
   const parallaxLayers = [
     0,      // white e - no parallax
@@ -351,42 +367,41 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
         width={circleSize}
         height={circleSize}
         viewBox="0 0 100 100"
-        style={{ 
-          marginRight: -size * 0.85, // overlap more onto ff
+        style={{
+          marginRight: showCascade ? -size * 0.85 : -size * 0.42,
           zIndex: 2,
-          display: 'block', // ensure proper centering
+          display: 'block',
         }}
       >
         <defs>
-          {/* Gradient for ring - equal 5 colors (using shuffled order) */}
-          <linearGradient id={`ringGrad-${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={colorDefinitions[layerColors[3]]}/>
-            <stop offset="20%" stopColor={colorDefinitions[layerColors[4]]}/>
-            <stop offset="40%" stopColor={colorDefinitions[layerColors[0]]}/>
-            <stop offset="60%" stopColor={colorDefinitions[layerColors[2]]}/>
-            <stop offset="80%" stopColor={colorDefinitions[layerColors[1]]}/>
-            <stop offset="100%" stopColor={colorDefinitions[layerColors[3]]}/>
-          </linearGradient>
-          
-          {/* Glow filters for each LED channel "e" - stronger glow (increased 20-30%) */}
-          {[0, 1, 2, 3, 4, 5].map((layerIndex) => {
-            const discipline = getDisciplineForLayer(layerIndex);
-            const isActive = discipline && activeDisciplines.includes(discipline);
-            const blurAmount = isActive ? 5 : 4; // Increased from 4/3 to 5/4 (~25% increase)
-            // Base opacity - scanning animation will be applied via text opacity
-            const baseOpacity = isActive ? 0.75 : 0.5; // Increased from 0.6/0.4 to 0.75/0.5 (~25% increase)
-            
-            return (
-              <filter key={layerIndex} id={`eGlow-${uniqueId}-${layerIndex}`} x="-100%" y="-100%" width="300%" height="300%">
-                <feGaussianBlur stdDeviation={blurAmount} result="blur"/>
-                <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="coloredBlur"/>
-                <feMerge>
-                  <feMergeNode in="coloredBlur" opacity={baseOpacity}/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-            );
-          })}
+          {showCascade && (
+            <>
+              <linearGradient id={`ringGrad-${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={colorDefinitions[layerColors[3]]} />
+                <stop offset="20%" stopColor={colorDefinitions[layerColors[4]]} />
+                <stop offset="40%" stopColor={colorDefinitions[layerColors[0]]} />
+                <stop offset="60%" stopColor={colorDefinitions[layerColors[2]]} />
+                <stop offset="80%" stopColor={colorDefinitions[layerColors[1]]} />
+                <stop offset="100%" stopColor={colorDefinitions[layerColors[3]]} />
+              </linearGradient>
+              {[0, 1, 2, 3, 4, 5].map((layerIndex) => {
+                const discipline = getDisciplineForLayer(layerIndex);
+                const isActive = discipline && activeDisciplines.includes(discipline);
+                const blurAmount = isActive ? 5 : 4;
+                const baseOpacity = isActive ? 0.75 : 0.5;
+                return (
+                  <filter key={layerIndex} id={`eGlow-${uniqueId}-${layerIndex}`} x="-100%" y="-100%" width="300%" height="300%">
+                    <feGaussianBlur stdDeviation={blurAmount} result="blur" />
+                    <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="coloredBlur" />
+                    <feMerge>
+                      <feMergeNode in="coloredBlur" opacity={baseOpacity} />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                );
+              })}
+            </>
+          )}
         </defs>
         
         {/* Dark background inside circle - removed */}
@@ -403,14 +418,14 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
           filter={`url(#ringGlow-${uniqueId})`}
         /> */}
         
-        {/* Phosphor white "e" - sharp, static */}
+        {/* Phosphor white "e" */}
         <text
-          x={42}
-          y={42}
+          x={showCascade ? 42 : 50}
+          y={showCascade ? 42 : 48}
           textAnchor="middle"
           dominantBaseline="central"
           fill="rgba(255, 255, 255, 0.92)"
-          fontSize={55}
+          fontSize={showCascade ? 55 : 52}
           fontWeight={300}
           fontFamily={fontFamily}
           transform={`translate(${parallax.x * parallaxLayers[0]}, ${parallax.y * parallaxLayers[0]})`}
@@ -418,96 +433,91 @@ export function EffortsWordmark({ size = 48, className = "", activeDisciplines =
         >
           e
         </text>
-        
-        {/* Layer 1 - LED channel with constant bright glow */}
-        <text
-          x={58}
-          y={56}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={colorDefinitions[layerColors[0]]}
-          fontSize={38}
-          fontWeight={300}
-          fontFamily={fontFamily}
-          filter={`url(#eGlow-${uniqueId}-1)`}
-          opacity={getLayerGlow(1)}
-          transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
-        >
-          e
-        </text>
 
-        {/* Layer 2 - LED channel with constant bright glow */}
-        <text
-          x={70}
-          y={66}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={colorDefinitions[layerColors[1]]}
-          fontSize={28}
-          fontWeight={300}
-          fontFamily={fontFamily}
-          filter={`url(#eGlow-${uniqueId}-2)`}
-          opacity={getLayerGlow(2)}
-          transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
-        >
-          e
-        </text>
-
-        {/* Layer 3 - LED channel with constant bright glow */}
-        <text
-          x={80}
-          y={74}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={colorDefinitions[layerColors[2]]}
-          fontSize={20}
-          fontWeight={300}
-          fontFamily={fontFamily}
-          filter={`url(#eGlow-${uniqueId}-3)`}
-          opacity={getLayerGlow(3)}
-          transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
-        >
-          e
-        </text>
-
-        {/* Layer 4 - LED channel with constant bright glow */}
-        <text
-          x={88}
-          y={80}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={colorDefinitions[layerColors[3]]}
-          fontSize={14}
-          fontWeight={300}
-          fontFamily={fontFamily}
-          filter={`url(#eGlow-${uniqueId}-4)`}
-          opacity={getLayerGlow(4)}
-          transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
-        >
-          e
-        </text>
-
-        {/* Layer 5 - LED channel with constant bright glow */}
-        <text
-          x={95}
-          y={85}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={colorDefinitions[layerColors[4]]}
-          fontSize={10}
-          fontWeight={300}
-          fontFamily={fontFamily}
-          filter={`url(#eGlow-${uniqueId}-5)`}
-          opacity={getLayerGlow(5)}
-          transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
-          style={{ transition: 'transform 0.1s ease-out' }}
-        >
-          e
-        </text>
+        {showCascade && (
+          <>
+            <text
+              x={58}
+              y={56}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={colorDefinitions[layerColors[0]]}
+              fontSize={38}
+              fontWeight={300}
+              fontFamily={fontFamily}
+              filter={`url(#eGlow-${uniqueId}-1)`}
+              opacity={getLayerGlow(1)}
+              transform={`translate(${parallax.x * parallaxLayers[1]}, ${parallax.y * parallaxLayers[1]})`}
+              style={{ transition: 'transform 0.1s ease-out' }}
+            >
+              e
+            </text>
+            <text
+              x={70}
+              y={66}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={colorDefinitions[layerColors[1]]}
+              fontSize={28}
+              fontWeight={300}
+              fontFamily={fontFamily}
+              filter={`url(#eGlow-${uniqueId}-2)`}
+              opacity={getLayerGlow(2)}
+              transform={`translate(${parallax.x * parallaxLayers[2]}, ${parallax.y * parallaxLayers[2]})`}
+              style={{ transition: 'transform 0.1s ease-out' }}
+            >
+              e
+            </text>
+            <text
+              x={80}
+              y={74}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={colorDefinitions[layerColors[2]]}
+              fontSize={20}
+              fontWeight={300}
+              fontFamily={fontFamily}
+              filter={`url(#eGlow-${uniqueId}-3)`}
+              opacity={getLayerGlow(3)}
+              transform={`translate(${parallax.x * parallaxLayers[3]}, ${parallax.y * parallaxLayers[3]})`}
+              style={{ transition: 'transform 0.1s ease-out' }}
+            >
+              e
+            </text>
+            <text
+              x={88}
+              y={80}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={colorDefinitions[layerColors[3]]}
+              fontSize={14}
+              fontWeight={300}
+              fontFamily={fontFamily}
+              filter={`url(#eGlow-${uniqueId}-4)`}
+              opacity={getLayerGlow(4)}
+              transform={`translate(${parallax.x * parallaxLayers[4]}, ${parallax.y * parallaxLayers[4]})`}
+              style={{ transition: 'transform 0.1s ease-out' }}
+            >
+              e
+            </text>
+            <text
+              x={95}
+              y={85}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={colorDefinitions[layerColors[4]]}
+              fontSize={10}
+              fontWeight={300}
+              fontFamily={fontFamily}
+              filter={`url(#eGlow-${uniqueId}-5)`}
+              opacity={getLayerGlow(5)}
+              transform={`translate(${parallax.x * parallaxLayers[5]}, ${parallax.y * parallaxLayers[5]})`}
+              style={{ transition: 'transform 0.1s ease-out' }}
+            >
+              e
+            </text>
+          </>
+        )}
       </svg>
       
       {/* "fforts" text - printed label with warm backlight */}

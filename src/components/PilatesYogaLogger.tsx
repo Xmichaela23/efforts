@@ -358,7 +358,7 @@ export default function PilatesYogaLogger({ onClose, scheduledWorkout, onWorkout
         className="flex-1 overflow-y-auto overscroll-contain"
         style={{
           WebkitOverflowScrolling: 'touch',
-          paddingBottom: 'calc(9rem + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'calc(12.5rem + env(safe-area-inset-bottom, 0px))',
         }}
       >
         <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />

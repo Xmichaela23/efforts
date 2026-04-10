@@ -131,7 +131,7 @@ export function MobileHeader({
             style={{ paddingTop: '6px' }}
             aria-hidden
           >
-            <EffortsWordmark size={wordmarkSize} />
+            <EffortsWordmark size={wordmarkSize} enableParallax={false} showCascade={false} />
           </div>
 
           {/* Right: Custom content or back button */}
