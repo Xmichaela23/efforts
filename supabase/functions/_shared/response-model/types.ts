@@ -198,8 +198,8 @@ export type WeeklyResponseState = {
   // Server-computed presentation — client renders verbatim
   headline: WeekHeadline;
   visible_signals: VisibleSignal[];
-  /** Present when no endurance lines in visible_signals; blends runs, rides, strength, load, plan intent. */
-  overall_training_read: OverallTrainingRead | null;
+  /** Holistic week line; clients show only when they render no endurance visible_signals. */
+  overall_training_read: OverallTrainingRead;
   context_prompt: ContextPrompt;
   goal_summary: GoalSummary | null;
   plan_context: {

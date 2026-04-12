@@ -415,16 +415,14 @@ function samplesLabel(n: number, category: 'endurance' | 'strength'): string {
   return n === 1 ? '1 run' : `${n} sessions`;
 }
 
+/** Holistic week copy; always computed. Clients show it only when they have no endurance lines to render. */
 function computeOverallTrainingRead(args: {
-  enduranceVisibleCount: number;
   discipline: { runs: number; rides: number; strength: number; swims: number };
   load: LoadContext;
   assessment: Assessment;
   planIntent: string | null;
   completionPct: number | null;
-}): OverallTrainingRead | null {
-  if (args.enduranceVisibleCount > 0) return null;
-
+}): OverallTrainingRead {
   const { runs, rides, strength, swims } = args.discipline;
   const bits: string[] = [];
   if (runs > 0) bits.push(`${runs} run${runs === 1 ? '' : 's'}`);
@@ -673,10 +671,8 @@ export function computeWeeklyResponse(opts: {
   const assessment = computeAssessment(endurance, strength, load, pc);
   const headline = computeWeekHeadline(assessment, pc, load, gs);
   const visible_signals = computeVisibleSignals(endurance, strength);
-  const enduranceVisibleCount = visible_signals.filter((s) => s.category === 'endurance').length;
   const disciplineMix = opts.discipline_mix ?? { runs: 0, rides: 0, strength: 0, swims: 0 };
   const overall_training_read = computeOverallTrainingRead({
-    enduranceVisibleCount,
     discipline: disciplineMix,
     load,
     assessment,

@@ -92,7 +92,7 @@ function signalToneColor(tone: string): string {
   return 'text-white/65';
 }
 
-/** Nested weekly_state_v1.response_model can lag root (e.g. cache); patch holistic BODY from root when missing. */
+/** Nested weekly_state_v1.response_model can lag root (e.g. cache); patch fields the client needs for BODY. */
 function resolveStateTabResponseModel(wsvRm: unknown, rootRm: unknown): Record<string, unknown> | undefined {
   const a = wsvRm as Record<string, unknown> | null | undefined;
   const b = rootRm as Record<string, unknown> | null | undefined;
@@ -102,8 +102,15 @@ function resolveStateTabResponseModel(wsvRm: unknown, rootRm: unknown): Record<s
   if (a === b) return a;
   const aSum = typeof (a as any).overall_training_read?.summary === 'string' && String((a as any).overall_training_read.summary).trim();
   const bSum = typeof (b as any).overall_training_read?.summary === 'string' && String((b as any).overall_training_read.summary).trim();
-  if (bSum && !aSum) return { ...a, overall_training_read: (b as any).overall_training_read };
-  return a;
+  const aVis = (a as any).visible_signals;
+  const bVis = (b as any).visible_signals;
+  const aVisEmpty = !Array.isArray(aVis) || aVis.length === 0;
+  const bVisHas = Array.isArray(bVis) && bVis.length > 0;
+
+  let out: Record<string, unknown> = { ...a };
+  if (bSum && !aSum) out = { ...out, overall_training_read: (b as any).overall_training_read };
+  if (aVisEmpty && bVisHas) out = { ...out, visible_signals: bVis };
+  return out;
 }
 
 function RaceSection({
