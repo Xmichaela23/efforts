@@ -92,6 +92,20 @@ function signalToneColor(tone: string): string {
   return 'text-white/65';
 }
 
+/** Nested weekly_state_v1.response_model can lag root (e.g. cache); patch holistic BODY from root when missing. */
+function resolveStateTabResponseModel(wsvRm: unknown, rootRm: unknown): Record<string, unknown> | undefined {
+  const a = wsvRm as Record<string, unknown> | null | undefined;
+  const b = rootRm as Record<string, unknown> | null | undefined;
+  if (!a && !b) return undefined;
+  if (!a) return b;
+  if (!b) return a;
+  if (a === b) return a;
+  const aSum = typeof (a as any).overall_training_read?.summary === 'string' && String((a as any).overall_training_read.summary).trim();
+  const bSum = typeof (b as any).overall_training_read?.summary === 'string' && String((b as any).overall_training_read.summary).trim();
+  if (bSum && !aSum) return { ...a, overall_training_read: (b as any).overall_training_read };
+  return a;
+}
+
 function RaceSection({
   rr,
   primaryRaceReadiness,
@@ -349,8 +363,7 @@ export default function StateTab({
 
   const week = wsv.week;
   const load = wsv.load;
-  // Some coach_cache rows omit nested weekly_state_v1.response_model; root response_model matches edge.
-  const rm = ((wsv as any).response_model ?? (data as any).response_model) as {
+  const rm = resolveStateTabResponseModel((wsv as any).response_model, (data as any).response_model) as {
     visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };

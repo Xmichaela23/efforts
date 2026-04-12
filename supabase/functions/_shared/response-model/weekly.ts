@@ -674,17 +674,15 @@ export function computeWeeklyResponse(opts: {
   const headline = computeWeekHeadline(assessment, pc, load, gs);
   const visible_signals = computeVisibleSignals(endurance, strength);
   const enduranceVisibleCount = visible_signals.filter((s) => s.category === 'endurance').length;
-  const overall_training_read =
-    opts.discipline_mix != null
-      ? computeOverallTrainingRead({
-          enduranceVisibleCount,
-          discipline: opts.discipline_mix,
-          load,
-          assessment,
-          planIntent: pc?.week_intent ?? null,
-          completionPct: opts.completionPct ?? null,
-        })
-      : null;
+  const disciplineMix = opts.discipline_mix ?? { runs: 0, rides: 0, strength: 0, swims: 0 };
+  const overall_training_read = computeOverallTrainingRead({
+    enduranceVisibleCount,
+    discipline: disciplineMix,
+    load,
+    assessment,
+    planIntent: pc?.week_intent ?? null,
+    completionPct: opts.completionPct ?? null,
+  });
 
   const rpeDecline = endurance.rpe.sufficient && endurance.rpe.trend === 'declining';
   const context_prompt = computeContextPrompt(
