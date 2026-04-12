@@ -68,8 +68,8 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-/** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. primary_race_readiness). */
-const COACH_PAYLOAD_VERSION = 4;
+/** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
+const COACH_PAYLOAD_VERSION = 5;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();

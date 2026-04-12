@@ -468,8 +468,8 @@ export function useCoachWeekContext(date?: string) {
     ).then(({ data: row }) => {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
-      // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate so we don't flash pre-primary_race_readiness payloads.
-      const MIN_CACHE_PAYLOAD_VERSION = 4;
+      // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate until foreground coach runs.
+      const MIN_CACHE_PAYLOAD_VERSION = 5;
       if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;
