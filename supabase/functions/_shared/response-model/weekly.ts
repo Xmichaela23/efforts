@@ -26,6 +26,7 @@ import {
   type ContextPrompt,
   type GoalSummary,
   type WeekHeadline,
+  type OverallTrainingRead,
 } from './types.ts';
 import { computeCrossDomain } from './cross-domain.ts';
 import { VERDICT_DEVIATION } from '../strength-profiles.ts';
@@ -414,6 +415,70 @@ function samplesLabel(n: number, category: 'endurance' | 'strength'): string {
   return n === 1 ? '1 run' : `${n} sessions`;
 }
 
+function computeOverallTrainingRead(args: {
+  enduranceVisibleCount: number;
+  discipline: { runs: number; rides: number; strength: number; swims: number };
+  load: LoadContext;
+  assessment: Assessment;
+  planIntent: string | null;
+  completionPct: number | null;
+}): OverallTrainingRead | null {
+  if (args.enduranceVisibleCount > 0) return null;
+
+  const { runs, rides, strength, swims } = args.discipline;
+  const bits: string[] = [];
+  if (runs > 0) bits.push(`${runs} run${runs === 1 ? '' : 's'}`);
+  if (rides > 0) bits.push(`${rides} ride${rides === 1 ? '' : 's'}`);
+  if (strength > 0) bits.push(`${strength} strength`);
+  if (swims > 0) bits.push(`${swims} swim${swims === 1 ? '' : 's'}`);
+  const mosaic = bits.length ? `${bits.join(', ')} completed this week.` : 'Very little completed training logged this week.';
+
+  const intent = String(args.planIntent || '').toLowerCase();
+  let intentFrag = '';
+  if (intent === 'taper') {
+    intentFrag = ' Taper week: fewer hard runs can be intentional before your race.';
+  } else if (intent === 'recovery') {
+    intentFrag = ' Recovery week: reduced run volume is often by design.';
+  }
+
+  const wv = args.load.week_vs_plan_pct;
+  let planFrag = '';
+  if (wv != null && intent !== 'taper' && intent !== 'recovery') {
+    if (wv < 70) planFrag = ' Total workload is well below what the plan targeted.';
+    else if (wv > 120) planFrag = ' Total workload is above planned.';
+  }
+
+  const loadFrag =
+    args.load.acwr_status === 'high_risk'
+      ? ' Training stress is high versus your recent baseline — prioritize recovery.'
+      : args.load.acwr_status === 'elevated'
+        ? ' Training stress is somewhat elevated versus baseline.'
+        : args.load.acwr_status === 'detrained' || args.load.acwr_status === 'undertrained'
+          ? ' Recent load is below your typical 4-week baseline — past weeks still anchor fitness.'
+          : '';
+
+  const summary = (mosaic + intentFrag + planFrag + loadFrag).replace(/\s+/g, ' ').trim();
+
+  let tone: OverallTrainingRead['tone'] = 'neutral';
+  if (args.load.acwr_status === 'high_risk') tone = 'warning';
+  else if (
+    args.completionPct != null &&
+    args.completionPct < 40 &&
+    intent !== 'taper' &&
+    intent !== 'recovery'
+  ) {
+    tone = 'warning';
+  } else if (intent === 'taper' || intent === 'recovery') {
+    tone = 'info';
+  } else if (args.assessment.label === 'responding') {
+    tone = 'positive';
+  } else if (runs + rides + strength + swims >= 3) {
+    tone = 'info';
+  }
+
+  return { summary, tone };
+}
+
 function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthResponse): VisibleSignal[] {
   const out: VisibleSignal[] = [];
 
@@ -596,6 +661,8 @@ export function computeWeeklyResponse(opts: {
   totalSessionsGaps?: number;
   completionPct?: number | null;
   existingAthleteContext?: string | null;
+  /** Week-to-date completed counts — drives holistic BODY copy when run signals are thin. */
+  discipline_mix?: { runs: number; rides: number; strength: number; swims: number } | null;
 }): WeeklyResponseState {
   const endurance = computeEndurance(opts.signals, opts.norms);
   const strength = computeStrength(opts.lifts, opts.planContext?.week_intent ?? 'base');
@@ -606,6 +673,18 @@ export function computeWeeklyResponse(opts: {
   const assessment = computeAssessment(endurance, strength, load, pc);
   const headline = computeWeekHeadline(assessment, pc, load, gs);
   const visible_signals = computeVisibleSignals(endurance, strength);
+  const enduranceVisibleCount = visible_signals.filter((s) => s.category === 'endurance').length;
+  const overall_training_read =
+    opts.discipline_mix != null
+      ? computeOverallTrainingRead({
+          enduranceVisibleCount,
+          discipline: opts.discipline_mix,
+          load,
+          assessment,
+          planIntent: pc?.week_intent ?? null,
+          completionPct: opts.completionPct ?? null,
+        })
+      : null;
 
   const rpeDecline = endurance.rpe.sufficient && endurance.rpe.trend === 'declining';
   const context_prompt = computeContextPrompt(
@@ -625,6 +704,7 @@ export function computeWeeklyResponse(opts: {
     assessment,
     headline,
     visible_signals,
+    overall_training_read,
     context_prompt,
     goal_summary: gs,
     plan_context: pc,

@@ -1727,6 +1727,22 @@ Deno.serve(async (req) => {
 
     const acwrEarly = chronic28Load > 0 ? (acute7Load / 7) / (chronic28Load / 28) : null;
 
+    const disciplineMixWtd = (() => {
+      let runs = 0;
+      let rides = 0;
+      let strength = 0;
+      let swims = 0;
+      for (const w of Array.isArray(weekWorkouts) ? weekWorkouts : []) {
+        if (String(w?.workout_status || '').toLowerCase() !== 'completed') continue;
+        const t = String(w?.type || '').toLowerCase();
+        if (t === 'run' || t === 'running' || t === 'walk' || t === 'walking') runs++;
+        else if (t === 'ride' || t === 'cycling' || t === 'bike') rides++;
+        else if (t.includes('strength')) strength++;
+        else if (t.includes('swim')) swims++;
+      }
+      return { runs, rides, strength, swims };
+    })();
+
     const weeklyResponseModel: WeeklyResponseState = computeWeeklyResponse({
       asOfDate,
       signals: responseModelSignals,
@@ -1775,6 +1791,7 @@ Deno.serve(async (req) => {
       totalSessionsGaps,
       completionPct: wtdCompletionRatio != null ? Math.round(wtdCompletionRatio * 100) : null,
       existingAthleteContext: athleteContextStr,
+      discipline_mix: disciplineMixWtd,
     });
 
     const goalPrediction = (() => {

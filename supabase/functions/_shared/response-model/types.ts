@@ -172,6 +172,12 @@ export type WeekHeadline = {
   subtext: string;
 };
 
+/** Holistic week read when granular run signals are missing — runs, rides, strength, load, plan intent. */
+export type OverallTrainingRead = {
+  summary: string;
+  tone: 'positive' | 'warning' | 'neutral' | 'info';
+};
+
 export type BlockHeadline = {
   text: string;       // "Your aerobic fitness is improving and strength is progressing."
   subtext: string;
@@ -192,6 +198,8 @@ export type WeeklyResponseState = {
   // Server-computed presentation — client renders verbatim
   headline: WeekHeadline;
   visible_signals: VisibleSignal[];
+  /** Present when no endurance lines in visible_signals; blends runs, rides, strength, load, plan intent. */
+  overall_training_read: OverallTrainingRead | null;
   context_prompt: ContextPrompt;
   goal_summary: GoalSummary | null;
   plan_context: {

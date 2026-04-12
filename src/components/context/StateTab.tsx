@@ -350,7 +350,8 @@ export default function StateTab({
   const week = wsv.week;
   const load = wsv.load;
   const rm = (wsv as any).response_model as {
-    visible_signals: Array<{ label: string; trend: string; trend_tone: string; detail: string; samples: number }>;
+    visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number }>;
+    overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };
     endurance: unknown;
     assessment: { label: string; signals_concerning: number };
@@ -508,7 +509,25 @@ export default function StateTab({
           <div className="flex items-start gap-3">
             <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
             <div className="flex-1 space-y-1.5">
-              {visibleSignals.length === 0 && (
+              {visibleSignals.length === 0 && (rm as any)?.overall_training_read?.summary && (
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[12px] text-white/70">This week</span>
+                  <span
+                    className={`text-[12px] text-right max-w-[min(100%,220px)] leading-snug ${
+                      (rm as any).overall_training_read.tone === 'positive'
+                        ? 'text-emerald-400/90'
+                        : (rm as any).overall_training_read.tone === 'warning'
+                          ? 'text-amber-400/90'
+                          : (rm as any).overall_training_read.tone === 'info'
+                            ? 'text-sky-400/85'
+                            : 'text-white/70'
+                    }`}
+                  >
+                    {(rm as any).overall_training_read.summary}
+                  </span>
+                </div>
+              )}
+              {visibleSignals.length === 0 && !(rm as any)?.overall_training_read?.summary && (
                 <Chip value="not enough data" valueClass="text-white/55" />
               )}
               {visibleSignals.map((s) => (

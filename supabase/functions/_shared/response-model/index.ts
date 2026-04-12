@@ -29,6 +29,7 @@ export type {
   ContextPrompt,
   GoalSummary,
   WeekHeadline,
+  OverallTrainingRead,
   BlockHeadline,
   WeeklySignalInputs,
   BaselineNorms,
