@@ -1109,6 +1109,32 @@ Deno.serve(async (req) => {
       // NP is optional, don't fail
     }
 
+    // Avg power while pedaling (> threshold W) and % of clock time pedaling — same stream as NP
+    const PEDALING_POWER_THRESHOLD_W = 25;
+    let avgPowerPedalingW: number | null = null;
+    let pctTimePedaling: number | null = null;
+    try {
+      if (isRide && hasRows && rows.some((r) => typeof r.power_w === 'number' && Number.isFinite(r.power_w as number))) {
+        let pedalingSec = 0;
+        let weightedPower = 0;
+        let clockSec = 0;
+        for (let i = 1; i < rows.length; i++) {
+          const dt = Math.max(0, (rows[i].t || 0) - (rows[i - 1].t || 0));
+          if (dt <= 0 || dt > 300) continue;
+          clockSec += dt;
+          const p = typeof rows[i].power_w === 'number' && Number.isFinite(rows[i].power_w) ? rows[i].power_w : 0;
+          if (p > PEDALING_POWER_THRESHOLD_W) {
+            pedalingSec += dt;
+            weightedPower += p * dt;
+          }
+        }
+        if (pedalingSec > 0) avgPowerPedalingW = Math.round(weightedPower / pedalingSec);
+        if (clockSec > 0) pctTimePedaling = Math.min(100, Math.round((100 * pedalingSec) / clockSec));
+      }
+    } catch {
+      /* optional */
+    }
+
     // Splits helper
     function computeSplits(splitMeters: number) {
       const out: any[] = [];
@@ -1212,11 +1238,17 @@ Deno.serve(async (req) => {
         }
         return bests;
       })(),
-      power: normalizedPower !== null ? {
-        normalized_power: Math.round(normalizedPower),
-        variability_index: variabilityIndex,
-        intensity_factor: intensityFactor
-      } : undefined,
+      power: (() => {
+        const b: Record<string, unknown> = {};
+        if (normalizedPower !== null) {
+          b.normalized_power = Math.round(normalizedPower);
+          b.variability_index = variabilityIndex;
+          b.intensity_factor = intensityFactor;
+        }
+        if (avgPowerPedalingW != null) b.avg_power_pedaling_w = avgPowerPedalingW;
+        if (pctTimePedaling != null) b.pct_time_pedaling = pctTimePedaling;
+        return Object.keys(b).length ? b : undefined;
+      })(),
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 

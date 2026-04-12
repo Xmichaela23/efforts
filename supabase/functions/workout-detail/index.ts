@@ -1014,13 +1014,15 @@ Deno.serve(async (req) => {
     const normalized_power = Number.isFinite(powerMetrics?.normalized_power) ? Number(powerMetrics.normalized_power) : null;
     const intensity_factor = Number.isFinite(powerMetrics?.intensity_factor) ? Number(powerMetrics.intensity_factor) : null;
     const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
+    const avg_power_pedaling_w = Number.isFinite(powerMetrics?.avg_power_pedaling_w) ? Number(powerMetrics.avg_power_pedaling_w) : null;
+    const pct_time_pedaling = Number.isFinite(powerMetrics?.pct_time_pedaling) ? Number(powerMetrics.pct_time_pedaling) : null;
     const swimMetrics = d?.computed?.analysis?.swim;
     const avg_swim_pace_per_100m = Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null;
     const avg_swim_pace_per_100yd = Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null;
     const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
     const rawSeries = d?.computed?.analysis?.series || null;
     const series = rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null;
-    (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport: (d?.type || null), series };
+    (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series };
 
     if (scope === 'workout') {
       return new Response(JSON.stringify({

@@ -26,6 +26,10 @@ export type WorkoutDataNormalized = {
   normalized_power: number | null;
   intensity_factor: number | null;
   variability_index: number | null;
+  /** Mean watts while power > ~25 W (coasting/stops excluded from numerator). */
+  avg_power_pedaling_w: number | null;
+  /** 0–100: share of sample clock time above pedaling threshold. */
+  pct_time_pedaling: number | null;
   sport: string | null;
   series: any | null;
 };
@@ -35,7 +39,11 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     // Prefer server-provided display_metrics (smart server, dumb client)
     const dm = workoutData?.display_metrics;
     if (dm && typeof dm === 'object' && Object.keys(dm).length > 0) {
-      return dm as WorkoutDataNormalized;
+      return {
+        ...dm,
+        avg_power_pedaling_w: (dm as WorkoutDataNormalized).avg_power_pedaling_w ?? null,
+        pct_time_pedaling: (dm as WorkoutDataNormalized).pct_time_pedaling ?? null,
+      } as WorkoutDataNormalized;
     }
     const distance_m = getDistanceMeters(workoutData);
     const distance_km = computeDistanceKm(workoutData);
@@ -85,6 +93,8 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     const normalized_power = Number.isFinite(powerMetrics?.normalized_power) ? Number(powerMetrics.normalized_power) : null;
     const intensity_factor = Number.isFinite(powerMetrics?.intensity_factor) ? Number(powerMetrics.intensity_factor) : null;
     const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
+    const avg_power_pedaling_w = Number.isFinite(powerMetrics?.avg_power_pedaling_w) ? Number(powerMetrics.avg_power_pedaling_w) : null;
+    const pct_time_pedaling = Number.isFinite(powerMetrics?.pct_time_pedaling) ? Number(powerMetrics.pct_time_pedaling) : null;
     
     // Read swim pace (server-calculated)
     const swimMetrics = workoutData?.computed?.analysis?.swim;
@@ -93,6 +103,6 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     
     const sport = typeof workoutData?.type === 'string' ? String(workoutData.type).toLowerCase() : null;
     const series = workoutData?.computed?.analysis?.series || null;
-    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, sport, series };
+    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport, series };
   }, [workoutData]);
 };

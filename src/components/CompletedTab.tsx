@@ -164,7 +164,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
   
   // Load gear for runs and rides
   useEffect(() => {
-    if (workoutData.type === 'run' || workoutData.type === 'ride') {
+    const t = String(workoutData.type || '').toLowerCase();
+    if (t === 'run' || t === 'ride' || t === 'cycling' || t === 'bike') {
       loadGear();
     }
   }, [workoutData.type, workoutData.id]);
@@ -178,7 +179,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
         return;
       }
 
-      const gearType = workoutData.type === 'run' ? 'shoe' : 'bike';
+      const wt = String(workoutData.type || '').toLowerCase();
+      const gearType = wt === 'run' || wt === 'walking' ? 'shoe' : 'bike';
       console.log('🔧 [Gear] Loading gear for type:', gearType);
       const { data, error } = await supabase
         .from('gear')
@@ -1668,7 +1670,7 @@ const formatMovingTime = () => {
          </>
        )}
       
-      {(workoutData.type === 'ride' || norm.sport === 'ride') ? (
+      {(workoutData.type === 'ride' || workoutData.type === 'cycling' || norm.sport === 'ride' || norm.sport === 'cycling') ? (
         <>
           {/* Row 1 */}
           <div className="px-0.5 pb-1">
@@ -1723,6 +1725,7 @@ const formatMovingTime = () => {
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Avg Power</div>
+              <div className="text-[10px] font-light text-white/45 leading-tight">Incl. coasting and stops</div>
             </div>
           </div>
 
@@ -1809,6 +1812,135 @@ const formatMovingTime = () => {
               <div className="text-xs font-light" style={metricLabelStyle}>IF</div>
             </div>
           </div>
+
+          {/* Row 6 — pedaling power + subjective */}
+          <div className="px-0.5 py-1">
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+              {norm.avg_power_pedaling_w != null ? `${norm.avg_power_pedaling_w} W` : 'N/A'}
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs font-light" style={metricLabelStyle}>Avg Power (pedaling)</div>
+              <div className="text-[10px] font-light text-white/45 leading-tight">&gt;25 W only</div>
+            </div>
+          </div>
+
+          <div className="px-0.5 py-1">
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+              {norm.pct_time_pedaling != null ? `${norm.pct_time_pedaling}%` : 'N/A'}
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs font-light" style={metricLabelStyle}>Time pedaling</div>
+            </div>
+          </div>
+
+          <div className="px-0.5 py-1">
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+              <Select
+                value={getSessionRPE(hydrated || workoutData) != null ? String(getSessionRPE(hydrated || workoutData)) : ''}
+                onValueChange={(value) => handleFeedbackChange('rpe', value ? parseInt(value, 10) : null)}
+                disabled={savingFeedback}
+              >
+                <SelectTrigger
+                  className="h-auto py-0 px-0 bg-transparent border-none text-base font-light hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full justify-start p-0"
+                  style={{ color: 'rgba(255,255,255,0.92)', textShadow: `0 0 12px rgba(${accentRgb}, 0.16)` }}
+                >
+                  <SelectValue placeholder="N/A">
+                    {getSessionRPE(hydrated || workoutData) != null ? String(getSessionRPE(hydrated || workoutData)) : 'N/A'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/10">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rpe) => (
+                    <SelectItem
+                      key={rpe}
+                      value={String(rpe)}
+                      className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                    >
+                      {rpe}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs font-light" style={metricLabelStyle}>RPE</div>
+            </div>
+          </div>
+
+          {/* Row 7 — gear */}
+          <div className="px-0.5 py-1">
+            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+              <Select
+                value={(() => {
+                  const currentData = hydrated || workoutData;
+                  const existingGearId = (currentData as any)?.gear_id;
+                  return existingGearId || '';
+                })()}
+                onValueChange={(value) => handleFeedbackChange('gear_id', value || null)}
+                disabled={savingFeedback || gearLoading}
+              >
+                <SelectTrigger
+                  className="h-auto py-0 px-0 bg-transparent border-none text-base font-light hover:bg-transparent focus:ring-0 focus:ring-offset-0 w-full p-0 [&>svg]:hidden [&>span]:text-center [&>span]:block"
+                  style={{ color: 'rgba(255,255,255,0.92)', textShadow: `0 0 12px rgba(${accentRgb}, 0.16)` }}
+                >
+                  <SelectValue placeholder="N/A">
+                    {(() => {
+                      const currentData = hydrated || workoutData;
+                      const existingGearId = (currentData as any)?.gear_id;
+                      const selectedId = existingGearId || gear.find((g) => g.is_default)?.id;
+                      const selected = gear.find((g) => g.id === selectedId);
+                      return selected?.name || 'N/A';
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a2e] border-white/10">
+                  {gear.map((item) => {
+                    const distanceMeters = item.total_distance || 0;
+                    const distanceMi = distanceMeters / 1609.34;
+                    const distanceText = useImperial
+                      ? (distanceMi < 1 ? `${Math.round(distanceMeters)} m` : `${distanceMi.toFixed(1)} mi`)
+                      : `${(distanceMeters / 1000).toFixed(1)} km`;
+                    return (
+                      <SelectItem
+                        key={item.id}
+                        value={item.id}
+                        className="text-white font-light focus:bg-white/[0.12] focus:text-white"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-light">{item.name}</span>
+                          {distanceMeters > 0 && (
+                            <span className="text-xs text-white/50 font-light" style={{ fontFeatureSettings: '"tnum"' }}>
+                              {distanceText}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                  {onAddGear && (
+                    <div className="border-t border-white/10 mt-1 pt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAddGear();
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-2 text-sm font-light text-white/70 hover:text-white hover:bg-white/[0.08] rounded transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                        <span>Add New Bike</span>
+                      </button>
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-muted-foreground font-normal">
+              <div className="text-xs font-light" style={metricLabelStyle}>Gear</div>
+            </div>
+          </div>
+          <div className="px-0.5 py-1" aria-hidden />
+          <div className="px-0.5 py-1" aria-hidden />
 
         </>
       ) : null}
