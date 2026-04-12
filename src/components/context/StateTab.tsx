@@ -349,7 +349,8 @@ export default function StateTab({
 
   const week = wsv.week;
   const load = wsv.load;
-  const rm = (wsv as any).response_model as {
+  // Some coach_cache rows omit nested weekly_state_v1.response_model; root response_model matches edge.
+  const rm = ((wsv as any).response_model ?? (data as any).response_model) as {
     visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };
