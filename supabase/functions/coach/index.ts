@@ -69,7 +69,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
-const COACH_PAYLOAD_VERSION = 5;
+const COACH_PAYLOAD_VERSION = 6;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2078,7 +2078,13 @@ Deno.serve(async (req) => {
       // ACWR elevated with insufficient signal to confirm either way — use caution label only
       if (v.code === 'caution_ramping_fast' && !bodySignalsImproving) return 'fatigued';
 
-      if (isAcwrDetrainedSignal(metrics.acwr)) return 'detrained';
+      // Low ACWR vs chronic: "detrained" in data terms — during taper/recovery/deload that is
+      // usually intentional (skips, reduced volume). Don't label as loss of fitness.
+      if (isAcwrDetrainedSignal(metrics.acwr)) {
+        const wi = String(weekIntent || '').toLowerCase();
+        if (wi === 'taper' || wi === 'recovery' || wi === 'deload') return 'normal';
+        return 'detrained';
+      }
       if (bodySignalsConcerning) return 'fatigued';
       if (rm.assessment.label === 'responding' && rm.assessment.signals_concerning === 0) return 'fresh';
       return 'normal';
@@ -3817,7 +3823,13 @@ ${narrativeFacts.join('\n')}`;
           if (ls === 'elevated' && readinessState === 'fresh') return 'WATCH LOAD';
           if (readinessState === 'fresh') return 'LOW FATIGUE';
           if (readinessState === 'adapting') return 'ABSORBING';
-          if (readinessState === 'detrained') return 'DETRAINED';
+          if (readinessState === 'normal' && isAcwrDetrainedSignal(metrics.acwr)) {
+            const wi = String(weekIntent || '').toLowerCase();
+            if (wi === 'taper' || wi === 'recovery' || wi === 'deload') {
+              return wi === 'taper' ? 'TAPER' : 'RECOVERY';
+            }
+          }
+          if (readinessState === 'detrained') return 'LOW vs BASELINE';
           return null;
         })(),
         signals: trendSignals,
