@@ -498,6 +498,20 @@ function reconcileLoadStatus(
     status = ceiling;
   }
 
+  // Detrained / low running ACWR: reconciler often sets "elevated" from declining
+  // execution or key-session caution near a race — not from high workload. "A bit
+  // high" then contradicts the ACWR dot + DETRAINED readiness. Soften to on_target
+  // unless total ACWR shows real cross-training stress.
+  if (
+    status === 'elevated' &&
+    isAcwrDetrainedSignal(unweightedAcwr) &&
+    raw.running_acwr != null &&
+    raw.running_acwr < 1.0 &&
+    (unweightedAcwr == null || unweightedAcwr < 1.25)
+  ) {
+    status = LOAD_RANK[raw.status] < LOAD_RANK['on_target'] ? raw.status : 'on_target';
+  }
+
   // ── Build interpretation ───────────────────────────────────────────────
   let interpretation = raw.interpretation;
   if (reasons.length > 0) {
