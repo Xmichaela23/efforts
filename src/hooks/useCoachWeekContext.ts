@@ -285,6 +285,7 @@ export type CoachWeekContextV1 = {
       narrative: string | null;
       baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
       plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
+      grounded_race_week_guidance_v1?: { title: string; bullets: string[] };
     };
     load: {
       wtd_planned_load: number | null;
@@ -469,7 +470,7 @@ export function useCoachWeekContext(date?: string) {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
       // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate until foreground coach runs.
-      const MIN_CACHE_PAYLOAD_VERSION = 6;
+      const MIN_CACHE_PAYLOAD_VERSION = 7;
       if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;

@@ -69,7 +69,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
-const COACH_PAYLOAD_VERSION = 6;
+const COACH_PAYLOAD_VERSION = 7;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -519,6 +519,62 @@ function reconcileLoadStatus(
   }
 
   return { status, interpretation };
+}
+
+/** Deterministic race-window cues — must agree with logged training + plan intent (not LLM). */
+function computeGroundedRaceWeekGuidanceV1(args: {
+  hasActivePlan: boolean;
+  primaryRaceName: string | null;
+  weekIntent: string;
+  weeksOut: number | null;
+  keySessionGapsDetails: Array<{ skip_reason?: string | null }>;
+  keySessionsRemaining: Array<{ name?: string | null; type?: string | null; category?: string }>;
+  runningAcwr: number | null;
+}): { title: string; bullets: string[] } | null {
+  if (!args.hasActivePlan || !args.primaryRaceName) return null;
+  if (args.weeksOut == null || args.weeksOut > 2) return null;
+  const wi = String(args.weekIntent || '').toLowerCase();
+  if (wi !== 'taper' && wi !== 'peak') return null;
+
+  const fatigueSkips = args.keySessionGapsDetails.filter((g) => {
+    const c = String(g?.skip_reason ?? '').trim().toLowerCase();
+    return c === 'fatigued' || c === 'tired';
+  }).length;
+
+  const bullets: string[] = [
+    'Most race-specific fitness is already in the bank — this week is about freshness and sharpness, not adding volume.',
+  ];
+
+  if (fatigueSkips > 0) {
+    bullets.push(
+      fatigueSkips === 1
+        ? 'You skipped a planned session tagged for fatigue or low energy. During taper, that is often the right trade: protect freshness for race day instead of forcing every scheduled run.'
+        : `You skipped ${fatigueSkips} planned sessions tagged for fatigue or low energy. During taper, that is often the right trade: protect freshness for race day instead of forcing every scheduled run.`,
+    );
+  }
+
+  bullets.push(
+    'Keep legs sharp with easy running plus short strides or a modest touch of race rhythm if your plan calls for it — avoid extra hard or long work that is not on the plan.',
+  );
+
+  const hasUpcomingLong = args.keySessionsRemaining.some((s) => {
+    const blob = `${s.name ?? ''} ${s.type ?? ''} ${s.category ?? ''}`.toLowerCase();
+    return blob.includes('long');
+  });
+  if (hasUpcomingLong) {
+    bullets.push(
+      'For your remaining long or key run, keep effort controlled — a race-specific touch, not a fitness build or empty-the-tank session.',
+    );
+  }
+
+  if (args.runningAcwr != null && args.runningAcwr < 0.85) {
+    bullets.push(
+      `Your running load ratio is low versus recent weeks (${args.runningAcwr.toFixed(2)}) — that matches a taper. Do not chase load or ACWR up now unless your plan intentionally adds stress.`,
+    );
+  }
+
+  const title = args.weeksOut <= 1 ? 'Race week — grounded cues' : 'Final weeks — grounded cues';
+  return { title, bullets };
 }
 
 function buildVerdict(
@@ -3551,6 +3607,18 @@ ${narrativeFacts.join('\n')}`;
         delta: null,
       }));
 
+    const groundedRaceWeekGuidanceV1 = computeGroundedRaceWeekGuidanceV1({
+      hasActivePlan: Boolean(activePlan),
+      primaryRaceName: goalContext.primary_event?.name ?? null,
+      weekIntent,
+      weeksOut: goalContext.primary_event
+        ? (goalContext.upcoming_races.find((r) => r.name === goalContext.primary_event!.name)?.weeks_out ?? null)
+        : null,
+      keySessionGapsDetails: reaction.key_session_gaps_details ?? [],
+      keySessionsRemaining,
+      runningAcwr: runningAcwr,
+    });
+
     const weekly_state_v1: NonNullable<CoachWeekContextResponseV1['weekly_state_v1']> = {
       version: 1,
       owner: 'coach',
@@ -3697,6 +3765,7 @@ ${narrativeFacts.join('\n')}`;
         narrative: week_narrative,
         baseline_drift_suggestions: baseline_drift_suggestions.length ? baseline_drift_suggestions : undefined,
         plan_adaptation_suggestions: plan_adaptation_suggestions.length ? plan_adaptation_suggestions : undefined,
+        ...(groundedRaceWeekGuidanceV1 ? { grounded_race_week_guidance_v1: groundedRaceWeekGuidanceV1 } : {}),
       },
       load: {
         wtd_planned_load: plannedWtdLoad ?? null,

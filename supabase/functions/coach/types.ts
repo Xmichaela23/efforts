@@ -297,6 +297,8 @@ export type CoachWeekContextResponseV1 = {
       narrative: string | null;
       baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
       plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
+      /** Deterministic taper/race-window cues from logged training + plan (not LLM). */
+      grounded_race_week_guidance_v1?: { title: string; bullets: string[] };
     };
     load: {
       wtd_planned_load: number | null;

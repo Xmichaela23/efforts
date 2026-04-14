@@ -477,6 +477,7 @@ export default function StateTab({
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
   const weekNarrative = wsv.coach?.narrative ?? null;
+  const raceWeekGuidance = wsv.coach?.grounded_race_week_guidance_v1;
   const trends = wsv.trends;
   const readinessLabel = trends.readiness_label;
   const readiness = trends.readiness_state;
@@ -507,6 +508,22 @@ export default function StateTab({
           )}
           {weekNarrative && (
             <span className="text-[12px] text-white/50 leading-snug">{weekNarrative}</span>
+          )}
+          {raceWeekGuidance && raceWeekGuidance.bullets.length > 0 && (
+            <div
+              className="mt-2 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5"
+              role="region"
+              aria-label="Race-week guidance"
+            >
+              <p className="text-[10px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1.5">
+                {raceWeekGuidance.title}
+              </p>
+              <ul className="text-[11px] text-white/72 leading-relaxed space-y-1.5 list-disc pl-3.5 marker:text-sky-400/50">
+                {raceWeekGuidance.bullets.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
         <button
