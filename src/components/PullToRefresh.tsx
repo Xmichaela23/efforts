@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void> | void;
@@ -153,6 +154,10 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
     };
   }, [thresholdPx]);
 
+  const pullProgress = thresholdPx > 0 ? Math.min(1, offset / thresholdPx) : 0;
+  const showPullIndicator = offset > 0 && !refreshing;
+  const showBusyIndicator = refreshing;
+
   return (
     <div
       style={{
@@ -164,9 +169,26 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
         flexDirection: 'column' as const,
       }}
     >
-      {refreshing && (
-        <div className="fixed top-10 left-1/2 -translate-x-1/2 text-[11px] text-gray-500 z-[100]">
-          Refreshing…
+      {(showPullIndicator || showBusyIndicator) && (
+        <div
+          className="pointer-events-none fixed left-1/2 z-[100] flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/50 px-3 py-1.5 shadow-lg backdrop-blur-md"
+          style={{
+            top: 'calc(env(safe-area-inset-top, 0px) + var(--header-h) + 6px)',
+          }}
+          aria-live="polite"
+        >
+          {showBusyIndicator ? (
+            <>
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-white/85" aria-hidden />
+              <span className="text-[12px] font-medium tracking-wide text-white/70">Refreshing</span>
+            </>
+          ) : (
+            <RefreshCw
+              className="h-4 w-4 shrink-0 text-white/75"
+              style={{ transform: `rotate(${pullProgress * 360}deg)` }}
+              aria-hidden
+            />
+          )}
         </div>
       )}
       {children}
