@@ -43,6 +43,17 @@ function allScrollChainAtTop(chain: HTMLElement[]): boolean {
   return chain.every((el) => el.scrollTop <= 1);
 }
 
+/** Finger displacement → on-screen offset: higher resistance feels sturdier (more drag per px). */
+function fingerToPullOffset(dy: number, threshold: number): number {
+  if (dy <= 0) return 0;
+  const resistance = 0.38;
+  const maxOffset = threshold * 1.22;
+  const linear = dy * resistance;
+  // Slight extra stiffness deep in the pull (keeps the tail from feeling mushy)
+  const stiffened = linear * (1 + Math.min(linear / (threshold * 2.2), 0.35));
+  return Math.min(maxOffset, stiffened);
+}
+
 const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thresholdPx = 70 }) => {
   const startYRef = useRef<number | null>(null);
   const pullingRef = useRef(false);
@@ -109,7 +120,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
 
       const dy = e.touches[0].clientY - startYRef.current;
       if (dy > 0) {
-        const eased = Math.min(thresholdPx * 1.5, dy * 0.6);
+        const eased = fingerToPullOffset(dy, thresholdPx);
         offsetRef.current = eased;
         setOffset(eased);
         e.preventDefault();
@@ -158,11 +169,14 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, thre
   const showPullIndicator = offset > 0 && !refreshing;
   const showBusyIndicator = refreshing;
 
+  const isDragging = offset > 0;
+
   return (
     <div
       style={{
         transform: offset ? `translateY(${offset}px)` : undefined,
-        transition: pullingRef.current ? 'none' : 'transform 120ms ease-out',
+        transition: isDragging ? 'none' : 'transform 180ms cubic-bezier(0.32, 0.72, 0.24, 1)',
+        willChange: isDragging ? 'transform' : undefined,
         flex: 1,
         minHeight: 0,
         display: 'flex',
