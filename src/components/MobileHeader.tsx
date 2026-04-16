@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { User, Upload, Download, Settings, Activity, Link, Package } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
+import { useAppAdmin } from '@/hooks/useAppAdmin';
 
 interface MobileHeaderProps {
   /** Custom content to render on the right side of the header */
@@ -38,6 +39,7 @@ export function MobileHeader({
   onImportClick,
 }: MobileHeaderProps) {
   const navigate = useNavigate();
+  const { isAdmin, loading: adminLoading } = useAppAdmin();
 
   // Default menu items
   const defaultMenuItems = (
@@ -74,10 +76,12 @@ export function MobileHeader({
           Sign Out
         </DropdownMenuItem>
       )}
-      <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
-        <Settings className="mr-2 h-4 w-4" />
-        Admin – Add template (JSON)
-      </DropdownMenuItem>
+      {!adminLoading && isAdmin && (
+        <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
+          <Settings className="mr-2 h-4 w-4" />
+          Admin – Add template (JSON)
+        </DropdownMenuItem>
+      )}
     </>
   );
 

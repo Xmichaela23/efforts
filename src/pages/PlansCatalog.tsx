@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MobileHeader } from '@/components/MobileHeader';
 import PlanCatalog from '@/components/PlanCatalog';
+import { useAppAdmin } from '@/hooks/useAppAdmin';
 
 export default function PlansCatalogPage() {
   const navigate = useNavigate();
+  const { isAdmin, loading: adminLoading } = useAppAdmin();
   const safeBack = () => { try { if (window.history.length>1) navigate(-1); else navigate('/'); } catch { navigate('/'); } };
 
   return (
@@ -15,7 +17,9 @@ export default function PlansCatalogPage() {
         onBack={safeBack}
         rightContent={
           <div className="flex items-center gap-2">
-            <Button onClick={() => navigate('/plans/admin')} variant="ghost" className="h-8 leading-none text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">Admin</Button>
+            {!adminLoading && isAdmin && (
+              <Button onClick={() => navigate('/plans/admin')} variant="ghost" className="h-8 leading-none text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">Admin</Button>
+            )}
             <Button onClick={() => navigate('/')} variant="ghost" className="h-8 leading-none text-sm font-medium text-white/80 hover:text-white hover:bg-white/10">Dashboard</Button>
           </div>
         }

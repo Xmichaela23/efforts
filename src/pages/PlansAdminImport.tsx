@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MobileHeader } from '@/components/MobileHeader';
 import PlanJSONImport from '@/components/PlanJSONImport';
 import WorkloadAdmin from '@/components/WorkloadAdmin';
+import { useAppAdmin } from '@/hooks/useAppAdmin';
 
 
 export default function PlansAdminImport() {
   const navigate = useNavigate();
+  const { isAdmin, loading: adminLoading } = useAppAdmin();
+
+  useEffect(() => {
+    if (!adminLoading && !isAdmin) {
+      navigate('/', { replace: true });
+    }
+  }, [adminLoading, isAdmin, navigate]);
 
   const safeBack = () => {
     try {
@@ -17,6 +25,18 @@ export default function PlansAdminImport() {
       navigate('/');
     }
   };
+
+  if (adminLoading) {
+    return (
+      <div className="mobile-app-container flex min-h-[40vh] items-center justify-center">
+        <p className="text-sm text-white/60">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="mobile-app-container">
