@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { User, Upload, Download, Settings, Activity, Link, Package } from 'lucide-react';
+import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
 
@@ -41,6 +41,13 @@ export function MobileHeader({
   const navigate = useNavigate();
   const { isAdmin, loading: adminLoading } = useAppAdmin();
 
+  const openHelpEmail = () => {
+    const q = new URLSearchParams({
+      subject: 'Efforts — Help request',
+    });
+    window.location.href = `mailto:support@efforts.work?${q.toString()}`;
+  };
+
   // Default menu items
   const defaultMenuItems = (
     <>
@@ -68,7 +75,8 @@ export function MobileHeader({
         <Upload className="mr-2 h-4 w-4" />
         Export Data
       </DropdownMenuItem>
-      <DropdownMenuItem>
+      <DropdownMenuItem onClick={openHelpEmail}>
+        <HelpCircle className="mr-2 h-4 w-4" />
         Help & Support
       </DropdownMenuItem>
       {onLogout && (
