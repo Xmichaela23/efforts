@@ -14,7 +14,7 @@ interface MobileHeaderProps {
   onBack?: () => void;
   /** Custom menu items (optional, defaults to standard menu) */
   menuItems?: React.ReactNode;
-  /** Wordmark size (default: 36) */
+  /** Wordmark size — with cascade on, keep ~≤26 so the SVG fits the fixed header (overflow hidden). */
   wordmarkSize?: number;
   /** Logout handler */
   onLogout?: () => void;
@@ -30,7 +30,7 @@ export function MobileHeader({
   showBackButton = false, 
   onBack,
   menuItems,
-  wordmarkSize = 40,
+  wordmarkSize = 26,
   onLogout,
   onTrainingBaselinesClick,
   onConnectionsClick,
@@ -131,7 +131,7 @@ export function MobileHeader({
             style={{ paddingTop: '6px' }}
             aria-hidden
           >
-            <EffortsWordmark size={wordmarkSize} enableParallax={false} showCascade={false} />
+            <EffortsWordmark size={wordmarkSize} enableParallax={false} />
           </div>
 
           {/* Right: Custom content or back button */}

@@ -11,10 +11,7 @@ interface EffortsWordmarkProps {
   activeDisciplines?: string[]; // e.g., ['run', 'strength'] for today's active disciplines
   /** False = no tilt/mouse parallax (use in MobileHeader — gyro drift separates cascade layers). */
   enableParallax?: boolean;
-  /**
-   * False = single white “e” + fforts only (no colored cascade). Use in MobileHeader — the stack
-   * reads like a glitch at small sizes.
-   */
+  /** False = single white “e” + fforts only (no colored cascade). Prefer true; keep header wordmark small so the cascade fits. */
   showCascade?: boolean;
 }
 
