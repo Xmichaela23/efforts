@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
+import { supabase } from '@/lib/supabase';
 
 interface MobileHeaderProps {
   /** Custom content to render on the right side of the header */
@@ -48,6 +49,15 @@ export function MobileHeader({
     window.location.href = `mailto:support@efforts.work?${q.toString()}`;
   };
 
+  const handleLogout = async () => {
+    if (onLogout) {
+      onLogout();
+      return;
+    }
+    await supabase.auth.signOut();
+    navigate('/', { replace: true });
+  };
+
   // Default menu items
   const defaultMenuItems = (
     <>
@@ -79,11 +89,9 @@ export function MobileHeader({
         <HelpCircle className="mr-2 h-4 w-4" />
         Help & Support
       </DropdownMenuItem>
-      {onLogout && (
-        <DropdownMenuItem onClick={onLogout}>
-          Sign Out
-        </DropdownMenuItem>
-      )}
+      <DropdownMenuItem onClick={handleLogout}>
+        Sign Out
+      </DropdownMenuItem>
       {!adminLoading && isAdmin && (
         <DropdownMenuItem onClick={() => navigate('/plans/admin')}>
           <Settings className="mr-2 h-4 w-4" />
