@@ -25,6 +25,7 @@ import {
   type RaceRecency,
   type TrainingPaces,
 } from '@/lib/effort-score';
+import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
 
 // ============================================================================
 // TYPES
@@ -1426,7 +1427,7 @@ export default function PlanWizard() {
                             : 'border-teal-500/40 text-gray-300 hover:border-teal-400 hover:text-teal-300'
                         }`}
                       >
-                        {dist === 'half' ? 'Half' : dist === 'marathon' ? 'Marathon' : dist.toUpperCase()}
+                        {planWizardRaceDistanceDisplay(dist)}
                       </button>
                     ))}
                   </div>

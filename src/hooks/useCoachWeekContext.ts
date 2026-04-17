@@ -59,6 +59,17 @@ export type CoachWeekContextV1 = {
     week_focus_label: string | null;
     week_start_dow: string;
     athlete_context_for_week: string | null;
+    /** Same `config.distance` as Plan Wizard (coach root `plan`). */
+    active_plans?: Array<{
+      plan_id: string;
+      plan_name: string | null;
+      sport?: string | null;
+      distance?: string | null;
+      race_date?: string | null;
+      race_name?: string | null;
+      duration_weeks?: number | null;
+      is_primary?: boolean;
+    }>;
   };
   metrics: {
     wtd_planned_load: number | null;

@@ -13,6 +13,7 @@ import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } fro
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData } from '@/lib/coach-payload';
+import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -132,6 +133,7 @@ function RaceSection({
   projection,
   rr,
   goalMeta,
+  planWizardDistance,
   primaryRaceReadiness,
   onOpenKeyRun,
   resolvedGoalId,
@@ -143,6 +145,8 @@ function RaceSection({
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
   goalMeta: { name: string; weeks_out: number; distance: string; target_time_seconds: number | null } | null;
+  /** From coach `plan.active_plans[].distance` (same as Plan Wizard / plan config). */
+  planWizardDistance: string | null;
   primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
   onOpenKeyRun?: (workoutId: string) => void;
   resolvedGoalId: string | null;
@@ -151,9 +155,9 @@ function RaceSection({
   onAddCourse: () => void;
   onViewStrategy: () => void;
 }) {
-  const distRaw = rr?.goal.distance ?? goalMeta?.distance ?? 'race';
-  const distLabel = distRaw.replace(/_/g, ' ');
-  const goalName = rr?.goal.name ?? goalMeta?.name ?? 'Race';
+  const distLabel = planWizardRaceDistanceDisplay(
+    planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
+  );
   const weeksOut = rr?.goal.weeks_out ?? goalMeta?.weeks_out ?? 0;
 
   const statedSec = goalMeta?.target_time_seconds ?? null;
@@ -183,7 +187,7 @@ function RaceSection({
       {/* Header: goal + weeks out */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
-        <span className="text-[11px] text-white/55">{goalName} — {weeksOut}w out</span>
+        <span className="text-[11px] text-white/55">{distLabel} — {weeksOut}w out</span>
       </div>
 
       {/* Anchor finish (unified with Course Strategy) + optional delta from full race_readiness */}
@@ -192,7 +196,6 @@ function RaceSection({
           <p className="text-[10px] text-white/45 leading-snug">{headlineLabel}</p>
           <div className="flex items-baseline gap-2">
             <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">{anchorDisplay}</span>
-            <span className="text-[11px] text-white/50">{distLabel}</span>
           </div>
           {showPlanSub && (
             <p className="text-[11px] text-white/45 tabular-nums pt-0.5">
@@ -488,6 +491,20 @@ export default function StateTab({
     ? goalMetaFromGoalLite(goalLinkedToPlan, gc?.upcoming_races)
     : null;
   const goalMeta = goalMetaPrimary ?? goalMetaFromProjection ?? goalMetaFromPlanLink ?? null;
+
+  const planRoot = (
+    data as CoachWeekContextV1 & {
+      plan?: {
+        active_plans?: Array<{ plan_id?: string | null; distance?: string | null; is_primary?: boolean }>;
+      };
+    }
+  ).plan;
+  const activePlans = planRoot?.active_plans;
+  const planWizardDistance =
+    (activePlanId && activePlans?.find(p => p.plan_id === activePlanId)?.distance) ??
+    activePlans?.find(p => p.is_primary)?.distance ??
+    activePlans?.[0]?.distance ??
+    null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -796,6 +813,7 @@ export default function StateTab({
             projection={raceFinishProjection}
             rr={raceReadiness}
             goalMeta={goalMeta}
+            planWizardDistance={planWizardDistance}
             primaryRaceReadiness={primaryRaceReadiness}
             resolvedGoalId={resolvedGoalId}
             courseRow={stateCourseRow}
