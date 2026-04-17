@@ -44,7 +44,6 @@ import {
   buildRaceFinishProjectionV1,
   type RaceFinishProjectionV1,
 } from '../_shared/resolve-server-predicted-finish.ts';
-import { fmtFinishClock } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 import {
   buildDailyLedger,
@@ -2240,7 +2239,7 @@ Deno.serve(async (req) => {
     // Persist projection so course-detail / course-strategy use the same finish time as State (SSoT).
     if (raceReadiness && goalContext.primary_event?.id) {
       try {
-        const { error: projErr } = await supabase
+        const { error: projErr } = await supabaseService
           .from('goals')
           .update({
             race_readiness_projection: {
@@ -2272,14 +2271,17 @@ Deno.serve(async (req) => {
       console.warn('[coach] primary_race_readiness failed (non-fatal):', prrErr?.message ?? prrErr);
     }
 
-    // Unified finish projection (State + Course Strategy — same resolver as terrain)
+    // Unified finish projection (State + Course Strategy — same resolver as terrain).
+    // Use service-role client (no user JWT) so reads match course-detail / course-strategy, which
+    // use service role. The user-scoped client applies RLS and can return null baselines/goals
+    // while terrain still resolves from the same DB rows.
     try {
       const pe = goalContext.primary_event;
       if (pe) {
         const sport = String(pe.sport || '').toLowerCase();
         const runish = sport === 'run' || sport === 'running' || !pe.sport;
         if (runish) {
-          const { data: gRow } = await supabase
+          const { data: gRow } = await supabaseService
             .from('goals')
             .select('name, distance, target_date, target_time, sport, race_readiness_projection')
             .eq('id', pe.id)
@@ -2287,8 +2289,8 @@ Deno.serve(async (req) => {
             .maybeSingle();
           if (gRow) {
             const gr = gRow as Record<string, unknown>;
-            const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, userId, pe.id);
-            raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabase, userId, {
+            const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, pe.id);
+            raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
               name: String(gr.name || ''),
               distance: gr.distance != null ? String(gr.distance) : null,
               target_date: gr.target_date != null ? String(gr.target_date) : null,
@@ -2301,38 +2303,6 @@ Deno.serve(async (req) => {
       }
     } catch (rfpErr: any) {
       console.warn('[coach] race_finish_projection_v1 failed (non-fatal):', rfpErr?.message ?? rfpErr);
-    }
-
-    // If unified build returned null (thin baselines / resolver miss) but a race target exists on
-    // the goal row or linked plan config, still emit projection so State shows the same clock as terrain.
-    if (!raceFinishProjectionV1 && goalContext.primary_event) {
-      const pe = goalContext.primary_event;
-      const sport = String(pe.sport || '').toLowerCase();
-      const runish = sport === 'run' || sport === 'running' || !pe.sport;
-      if (runish) {
-        let tt =
-          pe.target_time != null && Number.isFinite(Number(pe.target_time)) && Number(pe.target_time) > 0
-            ? Math.round(Number(pe.target_time))
-            : null;
-        if (tt == null) {
-          try {
-            tt = await resolveGoalTargetTimeSeconds(supabase, userId, pe.id);
-          } catch {
-            tt = null;
-          }
-        }
-        if (tt != null && tt > 0) {
-          raceFinishProjectionV1 = {
-            goal_id: pe.id,
-            anchor_seconds: tt,
-            anchor_display: fmtFinishClock(tt),
-            source_kind: 'plan_target',
-            plan_goal_seconds: tt,
-            plan_goal_display: fmtFinishClock(tt),
-            mismatch_blurb: null,
-          };
-        }
-      }
     }
 
     const interference = latestSnapshot?.interference ?? null;
