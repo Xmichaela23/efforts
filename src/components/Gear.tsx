@@ -1,13 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Menu, User, Upload, Download, Link, Package, Settings, Activity,
   Plus, Trash2, Check, X, AlertTriangle
 } from 'lucide-react';
-import { Button } from './ui/button';
 import { MobileHeader } from './MobileHeader';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { useVisualViewportKeyboardInset } from '@/hooks/useVisualViewportKeyboardInset';
 
 // Icons for gear types
 const RunningShoeIcon = () => (
@@ -81,15 +79,38 @@ const BIKE_MODELS: Record<string, string[]> = {
   'BMC': ['Roadmachine', 'Teammachine', 'Timemachine'],
 };
 
+function matchCatalogBrandKey(brand: string, catalog: Record<string, string[]>): string | null {
+  const t = brand.trim().toLowerCase();
+  if (!t) return null;
+  return Object.keys(catalog).find((k) => k.toLowerCase() === t) ?? null;
+}
+
+function filterModelSuggestions(
+  tab: 'shoes' | 'bikes',
+  brand: string,
+  modelQuery: string
+): string[] {
+  const catalog = tab === 'shoes' ? SHOE_MODELS : BIKE_MODELS;
+  const key = matchCatalogBrandKey(brand, catalog);
+  const q = modelQuery.trim().toLowerCase();
+  const pool = key ? catalog[key] : [...new Set(Object.values(catalog).flat())];
+  // iOS <datalist> is unreliable; we use a custom list only after the user types (true typeahead).
+  if (!q) return [];
+  return pool.filter((m) => m.toLowerCase().includes(q)).slice(0, 12);
+}
+
 export default function Gear({ onClose }: GearProps) {
-  const navigate = useNavigate();
+  const keyboardInset = useVisualViewportKeyboardInset();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const modelBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [shoes, setShoes] = useState<GearItem[]>([]);
   const [bikes, setBikes] = useState<GearItem[]>([]);
   const [activeTab, setActiveTab] = useState<'shoes' | 'bikes'>('shoes');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [modelSuggestOpen, setModelSuggestOpen] = useState(false);
   
   // Form state for new gear
   const [newGear, setNewGear] = useState({
@@ -100,6 +121,18 @@ export default function Gear({ onClose }: GearProps) {
     starting_miles: '', // Store as string for input, convert to meters on save
     notes: ''
   });
+
+  const modelSuggestions = useMemo(
+    () =>
+      showAddForm ? filterModelSuggestions(activeTab, newGear.brand, newGear.model) : [],
+    [showAddForm, activeTab, newGear.brand, newGear.model]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (modelBlurTimer.current) clearTimeout(modelBlurTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     loadGear();
@@ -278,21 +311,34 @@ export default function Gear({ onClose }: GearProps) {
 
   const currentItems = activeTab === 'shoes' ? shoes : bikes;
 
+  const scrollFieldIntoView = (el: HTMLElement) => {
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  };
+
   return (
     <div className="mobile-app-container">
       <MobileHeader />
-      <div className="px-4 pb-2 pt-2">
-        <h2 className="text-2xl font-bold text-white">Gear</h2>
-      </div>
-
-      <main className="mobile-main-content">
-        <div className="max-w-2xl mx-auto px-4 pb-6">
+      <main className="mobile-main-content min-h-0">
+        <div className="flex flex-col flex-1 min-h-0 max-w-2xl mx-auto w-full px-4">
+          <div className="shrink-0 pt-2 pb-1">
+            <h2 className="text-2xl font-bold text-white">Gear</h2>
+          </div>
+          <div
+            ref={scrollRef}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: `calc(1.5rem + ${keyboardInset}px)`,
+            }}
+          >
           {loading ? (
             <div className="text-center py-8">
               <p className="text-white/60">Loading your gear...</p>
             </div>
           ) : (
-            <div className="space-y-5 mt-12">
+            <div className="space-y-5 mt-4 pb-2">
               {/* Description */}
               <div className="text-center mb-4">
                 <p className="text-white/50 text-sm">Track mileage on your running shoes and bikes</p>
@@ -478,10 +524,16 @@ export default function Gear({ onClose }: GearProps) {
                         <label className="text-xs text-white/50 font-medium mb-1.5 block">Name *</label>
                         <input
                           type="text"
+                          name="gear-name"
                           value={newGear.name}
                           onChange={(e) => setNewGear({ ...newGear, name: e.target.value })}
+                          onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          enterKeyHint="next"
                           placeholder={activeTab === 'shoes' ? 'e.g. Daily Trainers' : 'e.g. Road Bike'}
-                          className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                          className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 scroll-mt-32"
                         />
                       </div>
                       
@@ -492,9 +544,14 @@ export default function Gear({ onClose }: GearProps) {
                             type="text"
                             list={activeTab === 'shoes' ? 'shoe-brands' : 'bike-brands'}
                             value={newGear.brand}
-                            onChange={(e) => setNewGear({ ...newGear, brand: e.target.value, model: '' })}
+                            onChange={(e) => setNewGear({ ...newGear, brand: e.target.value })}
+                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            enterKeyHint="next"
                             placeholder={activeTab === 'shoes' ? 'Nike, Hoka...' : 'Trek, Specialized...'}
-                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 scroll-mt-32"
                           />
                           <datalist id="shoe-brands">
                             {SHOE_BRANDS.map(brand => <option key={brand} value={brand} />)}
@@ -503,27 +560,53 @@ export default function Gear({ onClose }: GearProps) {
                             {BIKE_BRANDS.map(brand => <option key={brand} value={brand} />)}
                           </datalist>
                         </div>
-                        <div>
+                        <div className="relative">
                           <label className="text-xs text-white/50 font-medium mb-1.5 block">Model</label>
                           <input
                             type="text"
-                            list={`${newGear.brand.toLowerCase().replace(/\s+/g, '-')}-models`}
+                            name="gear-model"
                             value={newGear.model}
                             onChange={(e) => setNewGear({ ...newGear, model: e.target.value })}
+                            onFocus={(e) => {
+                              setModelSuggestOpen(true);
+                              scrollFieldIntoView(e.currentTarget);
+                            }}
+                            onBlur={() => {
+                              if (modelBlurTimer.current) clearTimeout(modelBlurTimer.current);
+                              modelBlurTimer.current = setTimeout(() => setModelSuggestOpen(false), 200);
+                            }}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            enterKeyHint="next"
                             placeholder={activeTab === 'shoes' ? 'Pegasus 40' : 'Domane SL5'}
-                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 scroll-mt-32"
                           />
-                          {/* Dynamic model datalists based on selected brand */}
-                          {activeTab === 'shoes' && Object.entries(SHOE_MODELS).map(([brand, models]) => (
-                            <datalist key={brand} id={`${brand.toLowerCase().replace(/\s+/g, '-')}-models`}>
-                              {models.map(model => <option key={model} value={model} />)}
-                            </datalist>
-                          ))}
-                          {activeTab === 'bikes' && Object.entries(BIKE_MODELS).map(([brand, models]) => (
-                            <datalist key={brand} id={`${brand.toLowerCase().replace(/\s+/g, '-')}-models`}>
-                              {models.map(model => <option key={model} value={model} />)}
-                            </datalist>
-                          ))}
+                          {modelSuggestOpen &&
+                            modelSuggestions.length > 0 &&
+                            !(modelSuggestions.length === 1 && modelSuggestions[0] === newGear.model) && (
+                              <ul
+                                role="listbox"
+                                className="absolute z-20 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-xl border border-white/20 bg-black/95 py-1 shadow-lg"
+                              >
+                                {modelSuggestions.map((m) => (
+                                  <li key={m}>
+                                    <button
+                                      type="button"
+                                      role="option"
+                                      className="w-full text-left px-3 py-2 text-sm text-white/90 hover:bg-white/10 font-light"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        setNewGear((prev) => ({ ...prev, model: m }));
+                                        setModelSuggestOpen(false);
+                                      }}
+                                    >
+                                      {m}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                         </div>
                       </div>
 
@@ -534,8 +617,9 @@ export default function Gear({ onClose }: GearProps) {
                             type="number"
                             value={newGear.starting_miles}
                             onChange={(e) => setNewGear({ ...newGear, starting_miles: e.target.value })}
+                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                             placeholder="0"
-                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 scroll-mt-32"
                           />
                         </div>
                         <div>
@@ -544,7 +628,8 @@ export default function Gear({ onClose }: GearProps) {
                             type="date"
                             value={newGear.purchase_date}
                             onChange={(e) => setNewGear({ ...newGear, purchase_date: e.target.value })}
-                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+                            onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
+                            className="w-full h-11 px-3 text-sm bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 scroll-mt-32"
                           />
                         </div>
                       </div>
@@ -574,6 +659,7 @@ export default function Gear({ onClose }: GearProps) {
               </div>
             </div>
           )}
+          </div>
         </div>
       </main>
     </div>
