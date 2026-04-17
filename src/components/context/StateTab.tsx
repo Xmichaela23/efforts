@@ -48,6 +48,21 @@ function fmtDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 }
 
+/** Goal target finish clock from coach `goal_context.primary_event.target_time` (seconds). */
+function fmtGoalClock(totalSec: number): string {
+  const h = Math.floor(totalSec / 3600);
+  const mi = Math.floor((totalSec % 3600) / 60);
+  const s = Math.round(totalSec % 60);
+  if (h > 0) return `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${mi}:${String(s).padStart(2, '0')}`;
+}
+
+function isRunPrimary(pe: { sport?: string | null } | null | undefined): boolean {
+  if (!pe) return false;
+  const s = String(pe.sport || '').toLowerCase();
+  return s === 'run' || s === 'running' || !pe.sport;
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -131,7 +146,7 @@ function RaceSection({
 }: {
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
-  goalMeta: { name: string; weeks_out: number; distance: string } | null;
+  goalMeta: { name: string; weeks_out: number; distance: string; target_time_seconds: number | null } | null;
   primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
   onOpenKeyRun?: (workoutId: string) => void;
   resolvedGoalId: string | null;
@@ -145,8 +160,22 @@ function RaceSection({
   const goalName = rr?.goal.name ?? goalMeta?.name ?? 'Race';
   const weeksOut = rr?.goal.weeks_out ?? goalMeta?.weeks_out ?? 0;
 
-  const anchorDisplay = projection?.anchor_display ?? rr?.predicted_finish_display ?? '—';
+  const statedSec = goalMeta?.target_time_seconds ?? null;
+  const anchorDisplay =
+    projection?.anchor_display ??
+    rr?.predicted_finish_display ??
+    (statedSec != null ? fmtGoalClock(statedSec) : '—');
   const headlineIsPlan = projection?.source_kind === 'plan_target';
+  const headlineLabel =
+    projection != null
+      ? headlineIsPlan
+        ? 'Your goal'
+        : 'Predicted from training'
+      : rr != null
+        ? 'Predicted from training'
+        : statedSec != null
+          ? 'Your goal'
+          : 'Race finish';
   const showPlanSub =
     projection?.plan_goal_display &&
     projection.plan_goal_seconds != null &&
@@ -164,13 +193,7 @@ function RaceSection({
       {/* Anchor finish (unified with Course Strategy) + optional delta from full race_readiness */}
       <div className="flex items-baseline justify-between">
         <div className="flex flex-col gap-0.5 min-w-0">
-          <p className="text-[10px] text-white/45 leading-snug">
-            {headlineIsPlan ? (
-              <>Your goal</>
-            ) : (
-              <>Predicted from training</>
-            )}
-          </p>
+          <p className="text-[10px] text-white/45 leading-snug">{headlineLabel}</p>
           <div className="flex items-baseline gap-2">
             <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">{anchorDisplay}</span>
             <span className="text-[11px] text-white/50">{distLabel}</span>
@@ -197,6 +220,11 @@ function RaceSection({
 
       {projection?.mismatch_blurb && (
         <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
+      )}
+      {!projection && !rr && statedSec == null && (
+        <p className="text-[11px] text-sky-400/80 leading-snug">
+          No projection in this response yet — pull down to refresh State.
+        </p>
       )}
 
       {/* Target comparison — full race_readiness only */}
@@ -357,7 +385,10 @@ export default function StateTab({
     if (!uid) return;
     let cancelled = false;
     const goalIdFromCoach =
-      raceFinishProjection?.goal_id?.trim() || raceReadiness?.goal?.id?.trim() || null;
+      raceFinishProjection?.goal_id?.trim() ||
+      raceReadiness?.goal?.id?.trim() ||
+      (data as CoachWeekContextV1 | null)?.goal_context?.primary_event?.id?.trim() ||
+      null;
 
     (async () => {
       let goalId: string | null = goalIdFromCoach;
@@ -404,6 +435,7 @@ export default function StateTab({
     raceReadiness?.goal?.id,
     raceReadiness?.goal?.name,
     raceReadiness?.goal?.weeks_out,
+    (data as CoachWeekContextV1 | null)?.goal_context?.primary_event?.id,
     raceFinishProjection ? 1 : 0,
     raceReadiness ? 1 : 0,
   ]);
@@ -439,9 +471,17 @@ export default function StateTab({
   const gc = (data as CoachWeekContextV1).goal_context;
   const pe = gc?.primary_event;
   const weeksOutMeta = pe ? gc.upcoming_races?.find(r => r.name === pe.name)?.weeks_out ?? 0 : 0;
-  const goalMeta = pe
-    ? { name: pe.name, weeks_out: weeksOutMeta, distance: pe.distance || 'marathon' }
-    : null;
+  const peTt = (pe as { target_time?: number | null } | null | undefined)?.target_time;
+  const goalMeta =
+    pe && isRunPrimary(pe)
+      ? {
+          name: pe.name,
+          weeks_out: weeksOutMeta,
+          distance: pe.distance || 'marathon',
+          target_time_seconds:
+            peTt != null && Number.isFinite(Number(peTt)) && Number(peTt) > 0 ? Math.round(Number(peTt)) : null,
+        }
+      : null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -744,8 +784,8 @@ export default function StateTab({
           </div>
         </div>
 
-        {/* RACE — unified projection (coach) + optional full race_readiness detail */}
-        {(raceFinishProjection || raceReadiness) && (
+        {/* RACE — show whenever primary run goal exists; projection/goal time from coach payload */}
+        {(raceFinishProjection || raceReadiness || goalMeta) && (
           <RaceSection
             projection={raceFinishProjection}
             rr={raceReadiness}
