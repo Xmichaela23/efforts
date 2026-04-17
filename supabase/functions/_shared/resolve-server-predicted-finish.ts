@@ -45,6 +45,12 @@ export type RaceFinishProjectionV1 = {
   plan_goal_seconds: number | null;
   plan_goal_display: string | null;
   mismatch_blurb: string | null;
+  /**
+   * Conservative fitness clock from baselines + race readiness (VDOT path), independent of pacing anchor.
+   * Omitted or null when distance/date/sport/baselines do not support a projection.
+   */
+  fitness_projection_seconds?: number | null;
+  fitness_projection_display?: string | null;
 };
 
 function isUsableRfp(r: RaceFinishProjectionV1 | null | undefined): r is RaceFinishProjectionV1 {
@@ -120,6 +126,8 @@ export async function resolvePaceAnchorForCourse(
   goal: GoalRowForPrediction,
   courseGoalId: string,
   planTargetSec: number | null,
+  /** When set (including `null`), skips a second `resolveServerPredictedFinishSeconds` call. */
+  precomputedFitnessSec?: number | null,
 ): Promise<PaceAnchorResult | null> {
   const fromGoalRow = parseGoalRaceReadinessProjection(goal.race_readiness_projection);
   if (fromGoalRow != null) return { seconds: fromGoalRow, kind: 'coach_readiness' };
@@ -132,7 +140,10 @@ export async function resolvePaceAnchorForCourse(
       ? Math.round(planTargetSec)
       : null;
 
-  const fitnessSec = await resolveServerPredictedFinishSeconds(supabase, userId, goal);
+  const fitnessSec =
+    precomputedFitnessSec !== undefined
+      ? precomputedFitnessSec
+      : await resolveServerPredictedFinishSeconds(supabase, userId, goal);
 
   if (pt != null && fitnessSec != null && pt < fitnessSec) {
     return { seconds: fitnessSec, kind: 'fitness_floors_stated_goal' };
@@ -156,7 +167,15 @@ export async function buildRaceFinishProjectionV1(
   goalId: string,
   planGoalSec: number | null,
 ): Promise<RaceFinishProjectionV1 | null> {
-  const anchor = await resolvePaceAnchorForCourse(supabase, userId, goal, goalId, planGoalSec);
+  const fitnessSec = await resolveServerPredictedFinishSeconds(supabase, userId, goal);
+  const anchor = await resolvePaceAnchorForCourse(
+    supabase,
+    userId,
+    goal,
+    goalId,
+    planGoalSec,
+    fitnessSec,
+  );
   let primarySec = anchor?.seconds ?? null;
   let sourceKind: PaceAnchorKind | null = anchor?.kind ?? null;
 
@@ -167,6 +186,9 @@ export async function buildRaceFinishProjectionV1(
   if (primarySec == null || sourceKind == null) return null;
 
   const planGoalDisplay = planGoalSec != null ? fmtFinishClock(planGoalSec) : null;
+
+  const fitnessRounded =
+    fitnessSec != null && Number.isFinite(fitnessSec) && fitnessSec > 0 ? Math.round(fitnessSec) : null;
 
   let mismatchBlurb: string | null = null;
   if (anchor && planGoalSec != null) {
@@ -187,6 +209,8 @@ export async function buildRaceFinishProjectionV1(
     plan_goal_seconds: planGoalSec,
     plan_goal_display: planGoalDisplay,
     mismatch_blurb: mismatchBlurb,
+    fitness_projection_seconds: fitnessRounded,
+    fitness_projection_display: fitnessRounded != null ? fmtFinishClock(fitnessRounded) : null,
   };
 }
 

@@ -11,6 +11,9 @@ export type RaceFinishProjectionV1 = {
   plan_goal_seconds: number | null;
   plan_goal_display: string | null;
   mismatch_blurb: string | null;
+  /** Server-only fitness clock (VDOT / baselines); optional when inputs are insufficient. */
+  fitness_projection_seconds?: number | null;
+  fitness_projection_display?: string | null;
 };
 
 export type RaceReadinessV1 = {

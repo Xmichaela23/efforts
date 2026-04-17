@@ -168,28 +168,19 @@ function RaceSection({
     planWizardTargetSeconds != null && Number.isFinite(planWizardTargetSeconds) && planWizardTargetSeconds > 0
       ? Math.round(planWizardTargetSeconds)
       : null;
-  const anchorDisplay =
-    projection?.anchor_display ??
-    rr?.predicted_finish_display ??
-    (statedSec != null ? fmtGoalClock(statedSec) : wizardSec != null ? fmtGoalClock(wizardSec) : '—');
-  const headlineIsPlan = projection?.source_kind === 'plan_target';
-  const headlineLabel =
-    projection != null
-      ? headlineIsPlan
-        ? 'Your goal'
-        : 'Projected from your training'
-      : rr != null
-        ? 'Projected from your training'
-        : statedSec != null
-          ? 'Your goal'
-          : wizardSec != null
-            ? 'Your goal'
-            : 'Race finish';
-  const showPlanSub =
-    projection?.plan_goal_display &&
-    projection.plan_goal_seconds != null &&
-    projection.plan_goal_seconds > 0 &&
-    !(projection.source_kind === 'plan_target' && projection.anchor_seconds === projection.plan_goal_seconds);
+  /** Stated goal from plan row, goal meta, or wizard — no client-side pace math. */
+  const statedGoalDisplay =
+    projection?.plan_goal_display ??
+    (statedSec != null ? fmtGoalClock(statedSec) : wizardSec != null ? fmtGoalClock(wizardSec) : null);
+  /** Server fitness clock from projection, else coach race_readiness (same server pipeline). */
+  const projectedFromTraining =
+    projection?.fitness_projection_display ?? rr?.predicted_finish_display ?? null;
+  const hideDuplicateProjected =
+    statedGoalDisplay != null &&
+    projectedFromTraining != null &&
+    statedGoalDisplay === projectedFromTraining;
+  const showProjectedRow = projectedFromTraining != null && !hideDuplicateProjected;
+  const hasAnyFinishTime = statedGoalDisplay != null || projectedFromTraining != null;
 
   return (
     <div className="px-3 py-3 space-y-2.5">
@@ -199,20 +190,27 @@ function RaceSection({
         <span className="text-[11px] text-white/55">{distLabel} — {weeksOut}w out</span>
       </div>
 
-      {/* Anchor finish (unified with Course Strategy) + optional delta from full race_readiness */}
-      <div className="flex items-baseline justify-between">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <p className="text-[10px] text-white/45 leading-snug">{headlineLabel}</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">{anchorDisplay}</span>
-          </div>
-          {showPlanSub && (
-            <p className="text-[11px] text-white/45 tabular-nums pt-0.5">
-              Plan {projection!.plan_goal_display}
-            </p>
+      {/* Stated goal vs server fitness projection (pacing anchor stays on projection for Course Strategy). */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-3 min-w-0 flex-1">
+          {statedGoalDisplay != null && (
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[10px] text-white/45 leading-snug">Your goal</p>
+              <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+                {statedGoalDisplay}
+              </span>
+            </div>
+          )}
+          {showProjectedRow && (
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[10px] text-white/45 leading-snug">Projected from your training</p>
+              <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+                {projectedFromTraining}
+              </span>
+            </div>
           )}
         </div>
-        <div className="flex items-baseline gap-2 shrink-0">
+        <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
           {rr?.delta_display && (
             <span className={`text-[13px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
               {rr.delta_display}
@@ -229,7 +227,7 @@ function RaceSection({
       {projection?.mismatch_blurb && (
         <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
       )}
-      {!projection && !rr && statedSec == null && wizardSec == null && (
+      {!hasAnyFinishTime && (
         <p className="text-[11px] text-sky-400/80 leading-snug">
           No finish time yet — pull down to refresh State.
         </p>
