@@ -130,11 +130,10 @@ function isRunGoalLite(g: GoalLite | null | undefined): boolean {
  * 2) activePlan.goal_id when present in race_courses (multi-course)
  * 3) primary_event (run)
  * 4) active plan linked goal + plan_id on goal rows
- * 5) active plan with missing plan.goal_id: single run event goal, or match plan.config.race_name to goal name
  */
 export function resolveRunGoalIdForRaceProjection(
   goalContext: GoalContext,
-  activePlan: { id: string; goal_id?: string | null; config?: unknown } | null | undefined,
+  activePlan: { id: string; goal_id?: string | null } | null | undefined,
   raceCourseGoalIds?: string[] | null,
 ): string | null {
   const uniq = [...new Set((raceCourseGoalIds || []).filter(Boolean).map(String))];
@@ -174,25 +173,6 @@ export function resolveRunGoalIdForRaceProjection(
       const runish = sport === 'run' || sport === 'running' || !linked.sport;
       if (runish) return linked.id;
     }
-  }
-
-  // Data drift: plan row active but plans.goal_id never set — goals never get plan_id; still show State projection.
-  const planGoalUnset = !gid && activePlan && planId;
-  if (planGoalUnset) {
-    const runEvents = goalContext.goals.filter(
-      g => isRunGoalLite(g) && g.goal_type === 'event',
-    );
-    if (runEvents.length === 1) return runEvents[0].id;
-    const cfg = activePlan?.config as Record<string, unknown> | null | undefined;
-    const raceName = cfg?.race_name != null ? String(cfg.race_name).trim().toLowerCase() : '';
-    if (raceName && runEvents.length > 0) {
-      const byName = runEvents.find(
-        g => String(g.name || '').toLowerCase().includes(raceName) || raceName.includes(String(g.name || '').toLowerCase()),
-      );
-      if (byName && isRunGoalLite(byName)) return byName.id;
-    }
-    const priorityA = runEvents.find(g => g.priority === 'A');
-    if (priorityA && isRunGoalLite(priorityA)) return priorityA.id;
   }
 
   return null;

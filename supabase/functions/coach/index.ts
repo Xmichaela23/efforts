@@ -44,7 +44,7 @@ import {
   buildRaceFinishProjectionV1,
   type RaceFinishProjectionV1,
 } from '../_shared/resolve-server-predicted-finish.ts';
-import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import { resolveGoalTargetTimeSeconds, targetSecondsFromPlanConfig } from '../_shared/resolve-goal-target-time.ts';
 import {
   buildDailyLedger,
   buildIdentity,
@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 14;
+const COACH_PAYLOAD_VERSION = 15;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2181,8 +2181,11 @@ Deno.serve(async (req) => {
       runGoalForReadiness = (() => {
         const pe = goalContext.primary_event;
         if (pe && (pe.sport === 'run' || pe.sport === 'running' || !pe.sport)) return pe;
-        if (!resolvedRunGoalIdForRace) return null;
-        const g = goalContext.goals.find(x => x.id === resolvedRunGoalIdForRace);
+        const gid =
+          resolvedRunGoalIdForRace ||
+          (typeof activePlan?.goal_id === 'string' && activePlan.goal_id.trim() ? activePlan.goal_id.trim() : '');
+        if (!gid) return null;
+        const g = goalContext.goals.find(x => x.id === gid);
         if (!g) return null;
         if (g.sport === 'run' || g.sport === 'running' || !g.sport) return g;
         return null;
@@ -2204,13 +2207,10 @@ Deno.serve(async (req) => {
             : planDistance != null
               ? String(planDistance)
               : null;
-        let targetDate =
+        const targetDate =
           runGoalForReadiness.target_date != null
             ? String(runGoalForReadiness.target_date).slice(0, 10)
             : planRaceDate;
-        if (!targetDate && distance) {
-          targetDate = addDaysISO(asOfDate, 84);
-        }
 
         if (distance && targetDate) {
           const weeksOutVal = goalContext.upcoming_races.find(r => r.name === runGoalForReadiness!.name)?.weeks_out ?? 0;
@@ -2327,40 +2327,41 @@ Deno.serve(async (req) => {
       console.warn('[coach] primary_race_readiness failed (non-fatal):', prrErr?.message ?? prrErr);
     }
 
-    // Unified finish projection (State + Course Strategy — same resolver as terrain).
-    // Use service-role client (no user JWT) so reads match course-detail / course-strategy, which
-    // use service role. The user-scoped client applies RLS and can return null baselines/goals
-    // while terrain still resolves from the same DB rows.
-    // Goal id: same resolver priority as course-detail (race_courses.goal_id when unambiguous) so State matches terrain.
+    // Unified finish projection (State + Course Strategy). User's plan-wizard target lives on
+    // `plans.config.target_time` (see generate-run-plan); read that first, then goal/plan DB.
+    // Goal id: race_courses / primary_event / plan link (resolveRunGoalIdForRace), else active plan's goal_id.
     try {
-      if (resolvedRunGoalIdForRace) {
+      const projGoalIdForRfp =
+        resolvedRunGoalIdForRace ||
+        (typeof activePlan?.goal_id === 'string' && activePlan.goal_id.trim() ? activePlan.goal_id.trim() : null);
+      const planGoalSecForRfp =
+        targetSecondsFromPlanConfig(activePlan?.config) ??
+        (projGoalIdForRfp ? await resolveGoalTargetTimeSeconds(supabaseService, userId, projGoalIdForRfp) : null);
+
+      if (projGoalIdForRfp) {
         const { data: gRow } = await supabaseService
           .from('goals')
           .select('name, distance, target_date, target_time, sport, race_readiness_projection')
-          .eq('id', resolvedRunGoalIdForRace)
+          .eq('id', projGoalIdForRfp)
           .eq('user_id', userId)
           .maybeSingle();
         if (gRow) {
           const gr = gRow as Record<string, unknown>;
-          const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, resolvedRunGoalIdForRace);
           const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
           const planOwnsGoal = Boolean(
             activePlan &&
-              (String(activePlan.goal_id || '') === String(resolvedRunGoalIdForRace) ||
-                goalContext.goals.some(g => g.id === resolvedRunGoalIdForRace && g.plan_id === activePlan!.id)),
+              (String(activePlan.goal_id || '') === String(projGoalIdForRfp) ||
+                goalContext.goals.some(g => g.id === projGoalIdForRfp && g.plan_id === activePlan!.id)),
           );
           const planRaceDate =
             planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
           const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
           const distFromPlan =
             planDistance != null ? String(planDistance) : null;
-          let targetDateForProj =
+          const targetDateForProj =
             gr.target_date != null
               ? String(gr.target_date).slice(0, 10)
               : planRaceDate;
-          if (!targetDateForProj && (gr.distance != null || distFromPlan)) {
-            targetDateForProj = addDaysISO(asOfDate, 84);
-          }
           raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
             name: String(gr.name || ''),
             distance: gr.distance != null ? String(gr.distance) : distFromPlan,
@@ -2368,7 +2369,7 @@ Deno.serve(async (req) => {
             target_time: gr.target_time != null ? Number(gr.target_time) : null,
             sport: gr.sport != null ? String(gr.sport) : null,
             race_readiness_projection: gr.race_readiness_projection,
-          }, resolvedRunGoalIdForRace, planGoalSec);
+          }, projGoalIdForRfp, planGoalSecForRfp);
         }
       }
     } catch (rfpErr: any) {

@@ -209,20 +209,9 @@ export async function resolveServerPredictedFinishSeconds(
   userId: string,
   goal: GoalRowForPrediction,
 ): Promise<number | null> {
-  if (!goal.distance) return null;
+  if (!goal.distance || !goal.target_date) return null;
   const sport = String(goal.sport || '').toLowerCase();
   if (sport && sport !== 'run' && sport !== 'running') return null;
-
-  // Weeks-out math needs a date; coach merges plan race_date, but if still missing use a stable horizon.
-  let targetDateIso =
-    goal.target_date != null && String(goal.target_date).trim() !== ''
-      ? String(goal.target_date).slice(0, 10)
-      : '';
-  if (!targetDateIso) {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() + 84);
-    targetDateIso = d.toISOString().slice(0, 10);
-  }
 
   const { data: ub } = await supabase
     .from('user_baselines')
@@ -235,7 +224,7 @@ export async function resolveServerPredictedFinishSeconds(
 
   let weeksOut = 0;
   try {
-    const race = new Date(String(targetDateIso).slice(0, 10));
+    const race = new Date(String(goal.target_date).slice(0, 10));
     if (!Number.isNaN(race.getTime())) {
       const now = new Date();
       weeksOut = Math.max(0, Math.round((race.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000)));
@@ -252,7 +241,7 @@ export async function resolveServerPredictedFinishSeconds(
     primaryEvent: {
       name: goal.name,
       distance: goal.distance,
-      target_date: targetDateIso,
+      target_date: String(goal.target_date).slice(0, 10),
       target_time: tt != null && Number.isFinite(tt) && tt > 0 ? tt : null,
       sport: goal.sport,
     },
@@ -264,9 +253,6 @@ export async function resolveServerPredictedFinishSeconds(
     easyRunDecouplingPct: null,
   });
 
-  if (!rr) {
-    if (tt != null && Number.isFinite(tt) && tt > 0) return Math.round(tt);
-    return null;
-  }
+  if (!rr) return null;
   return parseClientPredictedFinishSeconds(rr.predicted_finish_time_seconds);
 }
