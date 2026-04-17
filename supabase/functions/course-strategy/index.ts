@@ -29,7 +29,10 @@ import {
   type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
-import { resolvePaceAnchorForCourse } from '../_shared/resolve-server-predicted-finish.ts';
+import {
+  resolvePaceAnchorForCourse,
+  type PaceAnchorKind,
+} from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -170,20 +173,36 @@ Deno.serve(async (req) => {
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
 
-  const anchor = await resolvePaceAnchorForCourse(
-    supabase,
-    user.id,
-    {
-      name: String(goal.name || ''),
-      distance: goal.distance != null ? String(goal.distance) : null,
-      target_date: goal.target_date != null ? String(goal.target_date) : null,
-      target_time: goal.target_time != null ? Number(goal.target_time) : null,
-      sport: goal.sport != null ? String(goal.sport) : null,
-      race_readiness_projection: (goal as Record<string, unknown>).race_readiness_projection,
-    },
-    String(course.goal_id),
-    planGoalSec,
-  );
+  const { data: coachCacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
+  const coachPl = coachCacheRow?.payload as Record<string, unknown> | undefined;
+  const wsvRfp = (coachPl?.weekly_state_v1 as { race_finish_projection_v1?: unknown } | undefined)
+    ?.race_finish_projection_v1;
+  const cachedRfp = coachPl?.race_finish_projection_v1 ?? wsvRfp;
+  const unified =
+    cachedRfp &&
+    typeof cachedRfp === 'object' &&
+    cachedRfp !== null &&
+    String((cachedRfp as { goal_id?: string }).goal_id) === String(course.goal_id)
+      ? (cachedRfp as { anchor_seconds: number; source_kind: PaceAnchorKind })
+      : null;
+
+  const anchor =
+    unified != null
+      ? { seconds: unified.anchor_seconds, kind: unified.source_kind }
+      : await resolvePaceAnchorForCourse(
+          supabase,
+          user.id,
+          {
+            name: String(goal.name || ''),
+            distance: goal.distance != null ? String(goal.distance) : null,
+            target_date: goal.target_date != null ? String(goal.target_date) : null,
+            target_time: goal.target_time != null ? Number(goal.target_time) : null,
+            sport: goal.sport != null ? String(goal.sport) : null,
+            race_readiness_projection: (goal as Record<string, unknown>).race_readiness_projection,
+          },
+          String(course.goal_id),
+          planGoalSec,
+        );
 
   if (anchor == null) {
     return new Response(

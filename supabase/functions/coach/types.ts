@@ -172,6 +172,8 @@ export type CoachWeekContextResponseV1 = {
   goal_context?: import('../_shared/goal-context.ts').GoalContext;
   goal_prediction?: import('../_shared/goal-predictor/index.ts').GoalPredictionResult;
   race_readiness?: import('../_shared/race-readiness/index.ts').RaceReadinessV1 | null;
+  /** Same resolver as terrain; State + Course Strategy read this (coach + coach_cache). */
+  race_finish_projection_v1?: import('../_shared/resolve-server-predicted-finish.ts').RaceFinishProjectionV1 | null;
   /** Most recent ≥12mi run with session_detail_v1.race_readiness (State tab KEY RUN); null when gated or none. */
   primary_race_readiness?: {
     workout_id: string;
@@ -348,6 +350,7 @@ export type CoachWeekContextResponseV1 = {
     }>;
     run_session_types_7d?: RunSessionType7d[];
     response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
+    race_finish_projection_v1?: import('../_shared/resolve-server-predicted-finish.ts').RaceFinishProjectionV1 | null;
   };
 };
 

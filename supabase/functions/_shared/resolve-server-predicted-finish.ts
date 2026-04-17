@@ -10,6 +10,7 @@
  */
 import { computeRaceReadiness } from './race-readiness/index.ts';
 import { parseClientPredictedFinishSeconds } from './resolve-goal-target-time.ts';
+import { fmtFinishClock } from './course-strategy-helpers.ts';
 
 export type GoalRowForPrediction = {
   name: string;
@@ -98,6 +99,62 @@ export async function resolvePaceAnchorForCourse(
   if (fitnessSec != null) return { seconds: fitnessSec, kind: 'baseline_vdot' };
 
   return null;
+}
+
+/** Unified finish-time block for State + Course Strategy (same resolver as terrain). */
+export type RaceFinishProjectionV1 = {
+  goal_id: string;
+  anchor_seconds: number;
+  anchor_display: string;
+  source_kind: PaceAnchorKind;
+  plan_goal_seconds: number | null;
+  plan_goal_display: string | null;
+  mismatch_blurb: string | null;
+};
+
+/**
+ * Canonical race finish projection for coach payload + course-detail.
+ * Mirrors course-detail header logic: anchor from resolvePaceAnchorForCourse, then plan-only fallback.
+ */
+export async function buildRaceFinishProjectionV1(
+  supabase: any,
+  userId: string,
+  goal: GoalRowForPrediction,
+  goalId: string,
+  planGoalSec: number | null,
+): Promise<RaceFinishProjectionV1 | null> {
+  const anchor = await resolvePaceAnchorForCourse(supabase, userId, goal, goalId, planGoalSec);
+  let primarySec = anchor?.seconds ?? null;
+  let sourceKind: PaceAnchorKind | null = anchor?.kind ?? null;
+
+  if (primarySec == null && planGoalSec != null) {
+    primarySec = planGoalSec;
+    sourceKind = 'plan_target';
+  }
+  if (primarySec == null || sourceKind == null) return null;
+
+  const planGoalDisplay = planGoalSec != null ? fmtFinishClock(planGoalSec) : null;
+
+  let mismatchBlurb: string | null = null;
+  if (anchor && planGoalSec != null) {
+    if (anchor.kind === 'coach_readiness' && planGoalSec !== anchor.seconds) {
+      mismatchBlurb =
+        'The finish time above is your race readiness projection. It differs from your saved plan goal so pacing matches your current fitness.';
+    } else if (anchor.kind === 'fitness_floors_stated_goal') {
+      mismatchBlurb =
+        'The finish time above is your fitness-based projection. Your stated goal is faster than that projection right now, so pacing uses the slower time.';
+    }
+  }
+
+  return {
+    goal_id: goalId,
+    anchor_seconds: primarySec,
+    anchor_display: fmtFinishClock(primarySec),
+    source_kind: sourceKind,
+    plan_goal_seconds: planGoalSec,
+    plan_goal_display: planGoalDisplay,
+    mismatch_blurb: mismatchBlurb,
+  };
 }
 
 function parseLearnedFitness(raw: unknown): Record<string, unknown> | null {

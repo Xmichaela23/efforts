@@ -16,7 +16,7 @@ import {
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
-import { resolvePaceAnchorForCourse } from '../_shared/resolve-server-predicted-finish.ts';
+import { buildRaceFinishProjectionV1 } from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -158,46 +158,67 @@ Deno.serve(async (req) => {
   let goalTimeMismatchBlurb: string | null = null;
 
   if (course.goal_id) {
-    // select('*') avoids failing when race_readiness_projection column is not migrated yet.
-    const { data: gPred, error: gPredErr } = await supabase
-      .from('goals')
-      .select('*')
-      .eq('id', course.goal_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (gPredErr) {
-      console.warn('[course-detail] goals select for projection', gPredErr.message);
-    } else if (gPred) {
-      const gr = gPred as Record<string, unknown>;
-      const anchor = await resolvePaceAnchorForCourse(
-        supabase,
-        user.id,
-        {
-          name: String(gr.name || ''),
-          distance: gr.distance != null ? String(gr.distance) : null,
-          target_date: gr.target_date != null ? String(gr.target_date) : null,
-          target_time: gr.target_time != null ? Number(gr.target_time) : null,
-          sport: gr.sport != null ? String(gr.sport) : null,
-          race_readiness_projection: gr.race_readiness_projection,
-        },
-        String(course.goal_id),
-        planGoalSec,
-      );
-      if (anchor) {
-        primarySec = anchor.seconds;
-        goalTimeSource = anchor.kind === 'plan_target' ? 'plan' : 'predicted';
-        if (
-          (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) ||
-          (anchor.kind === 'fitness_floors_stated_goal' && planGoalSec != null)
-        ) {
-          planTargetTimeStr = fmtFinishClock(planGoalSec);
-          if (anchor.kind === 'coach_readiness') {
-            goalTimeMismatchBlurb =
-              'The finish time above is your race readiness projection. It differs from your saved plan goal so pacing matches your current fitness.';
-          } else if (anchor.kind === 'fitness_floors_stated_goal') {
-            goalTimeMismatchBlurb =
-              'The finish time above is your fitness-based projection. Your stated goal is faster than that projection right now, so pacing uses the slower time.';
-          }
+    // Prefer unified projection from coach_cache (parity with State); else same resolver as coach.
+    const { data: cacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
+    const pl = cacheRow?.payload as Record<string, unknown> | undefined;
+    const wsv = pl?.weekly_state_v1 as { race_finish_projection_v1?: unknown } | undefined;
+    const cached =
+      pl?.race_finish_projection_v1 ?? wsv?.race_finish_projection_v1;
+    const cachedRfp =
+      cached &&
+      typeof cached === 'object' &&
+      cached !== null &&
+      String((cached as { goal_id?: string }).goal_id) === String(course.goal_id)
+        ? (cached as {
+            anchor_seconds: number;
+            source_kind: string;
+            plan_goal_seconds: number | null;
+            plan_goal_display: string | null;
+            mismatch_blurb: string | null;
+          })
+        : null;
+
+    if (cachedRfp) {
+      primarySec = cachedRfp.anchor_seconds;
+      goalTimeSource = cachedRfp.source_kind === 'plan_target' ? 'plan' : 'predicted';
+      const hasPlan = cachedRfp.plan_goal_seconds != null && cachedRfp.plan_goal_seconds > 0;
+      const dupPlanHeadline =
+        cachedRfp.source_kind === 'plan_target' && cachedRfp.anchor_seconds === cachedRfp.plan_goal_seconds;
+      planTargetTimeStr = hasPlan && !dupPlanHeadline ? cachedRfp.plan_goal_display : null;
+      goalTimeMismatchBlurb = cachedRfp.mismatch_blurb;
+    } else {
+      const { data: gPred, error: gPredErr } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('id', course.goal_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (gPredErr) {
+        console.warn('[course-detail] goals select for projection', gPredErr.message);
+      } else if (gPred) {
+        const gr = gPred as Record<string, unknown>;
+        const built = await buildRaceFinishProjectionV1(
+          supabase,
+          user.id,
+          {
+            name: String(gr.name || ''),
+            distance: gr.distance != null ? String(gr.distance) : null,
+            target_date: gr.target_date != null ? String(gr.target_date) : null,
+            target_time: gr.target_time != null ? Number(gr.target_time) : null,
+            sport: gr.sport != null ? String(gr.sport) : null,
+            race_readiness_projection: gr.race_readiness_projection,
+          },
+          String(course.goal_id),
+          planGoalSec,
+        );
+        if (built) {
+          primarySec = built.anchor_seconds;
+          goalTimeSource = built.source_kind === 'plan_target' ? 'plan' : 'predicted';
+          const hasPlan = built.plan_goal_seconds != null && built.plan_goal_seconds > 0;
+          const dupPlanHeadline =
+            built.source_kind === 'plan_target' && built.anchor_seconds === built.plan_goal_seconds;
+          planTargetTimeStr = hasPlan && !dupPlanHeadline ? built.plan_goal_display : null;
+          goalTimeMismatchBlurb = built.mismatch_blurb;
         }
       }
     }

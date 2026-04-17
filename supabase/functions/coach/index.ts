@@ -41,6 +41,11 @@ import { loadGoalContext, type GoalContext } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
 import {
+  buildRaceFinishProjectionV1,
+  type RaceFinishProjectionV1,
+} from '../_shared/resolve-server-predicted-finish.ts';
+import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
+import {
   buildDailyLedger,
   buildIdentity,
   buildPlanPosition,
@@ -69,7 +74,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
-const COACH_PAYLOAD_VERSION = 7;
+const COACH_PAYLOAD_VERSION = 8;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2149,6 +2154,7 @@ Deno.serve(async (req) => {
     // =========================================================================
     // Race readiness (VDOT-based, gated on running event goal)
     // =========================================================================
+    let raceFinishProjectionV1: RaceFinishProjectionV1 | null = null;
     let raceReadiness: RaceReadinessV1 | null = null;
     try {
       if (goalContext.primary_event && (goalContext.primary_event.sport === 'run' || goalContext.primary_event.sport === 'running' || !goalContext.primary_event.sport)) {
@@ -2263,6 +2269,37 @@ Deno.serve(async (req) => {
       }
     } catch (prrErr: any) {
       console.warn('[coach] primary_race_readiness failed (non-fatal):', prrErr?.message ?? prrErr);
+    }
+
+    // Unified finish projection (State + Course Strategy — same resolver as terrain)
+    try {
+      const pe = goalContext.primary_event;
+      if (pe) {
+        const sport = String(pe.sport || '').toLowerCase();
+        const runish = sport === 'run' || sport === 'running' || !pe.sport;
+        if (runish) {
+          const { data: gRow } = await supabase
+            .from('goals')
+            .select('name, distance, target_date, target_time, sport, race_readiness_projection')
+            .eq('id', pe.id)
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (gRow) {
+            const gr = gRow as Record<string, unknown>;
+            const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, userId, pe.id);
+            raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabase, userId, {
+              name: String(gr.name || ''),
+              distance: gr.distance != null ? String(gr.distance) : null,
+              target_date: gr.target_date != null ? String(gr.target_date) : null,
+              target_time: gr.target_time != null ? Number(gr.target_time) : null,
+              sport: gr.sport != null ? String(gr.sport) : null,
+              race_readiness_projection: gr.race_readiness_projection,
+            }, pe.id, planGoalSec);
+          }
+        }
+      }
+    } catch (rfpErr: any) {
+      console.warn('[coach] race_finish_projection_v1 failed (non-fatal):', rfpErr?.message ?? rfpErr);
     }
 
     const interference = latestSnapshot?.interference ?? null;
@@ -3677,7 +3714,8 @@ ${narrativeFacts.join('\n')}`;
           // ── Race-aware overrides (≤21 days out) ─────────────────────────
           const raceNameForSummary = goalContext?.primary_event?.name ?? activePlan?.name ?? null;
           if (weeksOutVal != null && weeksOutVal <= 21 && raceNameForSummary) {
-            const projection = raceReadiness?.predicted_finish_display ?? null;
+            const projection =
+              raceFinishProjectionV1?.anchor_display ?? raceReadiness?.predicted_finish_display ?? null;
             const source = raceReadiness?.data_source ?? 'plan_targets';
             const sourceLabel = source === 'observed' ? 'from recent runs' : 'based on plan targets';
 
@@ -3921,6 +3959,7 @@ ${narrativeFacts.join('\n')}`;
         : undefined,
       run_session_types_7d: runSessionTypes7d,
       response_model: weeklyResponseModel,
+      race_finish_projection_v1: raceFinishProjectionV1,
     };
 
     const response: CoachWeekContextResponseV1 = {
@@ -3982,6 +4021,7 @@ ${narrativeFacts.join('\n')}`;
       athlete_snapshot: athleteSnapshot,
       race_readiness: raceReadiness,
       primary_race_readiness,
+      race_finish_projection_v1: raceFinishProjectionV1,
       coach_payload_version: COACH_PAYLOAD_VERSION,
     };
 

@@ -1,6 +1,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
+/** Same contract as coach + course-detail (terrain). */
+export type RaceFinishProjectionV1 = {
+  goal_id: string;
+  anchor_seconds: number;
+  anchor_display: string;
+  source_kind: 'coach_readiness' | 'plan_target' | 'baseline_vdot' | 'fitness_floors_stated_goal';
+  plan_goal_seconds: number | null;
+  plan_goal_display: string | null;
+  mismatch_blurb: string | null;
+};
+
 export type RaceReadinessV1 = {
   goal: {
     id?: string | null;
@@ -225,6 +236,7 @@ export type CoachWeekContextV1 = {
   };
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
   race_readiness?: RaceReadinessV1 | null;
+  race_finish_projection_v1?: RaceFinishProjectionV1 | null;
   /** State tab KEY RUN — most recent ≥12mi run with Performance race_readiness */
   primary_race_readiness?: {
     workout_id: string;
@@ -361,6 +373,7 @@ export type CoachWeekContextV1 = {
         };
       };
     };
+    race_finish_projection_v1?: RaceFinishProjectionV1 | null;
   };
 };
 
@@ -470,7 +483,7 @@ export function useCoachWeekContext(date?: string) {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
       // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate until foreground coach runs.
-      const MIN_CACHE_PAYLOAD_VERSION = 7;
+      const MIN_CACHE_PAYLOAD_VERSION = 8;
       if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;

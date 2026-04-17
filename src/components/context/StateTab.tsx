@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import type { CoachWeekContextV1, RaceReadinessV1 } from '@/hooks/useCoachWeekContext';
+import type {
+  CoachWeekContextV1,
+  RaceReadinessV1,
+  RaceFinishProjectionV1,
+} from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 import StrengthAdjustmentModal from '@/components/StrengthAdjustmentModal';
 import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
@@ -114,7 +118,9 @@ function resolveStateTabResponseModel(wsvRm: unknown, rootRm: unknown): Record<s
 }
 
 function RaceSection({
+  projection,
   rr,
+  goalMeta,
   primaryRaceReadiness,
   onOpenKeyRun,
   resolvedGoalId,
@@ -123,7 +129,9 @@ function RaceSection({
   onAddCourse,
   onViewStrategy,
 }: {
-  rr: RaceReadinessV1;
+  projection: RaceFinishProjectionV1 | null;
+  rr: RaceReadinessV1 | null;
+  goalMeta: { name: string; weeks_out: number; distance: string } | null;
   primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
   onOpenKeyRun?: (workoutId: string) => void;
   resolvedGoalId: string | null;
@@ -132,35 +140,67 @@ function RaceSection({
   onAddCourse: () => void;
   onViewStrategy: () => void;
 }) {
-  const distLabel = rr.goal.distance.replace(/_/g, ' ');
+  const distRaw = rr?.goal.distance ?? goalMeta?.distance ?? 'race';
+  const distLabel = distRaw.replace(/_/g, ' ');
+  const goalName = rr?.goal.name ?? goalMeta?.name ?? 'Race';
+  const weeksOut = rr?.goal.weeks_out ?? goalMeta?.weeks_out ?? 0;
+
+  const anchorDisplay = projection?.anchor_display ?? rr?.predicted_finish_display ?? '—';
+  const headlineIsPlan = projection?.source_kind === 'plan_target';
+  const showPlanSub =
+    projection?.plan_goal_display &&
+    projection.plan_goal_seconds != null &&
+    projection.plan_goal_seconds > 0 &&
+    !(projection.source_kind === 'plan_target' && projection.anchor_seconds === projection.plan_goal_seconds);
+
   return (
     <div className="px-3 py-3 space-y-2.5">
       {/* Header: goal + weeks out */}
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
-        <span className="text-[11px] text-white/55">{rr.goal.name} — {rr.goal.weeks_out}w out</span>
+        <span className="text-[11px] text-white/55">{goalName} — {weeksOut}w out</span>
       </div>
 
-      {/* Predicted finish + delta */}
+      {/* Anchor finish (unified with Course Strategy) + optional delta from full race_readiness */}
       <div className="flex items-baseline justify-between">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">{rr.predicted_finish_display}</span>
-          <span className="text-[11px] text-white/50">{distLabel}</span>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <p className="text-[10px] text-white/45 leading-snug">
+            {headlineIsPlan ? (
+              <>Your goal</>
+            ) : (
+              <>Predicted from training</>
+            )}
+          </p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">{anchorDisplay}</span>
+            <span className="text-[11px] text-white/50">{distLabel}</span>
+          </div>
+          {showPlanSub && (
+            <p className="text-[11px] text-white/45 tabular-nums pt-0.5">
+              Plan {projection!.plan_goal_display}
+            </p>
+          )}
         </div>
-        <div className="flex items-baseline gap-2">
-          {rr.delta_display && (
+        <div className="flex items-baseline gap-2 shrink-0">
+          {rr?.delta_display && (
             <span className={`text-[13px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
               {rr.delta_display}
             </span>
           )}
-          <span className={`text-[10px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
-            {assessmentLabel(rr.assessment)}
-          </span>
+          {rr && (
+            <span className={`text-[10px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
+              {assessmentLabel(rr.assessment)}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Target comparison */}
-      {rr.target_finish_display && (
+      {projection?.mismatch_blurb && (
+        <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
+      )}
+
+      {/* Target comparison — full race_readiness only */}
+      {rr?.target_finish_display && (
         <div className="flex items-baseline gap-2 text-[11px] text-white/55">
           <span>Target {rr.target_finish_display}</span>
           <Dot />
@@ -169,20 +209,24 @@ function RaceSection({
       )}
 
       {/* VDOT trend */}
-      <div className="flex items-baseline gap-2 text-[11px]">
-        <span className="text-white/55">VDOT {rr.current_vdot.toFixed(1)}</span>
-        {rr.plan_vdot != null && rr.vdot_delta != null && rr.vdot_direction !== 'stable' && (
-          <>
-            <Dot />
-            <span className={rr.vdot_direction === 'improved' ? 'text-emerald-400/85' : 'text-amber-400/85'}>
-              {rr.vdot_delta > 0 ? '+' : ''}{rr.vdot_delta.toFixed(1)} since plan start
-            </span>
-          </>
-        )}
-      </div>
+      {rr && (
+        <div className="flex items-baseline gap-2 text-[11px]">
+          <span className="text-white/55">VDOT {rr.current_vdot.toFixed(1)}</span>
+          {rr.plan_vdot != null && rr.vdot_delta != null && rr.vdot_direction !== 'stable' && (
+            <>
+              <Dot />
+              <span className={rr.vdot_direction === 'improved' ? 'text-emerald-400/85' : 'text-amber-400/85'}>
+                {rr.vdot_delta > 0 ? '+' : ''}{rr.vdot_delta.toFixed(1)} since plan start
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Assessment message */}
-      <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
+      {rr && (
+        <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
+      )}
 
       {resolvedGoalId && (
         <div className="pt-0.5">
@@ -234,7 +278,7 @@ function RaceSection({
       )}
 
       {/* Training signals */}
-      {rr.training_signals.length > 0 && (
+      {rr && rr.training_signals.length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
           {rr.training_signals.map((s, i) => (
             <span key={i} className="text-[11px]">
@@ -246,27 +290,31 @@ function RaceSection({
       )}
 
       {/* Pace zones */}
-      <div className="flex items-center gap-3 pt-0.5 text-[10px] text-white/45">
-        <span>Easy {rr.pace_zones.easy}</span>
-        <span>Threshold {rr.pace_zones.threshold}</span>
-        <span>Race {rr.pace_zones.race}</span>
-      </div>
+      {rr && (
+        <div className="flex items-center gap-3 pt-0.5 text-[10px] text-white/45">
+          <span>Easy {rr.pace_zones.easy}</span>
+          <span>Threshold {rr.pace_zones.threshold}</span>
+          <span>Race {rr.pace_zones.race}</span>
+        </div>
+      )}
 
       {/* Modifiers */}
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/35">
-        {rr.data_source === 'plan_targets' && (
-          <span className="italic">Based on plan targets</span>
-        )}
-        {rr.durability_factor < 0.97 && (
-          <span>Durability adj {((1 - rr.durability_factor) * 100).toFixed(1)}%</span>
-        )}
-        {rr.durability_factor >= 1.0 && (
-          <span className="text-emerald-400/40">Durability +{((rr.durability_factor - 1) * 100).toFixed(1)}%</span>
-        )}
-        {rr.confidence_adjustment_pct > 0 && (
-          <span>Confidence adj +{rr.confidence_adjustment_pct.toFixed(1)}%</span>
-        )}
-      </div>
+      {rr && (
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/35">
+          {rr.data_source === 'plan_targets' && (
+            <span className="italic">Based on plan targets</span>
+          )}
+          {rr.durability_factor < 0.97 && (
+            <span>Durability adj {((1 - rr.durability_factor) * 100).toFixed(1)}%</span>
+          )}
+          {rr.durability_factor >= 1.0 && (
+            <span className="text-emerald-400/40">Durability +{((rr.durability_factor - 1) * 100).toFixed(1)}%</span>
+          )}
+          {rr.confidence_adjustment_pct > 0 && (
+            <span>Confidence adj +{rr.confidence_adjustment_pct.toFixed(1)}%</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -293,10 +341,14 @@ export default function StateTab({
   const [strategyCourseId, setStrategyCourseId] = useState<string | null>(null);
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
 
-  const raceReadiness = (data as { race_readiness?: RaceReadinessV1 | null } | null)?.race_readiness ?? null;
+  const raceReadiness = (data as CoachWeekContextV1 | null)?.race_readiness ?? null;
+  const raceFinishProjection =
+    (data as CoachWeekContextV1 | null)?.race_finish_projection_v1 ??
+    data?.weekly_state_v1?.race_finish_projection_v1 ??
+    null;
 
   useEffect(() => {
-    if (!raceReadiness) {
+    if (!raceFinishProjection && !raceReadiness) {
       setResolvedGoalId(null);
       setStateCourseRow(null);
       return;
@@ -304,12 +356,13 @@ export default function StateTab({
     const uid = getStoredUserId();
     if (!uid) return;
     let cancelled = false;
-    const goalIdFromCoach = raceReadiness.goal.id?.trim() || null;
+    const goalIdFromCoach =
+      raceFinishProjection?.goal_id?.trim() || raceReadiness?.goal?.id?.trim() || null;
 
     (async () => {
       let goalId: string | null = goalIdFromCoach;
 
-      if (!goalId) {
+      if (!goalId && raceReadiness) {
         const { data: goalsRows, error: goalsErr } = await supabase
           .from('goals')
           .select('id, name, status, sport')
@@ -347,9 +400,11 @@ export default function StateTab({
       cancelled = true;
     };
   }, [
+    raceFinishProjection?.goal_id,
     raceReadiness?.goal?.id,
     raceReadiness?.goal?.name,
     raceReadiness?.goal?.weeks_out,
+    raceFinishProjection ? 1 : 0,
     raceReadiness ? 1 : 0,
   ]);
 
@@ -380,6 +435,13 @@ export default function StateTab({
   const snap = (data as any)?.athlete_snapshot ?? null;
   const loadStatus = snap?.body_response?.load_status ?? null;
   const primaryRaceReadiness: PrimaryRaceReadinessRow | null = data?.primary_race_readiness ?? null;
+
+  const gc = (data as CoachWeekContextV1).goal_context;
+  const pe = gc?.primary_event;
+  const weeksOutMeta = pe ? gc.upcoming_races?.find(r => r.name === pe.name)?.weeks_out ?? 0 : 0;
+  const goalMeta = pe
+    ? { name: pe.name, weeks_out: weeksOutMeta, distance: pe.distance || 'marathon' }
+    : null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -414,13 +476,18 @@ export default function StateTab({
       }
     }
     const coachPredSec =
-      raceReadiness &&
-      (raceReadiness.goal.id === resolvedGoalId ||
-        String(gRow?.name || '') === String(raceReadiness.goal.name)) &&
-      Number.isFinite(raceReadiness.predicted_finish_time_seconds) &&
-      raceReadiness.predicted_finish_time_seconds > 0
-        ? raceReadiness.predicted_finish_time_seconds
-        : null;
+      raceFinishProjection &&
+      raceFinishProjection.goal_id === resolvedGoalId &&
+      Number.isFinite(raceFinishProjection.anchor_seconds) &&
+      raceFinishProjection.anchor_seconds > 0
+        ? raceFinishProjection.anchor_seconds
+        : raceReadiness &&
+            (raceReadiness.goal.id === resolvedGoalId ||
+              String(gRow?.name || '') === String(raceReadiness.goal.name)) &&
+            Number.isFinite(raceReadiness.predicted_finish_time_seconds) &&
+            raceReadiness.predicted_finish_time_seconds > 0
+          ? raceReadiness.predicted_finish_time_seconds
+          : null;
     if (paceTargetSec == null && coachPredSec == null) {
       window.alert(
         'No pacing target yet: set a race target on the goal or plan, or load State once so coach can save a finish projection (then try again).',
@@ -677,10 +744,12 @@ export default function StateTab({
           </div>
         </div>
 
-        {/* RACE — predicted finish, VDOT trend, pace zones (gated on data) */}
-        {raceReadiness && (
+        {/* RACE — unified projection (coach) + optional full race_readiness detail */}
+        {(raceFinishProjection || raceReadiness) && (
           <RaceSection
+            projection={raceFinishProjection}
             rr={raceReadiness}
+            goalMeta={goalMeta}
             primaryRaceReadiness={primaryRaceReadiness}
             resolvedGoalId={resolvedGoalId}
             courseRow={stateCourseRow}
