@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 13;
+const COACH_PAYLOAD_VERSION = 14;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
