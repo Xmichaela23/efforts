@@ -114,18 +114,42 @@ export async function loadGoalContext(
   };
 }
 
+function isRunGoalLite(g: GoalLite | null | undefined): boolean {
+  if (!g) return false;
+  const sport = String(g.sport || '').toLowerCase();
+  return sport === 'run' || sport === 'running' || !g.sport;
+}
+
 /**
  * Goal id for unified finish projection (State + Course Strategy / terrain).
- * Prefer the canonical future run primary_event; if absent or not run, use the active plan's linked goal
- * so projection matches the plan + course_detail path when e.g. goals.target_date is missing but the plan has race_date.
  *
- * Also matches goals where `plan_id` was set from `plans.goal_id` in loadGoalContext — covers rows where
- * coach reads `goal_id` but the client DB still has it only on the joined goal side.
+ * course-detail anchors to `race_courses.goal_id`. Coach must prefer the same goal or State diverges from terrain.
+ *
+ * Priority:
+ * 1) Unique goal_id across user's race_courses (single uploaded course)
+ * 2) activePlan.goal_id when present in race_courses (multi-course)
+ * 3) primary_event (run)
+ * 4) active plan linked goal + plan_id on goal rows
  */
 export function resolveRunGoalIdForRaceProjection(
   goalContext: GoalContext,
   activePlan: { id: string; goal_id?: string | null } | null | undefined,
+  raceCourseGoalIds?: string[] | null,
 ): string | null {
+  const uniq = [...new Set((raceCourseGoalIds || []).filter(Boolean).map(String))];
+
+  if (uniq.length === 1) {
+    const g = goalContext.goals.find(x => x.id === uniq[0]);
+    if (isRunGoalLite(g ?? null)) return uniq[0];
+  }
+  if (uniq.length > 1) {
+    const ag = typeof activePlan?.goal_id === 'string' ? activePlan.goal_id.trim() : '';
+    if (ag && uniq.includes(ag)) {
+      const g = goalContext.goals.find(x => x.id === ag);
+      if (isRunGoalLite(g ?? null)) return ag;
+    }
+  }
+
   const pe = goalContext.primary_event;
   if (pe) {
     const sport = String(pe.sport || '').toLowerCase();

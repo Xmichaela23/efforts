@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 11;
+const COACH_PAYLOAD_VERSION = 12;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2278,9 +2278,16 @@ Deno.serve(async (req) => {
     // Use service-role client (no user JWT) so reads match course-detail / course-strategy, which
     // use service role. The user-scoped client applies RLS and can return null baselines/goals
     // while terrain still resolves from the same DB rows.
-    // Goal id: primary future run event when present; else active plan's linked goal (matches course_detail by goal_id).
+    // Goal id: same resolver priority as course-detail (race_courses.goal_id when unambiguous) so State matches terrain.
     try {
-      const projGoalId = resolveRunGoalIdForRaceProjection(goalContext, activePlan);
+      const { data: rcGoalRows } = await supabaseService
+        .from('race_courses')
+        .select('goal_id')
+        .eq('user_id', userId);
+      const raceCourseGoalIds = [
+        ...new Set((rcGoalRows || []).map((r: { goal_id?: string }) => r.goal_id).filter(Boolean).map(String)),
+      ];
+      const projGoalId = resolveRunGoalIdForRaceProjection(goalContext, activePlan, raceCourseGoalIds);
       if (projGoalId) {
         const { data: gRow } = await supabaseService
           .from('goals')

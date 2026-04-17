@@ -790,8 +790,8 @@ export default function StateTab({
           </div>
         </div>
 
-        {/* RACE — show whenever primary run goal exists; projection/goal time from coach payload */}
-        {(raceFinishProjection || raceReadiness || goalMeta) && (
+        {/* RACE — not optional when an active plan exists (same contract as terrain: coach must supply projection). */}
+        {(wsv.plan?.has_active_plan || raceFinishProjection || raceReadiness || goalMeta) && (
           <RaceSection
             projection={raceFinishProjection}
             rr={raceReadiness}
