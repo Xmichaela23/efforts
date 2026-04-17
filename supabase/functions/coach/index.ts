@@ -74,7 +74,8 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
-const COACH_PAYLOAD_VERSION = 8;
+/** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
+const COACH_PAYLOAD_VERSION = 9;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
