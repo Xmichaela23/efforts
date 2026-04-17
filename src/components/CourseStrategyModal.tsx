@@ -485,11 +485,11 @@ export default function CourseStrategyModal({
               <div className="space-y-0.5">
                 <p
                   className="text-[11px] text-white/55 leading-snug"
-                  title={`${payload.course.goal_time_source === 'predicted' ? 'Predicted from training' : 'Your goal'} ${payload.course.goal_time}`}
+                  title={`${payload.course.goal_time_source === 'predicted' ? 'Projected from your training' : 'Your goal'} ${payload.course.goal_time}`}
                 >
                   {payload.course.goal_time_source === 'predicted' ? (
                     <>
-                      Predicted from training{' '}
+                      Projected from your training{' '}
                       <span className="text-white/80">{payload.course.goal_time}</span>
                     </>
                   ) : (

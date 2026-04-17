@@ -177,9 +177,9 @@ function RaceSection({
     projection != null
       ? headlineIsPlan
         ? 'Your goal'
-        : 'Predicted from training'
+        : 'Projected from your training'
       : rr != null
-        ? 'Predicted from training'
+        ? 'Projected from your training'
         : statedSec != null
           ? 'Your goal'
           : wizardSec != null
@@ -572,7 +572,7 @@ export default function StateTab({
           : null;
     if (paceTargetSec == null && coachPredSec == null) {
       window.alert(
-        'No pacing target yet: set a race target on the goal or plan, or load State once so coach can save a finish projection (then try again).',
+        'No pacing target yet: set a race target on the goal or plan, or refresh State and try again.',
       );
       return;
     }
@@ -680,7 +680,7 @@ export default function StateTab({
           onClick={() => refresh()}
           disabled={coachBusy}
           className="min-h-[44px] min-w-[44px] -mr-1 flex items-center justify-center rounded-lg text-white/40 hover:text-white/65 hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors shrink-0 touch-manipulation relative z-10"
-          aria-label={coachBusy ? 'Refreshing coach data' : 'Refresh'}
+          aria-label={coachBusy ? 'Updating training data' : 'Refresh'}
         >
           <RefreshCw className={`w-4 h-4 ${coachBusy ? 'animate-spin' : ''}`} />
         </button>
@@ -826,7 +826,7 @@ export default function StateTab({
           </div>
         </div>
 
-        {/* RACE — not optional when an active plan exists (same contract as terrain: coach must supply projection). */}
+        {/* RACE — show when active plan or projection/readiness/goal meta exists (same finish anchor as terrain when available). */}
         {(wsv.plan?.has_active_plan || raceFinishProjection || raceReadiness || goalMeta) && (
           <RaceSection
             projection={raceFinishProjection}
