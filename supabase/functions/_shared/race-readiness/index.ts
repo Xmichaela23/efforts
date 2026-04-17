@@ -129,11 +129,45 @@ function resolveThresholdPaceSecPerMi(input: RaceReadinessInput): { pace: number
     }
   }
 
-  const pn = input.performanceNumbers;
-  if (pn?.threshold_pace != null) {
-    const tp = Number(pn.threshold_pace);
+  const pn = input.performanceNumbers as Record<string, unknown> | null | undefined;
+  const thresholdFromPn =
+    pn?.threshold_pace ??
+    pn?.thresholdPace ??
+    pn?.threshold_pace_sec_per_mi;
+  if (thresholdFromPn != null) {
+    const tp = Number(thresholdFromPn);
     if (Number.isFinite(tp) && tp > 0) {
       return { pace: tp, source: 'plan_targets' };
+    }
+  }
+
+  // Marathon / half plans usually have M-pace on `race`; many users never get `steady` or learned threshold.
+  if (ep?.race != null) {
+    const race = Number(ep.race);
+    if (Number.isFinite(race) && race > 0) {
+      return { pace: race, source: 'plan_targets' };
+    }
+  }
+  if (ep?.power != null) {
+    const power = Number(ep.power);
+    if (Number.isFinite(power) && power > 0) {
+      return { pace: power, source: 'plan_targets' };
+    }
+  }
+
+  // Last resort: goal time ÷ race distance → sec/mi (same VDOT path as plan; better than no projection).
+  const ev = input.primaryEvent;
+  if (ev?.target_time != null && ev.distance) {
+    const tt = Number(ev.target_time);
+    const distKey = normalizeRaceDistanceToKey(ev.distance);
+    if (Number.isFinite(tt) && tt > 0 && distKey) {
+      const miles = RACE_DISTANCE_MILES[distKey];
+      if (miles > 0) {
+        const pace = tt / miles;
+        if (Number.isFinite(pace) && pace >= 300 && pace <= 2200) {
+          return { pace, source: 'plan_targets' };
+        }
+      }
     }
   }
 

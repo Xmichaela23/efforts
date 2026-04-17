@@ -442,8 +442,10 @@ export function useCoachWeekContext(date?: string) {
           user_id: userId,
           date: focusDate,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          // Foreground refresh must bypass edge coach_cache or narrative stays frozen up to 24h.
-          skip_cache: !isBackground,
+          // Always bypass Edge *read* cache: full coach run recomputes weekly_state, race_readiness,
+          // and race_finish_projection_v1. The handler still *writes* coach_cache after compute.
+          // Background used skip_cache: false and could serve stale projection for up to 24h.
+          skip_cache: true,
         },
       });
 
