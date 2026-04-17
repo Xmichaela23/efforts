@@ -235,6 +235,25 @@ export type CoachWeekContextV1 = {
     context_note?: string | null;
   };
   readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
+  /** Server goal list + primary future event; used for State RACE labels when projection goal differs from primary_event. */
+  goal_context?: {
+    goals: Array<{
+      id: string;
+      name: string;
+      sport?: string | null;
+      distance?: string | null;
+      target_time?: number | null;
+      target_date?: string | null;
+    }>;
+    primary_event?: {
+      id?: string;
+      name: string;
+      sport?: string | null;
+      distance?: string | null;
+      target_time?: number | null;
+    } | null;
+    upcoming_races?: Array<{ name: string; weeks_out: number }>;
+  };
   race_readiness?: RaceReadinessV1 | null;
   race_finish_projection_v1?: RaceFinishProjectionV1 | null;
   /** State tab KEY RUN — most recent ≥12mi run with Performance race_readiness */
@@ -483,7 +502,7 @@ export function useCoachWeekContext(date?: string) {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
       // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate until foreground coach runs.
-      const MIN_CACHE_PAYLOAD_VERSION = 9;
+      const MIN_CACHE_PAYLOAD_VERSION = 10;
       if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;

@@ -37,7 +37,7 @@ import {
   type CrossDomainPair,
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
-import { loadGoalContext, type GoalContext } from '../_shared/goal-context.ts';
+import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
 import {
@@ -75,7 +75,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
-const COACH_PAYLOAD_VERSION = 9;
+const COACH_PAYLOAD_VERSION = 10;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -238,12 +238,13 @@ type ActivePlanLite = {
   name: string | null;
   config: any;
   duration_weeks: number | null;
+  goal_id?: string | null;
 };
 
 async function loadAllActivePlans(supabase: any, userId: string): Promise<ActivePlanLite[]> {
   const { data } = await supabase
     .from('plans')
-    .select('id,name,config,duration_weeks,athlete_context_by_week')
+    .select('id,name,config,duration_weeks,athlete_context_by_week,goal_id')
     .eq('user_id', userId)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -2276,30 +2277,27 @@ Deno.serve(async (req) => {
     // Use service-role client (no user JWT) so reads match course-detail / course-strategy, which
     // use service role. The user-scoped client applies RLS and can return null baselines/goals
     // while terrain still resolves from the same DB rows.
+    // Goal id: primary future run event when present; else active plan's linked goal (matches course_detail by goal_id).
     try {
-      const pe = goalContext.primary_event;
-      if (pe) {
-        const sport = String(pe.sport || '').toLowerCase();
-        const runish = sport === 'run' || sport === 'running' || !pe.sport;
-        if (runish) {
-          const { data: gRow } = await supabaseService
-            .from('goals')
-            .select('name, distance, target_date, target_time, sport, race_readiness_projection')
-            .eq('id', pe.id)
-            .eq('user_id', userId)
-            .maybeSingle();
-          if (gRow) {
-            const gr = gRow as Record<string, unknown>;
-            const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, pe.id);
-            raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
-              name: String(gr.name || ''),
-              distance: gr.distance != null ? String(gr.distance) : null,
-              target_date: gr.target_date != null ? String(gr.target_date) : null,
-              target_time: gr.target_time != null ? Number(gr.target_time) : null,
-              sport: gr.sport != null ? String(gr.sport) : null,
-              race_readiness_projection: gr.race_readiness_projection,
-            }, pe.id, planGoalSec);
-          }
+      const projGoalId = resolveRunGoalIdForRaceProjection(goalContext, activePlan?.goal_id ?? null);
+      if (projGoalId) {
+        const { data: gRow } = await supabaseService
+          .from('goals')
+          .select('name, distance, target_date, target_time, sport, race_readiness_projection')
+          .eq('id', projGoalId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (gRow) {
+          const gr = gRow as Record<string, unknown>;
+          const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, projGoalId);
+          raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
+            name: String(gr.name || ''),
+            distance: gr.distance != null ? String(gr.distance) : null,
+            target_date: gr.target_date != null ? String(gr.target_date) : null,
+            target_time: gr.target_time != null ? Number(gr.target_time) : null,
+            sport: gr.sport != null ? String(gr.sport) : null,
+            race_readiness_projection: gr.race_readiness_projection,
+          }, projGoalId, planGoalSec);
         }
       }
     } catch (rfpErr: any) {

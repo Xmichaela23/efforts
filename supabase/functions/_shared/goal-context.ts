@@ -113,3 +113,27 @@ export async function loadGoalContext(
     has_plan_for_all_events: futureEvents.length > 0 && futureEvents.every(g => g.plan_id != null),
   };
 }
+
+/**
+ * Goal id for unified finish projection (State + Course Strategy / terrain).
+ * Prefer the canonical future run primary_event; if absent or not run, use the active plan's linked goal
+ * so projection matches the plan + course_detail path when e.g. goals.target_date is missing but the plan has race_date.
+ */
+export function resolveRunGoalIdForRaceProjection(
+  goalContext: GoalContext,
+  activePlanGoalId: string | null | undefined,
+): string | null {
+  const pe = goalContext.primary_event;
+  if (pe) {
+    const sport = String(pe.sport || '').toLowerCase();
+    const runish = sport === 'run' || sport === 'running' || !pe.sport;
+    if (runish) return pe.id;
+  }
+  const gid = typeof activePlanGoalId === 'string' ? activePlanGoalId.trim() : '';
+  if (!gid) return null;
+  const g = goalContext.goals.find(x => x.id === gid);
+  if (!g) return null;
+  const sport = String(g.sport || '').toLowerCase();
+  const runish = sport === 'run' || sport === 'running' || !g.sport;
+  return runish ? g.id : null;
+}

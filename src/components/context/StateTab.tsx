@@ -63,6 +63,22 @@ function isRunPrimary(pe: { sport?: string | null } | null | undefined): boolean
   return s === 'run' || s === 'running' || !pe.sport;
 }
 
+function goalMetaFromGoalLite(
+  g: { name: string; sport?: string | null; distance?: string | null; target_time?: number | null } | null | undefined,
+  upcoming: Array<{ name: string; weeks_out: number }> | undefined,
+): { name: string; weeks_out: number; distance: string; target_time_seconds: number | null } | null {
+  if (!g || !isRunPrimary(g)) return null;
+  const weeksOutMeta = upcoming?.find(r => r.name === g.name)?.weeks_out ?? 0;
+  const tt = (g as { target_time?: number | null }).target_time;
+  return {
+    name: g.name,
+    weeks_out: weeksOutMeta,
+    distance: g.distance || 'marathon',
+    target_time_seconds:
+      tt != null && Number.isFinite(Number(tt)) && Number(tt) > 0 ? Math.round(Number(tt)) : null,
+  };
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -470,18 +486,12 @@ export default function StateTab({
 
   const gc = (data as CoachWeekContextV1).goal_context;
   const pe = gc?.primary_event;
-  const weeksOutMeta = pe ? gc.upcoming_races?.find(r => r.name === pe.name)?.weeks_out ?? 0 : 0;
-  const peTt = (pe as { target_time?: number | null } | null | undefined)?.target_time;
-  const goalMeta =
-    pe && isRunPrimary(pe)
-      ? {
-          name: pe.name,
-          weeks_out: weeksOutMeta,
-          distance: pe.distance || 'marathon',
-          target_time_seconds:
-            peTt != null && Number.isFinite(Number(peTt)) && Number(peTt) > 0 ? Math.round(Number(peTt)) : null,
-        }
-      : null;
+
+  const goalMetaPrimary = pe ? goalMetaFromGoalLite(pe, gc?.upcoming_races) : null;
+  const projGid = raceFinishProjection?.goal_id?.trim();
+  const goalForProj = projGid && gc?.goals ? gc.goals.find(x => x.id === projGid) : undefined;
+  const goalMetaFromProjection = goalForProj ? goalMetaFromGoalLite(goalForProj, gc?.upcoming_races) : null;
+  const goalMeta = goalMetaPrimary ?? goalMetaFromProjection ?? null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
