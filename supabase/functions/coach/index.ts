@@ -44,6 +44,7 @@ import {
   buildRaceFinishProjectionV1,
   type RaceFinishProjectionV1,
 } from '../_shared/resolve-server-predicted-finish.ts';
+import { fmtFinishClock } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 import {
   buildDailyLedger,
@@ -2300,6 +2301,38 @@ Deno.serve(async (req) => {
       }
     } catch (rfpErr: any) {
       console.warn('[coach] race_finish_projection_v1 failed (non-fatal):', rfpErr?.message ?? rfpErr);
+    }
+
+    // If unified build returned null (thin baselines / resolver miss) but a race target exists on
+    // the goal row or linked plan config, still emit projection so State shows the same clock as terrain.
+    if (!raceFinishProjectionV1 && goalContext.primary_event) {
+      const pe = goalContext.primary_event;
+      const sport = String(pe.sport || '').toLowerCase();
+      const runish = sport === 'run' || sport === 'running' || !pe.sport;
+      if (runish) {
+        let tt =
+          pe.target_time != null && Number.isFinite(Number(pe.target_time)) && Number(pe.target_time) > 0
+            ? Math.round(Number(pe.target_time))
+            : null;
+        if (tt == null) {
+          try {
+            tt = await resolveGoalTargetTimeSeconds(supabase, userId, pe.id);
+          } catch {
+            tt = null;
+          }
+        }
+        if (tt != null && tt > 0) {
+          raceFinishProjectionV1 = {
+            goal_id: pe.id,
+            anchor_seconds: tt,
+            anchor_display: fmtFinishClock(tt),
+            source_kind: 'plan_target',
+            plan_goal_seconds: tt,
+            plan_goal_display: fmtFinishClock(tt),
+            mismatch_blurb: null,
+          };
+        }
+      }
     }
 
     const interference = latestSnapshot?.interference ?? null;
