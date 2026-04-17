@@ -60,20 +60,35 @@ export interface RaceReadinessInput {
 
 const KM_TO_MI = 1.60934;
 
-const GOAL_DISTANCE_MAP: Record<string, string> = {
-  'marathon': 'marathon',
-  'half_marathon': 'half',
-  'half': 'half',
-  '10k': '10k',
-  '5k': '5k',
-};
+/** Canonical keys for VDOT / getTargetTime — must match `RACE_DISTANCE_MILES` and effort-score distanceMap. */
+type RaceDistKey = 'marathon' | 'half' | '10k' | '5k';
 
-const RACE_DISTANCE_MILES: Record<string, number> = {
-  'marathon': 26.2,
-  'half': 13.1,
+const RACE_DISTANCE_MILES: Record<RaceDistKey, number> = {
+  marathon: 26.2,
+  half: 13.1,
   '10k': 6.21371,
   '5k': 3.10686,
 };
+
+/**
+ * Same vocabulary as frontend `normalizeDistanceToWizardToken` (plan config + goals often use
+ * "Half Marathon", "full_marathon", etc.). Raw `GOAL_DISTANCE_MAP[event.distance]` missed those
+ * and returned null despite months of training data.
+ */
+function normalizeRaceDistanceToKey(raw: string | null | undefined): RaceDistKey | null {
+  const d = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (!d) return null;
+  if (d === 'marathon' || d === 'full_marathon' || d === '26.2' || d === '26_2') return 'marathon';
+  if (d.includes('half') || d === 'half_marathon' || d === '13.1' || d === '13_1' || d === '21k' || d === '21.1') {
+    return 'half';
+  }
+  if (d === '10k' || d === '10_k' || d === '10000' || d === '6.2') return '10k';
+  if (d === '5k' || d === '5_k' || d === '5000' || d === '3.1') return '5k';
+  return null;
+}
 
 // =============================================================================
 // Helpers
@@ -178,7 +193,7 @@ export function computeRaceReadiness(input: RaceReadinessInput): RaceReadinessV1
   const event = input.primaryEvent;
   if (!event || !event.distance || !event.target_date) return null;
 
-  const raceDistKey = GOAL_DISTANCE_MAP[event.distance.toLowerCase()];
+  const raceDistKey = normalizeRaceDistanceToKey(event.distance);
   if (!raceDistKey) return null;
 
   if (event.sport && event.sport !== 'run' && event.sport !== 'running') return null;
