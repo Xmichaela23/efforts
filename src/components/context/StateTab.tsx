@@ -168,19 +168,22 @@ function RaceSection({
     planWizardTargetSeconds != null && Number.isFinite(planWizardTargetSeconds) && planWizardTargetSeconds > 0
       ? Math.round(planWizardTargetSeconds)
       : null;
-  /** Stated goal from plan row, goal meta, or wizard — no client-side pace math. */
+  /**
+   * Stated goal: plan config / wizard first (intent), then goal meta, then coach plan_goal mirror.
+   * No client-side pace math.
+   */
   const statedGoalDisplay =
-    projection?.plan_goal_display ??
-    (statedSec != null ? fmtGoalClock(statedSec) : wizardSec != null ? fmtGoalClock(wizardSec) : null);
-  /** Server fitness clock from projection, else coach race_readiness (same server pipeline). */
+    wizardSec != null
+      ? fmtGoalClock(wizardSec)
+      : statedSec != null
+        ? fmtGoalClock(statedSec)
+        : projection?.plan_goal_display ?? null;
+  /** Server fitness clock only — race_finish_projection_v1 or coach race_readiness. */
   const projectedFromTraining =
     projection?.fitness_projection_display ?? rr?.predicted_finish_display ?? null;
-  const hideDuplicateProjected =
-    statedGoalDisplay != null &&
-    projectedFromTraining != null &&
-    statedGoalDisplay === projectedFromTraining;
-  const showProjectedRow = projectedFromTraining != null && !hideDuplicateProjected;
-  const hasAnyFinishTime = statedGoalDisplay != null || projectedFromTraining != null;
+  const hasProjection = projectedFromTraining != null;
+  const showProjectionPlaceholder = statedGoalDisplay != null && !hasProjection;
+  const hasAnyFinishTime = statedGoalDisplay != null || hasProjection;
 
   return (
     <div className="px-3 py-3 space-y-2.5">
@@ -190,7 +193,7 @@ function RaceSection({
         <span className="text-[11px] text-white/55">{distLabel} — {weeksOut}w out</span>
       </div>
 
-      {/* Stated goal vs server fitness projection (pacing anchor stays on projection for Course Strategy). */}
+      {/* Goal (intent) vs projected finish (server fitness); terrain refines projected server-side when applicable. */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-3 min-w-0 flex-1">
           {statedGoalDisplay != null && (
@@ -201,13 +204,18 @@ function RaceSection({
               </span>
             </div>
           )}
-          {showProjectedRow && (
+          {hasProjection && (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[10px] text-white/45 leading-snug">Projected from your training</p>
+              <p className="text-[10px] text-white/45 leading-snug">Projected</p>
               <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
                 {projectedFromTraining}
               </span>
             </div>
+          )}
+          {showProjectionPlaceholder && (
+            <p className="text-[11px] text-white/35 leading-snug pr-1">
+              Projection available after a few weeks of training
+            </p>
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
@@ -228,8 +236,8 @@ function RaceSection({
         <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
       )}
       {!hasAnyFinishTime && (
-        <p className="text-[11px] text-sky-400/80 leading-snug">
-          No finish time yet — pull down to refresh State.
+        <p className="text-[11px] text-white/40 leading-snug">
+          Add a race target in your plan to see your goal and projection.
         </p>
       )}
 
