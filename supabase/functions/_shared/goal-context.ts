@@ -118,10 +118,13 @@ export async function loadGoalContext(
  * Goal id for unified finish projection (State + Course Strategy / terrain).
  * Prefer the canonical future run primary_event; if absent or not run, use the active plan's linked goal
  * so projection matches the plan + course_detail path when e.g. goals.target_date is missing but the plan has race_date.
+ *
+ * Also matches goals where `plan_id` was set from `plans.goal_id` in loadGoalContext — covers rows where
+ * coach reads `goal_id` but the client DB still has it only on the joined goal side.
  */
 export function resolveRunGoalIdForRaceProjection(
   goalContext: GoalContext,
-  activePlanGoalId: string | null | undefined,
+  activePlan: { id: string; goal_id?: string | null } | null | undefined,
 ): string | null {
   const pe = goalContext.primary_event;
   if (pe) {
@@ -129,11 +132,23 @@ export function resolveRunGoalIdForRaceProjection(
     const runish = sport === 'run' || sport === 'running' || !pe.sport;
     if (runish) return pe.id;
   }
-  const gid = typeof activePlanGoalId === 'string' ? activePlanGoalId.trim() : '';
-  if (!gid) return null;
-  const g = goalContext.goals.find(x => x.id === gid);
-  if (!g) return null;
-  const sport = String(g.sport || '').toLowerCase();
-  const runish = sport === 'run' || sport === 'running' || !g.sport;
-  return runish ? g.id : null;
+  const gid = typeof activePlan?.goal_id === 'string' ? activePlan.goal_id.trim() : '';
+  if (gid) {
+    const g = goalContext.goals.find(x => x.id === gid);
+    if (g) {
+      const sport = String(g.sport || '').toLowerCase();
+      const runish = sport === 'run' || sport === 'running' || !g.sport;
+      if (runish) return g.id;
+    }
+  }
+  const planId = typeof activePlan?.id === 'string' ? activePlan.id.trim() : '';
+  if (planId) {
+    const linked = goalContext.goals.find(g => g.plan_id === planId);
+    if (linked) {
+      const sport = String(linked.sport || '').toLowerCase();
+      const runish = sport === 'run' || sport === 'running' || !linked.sport;
+      if (runish) return linked.id;
+    }
+  }
+  return null;
 }

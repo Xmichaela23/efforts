@@ -392,7 +392,19 @@ export default function StateTab({
     null;
 
   useEffect(() => {
-    if (!raceFinishProjection && !raceReadiness) {
+    const gc = (data as CoachWeekContextV1 | null)?.goal_context;
+    const planId = data?.weekly_state_v1?.plan?.plan_id ?? null;
+    const goalFromPlan =
+      planId && gc?.goals ? gc.goals.find(g => g.plan_id === planId && isRunPrimary(g)) : undefined;
+
+    const goalIdFromCoach =
+      raceFinishProjection?.goal_id?.trim() ||
+      raceReadiness?.goal?.id?.trim() ||
+      gc?.primary_event?.id?.trim() ||
+      goalFromPlan?.id?.trim() ||
+      null;
+
+    if (!goalIdFromCoach) {
       setResolvedGoalId(null);
       setStateCourseRow(null);
       return;
@@ -400,11 +412,6 @@ export default function StateTab({
     const uid = getStoredUserId();
     if (!uid) return;
     let cancelled = false;
-    const goalIdFromCoach =
-      raceFinishProjection?.goal_id?.trim() ||
-      raceReadiness?.goal?.id?.trim() ||
-      (data as CoachWeekContextV1 | null)?.goal_context?.primary_event?.id?.trim() ||
-      null;
 
     (async () => {
       let goalId: string | null = goalIdFromCoach;
@@ -451,7 +458,11 @@ export default function StateTab({
     raceReadiness?.goal?.id,
     raceReadiness?.goal?.name,
     raceReadiness?.goal?.weeks_out,
+    data?.weekly_state_v1?.plan?.plan_id,
     (data as CoachWeekContextV1 | null)?.goal_context?.primary_event?.id,
+    (data as CoachWeekContextV1 | null)?.goal_context?.goals
+      ?.map(g => `${g.id}:${g.plan_id ?? '-'}`)
+      .join('|'),
     raceFinishProjection ? 1 : 0,
     raceReadiness ? 1 : 0,
   ]);
@@ -491,7 +502,15 @@ export default function StateTab({
   const projGid = raceFinishProjection?.goal_id?.trim();
   const goalForProj = projGid && gc?.goals ? gc.goals.find(x => x.id === projGid) : undefined;
   const goalMetaFromProjection = goalForProj ? goalMetaFromGoalLite(goalForProj, gc?.upcoming_races) : null;
-  const goalMeta = goalMetaPrimary ?? goalMetaFromProjection ?? null;
+  const activePlanId = wsv.plan.plan_id;
+  const goalLinkedToPlan =
+    activePlanId && gc?.goals
+      ? gc.goals.find(g => g.plan_id === activePlanId && isRunPrimary(g))
+      : undefined;
+  const goalMetaFromPlanLink = goalLinkedToPlan
+    ? goalMetaFromGoalLite(goalLinkedToPlan, gc?.upcoming_races)
+    : null;
+  const goalMeta = goalMetaPrimary ?? goalMetaFromProjection ?? goalMetaFromPlanLink ?? null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

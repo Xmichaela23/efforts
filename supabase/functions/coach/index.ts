@@ -75,7 +75,7 @@ const corsHeaders: Record<string, string> = {
 
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
-const COACH_PAYLOAD_VERSION = 10;
+const COACH_PAYLOAD_VERSION = 11;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2279,7 +2279,7 @@ Deno.serve(async (req) => {
     // while terrain still resolves from the same DB rows.
     // Goal id: primary future run event when present; else active plan's linked goal (matches course_detail by goal_id).
     try {
-      const projGoalId = resolveRunGoalIdForRaceProjection(goalContext, activePlan?.goal_id ?? null);
+      const projGoalId = resolveRunGoalIdForRaceProjection(goalContext, activePlan);
       if (projGoalId) {
         const { data: gRow } = await supabaseService
           .from('goals')
@@ -2290,10 +2290,24 @@ Deno.serve(async (req) => {
         if (gRow) {
           const gr = gRow as Record<string, unknown>;
           const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, projGoalId);
+          const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
+          const planOwnsGoal = Boolean(
+            activePlan &&
+              (String(activePlan.goal_id || '') === String(projGoalId) ||
+                goalContext.goals.some(g => g.id === projGoalId && g.plan_id === activePlan!.id)),
+          );
+          const planRaceDate =
+            planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
+          const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
+          const distFromPlan =
+            planDistance != null ? String(planDistance) : null;
           raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
             name: String(gr.name || ''),
-            distance: gr.distance != null ? String(gr.distance) : null,
-            target_date: gr.target_date != null ? String(gr.target_date) : null,
+            distance: gr.distance != null ? String(gr.distance) : distFromPlan,
+            target_date:
+              gr.target_date != null
+                ? String(gr.target_date).slice(0, 10)
+                : planRaceDate,
             target_time: gr.target_time != null ? Number(gr.target_time) : null,
             sport: gr.sport != null ? String(gr.sport) : null,
             race_readiness_projection: gr.race_readiness_projection,

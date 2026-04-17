@@ -240,10 +240,13 @@ export type CoachWeekContextV1 = {
     goals: Array<{
       id: string;
       name: string;
+      goal_type?: 'event' | 'capacity' | 'maintenance' | string;
       sport?: string | null;
       distance?: string | null;
       target_time?: number | null;
       target_date?: string | null;
+      /** Set when plans.goal_id points at this goal (loadGoalContext). */
+      plan_id?: string | null;
     }>;
     primary_event?: {
       id?: string;
@@ -502,7 +505,7 @@ export function useCoachWeekContext(date?: string) {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
       // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate until foreground coach runs.
-      const MIN_CACHE_PAYLOAD_VERSION = 10;
+      const MIN_CACHE_PAYLOAD_VERSION = 11;
       if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;
