@@ -134,6 +134,7 @@ function RaceSection({
   rr,
   goalMeta,
   planWizardDistance,
+  planWizardTargetSeconds,
   primaryRaceReadiness,
   onOpenKeyRun,
   resolvedGoalId,
@@ -147,6 +148,8 @@ function RaceSection({
   goalMeta: { name: string; weeks_out: number; distance: string; target_time_seconds: number | null } | null;
   /** From coach `plan.active_plans[].distance` (same as Plan Wizard / plan config). */
   planWizardDistance: string | null;
+  /** `plans.config.target_time` from coach (Plan Wizard / generate-run-plan). Shown when coach RFP row is absent. */
+  planWizardTargetSeconds: number | null;
   primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
   onOpenKeyRun?: (workoutId: string) => void;
   resolvedGoalId: string | null;
@@ -161,10 +164,14 @@ function RaceSection({
   const weeksOut = rr?.goal.weeks_out ?? goalMeta?.weeks_out ?? 0;
 
   const statedSec = goalMeta?.target_time_seconds ?? null;
+  const wizardSec =
+    planWizardTargetSeconds != null && Number.isFinite(planWizardTargetSeconds) && planWizardTargetSeconds > 0
+      ? Math.round(planWizardTargetSeconds)
+      : null;
   const anchorDisplay =
     projection?.anchor_display ??
     rr?.predicted_finish_display ??
-    (statedSec != null ? fmtGoalClock(statedSec) : '—');
+    (statedSec != null ? fmtGoalClock(statedSec) : wizardSec != null ? fmtGoalClock(wizardSec) : '—');
   const headlineIsPlan = projection?.source_kind === 'plan_target';
   const headlineLabel =
     projection != null
@@ -175,7 +182,9 @@ function RaceSection({
         ? 'Predicted from training'
         : statedSec != null
           ? 'Your goal'
-          : 'Race finish';
+          : wizardSec != null
+            ? 'Your goal'
+            : 'Race finish';
   const showPlanSub =
     projection?.plan_goal_display &&
     projection.plan_goal_seconds != null &&
@@ -220,9 +229,9 @@ function RaceSection({
       {projection?.mismatch_blurb && (
         <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
       )}
-      {!projection && !rr && statedSec == null && (
+      {!projection && !rr && statedSec == null && wizardSec == null && (
         <p className="text-[11px] text-sky-400/80 leading-snug">
-          No projection in this response yet — pull down to refresh State.
+          No finish time yet — pull down to refresh State.
         </p>
       )}
 
@@ -495,7 +504,12 @@ export default function StateTab({
   const planRoot = (
     data as CoachWeekContextV1 & {
       plan?: {
-        active_plans?: Array<{ plan_id?: string | null; distance?: string | null; is_primary?: boolean }>;
+        active_plans?: Array<{
+          plan_id?: string | null;
+          distance?: string | null;
+          is_primary?: boolean;
+          plan_target_finish_seconds?: number | null;
+        }>;
       };
     }
   ).plan;
@@ -504,6 +518,11 @@ export default function StateTab({
     (activePlanId && activePlans?.find(p => p.plan_id === activePlanId)?.distance) ??
     activePlans?.find(p => p.is_primary)?.distance ??
     activePlans?.[0]?.distance ??
+    null;
+  const planWizardTargetSeconds =
+    (activePlanId && activePlans?.find(p => p.plan_id === activePlanId)?.plan_target_finish_seconds) ??
+    activePlans?.find(p => p.is_primary)?.plan_target_finish_seconds ??
+    activePlans?.[0]?.plan_target_finish_seconds ??
     null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -814,6 +833,7 @@ export default function StateTab({
             rr={raceReadiness}
             goalMeta={goalMeta}
             planWizardDistance={planWizardDistance}
+            planWizardTargetSeconds={planWizardTargetSeconds ?? null}
             primaryRaceReadiness={primaryRaceReadiness}
             resolvedGoalId={resolvedGoalId}
             courseRow={stateCourseRow}

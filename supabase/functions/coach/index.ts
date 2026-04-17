@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 15;
+const COACH_PAYLOAD_VERSION = 16;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -4059,6 +4059,8 @@ ${narrativeFacts.join('\n')}`;
           distance: p.config?.distance ?? p.config?.race_distance ?? null,
           race_date: p.config?.race_date ?? null,
           race_name: p.config?.race_name ?? null,
+          /** Plan Wizard / generate-run-plan: `config.target_time` (race finish seconds). Always sent when present. */
+          plan_target_finish_seconds: targetSecondsFromPlanConfig(p.config),
           duration_weeks: p.duration_weeks,
           is_primary: p.id === activePlan?.id,
         })),

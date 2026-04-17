@@ -67,6 +67,8 @@ export type CoachWeekContextV1 = {
       distance?: string | null;
       race_date?: string | null;
       race_name?: string | null;
+      /** From `plans.config` (Plan Wizard / generate-run-plan). */
+      plan_target_finish_seconds?: number | null;
       duration_weeks?: number | null;
       is_primary?: boolean;
     }>;
