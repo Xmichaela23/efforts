@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { COACH_CLIENT_MIN_PAYLOAD_VERSION } from '@/lib/coach-contract';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
 /** Same contract as coach + course-detail (terrain). */
@@ -504,9 +505,7 @@ export function useCoachWeekContext(date?: string) {
     ).then(({ data: row }) => {
       const p = row?.payload as CoachWeekContextV1 | undefined;
       const cacheVer = Number(p?.coach_payload_version ?? 0);
-      // Must match coach/index COACH_PAYLOAD_VERSION — old DB rows skip hydrate until foreground coach runs.
-      const MIN_CACHE_PAYLOAD_VERSION = 11;
-      if (p && cacheVer >= MIN_CACHE_PAYLOAD_VERSION) {
+      if (p && cacheVer >= COACH_CLIENT_MIN_PAYLOAD_VERSION) {
         setData(p);
         hasCachedData.current = true;
         runPipeline(true);

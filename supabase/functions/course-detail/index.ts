@@ -16,7 +16,10 @@ import {
   type SnapshotForHash,
 } from '../_shared/course-strategy-helpers.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
-import { buildRaceFinishProjectionV1 } from '../_shared/resolve-server-predicted-finish.ts';
+import {
+  buildRaceFinishProjectionV1,
+  pickRaceFinishProjectionV1ForCourseGoal,
+} from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -161,22 +164,7 @@ Deno.serve(async (req) => {
     // Prefer unified projection from coach_cache (parity with State); else same resolver as coach.
     const { data: cacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
     const pl = cacheRow?.payload as Record<string, unknown> | undefined;
-    const wsv = pl?.weekly_state_v1 as { race_finish_projection_v1?: unknown } | undefined;
-    const cached =
-      pl?.race_finish_projection_v1 ?? wsv?.race_finish_projection_v1;
-    const cachedRfp =
-      cached &&
-      typeof cached === 'object' &&
-      cached !== null &&
-      String((cached as { goal_id?: string }).goal_id) === String(course.goal_id)
-        ? (cached as {
-            anchor_seconds: number;
-            source_kind: string;
-            plan_goal_seconds: number | null;
-            plan_goal_display: string | null;
-            mismatch_blurb: string | null;
-          })
-        : null;
+    const cachedRfp = pl ? pickRaceFinishProjectionV1ForCourseGoal(pl, String(course.goal_id)) : null;
 
     if (cachedRfp) {
       primarySec = cachedRfp.anchor_seconds;

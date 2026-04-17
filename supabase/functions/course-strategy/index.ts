@@ -31,7 +31,7 @@ import {
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 import {
   resolvePaceAnchorForCourse,
-  type PaceAnchorKind,
+  pickRaceFinishProjectionV1ForCourseGoal,
 } from '../_shared/resolve-server-predicted-finish.ts';
 
 const cors = {
@@ -175,16 +175,7 @@ Deno.serve(async (req) => {
 
   const { data: coachCacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
   const coachPl = coachCacheRow?.payload as Record<string, unknown> | undefined;
-  const wsvRfp = (coachPl?.weekly_state_v1 as { race_finish_projection_v1?: unknown } | undefined)
-    ?.race_finish_projection_v1;
-  const cachedRfp = coachPl?.race_finish_projection_v1 ?? wsvRfp;
-  const unified =
-    cachedRfp &&
-    typeof cachedRfp === 'object' &&
-    cachedRfp !== null &&
-    String((cachedRfp as { goal_id?: string }).goal_id) === String(course.goal_id)
-      ? (cachedRfp as { anchor_seconds: number; source_kind: PaceAnchorKind })
-      : null;
+  const unified = coachPl ? pickRaceFinishProjectionV1ForCourseGoal(coachPl, String(course.goal_id)) : null;
 
   const anchor =
     unified != null

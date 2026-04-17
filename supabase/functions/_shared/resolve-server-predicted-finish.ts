@@ -1,10 +1,11 @@
 /**
  * Pace anchor for terrain strategy (single server resolver):
  * 1) goals.race_readiness_projection — written when coach runs
- * 2) coach_cache.payload.race_readiness — same as State tab when primary_event matches this course goal
- * 3) User plan / goal race target (resolveGoalTargetTimeSeconds) — only if baseline fitness does not
+ * 2) coach_cache.payload.race_finish_projection_v1 (goal_id match) — unified with State tab
+ * 3) Legacy: coach_cache.payload.race_readiness when primary_event matched course goal (pre-v1 projection)
+ * 4) User plan / goal race target (resolveGoalTargetTimeSeconds) — only if baseline fitness does not
  *    contradict a faster stated goal (if stated is faster than server fitness projection, anchor to fitness)
- * 4) Baseline VDOT computeRaceReadiness — when no usable plan target, or plan is slower/equal to fitness
+ * 5) Baseline VDOT computeRaceReadiness — when no usable plan target, or plan is slower/equal to fitness
  *
  * Clients must not send predicted_finish_time_seconds; course-detail / course-strategy use this only.
  */
@@ -28,10 +29,53 @@ function parseGoalRaceReadinessProjection(raw: unknown): number | null {
   return parseClientPredictedFinishSeconds(p.predicted_finish_time_seconds);
 }
 
-/**
- * State tab reads from coach_cache (stale-while-revalidate). Use the same payload so terrain pacing
- * matches the RACE block without relying on a goals column migration.
- */
+export type PaceAnchorKind =
+  | 'coach_readiness'
+  | 'plan_target'
+  | 'baseline_vdot'
+  /** Stated goal/plan time was faster than server fitness projection; anchor uses fitness. */
+  | 'fitness_floors_stated_goal';
+
+/** Unified finish-time block for coach payload + course-detail + State. */
+export type RaceFinishProjectionV1 = {
+  goal_id: string;
+  anchor_seconds: number;
+  anchor_display: string;
+  source_kind: PaceAnchorKind;
+  plan_goal_seconds: number | null;
+  plan_goal_display: string | null;
+  mismatch_blurb: string | null;
+};
+
+function isUsableRfp(r: RaceFinishProjectionV1 | null | undefined): r is RaceFinishProjectionV1 {
+  if (!r || typeof r !== 'object') return false;
+  if (!r.goal_id || String(r.goal_id).trim() === '') return false;
+  const s = Number(r.anchor_seconds);
+  return Number.isFinite(s) && s > 0;
+}
+
+/** Root wins (fresh invoke); weekly_state_v1 is fallback for partial/old rows. */
+export function pickRaceFinishProjectionV1FromCoachPayload(
+  payload: Record<string, unknown> | null | undefined,
+): RaceFinishProjectionV1 | null {
+  if (!payload) return null;
+  const root = payload.race_finish_projection_v1 as RaceFinishProjectionV1 | null | undefined;
+  if (isUsableRfp(root)) return root;
+  const wsv = payload.weekly_state_v1 as { race_finish_projection_v1?: RaceFinishProjectionV1 | null } | undefined;
+  const nested = wsv?.race_finish_projection_v1;
+  if (isUsableRfp(nested)) return nested;
+  return null;
+}
+
+export function pickRaceFinishProjectionV1ForCourseGoal(
+  payload: Record<string, unknown> | null | undefined,
+  courseGoalId: string,
+): RaceFinishProjectionV1 | null {
+  const r = pickRaceFinishProjectionV1FromCoachPayload(payload);
+  if (!r || String(r.goal_id) !== String(courseGoalId)) return null;
+  return r;
+}
+
 async function readPredictedFinishFromCoachCache(
   supabase: any,
   userId: string,
@@ -45,6 +89,13 @@ async function readPredictedFinishFromCoachCache(
   const payload = row?.payload as Record<string, unknown> | null | undefined;
   if (!payload) return null;
 
+  const rfp = pickRaceFinishProjectionV1ForCourseGoal(payload, courseGoalId);
+  if (rfp != null) {
+    const s = Number(rfp.anchor_seconds);
+    if (Number.isFinite(s) && s > 0) return s;
+  }
+
+  // Legacy: pre-race_finish_projection_v1 rows only had race_readiness aligned to primary_event
   const gc = payload.goal_context as Record<string, unknown> | undefined;
   const primary = gc?.primary_event as { id?: string } | undefined;
   if (!primary?.id || String(primary.id) !== String(courseGoalId)) return null;
@@ -54,13 +105,6 @@ async function readPredictedFinishFromCoachCache(
   return parseClientPredictedFinishSeconds(rr.predicted_finish_time_seconds);
 }
 
-export type PaceAnchorKind =
-  | 'coach_readiness'
-  | 'plan_target'
-  | 'baseline_vdot'
-  /** Stated goal/plan time was faster than server fitness projection; anchor uses fitness. */
-  | 'fitness_floors_stated_goal';
-
 export type PaceAnchorResult = {
   seconds: number;
   kind: PaceAnchorKind;
@@ -68,7 +112,7 @@ export type PaceAnchorResult = {
 
 /**
  * @param planTargetSec — goal.target_time or linked plan config (already resolved).
- * @param courseGoalId — goals.id for this race course (match coach primary_event for cache).
+ * @param courseGoalId — goals.id for this race course.
  */
 export async function resolvePaceAnchorForCourse(
   supabase: any,
@@ -100,17 +144,6 @@ export async function resolvePaceAnchorForCourse(
 
   return null;
 }
-
-/** Unified finish-time block for State + Course Strategy (same resolver as terrain). */
-export type RaceFinishProjectionV1 = {
-  goal_id: string;
-  anchor_seconds: number;
-  anchor_display: string;
-  source_kind: PaceAnchorKind;
-  plan_goal_seconds: number | null;
-  plan_goal_display: string | null;
-  mismatch_blurb: string | null;
-};
 
 /**
  * Canonical race finish projection for coach payload + course-detail.

@@ -12,6 +12,7 @@ import LoadBar from '@/components/LoadBar';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
+import { pickRaceFinishProjectionV1FromCoachData } from '@/lib/coach-payload';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -125,27 +126,6 @@ function signalToneColor(tone: string): string {
   if (tone === 'positive') return 'text-emerald-400/85';
   if (tone === 'warning') return 'text-amber-400/85';
   return 'text-white/65';
-}
-
-/** Nested weekly_state_v1.response_model can lag root (e.g. cache); patch fields the client needs for BODY. */
-function resolveStateTabResponseModel(wsvRm: unknown, rootRm: unknown): Record<string, unknown> | undefined {
-  const a = wsvRm as Record<string, unknown> | null | undefined;
-  const b = rootRm as Record<string, unknown> | null | undefined;
-  if (!a && !b) return undefined;
-  if (!a) return b;
-  if (!b) return a;
-  if (a === b) return a;
-  const aSum = typeof (a as any).overall_training_read?.summary === 'string' && String((a as any).overall_training_read.summary).trim();
-  const bSum = typeof (b as any).overall_training_read?.summary === 'string' && String((b as any).overall_training_read.summary).trim();
-  const aVis = (a as any).visible_signals;
-  const bVis = (b as any).visible_signals;
-  const aVisEmpty = !Array.isArray(aVis) || aVis.length === 0;
-  const bVisHas = Array.isArray(bVis) && bVis.length > 0;
-
-  let out: Record<string, unknown> = { ...a };
-  if (bSum && !aSum) out = { ...out, overall_training_read: (b as any).overall_training_read };
-  if (aVisEmpty && bVisHas) out = { ...out, visible_signals: bVis };
-  return out;
 }
 
 function RaceSection({
@@ -386,10 +366,7 @@ export default function StateTab({
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
 
   const raceReadiness = (data as CoachWeekContextV1 | null)?.race_readiness ?? null;
-  const raceFinishProjection =
-    (data as CoachWeekContextV1 | null)?.race_finish_projection_v1 ??
-    data?.weekly_state_v1?.race_finish_projection_v1 ??
-    null;
+  const raceFinishProjection = pickRaceFinishProjectionV1FromCoachData(data as CoachWeekContextV1 | null);
 
   useEffect(() => {
     const gc = (data as CoachWeekContextV1 | null)?.goal_context;
@@ -484,7 +461,7 @@ export default function StateTab({
 
   const week = wsv.week;
   const load = wsv.load;
-  const rm = resolveStateTabResponseModel((wsv as any).response_model, (data as any).response_model) as {
+  const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<{ label: string; category?: string; trend: string; trend_tone: string; detail: string; samples: number }>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean }> };
