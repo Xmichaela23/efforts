@@ -37,7 +37,7 @@ import {
   type CrossDomainPair,
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
-import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext } from '../_shared/goal-context.ts';
+import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
 import {
@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 12;
+const COACH_PAYLOAD_VERSION = 13;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2154,93 +2154,146 @@ Deno.serve(async (req) => {
       return 'normal';
     })() as 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';
 
+    // Race-course goal ids + unified run goal (State + terrain + VDOT readiness). Hoisted so race_readiness
+    // runs when primary_event is null but the plan still points at a run goal (e.g. race date in the past).
+    let raceCourseGoalIdsForRace: string[] = [];
+    let resolvedRunGoalIdForRace: string | null = null;
+    try {
+      const { data: rcGoalRows } = await supabaseService
+        .from('race_courses')
+        .select('goal_id')
+        .eq('user_id', userId);
+      raceCourseGoalIdsForRace = [
+        ...new Set((rcGoalRows || []).map((r: { goal_id?: string }) => r.goal_id).filter(Boolean).map(String)),
+      ];
+      resolvedRunGoalIdForRace = resolveRunGoalIdForRaceProjection(goalContext, activePlan, raceCourseGoalIdsForRace);
+    } catch (e: any) {
+      console.warn('[coach] race course goal resolution failed (non-fatal):', e?.message ?? e);
+    }
+
     // =========================================================================
     // Race readiness (VDOT-based, gated on running event goal)
     // =========================================================================
     let raceFinishProjectionV1: RaceFinishProjectionV1 | null = null;
     let raceReadiness: RaceReadinessV1 | null = null;
+    let runGoalForReadiness: GoalLite | null = null;
     try {
-      if (goalContext.primary_event && (goalContext.primary_event.sport === 'run' || goalContext.primary_event.sport === 'running' || !goalContext.primary_event.sport)) {
-        const weeksOutVal = goalContext.upcoming_races.find(r => r.name === goalContext.primary_event!.name)?.weeks_out ?? 0;
+      runGoalForReadiness = (() => {
+        const pe = goalContext.primary_event;
+        if (pe && (pe.sport === 'run' || pe.sport === 'running' || !pe.sport)) return pe;
+        if (!resolvedRunGoalIdForRace) return null;
+        const g = goalContext.goals.find(x => x.id === resolvedRunGoalIdForRace);
+        if (!g) return null;
+        if (g.sport === 'run' || g.sport === 'running' || !g.sport) return g;
+        return null;
+      })();
 
-        const readinessDrivers: Array<{ label: string; value: string; tone: 'positive' | 'neutral' | 'warning' }> = [];
-        const keyPlanned = reaction.key_sessions_planned;
-        const keyLinked = reaction.key_sessions_linked;
-        if (keyPlanned > 0) {
-          const ratio = keyLinked / keyPlanned;
-          readinessDrivers.push({
-            label: 'Key sessions',
-            value: `${keyLinked}/${keyPlanned} completed`,
-            tone: ratio >= 0.8 ? 'positive' : ratio >= 0.5 ? 'neutral' : 'warning',
-          });
+      if (runGoalForReadiness) {
+        const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
+        const planOwnsGoal = Boolean(
+          activePlan &&
+            (String(activePlan.goal_id || '') === String(runGoalForReadiness.id) ||
+              goalContext.goals.some(g => g.id === runGoalForReadiness!.id && g.plan_id === activePlan!.id)),
+        );
+        const planRaceDate =
+          planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
+        const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
+        const distance =
+          runGoalForReadiness.distance != null && String(runGoalForReadiness.distance).trim() !== ''
+            ? String(runGoalForReadiness.distance)
+            : planDistance != null
+              ? String(planDistance)
+              : null;
+        let targetDate =
+          runGoalForReadiness.target_date != null
+            ? String(runGoalForReadiness.target_date).slice(0, 10)
+            : planRaceDate;
+        if (!targetDate && distance) {
+          targetDate = addDaysISO(asOfDate, 84);
         }
 
-        const fitDir = fitnessDirection ?? 'stable';
-        readinessDrivers.push({
-          label: 'Fitness trend',
-          value: fitDir,
-          tone: fitDir === 'improving' ? 'positive' : fitDir === 'declining' ? 'warning' : 'neutral',
-        });
+        if (distance && targetDate) {
+          const weeksOutVal = goalContext.upcoming_races.find(r => r.name === runGoalForReadiness!.name)?.weeks_out ?? 0;
 
-        // HR drift vs 28d norm
-        if (reaction.hr_drift_avg_bpm != null && norms28d.hr_drift_avg_bpm != null && reaction.hr_drift_sample_size >= 2) {
-          const driftDelta = reaction.hr_drift_avg_bpm - norms28d.hr_drift_avg_bpm;
+          const readinessDrivers: Array<{ label: string; value: string; tone: 'positive' | 'neutral' | 'warning' }> = [];
+          const keyPlanned = reaction.key_sessions_planned;
+          const keyLinked = reaction.key_sessions_linked;
+          if (keyPlanned > 0) {
+            const ratio = keyLinked / keyPlanned;
+            readinessDrivers.push({
+              label: 'Key sessions',
+              value: `${keyLinked}/${keyPlanned} completed`,
+              tone: ratio >= 0.8 ? 'positive' : ratio >= 0.5 ? 'neutral' : 'warning',
+            });
+          }
+
+          const fitDir = fitnessDirection ?? 'stable';
           readinessDrivers.push({
-            label: 'Cardiac drift',
-            value: `${reaction.hr_drift_avg_bpm > 0 ? '+' : ''}${reaction.hr_drift_avg_bpm.toFixed(1)} bpm`,
-            tone: driftDelta <= -1 ? 'positive' : driftDelta >= 3 ? 'warning' : 'neutral',
+            label: 'Fitness trend',
+            value: fitDir,
+            tone: fitDir === 'improving' ? 'positive' : fitDir === 'declining' ? 'warning' : 'neutral',
+          });
+
+          // HR drift vs 28d norm
+          if (reaction.hr_drift_avg_bpm != null && norms28d.hr_drift_avg_bpm != null && reaction.hr_drift_sample_size >= 2) {
+            const driftDelta = reaction.hr_drift_avg_bpm - norms28d.hr_drift_avg_bpm;
+            readinessDrivers.push({
+              label: 'Cardiac drift',
+              value: `${reaction.hr_drift_avg_bpm > 0 ? '+' : ''}${reaction.hr_drift_avg_bpm.toFixed(1)} bpm`,
+              tone: driftDelta <= -1 ? 'positive' : driftDelta >= 3 ? 'warning' : 'neutral',
+            });
+          }
+
+          // RPE vs 28d norm
+          if (reaction.avg_session_rpe_7d != null && norms28d.session_rpe_avg != null && reaction.rpe_sample_size_7d >= 2) {
+            const rpeDelta = reaction.avg_session_rpe_7d - norms28d.session_rpe_avg;
+            readinessDrivers.push({
+              label: 'Perceived effort',
+              value: `${reaction.avg_session_rpe_7d.toFixed(1)} RPE`,
+              tone: rpeDelta <= -0.4 ? 'positive' : rpeDelta >= 0.4 ? 'warning' : 'neutral',
+            });
+          }
+
+          // Execution score vs 28d norm
+          if (reaction.avg_execution_score != null && norms28d.execution_score_avg != null && reaction.execution_sample_size >= 2) {
+            const execDelta = reaction.avg_execution_score - norms28d.execution_score_avg;
+            readinessDrivers.push({
+              label: 'Execution',
+              value: `${Math.round(reaction.avg_execution_score)}%`,
+              tone: execDelta >= 3 ? 'positive' : execDelta <= -5 ? 'warning' : 'neutral',
+            });
+          }
+
+          const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
+          const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
+
+          raceReadiness = computeRaceReadiness({
+            learnedFitness: learnedFitness || null,
+            effortPaces: (ub as any)?.effort_paces || null,
+            performanceNumbers: (ub as any)?.performance_numbers || null,
+            primaryEvent: {
+              id: runGoalForReadiness.id,
+              name: runGoalForReadiness.name,
+              distance,
+              target_date: targetDate,
+              target_time: runGoalForReadiness.target_time,
+              sport: runGoalForReadiness.sport,
+            },
+            weeksOut: weeksOutVal,
+            weeklyReadinessLabel: readinessState ?? null,
+            readinessDrivers,
+            hrDriftAvgBpm: reaction.hr_drift_avg_bpm,
+            hrDriftNorm28dBpm: norms28d.hr_drift_avg_bpm,
+            easyRunDecouplingPct: easyDecoupling,
           });
         }
-
-        // RPE vs 28d norm
-        if (reaction.avg_session_rpe_7d != null && norms28d.session_rpe_avg != null && reaction.rpe_sample_size_7d >= 2) {
-          const rpeDelta = reaction.avg_session_rpe_7d - norms28d.session_rpe_avg;
-          readinessDrivers.push({
-            label: 'Perceived effort',
-            value: `${reaction.avg_session_rpe_7d.toFixed(1)} RPE`,
-            tone: rpeDelta <= -0.4 ? 'positive' : rpeDelta >= 0.4 ? 'warning' : 'neutral',
-          });
-        }
-
-        // Execution score vs 28d norm
-        if (reaction.avg_execution_score != null && norms28d.execution_score_avg != null && reaction.execution_sample_size >= 2) {
-          const execDelta = reaction.avg_execution_score - norms28d.execution_score_avg;
-          readinessDrivers.push({
-            label: 'Execution',
-            value: `${Math.round(reaction.avg_execution_score)}%`,
-            tone: execDelta >= 3 ? 'positive' : execDelta <= -5 ? 'warning' : 'neutral',
-          });
-        }
-
-        const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
-        const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
-
-        raceReadiness = computeRaceReadiness({
-          learnedFitness: learnedFitness || null,
-          effortPaces: (ub as any)?.effort_paces || null,
-          performanceNumbers: (ub as any)?.performance_numbers || null,
-          primaryEvent: {
-            id: goalContext.primary_event.id,
-            name: goalContext.primary_event.name,
-            distance: goalContext.primary_event.distance,
-            target_date: goalContext.primary_event.target_date,
-            target_time: goalContext.primary_event.target_time,
-            sport: goalContext.primary_event.sport,
-          },
-          weeksOut: weeksOutVal,
-          weeklyReadinessLabel: readinessState ?? null,
-          readinessDrivers,
-          hrDriftAvgBpm: reaction.hr_drift_avg_bpm,
-          hrDriftNorm28dBpm: norms28d.hr_drift_avg_bpm,
-          easyRunDecouplingPct: easyDecoupling,
-        });
       }
     } catch (rrErr: any) {
       console.warn('[coach] race readiness failed (non-fatal):', rrErr?.message ?? rrErr);
     }
 
     // Persist projection so course-detail / course-strategy use the same finish time as State (SSoT).
-    if (raceReadiness && goalContext.primary_event?.id) {
+    if (raceReadiness && runGoalForReadiness?.id) {
       try {
         const { error: projErr } = await supabaseService
           .from('goals')
@@ -2251,7 +2304,7 @@ Deno.serve(async (req) => {
               updated_at: new Date().toISOString(),
             },
           })
-          .eq('id', goalContext.primary_event.id)
+          .eq('id', runGoalForReadiness.id)
           .eq('user_id', userId);
         if (projErr) console.warn('[coach] race_readiness_projection update failed:', projErr.message);
       } catch (e: any) {
@@ -2280,46 +2333,42 @@ Deno.serve(async (req) => {
     // while terrain still resolves from the same DB rows.
     // Goal id: same resolver priority as course-detail (race_courses.goal_id when unambiguous) so State matches terrain.
     try {
-      const { data: rcGoalRows } = await supabaseService
-        .from('race_courses')
-        .select('goal_id')
-        .eq('user_id', userId);
-      const raceCourseGoalIds = [
-        ...new Set((rcGoalRows || []).map((r: { goal_id?: string }) => r.goal_id).filter(Boolean).map(String)),
-      ];
-      const projGoalId = resolveRunGoalIdForRaceProjection(goalContext, activePlan, raceCourseGoalIds);
-      if (projGoalId) {
+      if (resolvedRunGoalIdForRace) {
         const { data: gRow } = await supabaseService
           .from('goals')
           .select('name, distance, target_date, target_time, sport, race_readiness_projection')
-          .eq('id', projGoalId)
+          .eq('id', resolvedRunGoalIdForRace)
           .eq('user_id', userId)
           .maybeSingle();
         if (gRow) {
           const gr = gRow as Record<string, unknown>;
-          const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, projGoalId);
+          const planGoalSec = await resolveGoalTargetTimeSeconds(supabaseService, userId, resolvedRunGoalIdForRace);
           const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
           const planOwnsGoal = Boolean(
             activePlan &&
-              (String(activePlan.goal_id || '') === String(projGoalId) ||
-                goalContext.goals.some(g => g.id === projGoalId && g.plan_id === activePlan!.id)),
+              (String(activePlan.goal_id || '') === String(resolvedRunGoalIdForRace) ||
+                goalContext.goals.some(g => g.id === resolvedRunGoalIdForRace && g.plan_id === activePlan!.id)),
           );
           const planRaceDate =
             planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
           const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
           const distFromPlan =
             planDistance != null ? String(planDistance) : null;
+          let targetDateForProj =
+            gr.target_date != null
+              ? String(gr.target_date).slice(0, 10)
+              : planRaceDate;
+          if (!targetDateForProj && (gr.distance != null || distFromPlan)) {
+            targetDateForProj = addDaysISO(asOfDate, 84);
+          }
           raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
             name: String(gr.name || ''),
             distance: gr.distance != null ? String(gr.distance) : distFromPlan,
-            target_date:
-              gr.target_date != null
-                ? String(gr.target_date).slice(0, 10)
-                : planRaceDate,
+            target_date: targetDateForProj,
             target_time: gr.target_time != null ? Number(gr.target_time) : null,
             sport: gr.sport != null ? String(gr.sport) : null,
             race_readiness_projection: gr.race_readiness_projection,
-          }, projGoalId, planGoalSec);
+          }, resolvedRunGoalIdForRace, planGoalSec);
         }
       }
     } catch (rfpErr: any) {
