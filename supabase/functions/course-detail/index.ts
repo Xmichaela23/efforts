@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
   let primarySec: number | null = null;
   let goalTimeSource: 'predicted' | 'plan' | null = null;
   let planTargetTimeStr: string | null = null;
+  let goalTimeMismatchBlurb: string | null = null;
 
   if (course.goal_id) {
     // select('*') avoids failing when race_readiness_projection column is not migrated yet.
@@ -190,6 +191,13 @@ Deno.serve(async (req) => {
           (anchor.kind === 'fitness_floors_stated_goal' && planGoalSec != null)
         ) {
           planTargetTimeStr = fmtFinishClock(planGoalSec);
+          if (anchor.kind === 'coach_readiness') {
+            goalTimeMismatchBlurb =
+              'The finish time above is your race readiness projection. It differs from your saved plan goal so pacing matches your current fitness.';
+          } else if (anchor.kind === 'fitness_floors_stated_goal') {
+            goalTimeMismatchBlurb =
+              'The finish time above is your fitness-based projection. Your stated goal is faster than that projection right now, so pacing uses the slower time.';
+          }
         }
       }
     }
@@ -311,6 +319,7 @@ Deno.serve(async (req) => {
       goal_time: goalTimeStr,
       goal_time_source: goalTimeSource,
       plan_target_time: planTargetTimeStr,
+      goal_time_mismatch_blurb: goalTimeMismatchBlurb,
       strategy_updated_at: course.strategy_updated_at,
       strategy_stale: strategyStale,
       has_strategy: hasStrategy,

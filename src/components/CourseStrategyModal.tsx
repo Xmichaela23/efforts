@@ -94,6 +94,8 @@ export type CourseDetailPayload = {
     /** When set, header shows predicted vs plan-target copy from coach race_readiness. */
     goal_time_source?: 'predicted' | 'plan' | null;
     plan_target_time?: string | null;
+    /** Server copy when anchor finish time differs from stated plan goal. */
+    goal_time_mismatch_blurb?: string | null;
     strategy_updated_at: string | null;
     strategy_stale: boolean;
     has_strategy: boolean;
@@ -498,6 +500,9 @@ export default function CourseStrategyModal({
                 </p>
                 {payload.course.plan_target_time && (
                   <p className="text-[10px] text-white/40">Plan {payload.course.plan_target_time}</p>
+                )}
+                {payload.course.goal_time_mismatch_blurb && (
+                  <p className="text-[10px] text-white/45 leading-snug pt-0.5">{payload.course.goal_time_mismatch_blurb}</p>
                 )}
               </div>
             )}
