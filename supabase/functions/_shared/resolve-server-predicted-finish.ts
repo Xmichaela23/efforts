@@ -2,8 +2,9 @@
  * Pace anchor for terrain strategy (single server resolver):
  * 1) goals.race_readiness_projection — written when coach runs
  * 2) coach_cache.payload.race_readiness — same as State tab when primary_event matches this course goal
- * 3) User plan / goal race target (resolveGoalTargetTimeSeconds) — borrow stated plan estimate
- * 4) Baseline-only VDOT computeRaceReadiness — only if no plan target exists
+ * 3) User plan / goal race target (resolveGoalTargetTimeSeconds) — only if baseline fitness does not
+ *    contradict a faster stated goal (if stated is faster than server fitness projection, anchor to fitness)
+ * 4) Baseline VDOT computeRaceReadiness — when no usable plan target, or plan is slower/equal to fitness
  *
  * Clients must not send predicted_finish_time_seconds; course-detail / course-strategy use this only.
  */
@@ -52,7 +53,12 @@ async function readPredictedFinishFromCoachCache(
   return parseClientPredictedFinishSeconds(rr.predicted_finish_time_seconds);
 }
 
-export type PaceAnchorKind = 'coach_readiness' | 'plan_target' | 'baseline_vdot';
+export type PaceAnchorKind =
+  | 'coach_readiness'
+  | 'plan_target'
+  | 'baseline_vdot'
+  /** Stated goal/plan time was faster than server fitness projection; anchor uses fitness. */
+  | 'fitness_floors_stated_goal';
 
 export type PaceAnchorResult = {
   seconds: number;
@@ -80,10 +86,16 @@ export async function resolvePaceAnchorForCourse(
     planTargetSec != null && Number.isFinite(planTargetSec) && planTargetSec > 0
       ? Math.round(planTargetSec)
       : null;
+
+  const fitnessSec = await resolveServerPredictedFinishSeconds(supabase, userId, goal);
+
+  if (pt != null && fitnessSec != null && pt < fitnessSec) {
+    return { seconds: fitnessSec, kind: 'fitness_floors_stated_goal' };
+  }
+
   if (pt != null) return { seconds: pt, kind: 'plan_target' };
 
-  const vdot = await resolveServerPredictedFinishSeconds(supabase, userId, goal);
-  if (vdot != null) return { seconds: vdot, kind: 'baseline_vdot' };
+  if (fitnessSec != null) return { seconds: fitnessSec, kind: 'baseline_vdot' };
 
   return null;
 }

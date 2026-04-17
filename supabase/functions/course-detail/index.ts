@@ -185,7 +185,10 @@ Deno.serve(async (req) => {
       if (anchor) {
         primarySec = anchor.seconds;
         goalTimeSource = anchor.kind === 'plan_target' ? 'plan' : 'predicted';
-        if (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) {
+        if (
+          (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) ||
+          (anchor.kind === 'fitness_floors_stated_goal' && planGoalSec != null)
+        ) {
           planTargetTimeStr = fmtFinishClock(planGoalSec);
         }
       }

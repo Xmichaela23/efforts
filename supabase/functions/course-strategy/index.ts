@@ -198,7 +198,10 @@ Deno.serve(async (req) => {
   const goalTimeSec = anchor.seconds;
 
   let pacingContextLines = '';
-  if (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) {
+  if (
+    (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) ||
+    (anchor.kind === 'fitness_floors_stated_goal' && planGoalSec != null)
+  ) {
     pacingContextLines =
       `- Pace anchor (current-fitness finish projection): ${fmtFinishClock(anchor.seconds)} — segment bands must aggregate to this finish time, not the plan time.\n` +
       `- Stated plan / goal target (aspirational): ${fmtFinishClock(planGoalSec)}.\n`;
