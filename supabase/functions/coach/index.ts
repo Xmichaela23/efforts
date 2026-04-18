@@ -78,7 +78,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 25;
+const COACH_PAYLOAD_VERSION = 26;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2567,13 +2567,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Align RFP fitness clock with coach race_readiness (threshold + durability + confidence).
-    // Avoids a second finish time on screen vs delta / narrative (resolveServerPredictedFinishSeconds can differ).
+    // Single ability-based finish on the wire: anchor + fitness both = race_readiness.
+    // buildRaceFinishProjectionV1 sets anchor from resolvePaceAnchorForCourse / lite computeRaceReadiness;
+    // course-detail / terrain read anchor_*, State reads rr — they must match or users see ~10min splits.
     if (raceReadiness && raceFinishProjectionV1) {
+      const sec = raceReadiness.predicted_finish_time_seconds;
+      const disp = raceReadiness.predicted_finish_display;
+      const planG = raceFinishProjectionV1.plan_goal_seconds;
+      let mismatch: string | null = null;
+      if (planG != null && Number.isFinite(planG) && Math.abs(planG - sec) > 30) {
+        mismatch =
+          sec > planG
+            ? 'Projected time follows current training data; it can differ from the goal time you saved.'
+            : 'Pacing uses the slower fitness-based time because your saved goal is faster than that estimate.';
+      }
       raceFinishProjectionV1 = {
         ...raceFinishProjectionV1,
-        fitness_projection_seconds: raceReadiness.predicted_finish_time_seconds,
-        fitness_projection_display: raceReadiness.predicted_finish_display,
+        anchor_seconds: sec,
+        anchor_display: disp,
+        source_kind: 'coach_readiness',
+        fitness_projection_seconds: sec,
+        fitness_projection_display: disp,
+        mismatch_blurb: mismatch,
       };
     }
 
