@@ -223,6 +223,11 @@ function RaceSection({
               <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
                 {projectedFromTraining}
               </span>
+              {rr && (
+                <p className="text-[10px] text-white/32 leading-snug max-w-[280px]">
+                  Matches the gap and details below — one model: threshold, durability, data confidence.
+                </p>
+              )}
             </div>
           )}
           {showProjectionPlaceholder && (
