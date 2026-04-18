@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 19;
+const COACH_PAYLOAD_VERSION = 20;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -786,12 +786,15 @@ Deno.serve(async (req) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    const allActivePlans = await loadAllActivePlans(supabase, userId);
+    // Use service-role reads for plan + goal lists. The `supabase` client forwards the user JWT,
+    // so PostgREST applies RLS — goals can return [] while plans still load, leaving goal_context
+    // empty and breaking race_readiness / race_finish_projection_v1 despite data existing (Gate A).
+    const allActivePlans = await loadAllActivePlans(supabaseService, userId);
     const activePlan = pickPrimaryPlan(allActivePlans);
     const secondaryPlans = allActivePlans.filter(p => p.id !== activePlan?.id);
     const planConfig = activePlan?.config || null;
 
-    const goalContext = await loadGoalContext(supabase, userId, asOfDate, allActivePlans.map(p => p.id));
+    const goalContext = await loadGoalContext(supabaseService, userId, asOfDate, allActivePlans.map(p => p.id));
     const methodologyId: MethodologyId = inferMethodologyId(planConfig);
     const weekStartDow: WeekStartDow = resolveWeekStartDow(planConfig);
 
