@@ -184,10 +184,10 @@ function RaceSection({
       : statedSec != null
         ? fmtGoalClock(statedSec)
         : projection?.plan_goal_display ?? null;
-  /** Server fitness clock — RFP fitness field, full race_readiness, or anchor when not plan-only duplicate. */
+  /** Server fitness clock — prefer full race_readiness so headline matches delta + sections (same model path). */
   const projectedFromTraining =
-    projection?.fitness_projection_display ??
     rr?.predicted_finish_display ??
+    projection?.fitness_projection_display ??
     (projection &&
     projection.source_kind &&
     projection.source_kind !== 'plan_target' &&

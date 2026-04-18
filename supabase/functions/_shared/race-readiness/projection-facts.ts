@@ -1,3 +1,4 @@
+import { formatPace } from '../../generate-run-plan/effort-score.ts';
 import type { EnduranceResponse } from '../response-model/types.ts';
 import type { RaceReadinessV1 } from './index.ts';
 
@@ -79,17 +80,23 @@ export function buildRaceProjectionDisplay(args: {
     const delta = cur - base;
     if (Math.abs(delta) >= 0.4) {
       durLines.push(
-        delta < 0
-          ? `HR drift on runs vs 28-day average: ${cur.toFixed(1)} vs ${base.toFixed(1)} bpm (lower).`
-          : `HR drift on runs vs 28-day average: ${cur.toFixed(1)} vs ${base.toFixed(1)} bpm (higher).`,
+        `HR drift (bpm vs 28d avg on runs): ${cur.toFixed(1)} vs ${base.toFixed(1)} (${delta < 0 ? 'lower' : 'higher'}).`,
       );
     }
+  } else if (rr.drift_delta != null && Number.isFinite(rr.drift_delta)) {
+    durLines.push(`Drift vs 28d norm: ${rr.drift_delta > 0 ? '+' : ''}${rr.drift_delta.toFixed(1)} bpm.`);
   }
   if (e.cardiac_efficiency.sufficient) {
-    if (e.cardiac_efficiency.trend === 'improving') {
-      durLines.push('Easy-effort pace trending faster than rolling baseline (aerobic efficiency).');
+    const cp = e.cardiac_efficiency.current_pace_at_hr;
+    const bp = e.cardiac_efficiency.baseline_pace_at_hr;
+    if (cp != null && bp != null && cp > 0 && bp > 0) {
+      durLines.push(
+        `Pace at comparable easy HR: ${formatPace(cp)}/mi vs ${formatPace(bp)}/mi baseline (${e.cardiac_efficiency.trend}).`,
+      );
+    } else if (e.cardiac_efficiency.trend === 'improving') {
+      durLines.push('Easy pace at fixed HR trending faster than baseline.');
     } else if (e.cardiac_efficiency.trend === 'declining') {
-      durLines.push('Easy-effort pace trending slower than rolling baseline.');
+      durLines.push('Easy pace at fixed HR trending slower than baseline.');
     }
   }
   pushSection(sections, 'Durability & aerobic', durLines);

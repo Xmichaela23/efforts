@@ -354,61 +354,32 @@ function buildAssessmentMessage(
   distLabel: string,
   targetTimeSec: number | null,
   racePaceSecPerMi: number | null,
-  dataSource: 'observed' | 'plan_targets',
-  vdotDirection: RaceReadinessV1['vdot_direction'],
-  vdotDelta: number | null,
-  durabilityFactor: number,
-  trainingSignals: Array<{ label: string; value: string; tone: string }>,
-  weeksOut: number | null,
+  _dataSource: 'observed' | 'plan_targets',
+  _vdotDirection: RaceReadinessV1['vdot_direction'],
+  _vdotDelta: number | null,
+  _durabilityFactor: number,
+  _trainingSignals: Array<{ label: string; value: string; tone: string }>,
+  _weeksOut: number | null,
 ): string {
-  const paceNote = racePaceSecPerMi != null ? ` at ${formatPace(racePaceSecPerMi)}/mi` : '';
-  const trendNote = vdotDirection === 'improved' && vdotDelta != null
-    ? ` Your fitness has improved (+${vdotDelta} VDOT) since starting your plan.`
-    : vdotDirection === 'declined' && vdotDelta != null
-    ? ` Your fitness has dipped (${vdotDelta} VDOT) since starting your plan.`
-    : '';
-  const durabilityNote = durabilityFactor < 0.96
-    ? ' Your recent cardiac drift suggests durability may be a limiter — long run consistency will help.'
-    : durabilityFactor >= 1.0
-    ? ' Your aerobic durability is strong — your body is holding pace well under load.'
-    : '';
-
-  // Signal-enriched source note
-  const positiveSignals = trainingSignals.filter(s => s.tone === 'positive').map(s => s.label);
-  const warningSignals = trainingSignals.filter(s => s.tone === 'warning').map(s => s.label);
-  const watchNote = warningSignals.length > 0 ? ` Watch: ${warningSignals[0]}.` : '';
-
-  let sourceNote: string;
-  if (dataSource === 'observed') {
-    sourceNote = positiveSignals.length > 0
-      ? ` Fitness confirmed by recent runs: ${positiveSignals.slice(0, 2).join(', ')}.`
-      : '';
-  } else {
-    sourceNote = positiveSignals.length > 0
-      ? ` Based on plan targets. Recent signals are positive: ${positiveSignals.slice(0, 2).join(', ')}.`
-      : ' Based on plan targets, not observed workout data.';
-  }
+  const paceFrag = racePaceSecPerMi != null ? ` · ~${formatPace(racePaceSecPerMi)}/mi` : '';
+  const targetDisplay = targetTimeSec != null ? formatFinishTime(targetTimeSec) : null;
 
   switch (assessment) {
     case 'ahead':
-      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Ahead of target — keep the consistency going.${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
-    case 'on_track': {
-      const weeksNote = weeksOut != null ? ` ${weeksOut}w out.` : '';
-      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Tracking close to target.${weeksNote}${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
-    }
-    case 'behind': {
-      const targetDisplay = targetTimeSec != null ? formatFinishTime(targetTimeSec) : null;
-      const adjustNote = targetDisplay
-        ? ` Consider adjusting target toward ${predictedDisplay}, or focus key sessions on closing the gap.`
-        : '';
-      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}. Target is ambitious — data suggests a more comfortable race at this pace.${adjustNote}${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
-    }
-    case 'well_behind': {
-      const targetDisplay = targetTimeSec != null ? formatFinishTime(targetTimeSec) : null;
-      const adjustNote = targetDisplay
-        ? ` Recommend targeting ${predictedDisplay} instead of ${targetDisplay}. Going out at target pace risks the wall.`
-        : '';
-      return `Current fitness supports a ${predictedDisplay} ${distLabel}${paceNote}.${adjustNote}${trendNote}${durabilityNote}${sourceNote}${watchNote}`;
-    }
+      return targetDisplay != null
+        ? `Based on current fitness, ~${predictedDisplay} for this ${distLabel}${paceFrag} is ahead of your ${targetDisplay}.`
+        : `Based on current fitness, ~${predictedDisplay} for this ${distLabel}${paceFrag}.`;
+    case 'on_track':
+      return targetDisplay != null
+        ? `Based on current fitness, ~${predictedDisplay} for this ${distLabel}${paceFrag} lines up with your ${targetDisplay}.`
+        : `Based on current fitness, ~${predictedDisplay} for this ${distLabel}${paceFrag}.`;
+    case 'behind':
+      return targetDisplay != null
+        ? `Based on current fitness, ~${predictedDisplay} is slower than your ${targetDisplay} goal on this model. Forcing goal pace increases late-race cost; details below.`
+        : `Based on current fitness, ~${predictedDisplay} for this ${distLabel}${paceFrag}.`;
+    case 'well_behind':
+      return targetDisplay != null
+        ? `Based on current fitness, ~${predictedDisplay} vs ${targetDisplay} goal: large gap on this model. Starting at goal pace is high risk; use projected pacing or adjust the goal.`
+        : `Based on current fitness, ~${predictedDisplay} for this ${distLabel}${paceFrag}.`;
   }
 }

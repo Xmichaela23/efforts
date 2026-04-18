@@ -78,7 +78,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 24;
+const COACH_PAYLOAD_VERSION = 25;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2565,6 +2565,16 @@ Deno.serve(async (req) => {
       } catch (e: any) {
         console.warn('[coach] race_readiness_projection update exception:', e?.message ?? e);
       }
+    }
+
+    // Align RFP fitness clock with coach race_readiness (threshold + durability + confidence).
+    // Avoids a second finish time on screen vs delta / narrative (resolveServerPredictedFinishSeconds can differ).
+    if (raceReadiness && raceFinishProjectionV1) {
+      raceFinishProjectionV1 = {
+        ...raceFinishProjectionV1,
+        fitness_projection_seconds: raceReadiness.predicted_finish_time_seconds,
+        fitness_projection_display: raceReadiness.predicted_finish_display,
+      };
     }
 
     const interference = latestSnapshot?.interference ?? null;
