@@ -281,6 +281,8 @@ Deno.serve(async (req) => {
   const displayGroups: Record<string, unknown>[] = [];
   const startMiList: number[] = [];
   const endMiList: number[] = [];
+  let terrainAdjustedSec = 0;
+  let terrainAdjustedValid = hasStrategy;
 
   for (const gid of groupIds) {
     const inG = rows.filter((r) => Number(r.display_group_id) === gid);
@@ -292,6 +294,12 @@ Deno.serve(async (req) => {
     endMiList.push(em);
     const slow = Number(first.target_pace_slow_sec_per_mi);
     const fast = Number(first.target_pace_fast_sec_per_mi);
+    // Accumulate terrain-adjusted finish time: mid-pace (already climb-floored) × distance.
+    if (terrainAdjustedValid && Number.isFinite(slow) && Number.isFinite(fast) && em > sm) {
+      terrainAdjustedSec += ((slow + fast) / 2) * (em - sm);
+    } else if (hasStrategy) {
+      terrainAdjustedValid = false;
+    }
     const hrl = first.target_hr_low;
     const hrh = first.target_hr_high;
     const paceRange = Number.isFinite(slow) && Number.isFinite(fast)
@@ -318,6 +326,9 @@ Deno.serve(async (req) => {
     g.tier = tiers[i] ?? 0;
   });
 
+  const terrainAdjustedFinishSec =
+    terrainAdjustedValid && terrainAdjustedSec > 0 ? Math.round(terrainAdjustedSec) : null;
+
   const payload = {
     course: {
       id: course.id,
@@ -329,6 +340,7 @@ Deno.serve(async (req) => {
       goal_time_source: goalTimeSource,
       plan_target_time: planTargetTimeStr,
       goal_time_mismatch_blurb: goalTimeMismatchBlurb,
+      terrain_adjusted_time: terrainAdjustedFinishSec != null ? fmtFinishClock(terrainAdjustedFinishSec) : null,
       strategy_updated_at: course.strategy_updated_at,
       strategy_stale: strategyStale,
       has_strategy: hasStrategy,

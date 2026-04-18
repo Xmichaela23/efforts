@@ -94,6 +94,8 @@ export type CourseDetailPayload = {
     /** When set, header shows predicted vs plan-target copy from coach race_readiness. */
     goal_time_source?: 'predicted' | 'plan' | null;
     plan_target_time?: string | null;
+    /** Finish time derived from summing terrain-adjusted segment paces × distance. */
+    terrain_adjusted_time?: string | null;
     /** Server copy when anchor finish time differs from stated plan goal. */
     goal_time_mismatch_blurb?: string | null;
     strategy_updated_at: string | null;
@@ -498,6 +500,11 @@ export default function CourseStrategyModal({
                     </>
                   )}
                 </p>
+                {payload.course.terrain_adjusted_time && payload.course.terrain_adjusted_time !== payload.course.goal_time && (
+                  <p className="text-[11px] text-white/55 leading-snug">
+                    On this course <span className="text-white/80">{payload.course.terrain_adjusted_time}</span>
+                  </p>
+                )}
                 {payload.course.plan_target_time && (
                   <p className="text-[10px] text-white/40">Plan {payload.course.plan_target_time}</p>
                 )}
