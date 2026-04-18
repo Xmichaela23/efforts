@@ -106,6 +106,12 @@ export function useGoals() {
     try {
       const userId = getStoredUserId();
       if (!userId) return false;
+      // Clear the goal link on any plans before deleting to avoid dangling goal_id references.
+      await supabase
+        .from('plans')
+        .update({ goal_id: null })
+        .eq('goal_id', id)
+        .eq('user_id', userId);
       const { error } = await supabase
         .from('goals')
         .delete()

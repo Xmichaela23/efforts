@@ -2392,6 +2392,12 @@ Deno.serve(async (req) => {
         targetSecondsFromPlanConfig(activePlan?.config) ??
         (projGoalIdForRfp ? await resolveGoalTargetTimeSeconds(supabaseService, userId, projGoalIdForRfp) : null);
 
+      console.log('[coach][rfp] projGoalIdForRfp:', projGoalIdForRfp, '| planGoalSecForRfp:', planGoalSecForRfp, '| resolvedRunGoalIdForRace:', resolvedRunGoalIdForRace, '| activePlan.goal_id:', activePlan?.goal_id ?? null);
+
+      const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
+
+      // Resolve goal row (may be null if goal was deleted but plan.goal_id not yet cleared).
+      let gr: Record<string, unknown> | null = null;
       if (projGoalIdForRfp) {
         const { data: gRow } = await supabaseService
           .from('goals')
@@ -2399,35 +2405,49 @@ Deno.serve(async (req) => {
           .eq('id', projGoalIdForRfp)
           .eq('user_id', userId)
           .maybeSingle();
-        if (gRow) {
-          const gr = gRow as Record<string, unknown>;
-          const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
-          const planOwnsGoalRfp = mergeActivePlanRaceConfigForGoal(projGoalIdForRfp);
-          const planRaceDate =
-            planOwnsGoalRfp && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
-          const planDistance = planOwnsGoalRfp ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
-          const distFromPlan =
-            planDistance != null ? String(planDistance) : null;
-          const targetDateForProj =
-            gr.target_date != null
-              ? String(gr.target_date).slice(0, 10)
-              : planRaceDate;
-          const grTargetSec = gr.target_time != null ? Number(gr.target_time) : null;
-          const targetTimeForProj =
-            grTargetSec != null && Number.isFinite(grTargetSec) && grTargetSec > 0
-              ? grTargetSec
-              : planOwnsGoalRfp && planGoalSecForRfp != null && planGoalSecForRfp > 0
-                ? planGoalSecForRfp
-                : null;
-          raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
-            name: String(gr.name || ''),
-            distance: gr.distance != null ? String(gr.distance) : distFromPlan,
-            target_date: targetDateForProj,
-            target_time: targetTimeForProj,
-            sport: gr.sport != null ? String(gr.sport) : null,
-            race_readiness_projection: gr.race_readiness_projection,
-          }, projGoalIdForRfp, planGoalSecForRfp, mergedEffortPacesForRace);
-        }
+        gr = gRow ? (gRow as Record<string, unknown>) : null;
+        if (!gr) console.log('[coach][rfp] goal row not found for projGoalIdForRfp:', projGoalIdForRfp);
+      }
+
+      // Build projection from goal row when available, otherwise fall back to plan config directly.
+      // Plan Wizard stores distance/race_date/target_time in plans.config — no goal row required.
+      const rfpGoalId = projGoalIdForRfp ?? activePlan?.id ?? null;
+      const planDistance = planCfg?.distance ?? planCfg?.race_distance ?? null;
+      const planRaceDate = planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
+
+      const finalDistance = gr?.distance != null ? String(gr.distance)
+        : planDistance != null ? String(planDistance)
+        : null;
+      const finalTargetDate = gr?.target_date != null ? String(gr.target_date).slice(0, 10)
+        : planRaceDate;
+      const grTargetSec = gr?.target_time != null ? Number(gr.target_time) : null;
+      const targetTimeForProj =
+        grTargetSec != null && Number.isFinite(grTargetSec) && grTargetSec > 0
+          ? grTargetSec
+          : planGoalSecForRfp != null && planGoalSecForRfp > 0
+            ? planGoalSecForRfp
+            : null;
+      const goalSportRaw = gr?.sport != null ? String(gr.sport) : (planCfg?.sport != null ? String(planCfg.sport) : null);
+      const goalSportForProjection = (() => {
+        if (!goalSportRaw) return null;
+        const s = goalSportRaw.toLowerCase();
+        if (s === 'triathlon' || s === 'multisport' || s === 'tri') return null;
+        return goalSportRaw;
+      })();
+
+      if (rfpGoalId && finalDistance && finalTargetDate) {
+        console.log('[coach][rfp] building projection:', { finalDistance, finalTargetDate, targetTimeForProj, goalSportForProjection, fromGoalRow: gr != null, 'mergedEffortPaces.steady': (mergedEffortPacesForRace as any)?.steady ?? null });
+        raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
+          name: String(gr?.name ?? planCfg?.race_name ?? activePlan?.name ?? ''),
+          distance: finalDistance,
+          target_date: finalTargetDate,
+          target_time: targetTimeForProj,
+          sport: goalSportForProjection,
+          race_readiness_projection: gr?.race_readiness_projection ?? null,
+        }, rfpGoalId, planGoalSecForRfp, mergedEffortPacesForRace);
+        console.log('[coach][rfp] result:', raceFinishProjectionV1 ? { source_kind: raceFinishProjectionV1.source_kind, anchor_display: raceFinishProjectionV1.anchor_display, fitness_projection_display: raceFinishProjectionV1.fitness_projection_display } : null);
+      } else {
+        console.log('[coach][rfp] insufficient data — rfpGoalId:', rfpGoalId, '| finalDistance:', finalDistance, '| finalTargetDate:', finalTargetDate);
       }
     } catch (rfpErr: any) {
       console.warn('[coach] race_finish_projection_v1 failed (non-fatal):', rfpErr?.message ?? rfpErr);
