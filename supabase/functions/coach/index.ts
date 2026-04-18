@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 20;
+const COACH_PAYLOAD_VERSION = 21;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2182,6 +2182,14 @@ Deno.serve(async (req) => {
       return goalContext.goals.some(g => g.id === goalId && g.plan_id === activePlan.id);
     };
 
+    /** Also merge when this goal is the A-priority primary event — avoids null race_date/distance when plan.goal_id or race_courses point elsewhere. */
+    const mergeActivePlanRaceConfigForGoal = (goalId: string | null | undefined): boolean => {
+      if (!goalId) return false;
+      if (planConfigAppliesToGoalId(goalId)) return true;
+      const pe = goalContext.primary_event;
+      return pe != null && String(pe.id) === String(goalId);
+    };
+
     // =========================================================================
     // Race readiness (VDOT-based, gated on running event goal)
     // =========================================================================
@@ -2204,7 +2212,7 @@ Deno.serve(async (req) => {
 
       if (runGoalForReadiness) {
         const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
-        const planOwnsGoal = planConfigAppliesToGoalId(runGoalForReadiness.id);
+        const planOwnsGoal = mergeActivePlanRaceConfigForGoal(runGoalForReadiness.id);
         const planRaceDate =
           planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
         const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
@@ -2365,7 +2373,7 @@ Deno.serve(async (req) => {
         if (gRow) {
           const gr = gRow as Record<string, unknown>;
           const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
-          const planOwnsGoalRfp = planConfigAppliesToGoalId(projGoalIdForRfp);
+          const planOwnsGoalRfp = mergeActivePlanRaceConfigForGoal(projGoalIdForRfp);
           const planRaceDate =
             planOwnsGoalRfp && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
           const planDistance = planOwnsGoalRfp ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;

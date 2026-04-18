@@ -214,7 +214,7 @@ function RaceSection({
           )}
           {showProjectionPlaceholder && (
             <p className="text-[11px] text-white/35 leading-snug pr-1">
-              Projection available after a few weeks of training
+              Can’t project a finish time yet (race date on the goal/plan, or baselines).
             </p>
           )}
         </div>
