@@ -12,7 +12,7 @@ import LoadBar from '@/components/LoadBar';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
-import { pickRaceFinishProjectionV1FromCoachData } from '@/lib/coach-payload';
+import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
 
 type CoachDataProp = {
@@ -402,7 +402,7 @@ export default function StateTab({
   const [strategyCourseId, setStrategyCourseId] = useState<string | null>(null);
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
 
-  const raceReadiness = (data as CoachWeekContextV1 | null)?.race_readiness ?? null;
+  const raceReadiness = pickRaceReadinessFromCoachData(data as CoachWeekContextV1 | null);
   const raceFinishProjection = pickRaceFinishProjectionV1FromCoachData(data as CoachWeekContextV1 | null);
 
   useEffect(() => {
