@@ -32,7 +32,12 @@ export interface RaceReadinessV1 {
   durability_factor: number;
   confidence_adjustment_pct: number;
   drift_delta: number | null;
-  /** Declarative lines (coach-only): how projection is built + vs goal; no pep talk. */
+  /** Framing + grouped sections for State (coach). */
+  projection_display?: {
+    framing: string | null;
+    sections: Array<{ label: string; lines: string[] }>;
+  };
+  /** @deprecated Prefer projection_display */
   projection_facts?: string[];
 }
 

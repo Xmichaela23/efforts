@@ -43,6 +43,12 @@ export type RaceReadinessV1 = {
   durability_factor: number;
   confidence_adjustment_pct: number;
   drift_delta: number | null;
+  /** Server-grouped framing + sections; prefer over projection_facts. */
+  projection_display?: {
+    framing: string | null;
+    sections: Array<{ label: string; lines: string[] }>;
+  };
+  /** @deprecated Use projection_display */
   projection_facts?: string[];
 };
 

@@ -129,6 +129,12 @@ function signalToneColor(tone: string): string {
   return 'text-white/65';
 }
 
+function hasRaceProjectionDetail(rr: RaceReadinessV1 | null | undefined): boolean {
+  const secs = rr?.projection_display?.sections;
+  if (secs && secs.length > 0) return true;
+  return Boolean(rr?.projection_facts && rr.projection_facts.length > 0);
+}
+
 function RaceSection({
   projection,
   rr,
@@ -239,8 +245,26 @@ function RaceSection({
         </div>
       </div>
 
-      {/* Factual projection breakdown (server); replaces pep-style blurb when present */}
-      {rr?.projection_facts && rr.projection_facts.length > 0 && (
+      {/* Factual projection: framing + grouped sections (server); legacy flat list still supported */}
+      {rr?.projection_display?.sections && rr.projection_display.sections.length > 0 && (
+        <div className="space-y-3 pt-0.5">
+          <p className="text-[10px] text-white/40 uppercase tracking-wide">From your data</p>
+          {rr.projection_display.framing ? (
+            <p className="text-[11px] text-white/60 leading-relaxed">{rr.projection_display.framing}</p>
+          ) : null}
+          {rr.projection_display.sections.map((sec) => (
+            <div key={sec.label} className="space-y-1.5">
+              <p className="text-[10px] font-semibold tracking-[0.1em] text-white/45 uppercase">{sec.label}</p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-white/65 leading-relaxed">
+                {sec.lines.map((line, i) => (
+                  <li key={`${sec.label}-${i}`}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+      {rr?.projection_facts && rr.projection_facts.length > 0 && !(rr.projection_display?.sections?.length) && (
         <div className="space-y-1.5 pt-0.5">
           <p className="text-[10px] text-white/40 uppercase tracking-wide">From your data</p>
           <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-white/60 leading-relaxed">
@@ -251,7 +275,7 @@ function RaceSection({
         </div>
       )}
 
-      {projection?.mismatch_blurb && !(rr?.projection_facts && rr.projection_facts.length > 0) && (
+      {projection?.mismatch_blurb && !hasRaceProjectionDetail(rr) && (
         <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
       )}
       {!hasAnyFinishTime && (
@@ -284,8 +308,8 @@ function RaceSection({
         </div>
       )}
 
-      {/* Legacy narrative — hidden when projection_facts supply factual copy */}
-      {rr && !(rr.projection_facts && rr.projection_facts.length > 0) && (
+      {/* Legacy narrative — hidden when projection display supplies factual copy */}
+      {rr && !hasRaceProjectionDetail(rr) && (
         <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
       )}
 

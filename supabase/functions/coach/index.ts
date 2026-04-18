@@ -40,7 +40,7 @@ import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
-import { buildRaceProjectionFactLines } from '../_shared/race-readiness/projection-facts.ts';
+import { buildRaceProjectionDisplay } from '../_shared/race-readiness/projection-facts.ts';
 import {
   buildRaceFinishProjectionV1,
   type RaceFinishProjectionV1,
@@ -78,7 +78,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 23;
+const COACH_PAYLOAD_VERSION = 24;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2378,7 +2378,7 @@ Deno.serve(async (req) => {
           raceReadiness = rrComputed
             ? {
               ...rrComputed,
-              projection_facts: buildRaceProjectionFactLines({
+              projection_display: buildRaceProjectionDisplay({
                 rr: rrComputed,
                 endurance: weeklyResponseModel.endurance,
               }),
@@ -2489,7 +2489,7 @@ Deno.serve(async (req) => {
     }
 
     // Primary readiness uses primary_event / plan-linked run goal only. RFP can still build from
-    // plans.config — mirror those fields so State gets race_readiness.projection_facts with the clock.
+    // plans.config — mirror those fields so State gets race_readiness.projection_display with the clock.
     if (!raceReadiness && rfpMirrorForRaceReadiness && raceFinishProjectionV1) {
       try {
         const mg = rfpMirrorForRaceReadiness;
@@ -2534,7 +2534,7 @@ Deno.serve(async (req) => {
           raceReadiness = rrComputed
             ? {
               ...rrComputed,
-              projection_facts: buildRaceProjectionFactLines({
+              projection_display: buildRaceProjectionDisplay({
                 rr: rrComputed,
                 endurance: weeklyResponseModel.endurance,
               }),
