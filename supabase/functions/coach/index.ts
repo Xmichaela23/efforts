@@ -76,7 +76,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 18;
+const COACH_PAYLOAD_VERSION = 19;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2171,6 +2171,14 @@ Deno.serve(async (req) => {
       console.warn('[coach] race course goal resolution failed (non-fatal):', e?.message ?? e);
     }
 
+    /** Merge plans.config race_date / distance / target when plan row omits goal_id or goal.plan_id. */
+    const planConfigAppliesToGoalId = (goalId: string | null | undefined): boolean => {
+      if (!activePlan || !goalId) return false;
+      if (String(activePlan.goal_id || '') === String(goalId)) return true;
+      if (resolvedRunGoalIdForRace != null && String(resolvedRunGoalIdForRace) === String(goalId)) return true;
+      return goalContext.goals.some(g => g.id === goalId && g.plan_id === activePlan.id);
+    };
+
     // =========================================================================
     // Race readiness (VDOT-based, gated on running event goal)
     // =========================================================================
@@ -2193,11 +2201,7 @@ Deno.serve(async (req) => {
 
       if (runGoalForReadiness) {
         const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
-        const planOwnsGoal = Boolean(
-          activePlan &&
-            (String(activePlan.goal_id || '') === String(runGoalForReadiness.id) ||
-              goalContext.goals.some(g => g.id === runGoalForReadiness!.id && g.plan_id === activePlan!.id)),
-        );
+        const planOwnsGoal = planConfigAppliesToGoalId(runGoalForReadiness.id);
         const planRaceDate =
           planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
         const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
@@ -2267,6 +2271,16 @@ Deno.serve(async (req) => {
           const easyRunType = runSessionTypes7d.find(rt => rt.type === 'easy' || rt.type === 'z2');
           const easyDecoupling = easyRunType?.avg_decoupling_pct ?? null;
 
+          const targetTimeForReadiness = (() => {
+            const raw = runGoalForReadiness.target_time;
+            if (raw != null && Number.isFinite(Number(raw)) && Number(raw) > 0) return Number(raw);
+            if (planOwnsGoal && activePlan?.config) {
+              const t = targetSecondsFromPlanConfig(activePlan.config as Record<string, unknown>);
+              if (t != null && t > 0) return t;
+            }
+            return null;
+          })();
+
           raceReadiness = computeRaceReadiness({
             learnedFitness: learnedFitness || null,
             effortPaces: (ub as any)?.effort_paces || null,
@@ -2276,7 +2290,7 @@ Deno.serve(async (req) => {
               name: runGoalForReadiness.name,
               distance,
               target_date: targetDate,
-              target_time: runGoalForReadiness.target_time,
+              target_time: targetTimeForReadiness,
               sport: runGoalForReadiness.sport,
             },
             weeksOut: weeksOutVal,
@@ -2348,25 +2362,28 @@ Deno.serve(async (req) => {
         if (gRow) {
           const gr = gRow as Record<string, unknown>;
           const planCfg = activePlan?.config as Record<string, unknown> | null | undefined;
-          const planOwnsGoal = Boolean(
-            activePlan &&
-              (String(activePlan.goal_id || '') === String(projGoalIdForRfp) ||
-                goalContext.goals.some(g => g.id === projGoalIdForRfp && g.plan_id === activePlan!.id)),
-          );
+          const planOwnsGoalRfp = planConfigAppliesToGoalId(projGoalIdForRfp);
           const planRaceDate =
-            planOwnsGoal && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
-          const planDistance = planOwnsGoal ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
+            planOwnsGoalRfp && planCfg?.race_date ? String(planCfg.race_date).slice(0, 10) : null;
+          const planDistance = planOwnsGoalRfp ? (planCfg?.distance ?? planCfg?.race_distance ?? null) : null;
           const distFromPlan =
             planDistance != null ? String(planDistance) : null;
           const targetDateForProj =
             gr.target_date != null
               ? String(gr.target_date).slice(0, 10)
               : planRaceDate;
+          const grTargetSec = gr.target_time != null ? Number(gr.target_time) : null;
+          const targetTimeForProj =
+            grTargetSec != null && Number.isFinite(grTargetSec) && grTargetSec > 0
+              ? grTargetSec
+              : planOwnsGoalRfp && planGoalSecForRfp != null && planGoalSecForRfp > 0
+                ? planGoalSecForRfp
+                : null;
           raceFinishProjectionV1 = await buildRaceFinishProjectionV1(supabaseService, userId, {
             name: String(gr.name || ''),
             distance: gr.distance != null ? String(gr.distance) : distFromPlan,
             target_date: targetDateForProj,
-            target_time: gr.target_time != null ? Number(gr.target_time) : null,
+            target_time: targetTimeForProj,
             sport: gr.sport != null ? String(gr.sport) : null,
             race_readiness_projection: gr.race_readiness_projection,
           }, projGoalIdForRfp, planGoalSecForRfp);
