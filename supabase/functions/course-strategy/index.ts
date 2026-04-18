@@ -296,7 +296,30 @@ Deno.serve(async (req) => {
   const snapHash = await hashAthleteSnapshot(snapshot);
 
   const distMi = goalDistanceMi(goal.distance as string);
-  const implied = impliedAvgPaceSecPerMi(goalTimeSec, distMi);
+
+  // Adjust goal time for course terrain before handing to LLM.
+  // Walk the elevation profile with +10 s/mi per 1% uphill (cap +60) / -6 s/mi per 1% downhill (cap -20).
+  let terrainGoalTimeSec = goalTimeSec;
+  if (distMi > 0 && smoothed.length >= 2) {
+    const flatPace = goalTimeSec / distMi;
+    let accSec = 0;
+    for (let i = 1; i < smoothed.length; i++) {
+      const p1 = smoothed[i - 1];
+      const p2 = smoothed[i];
+      const segDistM = p2.distance_m - p1.distance_m;
+      if (segDistM <= 0) continue;
+      const grade = (p2.elevation_m - p1.elevation_m) / segDistM * 100;
+      const gradeAdj = grade > 0 ? Math.min(grade * 10, 60) : Math.max(grade * 6, -20);
+      accSec += (flatPace + gradeAdj) * (segDistM / 1609.344);
+    }
+    const rounded = Math.round(accSec);
+    if (Math.abs(rounded - goalTimeSec) > 15) {
+      terrainGoalTimeSec = rounded;
+      pacingContextLines += `- Terrain-adjusted finish target: ${fmtFinishClock(terrainGoalTimeSec)} (grade-adjusted from flat projection ${fmtFinishClock(goalTimeSec)} based on course elevation profile).\n`;
+    }
+  }
+
+  const implied = impliedAvgPaceSecPerMi(terrainGoalTimeSec, distMi);
 
   const prompt = buildPrompt({
     segments: geometryToPromptSegments(geometry),
@@ -307,7 +330,7 @@ Deno.serve(async (req) => {
     longRun: longMi > 0
       ? `${Math.round(longMi * 10) / 10}mi at ${longHr ?? '?'} bpm, ${drift != null ? `${drift} bpm drift` : 'drift n/a'}`
       : 'no recent long run in data',
-    goalTime: fmtFinishClock(goalTimeSec),
+    goalTime: fmtFinishClock(terrainGoalTimeSec),
     impliedAvg: fmtPaceClock(implied),
     pacingContextLines: pacingContextLines.trimEnd(),
   });

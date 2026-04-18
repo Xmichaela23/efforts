@@ -278,11 +278,33 @@ Deno.serve(async (req) => {
     (a, b) => Number(a) - Number(b),
   ) as number[];
 
+  // Terrain-adjusted finish time: walk elevation profile applying grade-adjusted pace.
+  // Starting from the implied flat pace (fitness projection / distance), each micro-segment
+  // gets +10 s/mi per 1% uphill grade (capped at +60) and -6 s/mi per 1% downhill (capped at -20).
+  let terrainAdjustedFinishSec: number | null = null;
+  if (primarySec != null && primarySec > 0 && smoothed.length >= 2) {
+    const distMiTotal = Number(course.distance_m) / MI_M;
+    const flatPace = primarySec / distMiTotal;
+    let accSec = 0;
+    for (let i = 1; i < smoothed.length; i++) {
+      const p1 = smoothed[i - 1];
+      const p2 = smoothed[i];
+      const segDistM = p2.distance_m - p1.distance_m;
+      if (segDistM <= 0) continue;
+      const segDistMi = segDistM / MI_M;
+      const grade = (p2.elevation_m - p1.elevation_m) / segDistM * 100; // %
+      const gradeAdj = grade > 0
+        ? Math.min(grade * 10, 60)
+        : Math.max(grade * 6, -20);
+      accSec += (flatPace + gradeAdj) * segDistMi;
+    }
+    const rounded = Math.round(accSec);
+    terrainAdjustedFinishSec = rounded;
+  }
+
   const displayGroups: Record<string, unknown>[] = [];
   const startMiList: number[] = [];
   const endMiList: number[] = [];
-  let terrainAdjustedSec = 0;
-  let terrainAdjustedValid = hasStrategy;
 
   for (const gid of groupIds) {
     const inG = rows.filter((r) => Number(r.display_group_id) === gid);
@@ -294,12 +316,6 @@ Deno.serve(async (req) => {
     endMiList.push(em);
     const slow = Number(first.target_pace_slow_sec_per_mi);
     const fast = Number(first.target_pace_fast_sec_per_mi);
-    // Accumulate terrain-adjusted finish time: mid-pace (already climb-floored) × distance.
-    if (terrainAdjustedValid && Number.isFinite(slow) && Number.isFinite(fast) && em > sm) {
-      terrainAdjustedSec += ((slow + fast) / 2) * (em - sm);
-    } else if (hasStrategy) {
-      terrainAdjustedValid = false;
-    }
     const hrl = first.target_hr_low;
     const hrh = first.target_hr_high;
     const paceRange = Number.isFinite(slow) && Number.isFinite(fast)
@@ -326,9 +342,6 @@ Deno.serve(async (req) => {
     g.tier = tiers[i] ?? 0;
   });
 
-  const terrainAdjustedFinishSec =
-    terrainAdjustedValid && terrainAdjustedSec > 0 ? Math.round(terrainAdjustedSec) : null;
-
   const payload = {
     course: {
       id: course.id,
@@ -341,6 +354,7 @@ Deno.serve(async (req) => {
       plan_target_time: planTargetTimeStr,
       goal_time_mismatch_blurb: goalTimeMismatchBlurb,
       terrain_adjusted_time: terrainAdjustedFinishSec != null ? fmtFinishClock(terrainAdjustedFinishSec) : null,
+      _debug_terrain: { primarySec, smoothedLen: smoothed.length, terrainSec: terrainAdjustedFinishSec, distM: Number(course.distance_m) },
       strategy_updated_at: course.strategy_updated_at,
       strategy_stale: strategyStale,
       has_strategy: hasStrategy,
