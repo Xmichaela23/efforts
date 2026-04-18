@@ -43,6 +43,7 @@ export type RaceReadinessV1 = {
   durability_factor: number;
   confidence_adjustment_pct: number;
   drift_delta: number | null;
+  projection_facts?: string[];
 };
 
 export type CoachWeekContextV1 = {

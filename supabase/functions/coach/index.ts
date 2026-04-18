@@ -40,6 +40,7 @@ import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
+import { buildRaceProjectionFactLines } from '../_shared/race-readiness/projection-facts.ts';
 import {
   buildRaceFinishProjectionV1,
   type RaceFinishProjectionV1,
@@ -2321,7 +2322,7 @@ Deno.serve(async (req) => {
             return null;
           })();
 
-          raceReadiness = computeRaceReadiness({
+          const rrComputed = computeRaceReadiness({
             learnedFitness: learnedFitness || null,
             effortPaces: mergedEffortPacesForRace,
             performanceNumbers: (ub as any)?.performance_numbers || null,
@@ -2340,6 +2341,15 @@ Deno.serve(async (req) => {
             hrDriftNorm28dBpm: norms28d.hr_drift_avg_bpm,
             easyRunDecouplingPct: easyDecoupling,
           });
+          raceReadiness = rrComputed
+            ? {
+              ...rrComputed,
+              projection_facts: buildRaceProjectionFactLines({
+                rr: rrComputed,
+                endurance: weeklyResponseModel.endurance,
+              }),
+            }
+            : null;
         }
       }
     } catch (rrErr: any) {

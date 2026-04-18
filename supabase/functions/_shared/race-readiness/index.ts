@@ -32,6 +32,8 @@ export interface RaceReadinessV1 {
   durability_factor: number;
   confidence_adjustment_pct: number;
   drift_delta: number | null;
+  /** Declarative lines (coach-only): how projection is built + vs goal; no pep talk. */
+  projection_facts?: string[];
 }
 
 export interface RaceReadinessInput {

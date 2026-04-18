@@ -239,7 +239,19 @@ function RaceSection({
         </div>
       </div>
 
-      {projection?.mismatch_blurb && (
+      {/* Factual projection breakdown (server); replaces pep-style blurb when present */}
+      {rr?.projection_facts && rr.projection_facts.length > 0 && (
+        <div className="space-y-1.5 pt-0.5">
+          <p className="text-[10px] text-white/40 uppercase tracking-wide">From your data</p>
+          <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-white/60 leading-relaxed">
+            {rr.projection_facts.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {projection?.mismatch_blurb && !(rr?.projection_facts && rr.projection_facts.length > 0) && (
         <p className="text-[11px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
       )}
       {!hasAnyFinishTime && (
@@ -272,8 +284,8 @@ function RaceSection({
         </div>
       )}
 
-      {/* Assessment message */}
-      {rr && (
+      {/* Legacy narrative — hidden when projection_facts supply factual copy */}
+      {rr && !(rr.projection_facts && rr.projection_facts.length > 0) && (
         <p className="text-[12px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
       )}
 

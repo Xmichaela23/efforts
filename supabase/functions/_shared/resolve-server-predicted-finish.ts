@@ -196,10 +196,10 @@ export async function buildRaceFinishProjectionV1(
   if (anchor && planGoalSec != null) {
     if (anchor.kind === 'coach_readiness' && planGoalSec !== anchor.seconds) {
       mismatchBlurb =
-        'The finish time above is your race readiness projection. It differs from your saved plan goal so pacing matches your current fitness.';
+        'Projected time follows current training data; it can differ from the goal time you saved.';
     } else if (anchor.kind === 'fitness_floors_stated_goal') {
       mismatchBlurb =
-        'The finish time above is your fitness-based projection. Your stated goal is faster than that projection right now, so pacing uses the slower time.';
+        'Pacing uses the slower fitness-based time because your saved goal is faster than that estimate.';
     }
   }
 
