@@ -45,6 +45,7 @@ import {
   type RaceFinishProjectionV1,
 } from '../_shared/resolve-server-predicted-finish.ts';
 import { resolveGoalTargetTimeSeconds, targetSecondsFromPlanConfig } from '../_shared/resolve-goal-target-time.ts';
+import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
   buildDailyLedger,
   buildIdentity,
@@ -76,7 +77,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 21;
+const COACH_PAYLOAD_VERSION = 22;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -88,6 +89,29 @@ function toISODate(d: Date): string {
 function parseISODateOnly(iso: string): Date {
   const [y, m, d] = String(iso).split('-').map((x) => parseInt(x, 10));
   return new Date(y, (m || 1) - 1, d || 1);
+}
+
+/**
+ * Plan Wizard stores `effort_score` on `plans.config` but many athletes have no `user_baselines.effort_paces`
+ * row (or empty). Without steady/race paces, VDOT readiness returns null while the plan still has target_time.
+ */
+function mergedEffortPacesForCoach(
+  ubPaces: unknown,
+  planConfig: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  const u = ubPaces && typeof ubPaces === 'object' && !Array.isArray(ubPaces)
+    ? (ubPaces as Record<string, unknown>)
+    : null;
+  if (u != null && u.steady != null && Number(u.steady) > 0) return u;
+  const es = planConfig?.effort_score != null ? Number(planConfig.effort_score) : NaN;
+  if (Number.isFinite(es) && es > 0) {
+    try {
+      return getPacesFromScore(es) as unknown as Record<string, unknown>;
+    } catch {
+      return u;
+    }
+  }
+  return u;
 }
 
 function addDaysISO(iso: string, deltaDays: number): string {
@@ -2190,6 +2214,11 @@ Deno.serve(async (req) => {
       return pe != null && String(pe.id) === String(goalId);
     };
 
+    const mergedEffortPacesForRace = mergedEffortPacesForCoach(
+      (ub as any)?.effort_paces,
+      activePlan?.config as Record<string, unknown> | null | undefined,
+    );
+
     // =========================================================================
     // Race readiness (VDOT-based, gated on running event goal)
     // =========================================================================
@@ -2294,7 +2323,7 @@ Deno.serve(async (req) => {
 
           raceReadiness = computeRaceReadiness({
             learnedFitness: learnedFitness || null,
-            effortPaces: (ub as any)?.effort_paces || null,
+            effortPaces: mergedEffortPacesForRace,
             performanceNumbers: (ub as any)?.performance_numbers || null,
             primaryEvent: {
               id: runGoalForReadiness.id,
@@ -2397,7 +2426,7 @@ Deno.serve(async (req) => {
             target_time: targetTimeForProj,
             sport: gr.sport != null ? String(gr.sport) : null,
             race_readiness_projection: gr.race_readiness_projection,
-          }, projGoalIdForRfp, planGoalSecForRfp);
+          }, projGoalIdForRfp, planGoalSecForRfp, mergedEffortPacesForRace);
         }
       }
     } catch (rfpErr: any) {

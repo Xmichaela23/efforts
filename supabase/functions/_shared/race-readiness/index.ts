@@ -85,6 +85,9 @@ function normalizeRaceDistanceToKey(raw: string | null | undefined): RaceDistKey
   if (d.includes('half') || d === 'half_marathon' || d === '13.1' || d === '13_1' || d === '21k' || d === '21.1') {
     return 'half';
   }
+  if (d.includes('marathon')) return 'marathon';
+  if (d === '42k' || d === '42.2k' || d === '42_k' || d.startsWith('42k')) return 'marathon';
+  if (d === '26.2_mi' || d === '26_2_mi' || d === '26.2mi') return 'marathon';
   if (d === '10k' || d === '10_k' || d === '10000' || d === '6.2') return '10k';
   if (d === '5k' || d === '5_k' || d === '5000' || d === '3.1') return '5k';
   return null;

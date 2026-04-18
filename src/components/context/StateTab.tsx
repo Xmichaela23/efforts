@@ -178,9 +178,16 @@ function RaceSection({
       : statedSec != null
         ? fmtGoalClock(statedSec)
         : projection?.plan_goal_display ?? null;
-  /** Server fitness clock only — race_finish_projection_v1 or coach race_readiness. */
+  /** Server fitness clock — RFP fitness field, full race_readiness, or anchor when not plan-only duplicate. */
   const projectedFromTraining =
-    projection?.fitness_projection_display ?? rr?.predicted_finish_display ?? null;
+    projection?.fitness_projection_display ??
+    rr?.predicted_finish_display ??
+    (projection &&
+    projection.source_kind &&
+    projection.source_kind !== 'plan_target' &&
+    projection.anchor_display
+      ? projection.anchor_display
+      : null);
   const hasProjection = projectedFromTraining != null;
   const showProjectionPlaceholder = statedGoalDisplay != null && !hasProjection;
   const hasAnyFinishTime = statedGoalDisplay != null || hasProjection;

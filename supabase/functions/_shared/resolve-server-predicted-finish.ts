@@ -166,8 +166,10 @@ export async function buildRaceFinishProjectionV1(
   goal: GoalRowForPrediction,
   goalId: string,
   planGoalSec: number | null,
+  /** When set (e.g. coach merged user_baselines + plans.config.effort_score), used for VDOT path. */
+  effortPacesOverlay?: Record<string, unknown> | null,
 ): Promise<RaceFinishProjectionV1 | null> {
-  const fitnessSec = await resolveServerPredictedFinishSeconds(supabase, userId, goal);
+  const fitnessSec = await resolveServerPredictedFinishSeconds(supabase, userId, goal, effortPacesOverlay);
   const anchor = await resolvePaceAnchorForCourse(
     supabase,
     userId,
@@ -232,6 +234,8 @@ export async function resolveServerPredictedFinishSeconds(
   supabase: any,
   userId: string,
   goal: GoalRowForPrediction,
+  /** Coach-only: merged baselines + plan `effort_score` paces when `user_baselines.effort_paces` is empty. */
+  effortPacesOverlay?: Record<string, unknown> | null,
 ): Promise<number | null> {
   if (!goal.distance || !goal.target_date) return null;
   const sport = String(goal.sport || '').toLowerCase();
@@ -245,6 +249,14 @@ export async function resolveServerPredictedFinishSeconds(
 
   const row = ub as Record<string, unknown> | null | undefined;
   const learnedFitness = parseLearnedFitness(row?.learned_fitness);
+  const baseEp = (row?.effort_paces as Record<string, unknown>) || null;
+  const effortPacesMerged = (() => {
+    const steadyOk = (p: Record<string, unknown> | null) =>
+      p != null && p.steady != null && Number(p.steady) > 0;
+    if (steadyOk(baseEp)) return baseEp;
+    if (effortPacesOverlay != null && steadyOk(effortPacesOverlay)) return effortPacesOverlay;
+    return baseEp ?? effortPacesOverlay ?? null;
+  })();
 
   let weeksOut = 0;
   try {
@@ -260,7 +272,7 @@ export async function resolveServerPredictedFinishSeconds(
   const tt = goal.target_time != null ? Number(goal.target_time) : null;
   const rr = computeRaceReadiness({
     learnedFitness,
-    effortPaces: (row?.effort_paces as Record<string, unknown>) || null,
+    effortPaces: effortPacesMerged,
     performanceNumbers: (row?.performance_numbers as Record<string, unknown>) || null,
     primaryEvent: {
       name: goal.name,
