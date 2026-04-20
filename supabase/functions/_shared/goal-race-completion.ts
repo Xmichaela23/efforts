@@ -85,7 +85,15 @@ export async function fetchGoalRaceCompletionForWorkout(
       return { matched: false, eventName: '' };
     }
 
-    const candidates = rows.filter((g: any) => normDate(g.target_date) === workoutDay && isMarathonGoalDistance(g.distance));
+    // Allow ±1 day tolerance — race recording date and goal target_date often differ by one day.
+    const workoutDateMs = new Date(workoutDay + 'T00:00:00Z').getTime();
+    const candidates = rows.filter((g: any) => {
+      const gDay = normDate(g.target_date);
+      if (!gDay) return false;
+      if (!isMarathonGoalDistance(g.distance)) return false;
+      const diff = Math.abs(new Date(gDay + 'T00:00:00Z').getTime() - workoutDateMs);
+      return diff <= 86_400_000; // within 1 day
+    });
 
     if (candidates.length === 0) {
       return { matched: false, eventName: '' };
