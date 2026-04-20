@@ -473,6 +473,18 @@ export function buildInterpretation(input: InterpretationInput): string {
 // DRIFT INTERPRETATION (Steady-State Workouts)
 // =============================================================================
 
+function buildMarathonGoalRaceDriftLine(drift: DriftAnalysis, eventName: string, tempF?: number): string {
+  const e = Math.round(drift.earlyAvgHr);
+  const l = Math.round(drift.lateAvgHr);
+  const raw = Math.round(drift.rawDriftBpm);
+  const exp = drift.expected;
+  const hot = tempF !== undefined && tempF !== null && tempF >= 75;
+  const arc = `At ${eventName}, HR rose from ~${e} to ~${l} bpm (${raw > 0 ? '+' : ''}${raw} bpm across early vs late windows) — that is typical marathon cardiac drift for a ${exp.durationCategory} effort, not a training-day “recovery” mismatch.`;
+  const band = ` For this duration, roughly ${exp.lowerBpm}–${exp.upperBpm} bpm drift is unremarkable.`;
+  const heat = hot ? ' Warm air adds demand; the pattern still looks like honest aerobic progression, not a sudden blow-up.' : '';
+  return arc + band + heat;
+}
+
 function buildDriftInterpretation(
   drift: DriftAnalysis,
   zones: ZoneDistribution,
@@ -480,6 +492,14 @@ function buildDriftInterpretation(
   trends: TrendAnalysis | undefined,
   context: HRAnalysisContext
 ): string {
+  if (context.goalRaceCompletion?.matched && context.goalRaceCompletion.eventName) {
+    return buildMarathonGoalRaceDriftLine(
+      drift,
+      context.goalRaceCompletion.eventName,
+      context.weather?.temperatureF,
+    );
+  }
+
   // Calculate duration from intervals
   const durationSeconds = context.intervals?.reduce((sum, i) => {
     const dur = i.executed?.durationS || (i.sampleIdxEnd && i.sampleIdxStart ? i.sampleIdxEnd - i.sampleIdxStart : 0);

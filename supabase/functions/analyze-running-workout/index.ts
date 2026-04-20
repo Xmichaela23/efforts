@@ -11,6 +11,8 @@ import { calculateIntervalElevation } from './lib/analysis/elevation.ts';
 import { analyzeHeartRate, type HRAnalysisResult, type HRAnalysisContext, type WorkoutType, getEffectiveSlowFloor, getHeatAllowance } from './lib/heart-rate/index.ts';
 import { generateMileByMileTerrainBreakdown } from './lib/analysis/mile-by-mile-terrain.ts';
 import { fetchPlanContextForWorkout, type PlanContext } from '../_shared/plan-context.ts';
+import { fetchGoalRaceCompletionForWorkout, type GoalRaceCompletionMatch } from '../_shared/goal-race-completion.ts';
+import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-race-narrative.ts';
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
@@ -176,6 +178,15 @@ Deno.serve(async (req) => {
 
     if (workout.type !== 'run' && workout.type !== 'running') {
       throw new Error(`Workout type ${workout.type} is not supported for running analysis`);
+    }
+
+    const goalRaceCompletionMatch: GoalRaceCompletionMatch = await fetchGoalRaceCompletionForWorkout(
+      supabase,
+      workout.user_id,
+      workout,
+    );
+    if (goalRaceCompletionMatch.matched) {
+      console.log('🏁 [GOAL RACE] Marathon goal event:', goalRaceCompletionMatch.eventName, goalRaceCompletionMatch.goalId);
     }
 
     // Fetch historical weather if not cached (or force refresh) and we have location data
@@ -981,7 +992,7 @@ Deno.serve(async (req) => {
     // - Plan intent (when present) wins.
     // - Otherwise, fall back to deterministic detection (today: interval-structure heuristic).
     // - HR analyzer may observe interval-like patterns, but must not override plan intent.
-    const planClassifiedTypeKey = resolveClassifiedTypeKey(plannedWorkout, planContextForDrift);
+    const planClassifiedTypeKey = resolveClassifiedTypeKey(plannedWorkout, planContextForDrift, goalRaceCompletionMatch);
     const linkedPlanWorkSteps = getPlannedWorkSteps(plannedWorkout);
     const isLinkedPlanSession = !!plannedWorkout && linkedPlanWorkSteps.length > 0;
     const classifiedTypeKey = isLinkedPlanSession
@@ -1061,6 +1072,13 @@ Deno.serve(async (req) => {
         planName: planContextForDrift.planName,
         daysUntilRace: planContextForDrift.daysUntilRace ?? null,
       } : undefined,
+      goalRaceCompletion: goalRaceCompletionMatch.matched
+        ? {
+            matched: true,
+            eventName: goalRaceCompletionMatch.eventName,
+            goalId: goalRaceCompletionMatch.goalId,
+          }
+        : undefined,
       historicalDrift: historicalDriftData ? {
         similarWorkouts: historicalDriftData.similarWorkouts || [],
         avgDriftBpm: historicalDriftData.avgDriftBpm || 0,
@@ -1101,6 +1119,7 @@ Deno.serve(async (req) => {
         samples_in_zone: validHRSamples.length,
         samples_outside_zone: 0,
         average_heart_rate: avgHR,
+        max_heart_rate: hrAnalysisResult.summary?.maxHr ?? null,
         target_zone: null,
         // Drift metrics from new module
         hr_drift_bpm: hrAnalysisResult.drift?.driftBpm ?? null,
@@ -1793,7 +1812,18 @@ Deno.serve(async (req) => {
       }
     })();
 
-    const adherenceSummary = generateAdherenceSummary(performance, detailedAnalysis, plannedWorkout, planContext, enhancedAnalysis, aerobicCeilingBpm, classifiedTypeKey, (hrAnalysisContext as any)?.weather?.temperatureF ?? null);
+    const adherenceSummary = generateAdherenceSummary(
+      performance,
+      detailedAnalysis,
+      plannedWorkout,
+      planContext,
+      enhancedAnalysis,
+      aerobicCeilingBpm,
+      classifiedTypeKey,
+      (hrAnalysisContext as any)?.weather?.temperatureF ?? null,
+      goalRaceCompletionMatch,
+      workout,
+    );
     const scoreExplanation = adherenceSummary?.verdict ?? null;
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
 
@@ -2765,8 +2795,19 @@ function generateAdherenceSummary(
   granularAnalysis?: any,
   aerobicCeilingBpm?: number | null,
   classifiedTypeKey?: string | null,
-  weatherTempF?: number | null
+  weatherTempF?: number | null,
+  goalRaceCompletion?: GoalRaceCompletionMatch | null,
+  workout?: { moving_time?: number | null; duration?: number | null; elapsed_time?: number | null },
 ): WorkoutAdherenceSummary | null {
+  if (goalRaceCompletion?.matched) {
+    return buildMarathonGoalRaceAdherenceSummary({
+      match: goalRaceCompletion,
+      granularAnalysis,
+      detailedAnalysis,
+      workout: workout || {},
+    });
+  }
+
   const intervalBreakdown = detailedAnalysis?.interval_breakdown;
   
   // Only generate for interval workouts with breakdown data
@@ -3841,7 +3882,10 @@ function detectWorkoutIntent(plannedWorkout: any): 'easy' | 'long' | 'tempo' | '
  * 1) Plan intent wins when present
  * 2) Deterministic fallback (never let HR analyzer flip easy/recovery to intervals because of strides)
  */
-function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any): string | null {
+function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any, goalRace?: GoalRaceCompletionMatch | null): string | null {
+  if (goalRace?.matched) {
+    return 'long_run';
+  }
   if (!plannedWorkout) {
     // No plan-linked workout: only force a type when plan context clearly indicates recovery intent.
     if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';

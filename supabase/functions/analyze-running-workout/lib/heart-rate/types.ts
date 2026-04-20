@@ -80,6 +80,13 @@ export interface HRAnalysisContext {
     phaseName?: string;
     planName?: string;
   };
+
+  /** When the workout matches a goal event on target_date (e.g. marathon race day). */
+  goalRaceCompletion?: {
+    matched: boolean;
+    eventName: string;
+    goalId?: string;
+  };
   
   // Load context (from ACWR/weekly context)
   loadContext?: {
