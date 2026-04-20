@@ -67,8 +67,8 @@ export function buildMarathonGoalRaceDigest(args: {
   if (splits.length < 4) {
     return {
       headline,
-      pacingInsight: `Race day performance for ${name}. ${timePhrase !== 'your finish' ? `Time: ${timePhrase}.` : ''} Split-level pacing detail needs reliable mile splits in the recording.`,
-      hrInsight: buildHrArcFallback(args, name),
+      pacingInsight: '',
+      hrInsight: buildHrArcDetailed(args, []),
     };
   }
 
@@ -127,33 +127,6 @@ function parseClock(c: string): number | null {
   const p = String(c).trim().split(':').map((x) => Number(x));
   if (p.length !== 3 || p.some((n) => !Number.isFinite(n))) return null;
   return p[0] * 3600 + p[1] * 60 + p[2];
-}
-
-function buildHrArcFallback(
-  args: {
-    earlyHr: number | null;
-    lateHr: number | null;
-    driftBpm: number | null;
-    avgHr: number | null;
-    maxHr: number | null;
-  },
-  eventName: string,
-): string {
-  const e = args.earlyHr != null ? Math.round(args.earlyHr) : null;
-  const l = args.lateHr != null ? Math.round(args.lateHr) : null;
-  const d = args.driftBpm != null ? Math.round(args.driftBpm) : null;
-  const a = args.avgHr != null ? Math.round(args.avgHr) : null;
-  const x = args.maxHr != null ? Math.round(args.maxHr) : null;
-  const parts: string[] = [];
-  if (e != null && l != null) {
-    parts.push(`HR moved from ~${e} bpm early to ~${l} bpm late${d != null ? ` (+${d} bpm drift)` : ''} — typical marathon cardiac progression for ${eventName}.`);
-  } else if (d != null) {
-    parts.push(`Cardiac drift about +${d} bpm over the marathon — expected for this duration.`);
-  }
-  if (a != null) parts.push(`Avg ${a} bpm`);
-  if (x != null) parts.push(`max ${x} bpm.`);
-  if (parts.length === 0) return `Heart rate rose appropriately across the marathon effort.`;
-  return parts.join(' ');
 }
 
 function buildHrArcDetailed(
@@ -239,13 +212,17 @@ export function buildMarathonGoalRaceAdherenceSummary(args: {
   });
 
   const rich = typeof hr?.hr_drift_interpretation === 'string' ? hr.hr_drift_interpretation.trim() : '';
-  const summaryLabel = hr?.summary_label || 'Race effort';
+  const summaryLabel = typeof hr?.summary_label === 'string' && hr.summary_label.trim()
+    ? String(hr.summary_label).trim()
+    : 'Heart rate';
 
-  const technical_insights: { label: string; value: string }[] = [
-    { label: 'Race day', value: digest.headline },
-    { label: 'Pacing', value: digest.pacingInsight },
-    { label: summaryLabel, value: rich.length > 40 ? rich : digest.hrInsight },
-  ];
+  const technical_insights: { label: string; value: string }[] = [{ label: 'Race day', value: digest.headline }];
+  if (digest.pacingInsight.trim().length > 0) {
+    technical_insights.push({ label: 'Pacing', value: digest.pacingInsight.trim() });
+  }
+  if (rich.length > 0) {
+    technical_insights.push({ label: summaryLabel, value: rich });
+  }
 
   return {
     verdict: digest.headline,

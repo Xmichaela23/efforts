@@ -275,10 +275,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   );
 
   // ── Narrative ──────────────────────────────────────────────────────────────
-  /** Goal-race sessions: adherence summary has race headline + pacing/HR — use for INSIGHTS, not LLM/GAP fallback. */
+  /** Goal race: only structured adherence copy — never LLM or synthetic GAP paragraphs. */
+  const isGoalRaceSession = String(adherenceSummary?.plan_impact?.focus || '').trim() === 'Race result';
+
   const goalRaceNarrativeFromAdherence = (() => {
-    const ap = adherenceSummary?.plan_impact;
-    if (String(ap?.focus || '').trim() !== 'Race result') return null;
+    if (!isGoalRaceSession) return null;
     const verdict = typeof adherenceSummary?.verdict === 'string' ? adherenceSummary.verdict.trim() : '';
     const insights: any[] = Array.isArray(adherenceSummary?.technical_insights)
       ? adherenceSummary.technical_insights
@@ -297,17 +298,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   const llmNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
-  const resolvedNarrative =
-    goalRaceNarrativeFromAdherence ||
-    llmNarrative ||
-    buildFallbackNarrative(
-      factPacket,
-      executionScore,
-      type,
-      !!match?.planned_id,
-      match?.summary ?? null,
-      !!perf?.gap_adjusted,
-    );
+
+  const resolvedNarrative = isGoalRaceSession
+    ? goalRaceNarrativeFromAdherence
+    : llmNarrative || null;
 
   // ── Planned totals (must come before completed — swim unit needed for pace calc) ─
   const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
@@ -349,7 +343,15 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   }
 
   // ── Week label ─────────────────────────────────────────────────────────────
-  const weekLabel = buildWeekLabel(factPacket);
+  const weekLabel = (() => {
+    if (isGoalRaceSession) {
+      const verdict = String(adherenceSummary?.verdict || '');
+      const m = verdict.match(/Congratulations on finishing\s+(.+?)(?:\s*$|[.!])/i);
+      if (m?.[1]) return `Goal race • ${m[1].trim()}`;
+      return 'Goal race';
+    }
+    return buildWeekLabel(factPacket);
+  })();
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
   const analysisDetailRows = buildAnalysisDetailRows(
@@ -635,142 +637,6 @@ function fmtPace(secPerMi: number): string {
   const m = Math.floor(secPerMi / 60);
   const s = Math.round(secPerMi % 60);
   return `${m}:${String(s).padStart(2, '0')}/mi`;
-}
-
-function fmtDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return h > 0 ? `${h}h ${m}min` : `${m} min`;
-}
-
-/** Deterministic coaching paragraph built from structured data when LLM is unavailable.
- *  Follows the same principle as the LLM prompt: lead with insight, not metrics. */
-function buildFallbackNarrative(
-  factPacket: any, executionScore: number | null, type: string,
-  hasPlanned: boolean, _matchSummary: string | null, gapAdjusted: boolean,
-): string | null {
-  if (!factPacket) return null;
-  const facts = factPacket.facts || {};
-  const derived = factPacket.derived || {};
-
-  const pace = typeof facts.avg_pace_sec_per_mi === 'number' ? facts.avg_pace_sec_per_mi : null;
-  const gap = typeof facts.avg_gap_sec_per_mi === 'number' ? facts.avg_gap_sec_per_mi : null;
-  const avgHr = typeof facts.avg_hr === 'number' ? facts.avg_hr : null;
-  const terrain = typeof facts.terrain_type === 'string' && facts.terrain_type !== 'flat' ? facts.terrain_type : null;
-  const elevFt = typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
-  const wx = facts.weather;
-  const driftBpm = typeof derived.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
-  const driftTyp = typeof derived.hr_drift_typical === 'number' ? derived.hr_drift_typical : null;
-  const vsSim = derived.comparisons?.vs_similar;
-  const typeLabel = type === 'run' ? 'run' : type === 'ride' ? 'ride' : type === 'swim' ? 'swim' : 'workout';
-
-  const durMinForRace = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
-  const daysUntilRace = typeof facts.plan?.days_until_race === 'number' ? facts.plan.days_until_race : null;
-  const workoutTypeKey = String(facts.workout_type || '').toLowerCase();
-  const longRunForRaceFrame =
-    type === 'run' &&
-    hasPlanned &&
-    (workoutTypeKey.includes('long') || (durMinForRace != null && durMinForRace >= 90));
-
-  let raceProximityLead: string | null = null;
-  if (
-    daysUntilRace != null &&
-    daysUntilRace > 0 &&
-    daysUntilRace <= 21 &&
-    longRunForRaceFrame
-  ) {
-    const frame =
-      daysUntilRace <= 7
-        ? 'With race week approaching,'
-        : daysUntilRace <= 14
-          ? 'Inside the final two weeks before your race,'
-          : `With roughly ${daysUntilRace} days until race day,`;
-    const body =
-      executionScore != null && executionScore >= 88
-        ? 'this long run is a useful whole-session checkpoint: execution vs plan is strong, and end-to-end HR behavior matters as much as average pace.'
-        : executionScore != null && executionScore >= 75
-          ? 'treat this as a full-run checkpoint — pace and cardiovascular drift across the entire session show how you’re absorbing volume before the taper.'
-          : 'focus on how you felt and how HR trended across the full run; this close to race day, repeatable fatigue response beats any single mile split.';
-    raceProximityLead = `${frame} ${body}`;
-  }
-
-  const sentences: string[] = [];
-
-  // Lead: similar-run trend (most interesting insight if available)
-  if (vsSim && typeof vsSim.sample_size === 'number' && vsSim.sample_size > 0 && vsSim.assessment !== 'insufficient_data') {
-    const pDelta = typeof vsSim.pace_delta_sec === 'number' ? vsSim.pace_delta_sec : null;
-    if (vsSim.assessment === 'better_than_usual' && pDelta != null && Math.abs(pDelta) >= 3) {
-      sentences.push(`You're ${Math.abs(Math.round(pDelta))}s/mi faster than your last ${vsSim.sample_size} comparable ${typeLabel}s${avgHr != null ? ' at similar HR' : ''} — real progress.`);
-    } else if (vsSim.assessment === 'worse_than_usual' && pDelta != null && Math.abs(pDelta) >= 3) {
-      sentences.push(`This came in ${Math.abs(Math.round(pDelta))}s/mi slower than your recent comparable ${typeLabel}s.`);
-    } else {
-      sentences.push(`Right in line with your typical pace across ${vsSim.sample_size} similar ${typeLabel}s.`);
-    }
-  }
-
-  // Terrain + GAP: connect hills to pace when relevant
-  // On net climbing, GAP (flat-equivalent) should be faster than clock pace (lower sec/mi).
-  // If gap > pace with meaningful gain, skip GAP copy and fall through to terrain-only below.
-  const hasGapComparison =
-    gapAdjusted && gap != null && pace != null && Math.abs(pace - gap) > 5;
-  const gapContradictsClimb =
-    hasGapComparison && elevFt != null && elevFt > 50 && gap > pace;
-
-  if (hasGapComparison && !gapContradictsClimb) {
-    const costSec = Math.round(pace - gap);
-    sentences.push(`The ${terrain || 'hilly'} course${elevFt != null && elevFt > 50 ? ` (${elevFt} ft gain)` : ''} cost about ${costSec}s/mi — effort-adjusted pace was ${fmtPace(gap)} vs ${fmtPace(pace)} actual.`);
-  } else if (terrain && elevFt != null && elevFt > 50) {
-    sentences.push(`${terrain.charAt(0).toUpperCase() + terrain.slice(1)} course with ${elevFt} ft of climbing.`);
-  }
-
-  // HR drift: use pace-normalized drift + drift_explanation when available
-  const paceNormDriftFb = typeof derived?.pace_normalized_drift_bpm === 'number' ? derived.pace_normalized_drift_bpm : null;
-  const driftExpFb = typeof derived?.drift_explanation === 'string' ? derived.drift_explanation : null;
-  const driftSignalFb = paceNormDriftFb ?? driftBpm;
-  const durMinFb = typeof facts.total_duration_min === 'number' ? facts.total_duration_min : null;
-
-  if (driftExpFb === 'pace_driven' && driftBpm != null && Math.abs(driftBpm) >= 5) {
-    sentences.push(`HR rose ${Math.abs(Math.round(driftBpm))} bpm — proportional to the pace increase, not cardiovascular drift.`);
-  } else if (driftSignalFb != null && Math.abs(driftSignalFb) >= 3) {
-    // Match buildAnalysisDetailRows: only compare to "typical" when baseline is meaningful (not 0 / noise).
-    const typMeaningful = driftTyp != null && Math.abs(driftTyp) >= 1;
-    if (driftExpFb === 'terrain_driven' && terrain) {
-      sentences.push(`HR drifted ${Math.abs(Math.round(driftSignalFb))} bpm, consistent with the ${terrain} terrain.`);
-    } else if (typMeaningful && Math.abs(driftSignalFb) - Math.abs(driftTyp) <= 3) {
-      sentences.push(`HR drift was normal for this effort — no red flags.`);
-    } else if (driftSignalFb > 0 && typMeaningful && Math.abs(driftSignalFb) > Math.abs(driftTyp) + 3) {
-      sentences.push(`HR drifted +${Math.abs(Math.round(driftSignalFb))} bpm, more than your typical +${Math.round(Math.abs(driftTyp))}.`);
-    } else if (durMinFb != null) {
-      const expectedMax = durMinFb >= 150 ? 20 : durMinFb >= 90 ? 15 : durMinFb >= 60 ? 12 : 8;
-      const absDr = Math.abs(driftSignalFb);
-      if (absDr <= expectedMax) {
-        sentences.push(`HR drift ${Math.abs(Math.round(driftSignalFb))} bpm — normal for a ${Math.round(durMinFb)}-minute run.`);
-      } else if (!typMeaningful) {
-        sentences.push(`HR drift ${Math.abs(Math.round(driftSignalFb))} bpm over ${Math.round(durMinFb)} min — a bit high for this duration; conditions and fueling matter.`);
-      }
-    }
-  }
-
-  // Heat: only mention if it matters
-  if (wx?.heat_stress_level && wx.heat_stress_level !== 'none') {
-    const tempF = typeof wx.temperature_f === 'number' ? Math.round(wx.temperature_f) : null;
-    if (tempF != null) {
-      sentences.push(`${wx.heat_stress_level.charAt(0).toUpperCase() + wx.heat_stress_level.slice(1)} heat stress at ${tempF}°F — expect pace to run slower in these conditions.`);
-    }
-  }
-
-  // Execution: brief context if planned
-  if (sentences.length === 0 && hasPlanned && executionScore != null && executionScore >= 90) {
-    sentences.push(`Clean ${typeLabel} — hit plan targets with ${Math.round(executionScore)}% execution. Nothing to flag.`);
-  } else if (sentences.length === 0 && hasPlanned && executionScore != null) {
-    sentences.push(`Execution came in at ${Math.round(executionScore)}% of plan.`);
-  }
-
-  if (raceProximityLead) {
-    sentences.unshift(raceProximityLead);
-  }
-
-  return sentences.length >= 1 ? sentences.join(' ') : null;
 }
 
 function buildWeekLabel(factPacket: any): string | null {

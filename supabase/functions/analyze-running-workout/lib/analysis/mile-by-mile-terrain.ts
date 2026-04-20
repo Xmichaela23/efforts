@@ -1,7 +1,61 @@
 /**
  * Mile-by-mile terrain breakdown: pace, elevation, grade, and comparison to target.
  * Used for continuous runs (not interval workouts).
+ *
+ * Pace per mile is **time over distance** (interpolated on cumulative distance vs time), not an
+ * arithmetic mean of instantaneous pace samples — that was inflating split paces vs summary pace.
  */
+
+/** Monotonic cumulative time (seconds) aligned with sensorData indices. */
+function buildCumulativeTimeSec(sensorData: any[]): Float64Array {
+  const n = sensorData.length;
+  const out = new Float64Array(n);
+  if (n === 0) return out;
+  const t0Raw = Number(sensorData[0]?.timestamp ?? 0);
+  const useMs = t0Raw > 1e11;
+  const t0 = useMs ? t0Raw / 1000 : t0Raw > 1e9 ? t0Raw : 0;
+  let fallback = 0;
+  for (let i = 0; i < n; i++) {
+    const tr = Number(sensorData[i]?.timestamp ?? 0);
+    let sec: number;
+    if (useMs && tr > 1e11) {
+      sec = tr / 1000 - t0;
+    } else if (!useMs && tr > 1e6 && tr < 1e11) {
+      sec = tr - t0;
+    } else {
+      fallback += i === 0 ? 0 : Number(sensorData[i]?.duration_s) || 1;
+      sec = fallback;
+    }
+    out[i] = sec;
+  }
+  for (let i = 1; i < n; i++) {
+    if (out[i] < out[i - 1]) out[i] = out[i - 1];
+  }
+  return out;
+}
+
+/** Linear interpolation: time (seconds) at distance `targetM` (meters) along the run. */
+function timeAtDistance(
+  cumDist: Float64Array,
+  cumTime: Float64Array,
+  n: number,
+  targetM: number,
+): number | null {
+  if (n < 2) return null;
+  if (targetM <= cumDist[0]) return cumTime[0];
+  if (targetM >= cumDist[n - 1]) return cumTime[n - 1];
+  for (let i = 1; i < n; i++) {
+    const d0 = cumDist[i - 1];
+    const d1 = cumDist[i];
+    const t0 = cumTime[i - 1];
+    const t1 = cumTime[i];
+    if (targetM > d1) continue;
+    if (d1 === d0) return t0;
+    const f = (targetM - d0) / (d1 - d0);
+    return t0 + f * (t1 - t0);
+  }
+  return cumTime[n - 1];
+}
 
 /**
  * Generate detailed mile-by-mile breakdown with pace analysis and comparison to target range
@@ -74,20 +128,31 @@ export function generateMileByMileTerrainBreakdown(
     return null; // Too short for mile breakdown
   }
 
-  // Build a lightweight cumulative-distance array instead of copying every sample.
+  // Cumulative distance from speed samples (same as before), then scale to executed distance so
+  // mile boundaries align with workout totals (single source of truth vs interval distance).
   const len = sensorData.length;
-  const cumDist = new Float64Array(len);
+  const cumDistRaw = new Float64Array(len);
   let runningM = 0;
   for (let i = 0; i < len; i++) {
     const s = sensorData[i];
     if (s.pace_s_per_mi && s.pace_s_per_mi > 0) {
       runningM += (1609.34 / s.pace_s_per_mi) * (s.duration_s || 1);
     }
-    cumDist[i] = runningM;
+    cumDistRaw[i] = runningM;
   }
-  const cumulativeDistanceM = runningM;
+  const rawEnd = cumDistRaw[len - 1] || 0;
+  const scale = rawEnd > 10 && totalDistanceM > 0 ? totalDistanceM / rawEnd : 1;
+  const cumDist = new Float64Array(len);
+  for (let i = 0; i < len; i++) {
+    cumDist[i] = cumDistRaw[i] * scale;
+  }
+  const cumulativeDistanceM = cumDist[len - 1] || rawEnd;
 
-  console.log(`🔍 [MILE BREAKDOWN] Cumulative distance: ${cumulativeDistanceM.toFixed(0)}m (${(cumulativeDistanceM / 1609.34).toFixed(1)} mi) from ${len} samples`);
+  const cumTime = buildCumulativeTimeSec(sensorData);
+
+  console.log(
+    `🔍 [MILE BREAKDOWN] Cumulative distance: ${cumulativeDistanceM.toFixed(0)}m (${(cumulativeDistanceM / 1609.34).toFixed(1)} mi), scale=${scale.toFixed(4)} vs raw ${rawEnd.toFixed(0)}m`,
+  );
 
   const mileSplits: any[] = [];
   const miles = Math.floor(totalDistanceMi);
@@ -97,8 +162,13 @@ export function generateMileByMileTerrainBreakdown(
     const mileStartM = (mile - 1) * 1609.34;
     const mileEndM = mile * 1609.34;
 
-    let paceSum = 0;
-    let paceCount = 0;
+    const t0 = timeAtDistance(cumDist, cumTime, len, mileStartM);
+    const t1 = timeAtDistance(cumDist, cumTime, len, mileEndM);
+    if (t0 == null || t1 == null || t1 <= t0) continue;
+
+    const segmentM = mileEndM - mileStartM;
+    const avgPaceS = ((t1 - t0) / segmentM) * 1609.34;
+
     let hrSum = 0;
     let hrCount = 0;
     let firstElev: number | null = null;
@@ -107,13 +177,12 @@ export function generateMileByMileTerrainBreakdown(
     for (let i = searchStart; i < len; i++) {
       const d = cumDist[i];
       if (d < mileStartM) continue;
-      if (d >= mileEndM) { searchStart = i; break; }
+      if (d >= mileEndM) {
+        searchStart = i;
+        break;
+      }
 
       const s = sensorData[i];
-      if (s.pace_s_per_mi && s.pace_s_per_mi > 0) {
-        paceSum += s.pace_s_per_mi;
-        paceCount++;
-      }
       const hr = s.heartRate ?? s.heart_rate ?? s.hr ?? s.heartRateInBeatsPerMinute;
       if (typeof hr === 'number' && hr > 40 && hr < 250) {
         hrSum += hr;
@@ -126,9 +195,8 @@ export function generateMileByMileTerrainBreakdown(
       }
     }
 
-    if (paceCount === 0) continue;
+    if (!(avgPaceS > 0 && avgPaceS < 3600)) continue;
 
-    const avgPaceS = paceSum / paceCount;
     const avgHrBpm = hrCount > 0 ? Math.round(hrSum / hrCount) : null;
     const elevGain = firstElev != null && lastElev != null ? Math.max(0, lastElev - firstElev) : null;
     const gradePercent = firstElev != null && lastElev != null
