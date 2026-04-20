@@ -6,6 +6,8 @@ import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative from './SessionNarrative';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
+import { formatDuration } from '@/utils/workoutFormatting';
+import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
 
 type MobileSummaryProps = {
   planned: any | null;
@@ -153,6 +155,40 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         </div>
       )}
 
+      {(() => {
+        const race = sd?.race;
+        if (!race?.is_goal_race) return null;
+        const actualS = completed ? resolveMovingSeconds(completed) : null;
+        const fmt = (s: number | null | undefined) =>
+          s != null && Number.isFinite(s) && s > 0 ? formatDuration(s) : '—';
+        return (
+          <div className="w-full pt-2 pb-3">
+            <div className="mb-1 text-center text-xs text-gray-400 uppercase tracking-widest">
+              Goal race · {race.event_name}
+            </div>
+            <div className="flex items-start justify-center gap-8 text-center">
+              {race.goal_time_seconds != null && (
+                <div className="flex flex-col items-center">
+                  <div className="text-sm font-semibold text-gray-100">{fmt(race.goal_time_seconds)}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">Goal</div>
+                </div>
+              )}
+              {race.fitness_projection_seconds != null && (
+                <div className="flex flex-col items-center">
+                  <div className="text-sm font-semibold text-gray-100">
+                    {race.fitness_projection_display ?? fmt(race.fitness_projection_seconds)}
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">Projected</div>
+                </div>
+              )}
+              <div className="flex flex-col items-center">
+                <div className="text-sm font-semibold text-gray-100">{fmt(actualS)}</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">Actual</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <AdherenceChips
         sessionDetail={sd}
         hasSessionDetail={hasSessionDetail}

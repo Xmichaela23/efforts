@@ -10,6 +10,11 @@ export interface GoalRaceCompletionMatch {
   eventName: string;
   targetDate?: string | null;
   distanceKey?: string | null;
+  /** From goals.target_time — the plan's goal finish time (seconds) */
+  goalTimeSeconds?: number | null;
+  /** Snapshot from goals.race_readiness_projection — fitness-based projection at last coach run */
+  fitnessProjectionSeconds?: number | null;
+  fitnessProjectionDisplay?: string | null;
 }
 
 function normDate(iso: string | null | undefined): string | null {
@@ -64,7 +69,7 @@ export async function fetchGoalRaceCompletionForWorkout(
   try {
     const { data: rows, error } = await supabase
       .from('goals')
-      .select('id, name, target_date, distance, sport, goal_type, status, priority')
+      .select('id, name, target_date, distance, sport, goal_type, status, priority, target_time, race_readiness_projection')
       .eq('user_id', userId)
       .eq('goal_type', 'event')
       .not('target_date', 'is', null)
@@ -84,12 +89,16 @@ export async function fetchGoalRaceCompletionForWorkout(
     candidates.sort((a: any, b: any) => rank(String(a.priority || 'C')) - rank(String(b.priority || 'C')));
 
     const g = candidates[0];
+    const rrp = g.race_readiness_projection ?? null;
     return {
       matched: true,
       goalId: String(g.id),
       eventName: String(g.name || 'Race').trim() || 'Race',
       targetDate: g.target_date ?? null,
       distanceKey: g.distance != null ? String(g.distance) : null,
+      goalTimeSeconds: g.target_time != null ? Number(g.target_time) : null,
+      fitnessProjectionSeconds: rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) : null,
+      fitnessProjectionDisplay: rrp?.predicted_finish_display ?? null,
     };
   } catch {
     return { matched: false, eventName: '' };

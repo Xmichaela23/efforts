@@ -93,6 +93,24 @@ export function resolveMovingSeconds(workout: any): number | null {
       } catch { return src?.metrics; }
     })();
 
+    // For races, official finish time is total elapsed — bypass all moving-time candidates.
+    // Strava flags races as workout_type === 1; the app flags goal races via workout_analysis.is_goal_race.
+    const isRace =
+      Number(src?.workout_type) === 1 ||
+      src?.workout_analysis?.is_goal_race === true;
+
+    if (isRace) {
+      const elapsedSec = Number(METRICS?.total_elapsed_time_seconds ?? METRICS?.durationInSeconds);
+      if (Number.isFinite(elapsedSec) && elapsedSec > 0) return Math.round(elapsedSec);
+      const elapsedMin = [
+        Number(METRICS?.total_elapsed_time),
+        Number(src?.total_elapsed_time),
+        Number(src?.elapsed_time),
+        Number(METRICS?.elapsed_time),
+      ].find((n) => Number.isFinite(n) && n > 0);
+      if (typeof elapsedMin === 'number') return Math.round(elapsedMin * 60);
+    }
+
     // 0) Unified server-computed moving seconds (but skip if obviously rounded from minutes)
     try {
       const computed = Number(src?.computed?.overall?.duration_s_moving);

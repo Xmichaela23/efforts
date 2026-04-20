@@ -2321,6 +2321,16 @@ Deno.serve(async (req) => {
         is_transition_window: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
         suppress_deviation_language: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
       },
+      ...(goalRaceCompletionMatch.matched ? {
+        race: {
+          is_goal_race: true,
+          goal_id: goalRaceCompletionMatch.goalId ?? null,
+          event_name: goalRaceCompletionMatch.eventName,
+          goal_time_seconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,
+          fitness_projection_seconds: goalRaceCompletionMatch.fitnessProjectionSeconds ?? null,
+          fitness_projection_display: goalRaceCompletionMatch.fitnessProjectionDisplay ?? null,
+        },
+      } : {}),
     };
 
     // Full replacement — every field is computed fresh in this run.
@@ -2339,8 +2349,8 @@ Deno.serve(async (req) => {
         ai_summary_generated_at: ai_summary_generated_at,
         session_state_v1: sessionStateV1,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
-        // NEW: Structured HR summary for weekly/block context aggregation
-        heart_rate_summary: hrAnalysisResult.summary
+        heart_rate_summary: hrAnalysisResult.summary,
+        is_goal_race: goalRaceCompletionMatch.matched === true
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()
