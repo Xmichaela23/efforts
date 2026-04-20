@@ -275,11 +275,39 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   );
 
   // ── Narrative ──────────────────────────────────────────────────────────────
+  /** Goal-race sessions: adherence summary has race headline + pacing/HR — use for INSIGHTS, not LLM/GAP fallback. */
+  const goalRaceNarrativeFromAdherence = (() => {
+    const ap = adherenceSummary?.plan_impact;
+    if (String(ap?.focus || '').trim() !== 'Race result') return null;
+    const verdict = typeof adherenceSummary?.verdict === 'string' ? adherenceSummary.verdict.trim() : '';
+    const insights: any[] = Array.isArray(adherenceSummary?.technical_insights)
+      ? adherenceSummary.technical_insights
+      : [];
+    const pieces: string[] = [];
+    if (verdict) pieces.push(verdict);
+    for (const t of insights) {
+      const lab = String(t?.label || '').trim();
+      const val = typeof t?.value === 'string' ? t.value.trim() : '';
+      if (!val) continue;
+      if (lab === 'Race day') continue;
+      pieces.push(val);
+    }
+    return pieces.length >= 1 ? pieces.join(' ') : null;
+  })();
+
   const llmNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
-  const resolvedNarrative = llmNarrative || buildFallbackNarrative(
-    factPacket, executionScore, type, !!match?.planned_id, match?.summary ?? null, !!perf?.gap_adjusted,
-  );
+  const resolvedNarrative =
+    goalRaceNarrativeFromAdherence ||
+    llmNarrative ||
+    buildFallbackNarrative(
+      factPacket,
+      executionScore,
+      type,
+      !!match?.planned_id,
+      match?.summary ?? null,
+      !!perf?.gap_adjusted,
+    );
 
   // ── Planned totals (must come before completed — swim unit needed for pace calc) ─
   const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
