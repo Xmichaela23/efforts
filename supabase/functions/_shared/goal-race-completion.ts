@@ -74,8 +74,7 @@ export async function fetchGoalRaceCompletionForWorkout(
       .select('id, name, target_date, distance, sport, goal_type, status, priority, target_time')
       .eq('user_id', userId)
       .eq('goal_type', 'event')
-      .not('target_date', 'is', null)
-      .in('status', ['active', 'completed']);
+      .not('target_date', 'is', null);
 
     if (error) {
       console.error('[goal-race-completion] goals query error:', error.message);
