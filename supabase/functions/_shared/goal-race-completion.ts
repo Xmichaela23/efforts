@@ -67,15 +67,21 @@ export async function fetchGoalRaceCompletionForWorkout(
   }
 
   try {
+    // Fetch core match fields first; projection data fetched separately to avoid
+    // a missing-column error silently killing the entire race detection.
     const { data: rows, error } = await supabase
       .from('goals')
-      .select('id, name, target_date, distance, sport, goal_type, status, priority, target_time, race_readiness_projection')
+      .select('id, name, target_date, distance, sport, goal_type, status, priority, target_time')
       .eq('user_id', userId)
       .eq('goal_type', 'event')
       .not('target_date', 'is', null)
       .in('status', ['active', 'completed']);
 
-    if (error || !Array.isArray(rows) || rows.length === 0) {
+    if (error) {
+      console.error('[goal-race-completion] goals query error:', error.message);
+      return { matched: false, eventName: '' };
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
       return { matched: false, eventName: '' };
     }
 
@@ -89,7 +95,21 @@ export async function fetchGoalRaceCompletionForWorkout(
     candidates.sort((a: any, b: any) => rank(String(a.priority || 'C')) - rank(String(b.priority || 'C')));
 
     const g = candidates[0];
-    const rrp = g.race_readiness_projection ?? null;
+
+    // Projection is opportunistic — fetch separately so a missing column never blocks race detection.
+    let fitnessProjectionSeconds: number | null = null;
+    let fitnessProjectionDisplay: string | null = null;
+    try {
+      const { data: projRow } = await supabase
+        .from('goals')
+        .select('race_readiness_projection')
+        .eq('id', g.id)
+        .single();
+      const rrp = projRow?.race_readiness_projection ?? null;
+      fitnessProjectionSeconds = rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) : null;
+      fitnessProjectionDisplay = rrp?.predicted_finish_display ?? null;
+    } catch { /* projection unavailable — continue without it */ }
+
     return {
       matched: true,
       goalId: String(g.id),
@@ -97,8 +117,8 @@ export async function fetchGoalRaceCompletionForWorkout(
       targetDate: g.target_date ?? null,
       distanceKey: g.distance != null ? String(g.distance) : null,
       goalTimeSeconds: g.target_time != null ? Number(g.target_time) : null,
-      fitnessProjectionSeconds: rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) : null,
-      fitnessProjectionDisplay: rrp?.predicted_finish_display ?? null,
+      fitnessProjectionSeconds,
+      fitnessProjectionDisplay,
     };
   } catch {
     return { matched: false, eventName: '' };
