@@ -2329,6 +2329,13 @@ Deno.serve(async (req) => {
           goal_time_seconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,
           fitness_projection_seconds: goalRaceCompletionMatch.fitnessProjectionSeconds ?? null,
           fitness_projection_display: goalRaceCompletionMatch.fitnessProjectionDisplay ?? null,
+          actual_seconds: (() => {
+            const elapsed = Number(workout?.computed?.overall?.duration_s_elapsed);
+            if (Number.isFinite(elapsed) && elapsed > 0) return Math.round(elapsed);
+            const elapsedMin = Number(workout?.elapsed_time);
+            if (Number.isFinite(elapsedMin) && elapsedMin > 0) return Math.round(elapsedMin * 60);
+            return null;
+          })(),
         },
       } : {}),
     };

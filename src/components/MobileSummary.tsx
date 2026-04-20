@@ -7,7 +7,6 @@ import SessionNarrative from './SessionNarrative';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
 import { formatDuration } from '@/utils/workoutFormatting';
-import resolveMovingSeconds from '@/utils/resolveMovingSeconds';
 
 type MobileSummaryProps = {
   planned: any | null;
@@ -158,7 +157,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       {(() => {
         const race = sd?.race;
         if (!race?.is_goal_race) return null;
-        const actualS = completed ? resolveMovingSeconds(completed) : null;
+        const actualS = race.actual_seconds ?? null;
         const fmt = (s: number | null | undefined) =>
           s != null && Number.isFinite(s) && s > 0 ? formatDuration(s) : '—';
         return (
