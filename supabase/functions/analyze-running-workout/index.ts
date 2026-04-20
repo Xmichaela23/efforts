@@ -180,11 +180,13 @@ Deno.serve(async (req) => {
       throw new Error(`Workout type ${workout.type} is not supported for running analysis`);
     }
 
+    console.log(`🏁 [GOAL RACE DEBUG] date=${workout.date} distance=${workout.distance} computed_distance_m=${workout.computed?.overall?.distance_m}`);
     const goalRaceCompletionMatch: GoalRaceCompletionMatch = await fetchGoalRaceCompletionForWorkout(
       supabase,
       workout.user_id,
       workout,
     );
+    console.log(`🏁 [GOAL RACE RESULT] matched=${goalRaceCompletionMatch.matched}`);
     if (goalRaceCompletionMatch.matched) {
       console.log('🏁 [GOAL RACE] Marathon goal event:', goalRaceCompletionMatch.eventName, goalRaceCompletionMatch.goalId);
     }
@@ -2364,6 +2366,7 @@ Deno.serve(async (req) => {
     };
     
     console.log(`🏁 BEFORE_DB_UPDATE +${Date.now()-_t0}ms heap=${_mem()} keys=${Object.keys(updatePayload.workout_analysis).length}`);
+    console.log(`🏁 [GOAL RACE SUMMARY] matched=${goalRaceCompletionMatch.matched} date=${workout.date} distance_raw=${workout.distance} computed_distance_m=${workout.computed?.overall?.distance_m}`);
     
     // Update workout_analysis and status
     const { error: updateError } = await supabase

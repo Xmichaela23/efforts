@@ -62,7 +62,9 @@ export async function fetchGoalRaceCompletionForWorkout(
   const distM = workoutDistanceMeters(workout);
   const sport = String(workout?.type || '').toLowerCase();
   const isRun = sport === 'run' || sport === 'running' || sport === '';
+  console.log(`[goal-race-completion] workoutDay=${workoutDay} distM=${distM} sport=${sport} isRun=${isRun} isMarathon=${isMarathonDistanceMeters(distM)}`);
   if (!workoutDay || !isRun || !isMarathonDistanceMeters(distM)) {
+    console.log(`[goal-race-completion] early exit: workoutDay=${workoutDay} isRun=${isRun} isMarathon=${isMarathonDistanceMeters(distM)}`);
     return { matched: false, eventName: '' };
   }
 
@@ -80,6 +82,7 @@ export async function fetchGoalRaceCompletionForWorkout(
       console.error('[goal-race-completion] goals query error:', error.message);
       return { matched: false, eventName: '' };
     }
+    console.log(`[goal-race-completion] goals query returned ${rows?.length ?? 0} rows`);
     if (!Array.isArray(rows) || rows.length === 0) {
       return { matched: false, eventName: '' };
     }
@@ -94,6 +97,12 @@ export async function fetchGoalRaceCompletionForWorkout(
       return diff <= 86_400_000; // within 1 day
     });
 
+    console.log(`[goal-race-completion] candidates after date+distance filter: ${candidates.length}`);
+    rows.forEach((g: any) => {
+      const gDay = normDate(g.target_date);
+      const diff = gDay ? Math.abs(new Date(gDay + 'T00:00:00Z').getTime() - new Date(workoutDay + 'T00:00:00Z').getTime()) : null;
+      console.log(`[goal-race-completion] row: id=${g.id} name=${g.name} status=${g.status} goal_type=${g.goal_type} target_date=${g.target_date} distance=${g.distance} diff_ms=${diff} isMarathonDist=${isMarathonGoalDistance(g.distance)}`);
+    });
     if (candidates.length === 0) {
       return { matched: false, eventName: '' };
     }
