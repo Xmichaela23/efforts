@@ -177,7 +177,10 @@ function buildHrInsight(args: {
       parts.push(`Normal decoupling arc for 26.2. No late-race spike.`);
     } else if (totalDrift <= 35) {
       const heatNote = heatBpm != null && heatBpm > 5 ? ` ~${heatBpm} bpm of that is heat.` : '';
-      parts.push(`Higher drift (+${totalDrift} bpm).${heatNote} Shape matters: smooth climb = normal; sudden spike miles 20–26 = the wall.`);
+      parts.push(
+        `Higher drift (+${totalDrift} bpm).${heatNote} ` +
+          `A gradual rise in HR across the race is typical; a sharp jump in the final miles usually means fueling, hydration, or pacing limit rather than steady drift—check the per-mile curve.`,
+      );
     } else {
       parts.push(`Significant drift (+${totalDrift} bpm) — review the per-mile HR curve for where it accelerated.`);
     }
