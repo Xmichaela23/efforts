@@ -302,6 +302,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const llmNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
 
+  const raceDebriefText =
+    typeof (wa as any).race_debrief_text === 'string' && String((wa as any).race_debrief_text).trim()
+      ? String((wa as any).race_debrief_text).trim()
+      : null;
+
   // Goal races: use null so structured technical_insights render as label/value rows, not a wall of text
   const resolvedNarrative = isGoalRaceSession
     ? null
@@ -472,6 +477,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     observations,
     narrative_text: resolvedNarrative,
+    race_debrief_text: raceDebriefText,
 
     summary: { title: summaryTitle, bullets: summaryBullets },
 

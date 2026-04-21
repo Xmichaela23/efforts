@@ -102,6 +102,8 @@ export type SessionDetailV1 = {
 
   observations: string[];
   narrative_text: string | null;
+  /** LLM race debrief (goal race only); additive alongside adherence rows. */
+  race_debrief_text: string | null;
 
   // ── Summary (SessionNarrative) ────────────────────────────────────────────
   /** Pre-merged, deduped summary section. */

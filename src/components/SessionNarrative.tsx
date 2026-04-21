@@ -51,6 +51,8 @@ interface SessionNarrativeProps {
     };
     observations?: string[];
     narrative_text?: string | null;
+    /** Goal-race LLM debrief (additive). */
+    race_debrief_text?: string | null;
     summary?: { title?: string; bullets?: string[] };
     analysis_details?: { rows?: Array<{ label: string; value: string }> };
     adherence?: {
@@ -381,7 +383,9 @@ export default function SessionNarrative({
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
   const narrativeText = (typeof sd?.narrative_text === 'string' && sd.narrative_text.trim()) || '';
+  const raceDebriefText = (typeof sd?.race_debrief_text === 'string' && sd.race_debrief_text.trim()) || '';
   const hasNarrative = narrativeText.length > 0;
+  const hasRaceDebrief = raceDebriefText.length > 0;
   const hasSummaryBullets = summaryBullets.length > 0;
 
   const trend = sd?.trend ?? null;
@@ -406,7 +410,12 @@ export default function SessionNarrative({
   const hasPlanImpactForRender = planImpactText.length > 0;
   const hasTechnicalForRender = technicalInsightsForRender.length > 0;
   const hasStructuredForRender = hasTechnicalForRender || hasPlanImpactForRender;
-  const hasNothing = !hasNarrative && !hasSummaryBullets && !hasStructuredForRender && !hasAnalysisDetails;
+  const hasNothing =
+    !hasNarrative &&
+    !hasRaceDebrief &&
+    !hasSummaryBullets &&
+    !hasStructuredForRender &&
+    !hasAnalysisDetails;
 
   if (!hasSessionDetail || hasNothing) {
     return (
@@ -460,6 +469,14 @@ export default function SessionNarrative({
           {recomputing ? 'Recomputing…' : 'Recompute analysis'}
         </button>
       </div>
+      {hasRaceDebrief && (
+        <div>
+          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+            Race debrief
+          </span>
+          <p className="text-sm text-gray-300 leading-relaxed mt-1">{raceDebriefText}</p>
+        </div>
+      )}
       {hasNarrative && (
         <div>
           <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">

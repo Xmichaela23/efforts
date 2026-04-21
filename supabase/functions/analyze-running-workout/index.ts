@@ -16,6 +16,7 @@ import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-r
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
+import { generateRaceDebrief } from '../_shared/race-debrief.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -137,6 +138,7 @@ Deno.serve(async (req) => {
       .from('workouts')
       .select(`
         id,
+        name,
         type,
         sensor_data,
         computed,
@@ -154,7 +156,8 @@ Deno.serve(async (req) => {
         start_position_long,
         date,
         rpe,
-        feeling
+        feeling,
+        intensity_factor
       `)
       .eq('id', workout_id)
       .single();
@@ -2293,6 +2296,123 @@ Deno.serve(async (req) => {
       // Don't hold the blob — we only needed ai_summary.
     }
 
+    const { data: existingAnalysisRow } = await supabase
+      .from('workouts')
+      .select('workout_analysis')
+      .eq('id', workout_id)
+      .maybeSingle();
+    const prevWa = existingAnalysisRow?.workout_analysis as Record<string, unknown> | null | undefined;
+    const preservedRaceDebrief =
+      typeof prevWa?.race_debrief_text === 'string' && prevWa.race_debrief_text.trim()
+        ? prevWa.race_debrief_text.trim()
+        : null;
+
+    let raceDebriefNew: string | null = null;
+    if (Deno.env.get('RACE_NARRATIVE_LLM') === '1' && goalRaceCompletionMatch.matched) {
+      try {
+        const wAny = workout as Record<string, unknown>;
+        const overall = (wAny.computed as Record<string, unknown> | undefined)?.overall as
+          | Record<string, unknown>
+          | undefined;
+        const elapsedSec = (() => {
+          const el = Number(overall?.duration_s_elapsed);
+          if (Number.isFinite(el) && el > 60) return Math.round(el);
+          const et = Number(wAny.elapsed_time);
+          if (Number.isFinite(et) && et > 0) return et < 1000 ? Math.round(et * 60) : Math.round(et);
+          return 0;
+        })();
+        const movingSec = (() => {
+          const mv = Number(overall?.duration_s_moving);
+          if (Number.isFinite(mv) && mv > 60) return Math.round(mv);
+          const m = Number(wAny.moving_time);
+          if (Number.isFinite(m) && m > 0) return m < 1000 ? Math.round(m * 60) : Math.round(m);
+          return elapsedSec > 0 ? elapsedSec : 0;
+        })();
+
+        const terrain = (detailedAnalysis as Record<string, unknown> | undefined)?.mile_by_mile_terrain as
+          | { splits?: unknown[] }
+          | undefined;
+        const rawSplits = Array.isArray(terrain?.splits) ? terrain!.splits! : [];
+        const splits = rawSplits
+          .map((s: unknown) => {
+            const o = s as Record<string, unknown>;
+            return {
+              mile: Number(o.mile),
+              paceSeconds: Number(o.pace_s_per_mi),
+              avgHR: Math.round(Number(o.avg_hr_bpm ?? 0)),
+              grade: Math.round(Number(o.grade_percent ?? 0) * 10) / 10,
+            };
+          })
+          .filter((s) =>
+            s.mile > 0 && s.paceSeconds > 120 && s.paceSeconds < 7200 && s.avgHR > 40,
+          );
+
+        const hrObj = (enhancedAnalysis as Record<string, unknown>)?.heart_rate_analysis as
+          | Record<string, unknown>
+          | undefined;
+        const avgHr = Math.round(
+          Number(hrObj?.average_heart_rate ?? hrAnalysisResult?.summary?.avgHr ?? 0) || 0,
+        );
+        const maxHr = Math.round(
+          Number(hrObj?.max_heart_rate ?? hrAnalysisResult?.summary?.maxHr ?? 0) || 0,
+        );
+
+        const compOverall = (wAny.computed as Record<string, unknown> | undefined)?.overall as Record<string, unknown> | undefined;
+        const ifVal = (() => {
+          const v = Number(compOverall?.intensity_factor ?? wAny.intensity_factor);
+          return Number.isFinite(v) && v > 0 ? Math.round(v * 1000) / 1000 : null;
+        })();
+
+        let weather: {
+          startTempF: number | null;
+          finishTempF: number | null;
+          humidityPct: number | null;
+          conditions: string | null;
+        } = {
+          startTempF: null,
+          finishTempF: null,
+          humidityPct: null,
+          conditions: null,
+        };
+        if (goalRaceCompletionMatch.goalId) {
+          const { data: rc } = await supabase
+            .from('race_courses')
+            .select('start_temp_f, finish_temp_f, humidity_pct, conditions')
+            .eq('user_id', workout.user_id)
+            .eq('goal_id', goalRaceCompletionMatch.goalId)
+            .maybeSingle();
+          if (rc) {
+            weather = {
+              startTempF: rc.start_temp_f != null ? Number(rc.start_temp_f) : null,
+              finishTempF: rc.finish_temp_f != null ? Number(rc.finish_temp_f) : null,
+              humidityPct: rc.humidity_pct != null ? Number(rc.humidity_pct) : null,
+              conditions: rc.conditions != null ? String(rc.conditions) : null,
+            };
+          }
+        }
+
+        if (splits.length >= 8 && elapsedSec > 120) {
+          const debrief = await generateRaceDebrief({
+            workoutName: String(wAny.name ?? goalRaceCompletionMatch.eventName ?? 'Race'),
+            elapsedSeconds: elapsedSec,
+            movingSeconds: movingSec,
+            goalSeconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,
+            projectedSeconds: goalRaceCompletionMatch.fitnessProjectionSeconds ?? null,
+            avgHR: avgHr > 0 ? avgHr : 0,
+            maxHR: maxHr > 0 ? maxHr : 0,
+            intensityFactor: ifVal,
+            weather,
+            splits,
+          });
+          if (debrief) raceDebriefNew = debrief;
+        }
+      } catch (e) {
+        console.warn('[analyze-running-workout] race debrief skipped:', e);
+      }
+    }
+
+    const race_debrief_text = raceDebriefNew ?? preservedRaceDebrief;
+
     const sessionStateV1 = {
       version: 1,
       owner: 'analysis',
@@ -2364,7 +2484,8 @@ Deno.serve(async (req) => {
         session_state_v1: sessionStateV1,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         heart_rate_summary: hrAnalysisResult.summary,
-        is_goal_race: goalRaceCompletionMatch.matched === true
+        is_goal_race: goalRaceCompletionMatch.matched === true,
+        race_debrief_text: race_debrief_text ?? null,
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()

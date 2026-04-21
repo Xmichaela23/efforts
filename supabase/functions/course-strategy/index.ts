@@ -33,6 +33,7 @@ import {
   resolvePaceAnchorForCourse,
   pickRaceFinishProjectionV1ForCourseGoal,
 } from '../_shared/resolve-server-predicted-finish.ts';
+import { fetchRaceWeatherArchive } from '../_shared/fetch-race-weather-archive.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -52,6 +53,31 @@ async function promptHash(s: string): Promise<string> {
   const buf = new TextEncoder().encode(s);
   const digest = await crypto.subtle.digest('SHA-256', buf);
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
+
+/** First lat,lng from Google-encoded polyline (precision 5). */
+function decodePolylineFirstPoint(encoded: string): [number, number] | null {
+  const s = String(encoded || '').trim();
+  if (!s) return null;
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const factor = 1e5;
+  for (let k = 0; k < 2; k++) {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+    do {
+      if (index >= s.length) return null;
+      byte = s.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const delta = (result & 1) ? ~(result >> 1) : result >> 1;
+    if (k === 0) lat += delta;
+    else lng += delta;
+  }
+  return [lat / factor, lng / factor];
 }
 
 function extractDrift(wa: Record<string, unknown> | null): number | null {
@@ -140,7 +166,7 @@ Deno.serve(async (req) => {
 
   const { data: course, error: cErr } = await supabase
     .from('race_courses')
-    .select('id, user_id, goal_id, elevation_profile, distance_m, name')
+    .select('id, user_id, goal_id, elevation_profile, distance_m, name, polyline')
     .eq('id', courseId)
     .maybeSingle();
 
@@ -448,6 +474,44 @@ Deno.serve(async (req) => {
       athlete_snapshot_hash: snapHash,
     })
     .eq('id', courseId);
+
+  // Historical weather for race date + course start (additive; failures are non-fatal).
+  try {
+    const raceDateISO = goal.target_date != null ? String(goal.target_date).slice(0, 10) : null;
+    let startLat: number | null = null;
+    let startLng: number | null = null;
+    for (const p of smoothed) {
+      if (p.lat != null && p.lon != null && Number.isFinite(p.lat) && Number.isFinite(p.lon)) {
+        startLat = p.lat;
+        startLng = p.lon;
+        break;
+      }
+    }
+    if ((startLat == null || startLng == null) && course.polyline && String(course.polyline).length > 0) {
+      const first = decodePolylineFirstPoint(String(course.polyline));
+      if (first) {
+        startLat = first[0];
+        startLng = first[1];
+      }
+    }
+    const tz = Deno.env.get('RACE_WEATHER_TIMEZONE')?.trim() || 'America/Los_Angeles';
+    if (raceDateISO && startLat != null && startLng != null) {
+      const weather = await fetchRaceWeatherArchive(startLat, startLng, raceDateISO, tz);
+      if (weather) {
+        await supabase
+          .from('race_courses')
+          .update({
+            start_temp_f: weather.startTempF,
+            finish_temp_f: weather.finishTempF,
+            humidity_pct: weather.humidity,
+            conditions: weather.conditions,
+          })
+          .eq('id', courseId);
+      }
+    }
+  } catch (wErr) {
+    console.warn('[course-strategy] weather attach failed (non-fatal):', wErr instanceof Error ? wErr.message : wErr);
+  }
 
   await supabase.from('course_strategy_debug').insert({
     course_id: courseId,
