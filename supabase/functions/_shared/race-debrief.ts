@@ -27,6 +27,15 @@ TERRAIN:
 WEATHER:
 - Use the supplied temps and humidity. Rough guide: about +1 bpm cardiac load per ~1.8°F rise in ambient temperature during a long effort; high humidity tightens that. Sunny late race adds demand on top of pace.
 
+HEART RATE — DO NOT ROMANTICIZE DRIFT:
+- Late-race HR climbing is normal physiology, not a story about toughness. After roughly three hours of sustained running, HR rises even at constant perceived effort: that is natural cardiovascular drift.
+- When you describe HR in the second half, decompose it into the causes the data supports—do not collapse them into one heroic arc:
+  (1) Time on feet / natural drift in hour four and beyond.
+  (2) Heat load: use the supplied start vs finish temp (and humidity, conditions) to attribute part of the rise; temperature rise adds cardiac cost independent of pace.
+  (3) Terrain: rising HR on positive grade or hard climbing segments is terrain cost; align with grade column and any caution/climb sections implied by the splits.
+- Do not frame late-race HR as the athlete "pushing," "not folding," "holding what the legs wanted," or "cardiovascular system working hard" unless pace actually increased relative to what the grade would predict (i.e. real acceleration, not drift-plus-heat-plus-hills).
+- Forbidden motivational HR clichés include: "didn't fold," "pushing through," "what's interesting is," "working hard to hold," "legs wanted to give."
+
 VOICE:
 - Direct, human, like a coach talking to one person. No report tone.
 - No idioms, no slogans, no "real talk," no filler praise, no motivational clichés.
@@ -103,7 +112,7 @@ RACE: ${i.workoutName}
 ACTUAL FINISH (elapsed): ${fmtClock(i.elapsedSeconds)}
 COURSE MODEL PROJECTION (only benchmark for "vs plan"): ${i.projectedSeconds != null ? fmtClock(i.projectedSeconds) : 'not available'}
 GAP VS PROJECTION: ${vsProjected !== null ? signedDiffSeconds(vsProjected) : 'N/A'}
-MOVING TIME: ${fmtClock(i.movingSeconds)}
+MOVING TIME: ${fmtClock(i.movingSeconds)} (use for drift: natural HR rise is expected after ~3h sustained effort)
 TIME OFF COURSE (elapsed minus moving — aid, stops): ${aidLoss > 30 ? fmtClock(aidLoss) : 'negligible'}
 SESSION AVG HR / MAX HR: ${i.avgHR} / ${i.maxHR} bpm
 INTENSITY FACTOR (if available): ${i.intensityFactor ?? 'N/A'}
