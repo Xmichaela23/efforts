@@ -48,7 +48,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
     if (!workoutId) return;
 
     const formatInvokeError = async (err: unknown, step: string): Promise<string> => {
-      const base = (err as { message?: string })?.message || String(err);
+      const base = (err as { message?: string })?.message
+        || (typeof err === 'object' && err !== null ? JSON.stringify(err).slice(0, 200) : String(err));
       const ctx = (err as { context?: { json?: () => Promise<unknown> } })?.context;
       if (ctx && typeof ctx.json === 'function') {
         try {
