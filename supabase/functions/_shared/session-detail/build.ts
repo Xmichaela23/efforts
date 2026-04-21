@@ -113,6 +113,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   const type = normType(workoutType) as SessionDetailV1['type'];
   const wa = workoutAnalysis || {};
+  const isGoalRace = (wa as any).is_goal_race === true;
   const perf = (wa as any).performance || {};
   const sessionState = (wa as any).session_state_v1 || {};
   const factPacket = (wa as any).fact_packet_v1 || (sessionState?.details as any)?.fact_packet_v1;
@@ -166,6 +167,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     (durationAdherence ?? 0) === 0;
 
   const showAdherenceChips =
+    !isGoalRace &&
     !allZero &&
     (executionScore != null || paceAdherence != null || powerAdherence != null || durationAdherence != null);
 
@@ -478,6 +480,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     observations,
     narrative_text: resolvedNarrative,
     race_debrief_text: raceDebriefText,
+    race:
+      (sessionState as any).race && typeof (sessionState as any).race === 'object'
+        ? ((sessionState as any).race as SessionDetailV1['race'])
+        : null,
 
     summary: { title: summaryTitle, bullets: summaryBullets },
 

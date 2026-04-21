@@ -105,6 +105,21 @@ export type SessionDetailV1 = {
   /** LLM race debrief (goal race only); additive alongside adherence rows. */
   race_debrief_text: string | null;
 
+  /** Populated for goal race sessions (from `session_state_v1.race` in analyze-running-workout). */
+  race: {
+    is_goal_race: boolean;
+    goal_id: string | null;
+    event_name: string;
+    goal_time_seconds: number | null;
+    fitness_projection_seconds: number | null;
+    fitness_projection_display: string | null;
+    /** Uniform target pace (sec/mi) from goal clock ÷ race distance. */
+    goal_avg_pace_s_per_mi: number | null;
+    /** Uniform pace (sec/mi) from model projected finish ÷ distance. */
+    fitness_projection_avg_pace_s_per_mi: number | null;
+    actual_seconds: number | null;
+  } | null;
+
   // ── Summary (SessionNarrative) ────────────────────────────────────────────
   /** Pre-merged, deduped summary section. */
   summary: {

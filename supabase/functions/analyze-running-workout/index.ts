@@ -2486,21 +2486,38 @@ Deno.serve(async (req) => {
         suppress_deviation_language: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
       },
       ...(goalRaceCompletionMatch.matched ? {
-        race: {
-          is_goal_race: true,
-          goal_id: goalRaceCompletionMatch.goalId ?? null,
-          event_name: goalRaceCompletionMatch.eventName,
-          goal_time_seconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,
-          fitness_projection_seconds: goalRaceCompletionMatch.fitnessProjectionSeconds ?? null,
-          fitness_projection_display: goalRaceCompletionMatch.fitnessProjectionDisplay ?? null,
-          actual_seconds: (() => {
-            const elapsed = Number(workout?.computed?.overall?.duration_s_elapsed);
-            if (Number.isFinite(elapsed) && elapsed > 0) return Math.round(elapsed);
-            const elapsedMin = Number(workout?.elapsed_time);
-            if (Number.isFinite(elapsedMin) && elapsedMin > 0) return Math.round(elapsedMin * 60);
-            return null;
-          })(),
-        },
+        race: (() => {
+          const distM = Number(workout?.computed?.overall?.distance_m);
+          const distM2 = Number.isFinite(distM) && distM > 0
+            ? distM
+            : (Number(workout?.distance) > 0 ? Number(workout.distance) * 1000 : 0);
+          const raceMi = distM2 > 0 ? distM2 / 1609.34 : 26.2188;
+          const gts = goalRaceCompletionMatch.goalTimeSeconds;
+          const fps = goalRaceCompletionMatch.fitnessProjectionSeconds;
+          const goal_avg_pace_s_per_mi = (gts != null && Number.isFinite(gts) && raceMi > 0.1)
+            ? Math.round(gts / raceMi)
+            : null;
+          const fitness_projection_avg_pace_s_per_mi = (fps != null && Number.isFinite(fps) && raceMi > 0.1)
+            ? Math.round(fps / raceMi)
+            : null;
+          return {
+            is_goal_race: true,
+            goal_id: goalRaceCompletionMatch.goalId ?? null,
+            event_name: goalRaceCompletionMatch.eventName,
+            goal_time_seconds: gts ?? null,
+            fitness_projection_seconds: fps ?? null,
+            fitness_projection_display: goalRaceCompletionMatch.fitnessProjectionDisplay ?? null,
+            goal_avg_pace_s_per_mi,
+            fitness_projection_avg_pace_s_per_mi,
+            actual_seconds: (() => {
+              const elapsed = Number(workout?.computed?.overall?.duration_s_elapsed);
+              if (Number.isFinite(elapsed) && elapsed > 0) return Math.round(elapsed);
+              const elapsedMin = Number(workout?.elapsed_time);
+              if (Number.isFinite(elapsedMin) && elapsedMin > 0) return Math.round(elapsedMin * 60);
+              return null;
+            })(),
+          };
+        })(),
       } : {}),
     };
 

@@ -38,7 +38,7 @@ function isPersistedLlmRaceReadiness(rr: unknown): boolean {
   return !!rr && typeof rr === 'object' && typeof (rr as { verdict?: string }).verdict === 'string';
 }
 
-/** Prefer edge `session_detail_v1`; merge LLM `race_readiness` from persisted workout_analysis when the detail query is stale (e.g. right after recompute). */
+/** Prefer edge `session_detail_v1`; merge LLM `race_readiness` + `race` from persisted workout_analysis when the detail query is stale. */
 function mergeSessionDetailRaceReadiness(
   fromEdge: Record<string, unknown> | null | undefined,
   workoutAnalysis: unknown,
@@ -54,15 +54,27 @@ function mergeSessionDetailRaceReadiness(
       ? (embedded as { race_readiness?: unknown }).race_readiness
       : null;
   const rrEmbOk = isPersistedLlmRaceReadiness(rrEmb) ? rrEmb : null;
+  const stRace =
+    wa && typeof wa === 'object'
+      ? (wa as { session_state_v1?: { race?: unknown } }).session_state_v1?.race
+      : null;
+  const raceEmb = stRace && typeof stRace === 'object' ? (stRace as Record<string, unknown>) : null;
   if (fromEdge && typeof fromEdge === 'object') {
     const rrEdge = (fromEdge as { race_readiness?: unknown }).race_readiness;
+    const raceEdge = (fromEdge as { race?: unknown }).race;
+    const next = { ...fromEdge } as Record<string, unknown>;
     if (!rrEdge && rrEmbOk) {
-      return { ...fromEdge, race_readiness: rrEmbOk } as Record<string, unknown>;
+      next.race_readiness = rrEmbOk;
     }
-    return fromEdge as Record<string, unknown>;
+    if (!raceEdge && raceEmb) {
+      next.race = raceEmb;
+    }
+    return next;
   }
   if (embedded && typeof embedded === 'object') {
-    return embedded as Record<string, unknown>;
+    const e = { ...(embedded as Record<string, unknown>) };
+    if (!e.race && raceEmb) e.race = raceEmb;
+    return e;
   }
   return null;
 }

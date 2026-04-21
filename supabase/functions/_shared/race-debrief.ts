@@ -2,6 +2,10 @@
  * LLM race debrief — additive path for goal race sessions.
  * Sits alongside marathon-race-narrative.ts deterministic digest.
  * Callers merge result into workouts.workout_analysis.race_debrief_text.
+ *
+ * Weather: persisted canonical row is `workouts.weather_data` (get-weather / analysis). Client UI uses the
+ * same field names via `src/lib/sessionWeather.ts`. Here, `resolveRaceDebriefWeather` adds `race_courses`
+ * snapshot + `avg_temperature` device fallback for the LLM fact block only.
  */
 
 import { callLLM } from './llm.ts';

@@ -65,20 +65,26 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
 
   if (weather) {
     const { line1, line2 } = headline(weather);
-    const hum = `${Math.round(weather.humidity)}% humidity`;
-    const wind = weather.windSpeed > 0 ? `${Math.round(weather.windSpeed)} mph wind` : null;
+    const hum =
+      weather.humidity != null && Number.isFinite(weather.humidity)
+        ? `${Math.round(weather.humidity)}% humidity`
+        : null;
+    const wind =
+      weather.windSpeed != null && weather.windSpeed > 0
+        ? `${Math.round(weather.windSpeed)} mph wind`
+        : null;
     const showCond = weather.condition && weather.condition !== '—';
 
     return (
       <div
         className={`flex flex-col gap-0.5 text-white/90 ${className}`}
-        title="Open-Meteo at the activity start location; session window when duration is known (same fields as workout analysis)."
+        title="Uses workouts.weather_data when present (same as analysis); otherwise live Open-Meteo or device avg."
       >
         <span className="font-medium text-sm leading-snug">{line1}</span>
         {line2 ? <span className="text-white/55 text-xs leading-snug">{line2}</span> : null}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-white/65 text-xs">
           {showCond ? <span>{weather.condition}</span> : null}
-          <span>{hum}</span>
+          {hum ? <span>{hum}</span> : null}
           {wind ? <span>{wind}</span> : null}
         </div>
       </div>
@@ -88,7 +94,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
   if (fallbackTemperature != null && Number.isFinite(Number(fallbackTemperature))) {
     return (
       <div className={`flex items-center gap-2 text-sm ${className}`}>
-        <span className="text-white/90" title="Watch/phone average — no air-temp window stored">
+        <span className="text-white/90" title="Prefer resolveSessionWeatherFromWorkoutRow — this prop is legacy">
           {celsiusToF(Number(fallbackTemperature))}°F
         </span>
         <span className="text-white/45 text-xs">device avg only</span>

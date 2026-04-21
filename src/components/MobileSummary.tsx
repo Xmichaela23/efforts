@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative from './SessionNarrative';
-import EnduranceIntervalTable from './EnduranceIntervalTable';
+import EnduranceIntervalTable, { type GoalRaceReferenceMode } from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
 import { formatDuration } from '@/utils/workoutFormatting';
+
+const PROJECTION_TIP_STORAGE_KEY = 'has_seen_projection_tip_v1';
 
 type MobileSummaryProps = {
   planned: any | null;
@@ -20,6 +22,11 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
   const { useImperial } = useAppContext();
 
   const sd = session_detail_v1;
+  const [recomputing, setRecomputing] = useState(false);
+  const [recomputeError, setRecomputeError] = useState<string | null>(null);
+  const [referenceMode, setReferenceMode] = useState<GoalRaceReferenceMode | null>(null);
+  const [showProjectionTip, setShowProjectionTip] = useState(false);
+
   const hasSessionDetail = !!sd;
   const noPlannedCompare = !planned && !sd?.plan_context?.planned_id;
   if (noPlannedCompare) {
@@ -36,8 +43,87 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
   }
 
   const type = String(sd?.type || (planned as any)?.type || (completed as any)?.type || '').toLowerCase();
-  const [recomputing, setRecomputing] = useState(false);
-  const [recomputeError, setRecomputeError] = useState<string | null>(null);
+
+  const race = sd?.race;
+  const completedDate = (completed as { date?: string; start_date_local?: string } | null)?.date
+    ?? (completed as { start_date_local?: string } | null)?.start_date_local;
+
+  useEffect(() => {
+    if (!race?.is_goal_race || !race.goal_id) {
+      setReferenceMode(null);
+      return;
+    }
+    const goalId = String(race.goal_id);
+    const projS = race.fitness_projection_seconds;
+    const goalS = race.goal_time_seconds;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('last_reference_mode')
+        .eq('id', goalId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        console.warn('[MobileSummary] last_reference_mode load', error);
+      }
+      const dStr = completedDate != null ? String(completedDate) : '';
+      const raceDate = dStr
+        ? new Date(dStr.includes('T') ? dStr : `${dStr.slice(0, 10)}T12:00:00`)
+        : new Date();
+      const postRace = raceDate < new Date();
+      const def: GoalRaceReferenceMode = postRace ? 'projection' : 'goal';
+      const stored = data?.last_reference_mode;
+      let next: GoalRaceReferenceMode = stored === 'projection' || stored === 'goal' ? stored : def;
+      if (projS == null && goalS == null) {
+        next = 'goal';
+      } else {
+        if (next === 'projection' && projS == null) next = 'goal';
+        if (next === 'goal' && goalS == null) next = 'projection';
+      }
+      setReferenceMode(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    race?.is_goal_race,
+    race?.goal_id,
+    race?.fitness_projection_seconds,
+    race?.goal_time_seconds,
+    completedDate,
+  ]);
+
+  const handleModeToggle = useCallback(async (mode: GoalRaceReferenceMode) => {
+    if (!race?.is_goal_race || !race.goal_id) return;
+    if (mode === 'projection' && race.fitness_projection_seconds == null) return;
+    if (mode === 'goal' && race.goal_time_seconds == null) return;
+    setReferenceMode(mode);
+    if (mode === 'projection') {
+      try {
+        if (!localStorage.getItem(PROJECTION_TIP_STORAGE_KEY)) {
+          setShowProjectionTip(true);
+        }
+      } catch { /* private mode / quota */ }
+    }
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .update({ last_reference_mode: mode })
+        .eq('id', String(race.goal_id));
+      if (error) console.warn('[MobileSummary] last_reference_mode persist', error);
+    } catch (e) {
+      console.warn('[MobileSummary] last_reference_mode persist', e);
+    }
+  }, [race]);
+
+  const dismissProjectionTip = useCallback(() => {
+    setShowProjectionTip(false);
+    try {
+      localStorage.setItem(PROJECTION_TIP_STORAGE_KEY, '1');
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     setRecomputeError(null);
     setRecomputing(false);
@@ -159,6 +245,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         const race = sd?.race;
         if (!race?.is_goal_race) return null;
         const actualS = race.actual_seconds ?? null;
+        const projS = race.fitness_projection_seconds ?? null;
+        const goalS = race.goal_time_seconds ?? null;
+        const ref = referenceMode ?? 'goal';
+        const activeTarget = ref === 'projection' ? projS : goalS;
+        const delta =
+          activeTarget != null && actualS != null && Number.isFinite(activeTarget) && Number.isFinite(actualS)
+            ? actualS - activeTarget
+            : null;
+        const beatTarget = delta != null && delta < 0;
         const fmt = (s: number | null | undefined) =>
           s != null && Number.isFinite(s) && s > 0 ? formatDuration(s) : '—';
         return (
@@ -167,16 +262,16 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
               Goal race · {race.event_name}
             </div>
             <div className="flex items-start justify-center gap-8 text-center">
-              {race.goal_time_seconds != null && (
+              {goalS != null && (
                 <div className="flex flex-col items-center">
-                  <div className="text-sm font-semibold text-gray-100">{fmt(race.goal_time_seconds)}</div>
+                  <div className="text-sm font-semibold text-gray-100">{fmt(goalS)}</div>
                   <div className="text-[11px] text-gray-400 mt-0.5">Goal</div>
                 </div>
               )}
-              {race.fitness_projection_seconds != null && (
+              {projS != null && (
                 <div className="flex flex-col items-center">
                   <div className="text-sm font-semibold text-gray-100">
-                    {race.fitness_projection_display ?? fmt(race.fitness_projection_seconds)}
+                    {race.fitness_projection_display ?? fmt(projS)}
                   </div>
                   <div className="text-[11px] text-gray-400 mt-0.5">Projected</div>
                 </div>
@@ -186,6 +281,22 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
                 <div className="text-[11px] text-gray-400 mt-0.5">Actual</div>
               </div>
             </div>
+            {delta != null && (
+              <div className="mt-3 text-center space-y-1">
+                <div
+                  className={`text-sm font-medium ${
+                    beatTarget ? 'text-emerald-400' : 'text-white/60'
+                  }`}
+                >
+                  {beatTarget
+                    ? `${formatDuration(Math.abs(delta))} faster than ${ref === 'projection' ? 'projected' : 'goal'}`
+                    : `${formatDuration(delta)} over ${ref === 'projection' ? 'projection' : 'goal'}`}
+                </div>
+                {beatTarget && ref === 'projection' && (
+                  <div className="text-xs text-white/50">Ran faster than the model expected</div>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
@@ -193,9 +304,67 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         sessionDetail={sd}
         hasSessionDetail={hasSessionDetail}
         noPlannedCompare={noPlannedCompare}
-        hideTopAdherence={hideTopAdherence}
+        hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race}
       />
 
+
+      {(() => {
+        const race = sd?.race;
+        if (!race?.is_goal_race) return null;
+        const canProj = race.fitness_projection_seconds != null;
+        const canGoal = race.goal_time_seconds != null;
+        if (!canProj && !canGoal) return null;
+        const ref = referenceMode ?? 'goal';
+        return (
+          <div className="w-full mb-2 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void handleModeToggle('projection')}
+                disabled={!canProj}
+                className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                  ref === 'projection' && canProj
+                    ? 'border-white/30 bg-white/10'
+                    : 'border-white/10 bg-white/[0.03]'
+                } ${!canProj ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/8'}`}
+              >
+                <div className="text-sm font-medium text-gray-100">Projection</div>
+                <div className="text-[11px] text-gray-500 leading-snug">Model from current fitness</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleModeToggle('goal')}
+                disabled={!canGoal}
+                className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                  ref === 'goal' && canGoal
+                    ? 'border-white/30 bg-white/10'
+                    : 'border-white/10 bg-white/[0.03]'
+                } ${!canGoal ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/8'}`}
+              >
+                <div className={`text-sm font-medium ${!canGoal ? 'text-white/40' : 'text-gray-100'}`}>Goal</div>
+                <div className="text-[11px] text-gray-500 leading-snug">
+                  {canGoal ? 'Your target' : 'No goal set'}
+                </div>
+              </button>
+            </div>
+            {showProjectionTip && (
+              <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-white/80">
+                  Projection is what your current fitness suggested for this course. Goal is what you set before race
+                  day.
+                </p>
+                <button
+                  type="button"
+                  onClick={dismissProjectionTip}
+                  className="shrink-0 text-xs font-medium text-amber-200/90 hover:text-amber-100"
+                >
+                  Got it
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       
@@ -204,6 +373,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         hasSessionDetail={hasSessionDetail}
         useImperial={useImperial}
         noPlannedCompare={noPlannedCompare}
+        goalRaceReferenceMode={referenceMode ?? 'goal'}
       />
       {!sd?.classification?.is_pool_swim && (
         <SessionNarrative

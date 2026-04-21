@@ -25,6 +25,8 @@ type IntervalRow = {
   duration_adherence_pct: number | null;
 };
 
+export type GoalRaceReferenceMode = 'projection' | 'goal';
+
 type EnduranceIntervalTableProps = {
   sessionDetail: {
     workout_id?: string;
@@ -66,10 +68,17 @@ type EnduranceIntervalTableProps = {
     display?: { show_adherence_chips?: boolean; has_measured_execution?: boolean };
     plan_context?: { planned_id?: string | null };
     session_interpretation?: SessionInterpretationV1;
+    race?: {
+      is_goal_race?: boolean;
+      goal_avg_pace_s_per_mi?: number | null;
+      fitness_projection_avg_pace_s_per_mi?: number | null;
+    } | null;
   } | null;
   hasSessionDetail: boolean;
   useImperial: boolean;
   noPlannedCompare: boolean;
+  /** Goal race: which benchmark targets and adherence use (client toggle). */
+  goalRaceReferenceMode?: GoalRaceReferenceMode | null;
 };
 
 export default function EnduranceIntervalTable({
@@ -77,6 +86,7 @@ export default function EnduranceIntervalTable({
   hasSessionDetail,
   useImperial,
   noPlannedCompare,
+  goalRaceReferenceMode = null,
 }: EnduranceIntervalTableProps) {
   const [showAllIntervals, setShowAllIntervals] = useState(false);
 
@@ -85,6 +95,8 @@ export default function EnduranceIntervalTable({
   const isSwim = /swim/.test(sportType);
   const isPoolSwim = !!sd?.classification?.is_pool_swim;
   const isEasyLike = !!sd?.classification?.is_easy_like;
+  const isGoalRace = !!sd?.race?.is_goal_race;
+  const race = sd?.race;
   const displayMode = sd?.intervals_display?.mode ?? 'none';
   const displayReason = sd?.intervals_display?.reason ?? null;
   const allIntervals: IntervalRow[] = Array.isArray(sd?.intervals) ? sd!.intervals as IntervalRow[] : [];
@@ -222,7 +234,6 @@ export default function EnduranceIntervalTable({
         </thead>
         <tbody>
           {visibleIntervals.map((iv, idx) => {
-            const pct = iv.pace_adherence_pct;
             const execCell = isRide
               ? (iv.executed.power_watts != null ? `${Math.round(iv.executed.power_watts)} W` : '—')
               : fmtPaceSec(iv.executed.actual_pace_sec_per_mi);
@@ -232,7 +243,67 @@ export default function EnduranceIntervalTable({
             const hrVal = iv.executed.avg_hr != null && iv.executed.avg_hr > 0
               ? Math.round(iv.executed.avg_hr) : null;
 
+            const refMode: GoalRaceReferenceMode = goalRaceReferenceMode ?? 'goal';
+            const useProj =
+              isGoalRace &&
+              refMode === 'projection' &&
+              race?.fitness_projection_avg_pace_s_per_mi != null &&
+              !isRide;
+            const useGoalTarget =
+              isGoalRace &&
+              refMode === 'goal' &&
+              race?.goal_avg_pace_s_per_mi != null &&
+              !isRide;
+            const effPct = (() => {
+              if (!isGoalRace || isRide) return iv.pace_adherence_pct;
+              const a = iv.executed.actual_pace_sec_per_mi;
+              if (a == null || !Number.isFinite(a) || a <= 0) return iv.pace_adherence_pct;
+              if (useProj) {
+                const t = race?.fitness_projection_avg_pace_s_per_mi;
+                if (t == null) return null;
+                return Math.min(100, Math.round((100 * t) / a));
+              }
+              if (useGoalTarget) {
+                const t = race?.goal_avg_pace_s_per_mi;
+                if (t == null) return iv.pace_adherence_pct;
+                return Math.min(100, Math.round((100 * t) / a));
+              }
+              return iv.pace_adherence_pct;
+            })();
+            const pct = effPct;
+            const subtitlePace = (() => {
+              if (useProj) {
+                return fmtPaceSec(race?.fitness_projection_avg_pace_s_per_mi ?? null);
+              }
+              if (useGoalTarget) {
+                return iv.planned_pace_display || fmtPaceSec(race?.goal_avg_pace_s_per_mi ?? null);
+              }
+              return iv.planned_pace_display;
+            })();
+            const pctClass = (() => {
+              if (pct == null) return 'text-white/50';
+              if (isGoalRace) {
+                if (useProj) {
+                  const a = iv.executed.actual_pace_sec_per_mi;
+                  const t = race?.fitness_projection_avg_pace_s_per_mi;
+                  if (a != null && t != null) {
+                    if (a < t - 0.5) return 'text-emerald-400';
+                    if (a > t + 60) return 'text-amber-400/90';
+                  }
+                  return 'text-white/50';
+                }
+                if (useGoalTarget) {
+                  if (pct >= 90 && pct <= 110) return 'text-emerald-400/80';
+                  if (pct >= 80 && pct <= 120) return 'text-amber-400/80';
+                  return 'text-amber-500/80';
+                }
+                return pctColor(pct);
+              }
+              return pctColor(pct);
+            })();
+
             const showRangeSubtitle = (() => {
+              if (useProj || useGoalTarget) return !!subtitlePace;
               if (idx === 0) return true;
               const prev = visibleIntervals[idx - 1];
               const curRange = iv.planned_pace_display || null;
@@ -255,14 +326,14 @@ export default function EnduranceIntervalTable({
                       <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
                       {pct != null && (
                         <div className="flex items-center gap-1">
-                          <span className={`text-[11px] font-semibold whitespace-nowrap ${pctColor(pct)}`}>{pct}%</span>
+                          <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
                           {cvIndicator}
                         </div>
                       )}
                     </div>
-                    {showRangeSubtitle && iv.planned_pace_display && (
+                    {showRangeSubtitle && subtitlePace && (
                       <div className="text-[10px] text-gray-400 mt-0.5">
-                        {String(iv.planned_pace_display)}
+                        {String(subtitlePace)}
                       </div>
                     )}
                   </div>
