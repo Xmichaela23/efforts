@@ -2308,7 +2308,7 @@ Deno.serve(async (req) => {
         : null;
 
     let raceDebriefNew: string | null = null;
-    if (Deno.env.get('RACE_NARRATIVE_LLM') === '1' && goalRaceCompletionMatch.matched) {
+    if (goalRaceCompletionMatch.matched) {
       try {
         const wAny = workout as Record<string, unknown>;
         const overall = (wAny.computed as Record<string, unknown> | undefined)?.overall as
