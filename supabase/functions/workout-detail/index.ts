@@ -16,6 +16,7 @@ import {
 import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
+import { generateRaceNarrative } from '../_shared/race-narrative.ts';
 
 type DetailOptions = {
   include_gps?: boolean;
@@ -485,6 +486,44 @@ async function runSessionDetailPipelineAndPersist(
         );
       }
     }
+
+    // Goal race: generate LLM debrief narrative from actual per-mile data
+    if (sessionDetailV1 && wa?.is_goal_race === true) {
+      try {
+        const raceData = wa?.race ?? {};
+        const mileSplits = wa?.detailed_analysis?.mile_by_mile_terrain?.splits ?? [];
+        const wd = (() => {
+          const raw = (row as any)?.weather_data;
+          if (!raw) return null;
+          if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return null; } }
+          return raw;
+        })();
+
+        const actualSec = Number(raceData?.actual_seconds);
+        if (Array.isArray(mileSplits) && mileSplits.length >= 10 && Number.isFinite(actualSec) && actualSec > 3600) {
+          const raceNarrative = await generateRaceNarrative({
+            actualSeconds: actualSec,
+            goalTimeSeconds: raceData?.goal_time_seconds != null ? Number(raceData.goal_time_seconds) : null,
+            fitnessProjectionSeconds: raceData?.fitness_projection_seconds != null ? Number(raceData.fitness_projection_seconds) : null,
+            eventName: raceData?.event_name ?? null,
+            splits: mileSplits,
+            weatherStartF: wd?.temperature_start_f ?? wd?.temperature ?? null,
+            weatherEndF: wd?.temperature_end_f ?? null,
+            weatherPeakF: wd?.temperature_peak_f ?? null,
+            weatherHumidity: wd?.humidity ?? null,
+            weatherWindMph: wd?.windSpeed ?? wd?.wind_speed ?? null,
+          });
+          if (raceNarrative) {
+            sessionDetailV1.narrative_text = raceNarrative;
+            console.log('[race-narrative] narrative set, length:', raceNarrative.length);
+          }
+        } else {
+          console.log('[race-narrative] skipped — insufficient data (splits:', mileSplits?.length, 'actualSec:', actualSec, ')');
+        }
+      } catch (rnErr: unknown) {
+        console.warn('[race-narrative] skipped:', rnErr instanceof Error ? rnErr.message : rnErr);
+      }
+    }
   } catch (snapErr: any) {
     console.warn('[workout-detail] session_detail_v1 build failed:', snapErr?.message || snapErr, snapErr?.stack || '');
   }
@@ -748,7 +787,7 @@ Deno.serve(async (req) => {
       }
       const forceRefresh = body?.force_refresh === true || urlForceRefresh;
 
-      const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length';
+      const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length,weather_data';
       let qSd = supabase.from('workouts').select(selectSd).eq('id', id) as any;
       qSd = qSd.eq('user_id', userId);
       const { data: rowSd, error: errSd } = await qSd.maybeSingle();
@@ -759,11 +798,7 @@ Deno.serve(async (req) => {
 
       const analysisSd = parseAnalysisFromWorkoutRow(rowSd);
       if (!forceRefresh && !isSessionDetailStale(rowSd, analysisSd)) {
-        let sd = analysisSd.session_detail_v1 as any;
-        // Goal races use structured technical_insights — strip cached narrative_text so it doesn't render
-        if (analysisSd.is_goal_race === true && sd?.narrative_text) {
-          sd = { ...sd, narrative_text: null };
-        }
+        const sd = analysisSd.session_detail_v1 as any;
         console.log('[workout-detail] session_detail fast path: serving persisted session_detail_v1');
         const pcFast = processingCompleteFromWorkoutRow(rowSd);
         const cachedAt = analysisSd.session_detail_updated_at ?? analysisSd.updated_at;
