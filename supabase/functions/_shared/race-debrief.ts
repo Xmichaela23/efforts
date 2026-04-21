@@ -42,7 +42,95 @@ VOICE:
 - One paragraph, 5–6 sentences, no headers, no bullets.
 
 CLOSE:
-- End with one concrete line about what to adjust next time on this course (section of the race, pacing habit, or conditions strategy)—not a lecture.`;
+- End with one concrete line about what to adjust next time on this course (section of the race, pacing habit, or conditions strategy)—not a lecture.
+
+COURSE ZONES (from pre-race strategy):
+- Segments may be listed with effort zones: Conservative, Cruise, Caution, Push (from course strategy generation). When actual HR and pace align with what that zone implied, that is execution matching the plan—not drift or toughness.
+- When HR or stress exceeds what the zone and HR band suggested for a segment, that is where to explain why (heat, terrain, pace, or stop time). Use the zone labels and mile ranges together with per-mile grade; do not ignore zones and only use raw grade.`;
+
+export type RawCourseSegmentRow = {
+  segment_order: number;
+  start_distance_m: number;
+  end_distance_m: number;
+  display_group_id?: number | null;
+  effort_zone?: string | null;
+  display_label?: string | null;
+  coaching_cue?: string | null;
+  avg_grade_pct?: number | null;
+  terrain_type?: string | null;
+  target_hr_low?: number | null;
+  target_hr_high?: number | null;
+};
+
+export type CourseStrategyZoneLine = {
+  mileStart: number;
+  mileEnd: number;
+  effortZone: string | null;
+  displayLabel: string | null;
+  coachingCue: string | null;
+  targetHrLow: number | null;
+  targetHrHigh: number | null;
+};
+
+const MI = 1609.34;
+
+/** Collapse geometry segments into display groups (same display_group_id) for debrief mile ranges. */
+export function collapseCourseSegmentsToZones(segments: RawCourseSegmentRow[]): CourseStrategyZoneLine[] {
+  if (!Array.isArray(segments) || segments.length === 0) return [];
+  const sorted = [...segments]
+    .filter((s) => s != null && typeof s === 'object')
+    .sort((a, b) => Number(a.segment_order) - Number(b.segment_order));
+
+  const byGroup = new Map<number, RawCourseSegmentRow[]>();
+  for (const s of sorted) {
+    const gid = s.display_group_id != null && Number.isFinite(Number(s.display_group_id))
+      ? Number(s.display_group_id)
+      : Number(s.segment_order);
+    if (!byGroup.has(gid)) byGroup.set(gid, []);
+    byGroup.get(gid)!.push(s);
+  }
+
+  const zones: CourseStrategyZoneLine[] = [];
+  for (const [, segs] of byGroup) {
+    if (segs.length === 0) continue;
+    const first = segs[0];
+    const last = segs[segs.length - 1];
+    const startM = Number(first.start_distance_m);
+    const endM = Number(last.end_distance_m);
+    if (!Number.isFinite(startM) || !Number.isFinite(endM)) continue;
+    const mileStart = Math.round((startM / MI) * 10) / 10;
+    const mileEnd = Math.round((endM / MI) * 10) / 10;
+    zones.push({
+      mileStart,
+      mileEnd,
+      effortZone: first.effort_zone != null ? String(first.effort_zone).trim() : null,
+      displayLabel: first.display_label != null ? String(first.display_label).trim() : null,
+      coachingCue: first.coaching_cue != null ? String(first.coaching_cue).trim() : null,
+      targetHrLow: first.target_hr_low != null ? Number(first.target_hr_low) : null,
+      targetHrHigh: first.target_hr_high != null ? Number(first.target_hr_high) : null,
+    });
+  }
+  zones.sort((a, b) => a.mileStart - b.mileStart);
+  return zones;
+}
+
+function formatCourseStrategyZonesBlock(zones: CourseStrategyZoneLine[] | null | undefined): string {
+  if (!zones || zones.length === 0) return 'not available';
+  return zones
+    .map((z) => {
+      const zone = z.effortZone
+        ? z.effortZone.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+        : '—';
+      const label = z.displayLabel || 'segment';
+      const cue = z.coachingCue ? ` — ${z.coachingCue}` : '';
+      const hr =
+        z.targetHrLow != null && z.targetHrHigh != null
+          ? ` | pre-race HR band ${z.targetHrLow}–${z.targetHrHigh} bpm`
+          : '';
+      return `Mi ${z.mileStart}–${z.mileEnd}: ${zone} (${label})${cue}${hr}`;
+    })
+    .join('\n');
+}
 
 export interface RaceDebriefInputs {
   workoutName: string;
@@ -65,6 +153,8 @@ export interface RaceDebriefInputs {
     avgHR: number;
     grade: number;
   }>;
+  /** From race_courses.course_segments (collapsed by display group). */
+  courseStrategyZones?: CourseStrategyZoneLine[] | null;
 }
 
 function fmtClock(s: number): string {
@@ -124,6 +214,9 @@ Finish temp: ${i.weather.finishTempF ?? 'unknown'}°F
 Temp rise during race: ${tempRise !== null ? `${tempRise >= 0 ? '+' : ''}${tempRise}°F` : 'unknown'}
 Estimated heat-related HR contribution from temp rise: ${estimateHeatHRBpm(i.weather.startTempF, i.weather.finishTempF)}
 Humidity: ${i.weather.humidityPct != null ? `${i.weather.humidityPct}%` : 'unknown'}
+
+COURSE STRATEGY ZONES (pre-race — effort band + mile range; compare to actual HR/pace in those miles):
+${formatCourseStrategyZonesBlock(i.courseStrategyZones ?? null)}
 
 PER-MILE DATA (reference as needed; do not read aloud row by row):
 ${i.splits.map((s) =>

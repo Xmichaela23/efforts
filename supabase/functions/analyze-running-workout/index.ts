@@ -16,7 +16,12 @@ import { buildMarathonGoalRaceAdherenceSummary } from './lib/analysis/marathon-r
 import { buildWorkoutFactPacketV1 } from '../_shared/fact-packet/build.ts';
 import { generateAISummaryV1 } from '../_shared/fact-packet/ai-summary.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
-import { generateRaceDebrief } from '../_shared/race-debrief.ts';
+import {
+  collapseCourseSegmentsToZones,
+  generateRaceDebrief,
+  type CourseStrategyZoneLine,
+  type RawCourseSegmentRow,
+} from '../_shared/race-debrief.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -2374,10 +2379,29 @@ Deno.serve(async (req) => {
           humidityPct: null,
           conditions: null,
         };
+        let courseStrategyZones: CourseStrategyZoneLine[] | null = null;
         if (goalRaceCompletionMatch.goalId) {
           const { data: rc } = await supabase
             .from('race_courses')
-            .select('start_temp_f, finish_temp_f, humidity_pct, conditions')
+            .select(`
+              start_temp_f,
+              finish_temp_f,
+              humidity_pct,
+              conditions,
+              course_segments (
+                segment_order,
+                start_distance_m,
+                end_distance_m,
+                display_group_id,
+                effort_zone,
+                display_label,
+                coaching_cue,
+                avg_grade_pct,
+                terrain_type,
+                target_hr_low,
+                target_hr_high
+              )
+            `)
             .eq('user_id', workout.user_id)
             .eq('goal_id', goalRaceCompletionMatch.goalId)
             .maybeSingle();
@@ -2388,6 +2412,11 @@ Deno.serve(async (req) => {
               humidityPct: rc.humidity_pct != null ? Number(rc.humidity_pct) : null,
               conditions: rc.conditions != null ? String(rc.conditions) : null,
             };
+            const rawSegs = Array.isArray((rc as { course_segments?: unknown }).course_segments)
+              ? (rc as { course_segments: RawCourseSegmentRow[] }).course_segments
+              : [];
+            const z = collapseCourseSegmentsToZones(rawSegs);
+            courseStrategyZones = z.length > 0 ? z : null;
           }
         }
 
@@ -2403,6 +2432,7 @@ Deno.serve(async (req) => {
             intensityFactor: ifVal,
             weather,
             splits,
+            courseStrategyZones,
           });
           if (debrief) raceDebriefNew = debrief;
         }
