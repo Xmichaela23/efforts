@@ -188,6 +188,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       });
       if (error) throw error;
       const sessionDetailV1 = (data as any)?.session_detail_v1 || null;
+      console.log('[session_detail] cache_hit:', (data as any)?._cache_hit, 'narrative_text:', String(sessionDetailV1?.narrative_text || '').slice(0, 80) || null, 'is_goal_race:', sessionDetailV1?.race?.is_goal_race);
       return { session_detail_v1: sessionDetailV1 };
     },
     staleTime: 5 * 60 * 1000,

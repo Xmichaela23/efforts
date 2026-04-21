@@ -113,12 +113,12 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       }
       console.log('[recompute]', fnName, 'ok, data:', typeof analyzeRes.data === 'object' ? JSON.stringify(analyzeRes.data).slice(0, 200) : analyzeRes.data);
 
-      // Invalidate workout-detail cache so session_detail_v1 is rebuilt
-      try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
     } catch (e: unknown) {
       setRecomputeError(typeof e === 'string' ? e : (e as Error)?.message || String(e));
     } finally {
+      // Always invalidate so session_detail re-fetches even if recompute partially failed
+      try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
       setRecomputing(false);
     }
   };

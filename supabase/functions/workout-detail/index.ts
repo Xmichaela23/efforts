@@ -491,7 +491,69 @@ async function runSessionDetailPipelineAndPersist(
     if (sessionDetailV1 && wa?.is_goal_race === true) {
       try {
         const raceData = wa?.race ?? {};
-        const mileSplits = wa?.detailed_analysis?.mile_by_mile_terrain?.splits ?? [];
+        // Primary source: pre-computed mile splits from analyze-running-workout
+        let mileSplits: any[] = wa?.detailed_analysis?.mile_by_mile_terrain?.splits ?? [];
+
+        // Fallback: build mile splits from computed.analysis.series (columnar arrays written by
+        // compute-workout-analysis). This fires when analyze-running-workout couldn't read sensor
+        // data (e.g. after a recompute) and left mile_by_mile_terrain empty.
+        if (mileSplits.length < 10) {
+          const computedRaw = (row as any)?.computed;
+          const computed = typeof computedRaw === 'string' ? (() => { try { return JSON.parse(computedRaw); } catch { return null; } })() : computedRaw;
+          const series = computed?.analysis?.series;
+          if (series && Array.isArray(series.distance_m) && series.distance_m.length >= 20) {
+            const distM: number[] = series.distance_m;
+            const timeS: number[] = series.time_s ?? [];
+            const hrBpm: (number | null)[] = series.hr_bpm ?? [];
+            const elevM: (number | null)[] = series.elevation_m ?? [];
+            const n = distM.length;
+            const totalMi = (distM[n - 1] ?? 0) / 1609.34;
+            const miles = Math.floor(totalMi);
+
+            const interp = (arr: number[], targetD: number): number => {
+              for (let i = 1; i < n; i++) {
+                if (distM[i] >= targetD) {
+                  const d0 = distM[i - 1], d1 = distM[i];
+                  const f = d1 === d0 ? 0 : (targetD - d0) / (d1 - d0);
+                  return arr[i - 1] + f * (arr[i] - arr[i - 1]);
+                }
+              }
+              return arr[n - 1];
+            };
+
+            const fallbackSplits: any[] = [];
+            for (let m = 1; m <= miles; m++) {
+              const dStart = (m - 1) * 1609.34, dEnd = m * 1609.34;
+              if (timeS.length < n) continue;
+              const t0m = interp(timeS as number[], dStart);
+              const t1m = interp(timeS as number[], dEnd);
+              if (!(t1m > t0m)) continue;
+              const pace_s_per_mi = t1m - t0m;
+
+              let hrSum = 0, hrCnt = 0;
+              let firstElev: number | null = null, lastElev: number | null = null;
+              for (let i = 0; i < n; i++) {
+                if (distM[i] < dStart || distM[i] > dEnd) continue;
+                const hr = hrBpm[i];
+                if (typeof hr === 'number' && hr > 40 && hr < 250) { hrSum += hr; hrCnt++; }
+                const el = elevM[i];
+                if (typeof el === 'number' && Number.isFinite(el)) {
+                  if (firstElev === null) firstElev = el;
+                  lastElev = el;
+                }
+              }
+              const avg_hr_bpm = hrCnt > 0 ? Math.round(hrSum / hrCnt) : null;
+              const elevGain = firstElev != null && lastElev != null ? Math.max(0, lastElev - firstElev) : null;
+              const gradePercent = firstElev != null && lastElev != null ? ((lastElev - firstElev) / 1609.34) * 100 : null;
+              fallbackSplits.push({ mile: m, pace_s_per_mi, avg_hr_bpm, elevation_gain_m: elevGain, grade_percent: gradePercent, start_elevation_m: firstElev, end_elevation_m: lastElev });
+            }
+            if (fallbackSplits.length >= 10) {
+              mileSplits = fallbackSplits;
+              console.log('[race-narrative] using computed.analysis.series fallback splits:', fallbackSplits.length);
+            }
+          }
+        }
+
         const wd = (() => {
           const raw = (row as any)?.weather_data;
           if (!raw) return null;
