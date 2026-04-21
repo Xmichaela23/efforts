@@ -145,7 +145,12 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
 
       const emb = extractSessionDetailV1FromWorkout(merged);
       if (emb && id) {
-        queryClient.setQueryData(['workout-detail', id, 'session_detail'], { session_detail_v1: emb });
+        // Only seed if cache is empty — never overwrite existing data (even stale/invalidated),
+        // or the session query won't re-run after a recompute invalidation.
+        const existing = queryClient.getQueryData(['workout-detail', id, 'session_detail']);
+        if (!existing) {
+          queryClient.setQueryData(['workout-detail', id, 'session_detail'], { session_detail_v1: emb });
+        }
       }
 
       return { workout: merged };
@@ -188,7 +193,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       });
       if (error) throw error;
       const sessionDetailV1 = (data as any)?.session_detail_v1 || null;
-      console.log('[session_detail] cache_hit:', (data as any)?._cache_hit, 'narrative_text:', String(sessionDetailV1?.narrative_text || '').slice(0, 80) || null, 'is_goal_race:', sessionDetailV1?.race?.is_goal_race);
+      console.log('[session_detail] cache_hit:', (data as any)?._cache_hit, 'narrative_text:', String(sessionDetailV1?.narrative_text || '').slice(0, 80) || null, 'is_goal_race:', sessionDetailV1?.race?.is_goal_race, '_rn_gate:', (sessionDetailV1 as any)?._rn_gate, '_rn_data:', (sessionDetailV1 as any)?._rn_data);
       return { session_detail_v1: sessionDetailV1 };
     },
     staleTime: 5 * 60 * 1000,

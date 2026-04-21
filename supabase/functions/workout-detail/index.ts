@@ -488,6 +488,7 @@ async function runSessionDetailPipelineAndPersist(
     }
 
     // Goal race: generate LLM debrief narrative from actual per-mile data
+    if (sessionDetailV1) sessionDetailV1._rn_gate = `is_goal_race=${wa?.is_goal_race}`;
     if (sessionDetailV1 && wa?.is_goal_race === true) {
       try {
         const raceData = wa?.race ?? {};
@@ -562,6 +563,7 @@ async function runSessionDetailPipelineAndPersist(
         })();
 
         const actualSec = Number(raceData?.actual_seconds);
+        if (sessionDetailV1) sessionDetailV1._rn_data = `splits=${mileSplits?.length} actualSec=${actualSec} isFinite=${Number.isFinite(actualSec)} gt3600=${actualSec > 3600}`;
         if (Array.isArray(mileSplits) && mileSplits.length >= 10 && Number.isFinite(actualSec) && actualSec > 3600) {
           const raceNarrative = await generateRaceNarrative({
             actualSeconds: actualSec,
