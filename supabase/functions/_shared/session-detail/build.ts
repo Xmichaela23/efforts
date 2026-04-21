@@ -268,15 +268,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
   // ── Summary (pre-merged bullets) ───────────────────────────────────────────
   const summaryTitle = String(sessionState?.summary?.title || 'Insights');
-  const summaryBullets = mergeDedupe(
-    arrayOfStrings(sessionState?.summary?.bullets),
-    arrayOfStrings(observations),
-    arrayOfStrings(sessionState?.narrative?.observations),
-  );
+  const isGoalRaceSessionEarly = String(adherenceSummary?.plan_impact?.focus || '').trim() === 'Race result';
+  // Goal races use structured technical_insights — suppress bullets so they don't render alongside
+  const summaryBullets = isGoalRaceSessionEarly
+    ? []
+    : mergeDedupe(
+        arrayOfStrings(sessionState?.summary?.bullets),
+        arrayOfStrings(observations),
+        arrayOfStrings(sessionState?.narrative?.observations),
+      );
 
   // ── Narrative ──────────────────────────────────────────────────────────────
-  /** Goal race: only structured adherence copy — never LLM or synthetic GAP paragraphs. */
-  const isGoalRaceSession = String(adherenceSummary?.plan_impact?.focus || '').trim() === 'Race result';
+  const isGoalRaceSession = isGoalRaceSessionEarly;
 
   const goalRaceNarrativeFromAdherence = (() => {
     if (!isGoalRaceSession) return null;
@@ -299,8 +302,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const llmNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
 
+  // Goal races: use null so structured technical_insights render as label/value rows, not a wall of text
   const resolvedNarrative = isGoalRaceSession
-    ? goalRaceNarrativeFromAdherence
+    ? null
     : llmNarrative || null;
 
   // ── Planned totals (must come before completed — swim unit needed for pace calc) ─
@@ -354,14 +358,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   })();
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
-  const analysisDetailRows = buildAnalysisDetailRows(
-    factPacket,
-    flagsV1,
-    summaryBullets.length > 0,
-    comp,
-    !!perf?.gap_adjusted,
-    intervals,
-  );
+  // Goal races use structured technical_insights only — suppress fact-packet rows to avoid duplication
+  const analysisDetailRows = isGoalRaceSession
+    ? []
+    : buildAnalysisDetailRows(
+        factPacket,
+        flagsV1,
+        summaryBullets.length > 0,
+        comp,
+        !!perf?.gap_adjusted,
+        intervals,
+      );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
   const techInsights: Array<{ label: string; value: string }> = Array.isArray(adherenceSummary?.technical_insights)
@@ -370,6 +377,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         .map((t: any) => ({ label: String(t.label), value: String(t.value) }))
     : [];
   const planImpactText = (() => {
+    if (isGoalRaceSession) return null; // goal race has no plan adherence context
     const fromMatch = match?.summary;
     if (typeof fromMatch === 'string' && fromMatch.trim()) return fromMatch.trim();
     const outlook = adherenceSummary?.plan_impact?.outlook;

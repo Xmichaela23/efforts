@@ -1815,7 +1815,7 @@ Deno.serve(async (req) => {
     })();
 
     const adherenceSummary = generateAdherenceSummary(
-      performance,
+      performance as { execution_adherence: number; pace_adherence: number; duration_adherence: number },
       detailedAnalysis,
       plannedWorkout,
       planContext,
@@ -1825,6 +1825,7 @@ Deno.serve(async (req) => {
       (hrAnalysisContext as any)?.weather?.temperatureF ?? null,
       goalRaceCompletionMatch,
       workout,
+      workout?.weather_data ?? null,
     );
     const scoreExplanation = adherenceSummary?.verdict ?? null;
     console.log('📝 [ADHERENCE SUMMARY] verdict:', scoreExplanation, 'technical_insights:', adherenceSummary?.technical_insights?.length, 'plan_impact:', !!adherenceSummary?.plan_impact);
@@ -2249,7 +2250,10 @@ Deno.serve(async (req) => {
       const out: SummaryV1 = {
         version: 1,
         title: String(title),
-        bullets: cleanedBullets.length ? cleanedBullets : (scoreExplanation ? [String(scoreExplanation)] : []),
+        // Goal races use structured technical_insights — bullets would show as wall-of-text INSIGHTS
+        bullets: goalRaceCompletionMatch.matched
+          ? []
+          : (cleanedBullets.length ? cleanedBullets : (scoreExplanation ? [String(scoreExplanation)] : [])),
         tags: uniq(tags),
         confidence,
       };
@@ -2300,8 +2304,9 @@ Deno.serve(async (req) => {
         execution_score: typeof performance?.execution_adherence === 'number' ? performance.execution_adherence : null,
       },
       narrative: {
-        text: ai_summary || null,
-        source: ai_summary ? 'ai' : 'none',
+        // Goal race: suppress AI narrative so structured technical_insights render instead
+        text: goalRaceCompletionMatch.matched ? null : (ai_summary || null),
+        source: goalRaceCompletionMatch.matched ? 'none' : (ai_summary ? 'ai' : 'none'),
       },
       summary: {
         title: (summaryV1?.title && String(summaryV1.title).trim()) ? String(summaryV1.title).trim() : 'Insights',
@@ -2818,6 +2823,7 @@ function generateAdherenceSummary(
   weatherTempF?: number | null,
   goalRaceCompletion?: GoalRaceCompletionMatch | null,
   workout?: { moving_time?: number | null; duration?: number | null; elapsed_time?: number | null },
+  weatherProfile?: any | null,
 ): WorkoutAdherenceSummary | null {
   if (goalRaceCompletion?.matched) {
     return buildMarathonGoalRaceAdherenceSummary({
@@ -2825,6 +2831,8 @@ function generateAdherenceSummary(
       granularAnalysis,
       detailedAnalysis,
       workout: workout || {},
+      weatherTempF: weatherTempF ?? null,
+      weatherProfile: weatherProfile ?? null,
     });
   }
 

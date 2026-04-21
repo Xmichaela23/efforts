@@ -297,8 +297,10 @@ async function runSessionDetailPipelineAndPersist(
     const observations = sessionObs?.observations ?? [];
 
     const wa = (detail as any).workout_analysis || {};
-    const narrativeText =
-      wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null;
+    // Goal races use structured technical_insights — suppress ai_summary so it doesn't render as a wall of text
+    const narrativeText = wa?.is_goal_race === true
+      ? null
+      : (wa?.session_state_v1?.narrative?.text ?? wa?.ai_summary ?? null);
 
     const rowPlannedId =
       row?.planned_id != null && String(row.planned_id).length > 0 ? String(row.planned_id) : '';
@@ -757,7 +759,11 @@ Deno.serve(async (req) => {
 
       const analysisSd = parseAnalysisFromWorkoutRow(rowSd);
       if (!forceRefresh && !isSessionDetailStale(rowSd, analysisSd)) {
-        const sd = analysisSd.session_detail_v1;
+        let sd = analysisSd.session_detail_v1 as any;
+        // Goal races use structured technical_insights — strip cached narrative_text so it doesn't render
+        if (analysisSd.is_goal_race === true && sd?.narrative_text) {
+          sd = { ...sd, narrative_text: null };
+        }
         console.log('[workout-detail] session_detail fast path: serving persisted session_detail_v1');
         const pcFast = processingCompleteFromWorkoutRow(rowSd);
         const cachedAt = analysisSd.session_detail_updated_at ?? analysisSd.updated_at;
