@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from "re
 import MapEffort, { SegmentEffort } from "./MapEffort";
 import WeatherDisplay from "./WeatherDisplay";
 import { useWeather } from "../hooks/useWeather";
+import { parseWorkoutWeatherDataForDisplay } from "@/lib/sessionWeather";
 import { formatSpeed } from "../utils/workoutFormatting";
 import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
 import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
@@ -893,14 +894,40 @@ function EffortsViewerMapbox({
     } catch {}
   }, [theme]);
 
-  // Weather data
-  const { weather, loading: weatherLoading } = useWeather({
+  // Weather: prefer stored workout.weather_data (same blob as analysis) over a client refetch.
+  const workoutTimestamp = workoutData?.timestamp ?? workoutData?.date;
+
+  const persistedSessionWeather = useMemo(
+    () => parseWorkoutWeatherDataForDisplay((workoutData as any)?.weather_data),
+    [(workoutData as any)?.weather_data, workoutData?.id],
+  );
+
+  const weatherDurationSeconds = useMemo(() => {
+    const w = workoutData as any;
+    const comp = Number(w?.computed?.overall?.duration_s_moving);
+    if (Number.isFinite(comp) && comp >= 60) return Math.round(comp);
+    const mv = Number(w?.moving_time);
+    if (Number.isFinite(mv) && mv > 0) return mv < 1000 ? Math.round(mv * 60) : Math.round(mv);
+    return undefined;
+  }, [workoutData]);
+
+  const canFetchWeather = !!(
+    workoutData?.start_position_lat &&
+    workoutData?.start_position_long &&
+    workoutTimestamp
+  );
+
+  const { weather: fetchedWeather, loading: weatherLoading } = useWeather({
     lat: workoutData?.start_position_lat,
     lng: workoutData?.start_position_long,
-    timestamp: workoutData?.timestamp,
+    timestamp: workoutTimestamp,
     workoutId: workoutData?.id,
-    enabled: !!(workoutData?.start_position_lat && workoutData?.start_position_long && workoutData?.timestamp)
+    durationSeconds: weatherDurationSeconds,
+    enabled: canFetchWeather && !persistedSessionWeather,
   });
+
+  const weatherForHeader = persistedSessionWeather ?? fetchedWeather;
+  const weatherLoadingEffective = persistedSessionWeather ? false : weatherLoading;
 
   // Build a monotonic distance series to avoid GPS glitches (backwards/zero)
   const distCalc = useMemo(() => {
@@ -1545,8 +1572,8 @@ function EffortsViewerMapbox({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px", paddingLeft: 8, paddingRight: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <WeatherDisplay 
-            weather={weather}
-            loading={weatherLoading}
+            weather={weatherForHeader}
+            loading={weatherLoadingEffective}
             fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
           />
           {/* PR count badge - tap to open PR card */}

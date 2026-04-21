@@ -26,6 +26,7 @@ TERRAIN:
 
 WEATHER:
 - Use the supplied temps and humidity. Rough guide: about +1 bpm cardiac load per ~1.8°F rise in ambient temperature during a long effort; high humidity tightens that. Sunny late race adds demand on top of pace.
+- The fact block includes WEATHER MERGE (authoritative): follow it. If start/finish temp or humidity appears as a number in WEATHER, you MUST use it—never write that weather is missing, unknown, or unavailable for this session.
 
 HEART RATE — DO NOT ROMANTICIZE DRIFT:
 - Late-race HR climbing is normal physiology, not a story about toughness. After roughly three hours of sustained running, HR rises even at constant perceived effort: that is natural cardiovascular drift.
@@ -132,6 +133,124 @@ function formatCourseStrategyZonesBlock(zones: CourseStrategyZoneLine[] | null |
     .join('\n');
 }
 
+/** Resolved weather for debrief: prefer race-day activity (workout.weather_data), fall back to race_courses snapshot. */
+export type RaceDebriefWeatherResolved = {
+  startTempF: number | null;
+  finishTempF: number | null;
+  humidityPct: number | null;
+  conditions: string | null;
+  /** Provenance for the LLM fact block—single merge rule. */
+  provenance: string;
+};
+
+function asNum(v: unknown): number | null {
+  if (v == null) return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function meaningfulCondition(c: unknown): string | null {
+  if (c == null || typeof c !== 'string') return null;
+  const t = c.trim();
+  if (!t || t === '—' || t === '-' || t.toLowerCase() === 'unknown') return null;
+  return t;
+}
+
+/** Parse `workouts.weather_data` (JSON string or object) for merge with course strategy. */
+export function parseWorkoutWeatherDataBlob(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    try {
+      const j = JSON.parse(raw) as unknown;
+      return typeof j === 'object' && j != null ? (j as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  return null;
+}
+
+/**
+ * Single merge rule for race debrief weather:
+ * - Per field: prefer `activity` (workout.weather_data from get-weather), then a single representative temp from
+ *   `workouts.avg_temperature` (device °C → °F) when Open-Meteo rows are missing, then `race_courses` snapshot.
+ * - Activity may expose `temperature` when start/end are absent—used as fallback for both start and finish when needed.
+ */
+export function resolveRaceDebriefWeather(args: {
+  courseStrategy?: {
+    start_temp_f?: number | null;
+    finish_temp_f?: number | null;
+    humidity_pct?: number | null;
+    conditions?: string | null;
+  } | null;
+  activity?: Record<string, unknown> | null;
+  /** Garmin / device average temp on the workout row (°C); used only when weather_data has no temps. */
+  deviceAvgTempC?: number | null;
+}): RaceDebriefWeatherResolved {
+  const wd = args.activity;
+  const cs = args.courseStrategy;
+
+  const aStart = asNum(wd?.temperature_start_f);
+  const aEnd = asNum(wd?.temperature_end_f);
+  const aSingle = asNum(wd?.temperature);
+  const aHum = asNum(wd?.humidity);
+  const aCond = meaningfulCondition(wd?.condition);
+
+  const cStart = asNum(cs?.start_temp_f);
+  const cEnd = asNum(cs?.finish_temp_f);
+  const cHum = asNum(cs?.humidity_pct);
+  const cCond = meaningfulCondition(cs?.conditions);
+
+  const deviceFallbackF = (() => {
+    if (aStart != null || aEnd != null || aSingle != null) return null;
+    const c = args.deviceAvgTempC;
+    if (c == null || !Number.isFinite(c) || c === 0) return null;
+    return Math.round((c * 9) / 5 + 32);
+  })();
+
+  const effectiveSingle = aSingle ?? deviceFallbackF;
+
+  const startTempF = aStart ?? effectiveSingle ?? cStart ?? null;
+  const finishTempF = aEnd ?? effectiveSingle ?? cEnd ?? null;
+  const humidityPct = (() => {
+    if (aHum != null && Number.isFinite(aHum) && aHum >= 0) return Math.round(aHum);
+    if (cHum != null && Number.isFinite(cHum) && cHum >= 0) return Math.round(cHum);
+    return null;
+  })();
+  const conditions = aCond ?? cCond ?? null;
+
+  const startSource: 'activity' | 'device_avg' | 'course' | 'none' =
+    aStart != null ? 'activity'
+    : aSingle != null ? 'activity'
+    : deviceFallbackF != null ? 'device_avg'
+    : cStart != null ? 'course'
+    : 'none';
+  const finishSource: 'activity' | 'device_avg' | 'course' | 'none' =
+    aEnd != null ? 'activity'
+    : aSingle != null ? 'activity'
+    : deviceFallbackF != null ? 'device_avg'
+    : cEnd != null ? 'course'
+    : 'none';
+  const humSource: 'activity' | 'course' | 'none' =
+    aHum != null && aHum >= 0 ? 'activity' : cHum != null ? 'course' : 'none';
+  const condSource: 'activity' | 'course' | 'none' =
+    aCond ? 'activity' : cCond ? 'course' : 'none';
+
+  const provenance =
+    `WEATHER MERGE (authoritative): Prefer workout.weather_data (Open-Meteo), then workouts.avg_temperature as °F when no API temps, then race_courses snapshot. ` +
+    `Field sources — start: ${startSource}, finish: ${finishSource}, humidity: ${humSource}, conditions: ${condSource}. ` +
+    `If any numeric temp or humidity appears in WEATHER below, do not claim weather is missing.`;
+
+  return {
+    startTempF,
+    finishTempF,
+    humidityPct,
+    conditions,
+    provenance,
+  };
+}
+
 export interface RaceDebriefInputs {
   workoutName: string;
   elapsedSeconds: number;
@@ -141,12 +260,7 @@ export interface RaceDebriefInputs {
   avgHR: number;
   maxHR: number;
   intensityFactor: number | null;
-  weather: {
-    startTempF: number | null;
-    finishTempF: number | null;
-    humidityPct: number | null;
-    conditions: string | null;
-  };
+  weather: RaceDebriefWeatherResolved;
   splits: Array<{
     mile: number;
     paceSeconds: number;
@@ -206,6 +320,8 @@ MOVING TIME: ${fmtClock(i.movingSeconds)} (use for drift: natural HR rise is exp
 TIME OFF COURSE (elapsed minus moving — aid, stops): ${aidLoss > 30 ? fmtClock(aidLoss) : 'negligible'}
 SESSION AVG HR / MAX HR: ${i.avgHR} / ${i.maxHR} bpm
 INTENSITY FACTOR (if available): ${i.intensityFactor ?? 'N/A'}
+
+${i.weather.provenance}
 
 WEATHER:
 Conditions: ${i.weather.conditions ?? 'unknown'}

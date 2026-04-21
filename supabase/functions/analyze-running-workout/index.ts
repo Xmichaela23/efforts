@@ -19,6 +19,8 @@ import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import {
   collapseCourseSegmentsToZones,
   generateRaceDebrief,
+  parseWorkoutWeatherDataBlob,
+  resolveRaceDebriefWeather,
   type CourseStrategyZoneLine,
   type RawCourseSegmentRow,
 } from '../_shared/race-debrief.ts';
@@ -2368,18 +2370,13 @@ Deno.serve(async (req) => {
           return Number.isFinite(v) && v > 0 ? Math.round(v * 1000) / 1000 : null;
         })();
 
-        let weather: {
-          startTempF: number | null;
-          finishTempF: number | null;
-          humidityPct: number | null;
-          conditions: string | null;
-        } = {
-          startTempF: null,
-          finishTempF: null,
-          humidityPct: null,
-          conditions: null,
-        };
         let courseStrategyZones: CourseStrategyZoneLine[] | null = null;
+        let courseStrategyWeather: {
+          start_temp_f?: number | null;
+          finish_temp_f?: number | null;
+          humidity_pct?: number | null;
+          conditions?: string | null;
+        } | null = null;
         if (goalRaceCompletionMatch.goalId) {
           const { data: rc } = await supabase
             .from('race_courses')
@@ -2406,10 +2403,10 @@ Deno.serve(async (req) => {
             .eq('goal_id', goalRaceCompletionMatch.goalId)
             .maybeSingle();
           if (rc) {
-            weather = {
-              startTempF: rc.start_temp_f != null ? Number(rc.start_temp_f) : null,
-              finishTempF: rc.finish_temp_f != null ? Number(rc.finish_temp_f) : null,
-              humidityPct: rc.humidity_pct != null ? Number(rc.humidity_pct) : null,
+            courseStrategyWeather = {
+              start_temp_f: rc.start_temp_f,
+              finish_temp_f: rc.finish_temp_f,
+              humidity_pct: rc.humidity_pct,
               conditions: rc.conditions != null ? String(rc.conditions) : null,
             };
             const rawSegs = Array.isArray((rc as { course_segments?: unknown }).course_segments)
@@ -2419,6 +2416,16 @@ Deno.serve(async (req) => {
             courseStrategyZones = z.length > 0 ? z : null;
           }
         }
+
+        const activityWeather = parseWorkoutWeatherDataBlob(wAny.weather_data);
+        const devC = wAny.avg_temperature;
+        const deviceAvgTempC =
+          devC != null && Number.isFinite(Number(devC)) && Number(devC) !== 0 ? Number(devC) : null;
+        const weather = resolveRaceDebriefWeather({
+          courseStrategy: courseStrategyWeather,
+          activity: activityWeather,
+          deviceAvgTempC,
+        });
 
         if (splits.length >= 8 && elapsedSec > 120) {
           const debrief = await generateRaceDebrief({
