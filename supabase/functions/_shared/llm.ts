@@ -20,7 +20,7 @@ export type LLMOptions = {
 };
 
 // Model aliases — update here to roll all functions forward at once
-const MODELS = {
+export const MODELS = {
   haiku: 'claude-haiku-4-5-20251001',
   sonnet: 'claude-sonnet-4-6',
 } as const;

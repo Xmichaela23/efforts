@@ -1,5 +1,14 @@
 import type { ArcContext } from './arc-context.ts';
 
+const RACE_RESEARCH = `
+## RACE RESEARCH
+You have the web search tool. When the athlete mentions a **specific** race, search for it (unless CACHED RACE RESEARCH already covers that event).
+Look for: course profile, elevation gain on bike, swim type (open water / wetsuit legal), run course, typical weather, and any known difficulty factors.
+Integrate what you find naturally—do not recite a list of facts; let it inform your questions and arc summary.
+Example: if Santa Cruz 70.3 has a hilly bike, note it when discussing training priorities. **Do not** announce "I searched for this" or "I found online."
+If CACHED RACE RESEARCH in the system prompt already matches the event, prefer that and skip redundant searches unless the athlete wants fresher data.
+`.trim();
+
 function fiveKBlock(arc: ArcContext): string {
   const n = arc.five_k_nudge;
   if (!n?.should_prompt) return '';
@@ -14,10 +23,16 @@ function fiveKBlock(arc: ArcContext): string {
   ].join('\n');
 }
 
+export type ArcSetupPromptOptions = {
+  /** Pre-formatted CACHED RACE RESEARCH block (optional). */
+  raceCacheSection?: string;
+};
+
 /**
  * Full system prompt for AL season setup. `arc` is the live `ArcContext` from getArcContext.
  */
-export function buildArcSetupSystemPrompt(arc: ArcContext): string {
+export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPromptOptions): string {
+  const cacheBlock = (opts?.raceCacheSection && opts.raceCacheSection.trim()) ? `${opts.raceCacheSection}\n\n` : '';
   const arcJson = JSON.stringify(
     {
       athlete_identity: arc.athlete_identity,
@@ -38,6 +53,8 @@ export function buildArcSetupSystemPrompt(arc: ArcContext): string {
 ${arcJson}
 
 ${fiveKBlock(arc)}
+${cacheBlock}
+${RACE_RESEARCH}
 
 ## Rules
 - Use this context; do not invent race names or dates the athlete has not given in the chat. You may connect dots from context + what they said.

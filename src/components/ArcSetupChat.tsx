@@ -130,7 +130,9 @@ type ArcSetupChatProps = {
 };
 
 /**
- * AL season setup: chat with Claude via `arc-setup-chat`, optional `<arc_setup>` confirmation card.
+ * AL season setup: chat with Claude via `arc-setup-chat` (server uses web search for race research when needed).
+ * No extra loading state — searches add latency only.
+ * Optional `<arc_setup>` confirmation card.
  */
 export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
   const navigate = useNavigate();

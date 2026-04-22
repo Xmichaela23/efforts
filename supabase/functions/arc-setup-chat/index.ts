@@ -1,7 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { buildArcSetupSystemPrompt } from '../_shared/arc-setup-prompt.ts';
-import { callClaudeConversation, type ConversationMessage } from '../_shared/llm.ts';
+import type { ConversationMessage } from '../_shared/llm.ts';
+import {
+  callClaudeArcSetupConversation,
+  extractWebSearchTrace,
+  lastUserText,
+  tryExtractIsoDate,
+} from '../_shared/llm-arc-setup.ts';
+import {
+  buildCourseDataFromSearch,
+  deriveRaceNameFromQueries,
+  loadWebSearchRaceCache,
+  formatRaceCacheForSystemPrompt,
+  upsertWebSearchResearchRow,
+} from '../_shared/race-research-cache.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -60,21 +73,40 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const arc = await getArcContext(supabase, userId, focusDateISO);
-    const system = buildArcSetupSystemPrompt(arc);
 
-    const text = await callClaudeConversation({
+    const cacheRows = await loadWebSearchRaceCache(supabase, userId);
+    const cacheSection = formatRaceCacheForSystemPrompt(cacheRows);
+
+    const system = buildArcSetupSystemPrompt(arc, { raceCacheSection: cacheSection });
+
+    const { text, lastContent, lastUsage } = await callClaudeArcSetupConversation({
       system,
       messages: messages as ConversationMessage[],
       maxTokens: 4096,
       temperature: 0.4,
-      model: 'sonnet',
     });
 
     if (text == null) {
       return new Response(
-        JSON.stringify({ error: 'Model unavailable. Check ANTHROPIC_API_KEY and logs.' }),
+        JSON.stringify({ error: 'Model unavailable. Check ANTHROPIC_API_KEY, web search enablement, and logs.' }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    const nSearch = (lastUsage as { server_tool_use?: { web_search_requests?: number } } | undefined)?.server_tool_use
+      ?.web_search_requests;
+    const trace = extractWebSearchTrace(lastContent);
+    if ((nSearch != null && nSearch > 0) || trace.queries.length > 0) {
+      const lastUser = lastUserText(messages as ConversationMessage[]);
+      const { queries, results } = trace;
+      const courseData = buildCourseDataFromSearch(lastUser, queries, results, text);
+      const raceName = deriveRaceNameFromQueries(queries);
+      const fromUser = tryExtractIsoDate(lastUser) || tryExtractIsoDate(messages.map((m) => m.content).join('\n'));
+      await upsertWebSearchResearchRow(supabase, userId, {
+        name: raceName,
+        raceDate: fromUser,
+        courseData,
+      });
     }
 
     return new Response(JSON.stringify({ text }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
