@@ -19,6 +19,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { isWatchConnectivityAvailable, sendWorkoutToWatch, convertToWatchWorkout } from '@/services/watchConnectivity';
 import SkipSessionReasonPanel from '@/components/planned/SkipSessionReasonPanel';
 import { skipReasonLabel } from '@/lib/skip-session-reasons';
+import { useNavigate } from 'react-router-dom';
+import { fetchArcContext } from '@/lib/fetch-arc-context';
+import { buildArcLine, arcLineNeedsGoalsSetup, type ArcForHomeLine } from '@/lib/build-arc-line';
 
 // Component for expandable workout cards with fixed height
 const WorkoutCardExpandable: React.FC<{
@@ -109,7 +112,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   onViewCompleted, 
   onEditEffort 
 }) => {
+  const navigate = useNavigate();
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
+  const [homeArc, setHomeArc] = useState<ArcForHomeLine | null>(null);
+  const [homeArcReady, setHomeArcReady] = useState(false);
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -126,6 +132,33 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   useEffect(() => {
     if (!selectedPlannedWorkout) setPlannedDrawerStep('detail');
   }, [selectedPlannedWorkout]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const a = await fetchArcContext();
+        if (!cancelled) {
+          setHomeArc((a as ArcForHomeLine) ?? null);
+          setHomeArcReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setHomeArc(null);
+          setHomeArcReady(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const arcLineText = useMemo(
+    () => (homeArcReady ? buildArcLine(homeArc) : ''),
+    [homeArcReady, homeArc]
+  );
+  const arcNeedsGoals = useMemo(() => arcLineNeedsGoalsSetup(homeArc), [homeArc]);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -1346,6 +1379,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             )}
           </div>
         </div>
+
+        {homeArcReady && arcLineText ? (
+          <div className="flex-shrink-0 px-2 pt-2 pb-1">
+            {arcNeedsGoals ? (
+              <button
+                type="button"
+                onClick={() => navigate('/goals')}
+                className="m-0 w-full cursor-pointer border-none bg-transparent p-0 text-left"
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 400,
+                  letterSpacing: '0.02em',
+                  color: 'rgba(255, 255, 255, 0.38)',
+                }}
+              >
+                {arcLineText}
+              </button>
+            ) : (
+              <p
+                className="m-0"
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 400,
+                  letterSpacing: '0.02em',
+                  color: 'rgba(255, 255, 255, 0.38)',
+                }}
+              >
+                {arcLineText}
+              </p>
+            )}
+          </div>
+        ) : null}
 
         {/* Content area
             Option C: slightly wider rail + Today blocks get a small bleed.

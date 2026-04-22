@@ -241,6 +241,32 @@ export function estimateVdotFromPace(thresholdPaceSecPerMi: number): number | nu
 }
 
 /**
+ * Reverse-lookup VDOT from an easy (base) pace in seconds per mile.
+ * Mirrors {@link estimateVdotFromPace} but uses `paces.base` on the PACE_TABLE.
+ */
+export function estimateVdotFromBasePace(basePaceSecPerMi: number): number | null {
+  if (!Number.isFinite(basePaceSecPerMi) || basePaceSecPerMi <= 0) return null;
+
+  const first = PACE_TABLE[0];
+  const last = PACE_TABLE[PACE_TABLE.length - 1];
+  if (basePaceSecPerMi >= first.paces.base) return first.vdot;
+  if (basePaceSecPerMi <= last.paces.base) return last.vdot;
+
+  for (let i = 0; i < PACE_TABLE.length - 1; i++) {
+    const slower = PACE_TABLE[i];
+    const faster = PACE_TABLE[i + 1];
+    if (basePaceSecPerMi <= slower.paces.base && basePaceSecPerMi >= faster.paces.base) {
+      const paceRange = slower.paces.base - faster.paces.base;
+      if (paceRange === 0) return slower.vdot;
+      const fraction = (slower.paces.base - basePaceSecPerMi) / paceRange;
+      return Math.round((slower.vdot + fraction * (faster.vdot - slower.vdot)) * 10) / 10;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get projected finish time for a given Effort Score and distance
  * Returns time in seconds
  */

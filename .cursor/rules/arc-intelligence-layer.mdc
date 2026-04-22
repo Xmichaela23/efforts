@@ -1,0 +1,38 @@
+---
+description: The Arc is Efforts' deterministic intelligence layer; getArcContext is the contract for all athlete state
+alwaysApply: true
+---
+
+# Arc — intelligence layer (not a feature)
+
+The **Arc** is the **brain and nervous system** of Efforts: the layer every screen, edge function, and coaching interaction runs on. It is **not** a product feature, a plan, a dashboard, or the LLM.
+
+## What the Arc is
+
+- **Deterministic truth** computed from real data: workout history, HR zones, learned fitness, goals, load trends, athlete memory, etc. Not vibes, not ad-hoc LLM guessing.
+- **AL (coach voice)** reads from the Arc and speaks from it. The Arc does not depend on AL.
+- **Plans** are *expressions* of the Arc for a time window, not the Arc itself.
+
+## Contract: `getArcContext()`
+
+- **Single entry** for “who is this athlete and what do we know?” — prefer this over assembling state from scattered queries.
+- Before changing or adding behavior in **adapt-plan, generate-training-context, materialize-plan, coach, weekly state, home, goals, strength overlay**, or similar: **is this path loading ArcContext first?** If not, **fix that first**.
+
+## What screens do
+
+Screens **read and visualize** the Arc; they do not re-derive their own copy of athlete truth. Directionally:
+
+- **Home** — phase, today’s context, next goal
+- **State** — load, readiness, ACWR, phase health
+- **Goals** — stack ordered by target date, trajectory
+- **Coach** — AL grounded in ArcContext, not cold start
+- **Plan / adapt** — `athlete_identity`, learned fitness, active goals, phase before decisions
+- **Strength overlay** — discipline identity and current phase
+
+## What the Arc knows (summary)
+
+Identity and personality; full goal stack; current phase, load, readiness, recovery; athlete memory and derived rules; learned zones, paces, FTP, strength baselines.
+
+## Implementation habit
+
+**The Arc is the single source of athlete truth.** Build everything else on top of it; extend `getArcContext` and its data sources when something new must be true everywhere.

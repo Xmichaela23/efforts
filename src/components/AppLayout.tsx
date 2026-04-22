@@ -548,6 +548,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [location]);
 
+  // Deep link: /goals opens the in-app Goals stack (same as Goals tab)
+  useEffect(() => {
+    if (location.pathname === '/goals') {
+      setShowGoals(true);
+    }
+  }, [location.pathname]);
+
 
 
 
@@ -832,6 +839,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
+
+    if (location.pathname === '/goals') {
+      try {
+        navigate('/', { replace: true });
+      } catch {}
+    }
 
     // If we were viewing a workout (not from builder), reset date to today and sync calendar
     if (wasViewingWorkout && !shouldReturnToSummary) {

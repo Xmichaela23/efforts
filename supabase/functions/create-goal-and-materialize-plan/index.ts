@@ -5,6 +5,13 @@ import {
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
 import { computeRunPlanningSignals } from '../_shared/planning-context.ts';
+import {
+  calculateEffortScore,
+  estimateVdotFromBasePace,
+  estimateVdotFromPace,
+  getPacesFromScore,
+  type TrainingPaces,
+} from '../generate-run-plan/effort-score.ts';
 
 type GoalAction = 'keep' | 'replace';
 type RequestMode = 'create' | 'build_existing' | 'link_existing';
@@ -98,6 +105,141 @@ function weeksUntilRace(today: Date, raceDate: Date): number {
 function distanceToApiValue(distance: string | null): string {
   if (!distance) return '';
   return DISTANCE_TO_API[distance] || String(distance).toLowerCase();
+}
+
+function parseLearnedFitnessForSeed(raw: unknown): Record<string, unknown> {
+  if (raw == null) return {};
+  if (typeof raw === 'string') {
+    try {
+      const o = JSON.parse(raw);
+      return typeof o === 'object' && o && !Array.isArray(o) ? o as Record<string, unknown> : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  return {};
+}
+
+/** Prefer learned_fitness for seeding when confidence is `medium` or `high` (not `low` or missing). */
+function learnedPaceUsable(
+  m: unknown,
+): m is { value: number; confidence: string } {
+  if (!m || typeof m !== 'object') return false;
+  const c = String((m as { confidence?: string }).confidence || '').toLowerCase();
+  if (c !== 'medium' && c !== 'high') return false;
+  const v = Number((m as { value?: number }).value);
+  return Number.isFinite(v) && v > 0;
+}
+
+function secPerKmToSecPerMi(secKm: number): number {
+  return secKm * 1.60934;
+}
+
+/**
+ * Merges `user_baselines.learned_fitness` run paces (medium/high confidence) over
+ * performance / race-derived paces, and provides `effort_score` when the plan must be
+ * anchored only on learned data (generate-run requires score or source).
+ */
+type RunMergeResult =
+  & {
+    effort_paces: TrainingPaces;
+    base_pace_field: 'learned_fitness' | 'performance_numbers';
+    steady_pace_field: 'learned_fitness' | 'performance_numbers';
+  }
+  & (
+    | { effort_bearer: 'source'; effort_source_distance: number; effort_source_time: number }
+    | { effort_bearer: 'score'; effort_score: number }
+  );
+
+function mergeRunPerformanceSeeds(
+  baseline: Record<string, unknown> | null | undefined,
+): RunMergeResult | null {
+  if (!baseline) return null;
+  const learned = parseLearnedFitnessForSeed(baseline.learned_fitness);
+  const th = learned?.run_threshold_pace_sec_per_km;
+  const easy = learned?.run_easy_pace_sec_per_km;
+  const hasLearnedTh = learnedPaceUsable(th);
+  const hasLearnedEasy = learnedPaceUsable(easy);
+
+  let foundation: TrainingPaces | null = null;
+  let anchorVdot: number | undefined;
+  const rawPaces = baseline.effort_paces as Record<string, unknown> | null | undefined;
+  const hasBaselineRacePace = rawPaces && Number.isFinite(Number(rawPaces.race));
+
+  if (hasBaselineRacePace) {
+    foundation = { ...rawPaces } as TrainingPaces;
+  } else if (baseline.effort_source_distance && baseline.effort_source_time) {
+    const s = calculateEffortScore(
+      Number(baseline.effort_source_distance),
+      Number(baseline.effort_source_time),
+    );
+    foundation = getPacesFromScore(s);
+    anchorVdot = s;
+  } else if (baseline.effort_score != null && Number.isFinite(Number(baseline.effort_score))) {
+    const s = Number(baseline.effort_score);
+    foundation = getPacesFromScore(s);
+    anchorVdot = s;
+  } else if (hasLearnedTh) {
+    const tMi = secPerKmToSecPerMi(Number((th as { value: number }).value));
+    const v = estimateVdotFromPace(tMi);
+    if (v != null) {
+      foundation = getPacesFromScore(v);
+      anchorVdot = v;
+    }
+  } else if (hasLearnedEasy) {
+    const bMi = secPerKmToSecPerMi(Number((easy as { value: number }).value));
+    const v = estimateVdotFromBasePace(bMi);
+    if (v != null) {
+      foundation = getPacesFromScore(v);
+      anchorVdot = v;
+    }
+  }
+  if (!foundation) return null;
+
+  const paces: TrainingPaces = { ...foundation };
+  let baseField: 'learned_fitness' | 'performance_numbers' = 'performance_numbers';
+  let steadyField: 'learned_fitness' | 'performance_numbers' = 'performance_numbers';
+
+  if (hasLearnedTh) {
+    paces.steady = Math.round(secPerKmToSecPerMi(Number((th as { value: number }).value)));
+    steadyField = 'learned_fitness';
+  }
+  if (hasLearnedEasy) {
+    paces.base = Math.round(secPerKmToSecPerMi(Number((easy as { value: number }).value)));
+    baseField = 'learned_fitness';
+  }
+  if (!paces.race || !Number.isFinite(paces.race)) return null;
+
+  if (baseline.effort_source_distance && baseline.effort_source_time) {
+    return {
+      effort_bearer: 'source',
+      effort_source_distance: Number(baseline.effort_source_distance),
+      effort_source_time: Number(baseline.effort_source_time),
+      effort_paces: paces,
+      base_pace_field: baseField,
+      steady_pace_field: steadyField,
+    };
+  }
+  if (baseline.effort_score != null && Number.isFinite(Number(baseline.effort_score))) {
+    return {
+      effort_bearer: 'score',
+      effort_score: Number(baseline.effort_score),
+      effort_paces: paces,
+      base_pace_field: baseField,
+      steady_pace_field: steadyField,
+    };
+  }
+  if (anchorVdot != null) {
+    return {
+      effort_bearer: 'score',
+      effort_score: anchorVdot,
+      effort_paces: paces,
+      base_pace_field: baseField,
+      steady_pace_field: steadyField,
+    };
+  }
+  return null;
 }
 
 function isMarathonDistance(distance: string | null | undefined): boolean {
@@ -530,6 +672,14 @@ Deno.serve(async (req: Request) => {
         ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),
       };
 
+      const triLearned = parseLearnedFitnessForSeed(triBaseline?.learned_fitness);
+      if (learnedPaceUsable(triLearned?.ride_ftp_estimated)) {
+        triGenerateBody.ftp = Number((triLearned.ride_ftp_estimated as { value: number }).value);
+        console.log('[create-goal] tri ftp source: learned_fitness vs performance_numbers (using learned_fitness)');
+      } else {
+        console.log('[create-goal] tri ftp source: learned_fitness vs performance_numbers (using performance_numbers)');
+      }
+
       // Seed current discipline volumes from snapshot
       if (latestSnap?.workload_by_discipline) {
         const wd = latestSnap.workload_by_discipline;
@@ -728,7 +878,10 @@ Deno.serve(async (req: Request) => {
       const hasRaceTime = baseline?.effort_source_distance && baseline?.effort_source_time;
       const hasEffortScore = !!baseline?.effort_score;
       const hasThresholdPace = !!baseline?.effort_paces?.race;
-      if (!hasRaceTime && !hasEffortScore && !hasThresholdPace) {
+      const learnedForGate = parseLearnedFitnessForSeed(baseline?.learned_fitness);
+      const hasLearnedRunPace = learnedPaceUsable(learnedForGate?.run_threshold_pace_sec_per_km)
+        || learnedPaceUsable(learnedForGate?.run_easy_pace_sec_per_km);
+      if (!hasRaceTime && !hasEffortScore && !hasThresholdPace && !hasLearnedRunPace) {
         throw new AppError('missing_pace_benchmark', 'Pace benchmark required: enter a recent race result or run quick calibration first.');
       }
     }
@@ -802,13 +955,36 @@ Deno.serve(async (req: Request) => {
     }
 
     if (generateBody.approach === 'performance_build') {
-      if (baseline?.effort_source_distance && baseline?.effort_source_time) {
-        generateBody.effort_source_distance = baseline.effort_source_distance;
-        generateBody.effort_source_time = baseline.effort_source_time;
-      } else if (baseline?.effort_score) {
-        generateBody.effort_score = baseline.effort_score;
+      const merged = mergeRunPerformanceSeeds(
+        baseline as unknown as Record<string, unknown> | null | undefined,
+      );
+      if (merged) {
+        if (merged.effort_bearer === 'source') {
+          generateBody.effort_source_distance = merged.effort_source_distance;
+          generateBody.effort_source_time = merged.effort_source_time;
+        } else {
+          generateBody.effort_score = merged.effort_score;
+        }
+        generateBody.effort_paces = merged.effort_paces;
+        const effSrc =
+          (merged.base_pace_field === 'learned_fitness' && merged.steady_pace_field === 'learned_fitness')
+            ? 'learned_fitness (base + threshold)'
+            : (merged.base_pace_field === 'learned_fitness' || merged.steady_pace_field === 'learned_fitness'
+              ? 'learned_fitness (partial) vs performance_numbers'
+              : 'performance_numbers');
+        console.log(
+          `[create-goal] effort_paces source: ${effSrc} — base=${merged.base_pace_field}, threshold(steady)=${merged.steady_pace_field}`,
+        );
+      } else {
+        if (baseline?.effort_source_distance && baseline?.effort_source_time) {
+          generateBody.effort_source_distance = baseline.effort_source_distance;
+          generateBody.effort_source_time = baseline.effort_source_time;
+        } else if (baseline?.effort_score) {
+          generateBody.effort_score = baseline.effort_score;
+        }
+        if (baseline?.effort_paces) generateBody.effort_paces = baseline.effort_paces;
+        console.log('[create-goal] effort_paces source: learned_fitness vs performance_numbers (using performance_numbers — merge skipped)');
       }
-      if (baseline?.effort_paces) generateBody.effort_paces = baseline.effort_paces;
     }
 
     if (resolvedGoal?.training_prefs?.strength_protocol && resolvedGoal.training_prefs.strength_protocol !== 'none') {

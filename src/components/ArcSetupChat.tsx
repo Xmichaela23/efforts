@@ -26,10 +26,15 @@ function normalizeGoalInput(g: Record<string, unknown>): GoalInsert | null {
   if (!isValidGoalType(goal_type)) return null;
   const target_date =
     typeof g.target_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(g.target_date) ? g.target_date.slice(0, 10) : null;
+  const target_time =
+    typeof g.target_time === 'number' && Number.isFinite(g.target_time) && g.target_time > 0
+      ? Math.round(g.target_time)
+      : null;
   return {
     name,
     goal_type,
     target_date,
+    target_time,
     sport: typeof g.sport === 'string' ? g.sport : null,
     distance: typeof g.distance === 'string' ? g.distance : null,
     course_profile: typeof g.course_profile === 'object' && g.course_profile !== null ? (g.course_profile as Record<string, unknown>) : {},
@@ -43,26 +48,36 @@ function normalizeGoalInput(g: Record<string, unknown>): GoalInsert | null {
   };
 }
 
+function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
+  const out: GoalInsert[] = [];
+  for (const g of Array.isArray(payload.goals) ? payload.goals : []) {
+    if (typeof g !== 'object' || g === null) continue;
+    const row = normalizeGoalInput(g as Record<string, unknown>);
+    if (row) out.push(row);
+  }
+  return out;
+}
+
 async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean; error?: string }> {
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
-  const goalsRaw = Array.isArray(payload.goals) ? payload.goals : [];
+  const validGoals = collectValidGoals(payload);
   const idPatch = (payload.athlete_identity && typeof payload.athlete_identity === 'object' && !Array.isArray(payload.athlete_identity))
     ? (payload.athlete_identity as Record<string, unknown>)
     : null;
+  const hadGoalSlots = Array.isArray(payload.goals) && payload.goals.length > 0;
+  if (hadGoalSlots && validGoals.length === 0 && !idPatch) {
+    return { ok: false, error: 'No valid goals in the draft. Ask the coach to resend a proper <arc_setup> block.' };
+  }
+  if (validGoals.length === 0 && !idPatch) {
+    return { ok: false, error: 'Nothing to save.' };
+  }
 
   try {
-    for (const g of goalsRaw) {
-      if (typeof g !== 'object' || g === null) continue;
-      const row = normalizeGoalInput(g as Record<string, unknown>);
-      if (!row) continue;
-      const { error } = await supabase.from('goals').insert([
-        {
-          user_id: userId,
-          ...row,
-        },
-      ]);
+    if (validGoals.length > 0) {
+      const rows = validGoals.map((row) => ({ user_id: userId, ...row }));
+      const { error } = await supabase.from('goals').insert(rows);
       if (error) {
         console.error('[arc-setup] goal insert', error);
         return { ok: false, error: error.message };
@@ -82,6 +97,7 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
       const merged: Record<string, unknown> = {
         ...prev,
         ...idPatch,
+        confirmed_by_user: true,
         arc_setup_confirmed_at: new Date().toISOString(),
       };
       if (ub?.id) {
@@ -135,14 +151,15 @@ type ArcSetupChatProps = {
  * Optional `<arc_setup>` confirmation card.
  */
 export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
-  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: 'assistant', content: SEED_ASSISTANT }]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveBanner, setSaveBanner] = useState<string | null>(null);
   const [pendingSetup, setPendingSetup] = useState<{
     payload: ArcSetupPayload;
     summaryLine: string;
+    goalPreviews: string[];
   } | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -196,15 +213,20 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       const { displayText, payload } = parseArcSetupFromAssistant(text);
       const show = displayText || (payload ? 'Here’s a draft we can save—check the card below.' : '');
       setMessages((prev) => [...prev, { role: 'assistant', content: show }]);
-      const hasGoals = Array.isArray(payload?.goals) && payload.goals.length > 0;
+      setSaveBanner(null);
+      const validGoals = payload ? collectValidGoals(payload) : [];
       const hasId =
         payload?.athlete_identity &&
         typeof payload.athlete_identity === 'object' &&
         !Array.isArray(payload.athlete_identity) &&
         Object.keys(payload.athlete_identity as object).length > 0;
-      if (payload && (hasGoals || hasId)) {
+      if (payload && (validGoals.length > 0 || hasId)) {
+        const goalPreviews = validGoals.map(
+          (g) => [g.name, g.goal_type, g.target_date || ''].filter(Boolean).join(' · ')
+        );
         setPendingSetup({
           payload,
+          goalPreviews,
           summaryLine:
             typeof payload.summary === 'string' && payload.summary.trim()
               ? payload.summary.trim()
@@ -231,6 +253,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       return;
     }
     setPendingSetup(null);
+    setSaveBanner('Saved. Your goals and profile are updated.');
   };
 
   const onClarify = () => {
@@ -253,10 +276,21 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
           </div>
         ))}
 
+        {saveBanner && (
+          <p className="text-[12px] text-teal-200/90 px-1 py-1">{saveBanner}</p>
+        )}
+
         {pendingSetup && (
           <div className="mt-3 p-3 rounded-xl border border-teal-500/35 bg-teal-950/40">
             <p className="text-[11px] font-medium text-teal-200/90 uppercase tracking-wide mb-1.5">Ready to save</p>
-            <p className="text-[13px] text-white/85 leading-snug mb-3">{pendingSetup.summaryLine}</p>
+            <p className="text-[13px] text-white/85 leading-snug mb-2">{pendingSetup.summaryLine}</p>
+            {pendingSetup.goalPreviews.length > 0 && (
+              <ul className="text-[12px] text-white/60 list-disc pl-4 mb-3 space-y-0.5">
+                {pendingSetup.goalPreviews.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"

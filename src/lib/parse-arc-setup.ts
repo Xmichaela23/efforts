@@ -6,6 +6,14 @@ export type ArcSetupPayload = {
   athlete_identity?: Record<string, unknown>;
 };
 
+function innerJsonToParse(inner: string): string {
+  let s = inner.trim();
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+  }
+  return s.trim();
+}
+
 export function parseArcSetupFromAssistant(raw: string): {
   displayText: string;
   payload: ArcSetupPayload | null;
@@ -16,7 +24,7 @@ export function parseArcSetupFromAssistant(raw: string): {
     return { displayText, payload: null };
   }
   try {
-    const parsed = JSON.parse(m[1].trim()) as ArcSetupPayload;
+    const parsed = JSON.parse(innerJsonToParse(m[1])) as ArcSetupPayload;
     return { displayText, payload: parsed && typeof parsed === 'object' ? parsed : null };
   } catch {
     return { displayText, payload: null };

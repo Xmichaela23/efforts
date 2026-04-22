@@ -33,7 +33,7 @@ export interface ActivePlanSummary {
   discipline: string | null;
 }
 
-/** Full row shape when we load `athlete_snapshot` (TODO). */
+/** Latest `athlete_snapshot` row for the user (all columns, newest `week_start`). */
 export type AthleteSnapshot = Record<string, unknown>;
 
 export interface AthleteMemorySummary {
@@ -267,8 +267,8 @@ function buildActivePlanSummary(
 }
 
 /**
- * Aggregates user_baselines, active goals, active plan, and (later) snapshot + memory
- * for Athlete Arc–aware prompts and planners.
+ * Aggregates user_baselines, active goals, active plan, latest weekly snapshot, and
+ * current athlete memory for Athlete Arc–aware prompts and planners.
  */
 export async function getArcContext(
   supabase: { from: (t: string) => any },
@@ -277,7 +277,7 @@ export async function getArcContext(
 ): Promise<ArcContext> {
   const built_at = new Date().toISOString();
 
-  const [baselinesRes, goalsRes, plansRes] = await Promise.all([
+  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes] = await Promise.all([
     supabase
       .from('user_baselines')
       .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers')
@@ -295,7 +295,21 @@ export async function getArcContext(
       .eq('user_id', userId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('athlete_snapshot')
+      .select('*')
+      .eq('user_id', userId)
+      .order('week_start', { ascending: false })
       .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('athlete_memory')
+      .select('derived_rules, confidence_score')
+      .eq('user_id', userId)
+      .order('period_end', { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
 
   const baseline = baselinesRes?.data as Record<string, unknown> | null;
@@ -329,10 +343,29 @@ export async function getArcContext(
     );
   }
 
-  // TODO: load most recent `athlete_snapshot` row for this user
-  const latest_snapshot: AthleteSnapshot | null = null;
-  // TODO: load most recent `athlete_memory` row; map to { derived_rules, confidence_score } only
-  const athlete_memory: AthleteMemorySummary | null = null;
+  let latest_snapshot: AthleteSnapshot | null = null;
+  if (snapshotRes?.error) {
+    console.warn('[getArcContext] athlete_snapshot', snapshotRes.error.message);
+  } else {
+    const row = snapshotRes?.data;
+    if (row && typeof row === 'object' && !Array.isArray(row)) {
+      latest_snapshot = row as AthleteSnapshot;
+    }
+  }
+
+  let athlete_memory: AthleteMemorySummary | null = null;
+  if (memoryRes?.error) {
+    console.warn('[getArcContext] athlete_memory', memoryRes.error.message);
+  } else {
+    const m = memoryRes?.data as { derived_rules?: unknown; confidence_score?: unknown } | null;
+    if (m && typeof m === 'object') {
+      const cs = m.confidence_score;
+      athlete_memory = {
+        derived_rules: m.derived_rules ?? null,
+        confidence_score: cs != null && Number.isFinite(Number(cs)) ? Number(cs) : null
+      };
+    }
+  }
 
   return {
     athlete_identity,

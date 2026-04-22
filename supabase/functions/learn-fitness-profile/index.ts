@@ -59,12 +59,18 @@ function isRideWorkoutType(type: string): boolean {
   return normType(type) === 'ride';
 }
 
+/** `workouts.type` is the activity column; there is no `workouts.discipline` column. */
+function workoutTypeFromRow(w: { type?: string | null }): string {
+  return w?.type != null ? String(w.type) : '';
+}
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
 
 interface WorkoutRecord {
   id: string;
+  /** DB: `workouts.type` — not `discipline` */
   type: string;
   date: string;
   duration: number;
@@ -184,12 +190,12 @@ Deno.serve(async (req) => {
     );
     console.log(`📊 90d rows: ${allWorkouts.length} total, ${withAvgHr.length} with usable avg HR`);
 
-    const runs = allWorkouts.filter((w) => isRunWorkoutType(w.type));
-    const rides = allWorkouts.filter((w) => isRideWorkoutType(w.type));
+    const runs = allWorkouts.filter((w) => isRunWorkoutType(workoutTypeFromRow(w)));
+    const rides = allWorkouts.filter((w) => isRideWorkoutType(workoutTypeFromRow(w)));
 
     console.log(`🏃 Runs (normalized): ${runs.length}, 🚴 Rides (normalized): ${rides.length}`);
 
-    // Last activity per norm discipline (for dormant swim, etc.) — 18m lookback
+    // Last activity per normalized type (for dormant swim, etc.) — 18m lookback; uses `workouts.type`
     const { data: recencyRows, error: recencyErr } = await supabase
       .from('workouts')
       .select('type, date')
@@ -203,9 +209,10 @@ Deno.serve(async (req) => {
     }
     const recency: DisciplineRecency = {};
     for (const row of recencyRows || []) {
-      const raw = (row.type || '').toLowerCase().trim();
+      const t = workoutTypeFromRow(row);
+      const raw = t.toLowerCase().trim();
       if (raw === 'walk' || raw === 'hike') continue;
-      const k = normType(row.type);
+      const k = normType(t);
       if (k === 'other' || k === 'walk') continue;
       if (!recency[k] && row.date) {
         recency[k] = String(row.date).slice(0, 10);
@@ -294,7 +301,24 @@ Deno.serve(async (req) => {
     let identityUpdate: Record<string, unknown> = {};
     if (!userConfirmed) {
       try {
-        const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus, recency);
+        const { data: goalRowsForPhase, error: goalsPhaseErr } = await supabase
+          .from('goals')
+          .select('target_date, sport, distance')
+          .eq('user_id', user_id)
+          .eq('status', 'active')
+          .eq('goal_type', 'event')
+          .not('target_date', 'is', null);
+        if (goalsPhaseErr) {
+          console.warn('⚠️ goals for phase inference (non-fatal):', goalsPhaseErr.message);
+        }
+        const goalsForPhase = (goalRowsForPhase ?? []).map(
+          (r: { target_date: string; sport: string | null; distance: string | null }) => ({
+            target_date: String(r.target_date).slice(0, 10),
+            sport: r.sport ?? null,
+            distance: r.distance ?? null,
+          })
+        );
+        const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus, recency, goalsForPhase);
         const disciplines = inferDisciplinesTextArray(idv1.discipline_mix);
         const training_background = inferTrainingBackgroundSentence(idv1);
         identityUpdate = {

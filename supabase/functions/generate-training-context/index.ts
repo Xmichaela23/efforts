@@ -470,7 +470,7 @@ interface TrainingContextResponse {
     recommended_spacing_weeks: number | null;
     minimum_feasible_spacing_weeks: number | null;
   };
-  /** Athlete Arc bundle for prompts (baselines, goals, plan summary; snapshot/memory TBD in getArcContext). */
+  /** Athlete Arc bundle: baselines, goals, plan, latest weekly snapshot, memory summary, 5K nudge. */
   arc: ArcContext;
 }
 

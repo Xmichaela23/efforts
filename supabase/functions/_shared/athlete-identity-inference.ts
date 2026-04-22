@@ -22,13 +22,133 @@ export interface AthleteIdentityV1 {
 export type DisciplineRecency = Partial<Record<'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'other', string>>;
 
 type W = {
+  /** DB column is `workouts.type` (run | ride | swim | strength, etc.). There is no `discipline` column. */
   type: string;
   date: string;
   moving_time: number | null;
   duration: number | null;
   strava_data?: unknown;
   name?: string | null;
+  /** Often km in Efforts; used with race matching */
+  distance?: number | null;
+  computed?: { overall?: { distance_m?: number | null } };
 };
+
+/** Normalize using `workouts.type` only — never `workouts.discipline` (not a column). */
+function workoutTypeForNorm(w: { type?: string | null }): string {
+  return w?.type != null ? String(w.type) : '';
+}
+
+/** Active event goals from DB — `learn-fitness-profile` supplies these when available */
+export type GoalForPhaseInference = {
+  target_date: string;
+  sport: string | null;
+  distance: string | null;
+};
+
+function workoutDistanceMeters(w: W): number | null {
+  const dm = Number((w as W).computed?.overall?.distance_m);
+  if (Number.isFinite(dm) && dm > 0) return dm;
+  const raw = Number((w as W).distance);
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  if (raw > 300) return raw;
+  return raw * 1000;
+}
+
+function normGoalSport(s: string | null | undefined): 'run' | 'ride' | 'swim' | 'strength' | 'tri' | 'other' {
+  const x = (s || 'run').toLowerCase();
+  if (x.includes('tri') || x === 'hybrid') return 'tri';
+  if (x.includes('swim')) return 'swim';
+  if (x.includes('strength') || x.includes('lift')) return 'strength';
+  if (x.includes('ride') || x.includes('bike') || x === 'cycling' || x.includes('virtualride')) return 'ride';
+  if (x.includes('run') || x === 'walk') return 'run';
+  return 'other';
+}
+
+function normGoalDistanceKey(d: string | null | undefined): string {
+  const x = (d || '').toLowerCase().replace(/\s/g, '');
+  if (!x) return 'unknown';
+  if (x.includes('5k') || x === '5' || x === '5km') return '5k';
+  if (x.includes('10k') || x === '10' || x === '10km') return '10k';
+  if (x.includes('half') || x.includes('13.1') || x.includes('21k')) return 'half';
+  if (x.includes('marathon') || x.includes('42.2') || x.includes('42k')) return 'marathon';
+  if (x.includes('70.3') || x.includes('halfiron')) return '70.3';
+  if (x.includes('140.6') || x.includes('fulliron') || x.includes('kona') || /ironman(?! *70)/i.test(d || '')) return '140.6';
+  if (x.includes('century') || x.includes('100mi') || x.includes('160k')) return 'century';
+  if (x.includes('ultra')) return 'ultra';
+  if (x.includes('sprint') && x.includes('tri')) return 'sprint_tri';
+  return 'unknown';
+}
+
+/**
+ * If a goal's target_date is in the last 7 calendar days and a completed workout on that date
+ * matches the goal sport and (when known) distance band — race completed, athlete in recovery.
+ * Priority: caller should apply this before load-based phase inference.
+ */
+export function isPostGoalRaceCompletedWindow(workouts: W[], goals: GoalForPhaseInference[] | null | undefined, isoToday: string): boolean {
+  if (!goals || goals.length === 0) return false;
+  const today = new Date(isoToday + 'T12:00:00');
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  for (const g of goals) {
+    const tRaw = g.target_date != null ? String(g.target_date).slice(0, 10) : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(tRaw)) continue;
+    const t = new Date(tRaw + 'T12:00:00');
+    if (t < weekAgo || t > today) continue;
+    for (const w of workouts) {
+      if (!w.date) continue;
+      if (String(w.date).slice(0, 10) !== tRaw) continue;
+      if (goalWorkoutDisciplineAndDistanceMatch(g, w)) return true;
+    }
+  }
+  return false;
+}
+
+function goalWorkoutDisciplineAndDistanceMatch(g: GoalForPhaseInference, w: W): boolean {
+  const gSport = normGoalSport(g.sport);
+  const t = normType(workoutTypeForNorm(w));
+  if (gSport === 'tri') {
+    if (t !== 'run' && t !== 'ride' && t !== 'swim') return false;
+  } else {
+    if (gSport === 'strength' && t !== 'strength') return false;
+    if (gSport === 'ride' && t !== 'ride') return false;
+    if (gSport === 'swim' && t !== 'swim') return false;
+    if (gSport === 'run' && t !== 'run' && t !== 'walk') return false;
+  }
+
+  const distKey = normGoalDistanceKey(g.distance);
+  if (distKey === 'unknown' || !String(g.distance || '').trim()) {
+    return true;
+  }
+  const m = workoutDistanceMeters(w);
+  const durMin = minutes(w) / 60;
+  if (gSport === 'tri' || distKey === '70.3' || distKey === '140.6' || distKey === 'sprint_tri') {
+    if (m != null && m > 3_000) return true;
+    if (durMin >= 0.5) return true;
+    return (w.name && /\brace\b|tri|iron|swim|bike|run event/i.test(w.name)) || stravaWorkoutType(w) === 1;
+  }
+  if (distKey === '5k') {
+    if (m != null) return m >= 4_200 && m <= 8_000;
+    return durMin >= 0.1 && durMin <= 0.9;
+  }
+  if (distKey === '10k') {
+    if (m != null) return m >= 8_000 && m <= 13_000;
+    return durMin >= 0.2 && durMin <= 1.5;
+  }
+  if (distKey === 'half') {
+    if (m != null) return m >= 18_000 && m <= 25_000;
+    return durMin >= 0.5 && durMin <= 2.5;
+  }
+  if (distKey === 'marathon' || distKey === 'ultra') {
+    if (m != null) return m >= 38_000 && m <= 200_000;
+    return durMin >= 1.2;
+  }
+  if (distKey === 'century') {
+    if (m != null) return t === 'ride' && m >= 80_000;
+    return t === 'ride' && durMin >= 2;
+  }
+  return m != null && m > 1000;
+}
 
 export function normType(t: string): string {
   const x = (t || '').toLowerCase();
@@ -67,6 +187,7 @@ export function inferAthleteIdentityV1(
   workouts: W[],
   learningStatus: string,
   recency: DisciplineRecency = {},
+  goalsForPhase: GoalForPhaseInference[] | null | undefined = null,
 ): AthleteIdentityV1 {
   const now = new Date();
   const d90 = new Date(now);
@@ -77,7 +198,7 @@ export function inferAthleteIdentityV1(
   const recent = workouts.filter((w) => w.date && w.date >= iso90);
   const typeCounts: Record<string, number> = {};
   for (const w of recent) {
-    const k = normType(w.type);
+    const k = normType(workoutTypeForNorm(w));
     typeCounts[k] = (typeCounts[k] || 0) + 1;
   }
   const total = Object.values(typeCounts).reduce((a, b) => a + b, 0) || 1;
@@ -178,7 +299,12 @@ export function inferAthleteIdentityV1(
   }
   let current_phase: AthleteIdentityV1['current_phase'] = 'unknown';
   let phase_signal = 'insufficient_history';
-  if (m7 > 0 && m8_14 > 0) {
+
+  // Goal + workout match: target in last 7d + same-day activity matching sport/distance — beats load-based phase
+  if (isPostGoalRaceCompletedWindow(workouts, goalsForPhase, isoToday)) {
+    current_phase = 'recovery';
+    phase_signal = 'post_race';
+  } else if (m7 > 0 && m8_14 > 0) {
     const ratio = m7 / m8_14;
     if (ratio < 0.72) {
       current_phase = 'recovery';
@@ -205,16 +331,16 @@ export function inferAthleteIdentityV1(
   };
   const postKeyRace = recent.some((w) => {
     if (!w.date || w.date < iso2) return false;
-    if (normType(w.type) !== 'run') return false;
+    if (normType(workoutTypeForNorm(w)) !== 'run') return false;
     const nm = nname(w);
     const keyword = /\b(marathon|road race|20\s*miler|20mi|ultra|half marathon|\b20k\b)/i.test(nm) || /\brace\b|event|triathlon|ironman/i.test(nm);
     const longEnough = longRunMins(w) >= 90 || /marathon|20\s*mi|32\s*k|ultra|half marathon/i.test(nm);
     return keyword && (longEnough || stravaWorkoutType(w) === 1);
   });
-  if (postKeyRace) {
+  if (phase_signal !== 'post_race' && postKeyRace) {
     current_phase = 'recovery';
     phase_signal = 'post_race_or_marathon_window';
-  } else {
+  } else if (phase_signal !== 'post_race') {
     // Taper hint: long effort in last 3d with "race" name
     const d3 = new Date(now);
     d3.setDate(d3.getDate() - 3);
