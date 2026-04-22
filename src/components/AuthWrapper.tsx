@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getStoredAuthUser, supabase } from '@/lib/supabase';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import AppLayout from './AppLayout';
@@ -18,18 +18,20 @@ const AuthWrapper: React.FC = () => {
     // Initial approval check on mount
     const fetchUserAndApproval = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        // Do not use supabase.auth.getUser() on boot — it can hang on iOS/WKWebView
+        // (see lib/supabase.ts). Session is already in localStorage.
+        const u = getStoredAuthUser();
+        if (!u) {
           setUser(null);
           setLoading(false);
           return;
         }
-        setUser(user);
+        setUser(u);
         // Fetch approved flag from users table
         const { data, error } = await supabase
           .from('users')
           .select('approved')
-          .eq('id', user.id)
+          .eq('id', u.id)
           .single();
         if (error) {
           setApproved(false); // default to not approved

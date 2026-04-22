@@ -42,6 +42,27 @@ export function getStoredUserId(): string | null {
 }
 
 /**
+ * Full `user` object from the persisted session blob. Use instead of
+ * `supabase.auth.getUser()` in boot paths — getUser() can hang on iOS/WKWebView
+ * (see getStoredUserId() comment above).
+ */
+export function getStoredAuthUser(): { id: string; email?: string; [k: string]: unknown } | null {
+  const id = getStoredUserId();
+  if (!id) return null;
+  try {
+    const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
+    if (!raw) return { id };
+    const parsed = JSON.parse(raw) as { user?: { id?: string; [k: string]: unknown } };
+    if (parsed?.user && typeof parsed.user === 'object' && String(parsed.user.id) === id) {
+      return parsed.user as { id: string; email?: string; [k: string]: unknown };
+    }
+    return { id };
+  } catch {
+    return { id };
+  }
+}
+
+/**
  * Call a Supabase Edge Function using raw fetch, bypassing the Supabase JS
  * client's internal serialization pipeline which can hit cyclic-structure errors
  * on iOS/WKWebView when the Capacitor layer attaches internal window-referencing
