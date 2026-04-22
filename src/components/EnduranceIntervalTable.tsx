@@ -324,7 +324,7 @@ export default function EnduranceIntervalTable({
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
                       <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
-                      {pct != null && (
+                      {pct != null && !isGoalRace && (
                         <div className="flex items-center gap-1">
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
                           {cvIndicator}
