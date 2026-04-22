@@ -2,6 +2,20 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { COACH_CLIENT_MIN_PAYLOAD_VERSION } from '@/lib/coach-contract';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 
+/** Same Monday boundary logic as the coach's week (local calendar date, en-CA). */
+function weekStartMondayEnCA(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return ymd;
+  const dt = new Date(y, m - 1, d, 12, 0, 0, 0);
+  const day = dt.getDay();
+  const mondayOffset = (day + 6) % 7;
+  dt.setDate(dt.getDate() - mondayOffset);
+  return dt.toLocaleDateString('en-CA');
+}
+
+/** If cache is this fresh, tab switches / remounts do not re-invoke `coach` (saves token spend). */
+const COACH_CLIENT_FRESH_WINDOW_MS = 4 * 60 * 60 * 1000;
+
 /** Same contract as coach + course-detail (terrain). */
 export type RaceFinishProjectionV1 = {
   goal_id: string;
@@ -433,9 +447,10 @@ export function useCoachWeekContext(date?: string) {
   /** Avoid overlapping foreground coach+adapt calls (double-tap refresh). */
   const foregroundPipelineBusy = useRef(false);
 
-  const runPipeline = useCallback(async (isBackground: boolean) => {
+  const runPipeline = useCallback(async (isBackground: boolean, options?: { force?: boolean }) => {
     if (!isBackground && foregroundPipelineBusy.current) return;
     if (!isBackground) foregroundPipelineBusy.current = true;
+    const force = options?.force === true;
     try {
       if (isBackground) setRevalidating(true);
       else setLoading(true);
@@ -449,10 +464,8 @@ export function useCoachWeekContext(date?: string) {
           user_id: userId,
           date: focusDate,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          // Always bypass Edge *read* cache: full coach run recomputes weekly_state, race_readiness,
-          // and race_finish_projection_v1. The handler still *writes* coach_cache after compute.
-          // Background used skip_cache: false and could serve stale projection for up to 24h.
-          skip_cache: true,
+          // `skip_cache: true` bypasses `coach_cache` and forces a full recompute (incl. Anthropic narrative). Use only for explicit user refresh. Automatic mounts use `false` so the edge function can return cached JSON without LLM.
+          skip_cache: force,
         },
       });
 
@@ -512,35 +525,71 @@ export function useCoachWeekContext(date?: string) {
     }
   }, [focusDate]);
 
-  const fetchCoach = useCallback(() => runPipeline(false), [runPipeline]);
+  const fetchCoach = useCallback(() => runPipeline(false, { force: true }), [runPipeline]);
 
   useEffect(() => {
     hasCachedData.current = false;
 
     const userId = getStoredUserId();
-    if (!userId) { runPipeline(false); return; }
+    if (!userId) {
+      void runPipeline(false, { force: true });
+      return;
+    }
 
-    // 1. Read DB cache immediately — serve stale data with no spinner
-    Promise.resolve(
+    // 1. Read `coach_cache` (same as edge): avoid calling `coach` on every tab mount if still fresh.
+    void Promise.resolve(
       supabase
         .from('coach_cache')
-        .select('payload')
+        .select('payload, generated_at, invalidated_at')
         .eq('user_id', userId)
         .maybeSingle()
-    ).then(({ data: row }) => {
-      const p = row?.payload as CoachWeekContextV1 | undefined;
-      const cacheVer = Number(p?.coach_payload_version ?? 0);
-      if (p && cacheVer >= COACH_CLIENT_MIN_PAYLOAD_VERSION) {
-        setData(p);
+    )
+      .then(({ data: row, error: rowErr }) => {
+        if (rowErr) {
+          void runPipeline(false, { force: false });
+          return;
+        }
+        const p = row?.payload as CoachWeekContextV1 | undefined;
+        const cacheVer = Number(p?.coach_payload_version ?? 0);
+        const versionOk = p != null && cacheVer >= COACH_CLIENT_MIN_PAYLOAD_VERSION;
+        if (!p || !versionOk) {
+          if (p) void runPipeline(false, { force: true });
+          else void runPipeline(false, { force: false });
+          return;
+        }
+
+        const wantWeek = weekStartMondayEnCA(focusDate);
+        const cachedWeek = p.week_start_date;
+        const weekOk = !cachedWeek || cachedWeek === wantWeek;
+
+        const genAt = row?.generated_at != null ? new Date(String(row.generated_at)).getTime() : 0;
+        const ageOk = genAt > 0 && Date.now() - genAt <= COACH_CLIENT_FRESH_WINDOW_MS;
+        const notInvalidated = row?.invalidated_at == null;
+
+        if (notInvalidated && ageOk && weekOk) {
+          setData(p);
+          hasCachedData.current = true;
+          return;
+        }
+
+        if (p) setData(p);
         hasCachedData.current = true;
-        runPipeline(true);
-      } else if (p) {
-        // Stale schema: go straight to coach (edge will also miss cache until recomputed)
-        runPipeline(false);
-      } else {
-        runPipeline(false);
-      }
-    }).catch(() => runPipeline(false));
+
+        if (row?.invalidated_at != null) {
+          void runPipeline(false, { force: false });
+          return;
+        }
+        if (!weekOk) {
+          void runPipeline(false, { force: false });
+          return;
+        }
+        if (!ageOk) {
+          void runPipeline(true, { force: false });
+        }
+      })
+      .catch(() => {
+        void runPipeline(false, { force: false });
+      });
   }, [focusDate]); // eslint-disable-line
 
   return { data, loading, revalidating, error, refresh: fetchCoach };
