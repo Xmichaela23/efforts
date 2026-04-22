@@ -2,6 +2,7 @@
 /// <reference lib="deno.ns" />
 // @ts-ignore Deno Edge Functions resolve jsr imports at runtime
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
 
 // Strava webhook verification and processing
 // Use service role to bypass RLS from server-side webhook processing
@@ -180,6 +181,8 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     await createWorkoutFromStravaActivity(userId, activityData, accessToken);
     
     console.log(`✅ Activity ${activityId} processed successfully for user ${userId}`);
+
+    await runPostImportAthletePipeline(String(userId), 'strava-webhook-create');
   } catch (error) {
     console.error(`❌ Error handling activity creation for ${activityId}:`, error);
   }
@@ -261,6 +264,8 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     await createWorkoutFromStravaActivity(userId, activityData, accessToken);
     
     console.log(`✅ Activity ${activityId} updated successfully for user ${userId}`);
+    // Do not run learn/memory/snapshot pipeline on updates — re-infer identity is unnecessary;
+    // import-strava-history and create events cover new data.
   } catch (error) {
     console.error(`❌ Error handling activity update for ${activityId}:`, error);
   }

@@ -1548,6 +1548,38 @@ Deno.serve(async (req)=>{
       console.error('[ingest-activity] adapt-plan auto trigger error:', e);
     }
 
+    // Warm learned profile + memory + snapshot (Garmin/ongoing: bounded). Strava bulk import uses
+    // import-strava-history + strava-webhook chains — skip here for provider=strava to avoid duplicate work.
+    try {
+      if (provider === 'garmin' && row.workout_status === 'completed') {
+        const { count } = await supabase
+          .from('workouts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('workout_status', 'completed');
+        const n = typeof count === 'number' ? count : 0;
+        const { data: bl } = await supabase
+          .from('user_baselines')
+          .select('athlete_identity')
+          .eq('user_id', userId)
+          .maybeSingle();
+        const aid: any = bl?.athlete_identity || {};
+        const inferredAt = aid?.inferred_at ? new Date(aid.inferred_at).getTime() : 0;
+        const weekMs = 7 * 24 * 60 * 60 * 1000;
+        const needsWeekly = inferredAt > 0 && (Date.now() - inferredAt) > weekMs;
+        const neverInferred = !aid?.inferred_at;
+        const milestone = n === 1 || n === 2 || n === 5 || n === 10;
+        const runPipeline =
+          (milestone && n <= 10) || (n > 10 && (needsWeekly || neverInferred));
+        if (runPipeline) {
+          const { runPostImportAthletePipeline } = await import('../_shared/post-import-athlete-pipeline.ts');
+          await runPostImportAthletePipeline(String(userId), 'ingest-activity');
+        }
+      }
+    } catch (pipeErr) {
+      console.error('[ingest-activity] post-import athlete pipeline:', pipeErr);
+    }
+
     return new Response(JSON.stringify({
       success: true
     }), {

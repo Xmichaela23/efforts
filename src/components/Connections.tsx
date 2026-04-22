@@ -571,16 +571,18 @@ const Connections: React.FC = () => {
         // If function refreshed tokens, persist them
         // (No localStorage writes needed; function updates device_connections)
         
-        // Show success message
+        const imported = Number(result?.imported ?? 0);
         toast({
-          title: "Import Complete!",
-          description: `Successfully imported ${result.imported} activities${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}. Redirecting to dashboard...`,
+          title: "Import complete",
+          description:
+            imported > 0
+              ? `Imported ${imported} activities. Opening your inferred profile...`
+              : `No new activities to import${result?.skipped > 0 ? ` (${result.skipped} skipped)` : ''}.`,
         });
 
-        // Redirect to dashboard after a short delay
         setTimeout(() => {
-          navigate('/');
-        }, 2000);
+          navigate(imported > 0 ? '/onboarding/profile' : '/');
+        }, 1500);
       }
       
     } catch (error) {

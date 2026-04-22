@@ -24,6 +24,11 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  inferAthleteIdentityV1,
+  inferDisciplinesTextArray,
+  inferTrainingBackgroundSentence,
+} from '../_shared/athlete-identity-inference.ts';
 
 // =============================================================================
 // CORS HEADERS
@@ -135,7 +140,7 @@ Deno.serve(async (req) => {
 
     const { data: workouts, error: workoutsError } = await supabase
       .from('workouts')
-      .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, normalized_power, avg_speed, workout_status, computed')
+      .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, normalized_power, avg_speed, workout_status, computed, strava_data, name')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
       .in('type', ['run', 'ride'])
@@ -211,7 +216,7 @@ Deno.serve(async (req) => {
     // First, fetch existing baselines (preserve strength_1rms from compute-facts)
     const { data: existingBaselines } = await supabase
       .from('user_baselines')
-      .select('id, learned_fitness')
+      .select('id, learned_fitness, athlete_identity, disciplines, training_background')
       .eq('user_id', user_id)
       .maybeSingle();
 
@@ -223,12 +228,30 @@ Deno.serve(async (req) => {
       strength_1rms: existing?.strength_1rms
     };
 
+    const existingIdentity = (typeof (existingBaselines as any)?.athlete_identity === 'string'
+      ? JSON.parse((existingBaselines as any).athlete_identity || '{}')
+      : (existingBaselines as any)?.athlete_identity) || {};
+    const userConfirmed = existingIdentity?.confirmed_by_user === true;
+
+    let identityUpdate: Record<string, unknown> = {};
+    if (!userConfirmed) {
+      const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus);
+      const disciplines = inferDisciplinesTextArray(idv1.discipline_mix);
+      const training_background = inferTrainingBackgroundSentence(idv1);
+      identityUpdate = {
+        disciplines,
+        training_background,
+        athlete_identity: { ...existingIdentity, ...idv1, confirmed_by_user: false },
+      };
+    }
+
     if (existingBaselines?.id) {
       // Update existing record
       const { error: updateError } = await supabase
         .from('user_baselines')
         .update({ 
           learned_fitness: mergedLearned,
+          ...identityUpdate,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingBaselines.id);
@@ -240,14 +263,16 @@ Deno.serve(async (req) => {
       }
     } else {
       // Insert new record
+      const baseInsert: Record<string, unknown> = {
+        user_id: user_id,
+        learned_fitness: mergedLearned,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...identityUpdate,
+      };
       const { error: insertError } = await supabase
         .from('user_baselines')
-        .insert({
-          user_id: user_id,
-          learned_fitness: mergedLearned,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        .insert(baseInsert);
 
       if (insertError) {
         console.error('❌ Error inserting baselines:', insertError);

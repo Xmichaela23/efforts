@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY =
@@ -850,6 +851,10 @@ Deno.serve(async (req) => {
       })
       .eq('user_id', userId)
       .eq('provider', 'strava');
+
+    if (imported > 0) {
+      await runPostImportAthletePipeline(userId, 'import-strava-history');
+    }
 
     return new Response(JSON.stringify({ success: true, imported, skipped, tokens: updatedTokens }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
