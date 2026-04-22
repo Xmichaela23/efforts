@@ -6,6 +6,10 @@
 export interface AthleteIdentityV1 {
   discipline_identity: string;
   discipline_mix: Record<string, number>;
+  /** Disciplines with meaningful recent share or volume (e.g. run, ride, strength) */
+  active_disciplines: string[];
+  /** Disciplines with prior history but not recent (e.g. long gap since last swim) */
+  dormant_disciplines: string[];
   training_personality: 'structured' | 'varied' | 'race_focused' | 'exploratory';
   current_phase: 'recovery' | 'build' | 'maintenance' | 'taper' | 'unknown';
   phase_signal: string;
@@ -13,6 +17,9 @@ export interface AthleteIdentityV1 {
   confirmed_by_user: boolean;
   learning_status_snapshot?: string;
 }
+
+/** Last completed activity date (ISO) per logical discipline — from a longer lookback for dormancy. */
+export type DisciplineRecency = Partial<Record<'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'other', string>>;
 
 type W = {
   type: string;
@@ -23,7 +30,7 @@ type W = {
   name?: string | null;
 };
 
-function normType(t: string): string {
+export function normType(t: string): string {
   const x = (t || '').toLowerCase();
   if (x.includes('run') || x === 'walk') return 'run';
   if (x.includes('ride') || x.includes('bike') || x.includes('cycling') || x.includes('virtualride')) return 'ride';
@@ -50,14 +57,22 @@ function stravaWorkoutType(w: W): number | null {
   return typeof wt === 'number' ? wt : null;
 }
 
+function monthsBetween(isoA: string, isoB: string): number {
+  const a = new Date(String(isoA) + 'T12:00:00');
+  const b = new Date(String(isoB) + 'T12:00:00');
+  return Math.max(0, (b.getTime() - a.getTime()) / (30.44 * 24 * 60 * 60 * 1000));
+}
+
 export function inferAthleteIdentityV1(
   workouts: W[],
   learningStatus: string,
+  recency: DisciplineRecency = {},
 ): AthleteIdentityV1 {
   const now = new Date();
   const d90 = new Date(now);
   d90.setDate(d90.getDate() - 90);
   const iso90 = d90.toLocaleDateString('en-CA');
+  const isoToday = now.toLocaleDateString('en-CA');
 
   const recent = workouts.filter((w) => w.date && w.date >= iso90);
   const typeCounts: Record<string, number> = {};
@@ -71,18 +86,52 @@ export function inferAthleteIdentityV1(
     discipline_mix[k] = Math.round((v / total) * 100) / 100;
   }
 
+  // Active: disciplines with enough share in 90d (strength "integrated" at a slightly lower bar).
+  const active_disciplines = (Object.keys(discipline_mix) as string[])
+    .filter((k) => {
+      if (k === 'other' || k === 'walk') return false;
+      const p = discipline_mix[k] ?? 0;
+      if (k === 'strength') return p >= 0.05;
+      return p >= 0.08;
+    })
+    .sort((a, b) => (discipline_mix[b] ?? 0) - (discipline_mix[a] ?? 0));
+
+  // Dormant: had a last-ever session in recency map but not in 90d window (or last was long ago)
+  const dormant_disciplines: string[] = [];
+  const seenIn90 = new Set(
+    (Object.keys(typeCounts) as string[]).filter((k) => (typeCounts[k] ?? 0) > 0)
+  );
+  for (const disc of ['swim', 'strength', 'ride'] as const) {
+    const last = recency[disc];
+    if (!last) continue;
+    if (seenIn90.has(disc)) continue;
+    const m = monthsBetween(last, isoToday);
+    if (m >= 2.5) {
+      dormant_disciplines.push(disc);
+    }
+  }
+  dormant_disciplines.sort();
+
   const runP = discipline_mix.run ?? 0;
   const rideP = discipline_mix.ride ?? 0;
   const swimP = discipline_mix.swim ?? 0;
   const strP = discipline_mix.strength ?? 0;
 
   let discipline_identity = 'multi_sport';
-  if (runP >= 0.55) discipline_identity = 'runner';
-  else if (rideP >= 0.55) discipline_identity = 'cyclist';
-  else if (swimP >= 0.2 && (runP > 0.15 || rideP > 0.15)) discipline_identity = 'triathlete';
-  else if (Object.values(discipline_mix).filter((v) => v >= 0.12).length >= 2) {
+  if (runP >= 0.55 && rideP < 0.12 && strP < 0.12) {
+    discipline_identity = 'runner';
+  } else if (rideP >= 0.55 && runP < 0.12) {
+    discipline_identity = 'cyclist';
+  } else if (swimP >= 0.2 && (runP > 0.15 || rideP > 0.15)) {
+    discipline_identity = 'triathlete';
+  } else if (Object.values(discipline_mix).filter((v) => v >= 0.12).length >= 2) {
     discipline_identity = 'multi_sport';
-  } else if (strP >= 0.35) discipline_identity = 'strength_athlete';
+  } else if (strP >= 0.35) {
+    discipline_identity = 'strength_athlete';
+  } else if (runP >= 0.35 && (rideP >= 0.1 || strP >= 0.08)) {
+    // Run-dominant but meaningful bike or strength in the same block → multi_sport, not "runner"
+    discipline_identity = 'multi_sport';
+  }
 
   // Strava workout_type: 1 = race, 2 = long run, 3 = workout, 0 = default
   const wtN = recent.length;
@@ -101,6 +150,14 @@ export function inferAthleteIdentityV1(
     training_personality = (raceN + raceNameHints) / wtN > 0.2 ? 'race_focused' : 'structured';
   } else if (Object.keys(discipline_mix).filter((k) => (discipline_mix[k] ?? 0) >= 0.1).length >= 3) {
     training_personality = 'exploratory';
+  }
+  // Consistent multi-discipline + structured sessions → structured (if not already race_focused)
+  if (
+    training_personality === 'varied' &&
+    active_disciplines.length >= 2 &&
+    (strP > 0.08 || workoutN / Math.max(1, wtN) > 0.12)
+  ) {
+    training_personality = 'structured';
   }
 
   // Volume phase: last 7d vs prior 7d (calendar minutes)
@@ -138,19 +195,44 @@ export function inferAthleteIdentityV1(
     phase_signal = 'recent_activity_only';
   }
 
-  // Taper hint: long effort in last 3d with "race" name
-  const d3 = new Date(now);
-  d3.setDate(d3.getDate() - 3);
-  const iso3 = d3.toLocaleDateString('en-CA');
-  const recentRace = recent.some((w) => w.date >= iso3 && (stravaWorkoutType(w) === 1 || /\brace\b|event|marathon|half|triathlon|ironman/i.test(nname(w))));
-  if (recentRace && current_phase !== 'build') {
-    current_phase = 'taper';
-    phase_signal = 'race_or_event_last_3d';
+  // Post–key event (e.g. marathon): recovery, not "taper"
+  const d2 = new Date(now);
+  d2.setDate(d2.getDate() - 2);
+  const iso2 = d2.toLocaleDateString('en-CA');
+  const longRunMins = (w: W) => {
+    const m = minutes(w);
+    return m;
+  };
+  const postKeyRace = recent.some((w) => {
+    if (!w.date || w.date < iso2) return false;
+    if (normType(w.type) !== 'run') return false;
+    const nm = nname(w);
+    const keyword = /\b(marathon|road race|20\s*miler|20mi|ultra|half marathon|\b20k\b)/i.test(nm) || /\brace\b|event|triathlon|ironman/i.test(nm);
+    const longEnough = longRunMins(w) >= 90 || /marathon|20\s*mi|32\s*k|ultra|half marathon/i.test(nm);
+    return keyword && (longEnough || stravaWorkoutType(w) === 1);
+  });
+  if (postKeyRace) {
+    current_phase = 'recovery';
+    phase_signal = 'post_race_or_marathon_window';
+  } else {
+    // Taper hint: long effort in last 3d with "race" name
+    const d3 = new Date(now);
+    d3.setDate(d3.getDate() - 3);
+    const iso3 = d3.toLocaleDateString('en-CA');
+    const recentRace = recent.some((w) =>
+      w.date >= iso3 && (stravaWorkoutType(w) === 1 || /\brace\b|event|marathon|half|triathlon|ironman/i.test(nname(w)))
+    );
+    if (recentRace && current_phase !== 'build') {
+      current_phase = 'taper';
+      phase_signal = 'race_or_event_last_3d';
+    }
   }
 
   return {
     discipline_identity,
     discipline_mix,
+    active_disciplines,
+    dormant_disciplines,
     training_personality,
     current_phase,
     phase_signal,

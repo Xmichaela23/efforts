@@ -68,6 +68,7 @@ import {
   isRuleUsable,
   type AthleteMemoryRow,
 } from '../_shared/athlete-memory.ts';
+import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 
 // =============================================================================
 // CORS HEADERS (matching existing edge functions)
@@ -469,6 +470,8 @@ interface TrainingContextResponse {
     recommended_spacing_weeks: number | null;
     minimum_feasible_spacing_weeks: number | null;
   };
+  /** Athlete Arc bundle for prompts (baselines, goals, plan summary; snapshot/memory TBD in getArcContext). */
+  arc: ArcContext;
 }
 
 /** Monday of week containing date, ISO (YYYY-MM-DD). Matches compute-snapshot week boundary. */
@@ -570,6 +573,8 @@ Deno.serve(async (req) => {
 
     const focusDate = new Date(resolvedDate + 'T12:00:00');
     const focusDateISO = resolvedDate;
+
+    const arc = await getArcContext(supabase, user_id, focusDateISO);
 
     // ==========================================================================
     // FETCH PLAN CONTEXT FIRST (needed for smart date range calculation)
@@ -2300,6 +2305,7 @@ Deno.serve(async (req) => {
       gaps_summary: gaps_summary && gaps_summary.length > 0 ? gaps_summary : undefined,
       marathon_readiness: marathonReadiness,
       goal_context: goalContext,
+      arc,
     };
 
     console.log(`✅ Training context generated: ACWR=${acwr.ratio}, insights=${insights.length}`);

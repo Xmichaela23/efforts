@@ -28,6 +28,8 @@ import {
   inferAthleteIdentityV1,
   inferDisciplinesTextArray,
   inferTrainingBackgroundSentence,
+  normType,
+  type DisciplineRecency,
 } from '../_shared/athlete-identity-inference.ts';
 
 // =============================================================================
@@ -39,6 +41,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Vary': 'Origin'
 };
+
+/** DB `workouts.type` values used in 90d — matches Strava/Garmin/bulk imports + legacy aliases. */
+const TYPES_90D_LEARN = [
+  'run', 'ride', 'swim', 'strength', 'walk',
+  'cycling', 'bike', 'virtualride', 'swimming', 'indoorcycling', 'gravelride',
+  'ebikeride', 'mountainbikeride', 'virtualrun', 'treadmillrun', 'workout', 'nordicski',
+] as const;
+
+function isRunWorkoutType(type: string): boolean {
+  const r = (type || '').toLowerCase().trim();
+  if (r === 'walk' || r === 'hike') return false;
+  return normType(type) === 'run';
+}
+
+function isRideWorkoutType(type: string): boolean {
+  return normType(type) === 'ride';
+}
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -134,19 +153,24 @@ Deno.serve(async (req) => {
     ninetyDaysAgo.setDate(today.getDate() - 90);
     const ninetyDaysAgoISO = ninetyDaysAgo.toLocaleDateString('en-CA');
 
+    const eighteenMoAgo = new Date(today);
+    eighteenMoAgo.setDate(today.getDate() - 550);
+    const eighteenMoAgoISO = eighteenMoAgo.toLocaleDateString('en-CA');
+
     // ==========================================================================
     // FETCH WORKOUT DATA
     // ==========================================================================
+    // Include swim/strength/walk for arc identity. Do not require HR here — the DB stores
+    // `ride` (not "cycling"); also include aliases like cycling, bike, virtualride.
+    // HR gating is applied inside analyzeRuns / analyzeRides.
 
     const { data: workouts, error: workoutsError } = await supabase
       .from('workouts')
       .select('id, type, date, duration, moving_time, distance, avg_heart_rate, max_heart_rate, avg_pace, avg_power, normalized_power, avg_speed, workout_status, computed, strava_data, name')
       .eq('user_id', user_id)
       .eq('workout_status', 'completed')
-      .in('type', ['run', 'ride'])
+      .in('type', [...TYPES_90D_LEARN])
       .gte('date', ninetyDaysAgoISO)
-      .not('avg_heart_rate', 'is', null)
-      .gt('avg_heart_rate', 60)  // Filter out bad data
       .order('date', { ascending: false });
 
     if (workoutsError) {
@@ -155,13 +179,38 @@ Deno.serve(async (req) => {
     }
 
     const allWorkouts: WorkoutRecord[] = workouts || [];
-    console.log(`📊 Found ${allWorkouts.length} workouts with HR data`);
+    const withAvgHr = allWorkouts.filter(
+      w => w.avg_heart_rate != null && w.avg_heart_rate > 60 && w.avg_heart_rate < 220
+    );
+    console.log(`📊 90d rows: ${allWorkouts.length} total, ${withAvgHr.length} with usable avg HR`);
 
-    // Separate by type
-    const runs = allWorkouts.filter(w => w.type === 'run');
-    const rides = allWorkouts.filter(w => w.type === 'ride');
+    const runs = allWorkouts.filter((w) => isRunWorkoutType(w.type));
+    const rides = allWorkouts.filter((w) => isRideWorkoutType(w.type));
 
-    console.log(`🏃 Runs: ${runs.length}, 🚴 Rides: ${rides.length}`);
+    console.log(`🏃 Runs (normalized): ${runs.length}, 🚴 Rides (normalized): ${rides.length}`);
+
+    // Last activity per norm discipline (for dormant swim, etc.) — 18m lookback
+    const { data: recencyRows, error: recencyErr } = await supabase
+      .from('workouts')
+      .select('type, date')
+      .eq('user_id', user_id)
+      .eq('workout_status', 'completed')
+      .gte('date', eighteenMoAgoISO)
+      .order('date', { ascending: false });
+
+    if (recencyErr) {
+      console.warn('⚠️ recency query failed (non-fatal):', recencyErr.message);
+    }
+    const recency: DisciplineRecency = {};
+    for (const row of recencyRows || []) {
+      const raw = (row.type || '').toLowerCase().trim();
+      if (raw === 'walk' || raw === 'hike') continue;
+      const k = normType(row.type);
+      if (k === 'other' || k === 'walk') continue;
+      if (!recency[k] && row.date) {
+        recency[k] = String(row.date).slice(0, 10);
+      }
+    }
 
     // ==========================================================================
     // ANALYZE RUNS
@@ -179,12 +228,12 @@ Deno.serve(async (req) => {
     // BUILD LEARNED PROFILE
     // ==========================================================================
 
-    const totalWorkouts = runs.length + rides.length;
+    const runRideSessions = runs.length + rides.length;
     let learningStatus: 'insufficient_data' | 'learning' | 'confident' = 'insufficient_data';
-    
-    if (totalWorkouts >= 15) {
+
+    if (runRideSessions >= 15) {
       learningStatus = 'confident';
-    } else if (totalWorkouts >= 5) {
+    } else if (runRideSessions >= 5) {
       learningStatus = 'learning';
     }
 
@@ -203,8 +252,8 @@ Deno.serve(async (req) => {
       ride_max_hr_observed: rideProfile.max_hr_observed,
       ride_ftp_estimated: rideProfile.ftp_estimated,
       
-      // Meta
-      workouts_analyzed: totalWorkouts,
+      // Meta: count run+ride sessions in window (all included rows, not only those with HR)
+      workouts_analyzed: runRideSessions,
       last_updated: new Date().toISOString(),
       learning_status: learningStatus
     };
@@ -235,7 +284,7 @@ Deno.serve(async (req) => {
 
     let identityUpdate: Record<string, unknown> = {};
     if (!userConfirmed) {
-      const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus);
+      const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus, recency);
       const disciplines = inferDisciplinesTextArray(idv1.discipline_mix);
       const training_background = inferTrainingBackgroundSentence(idv1);
       identityUpdate = {
@@ -586,10 +635,11 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   // Filter: Only consider rides with power > 75th percentile as threshold candidates
   // ==========================================================================
   
-  const sustainedEfforts = rides.filter(r => {
+  // Duration is stored in minutes; allow up to 2h for outdoor rides (common endurance length).
+  const sustainedEfforts = rides.filter((r) => {
     const duration = r.moving_time || r.duration || 0;
     const hr = r.avg_heart_rate || 0;
-    return duration >= 20 && duration <= 90 && hr > 100 && hr < 220;
+    return duration >= 20 && duration <= 120 && hr > 100 && hr < 220;
   });
 
   let threshold_hr: LearnedMetric | null = null;
@@ -746,9 +796,9 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   let ftp_estimated: LearnedMetric | null = null;
 
   if (ridesWithPower.length >= 3) {
-    const sustainedPowerRides = ridesWithPower.filter(r => {
+    const sustainedPowerRides = ridesWithPower.filter((r) => {
       const duration = r.moving_time || r.duration || 0;
-      return duration >= 20 && duration <= 90;
+      return duration >= 20 && duration <= 120;
     });
 
     // Priority 1: Look for pre-calculated 20-min best power (already represents hard effort)
