@@ -74,3 +74,65 @@ export async function callLLM(opts: LLMOptions): Promise<string | null> {
     return null;
   }
 }
+
+export type ConversationMessage = { role: 'user' | 'assistant'; content: string };
+
+/**
+ * Multi-turn chat. `messages` must be non-empty and start with a `user` turn (Claude API rule).
+ */
+export async function callClaudeConversation(opts: {
+  system: string;
+  messages: ConversationMessage[];
+  maxTokens?: number;
+  temperature?: number;
+  model?: 'haiku' | 'sonnet' | string;
+}): Promise<string | null> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) {
+    console.warn('[llm] ANTHROPIC_API_KEY not set — skipping conversation call');
+    return null;
+  }
+  if (!Array.isArray(opts.messages) || opts.messages.length < 1) {
+    console.warn('[llm] callClaudeConversation: messages must be non-empty');
+    return null;
+  }
+  if (opts.messages[0].role !== 'user') {
+    console.warn('[llm] callClaudeConversation: first message must be user');
+    return null;
+  }
+
+  const modelId =
+    opts.model === 'haiku' || opts.model === 'sonnet'
+      ? MODELS[opts.model]
+      : (opts.model ?? MODELS[DEFAULT_MODEL]);
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: modelId,
+        system: opts.system,
+        messages: opts.messages,
+        max_tokens: opts.maxTokens ?? 1024,
+        temperature: opts.temperature ?? 0.4,
+      }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      console.warn(`[llm] Anthropic (conversation) non-ok: ${resp.status} — ${body.slice(0, 200)}`);
+      return null;
+    }
+    const data = await resp.json();
+    const text = String(data?.content?.[0]?.text || '').trim();
+    return text || null;
+  } catch (e: any) {
+    console.warn('[llm] callClaudeConversation failed:', e?.message || e);
+    return null;
+  }
+}

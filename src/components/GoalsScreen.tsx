@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Target, Calendar, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
+import { X, Target, Calendar, CalendarRange, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
@@ -1045,6 +1045,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Bottom actions */}
       <div className="shrink-0 px-4 pb-4 pt-2 space-y-2">
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            navigate('/arc-setup');
+          }}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all"
+        >
+          <CalendarRange className="h-5 w-5 opacity-90" />
+          Plan my season
+        </button>
         <button onClick={() => setShowAddGoal(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-white/70 font-medium hover:bg-white/[0.10] transition-all">
           <Plus className="h-5 w-5" />Add Goal
         </button>

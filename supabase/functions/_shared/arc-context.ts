@@ -41,6 +41,22 @@ export interface AthleteMemorySummary {
   confidence_score: number | null;
 }
 
+/**
+ * When manual 5K in `performance_numbers` is much slower than a rough 5K implied by
+ * learned threshold pace, coaches / prompts can suggest updating the saved race time.
+ */
+export interface ArcFiveKLearnedDivergence {
+  should_prompt: boolean;
+  manual_5k_total_sec: number;
+  manual_5k_label: string;
+  /** From learned `run_threshold_pace_sec_per_km` via a Daniels-style heuristic. */
+  implied_5k_total_sec: number;
+  implied_5k_label: string;
+  /** manual − implied; positive = saved 5K is slower than the estimate. */
+  gap_sec: number;
+  message: string;
+}
+
 export interface ArcContext {
   athlete_identity: AthleteIdentity | null;
   learned_fitness: LearnedFitness | null;
@@ -48,6 +64,11 @@ export interface ArcContext {
   disciplines: string[] | null;
   /** `user_baselines.training_background` */
   training_background: string | null;
+  /**
+   * Populated when we have a manual 5K and a sufficiently confident learned threshold;
+   * `should_prompt` is true when the gap exceeds a small threshold (e.g. ~90s).
+   */
+  five_k_nudge: ArcFiveKLearnedDivergence | null;
 
   active_goals: Goal[];
   active_plan: ActivePlanSummary | null;
@@ -79,6 +100,131 @@ function parseJsonObject(value: unknown): Record<string, unknown> | null {
   if (value == null) return null;
   if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
   return null;
+}
+
+/** 5K race effort is faster per km than "threshold" (hour) pace — simple multiplier on sec/km. */
+const FIVEK_PACE_TO_THRESHOLD_SEC_KM = 0.82;
+const NUDGE_FIVEK_GAP_MIN_SEC = 90;
+const THR_SEC_KM_MIN = 200;
+const THR_SEC_KM_MAX = 520;
+/** Reject only obvious bad inputs (seconds full race time, typos, etc.) */
+const FIVEK_TOTAL_SEC_SANE = { min: 7 * 60, max: 80 * 60 };
+
+function formatRaceClockSec(totalSec: number): string {
+  const t = Math.round(Math.max(0, totalSec));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = Math.round(t % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function parseClockToTotalSec(s: string): number | null {
+  const t = s.trim().replace(/\/(mi|km)$/i, '').trim();
+  const parts = t.split(':').map((p) => parseInt(p, 10));
+  if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function readManualFiveK(performanceNumbers: Record<string, unknown> | null): { sec: number; label: string } | null {
+  if (!performanceNumbers) return null;
+  const raw = performanceNumbers.fiveK ?? performanceNumbers.fiveKTime;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const sec = Math.round(raw);
+    if (sec < FIVEK_TOTAL_SEC_SANE.min || sec > FIVEK_TOTAL_SEC_SANE.max) return null;
+    return { sec, label: formatRaceClockSec(sec) };
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    const sec = parseClockToTotalSec(raw);
+    if (sec == null) return null;
+    if (sec < FIVEK_TOTAL_SEC_SANE.min || sec > FIVEK_TOTAL_SEC_SANE.max) return null;
+    return { sec, label: formatRaceClockSec(sec) };
+  }
+  return null;
+}
+
+function learnedThresholdPaceUsable(
+  m: { value?: unknown; confidence?: unknown; sample_count?: unknown } | null | undefined
+): m is { value: number; confidence?: string; sample_count: number } {
+  if (!m || typeof m !== 'object') return false;
+  const v = m.value;
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < THR_SEC_KM_MIN || v > THR_SEC_KM_MAX) return false;
+  if (m.confidence === 'low') return false;
+  const sc = m.sample_count;
+  const n = typeof sc === 'number' && Number.isFinite(sc) ? Math.floor(sc) : 0;
+  if (n < 2) return false;
+  if (m.confidence === 'medium' || m.confidence === 'high') return true;
+  return n >= 3;
+}
+
+function formatGapDurationSec(gap: number): string {
+  const a = Math.abs(Math.round(gap));
+  const m = Math.floor(a / 60);
+  const s = a % 60;
+  if (m === 0) return `${s} seconds`;
+  return s > 0 ? `${m}m ${s}s` : `${m} minutes`;
+}
+
+function impliedFiveKFromThresholdSecPerKm(thresholdSecPerKm: number): number {
+  const pace5kSecPerKm = thresholdSecPerKm * FIVEK_PACE_TO_THRESHOLD_SEC_KM;
+  return 5 * pace5kSecPerKm;
+}
+
+function buildFiveKNudge(
+  performanceNumbers: Record<string, unknown> | null,
+  learnedFitness: LearnedFitness | null
+): ArcFiveKLearnedDivergence | null {
+  const manual = readManualFiveK(performanceNumbers);
+  if (!manual) return null;
+
+  const rawThr = learnedFitness?.run_threshold_pace_sec_per_km;
+  const thrObj =
+    rawThr && typeof rawThr === 'object' && !Array.isArray(rawThr)
+      ? (rawThr as { value?: unknown; confidence?: unknown; sample_count?: unknown })
+      : null;
+  if (!learnedThresholdPaceUsable(thrObj)) return null;
+
+  const implied = impliedFiveKFromThresholdSecPerKm(thrObj.value);
+  if (implied < FIVEK_TOTAL_SEC_SANE.min || implied > FIVEK_TOTAL_SEC_SANE.max) return null;
+
+  const impliedLabel = formatRaceClockSec(implied);
+  const gap = manual.sec - implied;
+  if (gap < -NUDGE_FIVEK_GAP_MIN_SEC) {
+    return {
+      should_prompt: false,
+      manual_5k_total_sec: manual.sec,
+      manual_5k_label: manual.label,
+      implied_5k_total_sec: implied,
+      implied_5k_label: impliedLabel,
+      gap_sec: gap,
+      message:
+        'Saved 5K is faster than a rough estimate from your learned threshold pace; the manual race time is already the sharper anchor.'
+    };
+  }
+  if (gap >= NUDGE_FIVEK_GAP_MIN_SEC) {
+    return {
+      should_prompt: true,
+      manual_5k_total_sec: manual.sec,
+      manual_5k_label: manual.label,
+      implied_5k_total_sec: implied,
+      implied_5k_label: impliedLabel,
+      gap_sec: gap,
+      message: `Your saved 5K (${manual.label}) is about ${formatGapDurationSec(
+        gap
+      )} slower than a rough estimate from recent threshold training data (${impliedLabel}). You can update your 5K in Training Baselines if you want coaching tuned to current fitness.`
+    };
+  }
+  return {
+    should_prompt: false,
+    manual_5k_total_sec: manual.sec,
+    manual_5k_label: manual.label,
+    implied_5k_total_sec: implied,
+    implied_5k_label: impliedLabel,
+    gap_sec: gap,
+    message: 'Saved 5K and the estimate from your learned threshold pace are close; no change suggested.'
+  };
 }
 
 function buildActivePlanSummary(
@@ -134,7 +280,7 @@ export async function getArcContext(
   const [baselinesRes, goalsRes, plansRes] = await Promise.all([
     supabase
       .from('user_baselines')
-      .select('athlete_identity, learned_fitness, disciplines, training_background')
+      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase
@@ -155,6 +301,8 @@ export async function getArcContext(
   const baseline = baselinesRes?.data as Record<string, unknown> | null;
   const athlete_identity = parseJsonObject(baseline?.athlete_identity);
   const learned_fitness = parseJsonObject(baseline?.learned_fitness);
+  const performance_numbers = parseJsonObject(baseline?.performance_numbers);
+  const five_k_nudge = buildFiveKNudge(performance_numbers, learned_fitness);
   const rawDisc = baseline?.disciplines;
   const disciplines = Array.isArray(rawDisc) ? rawDisc.map((d) => String(d)) : null;
   const training_background =
@@ -191,6 +339,7 @@ export async function getArcContext(
     learned_fitness,
     disciplines,
     training_background,
+    five_k_nudge,
     active_goals,
     active_plan,
     latest_snapshot,

@@ -8,6 +8,8 @@ import { Button } from './ui/button';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { fetchArcContext } from '@/lib/fetch-arc-context';
+import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -177,6 +179,11 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   // Learned fitness profile state
   const [learnedFitness, setLearnedFitness] = useState<any>(null);
   const [learningProfile, setLearningProfile] = useState(false);
+
+  /** From `get-arc-context` — 5K vs learned threshold nudge */
+  const [arcFiveKNudge, setArcFiveKNudge] = useState<ArcFiveKLearnedDivergence | null>(null);
+  /** `dismissed_suggestions.five_k_nudge` keys already dismissed for this manual/implied pair */
+  const [dismissedFiveKMap, setDismissedFiveKMap] = useState<Record<string, string>>({});
   
   // Resting HR override (optional - user can set their own)
   const [customRestingHR, setCustomRestingHR] = useState<number | null>(null);
@@ -282,6 +289,29 @@ useEffect(() => {
   return () => window.removeEventListener('message', handleMessage);
 }, []);
 
+const loadArcNudge = async () => {
+  try {
+    const userId = getStoredUserId();
+    if (!userId) {
+      setArcFiveKNudge(null);
+      setDismissedFiveKMap({});
+      return;
+    }
+    const [{ data: dismissRow }, arc] = await Promise.all([
+      supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', userId).maybeSingle(),
+      fetchArcContext(),
+    ]);
+    const raw = dismissRow?.dismissed_suggestions as Record<string, unknown> | null | undefined;
+    const fm = raw?.five_k_nudge;
+    const fiveMap =
+      fm && typeof fm === 'object' && !Array.isArray(fm) ? (fm as Record<string, string>) : {};
+    setDismissedFiveKMap(fiveMap);
+    setArcFiveKNudge((arc?.five_k_nudge as ArcFiveKLearnedDivergence | null) ?? null);
+  } catch {
+    setArcFiveKNudge(null);
+  }
+};
+
 const loadBaselines = async () => {
   try {
     setLoading(true);
@@ -339,6 +369,7 @@ const loadBaselines = async () => {
     if (!initialManualHR) {
       setInitialManualHR(JSON.stringify({ manualRunMaxHR: null, manualRunLTHR: null, manualRideMaxHR: null, manualRideLTHR: null }));
     }
+    await loadArcNudge();
     setLoading(false);
   } catch (error) {
     setLoading(false);
@@ -384,10 +415,59 @@ const refreshLearnedProfile = async () => {
     } else {
       setLastUpdated(row?.updated_at || null);
     }
+    await loadArcNudge();
   } catch (error) {
     console.error('refreshLearnedProfile', error);
   } finally {
     setLearningProfile(false);
+  }
+};
+
+const handleFiveKNudgeYes = async () => {
+  if (!arcFiveKNudge) return;
+  const next: BaselineData = {
+    ...data,
+    performanceNumbers: { ...data.performanceNumbers, fiveK: arcFiveKNudge.implied_5k_label },
+  };
+  setData(next);
+  setSaving(true);
+  setSaveMessage('');
+  try {
+    await saveUserBaselines(next);
+    setOriginalData(JSON.stringify(next));
+    await loadArcNudge();
+    setSaveMessage('5K updated from training data.');
+  } catch (e) {
+    console.error(e);
+    setSaveMessage('Could not save.');
+  } finally {
+    setSaving(false);
+  }
+};
+
+const handleFiveKNudgeNo = async () => {
+  if (!arcFiveKNudge) return;
+  const userId = getStoredUserId();
+  if (!userId) return;
+  const key = fiveKNudgeDismissKey(arcFiveKNudge);
+  try {
+    const { data: ub } = await supabase.from('user_baselines').select('dismissed_suggestions').eq('user_id', userId).maybeSingle();
+    const dismissed = (ub?.dismissed_suggestions as Record<string, unknown>) || {};
+    const prevFive =
+      dismissed.five_k_nudge && typeof dismissed.five_k_nudge === 'object' && !Array.isArray(dismissed.five_k_nudge)
+        ? (dismissed.five_k_nudge as Record<string, string>)
+        : {};
+    const { error } = await supabase
+      .from('user_baselines')
+      .update({
+        dismissed_suggestions: { ...dismissed, five_k_nudge: { ...prevFive, [key]: new Date().toISOString() } },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId);
+    if (error) throw error;
+    setDismissedFiveKMap((m) => ({ ...m, [key]: new Date().toISOString() }));
+  } catch (e) {
+    console.error('dismiss five_k nudge', e);
   }
 };
 
@@ -982,6 +1062,9 @@ return (
                         const thrLearned = learnedFitness?.run_threshold_pace_sec_per_km;
                         const hasEasyLearned = easyLearned?.value != null && Number.isFinite(Number(easyLearned.value)) && Number(easyLearned.value) > 0;
                         const hasThrLearned = thrLearned?.value != null && Number.isFinite(Number(thrLearned.value)) && Number(thrLearned.value) > 0;
+                        const nudge = arcFiveKNudge;
+                        const nudgeKey = nudge ? fiveKNudgeDismissKey(nudge) : '';
+                        const showFiveKNudge = !!nudge?.should_prompt && nudgeKey && !dismissedFiveKMap[nudgeKey];
                         return (
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
@@ -989,7 +1072,7 @@ return (
                             <h3 className="text-sm font-medium text-white/90">Running</h3>
                           </div>
                           <div className="flex flex-wrap gap-6 mt-2">
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-1.5 min-w-[12rem]">
                               <label className="text-xs text-white/50 font-medium">5K Time</label>
                               <input
                                 type="text"
@@ -1005,6 +1088,31 @@ return (
                                 className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.06] backdrop-blur-lg border border-white/20 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                               />
+                              {showFiveKNudge && nudge && (
+                                <div className="mt-1 flex flex-col gap-2 pl-0.5">
+                                  <p className="text-[11px] text-white/55 leading-snug max-w-[18rem]">
+                                    Training data suggests ~{nudge.implied_5k_label}. Update?
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleFiveKNudgeYes()}
+                                      disabled={saving}
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-teal-500/25 text-teal-200 border border-teal-500/40 hover:bg-teal-500/35 disabled:opacity-50"
+                                    >
+                                      Yes
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleFiveKNudgeNo()}
+                                      disabled={saving}
+                                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white/[0.06] text-white/70 border border-white/15 hover:bg-white/10 disabled:opacity-50"
+                                    >
+                                      No
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             {hasEasyLearned && (
                             <div className="flex flex-col gap-1.5 min-w-[10rem]">

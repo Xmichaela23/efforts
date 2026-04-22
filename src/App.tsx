@@ -19,6 +19,7 @@ import MobilityPlanBuilderPage from "./pages/PTPlanBuilderPage";
 import PlansBuild from "./pages/PlansBuild";
 import PlanWizard from "./components/PlanWizard";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
+import ArcSetupPage from "./pages/ArcSetupPage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
 <Route path="/plans/build" element={<PlansBuild />} />
 <Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
 <Route path="/plans/generate" element={<PlanWizard />} />
+<Route path="/arc-setup" element={<ArcSetupPage />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>
