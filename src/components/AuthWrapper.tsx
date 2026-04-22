@@ -8,6 +8,25 @@ import { EffortsWordmark } from './EffortsButton';
 
 const AUTH_DISCIPLINES = ['run', 'strength', 'ride', 'pilates', 'swim'] as const;
 
+/** Ensures a promise cannot block forever; a stuck network call would otherwise prevent `try/finally` from ever reaching `finally` and the boot spinner would never clear. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error('auth_approval_request_timeout')), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(id);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(id);
+        reject(e);
+      }
+    );
+  });
+}
+
+const USERS_APPROVAL_TIMEOUT_MS = 12_000;
+
 const AuthWrapper: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -27,14 +46,21 @@ const AuthWrapper: React.FC = () => {
           return;
         }
         setUser(u);
-        // Fetch approved flag from users table
-        const { data, error } = await supabase
-          .from('users')
-          .select('approved')
-          .eq('id', u.id)
-          .single();
+        // Fetch approved flag from users table (bounded: an unsettled request blocks `finally` below)
+        let data: { approved?: boolean } | null = null;
+        let error: { message?: string } | null = null;
+        try {
+          const res = await withTimeout(
+            supabase.from('users').select('approved').eq('id', u.id).single(),
+            USERS_APPROVAL_TIMEOUT_MS
+          );
+          data = (res as { data: { approved?: boolean } | null }).data;
+          error = (res as { error: { message?: string } | null }).error;
+        } catch {
+          error = { message: 'timeout_or_rejected' };
+        }
         if (error) {
-          setApproved(false); // default to not approved
+          setApproved(false);
         } else {
           setApproved(data?.approved ?? false);
         }
