@@ -8,8 +8,6 @@ import type { GoalInsert } from '@/hooks/useGoals';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
-const SEED_ASSISTANT = 'What does your season look like?';
-
 function threadForApi(thread: ChatMessage[]): { role: 'user' | 'assistant'; content: string }[] {
   const t = thread.map((m) => ({ role: m.role, content: m.content }));
   if (t[0]?.role === 'assistant') t.shift();
@@ -159,7 +157,7 @@ type ArcSetupChatProps = {
  * Optional `<arc_setup>` confirmation card.
  */
 export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([{ role: 'assistant', content: SEED_ASSISTANT }]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -270,19 +268,39 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     setPendingSetup(null);
   };
 
+  const showIntroBanner = messages.length === 0;
+
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full min-w-0 max-w-lg mx-auto overflow-x-hidden">
       <div
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2.5 pb-32 pt-1
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-32 pt-2
           pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
       >
+        {showIntroBanner && (
+          <div
+            className="rounded-2xl border border-teal-500/25 bg-gradient-to-b from-teal-950/55 via-zinc-950/50 to-zinc-950/90 px-4 py-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+            role="region"
+            aria-label="Season setup"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-400/90 mb-2">
+              Athlete Leg
+            </p>
+            <h2 className="text-[1.35rem] sm:text-2xl font-semibold text-white leading-snug tracking-tight pr-1">
+              What does your season look like?
+            </h2>
+            <p className="mt-2.5 text-[17px] leading-relaxed text-white/60">
+              Races, goals, and limits—AL uses this to shape your arc. Type below to start.
+            </p>
+          </div>
+        )}
+
         {messages.map((m, i) => (
           <div
             key={i}
             className={
               m.role === 'user'
-                ? 'w-fit max-w-[min(100%,22rem)] ml-auto pl-3 pr-3 py-2 text-[15px] leading-relaxed text-white/90 bg-white/[0.07] rounded-xl border border-white/[0.08] break-words [overflow-wrap:anywhere]'
-                : 'text-[15px] leading-relaxed text-white/80 break-words [overflow-wrap:anywhere] min-w-0 pr-1'
+                ? 'w-fit max-w-[min(100%,24rem)] ml-auto pl-3.5 pr-3.5 py-2.5 text-[17px] leading-relaxed text-white/90 bg-white/[0.08] rounded-xl border border-white/[0.1] break-words [overflow-wrap:anywhere]'
+                : 'text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere] min-w-0 pr-1'
             }
           >
             {m.content}
@@ -290,17 +308,17 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         ))}
 
         {saveBanner && (
-          <p className="text-sm text-teal-200/90 py-1 break-words">{saveBanner}</p>
+          <p className="text-base text-teal-200/90 py-1 break-words leading-relaxed">{saveBanner}</p>
         )}
 
         {pendingSetup && (
           <div className="mt-2 p-3.5 rounded-xl border border-teal-500/35 bg-teal-950/40 min-w-0 max-w-full">
             <p className="text-[12px] font-medium text-teal-200/90 uppercase tracking-wide mb-1.5">Ready to save</p>
-            <p className="text-[15px] text-white/85 leading-snug mb-2 break-words [overflow-wrap:anywhere]">
+            <p className="text-[17px] text-white/85 leading-snug mb-2 break-words [overflow-wrap:anywhere]">
               {pendingSetup.summaryLine}
             </p>
             {pendingSetup.goalPreviews.length > 0 && (
-              <ul className="text-[14px] text-white/65 list-disc pl-4 mb-3 space-y-1 [overflow-wrap:anywhere]">
+              <ul className="text-[16px] text-white/65 list-disc pl-4 mb-3 space-y-1.5 [overflow-wrap:anywhere]">
                 {pendingSetup.goalPreviews.map((line, i) => (
                   <li key={i} className="break-words">
                     {line}
@@ -330,7 +348,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         )}
 
         {error && (
-          <p className="text-sm text-red-300/90 break-words [overflow-wrap:anywhere]">{error}</p>
+          <p className="text-base text-red-300/90 break-words leading-relaxed [overflow-wrap:anywhere]">{error}</p>
         )}
         <div ref={bottomRef} />
       </div>
@@ -352,14 +370,14 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
             }}
             rows={1}
             placeholder="Message…"
-            className="flex-1 min-w-0 min-h-[44px] max-h-28 resize-y rounded-xl bg-white/[0.07] border border-white/15 text-[15px] text-white placeholder:text-white/30 px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            className="flex-1 min-w-0 min-h-[48px] max-h-28 resize-y rounded-xl bg-white/[0.07] border border-white/15 text-[17px] text-white placeholder:text-white/35 px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
             disabled={sending}
           />
           <button
             type="button"
             onClick={() => void send()}
             disabled={sending || !draft.trim()}
-            className="shrink-0 h-11 px-4 rounded-xl bg-teal-500/25 text-teal-100 text-sm font-medium border border-teal-500/40 disabled:opacity-40"
+            className="shrink-0 h-12 min-w-[4.5rem] px-4 rounded-xl bg-teal-500/25 text-teal-100 text-base font-medium border border-teal-500/40 disabled:opacity-40"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
           </button>
@@ -379,7 +397,7 @@ export function ArcSetupScreenChrome({ title = 'Plan my season' }: { title?: str
         wordmarkSize={28}
       />
       <div className="shrink-0 z-30 border-b border-white/10 bg-zinc-950/90">
-        <p className="text-center text-[15px] sm:text-base font-medium text-white/90 px-4 py-2">{title}</p>
+        <p className="text-center text-lg font-semibold text-white/95 px-4 py-2.5 tracking-tight">{title}</p>
       </div>
     </>
   );
