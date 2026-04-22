@@ -31,6 +31,7 @@ import {
   normType,
   type DisciplineRecency,
 } from '../_shared/athlete-identity-inference.ts';
+import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 
 // =============================================================================
 // CORS HEADERS
@@ -331,6 +332,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    let baselinesWriteOk = false;
     if (existingBaselines?.id) {
       // Update existing record
       const { error: updateError } = await supabase
@@ -345,6 +347,7 @@ Deno.serve(async (req) => {
       if (updateError) {
         console.error('❌ Error updating baselines:', updateError);
       } else {
+        baselinesWriteOk = true;
         console.log('✅ Updated learned_fitness in user_baselines');
       }
     } else {
@@ -363,11 +366,18 @@ Deno.serve(async (req) => {
       if (insertError) {
         console.error('❌ Error inserting baselines:', insertError);
       } else {
+        baselinesWriteOk = true;
         console.log('✅ Created new user_baselines with learned_fitness');
       }
     }
 
     console.log(`✅ Fitness profile learned: status=${learningStatus}, workouts=${runRideSessions}`);
+
+    if (baselinesWriteOk) {
+      recomputeRaceProjectionsForUser(supabase, user_id).catch((e) =>
+        console.warn('[learn-fitness-profile] recompute goal projection', e)
+      );
+    }
 
     return new Response(JSON.stringify(learnedProfile), {
       status: 200,

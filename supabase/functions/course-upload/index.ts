@@ -149,6 +149,15 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (goalId) {
+    try {
+      const { recomputeRaceProjectionsForUser } = await import('../_shared/recompute-goal-race-projections.ts');
+      await recomputeRaceProjectionsForUser(supabase, user.id, { goalIds: [goalId] });
+    } catch (e) {
+      console.warn('[course-upload] recompute goal projection', e);
+    }
+  }
+
   return new Response(
     JSON.stringify({
       course_id: courseId,

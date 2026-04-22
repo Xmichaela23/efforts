@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { MobileHeader } from '@/components/MobileHeader';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { parseArcSetupFromAssistant, type ArcSetupPayload } from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
@@ -76,7 +77,14 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
 
   try {
     if (validGoals.length > 0) {
-      const rows = validGoals.map((row) => ({ user_id: userId, ...row }));
+      const rows = validGoals.map((row) => {
+        const { target_time, ...rest } = row;
+        const base: Record<string, unknown> = { user_id: userId, ...rest };
+        if (target_time != null && Number.isFinite(target_time) && target_time > 0) {
+          base.target_time = Math.round(target_time);
+        }
+        return base;
+      });
       const { error } = await supabase.from('goals').insert(rows);
       if (error) {
         console.error('[arc-setup] goal insert', error);
@@ -220,7 +228,9 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         typeof payload.athlete_identity === 'object' &&
         !Array.isArray(payload.athlete_identity) &&
         Object.keys(payload.athlete_identity as object).length > 0;
-      if (payload && (validGoals.length > 0 || hasId)) {
+      const userTurnCount = nextThread.filter((m) => m.role === 'user').length;
+      const allowReadyToSave = userTurnCount >= 2;
+      if (payload && (validGoals.length > 0 || hasId) && allowReadyToSave) {
         const goalPreviews = validGoals.map(
           (g) => [g.name, g.goal_type, g.target_date || ''].filter(Boolean).join(' · ')
         );
@@ -261,15 +271,18 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 w-full max-w-lg mx-auto">
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2 space-y-2 pb-28">
+    <div className="flex flex-col flex-1 min-h-0 w-full min-w-0 max-w-lg mx-auto overflow-x-hidden">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2.5 pb-32 pt-1
+          pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+      >
         {messages.map((m, i) => (
           <div
             key={i}
             className={
               m.role === 'user'
-                ? 'ml-8 pl-2 py-1.5 text-[13px] leading-snug text-white/90 bg-white/[0.07] rounded-lg border border-white/[0.08]'
-                : 'mr-6 text-[13px] leading-snug text-white/80'
+                ? 'w-fit max-w-[min(100%,22rem)] ml-auto pl-3 pr-3 py-2 text-[15px] leading-relaxed text-white/90 bg-white/[0.07] rounded-xl border border-white/[0.08] break-words [overflow-wrap:anywhere]'
+                : 'text-[15px] leading-relaxed text-white/80 break-words [overflow-wrap:anywhere] min-w-0 pr-1'
             }
           >
             {m.content}
@@ -277,17 +290,21 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         ))}
 
         {saveBanner && (
-          <p className="text-[12px] text-teal-200/90 px-1 py-1">{saveBanner}</p>
+          <p className="text-sm text-teal-200/90 py-1 break-words">{saveBanner}</p>
         )}
 
         {pendingSetup && (
-          <div className="mt-3 p-3 rounded-xl border border-teal-500/35 bg-teal-950/40">
-            <p className="text-[11px] font-medium text-teal-200/90 uppercase tracking-wide mb-1.5">Ready to save</p>
-            <p className="text-[13px] text-white/85 leading-snug mb-2">{pendingSetup.summaryLine}</p>
+          <div className="mt-2 p-3.5 rounded-xl border border-teal-500/35 bg-teal-950/40 min-w-0 max-w-full">
+            <p className="text-[12px] font-medium text-teal-200/90 uppercase tracking-wide mb-1.5">Ready to save</p>
+            <p className="text-[15px] text-white/85 leading-snug mb-2 break-words [overflow-wrap:anywhere]">
+              {pendingSetup.summaryLine}
+            </p>
             {pendingSetup.goalPreviews.length > 0 && (
-              <ul className="text-[12px] text-white/60 list-disc pl-4 mb-3 space-y-0.5">
+              <ul className="text-[14px] text-white/65 list-disc pl-4 mb-3 space-y-1 [overflow-wrap:anywhere]">
                 {pendingSetup.goalPreviews.map((line, i) => (
-                  <li key={i}>{line}</li>
+                  <li key={i} className="break-words">
+                    {line}
+                  </li>
                 ))}
               </ul>
             )}
@@ -296,7 +313,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                 type="button"
                 disabled={sending}
                 onClick={() => void onConfirm()}
-                className="text-[12px] font-medium px-3 py-1.5 rounded-lg bg-teal-500/30 text-teal-100 border border-teal-500/50 hover:bg-teal-500/40 disabled:opacity-50"
+                className="text-sm font-medium px-3.5 py-2 rounded-lg bg-teal-500/30 text-teal-100 border border-teal-500/50 hover:bg-teal-500/40 disabled:opacity-50"
               >
                 Looks right
               </button>
@@ -304,7 +321,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                 type="button"
                 disabled={sending}
                 onClick={onClarify}
-                className="text-[12px] font-medium px-3 py-1.5 rounded-lg bg-white/[0.06] text-white/80 border border-white/15 hover:bg-white/10"
+                className="text-sm font-medium px-3.5 py-2 rounded-lg bg-white/[0.06] text-white/80 border border-white/15 hover:bg-white/10"
               >
                 Let me clarify
               </button>
@@ -312,12 +329,18 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
           </div>
         )}
 
-        {error && <p className="text-[12px] text-red-300/90 px-1">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-300/90 break-words [overflow-wrap:anywhere]">{error}</p>
+        )}
         <div ref={bottomRef} />
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-zinc-950/95 backdrop-blur-md">
-        <div className="max-w-lg mx-auto flex gap-2 items-end">
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-zinc-950/95 backdrop-blur-md
+          pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]
+          pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      >
+        <div className="max-w-lg mx-auto w-full min-w-0 flex gap-2 items-end">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -329,14 +352,14 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
             }}
             rows={1}
             placeholder="Message…"
-            className="flex-1 min-h-[44px] max-h-28 resize-y rounded-xl bg-white/[0.07] border border-white/15 text-[13px] text-white placeholder:text-white/30 px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            className="flex-1 min-w-0 min-h-[44px] max-h-28 resize-y rounded-xl bg-white/[0.07] border border-white/15 text-[15px] text-white placeholder:text-white/30 px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
             disabled={sending}
           />
           <button
             type="button"
             onClick={() => void send()}
             disabled={sending || !draft.trim()}
-            className="shrink-0 h-11 px-4 rounded-xl bg-teal-500/25 text-teal-100 text-[12px] font-medium border border-teal-500/40 disabled:opacity-40"
+            className="shrink-0 h-11 px-4 rounded-xl bg-teal-500/25 text-teal-100 text-sm font-medium border border-teal-500/40 disabled:opacity-40"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
           </button>
@@ -349,16 +372,15 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
 export function ArcSetupScreenChrome({ title = 'Plan my season' }: { title?: string }) {
   const navigate = useNavigate();
   return (
-    <header className="shrink-0 z-40 flex items-center gap-2 px-3 py-2 border-b border-white/10 bg-zinc-950/80">
-      <button
-        type="button"
-        onClick={() => navigate(-1)}
-        className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/[0.06]"
-        aria-label="Back"
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </button>
-      <h1 className="text-sm font-medium text-white/90 tracking-wide">{title}</h1>
-    </header>
+    <>
+      <MobileHeader
+        showBackButton
+        onBack={() => navigate(-1)}
+        wordmarkSize={28}
+      />
+      <div className="shrink-0 z-30 border-b border-white/10 bg-zinc-950/90">
+        <p className="text-center text-[15px] sm:text-base font-medium text-white/90 px-4 py-2">{title}</p>
+      </div>
+    </>
   );
 }

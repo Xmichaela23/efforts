@@ -24,9 +24,21 @@ export type ArcGearSummary = {
   bikes: ArcGearItem[];
 };
 
+/** Mirrors `CompletedEvent` from `supabase/functions/_shared/arc-context.ts` */
+export type CompletedEvent = {
+  id: string;
+  name: string;
+  sport: string;
+  distance: string;
+  target_date: string;
+  days_ago: number;
+  finish_time_seconds: number | null;
+};
+
 export type ClientArcContext = {
   five_k_nudge: ArcFiveKLearnedDivergence | null;
   gear?: ArcGearSummary;
+  recent_completed_events?: CompletedEvent[];
 };
 
 export function fiveKNudgeDismissKey(n: { manual_5k_total_sec: number; implied_5k_total_sec: number }): string {

@@ -19,6 +19,8 @@ export interface Goal {
   notes: string | null;
   /** Target finish time in seconds (event goals), from DB */
   target_time?: number | null;
+  /** v1 tri projection (server) — _shared/race-projections */
+  projection?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

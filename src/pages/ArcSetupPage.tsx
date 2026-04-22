@@ -13,9 +13,9 @@ const ArcSetupPage: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-zinc-950 text-white overflow-hidden">
+    <div className="h-[100dvh] w-full min-w-0 flex flex-col bg-zinc-950 text-white overflow-x-hidden overflow-y-hidden">
       <ArcSetupScreenChrome title="Plan my season" />
-      <div className="flex-1 flex flex-col min-h-0 w-full max-w-md mx-auto overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-lg mx-auto overflow-hidden">
         <ArcSetupChat />
       </div>
     </div>

@@ -5,6 +5,7 @@ import {
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
 import { computeRunPlanningSignals } from '../_shared/planning-context.ts';
+import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import {
   calculateEffortScore,
   estimateVdotFromBasePace,
@@ -726,6 +727,14 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      if (createdGoalId) {
+        try {
+          await recomputeRaceProjectionsForUser(supabase, user_id, { goalIds: [createdGoalId] });
+        } catch (e) {
+          console.warn('[create-goal-and-materialize-plan] recompute projection', e);
+        }
+      }
+
       return new Response(
         JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: triPlanId, sport: 'triathlon', distance: triDistanceApi }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -1085,6 +1094,14 @@ Deno.serve(async (req: Request) => {
         const weekStart = currentWeekMondayISO();
         await supabase.from('planned_workouts').delete().eq('training_plan_id', lp.id).gte('date', weekStart);
         await supabase.from('plans').update({ status: 'ended' }).eq('id', lp.id).eq('user_id', user_id);
+      }
+    }
+
+    if (createdGoalId) {
+      try {
+        await recomputeRaceProjectionsForUser(supabase, user_id, { goalIds: [createdGoalId] });
+      } catch (e) {
+        console.warn('[create-goal-and-materialize-plan] recompute projection', e);
       }
     }
 

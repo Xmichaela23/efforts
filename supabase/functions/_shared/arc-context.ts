@@ -3,6 +3,11 @@
 // =============================================================================
 
 import { resolvePlanWeekIndex } from './plan-week.ts';
+import {
+  resolveFinishFromWorkouts,
+  ymdFromWorkoutDate,
+  type WorkoutFinishRow,
+} from './goal-finish-from-workouts.ts';
 
 /** JSON payload from `user_baselines.athlete_identity` */
 export type AthleteIdentity = Record<string, unknown>;
@@ -22,6 +27,8 @@ export interface Goal {
   target_metric: string | null;
   target_value: number | null;
   current_value: number | null;
+  /** v1 tri projection — see _shared/race-projections.ts */
+  projection: Record<string, unknown> | null;
 }
 
 export interface ActivePlanSummary {
@@ -73,6 +80,18 @@ export interface ArcGearSummary {
   bikes: ArcGearItem[];
 }
 
+/** Completed event goals in the last ~8 weeks, for recovery framing in Arc prompts. */
+export interface CompletedEvent {
+  id: string;
+  name: string;
+  sport: string;
+  distance: string;
+  target_date: string;
+  days_ago: number;
+  /** Actual time from a matching workout when available, else `goals.target_time` (seconds). */
+  finish_time_seconds: number | null;
+}
+
 export interface ArcContext {
   athlete_identity: AthleteIdentity | null;
   learned_fitness: LearnedFitness | null;
@@ -87,6 +106,8 @@ export interface ArcContext {
   five_k_nudge: ArcFiveKLearnedDivergence | null;
 
   active_goals: Goal[];
+  /** `goal_type` = event, `status` = completed, `target_date` in the last 8 weeks (inclusive of focus day). */
+  recent_completed_events: CompletedEvent[];
   active_plan: ActivePlanSummary | null;
 
   latest_snapshot: AthleteSnapshot | null;
@@ -100,6 +121,7 @@ export interface ArcContext {
 }
 
 function toGoalRow(r: Record<string, unknown>): Goal {
+  const proj = r.projection;
   return {
     id: String(r.id),
     name: String(r.name ?? 'Untitled'),
@@ -112,6 +134,7 @@ function toGoalRow(r: Record<string, unknown>): Goal {
     target_metric: r.target_metric != null ? String(r.target_metric) : null,
     target_value: r.target_value != null && Number.isFinite(Number(r.target_value)) ? Number(r.target_value) : null,
     current_value: r.current_value != null && Number.isFinite(Number(r.current_value)) ? Number(r.current_value) : null,
+    projection: proj && typeof proj === 'object' && !Array.isArray(proj) ? (proj as Record<string, unknown>) : null,
   };
 }
 
@@ -328,6 +351,73 @@ function buildActivePlanSummary(
   };
 }
 
+const EIGHT_WEEKS_DAYS = 56;
+
+async function buildRecentCompletedEvents(
+  supabase: { from: (t: string) => any },
+  userId: string,
+  focusYmd: string,
+  completedRows: Record<string, unknown>[] | null | undefined,
+): Promise<CompletedEvent[]> {
+  if (!completedRows || completedRows.length === 0) return [];
+
+  const { data: wrows, error: wErr } = await supabase
+    .from('workouts')
+    .select('id, type, date, moving_time, elapsed_time, workout_status')
+    .eq('user_id', userId)
+    .in(
+      'date',
+      [...new Set(completedRows.map((r) => String(r.target_date).slice(0, 10)))],
+    )
+    .eq('workout_status', 'completed');
+  if (wErr) {
+    console.warn('[getArcContext] recent_completed_events workouts', wErr.message);
+  }
+
+  const byDate = new Map<string, WorkoutFinishRow[]>();
+  for (const w of wrows || []) {
+    const d = ymdFromWorkoutDate((w as { date?: unknown }).date);
+    if (!d) continue;
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d)!.push(w as WorkoutFinishRow);
+  }
+
+  const focusMs = new Date(focusYmd + 'T12:00:00.000Z').getTime();
+  const out: CompletedEvent[] = [];
+
+  for (const r of completedRows) {
+    const name = r.name != null ? String(r.name) : 'Untitled';
+    const id = String(r.id);
+    const sport = r.sport != null ? String(r.sport) : '';
+    const distance = r.distance != null ? String(r.distance) : '';
+    const target_date = r.target_date != null ? String(r.target_date).slice(0, 10) : '';
+    if (!target_date) continue;
+
+    const { finishSeconds } = resolveFinishFromWorkouts(sport, byDate.get(target_date) || []);
+    const stored =
+      r.target_time != null && Number.isFinite(Number(r.target_time))
+        ? Math.round(Number(r.target_time))
+        : null;
+    const finish_time_seconds = finishSeconds != null ? finishSeconds : stored;
+
+    const raceMs = new Date(target_date + 'T12:00:00.000Z').getTime();
+    if (!Number.isFinite(raceMs) || !Number.isFinite(focusMs)) continue;
+    const days_ago = Math.max(0, Math.floor((focusMs - raceMs) / 86400000));
+
+    out.push({
+      id,
+      name,
+      sport,
+      distance,
+      target_date,
+      days_ago,
+      finish_time_seconds: finish_time_seconds ?? null,
+    });
+  }
+  out.sort((a, b) => b.target_date.localeCompare(a.target_date));
+  return out;
+}
+
 /**
  * Aggregates user_baselines, active goals, active plan, latest weekly snapshot, and
  * current athlete memory for Athlete Arc–aware prompts and planners.
@@ -338,8 +428,13 @@ export async function getArcContext(
   focusDateISO: string
 ): Promise<ArcContext> {
   const built_at = new Date().toISOString();
+  const focusYmd = focusDateISO.slice(0, 10);
+  const focusDay = new Date(focusYmd + 'T12:00:00.000Z');
+  const start8w = new Date(focusDay);
+  start8w.setUTCDate(start8w.getUTCDate() - EIGHT_WEEKS_DAYS);
+  const start8wYmd = start8w.toISOString().slice(0, 10);
 
-  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes] = await Promise.all([
+  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes, recentCompletedGoalsRes] = await Promise.all([
     supabase
       .from('user_baselines')
       .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers')
@@ -347,7 +442,7 @@ export async function getArcContext(
       .maybeSingle(),
     supabase
       .from('goals')
-      .select('id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value')
+      .select('id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection')
       .eq('user_id', userId)
       .eq('status', 'active')
       .order('target_date', { ascending: true, nullsFirst: false }),
@@ -379,6 +474,15 @@ export async function getArcContext(
       .eq('retired', false)
       .order('is_default', { ascending: false })
       .order('name', { ascending: true }),
+    supabase
+      .from('goals')
+      .select('id, name, sport, distance, target_date, target_time')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .eq('goal_type', 'event')
+      .gte('target_date', start8wYmd)
+      .lte('target_date', focusYmd)
+      .order('target_date', { ascending: false }),
   ]);
 
   const baseline = baselinesRes?.data as Record<string, unknown> | null;
@@ -443,6 +547,19 @@ export async function getArcContext(
     gear = buildGearSummary(gearRes?.data);
   }
 
+  if (recentCompletedGoalsRes?.error) {
+    console.warn('[getArcContext] recent completed goals', recentCompletedGoalsRes.error.message);
+  }
+  const recentCompletedRows = Array.isArray(recentCompletedGoalsRes?.data)
+    ? (recentCompletedGoalsRes.data as Record<string, unknown>[])
+    : [];
+  const recent_completed_events = await buildRecentCompletedEvents(
+    supabase,
+    userId,
+    focusYmd,
+    recentCompletedRows,
+  );
+
   return {
     athlete_identity,
     learned_fitness,
@@ -450,6 +567,7 @@ export async function getArcContext(
     training_background,
     five_k_nudge,
     active_goals,
+    recent_completed_events,
     active_plan,
     latest_snapshot,
     athlete_memory,
