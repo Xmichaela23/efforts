@@ -163,14 +163,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         const actualS = race.actual_seconds ?? null;
         const projS = race.fitness_projection_seconds ?? null;
         const goalS = race.goal_time_seconds ?? null;
-        // Single reference: prefer goal time when set, else model projection
-        const ref: 'goal' | 'projection' = goalS != null ? 'goal' : 'projection';
-        const activeTarget = ref === 'projection' ? projS : goalS;
-        const delta =
-          activeTarget != null && actualS != null && Number.isFinite(activeTarget) && Number.isFinite(actualS)
-            ? actualS - activeTarget
-            : null;
-        const beatTarget = delta != null && delta < 0;
         const fmt = (s: number | null | undefined) =>
           s != null && Number.isFinite(s) && s > 0 ? formatDuration(s) : '—';
         return (
@@ -198,22 +190,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
                 <div className="text-[11px] text-gray-400 mt-0.5">Actual</div>
               </div>
             </div>
-            {delta != null && (
-              <div className="mt-3 text-center space-y-1">
-                <div
-                  className={`text-sm font-medium ${
-                    beatTarget ? 'text-emerald-400' : 'text-white/60'
-                  }`}
-                >
-                  {beatTarget
-                    ? `${formatDuration(Math.abs(delta))} faster than ${ref === 'projection' ? 'projected' : 'goal'}`
-                    : `${formatDuration(delta)} over ${ref === 'projection' ? 'projection' : 'goal'}`}
-                </div>
-                {beatTarget && ref === 'projection' && (
-                  <div className="text-xs text-white/50">Ran faster than the model expected</div>
-                )}
-              </div>
-            )}
           </div>
         );
       })()}
@@ -226,16 +202,15 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
 
 
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
-      
-      <EnduranceIntervalTable
-        sessionDetail={sd}
-        hasSessionDetail={hasSessionDetail}
-        useImperial={useImperial}
-        noPlannedCompare={noPlannedCompare}
-        goalRaceReferenceMode={sd?.race?.is_goal_race
-          ? (sd.race?.goal_time_seconds != null ? 'goal' : 'projection')
-          : undefined}
-      />
+      {/* Goal race: no segments table — summary times + debrief only */}
+      {!sd?.race?.is_goal_race && (
+        <EnduranceIntervalTable
+          sessionDetail={sd}
+          hasSessionDetail={hasSessionDetail}
+          useImperial={useImperial}
+          noPlannedCompare={noPlannedCompare}
+        />
+      )}
       {!sd?.classification?.is_pool_swim && (
         <SessionNarrative
           sessionDetail={sd}
