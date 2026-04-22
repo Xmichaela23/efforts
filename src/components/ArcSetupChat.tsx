@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { parseArcSetupFromAssistant, type ArcSetupPayload } from '@/lib/parse-arc-setup';
+import {
+  coachVisibleProseSeeksReply,
+  parseArcSetupFromAssistant,
+  type ArcSetupPayload,
+} from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
@@ -275,7 +279,13 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         Object.keys(payload.athlete_identity as object).length > 0;
       const userTurnCount = nextThread.filter((m) => m.role === 'user').length;
       const allowReadyToSave = userTurnCount >= 2;
-      if (payload && (validGoals.length > 0 || hasId) && allowReadyToSave) {
+      const stillAsking = coachVisibleProseSeeksReply(displayText);
+      if (
+        payload &&
+        (validGoals.length > 0 || hasId) &&
+        allowReadyToSave &&
+        !stillAsking
+      ) {
         const goalPreviews = validGoals.map(
           (g) => [g.name, g.goal_type, g.target_date || ''].filter(Boolean).join(' · ')
         );
@@ -330,7 +340,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
             aria-label="Season setup"
           >
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-400/90 mb-2">
-              Athlete Leg
+              Season setup
             </p>
             <h2 className="text-[1.35rem] sm:text-2xl font-semibold text-white leading-snug tracking-tight pr-1">
               What does your season look like?
@@ -434,7 +444,18 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
   );
 }
 
-export function ArcSetupScreenChrome({ title = 'Plan my season' }: { title?: string }) {
+const ARC_HEADER_INSET: React.CSSProperties = {
+  // Fixed .mobile-header does not take flow space. Pad the whole main column. Extra 12px
+  // keeps the title strip and intro below the wordmark and header-glow blend on iOS.
+  paddingTop: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px) + 12px)',
+};
+
+type ArcSetupScreenChromeProps = {
+  title?: string;
+  children: React.ReactNode;
+};
+
+export function ArcSetupScreenChrome({ title = 'Plan my season', children }: ArcSetupScreenChromeProps) {
   const navigate = useNavigate();
   return (
     <>
@@ -443,17 +464,14 @@ export function ArcSetupScreenChrome({ title = 'Plan my season' }: { title?: str
         onBack={() => navigate(-1)}
         wordmarkSize={28}
       />
-      {/*
-        mobile-header is position:fixed and does not reserve layout height — without this
-        spacer, the title strip and first messages sit under the wordmark / notch.
-      */}
       <div
-        aria-hidden
-        className="shrink-0"
-        style={{ height: 'calc(var(--header-h, 4rem) + env(safe-area-inset-top, 0px))' }}
-      />
-      <div className="shrink-0 z-30 border-b border-white/10 bg-zinc-950/90">
-        <p className="text-center text-lg font-semibold text-white/95 px-4 py-2.5 tracking-tight">{title}</p>
+        className="flex-1 flex flex-col min-h-0 min-w-0 w-full bg-zinc-950"
+        style={ARC_HEADER_INSET}
+      >
+        <div className="shrink-0 z-20 border-b border-white/10 bg-zinc-950">
+          <p className="text-center text-lg font-semibold text-white/95 px-4 py-2.5 tracking-tight">{title}</p>
+        </div>
+        {children}
       </div>
     </>
   );

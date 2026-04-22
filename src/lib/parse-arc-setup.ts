@@ -17,6 +17,16 @@ function innerJsonToParse(inner: string): string {
   return s.trim();
 }
 
+/**
+ * If visible prose ends with a question, the coach is still waiting on the athlete;
+ * "Ready to save" should not appear in the same turn (avoids card + open question at once).
+ */
+export function coachVisibleProseSeeksReply(visible: string): boolean {
+  const t = visible.trim();
+  if (!t) return false;
+  return /[?？]\s*$/.test(t);
+}
+
 export function parseArcSetupFromAssistant(raw: string): {
   displayText: string;
   payload: ArcSetupPayload | null;
