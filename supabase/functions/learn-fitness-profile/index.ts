@@ -269,29 +269,42 @@ Deno.serve(async (req) => {
       .eq('user_id', user_id)
       .maybeSingle();
 
-    const existing = (typeof existingBaselines?.learned_fitness === 'string'
-      ? JSON.parse(existingBaselines.learned_fitness || '{}')
-      : existingBaselines?.learned_fitness) || {};
+    const parseJsonb = (raw: unknown): Record<string, unknown> => {
+      if (raw == null) return {};
+      if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+      if (typeof raw === 'string') {
+        try {
+          const o = JSON.parse(raw);
+          return typeof o === 'object' && o !== null && !Array.isArray(o) ? o : {};
+        } catch {
+          return {};
+        }
+      }
+      return {};
+    };
+    const existing = parseJsonb(existingBaselines?.learned_fitness);
     const mergedLearned = {
       ...learnedProfile,
       strength_1rms: existing?.strength_1rms
     };
 
-    const existingIdentity = (typeof (existingBaselines as any)?.athlete_identity === 'string'
-      ? JSON.parse((existingBaselines as any).athlete_identity || '{}')
-      : (existingBaselines as any)?.athlete_identity) || {};
+    const existingIdentity = parseJsonb((existingBaselines as any)?.athlete_identity);
     const userConfirmed = existingIdentity?.confirmed_by_user === true;
 
     let identityUpdate: Record<string, unknown> = {};
     if (!userConfirmed) {
-      const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus, recency);
-      const disciplines = inferDisciplinesTextArray(idv1.discipline_mix);
-      const training_background = inferTrainingBackgroundSentence(idv1);
-      identityUpdate = {
-        disciplines,
-        training_background,
-        athlete_identity: { ...existingIdentity, ...idv1, confirmed_by_user: false },
-      };
+      try {
+        const idv1 = inferAthleteIdentityV1(allWorkouts as any, learningStatus, recency);
+        const disciplines = inferDisciplinesTextArray(idv1.discipline_mix);
+        const training_background = inferTrainingBackgroundSentence(idv1);
+        identityUpdate = {
+          disciplines,
+          training_background,
+          athlete_identity: { ...existingIdentity, ...idv1, confirmed_by_user: false },
+        };
+      } catch (e) {
+        console.warn('⚠️ inferAthleteIdentityV1 failed (non-fatal):', e);
+      }
     }
 
     if (existingBaselines?.id) {
@@ -330,7 +343,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`✅ Fitness profile learned: status=${learningStatus}, workouts=${totalWorkouts}`);
+    console.log(`✅ Fitness profile learned: status=${learningStatus}, workouts=${runRideSessions}`);
 
     return new Response(JSON.stringify(learnedProfile), {
       status: 200,
