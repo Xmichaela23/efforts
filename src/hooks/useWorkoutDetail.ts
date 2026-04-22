@@ -34,17 +34,16 @@ export function extractSessionDetailV1FromWorkout(w: unknown): Record<string, un
 export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
-  const [hasSession, setHasSession] = useState(false);
+  /** Sync init avoids one frame (or more) with hasSession false while queries are disabled; v5 would treat disabled queries as `isPending` and we must not use that for global loading. */
+  const [hasSession, setHasSession] = useState(() => typeof window !== 'undefined' && !!getStoredUserId());
   const fetchSessionDetail = !!opts?.fetchSessionDetail;
   /** Next session_detail invoke skips server fast path (recompute / attach / invalidate). */
   const forceSessionDetailRefreshRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const uid = getStoredUserId();
-      if (mounted) setHasSession(!!uid);
-    })();
+    const uid = getStoredUserId();
+    if (mounted) setHasSession(!!uid);
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_evt, s) => {
       if (mounted) setHasSession(!!s);
     });
@@ -242,15 +241,18 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   }, [sessionQuery.data, embeddedSessionDetail]);
 
   const haveSessionForUi = sessionDetailV1 != null;
+  // v5: disabled queries are still `isPending` with fetchStatus `idle` — do not OR `isPending` for loading UX.
+  const workoutQueryEnabled = !!id && isUuid(id) && hasSession;
+  const sessionQueryEnabled = workoutQueryEnabled && fetchSessionDetail;
   const sessionDetailLoading =
-    fetchSessionDetail &&
+    sessionQueryEnabled &&
     !haveSessionForUi &&
-    (sessionQuery.isPending || sessionQuery.isFetching);
+    sessionQuery.isLoading;
 
   return {
     workout: stableWorkout,
     session_detail_v1: sessionDetailV1,
-    loading: workoutQuery.isFetching || workoutQuery.isPending,
+    loading: workoutQueryEnabled && workoutQuery.isLoading,
     sessionDetailLoading,
     error:
       (workoutQuery.error as any)?.message ||
