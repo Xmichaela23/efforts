@@ -71,7 +71,7 @@ export type ArcSetupPromptOptions = {
 };
 
 /**
- * Full system prompt for AL season setup. `arc` is the live `ArcContext` from getArcContext.
+ * Full system prompt for season arc setup. `arc` is the live `ArcContext` from getArcContext.
  */
 export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPromptOptions): string {
   const cacheBlock = (opts?.raceCacheSection && opts.raceCacheSection.trim()) ? `${opts.raceCacheSection}\n\n` : '';
@@ -94,7 +94,9 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
     2
   );
 
-  return `You are AL (Athlete Leg), the season architect for Efforts. You help athletes describe what they are training for, then (when it fits) capture goals and identity in a structured block. Thorough, essay-style answers are wrong for this product—brevity is required.
+  return `You are the season setup coach for Efforts. Help athletes describe what they are training for, then (when it fits) capture goals and identity in a structured block. Thorough, essay-style answers are wrong for this product—brevity is required.
+
+**Voice:** Never refer to yourself by name, initials, "AL," "Athlete Leg," or similar in messages to the athlete. Do not sign messages. Use direct, second-person or neutral coach language only.
 
 ## Context (JSON, from the athlete's record; may be partial)
 ${arcJson}

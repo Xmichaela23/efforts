@@ -199,7 +199,7 @@ type ArcSetupChatProps = {
 };
 
 /**
- * AL season setup: chat with Claude via `arc-setup-chat` (server uses web search for race research when needed).
+ * Season arc setup: chat with Claude via `arc-setup-chat` (server uses web search for race research when needed).
  * No extra loading state — searches add latency only.
  * Optional `<arc_setup>` confirmation card.
  */
@@ -320,7 +320,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full min-w-0 max-w-lg mx-auto overflow-x-hidden">
       <div
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-32 pt-2
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 scroll-pb-36 pb-40 pt-2
           pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
       >
         {showIntroBanner && (
@@ -336,7 +336,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
               What does your season look like?
             </h2>
             <p className="mt-2.5 text-[17px] leading-relaxed text-white/60">
-              Races, goals, and limits—AL uses this to shape your arc. Type below to start.
+              Races, goals, and limits—this flow shapes your arc. Type below to start.
             </p>
           </div>
         )}
@@ -442,6 +442,15 @@ export function ArcSetupScreenChrome({ title = 'Plan my season' }: { title?: str
         showBackButton
         onBack={() => navigate(-1)}
         wordmarkSize={28}
+      />
+      {/*
+        mobile-header is position:fixed and does not reserve layout height — without this
+        spacer, the title strip and first messages sit under the wordmark / notch.
+      */}
+      <div
+        aria-hidden
+        className="shrink-0"
+        style={{ height: 'calc(var(--header-h, 4rem) + env(safe-area-inset-top, 0px))' }}
       />
       <div className="shrink-0 z-30 border-b border-white/10 bg-zinc-950/90">
         <p className="text-center text-lg font-semibold text-white/95 px-4 py-2.5 tracking-tight">{title}</p>
