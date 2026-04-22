@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
@@ -289,11 +289,16 @@ const loadBaselines = async () => {
     if (baselines) {
       setData(baselines as BaselineData);
       setOriginalData(JSON.stringify(baselines)); // Store original for comparison
-      setLastUpdated(baselines.lastUpdated || null);
-      // Load learned fitness if available
-      if ((baselines as any).learned_fitness) {
-        setLearnedFitness((baselines as any).learned_fitness);
+      const rawLf = (baselines as any).learned_fitness;
+      let parsedLf: any = null;
+      if (rawLf) {
+        parsedLf = typeof rawLf === 'string' ? (() => { try { return JSON.parse(rawLf); } catch { return null; } })() : rawLf;
+        setLearnedFitness(parsedLf);
+      } else {
+        setLearnedFitness(null);
       }
+      const learnedAt = parsedLf?.last_updated as string | undefined;
+      setLastUpdated(learnedAt || baselines.lastUpdated || null);
       // Load custom resting HR if set
       if ((baselines as any).performanceNumbers?.restingHeartRate) {
         setCustomRestingHR(Number((baselines as any).performanceNumbers.restingHeartRate));
@@ -340,7 +345,7 @@ const loadBaselines = async () => {
   }
 };
 
-// Fetch learned fitness profile from edge function
+// Fetch learned fitness profile from edge function, then reload from DB
 const refreshLearnedProfile = async () => {
   try {
     setLearningProfile(true);
@@ -349,16 +354,38 @@ const refreshLearnedProfile = async () => {
       return;
     }
 
-    const { data: result, error } = await supabase.functions.invoke('learn-fitness-profile', {
+    const { error } = await supabase.functions.invoke('learn-fitness-profile', {
       body: { user_id: userId }
     });
 
     if (error) {
+      console.error('learn-fitness-profile', error);
       return;
     }
 
-    setLearnedFitness(result);
+    const { data: row } = await supabase
+      .from('user_baselines')
+      .select('learned_fitness, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    let lf = row?.learned_fitness as any;
+    if (typeof lf === 'string') {
+      try {
+        lf = JSON.parse(lf);
+      } catch {
+        lf = null;
+      }
+    }
+    if (lf) {
+      setLearnedFitness(lf);
+      const t = typeof lf.last_updated === 'string' ? lf.last_updated : null;
+      setLastUpdated(t || row?.updated_at || null);
+    } else {
+      setLastUpdated(row?.updated_at || null);
+    }
   } catch (error) {
+    console.error('refreshLearnedProfile', error);
   } finally {
     setLearningProfile(false);
   }
@@ -366,11 +393,17 @@ const refreshLearnedProfile = async () => {
 
 // Format pace from seconds per km to mm:ss/mi
 const formatPace = (secPerKm: number | undefined): string => {
-  if (!secPerKm) return '--';
+  if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return '—';
   const secPerMile = secPerKm * 1.60934;
   const mins = Math.floor(secPerMile / 60);
   const secs = Math.round(secPerMile % 60);
   return `${mins}:${String(secs).padStart(2, '0')}/mi`;
+};
+
+const paceConfidenceLine = (metric: { sample_count?: number } | null | undefined, sport: 'run' | 'ride'): string | null => {
+  if (!metric?.sample_count || metric.sample_count < 1) return null;
+  const u = sport === 'ride' ? 'rides' : 'runs';
+  return `Learned from ${metric.sample_count} ${u}`;
 };
 
 // Get confidence dots
@@ -944,7 +977,12 @@ return (
                       </h2>
 
                       {/* Running */}
-                      {activeSport === 'running' && (
+                      {activeSport === 'running' && (() => {
+                        const easyLearned = learnedFitness?.run_easy_pace_sec_per_km;
+                        const thrLearned = learnedFitness?.run_threshold_pace_sec_per_km;
+                        const hasEasyLearned = easyLearned?.value != null && Number.isFinite(Number(easyLearned.value)) && Number(easyLearned.value) > 0;
+                        const hasThrLearned = thrLearned?.value != null && Number.isFinite(Number(thrLearned.value)) && Number(thrLearned.value) > 0;
+                        return (
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
                             <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
@@ -968,8 +1006,23 @@ return (
                                 style={{ fontFamily: 'Inter, sans-serif' }}
                               />
                             </div>
+                            {hasEasyLearned && (
+                            <div className="flex flex-col gap-1.5 min-w-[10rem]">
+                              <label className="text-xs text-white/50 font-medium">Easy pace</label>
+                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-lg font-medium text-white tabular-nums">{formatPace(easyLearned.value)}</span>
+                                  <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(easyLearned.confidence)}</span>
+                                </div>
+                                {paceConfidenceLine(easyLearned, 'run') && (
+                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{paceConfidenceLine(easyLearned, 'run')}</p>
+                                )}
+                              </div>
+                            </div>
+                            )}
+                            {!hasEasyLearned && (
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-xs text-white/50 font-medium">Easy Pace</label>
+                              <label className="text-xs text-white/50 font-medium">Easy pace (manual)</label>
                               <div className="flex items-center gap-2">
                                 <input
                                   type="text"
@@ -988,9 +1041,25 @@ return (
                                 <span className="text-sm text-white/50">/mi</span>
                               </div>
                             </div>
+                            )}
+                            {hasThrLearned && (
+                            <div className="flex flex-col gap-1.5 min-w-[10rem]">
+                              <label className="text-xs text-white/50 font-medium">Threshold pace</label>
+                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-left">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-lg font-medium text-white tabular-nums">{formatPace(thrLearned.value)}</span>
+                                  <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(thrLearned.confidence)}</span>
+                                </div>
+                                {paceConfidenceLine(thrLearned, 'run') && (
+                                  <p className="text-[11px] text-white/40 mt-1 leading-snug">{paceConfidenceLine(thrLearned, 'run')}</p>
+                                )}
+                              </div>
+                            </div>
+                            )}
                           </div>
                         </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Cycling */}
                       {activeSport === 'cycling' && (
@@ -1462,9 +1531,14 @@ return (
                         onClick={refreshLearnedProfile}
                         disabled={learningProfile}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-50"
+                        type="button"
                       >
-                        <RefreshCw className={`h-3 w-3 ${learningProfile ? 'animate-spin' : ''}`} />
-                        {learningProfile ? 'Learning...' : 'Refresh'}
+                        {learningProfile ? (
+                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" aria-hidden />
+                        )}
+                        {learningProfile ? 'Analyzing...' : 'Refresh'}
                       </button>
                     </div>
 
@@ -1675,8 +1749,10 @@ return (
                               <button
                                 onClick={refreshLearnedProfile}
                                 disabled={learningProfile}
-                                className="px-5 py-2.5 text-sm font-medium rounded-full bg-teal-500/20 border border-teal-500/50 text-teal-400 hover:bg-teal-500/30 transition-all disabled:opacity-50"
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium rounded-full bg-teal-500/20 border border-teal-500/50 text-teal-400 hover:bg-teal-500/30 transition-all disabled:opacity-50"
+                                type="button"
                               >
+                                {learningProfile ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                                 {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
                               </button>
                               <p className="text-xs text-white/50 mt-3">
