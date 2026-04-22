@@ -2,6 +2,7 @@
  * Shared training context for plan generation (generate-run-plan, wizard, goal flow).
  * Reads athlete_snapshot rows + ended-plan tombstones so starting volume matches reality.
  */
+import type { CompletedEvent } from './arc-context.ts';
 
 export type TrainingTransitionMode =
   | 'peak_bridge'
@@ -82,6 +83,52 @@ export function classifyTrainingTransition(opts: {
       ? `Last training block was ${weeksSinceEnd} weeks ago — treating as a fresh build.`
       : 'Building from current fitness.',
   };
+}
+
+/** Heuristic long-run miles from a completed event when snapshots/tombstones are missing. */
+export function recentLongRunMilesFromCompletedEvent(distance: string, sport: string): number {
+  const d = (distance || '').toLowerCase();
+  const s = (sport || '').toLowerCase();
+  if (d.includes('marathon') && !d.includes('half') && !d.includes('70')) return 26.2;
+  if (d.includes('half') || d.includes('13.1') || d.includes('21k') || d.includes('half marathon')) return 13.1;
+  if (d.includes('70.3') || d.includes('half iron') || s.includes('tri')) return 16;
+  if (d.includes('ironman') || d.includes('140.6')) return s.includes('tri') ? 18 : 26.2;
+  if (d.includes('ultra') || d.includes('50k')) return 20;
+  return 16;
+}
+
+/**
+ * A recent run or tri finish (from Arc `recent_completed_events`) should start the next
+ * run/tri plan in `recovery_rebuild` with the race treated as the long-run peak.
+ */
+export function findPostRaceRecoveryContext(
+  events: CompletedEvent[] | null | undefined,
+  newGoalSport: string,
+):
+  | {
+      apply: true;
+      event: CompletedEvent;
+      recentLongRunMilesHint: number;
+      reasoning: string;
+    }
+  | { apply: false } {
+  const goal = (newGoalSport || '').toLowerCase();
+  if (!['run', 'tri', 'triathlon'].includes(goal)) return { apply: false };
+  if (!events?.length) return { apply: false };
+  for (const e of events) {
+    if (e.days_ago >= 21) continue;
+    const s = (e.sport || '').toLowerCase();
+    if (s === 'run' || s.includes('tri')) {
+      const hint = recentLongRunMilesFromCompletedEvent(e.distance, e.sport);
+      return {
+        apply: true,
+        event: e,
+        recentLongRunMilesHint: hint,
+        reasoning: `Recent race "${e.name}" (${e.days_ago}d ago) — starting in recovery rebuild from event peak.`,
+      };
+    }
+  }
+  return { apply: false };
 }
 
 /**

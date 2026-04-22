@@ -100,6 +100,11 @@ export interface ArcContext {
   /** `user_baselines.training_background` */
   training_background: string | null;
   /**
+   * `user_baselines.equipment` — e.g. `{ strength: string[] }` for gym / strength access.
+   * Omitted from prompts when null; do not ask the athlete to repeat this if present.
+   */
+  equipment: Record<string, unknown> | null;
+  /**
    * Populated when we have a manual 5K and a sufficiently confident learned threshold;
    * `should_prompt` is true when the gap exceeds a small threshold (e.g. ~90s).
    */
@@ -437,7 +442,7 @@ export async function getArcContext(
   const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes, recentCompletedGoalsRes] = await Promise.all([
     supabase
       .from('user_baselines')
-      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers')
+      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers, equipment')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase
@@ -495,6 +500,12 @@ export async function getArcContext(
   const training_background =
     baseline?.training_background != null && typeof baseline.training_background === 'string'
       ? (baseline.training_background as string)
+      : null;
+
+  const equipmentRaw = baseline?.equipment;
+  const equipment: Record<string, unknown> | null =
+    equipmentRaw != null && typeof equipmentRaw === 'object' && !Array.isArray(equipmentRaw)
+      ? (equipmentRaw as Record<string, unknown>)
       : null;
 
   const active_goals: Goal[] = (Array.isArray(goalsRes?.data) ? goalsRes.data : []).map((r: Record<string, unknown>) =>
@@ -565,6 +576,7 @@ export async function getArcContext(
     learned_fitness,
     disciplines,
     training_background,
+    equipment,
     five_k_nudge,
     active_goals,
     recent_completed_events,

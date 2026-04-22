@@ -4,6 +4,9 @@ export type ArcSetupPayload = {
   summary?: string;
   goals?: unknown[];
   athlete_identity?: Record<string, unknown>;
+  /** Optional top-level; merged into each goal's training_prefs when saving */
+  strength_frequency?: 0 | 1 | 2 | 3;
+  strength_focus?: 'general' | 'power' | 'maintenance';
 };
 
 function innerJsonToParse(inner: string): string {

@@ -18,7 +18,27 @@ function isValidGoalType(t: unknown): t is GoalInsert['goal_type'] {
   return t === 'event' || t === 'capacity' || t === 'maintenance';
 }
 
-function normalizeGoalInput(g: Record<string, unknown>): GoalInsert | null {
+function mapStrengthFocusToProtocol(focus: string | undefined): string {
+  const f = (focus || 'general').toLowerCase();
+  if (f === 'power') return 'neural_speed';
+  return 'durability';
+}
+
+function coalesceStrengthFrequency(
+  g: Record<string, unknown>,
+  parent?: { strength_frequency?: 0 | 1 | 2 | 3 },
+  trainingPrefs?: Record<string, unknown>,
+): 0 | 1 | 2 | 3 | undefined {
+  const raw = g.strength_frequency ?? parent?.strength_frequency ?? trainingPrefs?.strength_frequency;
+  if (typeof raw === 'number' && [0, 1, 2, 3].includes(raw)) return raw;
+  if (typeof raw === 'string' && ['0', '1', '2', '3'].includes(raw)) return Number(raw) as 0 | 1 | 2 | 3;
+  return undefined;
+}
+
+function normalizeGoalInput(
+  g: Record<string, unknown>,
+  parent?: { strength_frequency?: 0 | 1 | 2 | 3; strength_focus?: string },
+): GoalInsert | null {
   const name = typeof g.name === 'string' && g.name.trim() ? g.name.trim() : null;
   if (!name) return null;
   const goal_type = g.goal_type;
@@ -42,16 +62,43 @@ function normalizeGoalInput(g: Record<string, unknown>): GoalInsert | null {
     current_value: typeof g.current_value === 'number' && Number.isFinite(g.current_value) ? g.current_value : null,
     priority: g.priority === 'B' || g.priority === 'C' ? g.priority : 'A',
     status: 'active',
-    training_prefs: typeof g.training_prefs === 'object' && g.training_prefs !== null ? (g.training_prefs as Record<string, unknown>) : {},
+    training_prefs: (() => {
+      const tp =
+        typeof g.training_prefs === 'object' && g.training_prefs !== null
+          ? { ...(g.training_prefs as Record<string, unknown>) }
+          : {};
+      const freq = coalesceStrengthFrequency(g, parent, tp);
+      const focusRaw =
+        typeof g.strength_focus === 'string'
+          ? g.strength_focus
+          : parent?.strength_focus ??
+            (typeof tp.strength_focus === 'string' ? tp.strength_focus : undefined);
+      if (freq !== undefined) {
+        if (freq === 0) {
+          tp.strength_protocol = 'none';
+          tp.strength_frequency = 0;
+        } else {
+          tp.strength_frequency = freq;
+          tp.strength_protocol = mapStrengthFocusToProtocol(
+            typeof focusRaw === 'string' ? focusRaw : 'general',
+          );
+        }
+      }
+      return tp;
+    })(),
     notes: typeof g.notes === 'string' ? g.notes : null,
   };
 }
 
 function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
   const out: GoalInsert[] = [];
+  const parent = {
+    strength_frequency: payload.strength_frequency,
+    strength_focus: payload.strength_focus,
+  };
   for (const g of Array.isArray(payload.goals) ? payload.goals : []) {
     if (typeof g !== 'object' || g === null) continue;
-    const row = normalizeGoalInput(g as Record<string, unknown>);
+    const row = normalizeGoalInput(g as Record<string, unknown>, parent);
     if (row) out.push(row);
   }
   return out;

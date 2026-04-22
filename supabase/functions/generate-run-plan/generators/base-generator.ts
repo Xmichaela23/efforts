@@ -165,6 +165,7 @@ export abstract class BaseGenerator {
     const hint = this.params.structural_load_hint;
     if (!hint || hint === 'none' || weekNumber > 2) return 1.0;
     if (hint === 'heavy_lower') return 0.90;
+    if (hint === 'low') return weekNumber === 1 ? 0.85 : 0.92;
     if (hint === 'moderate' && weekNumber === 1) return 0.95;
     return 1.0;
   }

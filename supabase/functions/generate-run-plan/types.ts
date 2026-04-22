@@ -31,7 +31,7 @@ export interface GeneratePlanRequest {
   // Structural load hint: tells the generator that heavy lower-body strength
   // work will be overlaid, so long-run volume should be governed down in early
   // weeks to avoid CNS overload from concurrent introduction of new stressors.
-  structural_load_hint?: 'heavy_lower' | 'moderate' | 'none';
+  structural_load_hint?: 'heavy_lower' | 'moderate' | 'low' | 'none';
   // Effort Score (for Performance Build / speed goal)
   effort_score?: number;
   effort_source_distance?: number; // meters
@@ -96,7 +96,7 @@ export interface GeneratorParams {
   current_acwr?: number;
   volume_trend?: 'building' | 'holding' | 'declining';
   transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
-  structural_load_hint?: 'heavy_lower' | 'moderate' | 'none';
+  structural_load_hint?: 'heavy_lower' | 'moderate' | 'low' | 'none';
   // Effort Score for pace calculations (Balanced Build only)
   effort_score?: number;
   effort_paces?: {

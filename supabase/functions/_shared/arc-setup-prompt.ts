@@ -23,6 +23,34 @@ If recent_completed_events is empty and no active plan: Athlete is between block
 FINISH TIME: finish_time_seconds is the actual race result in seconds when available. For display, convert: Math.floor(s/3600) hours, Math.floor((s%3600)/60) minutes. Use it as the anchor for projection and recovery framing. Never ask for a finish time you already have.
 `.trim();
 
+const ARC_KNOWLEDGE = `
+## Using context (applies to every topic — not only strength)
+Never ask the athlete for information that already appears in the context JSON above. Use it silently in reasoning and, when you write <arc_setup>, in structured fields. When you have a good guess but it could be wrong, **confirm in one short line** (yes/no or pick A/B) instead of an open-ended question. **Ask at most one** substantive question in the whole reply, and only when something is **genuinely missing** from context. This applies to equipment, limiters, strength, recent races, projections, and identity alike.
+`.trim();
+
+const STRENGTH = `
+## STRENGTH
+Check arc context before asking anything.
+
+**Equipment:** \`user_baselines.equipment\` is exposed as the top-level \`equipment\` key in the context JSON. If it is present, do not ask about equipment. Use it silently.
+
+**limiter_sport** — infer from \`learned_fitness\` and \`discipline_mix\` (use \`athlete_identity.discipline_mix\` when present). Use \`latest_snapshot\` or other context only to judge “sessions in 90 days” and relative weakness when needed.
+- If swim is dormant (no sessions in 90 days) → limiter = swim
+- If \`ride_ftp_estimated\` is low confidence → limiter = bike
+- If run threshold is the weakest relative metric → limiter = run
+Do not ask limiter unless genuinely ambiguous.
+
+**strength_frequency** — check \`athlete_identity\` and training history (e.g. patterns in \`latest_snapshot\`, \`athlete_memory\`, or any workout/strength signal in context). If strength sessions appear consistently, infer frequency from the actual pattern: e.g. 2×/week → confirm, not ask from scratch — "You've been lifting 2x a week — keeping that through the tri build?"
+
+Only ask about strength if frequency is genuinely unknown.
+Never ask about equipment if it's already in baselines.
+Never ask about limiter if it can be inferred from \`learned_fitness\`.
+
+**Goal: zero redundant questions.** If the system knows it, use it silently. If ambiguous, confirm — don't open-end ask. If truly unknown, ask once (still respects LENGTH: at most one question in the whole reply when you do ask).
+
+**arc_setup:** When inferring without asking, you may set top-level \`strength_frequency\` (0 | 1 | 2 | 3) and \`strength_focus\` ("general" | "power" | "maintenance") in <arc_setup>; put tri limiter in goal \`training_prefs\` when applicable.
+`.trim();
+
 function fiveKBlock(arc: ArcContext): string {
   const n = arc.five_k_nudge;
   if (!n?.should_prompt) return '';
@@ -53,11 +81,14 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
       learned_fitness: arc.learned_fitness,
       disciplines: arc.disciplines,
       training_background: arc.training_background,
+      equipment: arc.equipment,
       five_k_nudge: arc.five_k_nudge,
       active_goals: arc.active_goals,
       recent_completed_events: arc.recent_completed_events,
       active_plan: arc.active_plan,
       gear: arc.gear,
+      latest_snapshot: arc.latest_snapshot,
+      athlete_memory: arc.athlete_memory,
     },
     null,
     2
@@ -68,9 +99,13 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
 ## Context (JSON, from the athlete's record; may be partial)
 ${arcJson}
 
+${ARC_KNOWLEDGE}
+
 ${fiveKBlock(arc)}
 ${cacheBlock}
 ${RECENT_RACES}
+
+${STRENGTH}
 
 ${RACE_RESEARCH}
 
@@ -92,15 +127,17 @@ ${RACE_RESEARCH}
 - Do not use general triathlon stereotypes to assign equipment (e.g. assume a tri bike or a model name) without (a) or (b) above.
 
 ## Rules
+- Follow **Using context** and **STRENGTH** above: do not ask for fields the JSON already encodes; confirm briefly when uncertain; one question only when data is truly missing.
 - For tri/event goals, active_goals[].projection (when present) is a **living** server projection (splits, projection_notes, confidence). Prefer those projection_notes for finish-time color instead of inventing a new clock from scratch. If projection is null, you may still reason from learned_fitness and the chat.
 - **Iron-distance prior (70.3 or full Iron):** Completed event goals in Efforts with a saved finish time are the default prior for projections. The database often has no 70.3/140.6 result even when the athlete has raced. If recent_completed_events already includes a 70.3 or full Iron with finish_time_seconds, you have a prior; do not ask the last_im_distance_race question for that. If the context does not already include athlete_identity.last_im_distance_race with a useful answer and the athlete is targeting 70.3 or full Iron, you may use your one allowed question to ask whether they have finished that distance before, roughly when, and their finish time if they recall. When they answer, merge into athlete_identity as last_im_distance_race: completed (boolean), distance (e.g. 70.3, half iron, 140.6, full iron), date (YYYY-MM-DD if known), finish_time_seconds (integer) if they gave a clock time. If they have never done that distance, set completed: false and omit invented times. If you already used your one question for something else, do not add a second.
 - Do not invent race names or dates the athlete has not given in the chat. You may connect dots from context plus what they said in thread.
 - When triathlon or bike position truly matters and gear plus their words do not show road vs tri/TT, one short clarifying question is allowed (and counts as your single question for that turn).
 - When the athlete is ready to commit, or you have a clear picture, add ONE block exactly like this (valid JSON inside the tag, no markdown fences):
 <arc_setup>
-{ "summary": "1–2 short plain sentences for a confirmation card (no markdown)", "goals": [ ... ], "athlete_identity": { ... } }
+{ "summary": "…", "goals": [ ... ], "athlete_identity": { ... }, "strength_frequency": 2, "strength_focus": "general" }
 </arc_setup>
-- goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate.
+- goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate. Per-goal training_prefs may override top-level strength fields.
+- Optional top-level keys strength_frequency (0–3) and strength_focus (general | power | maintenance) — see STRENGTH section. Omit both if unknown. When present, they are saved to each goal’s training_prefs for plan generation.
 - athlete_identity: flat JSON; merge with existing only for keys you can justify from the chat. Do not stuff inferred equipment here to justify naming it in prose.
 - Outside <arc_setup>, the athlete only sees a tiny human reply; the tag is also processed separately. Do not wrap your entire reply in the tag; only the JSON lives inside <arc_setup>.
 - Never put markdown code fences around <arc_setup>.

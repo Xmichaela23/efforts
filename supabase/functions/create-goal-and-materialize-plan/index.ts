@@ -4,7 +4,12 @@ import {
   resolveAdaptiveMarathonDecisionFromMemory,
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
-import { computeRunPlanningSignals } from '../_shared/planning-context.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
+import {
+  computeRunPlanningSignals,
+  findPostRaceRecoveryContext,
+  type TrainingTransition,
+} from '../_shared/planning-context.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import {
   calculateEffortScore,
@@ -549,6 +554,10 @@ Deno.serve(async (req: Request) => {
     const goalType = String(resolvedGoal?.training_prefs?.goal_type || '').toLowerCase();
     if (!fitness || !goalType) throw new AppError('missing_training_prefs', 'Missing fitness or training goal');
 
+    const focusDateStr = new Date().toISOString().slice(0, 10);
+    const arcForPlanning = await getArcContext(supabase, user_id, focusDateStr);
+    const postRaceRecovery = findPostRaceRecoveryContext(arcForPlanning.recent_completed_events, sport);
+
     // ── Triathlon path ────────────────────────────────────────────────────
     if (isTri) {
       const triDistanceApi = TRI_DISTANCE_TO_API[String(resolvedGoal?.distance || '')] ?? null;
@@ -671,6 +680,7 @@ Deno.serve(async (req: Request) => {
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
         // Days already covered by a concurrent run plan — tri generator defers to those sessions
         ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),
+        ...(postRaceRecovery.apply ? { transition_mode: 'recovery_rebuild' as const } : {}),
       };
 
       const triLearned = parseLearnedFitnessForSeed(triBaseline?.learned_fitness);
@@ -773,12 +783,23 @@ Deno.serve(async (req: Request) => {
       newDiscipline: String(resolvedGoal?.sport || 'run'),
       weeksOut,
     });
-    const trainingTransition = planningCtx.transition;
+    let trainingTransition: TrainingTransition = planningCtx.transition;
     const weeklyMiles = planningCtx.current_weekly_miles;
-    const recent_long_run_miles = planningCtx.recent_long_run_miles;
-    const weeks_since_peak_long_run = planningCtx.weeks_since_peak_long_run;
+    let recent_long_run_miles = planningCtx.recent_long_run_miles;
+    let weeks_since_peak_long_run = planningCtx.weeks_since_peak_long_run;
     const current_acwr = planningCtx.current_acwr;
     const volume_trend = planningCtx.volume_trend;
+    if (postRaceRecovery.apply) {
+      trainingTransition = {
+        mode: 'recovery_rebuild',
+        reasoning: postRaceRecovery.reasoning,
+        peak_long_run_miles: postRaceRecovery.recentLongRunMilesHint,
+      };
+      weeks_since_peak_long_run = 0;
+      const hint = postRaceRecovery.recentLongRunMilesHint;
+      recent_long_run_miles = recent_long_run_miles != null ? Math.max(recent_long_run_miles, hint) : hint;
+      console.log(`[create-goal] post-race recovery from Arc: ${postRaceRecovery.event.name}, days_ago=${postRaceRecovery.event.days_ago}, longRunHint=${hint} mi`);
+    }
     if (recent_long_run_miles != null && weeks_since_peak_long_run != null) {
       console.log(`[AthleteState] Peak long run: ${recent_long_run_miles} mi, ${weeks_since_peak_long_run} weeks ago (planning context)`);
     }
@@ -1017,6 +1038,9 @@ Deno.serve(async (req: Request) => {
     const strengthTier = String(generateBody.strength_tier ?? '');
     if (strengthFreq >= 2 && (strengthProto === 'neural_speed' || strengthTier === 'strength_power')) {
       generateBody.structural_load_hint = strengthProto === 'neural_speed' ? 'heavy_lower' : 'moderate';
+    }
+    if (postRaceRecovery.apply) {
+      generateBody.structural_load_hint = 'low';
     }
 
     const generated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', generateBody);
