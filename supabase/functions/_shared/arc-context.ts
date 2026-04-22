@@ -57,6 +57,22 @@ export interface ArcFiveKLearnedDivergence {
   message: string;
 }
 
+/** One row from `gear` (non-retired), for arc prompts — no raw ids. */
+export interface ArcGearItem {
+  type: 'shoe' | 'bike';
+  name: string;
+  brand: string | null;
+  model: string | null;
+  is_default: boolean;
+  /** Truncated — may hint at type (e.g. TT) but often absent */
+  notes: string | null;
+}
+
+export interface ArcGearSummary {
+  shoes: ArcGearItem[];
+  bikes: ArcGearItem[];
+}
+
 export interface ArcContext {
   athlete_identity: AthleteIdentity | null;
   learned_fitness: LearnedFitness | null;
@@ -75,6 +91,9 @@ export interface ArcContext {
 
   latest_snapshot: AthleteSnapshot | null;
   athlete_memory: AthleteMemorySummary | null;
+
+  /** Active (non-retired) shoes and bikes from `gear` — same source as the Gear screen. */
+  gear: ArcGearSummary;
 
   user_id: string;
   built_at: string;
@@ -227,6 +246,49 @@ function buildFiveKNudge(
   };
 }
 
+const GEAR_NOTES_MAX_LEN = 160;
+
+function truncateNotes(s: unknown): string | null {
+  if (s == null || typeof s !== 'string') return null;
+  const t = s.trim();
+  if (!t) return null;
+  if (t.length <= GEAR_NOTES_MAX_LEN) return t;
+  return `${t.slice(0, GEAR_NOTES_MAX_LEN - 1)}…`;
+}
+
+function mapGearRow(r: Record<string, unknown>): ArcGearItem | null {
+  const type = r.type;
+  if (type !== 'shoe' && type !== 'bike') return null;
+  const name = typeof r.name === 'string' && r.name.trim() ? r.name.trim() : null;
+  if (!name) return null;
+  const brand = typeof r.brand === 'string' && r.brand.trim() ? r.brand.trim() : null;
+  const model = typeof r.model === 'string' && r.model.trim() ? r.model.trim() : null;
+  const is_default = Boolean(r.is_default);
+  return {
+    type,
+    name,
+    brand,
+    model,
+    is_default,
+    notes: truncateNotes(r.notes),
+  };
+}
+
+function buildGearSummary(rows: unknown): ArcGearSummary {
+  const empty: ArcGearSummary = { shoes: [], bikes: [] };
+  if (!Array.isArray(rows)) return empty;
+  const items: ArcGearItem[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const g = mapGearRow(row as Record<string, unknown>);
+    if (g) items.push(g);
+  }
+  return {
+    shoes: items.filter((i) => i.type === 'shoe'),
+    bikes: items.filter((i) => i.type === 'bike'),
+  };
+}
+
 function buildActivePlanSummary(
   plan: { id: string; config: unknown; current_week: unknown; duration_weeks: unknown; plan_type?: unknown },
   focusDateISO: string
@@ -277,7 +339,7 @@ export async function getArcContext(
 ): Promise<ArcContext> {
   const built_at = new Date().toISOString();
 
-  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes] = await Promise.all([
+  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes] = await Promise.all([
     supabase
       .from('user_baselines')
       .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers')
@@ -309,7 +371,14 @@ export async function getArcContext(
       .eq('user_id', userId)
       .order('period_end', { ascending: false })
       .limit(1)
-      .maybeSingle()
+      .maybeSingle(),
+    supabase
+      .from('gear')
+      .select('type, name, brand, model, is_default, notes')
+      .eq('user_id', userId)
+      .eq('retired', false)
+      .order('is_default', { ascending: false })
+      .order('name', { ascending: true }),
   ]);
 
   const baseline = baselinesRes?.data as Record<string, unknown> | null;
@@ -367,6 +436,13 @@ export async function getArcContext(
     }
   }
 
+  let gear: ArcGearSummary = { shoes: [], bikes: [] };
+  if (gearRes?.error) {
+    console.warn('[getArcContext] gear', gearRes.error.message);
+  } else {
+    gear = buildGearSummary(gearRes?.data);
+  }
+
   return {
     athlete_identity,
     learned_fitness,
@@ -377,6 +453,7 @@ export async function getArcContext(
     active_plan,
     latest_snapshot,
     athlete_memory,
+    gear,
     user_id: userId,
     built_at
   };
