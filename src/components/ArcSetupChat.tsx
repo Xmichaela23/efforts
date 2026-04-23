@@ -10,6 +10,8 @@ import {
 } from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
 import { autoBuildAfterArcGoalInsert } from '@/lib/autoBuildArcGoals';
+import { fetchArcContext } from '@/lib/fetch-arc-context';
+import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
@@ -138,7 +140,8 @@ async function persistArcSetup(
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
-  const validGoals = collectValidGoals(payload);
+  const arcCtx = await fetchArcContext();
+  const validGoals = collectValidGoals(payload).map((g) => enrichGoalInsertWithArcContext(g, arcCtx));
   const idPatch = (payload.athlete_identity && typeof payload.athlete_identity === 'object' && !Array.isArray(payload.athlete_identity))
     ? (payload.athlete_identity as Record<string, unknown>)
     : null;

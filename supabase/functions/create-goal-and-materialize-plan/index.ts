@@ -4,7 +4,7 @@ import {
   resolveAdaptiveMarathonDecisionFromMemory,
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
-import { getArcContext } from '../_shared/arc-context.ts';
+import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import {
   computeRunPlanningSignals,
   findPostRaceRecoveryContext,
@@ -301,6 +301,58 @@ function hasBarbellCapability(strengthEquipment: string[]): boolean {
   );
 }
 
+function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
+  const swim = arc.swim_training_from_workouts;
+  if (swim && swim.completed_swim_sessions_last_90_days === 0) return 'swim';
+  const lf = arc.learned_fitness as Record<string, unknown> | null | undefined;
+  const ftp = lf?.ride_ftp_estimated as { confidence?: string } | undefined;
+  if (ftp && typeof ftp === 'object' && String(ftp.confidence || '').toLowerCase() === 'low') {
+    return 'bike';
+  }
+  return 'run';
+}
+
+/**
+ * Arc-created goals may omit tri training_prefs; never fail "Missing fitness" — fill from ArcContext.
+ * Matches persist-side enrichment in ArcSetupChat.
+ */
+function mergeTrainingPrefsWithArcDefaults(
+  trainingPrefs: Record<string, unknown> | null | undefined,
+  sportRaw: string | null | undefined,
+  arc: ArcContext,
+): Record<string, unknown> {
+  const tp: Record<string, unknown> = {
+    ...(trainingPrefs && typeof trainingPrefs === 'object' && !Array.isArray(trainingPrefs) ? trainingPrefs : {}),
+  };
+  const sport = String(sportRaw || '').toLowerCase();
+  const isTri = sport === 'triathlon' || sport === 'tri';
+  const isRun = sport === 'run';
+
+  if (isTri || isRun) {
+    if (!String(tp.fitness ?? '').trim()) tp.fitness = 'intermediate';
+    if (!String(tp.goal_type ?? '').trim()) tp.goal_type = 'complete';
+  }
+
+  if (isTri) {
+    if (tp.strength_frequency == null || Number.isNaN(Number(tp.strength_frequency))) {
+      tp.strength_frequency = 2;
+    }
+    if (!String(tp.equipment_type ?? '').trim()) {
+      const raw = arc.equipment as { strength?: string[] } | null | undefined;
+      const arr = Array.isArray(raw?.strength) ? raw.strength : [];
+      tp.equipment_type = hasBarbellCapability(arr) ? 'commercial_gym' : 'home_gym';
+    }
+    if (!String(tp.limiter_sport ?? '').trim()) {
+      tp.limiter_sport = inferLimiterSportFromArc(arc);
+    }
+    if (!String(tp.tri_approach ?? '').trim()) {
+      const gt = String(tp.goal_type ?? '').toLowerCase();
+      tp.tri_approach = gt === 'speed' || gt === 'performance' ? 'race_peak' : 'base_first';
+    }
+  }
+  return tp;
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -543,6 +595,25 @@ Deno.serve(async (req: Request) => {
       };
     }
 
+    const focusDateStr = new Date().toISOString().slice(0, 10);
+    const arcForPlanning = await getArcContext(supabase, user_id, focusDateStr);
+
+    if (resolvedGoal) {
+      const mergedPrefs = mergeTrainingPrefsWithArcDefaults(
+        resolvedGoal.training_prefs as Record<string, unknown>,
+        resolvedGoal.sport,
+        arcForPlanning,
+      );
+      resolvedGoal = { ...resolvedGoal, training_prefs: mergedPrefs };
+      if (mode === 'build_existing' && existing_goal_id) {
+        await supabase
+          .from('goals')
+          .update({ training_prefs: mergedPrefs, updated_at: new Date().toISOString() })
+          .eq('id', existing_goal_id)
+          .eq('user_id', user_id);
+      }
+    }
+
     const sport = String(resolvedGoal?.sport || '').toLowerCase();
     const isTri = sport === 'triathlon' || sport === 'tri';
 
@@ -550,12 +621,8 @@ Deno.serve(async (req: Request) => {
       throw new AppError('unsupported_sport', `Auto-build is not yet supported for "${sport}" goals. Supported: run, triathlon.`);
     }
 
-    const fitness = String(resolvedGoal?.training_prefs?.fitness || '').toLowerCase();
-    const goalType = String(resolvedGoal?.training_prefs?.goal_type || '').toLowerCase();
-    if (!fitness || !goalType) throw new AppError('missing_training_prefs', 'Missing fitness or training goal');
-
-    const focusDateStr = new Date().toISOString().slice(0, 10);
-    const arcForPlanning = await getArcContext(supabase, user_id, focusDateStr);
+    const fitness = String(resolvedGoal?.training_prefs?.fitness || 'intermediate').toLowerCase();
+    const goalType = String(resolvedGoal?.training_prefs?.goal_type || 'complete').toLowerCase();
     const postRaceRecovery = findPostRaceRecoveryContext(arcForPlanning.recent_completed_events, sport);
 
     // ── Triathlon path ────────────────────────────────────────────────────
