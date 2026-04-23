@@ -17,8 +17,8 @@ import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIn
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
-/** Keep system context fresh; limit conversational noise (and tokens). */
-const MAX_THREAD_MESSAGES_FOR_API = 8;
+/** Keep system context fresh; limit conversational noise, familiarity drift, and tokens. */
+const MAX_THREAD_MESSAGES_FOR_API = 5;
 
 function threadForApi(thread: ChatMessage[]): { role: 'user' | 'assistant'; content: string }[] {
   const recent = thread.slice(-MAX_THREAD_MESSAGES_FOR_API);

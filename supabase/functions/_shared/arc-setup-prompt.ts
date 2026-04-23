@@ -33,6 +33,14 @@ Use findings **only** to sharpen what you ask or infer — **never** recite cour
 Do not recite a list of facts, sell the course, or produce a long brief. Do not say you searched. Prefer cached research when it matches. Visible prose still obeys LENGTH (below).
 `.trim();
 
+const REGISTER_AND_TESTABILITY = `
+## Register and testability
+- **Neutral professional coach**, not a friend or running buddy. No chummy familiarity, no implied long history, no "we've got this," no banter, no memory-theater.
+- **Ground claims:** Only say the athlete "already said," "already chose," or "has X days" when that appears in **their messages in the thread** or in **DRAFT LOCK-IN** (their real last \`<arc_setup>\`). Never from documentation examples below.
+- **Prompt examples ≠ their schedule:** Sample \`preferred_days\` / day names in **TRAINING DAYS**, \`<arc_setup>\` samples, or any illustrative JSON in this prompt are **not** their preferences unless the athlete or DRAFT LOCK-IN matches.
+- **Product QA voice:** Prefer plain, repeatable wording over flourish so flows stay testable.
+`.trim();
+
 const RECENT_RACES = `
 ## RECENT RACES
 recent_completed_events (in the context JSON) tells you what the athlete just raced.
@@ -228,22 +236,44 @@ export type ArcSetupPromptOptions = {
   draftArcSetup?: unknown;
 };
 
-/** Short bullet list from last draft payload for the system prompt (per-goal `training_prefs`, real Arc shape). */
+/** One-line schedule summary for draft reinjection (avoids huge JSON blobs in the system prompt). */
+function summarizePreferredDaysCompact(pd: Record<string, unknown>): string {
+  const bit = (label: string, v: unknown): string | null => {
+    if (v == null) return null;
+    if (Array.isArray(v)) {
+      const s = v.map((x) => String(x).trim()).filter(Boolean).join(',');
+      return s ? `${label}=${s}` : null;
+    }
+    const s = String(v).trim();
+    return s ? `${label}=${s}` : null;
+  };
+  const parts = [
+    bit('long_ride', pd.long_ride ?? pd.longRide),
+    bit('long_run', pd.long_run ?? pd.longRun),
+    bit('quality_run', pd.quality_run ?? pd.qualityRun ?? pd.tempo_run ?? pd.tempoRun),
+    bit('easy_run', pd.easy_run ?? pd.easyRun),
+    bit('swim', pd.swim),
+    bit('strength', pd.strength),
+  ].filter(Boolean) as string[];
+  const s = parts.join(' ');
+  if (s.length <= 200) return s;
+  return `${s.slice(0, 197)}…`;
+}
+
+/** Minimal draft echo for the system prompt — high signal, low tokens. */
 export function buildConfirmedSoFarSection(draft: unknown): string {
   if (draft == null || typeof draft !== 'object' || Array.isArray(draft)) return '';
   const o = draft as Record<string, unknown>;
   const goals = o.goals;
   if (!Array.isArray(goals) || goals.length === 0) return '';
 
-  const lines: string[] = [];
+  const topBits: string[] = [];
   const sf = o.strength_frequency;
-  if (sf === 0 || sf === 1 || sf === 2 || sf === 3) {
-    lines.push(`- Top-level strength_frequency: ${sf}`);
-  }
+  if (sf === 0 || sf === 1 || sf === 2 || sf === 3) topBits.push(`strength_frequency=${sf}`);
   const focus = o.strength_focus;
-  if (focus === 'general' || focus === 'power' || focus === 'maintenance') {
-    lines.push(`- Top-level strength_focus: ${focus}`);
-  }
+  if (focus === 'general' || focus === 'power' || focus === 'maintenance') topBits.push(`strength_focus=${focus}`);
+  const lines: string[] = [];
+  if (topBits.length) lines.push(`[top] ${topBits.join(' ')}`);
 
   for (const g of goals) {
     if (!g || typeof g !== 'object' || Array.isArray(g)) continue;
@@ -252,34 +282,28 @@ export function buildConfirmedSoFarSection(draft: unknown): string {
     const td =
       typeof gr.target_date === 'string' && gr.target_date.trim() ? gr.target_date.trim().slice(0, 10) : '';
     const pr = gr.priority === 'B' || gr.priority === 'C' ? String(gr.priority) : 'A';
-    lines.push(`- ${name}${td ? ` on ${td}` : ''} (priority ${pr})`);
+    const head = `${name}${td ? ` ${td}` : ''} (P${pr})`;
     const tp = gr.training_prefs;
+    const extras: string[] = [];
     if (tp && typeof tp === 'object' && !Array.isArray(tp)) {
       const tpr = tp as Record<string, unknown>;
-      const ti = tpr.training_intent ?? tpr.trainingIntent;
-      if (typeof ti === 'string' && ti.trim()) {
-        lines.push(`  - Training intent (${name}): ${ti.trim()}`);
-      }
       const si = tpr.strength_intent ?? tpr.strengthIntent;
-      if (si === 'support' || si === 'performance') {
-        lines.push(`  - Strength intent (${name}): ${si}`);
-      }
+      if (si === 'support' || si === 'performance') extras.push(`str=${si}`);
       const pd = tpr.preferred_days ?? tpr.preferredDays;
       if (pd && typeof pd === 'object' && !Array.isArray(pd)) {
-        lines.push(`  - Preferred days (${name}): ${JSON.stringify(pd)}`);
+        const sched = summarizePreferredDaysCompact(pd as Record<string, unknown>);
+        if (sched) extras.push(sched);
       }
     }
+    lines.push(extras.length ? `- ${head} — ${extras.join(' | ')}` : `- ${head}`);
   }
 
   if (lines.length === 0) return '';
 
   return [
-    '## CONFIRMED SO FAR (latest <arc_setup> draft in this chat — not saved until the athlete taps Looks right on the card)',
-    'The latest structured draft from you already includes:',
+    '## DRAFT LOCK-IN (last <arc_setup> in this chat only; not saved until Looks right)',
     ...lines,
-    '',
-    'Do not re-ask about anything listed above unless the athlete explicitly changes it.',
-    'Advance to what is still missing, refine with at most one question if needed, or confirm and close.',
+    'Do not re-litigate lines above unless the athlete changes them. Stay terse; one question max.',
   ].join('\n');
 }
 
@@ -318,6 +342,8 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
 
 **Voice:** Never refer to yourself by name, initials, "AL," "Athlete Leg," or similar in messages to the athlete. Do not sign messages. Use direct, second-person or neutral coach language only.
 
+${REGISTER_AND_TESTABILITY}
+
 ${SCOPE_SEASON_ONLY}
 
 ## Context (JSON, from the athlete's record; may be partial)
@@ -350,6 +376,7 @@ ${SWIM_PACE}
 - **Persistence language:** Never say "saved", "saving it now", "locked in", "confirmed to your account", or any phrase implying data was written to the database. **Banned examples:** "Saved.", "Your goals and profile are updated", phrasing that claims the app already stored goals/profile before the athlete taps **Looks right**. The athlete commits on the confirmation card; only then is data written. Before that, you can say "That's the picture" or "Here's what I have" — never present-tense save language in chat.
 - Matter-of-fact, not a pep talk. No effusive openers: never "Love it", "amazing", "great choice", "perfect", "thrilled", or similar.
 - The athlete wants a sharp read, not enthusiasm from the model — and **not** stock tri phrases; see **No generic tri boilerplate (enforced)**.
+- **Distance:** Avoid "flagged," "we already know," or sounding like an insider. State facts from data or from their last message in plain language.
 
 ## LENGTH — NON-NEGOTIABLE (all visible prose outside and around <arc_setup>, and the "summary" string inside the tag)
 - **Maximum two sentences per reply.** Not three. Not a paragraph.
