@@ -29,6 +29,8 @@ export interface Goal {
   current_value: number | null;
   /** v1 tri projection — see _shared/race-projections.ts */
   projection: Record<string, unknown> | null;
+  /** Per-goal prefs (e.g. `preferred_days`) — included so Arc chat is grounded in saved goals */
+  training_prefs: Record<string, unknown> | null;
 }
 
 export interface ActivePlanSummary {
@@ -162,6 +164,12 @@ export interface ArcContext {
   built_at: string;
 }
 
+function parseGoalTrainingPrefs(value: unknown): Record<string, unknown> | null {
+  if (value == null) return null;
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  return null;
+}
+
 function toGoalRow(r: Record<string, unknown>): Goal {
   const proj = r.projection;
   return {
@@ -177,6 +185,7 @@ function toGoalRow(r: Record<string, unknown>): Goal {
     target_value: r.target_value != null && Number.isFinite(Number(r.target_value)) ? Number(r.target_value) : null,
     current_value: r.current_value != null && Number.isFinite(Number(r.current_value)) ? Number(r.current_value) : null,
     projection: proj && typeof proj === 'object' && !Array.isArray(proj) ? (proj as Record<string, unknown>) : null,
+    training_prefs: parseGoalTrainingPrefs(r.training_prefs),
   };
 }
 
@@ -560,7 +569,9 @@ export async function getArcContext(
       .maybeSingle(),
     supabase
       .from('goals')
-      .select('id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection')
+      .select(
+        'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs',
+      )
       .eq('user_id', userId)
       .eq('status', 'active')
       .order('target_date', { ascending: true, nullsFirst: false }),
