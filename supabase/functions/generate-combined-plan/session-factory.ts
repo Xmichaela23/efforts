@@ -4,7 +4,7 @@
 // understood by materialize-plan. Every session has TSS, intensity class,
 // zone targets, and steps_preset tokens.
 
-import type { PlannedSession, Phase, Intensity } from './types.ts';
+import type { PlannedSession, Phase, Intensity, PlannedStrengthExercise } from './types.ts';
 import type { Sport } from './types.ts';
 import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK } from './science.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
@@ -442,7 +442,28 @@ function intentToPlanned(
   const tss = estimateSessionTSS('strength', intensity, intent.duration);
   const wtss = weightedTSS('strength', tss);
 
-  const steps: string[] = buildStrengthSteps(intent);
+  const rawEx = intent.exercises ?? [];
+  const strengthEx: PlannedStrengthExercise[] | undefined =
+    rawEx.length > 0
+      ? rawEx.map((ex) => ({
+        name: String(ex?.name ?? 'Exercise'),
+        sets: typeof ex?.sets === 'number' ? ex.sets : undefined,
+        reps: ex?.reps as number | string | undefined,
+        weight: ex?.weight as string | number | undefined,
+        percent_1rm: typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : undefined,
+        load: ex?.load as { percent_1rm?: number } | undefined,
+        target_rir: typeof ex?.target_rir === 'number' ? ex.target_rir : undefined,
+        notes: typeof ex?.notes === 'string' ? ex.notes : undefined,
+      }))
+      : undefined;
+
+  const tokenSteps = buildStrengthSteps(intent);
+  const steps: string[] =
+    strengthEx && strengthEx.length > 0
+      ? []
+      : tokenSteps.length > 0
+        ? tokenSteps
+        : ['st_main_squat_3x8', 'st_acc_hip_thrusts_3x10', 'st_acc_step_ups_3x10'];
 
   return {
     day,
@@ -454,9 +475,10 @@ function intentToPlanned(
     weighted_tss: wtss,
     intensity_class: intensity,
     zone_targets: intensity === 'MODERATE' ? 'Z3 strength' : 'Z2 strength',
-    steps_preset: steps.length > 0 ? steps : ['st_main_squat_3x8', 'st_acc_hip_thrusts_3x10', 'st_acc_step_ups_3x10'],
+    steps_preset: steps,
     tags: intent.tags,
     serves_goal: goalId,
+    ...(strengthEx && strengthEx.length > 0 ? { strength_exercises: strengthEx } : {}),
   };
 }
 
@@ -472,6 +494,10 @@ function intentMap(intent: IntentSession): Intensity | null {
 function buildStrengthSteps(intent: IntentSession): string[] {
   const steps: string[] = [];
   const nameToToken: Record<string, string> = {
+    'back squat': 'st_main_squat_3x8',
+    'barbell back squat': 'st_main_squat_3x8',
+    'conventional deadlift': 'st_main_deadlift_3x6',
+    deadlift: 'st_main_deadlift_3x6',
     'trap bar deadlift': 'st_main_deadlift_3x6',
     'romanian deadlift': 'st_main_deadlift_3x8',
     'single-leg rdl': 'st_acc_single_leg_rdl_3x8',

@@ -122,7 +122,9 @@ function enforce8020(grid: WeekGrid, phase: Phase): void {
     for (const slot of grid.values()) {
       for (const s of slot.sessions) {
         if (hardMin <= maxAllowed) break;
-        const isProtected = s.tags?.some(t => ['brick','long_run','long_ride'].includes(t));
+        const isProtected = s.tags?.some(t =>
+          ['brick', 'long_run', 'long_ride', 'quality'].includes(t),
+        );
         if (s.type !== sport || s.intensity_class === 'EASY' || isProtected) continue;
 
         const before = effectiveHardMin(s);

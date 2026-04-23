@@ -104,6 +104,18 @@ export interface EventRelationship {
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
 
+/** Serialized on plan rows for materialize-plan strength expansion. */
+export interface PlannedStrengthExercise {
+  name: string;
+  sets?: number;
+  reps?: number | string;
+  weight?: string | number;
+  percent_1rm?: number;
+  load?: { percent_1rm?: number };
+  target_rir?: number;
+  notes?: string;
+}
+
 export interface PlannedSession {
   day: string;           // 'Monday' … 'Sunday'
   type: Sport;
@@ -118,6 +130,8 @@ export interface PlannedSession {
   serves_goal: string;   // goal.id or 'shared'
   zone_targets: string;  // "Z2" | "Z4 intervals" | etc.
   timing?: 'AM' | 'PM';
+  /** When set (e.g. neural_speed / triathlon protocol), activate-plan persists this and materialize uses it instead of token-derived exercises. */
+  strength_exercises?: PlannedStrengthExercise[];
 }
 
 export interface GeneratedWeek {

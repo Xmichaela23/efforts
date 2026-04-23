@@ -113,22 +113,100 @@ function resolveStrengthPercentForLift(
   return Math.max(0.6, Math.min(0.85, base));
 }
 
+function parseTrainingPrefs(tp: unknown): Record<string, unknown> | null {
+  if (!tp) return null;
+  if (typeof tp === 'string') {
+    try {
+      const o = JSON.parse(tp);
+      return o && typeof o === 'object' && !Array.isArray(o) ? o as Record<string, unknown> : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof tp === 'object' && !Array.isArray(tp)) return tp as Record<string, unknown>;
+  return null;
+}
+
+function strengthIntentFromPrefs(prefs: Record<string, unknown> | null): StrengthIntentMat {
+  if (!prefs) return null;
+  const raw = prefs.strength_intent ?? prefs.strengthIntent;
+  if (raw === 'support' || raw === 'performance') return raw;
+  return null;
+}
+
 async function loadStrengthIntentForPlan(
   trainingPlanId: string | null | undefined,
   supabase: ReturnType<typeof createClient>,
 ): Promise<StrengthIntentMat> {
   if (!trainingPlanId) return null;
   try {
-    const { data: planRow } = await supabase.from('plans').select('goal_id').eq('id', trainingPlanId).maybeSingle();
+    const { data: planRow } = await supabase
+      .from('plans')
+      .select('goal_id, user_id, config')
+      .eq('id', trainingPlanId)
+      .maybeSingle();
+    const cfg = planRow?.config as Record<string, unknown> | null | undefined;
+    const contract = cfg?.plan_contract_v1 as Record<string, unknown> | undefined;
+    const fromContract = contract?.strength_intent ?? cfg?.strength_intent;
+    if (fromContract === 'support' || fromContract === 'performance') return fromContract;
+
+    const uid = planRow?.user_id as string | undefined;
     const gid = planRow?.goal_id as string | undefined;
-    if (!gid) return null;
-    const { data: gRow } = await supabase.from('goals').select('training_prefs').eq('id', gid).maybeSingle();
-    const si = (gRow?.training_prefs as Record<string, unknown> | null)?.strength_intent;
-    if (si === 'support' || si === 'performance') return si;
+
+    if (gid) {
+      const { data: gRow } = await supabase.from('goals').select('training_prefs, sport, priority').eq('id', gid).maybeSingle();
+      const si = strengthIntentFromPrefs(parseTrainingPrefs(gRow?.training_prefs));
+      if (si) return si;
+    }
+
+    if (uid) {
+      const { data: triGoals } = await supabase
+        .from('goals')
+        .select('id, training_prefs, sport, priority')
+        .eq('user_id', uid)
+        .eq('goal_type', 'event')
+        .eq('status', 'active');
+      const tri = (triGoals || []).filter((g) => ['triathlon', 'tri'].includes(String(g.sport ?? '').toLowerCase()));
+      const a = tri.find((g) => g.priority === 'A') ?? tri[0];
+      if (a) {
+        const si = strengthIntentFromPrefs(parseTrainingPrefs(a.training_prefs));
+        if (si) return si;
+      }
+    }
   } catch (e) {
     console.warn('[materialize-plan] loadStrengthIntentForPlan:', e);
   }
   return null;
+}
+
+/** Performance intent: small weekly progression; recovery week (every 4th) −10% on compounds. */
+function adjustPerformanceWorkingLoadLb(
+  weightLb: number | undefined,
+  exerciseName: string,
+  strengthIntent: StrengthIntentMat,
+  weekNum: number | null | undefined,
+): number | undefined {
+  if (weightLb == null || !Number.isFinite(weightLb) || strengthIntent !== 'performance') return weightLb;
+  const n = String(exerciseName || '').toLowerCase();
+  const compound =
+    (n.includes('squat') && !n.includes('goblet') && !n.includes('jump')) ||
+    n.includes('deadlift') ||
+    n.includes('rdl') ||
+    n.includes('bench') ||
+    (n.includes('press') && !n.includes('leg')) ||
+    n.includes('barbell row') ||
+    n.includes('barbell rows') ||
+    n.includes('hip thrust');
+  if (!compound) return weightLb;
+
+  const w = Number(weekNum);
+  let x = weightLb;
+  if (Number.isFinite(w) && w >= 1 && w % 4 === 0) {
+    x *= 0.9;
+  } else if (Number.isFinite(w) && w >= 1) {
+    x += Math.floor((w - 1) / 2) * 5;
+  }
+  return Math.max(5, Math.round(x / 5) * 5);
 }
 
 type Baselines = { 
@@ -989,6 +1067,7 @@ function expandTokensForRow(
   baselines: Baselines,
   adjustments: PlanAdjustment[] = [],
   strengthIntent: StrengthIntentMat = null,
+  planWeekNumber: number | null = null,
 ): { steps: any[]; total_s: number } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
@@ -1128,15 +1207,15 @@ function expandTokensForRow(
           // Extract target RIR from the exercise (if present from overlay)
           const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
           
+          const progressed = adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
           // Apply plan adjustments if any
-          const adjustResult = applyAdjustment(name, prescribed, adjustments, workoutDate);
+          const adjustResult = applyAdjustment(name, progressed, adjustments, workoutDate);
           const finalWeight = adjustResult.weight;
           const wasAdjusted = adjustResult.adjusted;
-          const originalWeight = wasAdjusted ? prescribed : undefined; // Store original for UI display
+          const originalWeight = wasAdjusted ? progressed : undefined; // Store original for UI display
           
-          // Update weight display if adjusted
           let finalWeightDisplay = weightDisplay;
-          if (wasAdjusted && finalWeight != null) {
+          if (finalWeight != null) {
             const config = getExerciseConfig(name);
             finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
           }
@@ -1266,15 +1345,14 @@ function expandTokensForRow(
           // Extract target RIR from the exercise (if present from overlay)
           const target_rir = typeof ex?.target_rir === 'number' ? ex.target_rir : undefined;
           
-          // Apply plan adjustments if any
-          const adjustResult = applyAdjustment(name, prescribed, adjustments, workoutDate);
+          const progressed = adjustPerformanceWorkingLoadLb(prescribed, name, strengthIntent, planWeekNumber);
+          const adjustResult = applyAdjustment(name, progressed, adjustments, workoutDate);
           const finalWeight = adjustResult.weight;
           const wasAdjusted = adjustResult.adjusted;
-          const originalWeight = wasAdjusted ? prescribed : undefined; // Store original for UI display
+          const originalWeight = wasAdjusted ? progressed : undefined; // Store original for UI display
           
-          // Update weight display if adjusted
           let finalWeightDisplay = weightDisplay;
-          if (wasAdjusted && finalWeight != null) {
+          if (finalWeight != null) {
             const config = getExerciseConfig(name);
             finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
           }
@@ -1911,7 +1989,11 @@ Deno.serve(async (req) => {
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
         const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
-        const { steps, total_s } = expandTokensForRow(row, baselines, adjustments, strengthIntent);
+        const weekNum =
+          typeof row?.week_number === 'number' && Number.isFinite(row.week_number)
+            ? row.week_number
+            : null;
+        const { steps, total_s } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist

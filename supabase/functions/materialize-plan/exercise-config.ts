@@ -36,6 +36,51 @@ export interface ExerciseConfig {
 // Research-based exercise configurations
 export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // ============================================================================
+  // PRIMARY COMPOUNDS — exact keys so "squat" / "deadlift" never fuzzy-match accessories first
+  // ============================================================================
+
+  squat: {
+    primaryRef: 'squat',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'Barbell back squat — use squat 1RM directly.',
+  },
+  'back squat': {
+    primaryRef: 'squat',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'barbell back squat': {
+    primaryRef: 'squat',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+
+  deadlift: {
+    primaryRef: 'deadlift',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'Conventional deadlift — use deadlift / trap bar 1RM from baselines.',
+  },
+  'conventional deadlift': {
+    primaryRef: 'deadlift',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
+  'trap bar deadlift': {
+    primaryRef: 'deadlift',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    notes: 'Trap bar — same 1RM slot as deadlift when conventional is unknown.',
+  },
+
+  // ============================================================================
   // KNEE DOMINANT (Squat Reference)
   // ============================================================================
   
@@ -431,6 +476,20 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   
   // Standing/Seated Shoulder Press (OHP): Uses overhead 1RM directly
   'shoulder press': {
+    primaryRef: 'overhead',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high'
+  },
+  'overhead press': {
+    primaryRef: 'overhead',
+    ratio: 1.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+    confidence: 'high'
+  },
+  'standing barbell overhead press': {
     primaryRef: 'overhead',
     ratio: 1.0,
     displayFormat: 'total',
@@ -1013,14 +1072,19 @@ export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
     return EXERCISE_CONFIG[normalized];
   }
   
-  // Fuzzy match: check if exercise name contains any key
+  // Longest-key fuzzy match so "squat" hits primary `squat`, not "bulgarian split squat"
+  let best: ExerciseConfig | null = null;
+  let bestScore = -1;
   for (const [key, config] of Object.entries(EXERCISE_CONFIG)) {
-    if (normalized.includes(key) || key.includes(normalized)) {
-      return config;
+    let score = -1;
+    if (normalized.includes(key)) score = key.length;
+    else if (key.includes(normalized)) score = normalized.length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = config;
     }
   }
-  
-  return null;
+  return bestScore > 0 ? best : null;
 }
 
 /**
