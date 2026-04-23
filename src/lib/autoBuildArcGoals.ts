@@ -3,6 +3,7 @@
  * so users are not only sent to Goals → Build Plan. Mirrors GoalsScreen.executeBuildPlan.
  */
 import { supabase, invokeFunction, getStoredUserId } from '@/lib/supabase';
+import { triDistanceApiKey } from '@/lib/tri-goal-helpers';
 
 function inferSportFromPlanConfig(config: Record<string, unknown> | null, planType?: string | null): string {
   if (config?.sport) return String(config.sport).toLowerCase();
@@ -16,29 +17,9 @@ function inferSportFromPlanConfig(config: Record<string, unknown> | null, planTy
   return '';
 }
 
-/** Same keys as create-goal-and-materialize-plan TRI_DISTANCE_TO_API */
-function triDistanceApi(distance: string | null): string | null {
-  if (!distance) return null;
-  const d = String(distance).trim();
-  const map: Record<string, string> = {
-    Sprint: 'sprint',
-    sprint: 'sprint',
-    Olympic: 'olympic',
-    olympic: 'olympic',
-    '70.3': '70.3',
-    'Half-Iron': '70.3',
-    'Half Iron': '70.3',
-    'half-iron': '70.3',
-    Ironman: 'ironman',
-    ironman: 'ironman',
-    Full: 'ironman',
-    full: 'ironman',
-  };
-  return map[d] ?? null;
-}
-
 type GoalRow = {
   id: string;
+  name?: string;
   goal_type: string;
   sport: string | null;
   distance: string | null;
@@ -46,10 +27,15 @@ type GoalRow = {
   target_date: string | null;
 };
 
+/** Tri plan auto-build: must resolve distance + (missing or tri) sport — LLM often omits sport. */
 function isBuildableTri(g: GoalRow): boolean {
+  const hasTriDistance =
+    triDistanceApiKey(g.distance) != null ||
+    (g.name && triDistanceApiKey(g.name) != null);
+  if (!hasTriDistance) return false;
   const s = (g.sport || '').toLowerCase();
-  if (s !== 'triathlon' && s !== 'tri') return false;
-  return triDistanceApi(g.distance) != null;
+  if (s && s !== 'triathlon' && s !== 'tri') return false;
+  return true;
 }
 
 function isBuildableRun(g: GoalRow): boolean {
@@ -90,7 +76,7 @@ export async function autoBuildAfterArcGoalInsert(newGoalIds: string[]): Promise
 
   const { data: rows, error } = await supabase
     .from('goals')
-    .select('id, goal_type, sport, distance, priority, target_date')
+    .select('id, name, goal_type, sport, distance, priority, target_date')
     .in('id', newGoalIds);
 
   if (error || !rows?.length) {

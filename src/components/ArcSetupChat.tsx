@@ -12,6 +12,7 @@ import type { GoalInsert } from '@/hooks/useGoals';
 import { autoBuildAfterArcGoalInsert } from '@/lib/autoBuildArcGoals';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs';
+import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
@@ -70,13 +71,19 @@ function normalizeGoalInput(
     typeof g.target_time === 'number' && Number.isFinite(g.target_time) && g.target_time > 0
       ? Math.round(g.target_time)
       : null;
+  let sport: string | null = typeof g.sport === 'string' ? g.sport : null;
+  const distance: string | null = typeof g.distance === 'string' ? g.distance : null;
+  if (goal_type === 'event') {
+    sport = inferEventSportForTri(String(goal_type), sport, distance, name) ?? sport;
+  }
+
   return {
     name,
     goal_type,
     target_date,
     target_time,
-    sport: typeof g.sport === 'string' ? g.sport : null,
-    distance: typeof g.distance === 'string' ? g.distance : null,
+    sport,
+    distance,
     course_profile: typeof g.course_profile === 'object' && g.course_profile !== null ? (g.course_profile as Record<string, unknown>) : {},
     target_metric: typeof g.target_metric === 'string' ? g.target_metric : null,
     target_value: typeof g.target_value === 'number' && Number.isFinite(g.target_value) ? g.target_value : null,
@@ -106,7 +113,7 @@ function normalizeGoalInput(
         }
       }
       // Auto-build requires `training_prefs.fitness` + `training_prefs.goal_type` for run/tri events.
-      const sportLower = typeof g.sport === 'string' ? g.sport.toLowerCase() : '';
+      const sportLower = (sport || '').toLowerCase();
       const needsBuildPrefs =
         goal_type === 'event' &&
         (sportLower === 'run' || sportLower === 'triathlon' || sportLower === 'tri');
