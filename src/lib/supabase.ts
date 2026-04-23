@@ -19,41 +19,28 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 /**
- * Read the authenticated user's ID directly from localStorage.
+ * Authenticated user id = JWT `sub` from the persisted session access token.
+ * Same claim the Edge Functions should use from the `Authorization` header — one pipeline.
  *
  * NEVER use supabase.auth.getUser() or supabase.auth.getSession() in components
  * or hooks that run on iOS — those calls trigger an XHR-based token refresh which
- * fails in WKWebView with:
- *   "The XMLHttpRequest.onreadystatechange getter can only be called on instances
- *    of XMLHttpRequest"
- *
- * This helper is safe for all environments: it reads the JWT payload that the
- * Supabase auth module already stores in localStorage after sign-in.
+ * fails in WKWebView. Read the blob + decode the token locally instead.
  */
-function userIdFromAccessToken(accessToken: string | undefined): string | null {
-  if (!accessToken || typeof accessToken !== 'string') return null;
-  const parts = accessToken.split('.');
-  if (parts.length !== 3) return null;
+export function getStoredUserId(): string | null {
   try {
+    const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { access_token?: string };
+    const accessToken = parsed?.access_token;
+    if (!accessToken || typeof accessToken !== 'string') return null;
+    const parts = accessToken.split('.');
+    if (parts.length !== 3) return null;
     const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
     const payload = JSON.parse(atob(b64 + pad)) as { sub?: string; role?: string };
     const sub = typeof payload?.sub === 'string' ? payload.sub.trim() : '';
     if (!sub || payload?.role !== 'authenticated') return null;
     return sub;
-  } catch {
-    return null;
-  }
-}
-
-export function getStoredUserId(): string | null {
-  try {
-    const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { user?: { id?: string }; access_token?: string };
-    const fromUser = parsed?.user?.id ?? null;
-    if (fromUser) return fromUser;
-    return userIdFromAccessToken(parsed?.access_token);
   } catch {
     return null;
   }

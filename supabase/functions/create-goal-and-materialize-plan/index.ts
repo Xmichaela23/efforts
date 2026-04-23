@@ -60,36 +60,45 @@ const corsHeaders = {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/**
- * Prefer JWT `sub` when the caller presents an authenticated access token.
- * The client also sends `user_id` in the JSON body; if that drifts from the
- * session (stale localStorage shape, partial session restore), goal lookups
- * return zero rows and the UI shows "Goal not found".
- */
-function resolveUserIdFromRequest(req: Request, bodyUserId: unknown): string {
-  const fromBody = typeof bodyUserId === 'string' ? bodyUserId.trim() : '';
+/** `sub` from a user access JWT, or null if not an authenticated caller token. */
+function authenticatedSubFromBearer(req: Request): string | null {
   const authHeader = req.headers.get('Authorization') ?? '';
   const m = authHeader.match(/^Bearer\s+(.+)$/i);
   const token = m?.[1]?.trim();
-  if (!token) return fromBody;
+  if (!token) return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return fromBody;
+  if (parts.length !== 3) return null;
   try {
     const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
-    const json = JSON.parse(atob(b64 + pad));
+    const json = JSON.parse(atob(b64 + pad)) as { role?: string; sub?: string };
     const role = typeof json?.role === 'string' ? json.role : '';
     const sub = typeof json?.sub === 'string' ? json.sub.trim() : '';
-    if (role === 'authenticated' && UUID_RE.test(sub)) {
-      if (fromBody && fromBody !== sub) {
-        console.warn('[create-goal-and-materialize-plan] body user_id !== JWT sub; using sub', { fromBody, sub });
-      }
-      return sub;
-    }
+    if (role === 'authenticated' && UUID_RE.test(sub)) return sub;
   } catch {
-    /* malformed JWT — fall back to body */
+    /* invalid JWT */
   }
-  return fromBody;
+  return null;
+}
+
+/**
+ * User id for all DB work = JWT `sub`. Body `user_id` is legacy; if sent, it must
+ * equal `sub` or we fail fast (no silent override).
+ */
+function requireUserIdFromRequest(req: Request, bodyUserId: unknown): string {
+  const sub = authenticatedSubFromBearer(req);
+  if (!sub) {
+    throw new AppError(
+      'invalid_auth',
+      'Sign in required: call this function with your user access token (Authorization: Bearer …).',
+      401,
+    );
+  }
+  const fromBody = typeof bodyUserId === 'string' ? bodyUserId.trim() : '';
+  if (fromBody && fromBody !== sub) {
+    throw new AppError('user_id_mismatch', 'user_id must match the signed-in user', 400);
+  }
+  return sub;
 }
 
 function trimId(id: unknown): string | undefined {
@@ -639,7 +648,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const raw = ((await req.json()) as CreateGoalRequest) || ({} as CreateGoalRequest);
-    const user_id = resolveUserIdFromRequest(req, raw.user_id);
+    const user_id = requireUserIdFromRequest(req, raw.user_id);
     const mode = String(raw.mode ?? 'create').trim() as RequestMode;
     const action = raw.action;
     const existing_goal_id = trimId(raw.existing_goal_id);
