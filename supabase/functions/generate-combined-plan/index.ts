@@ -116,6 +116,7 @@ Deno.serve(async (req: Request) => {
       tri_approach: athlete_state.tri_approach ?? null,  // 'base_first' | 'race_peak' — read by coach narrative
       transition_mode: athlete_state.transition_mode ?? null,
       structural_load_hint: athlete_state.structural_load_hint ?? null,
+      swim_volume_multiplier: athlete_state.swim_volume_multiplier ?? null,
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
       sport: 'multi_sport',

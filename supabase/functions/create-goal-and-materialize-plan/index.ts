@@ -8,6 +8,7 @@ import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import {
   computeRunPlanningSignals,
   findPostRaceRecoveryContext,
+  swimVolumeMultiplierFromArcWorkouts,
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
@@ -582,6 +583,10 @@ async function buildCombinedPlan(
     ? '2:1'
     : (fitness === 'beginner' ? '2:1' : '3:1');
 
+  const focusForCombined = new Date().toISOString().slice(0, 10);
+  const arcForCombined = await getArcContext(supabase, user_id, focusForCombined);
+  const swim_volume_multiplier = swimVolumeMultiplierFromArcWorkouts(arcForCombined.swim_training_from_workouts);
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -592,6 +597,7 @@ async function buildCombinedPlan(
       loading_pattern: loadingPattern,
       equipment_type: hasCommercialGym ? 'commercial_gym' : 'home_gym',
       tri_approach: triApproach,
+      swim_volume_multiplier,
       ...(combinedTransition?.transition_mode ? { transition_mode: combinedTransition.transition_mode } : {}),
       ...(combinedTransition?.structural_load_hint
         ? { structural_load_hint: combinedTransition.structural_load_hint }

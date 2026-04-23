@@ -2,7 +2,7 @@
  * Shared training context for plan generation (generate-run-plan, wizard, goal flow).
  * Reads athlete_snapshot rows + ended-plan tombstones so starting volume matches reality.
  */
-import type { CompletedEvent } from './arc-context.ts';
+import type { CompletedEvent, SwimTrainingFromWorkouts } from './arc-context.ts';
 
 export type TrainingTransitionMode =
   | 'peak_bridge'
@@ -129,6 +129,23 @@ export function findPostRaceRecoveryContext(
     }
   }
   return { apply: false };
+}
+
+/**
+ * Down-scale combined-plan swim yards when Arc shows little or no recent pool volume.
+ * Without this, swim TSS share × 80 yd/min produces ~3–4k yd main sets for "returning" athletes.
+ */
+export function swimVolumeMultiplierFromArcWorkouts(
+  st: SwimTrainingFromWorkouts | null | undefined,
+): number {
+  if (!st) return 0.5;
+  const n90 = st.completed_swim_sessions_last_90_days ?? 0;
+  const n28 = st.completed_swim_sessions_last_28_days ?? 0;
+  if (n90 === 0 && n28 === 0) return 0.42;
+  if (n90 <= 2) return 0.52;
+  if (n90 <= 6) return 0.68;
+  if (n90 <= 14) return 0.85;
+  return 1.0;
 }
 
 /**

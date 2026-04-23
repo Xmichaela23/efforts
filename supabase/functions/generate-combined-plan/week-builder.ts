@@ -248,8 +248,12 @@ export function buildWeek(
   const runTotalMin  = Math.max(60, Math.round((runBudget / 65) * 60));
   // Bike: mix of easy + quality → use 62 avg
   const bikeTotalMin = Math.max(60, Math.round((bikeBudget / 62) * 60));
-  // Swim: use 42 avg
-  const swimTotalMin = Math.max(30, Math.round((swimBudget / 42) * 60));
+  // Swim: use 42 avg; scale down when Arc shows few recent swims (athlete_state.swim_volume_multiplier).
+  const swimMult = Math.min(1, Math.max(0.35, athleteState.swim_volume_multiplier ?? 1));
+  const swimTotalMin = Math.max(
+    25,
+    Math.round(Math.max(30, Math.round((swimBudget / 42) * 60)) * swimMult),
+  );
 
   // Derive long run miles from typical 9:30/mi easy pace
   let longRunMinutes = isRecovery
@@ -276,7 +280,10 @@ export function buildWeek(
   }
 
   // Swim yards (average ~2.0 yd/sec net = 120 yd/min; with rest ~80 yd/min effective)
-  const swimYards = Math.max(1200, Math.round(swimTotalMin * 80 / (hasTri ? 1 : 2)));
+  let swimYards = Math.max(1200, Math.round(swimTotalMin * 80 / (hasTri ? 1 : 2)));
+  if (swimMult < 0.92 && weekNum <= 8) {
+    swimYards = Math.min(swimYards, Math.round(2400 + (weekNum - 1) * 80));
+  }
 
   // ── BRICK / LONG RIDE ─────────────────────────────────────────────────────
   // Brick escalation by approach:
