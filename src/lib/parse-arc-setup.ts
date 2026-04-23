@@ -78,6 +78,14 @@ export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload 
       pdo.recovery_run ??
       pdo.recoveryRun;
     if (qRun == null || eRun == null) return false;
+    const qBike =
+      pdo.quality_bike ??
+      pdo.qualityBike ??
+      pdo.bike_quality ??
+      pdo.bikeQuality ??
+      pdo.mid_week_quality_bike;
+    const eBike = pdo.easy_bike ?? pdo.easyBike ?? pdo.bike_easy ?? pdo.bikeEasy ?? pdo.mid_week_easy_bike;
+    if (qBike == null || eBike == null) return false;
     return true;
   });
 }

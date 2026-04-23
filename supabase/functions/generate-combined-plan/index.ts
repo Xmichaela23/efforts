@@ -132,6 +132,8 @@ Deno.serve(async (req: Request) => {
       swim_quality_day: state.swim_quality_day ?? null,
       run_quality_day: state.run_quality_day ?? null,
       run_easy_day: state.run_easy_day ?? null,
+      bike_quality_day: state.bike_quality_day ?? null,
+      bike_easy_day: state.bike_easy_day ?? null,
       strength_protocol: state.strength_protocol ?? null,
       strength_intent: state.strength_intent ?? null,
       strength_preferred_days: state.strength_preferred_days ?? null,

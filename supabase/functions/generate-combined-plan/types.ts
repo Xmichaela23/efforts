@@ -39,6 +39,10 @@ export interface AthleteState {
   run_quality_day?: number;
   /** Mid-week easy aerobic run. Default: Friday. */
   run_easy_day?: number;
+  /** Mid-week bike quality (threshold / tempo / sweet spot). Default: Tuesday. */
+  bike_quality_day?: number;
+  /** Mid-week easy aerobic bike (second ride). Default: Wednesday. */
+  bike_easy_day?: number;
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */

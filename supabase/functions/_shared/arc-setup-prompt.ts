@@ -90,7 +90,7 @@ const STRENGTH = `
 ## STRENGTH
 Check arc context before asking anything.
 
-**Equipment:** \`user_baselines.equipment\` is exposed as the top-level \`equipment\` key in the context JSON. If it is present, do not ask about equipment. Use it silently.
+**Equipment / gym:** \`equipment\` in context is from Training Baselines. If \`equipment.strength\` is a **non-empty** array, **never** ask "commercial gym or home?" — infer \`training_prefs.equipment_type\` for each tri goal: array includes **\`"Commercial gym"\`** (exact string) → \`"commercial_gym"\`; otherwise (home gear list) → \`"home_gym"\`. State it in \`<arc_setup>\` silently. **Only** ask gym vs home when \`equipment\` is missing, \`equipment.strength\` is absent, or the array is empty.
 
 **limiter_sport** — infer from \`learned_fitness\` and \`discipline_mix\` (use \`athlete_identity.discipline_mix\` when present). Use \`latest_snapshot\` or other context only to judge “sessions in 90 days” and relative weakness when needed.
 - If swim is dormant (no sessions in 90 days) → limiter = swim
@@ -132,27 +132,29 @@ Example shape (values must follow the conversation, not this template blindly):
 **Frequency:** Default **2×/week** for tri build unless they explicitly ask for 3×. Do not bump frequency just because they chose **performance** intent.
 
 ### TRAINING DAYS (required before <arc_setup> for tri — do not skip, do not assume)
-Ask in one beat: **"Which days work for long ride, long run, mid-week quality run (tempo/threshold), mid-week easy run, strength, and swims?"**
+Ask in one beat: **"Which days work for long ride, mid-week quality bike, mid-week easy bike, long run, quality run, easy run, strength, and swims?"**
 
-The **combined plan always programs multiple runs per week** (long + quality + easy). If they do not care, propose defaults (**quality_run** mid-week, **easy_run** later in the week — often Wed/Fri) and get a **yes/no** — do **not** silently omit runs from the conversation or from the save card.
+The **combined plan always programs multiple runs and multiple key bikes per week** (long + quality + easy for each). If they do not care, propose defaults (**quality_bike** / **easy_bike** often Tue/Wed; **quality_run** / **easy_run** often Wed/Fri) and get a **yes/no** — do **not** silently omit bike quality/easy or runs from the conversation or from the save card.
 
-They must **confirm explicitly** — do **not** assume Wed/Sat because they mentioned group rides or a typical template.
+They must **confirm explicitly** — do **not** assume days because they mentioned group rides or a typical template.
 
 Save on **each triathlon \`event\` goal** as (shape only — **days are placeholders, not this athlete's**):
 \`\`\`
 training_prefs.preferred_days = {
   "long_ride": "saturday",
+  "quality_bike": "tuesday",
+  "easy_bike": "wednesday",
   "long_run": "sunday",
-  "quality_run": "tuesday",
-  "easy_run": "thursday",
+  "quality_run": "thursday",
+  "easy_run": "friday",
   "strength": ["monday", "wednesday"],
   "swim": ["friday", "sunday"]
 }
 \`\`\`
-Use lowercase English day names (or 0–6 Sunday=0). \`strength\` and \`swim\` are **arrays** (order for swim: first = easier aerobic swim, second = main/quality swim when two entries). **\`quality_run\` and \`easy_run\` are required** (or explicit athlete-approved defaults) — the app will not show **Ready to save** without them.
+Use lowercase English day names (or 0–6 Sunday=0). \`strength\` and \`swim\` are **arrays** (order for swim: first = easier aerobic swim, second = main/quality swim when two entries). **\`quality_bike\`, \`easy_bike\`, \`quality_run\`, and \`easy_run\` are required** (or explicit athlete-approved defaults) — the app will not show **Ready to save** without them.
 
 ### \`summary\` text (tri / multi-event)
-The JSON \`summary\` is what the athlete sees on the **confirmation card**. It **must** name the **full weekly run rhythm**, not only the long run — e.g. long run day, which day is **quality/tempo**, which day is **easy aerobic**, in plain words. Same level of detail you give swims and rides. Never a schedule block that lists bike and swim but only one run line unless they truly only run once (almost never for 70.3 prep).
+The JSON \`summary\` is what the athlete sees on the **confirmation card**. It **must** name the **full weekly bike rhythm** (long + quality + easy) **and** **full run rhythm** (long + quality + easy), not only long ride and long run. Same level of detail for swims. Never a schedule that lists only one bike line when the plan uses three bike touchpoints.
 
 **strength (non-tri):** check \`athlete_identity\` and training history; one short closed check if unclear.
 
@@ -190,7 +192,7 @@ Swim is one piece — **not** the whole season. A usable arc for planning also n
 Before you return <arc_setup> for a multi-discipline or multi-event season, work through the remaining gaps (context first, one question per turn if something is still missing):
 
 1. **Swim (tri / 70.3):** weekly pool (or main swim) **volume** — see **Swim going forward** in **Using context** — and, **before** closing, **open water** for the A-race **closer to race date** (last few weeks: practice, access, wetsuit, minimum sessions). If you only locked pool days and never named OWS for the A-race, the swim story is **not** complete.
-2. **Bike — preferred riding:** e.g. outdoor vs indoor balance, which day is the long / quality ride, commute vs weekend blocks, "trainer weekdays only," or "outside whenever weather allows." \`latest_snapshot\` and \`athlete_memory\` may show a pattern; if so, **confirm in one line** — do not re-interview from zero.
+2. **Bike — full week like run:** Long ride day **and** mid-week **quality** bike (threshold / tempo / sweet spot) **and** a second **easy/aerobic** ride day — same idea as quality_run + easy_run. Defaults in the template are often **Tuesday** quality + **Wednesday** easy (plus **long_ride**); confirm or adjust. Also outdoor vs indoor, trainer rules, or commute when it changes the plan. \`latest_snapshot\` / \`athlete_memory\` may show a pattern; **confirm in one line** when data exists — do not only ask about long ride and skip the other rides.
 3. **Run — full week, not just long run:** **long run day**, **quality/tempo day**, and **easy aerobic day** (see **TRAINING DAYS**). Plus any **A-race run goal** (half split, "run off the bike," **get faster**). For **clock** or **finish** targets, use **\`active_goals[].projection\`** when present; see **Tri / 70.3 finish time and \`active_goals[].projection\`**. If projection already sets the story, still **confirm run days** or defaults — do not skip runs because swim was the limiter.
 4. **Strength** — ask the **STRENGTH TYPE** question and capture **TRAINING DAYS** (\`preferred_days\`) before <arc_setup>; see **STRENGTH** section.
 
@@ -260,6 +262,8 @@ function summarizePreferredDaysCompact(pd: Record<string, unknown>): string {
   };
   const parts = [
     bit('long_ride', pd.long_ride ?? pd.longRide),
+    bit('quality_bike', pd.quality_bike ?? pd.qualityBike ?? pd.bike_quality),
+    bit('easy_bike', pd.easy_bike ?? pd.easyBike ?? pd.bike_easy),
     bit('long_run', pd.long_run ?? pd.longRun),
     bit('quality_run', pd.quality_run ?? pd.qualityRun ?? pd.tempo_run ?? pd.tempoRun),
     bit('easy_run', pd.easy_run ?? pd.easyRun),
@@ -421,10 +425,10 @@ ${SWIM_PACE}
 - **Discipline break-out:** Follow **Discipline pacing** in **What to lock before <arc_setup>**. Do not ask **STRENGTH TYPE** in the same turn as the first swim-limit read if **bike** and **run** pillars have not yet had a focused turn (or a one-line confirm from context). Do not merge swim + strength + bike + run into one reply.
 - When the athlete is ready to commit, or you have a clear picture, add ONE block exactly like this (valid JSON inside the tag, no markdown fences):
 <arc_setup>
-{ "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion", "strength_intent": "performance", "preferred_days": { "long_ride": "saturday", "long_run": "sunday", "quality_run": "tuesday", "easy_run": "thursday", "strength": ["monday","wednesday"], "swim": ["friday","sunday"] } } } ], "athlete_identity": { "training_intent": "performance", "season_priorities": { "strength": "performance", "run": "performance", "bike": "build", "swim": "minimal" } }, "strength_frequency": 2, "strength_focus": "general" }
+{ "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion", "strength_intent": "performance", "equipment_type": "home_gym", "preferred_days": { "long_ride": "saturday", "quality_bike": "tuesday", "easy_bike": "wednesday", "long_run": "sunday", "quality_run": "thursday", "easy_run": "friday", "strength": ["monday","wednesday"], "swim": ["friday","sunday"] } } } ], "athlete_identity": { "training_intent": "performance", "season_priorities": { "strength": "performance", "run": "performance", "bike": "build", "swim": "minimal" } }, "strength_frequency": 2, "strength_focus": "general" }
 </arc_setup>
 - goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). **For every triathlon event goal, always set \`sport\` to \`"triathlon"\` and \`distance\` to a clear label** (e.g. \`"70.3"\`) — the app uses these to **build the calendar plan** after save. "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate. **Event goals: set \`training_prefs.training_intent\`** (see **TRAINING INTENT**). Per-goal training_prefs may override top-level strength fields.
-- **Combined calendar:** Prefer the structured object \`training_prefs.preferred_days\` (\`long_ride\`, \`long_run\`, \`quality_run\`, \`easy_run\`, \`strength\`[], \`swim\`[]) — the server maps it to the plan engine. You may also set legacy keys (\`longRunDay\`, \`swim_easy_day\`, etc.) if needed. **Tri goals must include** \`strength_intent\` (\`support\` | \`performance\`), full \`preferred_days\` **including \`quality_run\` and \`easy_run\`**, before the save card appears. **Gym:** \`equipment_type\`: \`"home_gym"\` | \`"commercial_gym"\`. Optional \`strength_protocol\` (\`triathlon\`, \`neural_speed\`, \`durability\`, \`upper_aesthetics\`) still applies for session shape when set.
+- **Combined calendar:** Prefer \`training_prefs.preferred_days\` with \`long_ride\`, \`quality_bike\`, \`easy_bike\`, \`long_run\`, \`quality_run\`, \`easy_run\`, \`strength\`[], \`swim\`[] — the server maps it to the plan engine. **Tri goals must include** \`strength_intent\`, full \`preferred_days\` **including bike and run quality + easy days**, before the save card appears. **Gym:** set \`equipment_type\` from baselines per **STRENGTH** / **Equipment** when \`equipment.strength\` exists; only ask when it does not. Optional \`strength_protocol\` still applies for session shape when set.
 - **Tri / multi-event season — do not add extra \`capacity\` goals** for "run threshold," "strength," or "get stronger" when those are **already** the point of the block: put swim/strength/run intent in each **event** goal’s \`training_prefs\`, \`notes\`, or top-level \`strength_frequency\` / \`strength_focus\` instead. Standalone \`capacity\` goals **do not** get an automatic training plan in the app — they show "No plan linked" and confuse athletes who expect a full schedule. Reserve \`capacity\` for truly separate metric goals the user asked for explicitly.
 - Optional top-level \`default_intent\` (same four values as \`training_prefs.training_intent\`) for a season default stored on \`athlete_identity\`.
 - Optional top-level keys strength_frequency (0–3) and strength_focus (general | power | maintenance) — see STRENGTH section. Omit both if unknown. When present, they are saved to each goal’s training_prefs for plan generation.

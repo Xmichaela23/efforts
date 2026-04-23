@@ -81,7 +81,7 @@ function titleCaseWeekdayFromIndex(idx: number): string {
   return TITLE_BY_SUN[idx] ?? 'Monday';
 }
 
-/** Parse `training_prefs.preferred_days` from Arc (object with long_run, long_ride, swim[], strength[]). */
+/** Parse `training_prefs.preferred_days` from Arc (long ride/run, quality/easy bike & run, swim[], strength[]). */
 export function parsePreferredDaysPatch(
   src: Record<string, unknown> | null | undefined,
 ): Partial<CombinedSchedulePrefs> {
@@ -116,6 +116,14 @@ export function parsePreferredDaysPatch(
   );
   if (qRun !== undefined) patch.run_quality_day = qRun;
   if (eRun !== undefined) patch.run_easy_day = eRun;
+  const qBike = parseSunFirstDayIndex(
+    o.quality_bike ?? o.qualityBike ?? o.bike_quality ?? o.bikeQuality ?? o.mid_week_quality_bike,
+  );
+  const eBike = parseSunFirstDayIndex(
+    o.easy_bike ?? o.easyBike ?? o.bike_easy ?? o.bikeEasy ?? o.mid_week_easy_bike,
+  );
+  if (qBike !== undefined) patch.bike_quality_day = qBike;
+  if (eBike !== undefined) patch.bike_easy_day = eBike;
   return patch;
 }
 
@@ -128,6 +136,10 @@ export interface CombinedSchedulePrefs {
   run_easy_day?: number;
   swim_easy_day?: number;
   swim_quality_day?: number;
+  /** Mid-week bike quality (threshold / tempo / SS). 0=Sun … 6=Sat */
+  bike_quality_day?: number;
+  /** Mid-week easy aerobic bike add-on. 0=Sun … 6=Sat */
+  bike_easy_day?: number;
   rest_days?: number[];
   strength_protocol?: string;
   /** From Arc: support = tri accessory loads; performance = compound / progressive overload. */
@@ -172,6 +184,8 @@ export function mergeCombinedSchedulePrefs(
     if (pdPatch.swim_quality_day !== undefined) out.swim_quality_day = pdPatch.swim_quality_day;
     if (pdPatch.run_quality_day !== undefined) out.run_quality_day = pdPatch.run_quality_day;
     if (pdPatch.run_easy_day !== undefined) out.run_easy_day = pdPatch.run_easy_day;
+    if (pdPatch.bike_quality_day !== undefined) out.bike_quality_day = pdPatch.bike_quality_day;
+    if (pdPatch.bike_easy_day !== undefined) out.bike_easy_day = pdPatch.bike_easy_day;
     if (pdPatch.strength_preferred_days?.length) {
       out.strength_preferred_days = pdPatch.strength_preferred_days;
     }

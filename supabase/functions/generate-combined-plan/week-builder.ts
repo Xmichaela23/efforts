@@ -360,32 +360,62 @@ export function buildWeek(
     runEasyDay = adjDay(runEasyDay, 1);
   }
 
-  // ── TUESDAY: Bike quality ─────────────────────────────────────────────────
-  const tuesdaySlot = grid.get('Tuesday');
-  if (!recoveryRebuildWeek1 && !tuesdaySlot?.isRest && hasTri) {
+  // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
+  const bikeQualIdxBase =
+    athleteState.bike_quality_day != null
+      ? (athleteState.bike_quality_day + 6) % 7
+      : DAYS_OF_WEEK.indexOf('Tuesday');
+  let bikeQualityDay = DAYS_OF_WEEK[bikeQualIdxBase] ?? 'Tuesday';
+  const bikeEasyIdxBase =
+    athleteState.bike_easy_day != null
+      ? (athleteState.bike_easy_day + 6) % 7
+      : DAYS_OF_WEEK.indexOf('Wednesday');
+  let bikeEasyDay = DAYS_OF_WEEK[bikeEasyIdxBase] ?? 'Wednesday';
+
+  const blockedForBikeQual = new Set<string>([longRideDay, longRunActualDay, ...restDayNames]);
+  if (blockedForBikeQual.has(bikeQualityDay)) {
+    for (let step = 1; step <= 6; step++) {
+      const cand = adjDay(bikeQualityDay, step);
+      if (!blockedForBikeQual.has(cand)) {
+        bikeQualityDay = cand;
+        break;
+      }
+    }
+  }
+  if (bikeEasyDay === bikeQualityDay || bikeEasyDay === longRideDay || restDayNames.has(bikeEasyDay)) {
+    for (let step = 1; step <= 6; step++) {
+      const cand = adjDay(bikeEasyDay, step);
+      if (cand !== bikeQualityDay && cand !== longRideDay && !restDayNames.has(cand)) {
+        bikeEasyDay = cand;
+        break;
+      }
+    }
+  }
+
+  const bikeQualitySlot = grid.get(bikeQualityDay);
+  if (!recoveryRebuildWeek1 && !bikeQualitySlot?.isRest && hasTri) {
+    const bq = bikeQualityDay;
     if (phase === 'taper') {
-      tuesdaySlot!.sessions.push(bikeOpeners('Tuesday', servedGoal));
+      bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
     } else if (triApproach === 'base_first') {
-      // base_first: quality time stays in Z3. No threshold or VO2 work.
       if (phase === 'race_specific') {
-        tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 3, 12, servedGoal)); // 3×12 SS
+        bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 3, 12, servedGoal));
       } else if (phase === 'build') {
         const intervals = Math.max(2, Math.min(3, Math.floor(bikeTotalMin / 60)));
-        tuesdaySlot!.sessions.push(tempoBike('Tuesday', intervals, 20, servedGoal));
+        bikeQualitySlot!.sessions.push(tempoBike(bq, intervals, 20, servedGoal));
       } else {
-        // Base: easy aerobic with gentle sweet spot introduction
-        tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 2, 12, servedGoal));
+        bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 2, 12, servedGoal));
       }
     } else {
-      // race_peak: push the ceiling with threshold and VO2 work
       if (phase === 'race_specific') {
-        tuesdaySlot!.sessions.push(vo2Bike('Tuesday', Math.max(4, Math.min(6, Math.round(bikeTotalMin / 40))), servedGoal));
+        bikeQualitySlot!.sessions.push(
+          vo2Bike(bq, Math.max(4, Math.min(6, Math.round(bikeTotalMin / 40))), servedGoal),
+        );
       } else if (phase === 'build') {
         const intervals = Math.max(2, Math.min(4, Math.floor(bikeTotalMin / 60)));
-        tuesdaySlot!.sessions.push(thresholdBike('Tuesday', intervals, 20, servedGoal));
+        bikeQualitySlot!.sessions.push(thresholdBike(bq, intervals, 20, servedGoal));
       } else {
-        // Base: sweet spot to introduce intensity gently
-        tuesdaySlot!.sessions.push(sweetSpotBike('Tuesday', 2, 15, servedGoal));
+        bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 2, 15, servedGoal));
       }
     }
   }
@@ -574,10 +604,10 @@ export function buildWeek(
 
   // Add a mid-week easy bike if budget remains and plan is triathlon-focused
   if (remaining > 50 && hasTri && !isRecovery && !recoveryRebuildWeek1) {
-    const midRideSlot = grid.get('Wednesday');
+    const midRideSlot = grid.get(bikeEasyDay);
     if (midRideSlot && !midRideSlot.isRest && midRideSlot.sessions.length === 1) {
       const midRideHr = Math.max(0.75, Math.min(1.5, remaining * 0.50 / 55));
-      midRideSlot.sessions.push(easyBike('Wednesday', midRideHr, servedGoal));
+      midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
     }
   }
 

@@ -492,6 +492,8 @@ function mergeTrainingPrefsWithArcDefaults(
 const DEFAULT_TRI_PREFERRED_DAYS = {
   long_ride: 'saturday',
   long_run: 'sunday',
+  quality_bike: 'tuesday',
+  easy_bike: 'wednesday',
   quality_run: 'wednesday',
   easy_run: 'friday',
   strength: ['monday', 'wednesday'],
@@ -537,6 +539,8 @@ function backfillTriTrainingPrefsDefenseInDepth(
     trainingPrefs.preferred_days = {
       long_ride: DEFAULT_TRI_PREFERRED_DAYS.long_ride,
       long_run: DEFAULT_TRI_PREFERRED_DAYS.long_run,
+      quality_bike: DEFAULT_TRI_PREFERRED_DAYS.quality_bike,
+      easy_bike: DEFAULT_TRI_PREFERRED_DAYS.easy_bike,
       quality_run: DEFAULT_TRI_PREFERRED_DAYS.quality_run,
       easy_run: DEFAULT_TRI_PREFERRED_DAYS.easy_run,
       strength: [...DEFAULT_TRI_PREFERRED_DAYS.strength],
@@ -553,7 +557,15 @@ function backfillTriTrainingPrefsDefenseInDepth(
       pd.easy_run = DEFAULT_TRI_PREFERRED_DAYS.easy_run;
       touched = true;
     }
-    if (touched) notes.push('preferred_days→run_days_defaults');
+    if (pd.quality_bike == null && pd.qualityBike == null && pd.bike_quality == null) {
+      pd.quality_bike = DEFAULT_TRI_PREFERRED_DAYS.quality_bike;
+      touched = true;
+    }
+    if (pd.easy_bike == null && pd.easyBike == null && pd.bike_easy == null) {
+      pd.easy_bike = DEFAULT_TRI_PREFERRED_DAYS.easy_bike;
+      touched = true;
+    }
+    if (touched) notes.push('preferred_days→run_bike_defaults');
   }
   return notes;
 }
@@ -734,6 +746,12 @@ async function buildCombinedPlan(
         : {}),
       ...(combinedSchedulePrefs.run_easy_day !== undefined
         ? { run_easy_day: combinedSchedulePrefs.run_easy_day }
+        : {}),
+      ...(combinedSchedulePrefs.bike_quality_day !== undefined
+        ? { bike_quality_day: combinedSchedulePrefs.bike_quality_day }
+        : {}),
+      ...(combinedSchedulePrefs.bike_easy_day !== undefined
+        ? { bike_easy_day: combinedSchedulePrefs.bike_easy_day }
         : {}),
       ...(combinedSchedulePrefs.strength_protocol
         ? { strength_protocol: combinedSchedulePrefs.strength_protocol }
