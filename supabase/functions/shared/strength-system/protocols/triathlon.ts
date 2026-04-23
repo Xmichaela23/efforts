@@ -61,7 +61,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
   const freq = strengthFrequency ?? 2;
 
-  const phaseName = phase.name.toLowerCase();
+  const phaseName = String(phase?.name ?? '').toLowerCase();
 
   // Recovery weeks: one light full-body, no intensity
   if (isRecovery) {

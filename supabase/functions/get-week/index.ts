@@ -452,10 +452,6 @@ Deno.serve(async (req)=>{
       where: 'planned_workouts',
       message: pErr.message || String(pErr)
     });
-    const plannedByKey = new Map();
-    for (const p of Array.isArray(plannedRows) ? plannedRows : []){
-      plannedByKey.set(`${String(p.date)}|${String(p.type).toLowerCase()}`, p);
-    }
     // Opportunistic re-materialize: swim rows where tokens include warmup/cooldown but computed steps are missing them
     try {
       const needsWuCd = [];
@@ -510,6 +506,80 @@ Deno.serve(async (req)=>{
         } catch  {}
       }
     } catch  {}
+    // Two+ active event-goal plans each materialize into `planned_workouts`; the unified
+    // week was merging every row (two full A-race weeks on one calendar). Keep all plans
+    // in the DB, but show only the primary event goal's schedule on Home: A > B > C,
+    // then nearest race. Always keep plans with no goal_id (catalog / unlinked).
+    try {
+      const pr = Array.isArray(plannedRows) ? plannedRows : [];
+      if (pr.length) {
+        const { data: aps } = await supabase
+          .from('plans')
+          .select('id, goal_id')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .not('goal_id', 'is', null);
+        if (aps && aps.length > 1) {
+          const gidSet = [...new Set(aps.map((p) => p.goal_id).filter(Boolean))];
+          if (gidSet.length > 1) {
+            const { data: gRows } = await supabase
+              .from('goals')
+              .select('id, priority, target_date, goal_type')
+              .eq('user_id', userId)
+              .in('id', gidSet)
+              .eq('status', 'active');
+            const eventGoals = (gRows || []).filter((g) => g.goal_type === 'event');
+            if (eventGoals.length > 1) {
+              const pri = (p) => (p === 'A' ? 0 : p === 'B' ? 1 : p === 'C' ? 2 : 3);
+              eventGoals.sort((a, b) => {
+                const c = pri(a.priority) - pri(b.priority);
+                if (c !== 0) return c;
+                const da = a.target_date ? new Date(String(a.target_date) + 'T12:00:00').getTime() : 0;
+                const db = b.target_date ? new Date(String(b.target_date) + 'T12:00:00').getTime() : 0;
+                if (da !== db) return da - db;
+                return String(a.id).localeCompare(String(b.id));
+              });
+              const byGid = new Map(aps.map((p) => [p.goal_id, p]));
+              let winPlan = null;
+              for (const g of eventGoals) {
+                const pl = byGid.get(g.id);
+                if (pl) {
+                  winPlan = pl;
+                  break;
+                }
+              }
+              const { data: unl } = await supabase
+                .from('plans')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('status', 'active')
+                .is('goal_id', null);
+              const allowUnlinked = new Set((unl || []).map((p) => String(p.id)));
+              if (winPlan?.id) {
+                const wid = String(winPlan.id);
+                plannedRows = pr.filter(
+                  (r) => allowUnlinked.has(String(r.training_plan_id)) || String(r.training_plan_id) === wid
+                );
+                if (debug) {
+                  debugNotes.push({
+                    where: 'primary_event_plan_filter',
+                    winning_plan_id: wid,
+                    goals_competing: eventGoals.length,
+                    row_count: plannedRows.length
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (debug) debugNotes.push({ where: 'primary_event_plan_filter', err: String(e) });
+    }
+    const plannedByKey = new Map();
+    for (const p of Array.isArray(plannedRows) ? plannedRows : []){
+      plannedByKey.set(`${String(p.date)}|${String(p.type).toLowerCase()}`, p);
+    }
     // Derive brick group info in-memory (no schema change):
     // Pair same-day sessions tagged with 'brick' across endurance types.
     const brickMetaByPlannedId = new Map();
@@ -1218,13 +1288,21 @@ Deno.serve(async (req)=>{
           
           const weekSummary = weeklySummaries[String(currentWeek)] || {};
           
-          // Calculate weeks till race — only show if race date is still in the future
+          // "Weeks till race" for header — use calendar time to the event, not
+          // (duration - currentWeek + 1), which is weeks left inside the plan block
+          // and often disagrees with the goal / arc line (e.g. 21 vs 16 for the same A-race).
           const raceInFuture = config.race_date
             ? new Date(config.race_date + 'T12:00:00') > new Date()
             : true;
-          const weeksToRace = durationWeeks > 0 && raceInFuture
-            ? Math.max(0, durationWeeks - currentWeek + 1)
-            : null;
+          let weeksToRace: number | null = null;
+          if (config.race_date && raceInFuture) {
+            const raceD = new Date(String(config.race_date) + 'T12:00:00');
+            const nowD = new Date();
+            const diffMs = raceD.getTime() - nowD.getTime();
+            weeksToRace = Math.max(0, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000)));
+          } else if (durationWeeks > 0 && raceInFuture) {
+            weeksToRace = Math.max(0, durationWeeks - currentWeek + 1);
+          }
           
           // Extract focus - handle both string and empty/null cases
           let focus = weekSummary.focus;

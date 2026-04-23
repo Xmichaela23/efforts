@@ -261,6 +261,54 @@ function currentWeekMondayISO(): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * After a new plan is generated, linked to a goal, and activate-plan has run, retire any
+ * competing active plans that would double-book the calendar. The run path had this;
+ * the tri path returned early and skipped it, duplicating every workout. Both paths use this.
+ */
+async function retireCompetingActivePlans(
+  supabase: ReturnType<typeof createClient>,
+  user_id: string,
+  newPlanId: string,
+  params: { mode: RequestMode; existing_goal_id?: string | null; replace_plan_id?: string | null },
+): Promise<void> {
+  const { mode, existing_goal_id, replace_plan_id } = params;
+  if (replace_plan_id) {
+    const weekStart = currentWeekMondayISO();
+    await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', weekStart);
+    await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
+  }
+  if (mode === 'build_existing' && existing_goal_id) {
+    const { data: priorLinkedPlans } = await supabase
+      .from('plans')
+      .select('id,status')
+      .eq('user_id', user_id)
+      .eq('goal_id', existing_goal_id)
+      .eq('status', 'active');
+    const weekStart = currentWeekMondayISO();
+    for (const p of priorLinkedPlans || []) {
+      if (p.id === newPlanId) continue;
+      await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', weekStart);
+      await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
+    }
+  }
+  const { data: unlinkedPlans } = await supabase
+    .from('plans')
+    .select('id, config, plan_type, status')
+    .eq('user_id', user_id)
+    .is('goal_id', null)
+    .in('status', ['active', 'paused']);
+  for (const p of unlinkedPlans || []) {
+    const planType = String(p.plan_type || '').toLowerCase();
+    const planSport = String(p.config?.sport || '').toLowerCase();
+    const looksRun = planSport === 'run' || planType.includes('run');
+    if (!looksRun || p.id === newPlanId) continue;
+    const weekStart = currentWeekMondayISO();
+    await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', weekStart);
+    await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
+  }
+}
+
 async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name: string, body: Record<string, any>) {
   const resp = await fetch(`${functionsBaseUrl}/${name}`, {
     method: 'POST',
@@ -807,13 +855,7 @@ Deno.serve(async (req: Request) => {
 
       await supabase.from('plans').update({ goal_id: createdGoalId, plan_mode: 'rolling' }).eq('id', triPlanId).eq('user_id', user_id);
       await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: triPlanId });
-
-      // End a specific replaced plan if caller passed replace_plan_id
-      if (replace_plan_id) {
-        const weekStart = currentWeekMondayISO();
-        await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', weekStart);
-        await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
-      }
+      await retireCompetingActivePlans(supabase, user_id, triPlanId, { mode, existing_goal_id, replace_plan_id });
 
       // Cancel the replaced triathlon goal and end its linked plans (mirrors run-path replace logic)
       if (mode === 'create' && action === 'replace' && replace_goal_id) {
@@ -1156,49 +1198,7 @@ Deno.serve(async (req: Request) => {
     if (linkErr) throw new AppError('plan_link_failed', linkErr.message);
 
     await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: generatedPlanId });
-
-    // If the caller asked to replace a specific plan (e.g., End & Build), end it explicitly.
-    if (replace_plan_id) {
-      const weekStart = currentWeekMondayISO();
-      await supabase.from('planned_workouts').delete().eq('training_plan_id', replace_plan_id).gte('date', weekStart);
-      await supabase.from('plans').update({ status: 'ended' }).eq('id', replace_plan_id).eq('user_id', user_id);
-    }
-
-    // If rebuilding for an existing goal, retire any previously active linked plans for that same goal.
-    if (mode === 'build_existing' && existing_goal_id) {
-      const { data: priorLinkedPlans } = await supabase
-        .from('plans')
-        .select('id,status')
-        .eq('user_id', user_id)
-        .eq('goal_id', existing_goal_id)
-        .eq('status', 'active');
-
-      const weekStart = currentWeekMondayISO();
-      for (const p of priorLinkedPlans || []) {
-        if (p.id === generatedPlanId) continue;
-        await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', weekStart);
-        await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
-      }
-    }
-
-    // End unlinked active run plans to avoid duplicate active plan stacks.
-    const { data: unlinkedPlans } = await supabase
-      .from('plans')
-      .select('id, config, plan_type, status')
-      .eq('user_id', user_id)
-      .is('goal_id', null)
-      .in('status', ['active', 'paused']);
-
-    for (const p of unlinkedPlans || []) {
-      const planType = String(p.plan_type || '').toLowerCase();
-      const planSport = String(p.config?.sport || '').toLowerCase();
-      const looksRun = planSport === 'run' || planType.includes('run');
-      if (!looksRun || p.id === generatedPlanId) continue;
-
-      const weekStart = currentWeekMondayISO();
-      await supabase.from('planned_workouts').delete().eq('training_plan_id', p.id).gte('date', weekStart);
-      await supabase.from('plans').update({ status: 'ended' }).eq('id', p.id).eq('user_id', user_id);
-    }
+    await retireCompetingActivePlans(supabase, user_id, generatedPlanId, { mode, existing_goal_id, replace_plan_id });
 
     if (mode === 'create' && action === 'replace' && replace_goal_id) {
       await supabase

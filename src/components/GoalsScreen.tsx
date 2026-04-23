@@ -80,6 +80,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [buildingGoalId, setBuildingGoalId] = useState<string | null>(null);
+  const [seasonBuilding, setSeasonBuilding] = useState(false);
+  const [seasonError, setSeasonError] = useState<string | null>(null);
   const [buildError, setBuildError] = useState<{ goalId: string; message: string } | null>(null);
   /** Brief confirmation after a successful `build_existing` (cleared after a few seconds). */
   const [planReadyGoalId, setPlanReadyGoalId] = useState<string | null>(null);
@@ -328,10 +330,23 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const activeGoals = useMemo(() => goals.filter(g => g.status === 'active'), [goals]);
   const inactiveGoals = useMemo(() => goals.filter(g => g.status !== 'active'), [goals]);
+  const activeEventGoals = useMemo(
+    () => activeGoals.filter(g => g.goal_type === 'event'),
+    [activeGoals],
+  );
+  const multipleEventGoals = activeEventGoals.length >= 2;
 
   const plansByGoalId = useMemo(() => {
-    const map = new Map<string, typeof currentPlans[0]>();
-    for (const p of currentPlans) if (p.goal_id) map.set(p.goal_id, p);
+    const map = new Map<string, (typeof currentPlans)[0]>();
+    for (const p of currentPlans) {
+      if (p.goal_id) map.set(p.goal_id, p);
+      const served = (p.config as { goals_served?: string[] } | undefined)?.goals_served;
+      if (Array.isArray(served)) {
+        for (const gid of served) {
+          if (typeof gid === 'string' && !map.has(gid)) map.set(gid, p);
+        }
+      }
+    }
     return map;
   }, [currentPlans]);
 
@@ -523,6 +538,61 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       return { success: false, error: message };
     } finally {
       setBuildingGoalId(null);
+    }
+  }
+
+  /** One combined plan for every active event goal (A/B priority + dates). Not per-goal builds. */
+  async function handleBuildSeasonPlan(replacePlanId: string | null = null) {
+    const buildUserId = readStoredUserId();
+    if (!buildUserId) {
+      setSeasonError('Not signed in');
+      return;
+    }
+    const sorted = [...activeEventGoals].sort((a, b) => {
+      const pr = (p: string) => (p === 'A' ? 0 : p === 'B' ? 1 : p === 'C' ? 2 : 3);
+      const c = pr(a.priority) - pr(b.priority);
+      if (c !== 0) return c;
+      const da = a.target_date ? new Date(a.target_date + 'T12:00:00').getTime() : 0;
+      const db = b.target_date ? new Date(b.target_date + 'T12:00:00').getTime() : 0;
+      if (da !== db) return da - db;
+      return a.id.localeCompare(b.id);
+    });
+    const primary = sorted[0];
+    if (!primary) return;
+
+    setSeasonBuilding(true);
+    setSeasonError(null);
+    setConflictDialog(null);
+    setBuildError(null);
+    try {
+      const { data, error } = await invokeFunction('create-goal-and-materialize-plan', {
+        user_id: buildUserId,
+        mode: 'build_existing',
+        existing_goal_id: String(primary.id),
+        combine: true,
+        replace_plan_id: replacePlanId ? String(replacePlanId) : null,
+      });
+      if (error || !data?.success) {
+        const parsed = await parseFunctionError(error, data, 'Unable to build season plan');
+        if (parsed.code === 'missing_pace_benchmark') setShowCalibration(true);
+        throw new Error(parsed.message);
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      } catch {
+        void 0;
+      }
+      onPlanBuilt?.();
+      await refreshGoals();
+      setPlanReadyGoalId(primary.id);
+      window.setTimeout(() => {
+        setPlanReadyGoalId((prev) => (prev === primary.id ? null : prev));
+      }, 6000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to build season plan';
+      setSeasonError(message);
+    } finally {
+      setSeasonBuilding(false);
     }
   }
 
@@ -746,7 +816,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     <button
                       type="button"
                       className="rounded-xl bg-white/[0.08] border border-white/10 px-3 py-2.5 text-xs font-medium text-white/60 hover:bg-white/[0.12] transition-all"
-                      disabled={buildingGoalId === goal.id}
+                      disabled={buildingGoalId === goal.id || seasonBuilding}
                       onClick={() => handleLinkPlan(conflictPlan.id, goal.id)}
                     >
                       Link existing plan
@@ -754,10 +824,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     <button
                       type="button"
                       className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                      disabled={buildingGoalId === goal.id}
+                      disabled={buildingGoalId === goal.id || seasonBuilding}
                       onClick={() => handleBuildPlan(goal)}
                     >
-                      {buildingGoalId === goal.id ? (
+                      {seasonBuilding || buildingGoalId === goal.id ? (
                         <>
                           <Loader2 className="h-5 w-5 animate-spin opacity-90" />
                           Ending & building…
@@ -765,7 +835,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       ) : (
                         <>
                           <CalendarRange className="h-5 w-5 opacity-90" />
-                          Build Plan
+                          {activeEventGoals.length >= 2 ? 'Build season plan' : 'Build Plan'}
                         </>
                       )}
                     </button>
@@ -774,11 +844,18 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               );
             }
             if (goal.goal_type === 'event') {
+              if (multipleEventGoals) {
+                return (
+                  <p className="text-xs text-white/40 leading-relaxed">
+                    This race is part of your season. Use <span className="text-white/55">Build season plan</span> (above) once — one schedule covers every event (A- and B-race priority), not a separate plan per goal.
+                  </p>
+                );
+              }
               return (
                 <button
                   type="button"
                   className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  disabled={buildingGoalId === goal.id}
+                  disabled={buildingGoalId === goal.id || seasonBuilding}
                   onClick={() => handleBuildPlan(goal)}
                 >
                   {buildingGoalId === goal.id ? (
@@ -918,11 +995,24 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             <p className="text-base font-medium text-white/90 mb-2">Replace existing plan?</p>
             <p className="text-sm text-white/50 leading-relaxed mb-5">
               You have an active plan: <span className="text-white/70">{conflictDialog.conflictPlan.name}</span>.
-              This will end it and build a new plan for <span className="text-white/70">{conflictDialog.goal.name}</span>.
+              {activeEventGoals.length >= 2 ? (
+                <> Ending it will make room for <span className="text-white/70">one season plan that includes all {activeEventGoals.length} of your event goals</span> (A/B priority).</>
+              ) : (
+                <> This will end it and build a new plan for <span className="text-white/70">{conflictDialog.goal.name}</span>.</>
+              )}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setConflictDialog(null)} className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-medium text-white/50 hover:bg-white/[0.06] transition-all">Cancel</button>
-              <button onClick={() => executeBuildPlan(conflictDialog.goal, conflictDialog.conflictPlan.id)} className="flex-1 rounded-xl bg-white/[0.15] py-2.5 text-sm font-medium text-white/90 hover:bg-white/[0.22] transition-all">End & Build</button>
+              <button
+                onClick={() =>
+                  activeEventGoals.length >= 2
+                    ? void handleBuildSeasonPlan(conflictDialog.conflictPlan.id)
+                    : void executeBuildPlan(conflictDialog.goal, conflictDialog.conflictPlan.id)
+                }
+                className="flex-1 rounded-xl bg-white/[0.15] py-2.5 text-sm font-medium text-white/90 hover:bg-white/[0.22] transition-all"
+              >
+                {activeEventGoals.length >= 2 ? 'End & build season' : 'End & Build'}
+              </button>
             </div>
           </div>
         </div>
@@ -1093,6 +1183,33 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           </div>
         ) : (
           <div className="space-y-3">
+            {multipleEventGoals && (
+              <div className="rounded-2xl border border-teal-500/30 bg-teal-950/35 p-4">
+                <p className="text-sm text-white/85 font-medium">One season, every race</p>
+                <p className="text-xs text-white/45 leading-relaxed mt-1.5">
+                  {activeEventGoals.length} event goals are on your season. We build a single multi-event plan (priorities A/B and race dates) — not a separate build per goal. Use Plan my season in chat for setup details, or build the schedule here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleBuildSeasonPlan(null)}
+                  disabled={seasonBuilding}
+                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/40 bg-teal-900/30 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-900/45 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {seasonBuilding ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin opacity-90" />
+                      Building season…
+                    </>
+                  ) : (
+                    <>
+                      <CalendarRange className="h-5 w-5 opacity-90" />
+                      Build season plan
+                    </>
+                  )}
+                </button>
+                {seasonError && <p className="mt-2 text-xs text-red-400/80">{seasonError}</p>}
+              </div>
+            )}
             {activeGoals.map(renderGoalCard)}
 
             {activeUnlinkedPlans.length > 0 && (

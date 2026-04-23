@@ -40,7 +40,7 @@ function hasLowerBodyHotspot(hotspots: string[]): boolean {
     'tibial', 'peroneal', 'patellar', 'femoral',
   ];
   return hotspots.some(h =>
-    lowerTerms.some(t => h.toLowerCase().includes(t))
+    lowerTerms.some(t => String(h ?? '').toLowerCase().includes(t))
   );
 }
 
@@ -306,7 +306,7 @@ export function mapApproachToMethodology(approach: string): MethodologyId {
  * Convert weekday string to Weekday type
  */
 export function normalizeWeekday(day: string): Weekday {
-  const normalized = day.toLowerCase().substring(0, 3);
+  const normalized = String(day ?? '').toLowerCase().substring(0, 3);
   const weekdays: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   return weekdays.includes(normalized as Weekday) ? (normalized as Weekday) : 'mon';
 }

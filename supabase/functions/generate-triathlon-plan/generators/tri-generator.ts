@@ -774,18 +774,23 @@ export class TriathlonGenerator {
     // Guard: never place strength on a brick day
     if (brickDays.includes(day)) return null;
 
-    // Map TriPhase to the strength protocol's phase name convention
-    const phaseNameMap: Record<TriPhase, string> = {
-      base: 'Base', build: 'Build', race_specific: 'Race Prep', taper: 'Taper',
+    // Map plan phase *names* to the strength protocol (keys must be strings — TriPhase is an object, never use it as a map key).
+    const phaseNameMap: Record<string, string> = {
+      Base: 'Base',
+      Build: 'Build',
+      'Race-Specific': 'Race Prep',
+      Taper: 'Taper',
     };
 
     const limiter = this.params.limiter_sport ?? 'run';
     const equipmentType = this.params.equipment_type ?? 'commercial_gym';
 
+    const protocolPhaseName = phaseNameMap[phase.name] ?? phase.name ?? 'Base';
+
     const ctx: ProtocolContext = {
       weekIndex: weekInPhase,
       weekInPhase,
-      phase: { name: phaseNameMap[phase], start_week: 1, end_week: 4, weeks_in_phase: 4 },
+      phase: { name: protocolPhaseName, start_week: 1, end_week: 4, weeks_in_phase: 4 },
       totalWeeks: this.params.total_weeks ?? 16,
       isRecovery: false,
       primarySchedule: {
