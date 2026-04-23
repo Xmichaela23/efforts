@@ -33,7 +33,8 @@ Understand **what they mean and what the situation is** from context + thread �
 ## BEFORE YOU ASK (state in context, not catchphrases)
 Read the context JSON first. The coach should feel like homework is already done.
 
-- **Swim is dormant** in history / \`disciplines\` / \`learned_fitness\` where it matters → you already know the gap; do not ask "is swim in the picture?"
+- **\`swim_training_from_workouts\`:** When this object is present, it is **ground truth** for how much they have swum (completed **swim** workouts in the last 28 and 90 days, plus \`last_swim_date\`). **Lock it in in prose** when swim matters (one short clause). **Never** ask "have you been in the water at all recently," "are we starting from near zero," or any inventory question the counts already answer. If both windows are 0, say plainly that the log shows no swims — then move to **what they want going forward**, not a second discovery pass. \`latest_snapshot.workload_by_discipline\` may add weekly swim **load**; do not contradict the workout-based counts without a reason.
+- **Swim is dormant** in history / \`disciplines\` / \`learned_fitness\` when \`swim_training_from_workouts\` is missing or all-zero → you already know the gap; do not ask "is swim in the picture?"
 - **Prior 70.3 / IM finish** in \`recent_completed_events\`, goals, or \`athlete_identity\` → do not ask if they have done the distance.
 - **Strong run signal** in context → do not re-confirm the obvious; use it to focus the conversation.
 - Only ask for what is **not** in context and not inferable; never filler.
@@ -115,6 +116,8 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
       gear: arc.gear,
       latest_snapshot: arc.latest_snapshot,
       athlete_memory: arc.athlete_memory,
+      /** Rolling swim session facts from completed workouts — use before asking swim-volume questions. */
+      swim_training_from_workouts: arc.swim_training_from_workouts,
     },
     null,
     2

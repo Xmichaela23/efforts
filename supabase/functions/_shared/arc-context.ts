@@ -80,6 +80,17 @@ export interface ArcGearSummary {
   bikes: ArcGearItem[];
 }
 
+/**
+ * Factual swim volume from `workouts` (completed) — arc prompts must not re-ask
+ * "in the water recently?" when this object is present.
+ */
+export interface SwimTrainingFromWorkouts {
+  completed_swim_sessions_last_28_days: number;
+  completed_swim_sessions_last_90_days: number;
+  /** Most recent completed swim YYYY-MM-DD in window, or null if none */
+  last_swim_date: string | null;
+}
+
 /** Completed event goals in the last ~8 weeks, for recovery framing in Arc prompts. */
 export interface CompletedEvent {
   id: string;
@@ -117,6 +128,12 @@ export interface ArcContext {
 
   latest_snapshot: AthleteSnapshot | null;
   athlete_memory: AthleteMemorySummary | null;
+
+  /**
+   * Rolling swim session counts from completed workouts; null if query failed.
+   * Supersedes guesswork in season-setup chat ("have you been swimming?").
+   */
+  swim_training_from_workouts: SwimTrainingFromWorkouts | null;
 
   /** Active (non-retired) shoes and bikes from `gear` — same source as the Gear screen. */
   gear: ArcGearSummary;
@@ -423,6 +440,39 @@ async function buildRecentCompletedEvents(
   return out;
 }
 
+function addDaysYmd(ymd: string, deltaDays: number): string {
+  const d = new Date(ymd + 'T12:00:00.000Z');
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
+function isSwimWorkoutType(t: string | null | undefined): boolean {
+  const s = String(t || '').toLowerCase();
+  return s.startsWith('swim') || s.includes('swimming');
+}
+
+function buildSwimTrainingFromWorkouts(
+  data: { date?: string; type?: string }[] | null | undefined,
+  focusYmd: string
+): SwimTrainingFromWorkouts | null {
+  const rows = Array.isArray(data) ? data : [];
+  const start28 = addDaysYmd(focusYmd, -28);
+  const swimRows = rows.filter((r) => isSwimWorkoutType(r.type));
+  let c28 = 0;
+  let last: string | null = null;
+  for (const r of swimRows) {
+    const d = typeof r.date === 'string' ? r.date.slice(0, 10) : '';
+    if (!/^\d{4}-\d{2}-\d{2}/.test(d)) continue;
+    if (d >= start28) c28 += 1;
+    if (!last || d > last) last = d;
+  }
+  return {
+    completed_swim_sessions_last_28_days: c28,
+    completed_swim_sessions_last_90_days: swimRows.length,
+    last_swim_date: last,
+  };
+}
+
 /**
  * Aggregates user_baselines, active goals, active plan, latest weekly snapshot, and
  * current athlete memory for Athlete Arc–aware prompts and planners.
@@ -439,7 +489,10 @@ export async function getArcContext(
   start8w.setUTCDate(start8w.getUTCDate() - EIGHT_WEEKS_DAYS);
   const start8wYmd = start8w.toISOString().slice(0, 10);
 
-  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes, recentCompletedGoalsRes] = await Promise.all([
+  const start90Ymd = addDaysYmd(focusYmd, -90);
+
+  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes, recentCompletedGoalsRes, swimWorkoutsRes] =
+    await Promise.all([
     supabase
       .from('user_baselines')
       .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers, equipment')
@@ -488,6 +541,14 @@ export async function getArcContext(
       .gte('target_date', start8wYmd)
       .lte('target_date', focusYmd)
       .order('target_date', { ascending: false }),
+    supabase
+      .from('workouts')
+      .select('date, type')
+      .eq('user_id', userId)
+      .eq('workout_status', 'completed')
+      .in('type', ['swim', 'swimming'])
+      .gte('date', start90Ymd)
+      .lte('date', focusYmd),
   ]);
 
   const baseline = baselinesRes?.data as Record<string, unknown> | null;
@@ -571,6 +632,16 @@ export async function getArcContext(
     recentCompletedRows,
   );
 
+  let swim_training_from_workouts: SwimTrainingFromWorkouts | null = null;
+  if (swimWorkoutsRes?.error) {
+    console.warn('[getArcContext] swim workouts', swimWorkoutsRes.error.message);
+  } else {
+    swim_training_from_workouts = buildSwimTrainingFromWorkouts(
+      swimWorkoutsRes?.data as { date?: string; type?: string }[] | undefined,
+      focusYmd
+    );
+  }
+
   return {
     athlete_identity,
     learned_fitness,
@@ -583,6 +654,7 @@ export async function getArcContext(
     active_plan,
     latest_snapshot,
     athlete_memory,
+    swim_training_from_workouts,
     gear,
     user_id: userId,
     built_at
