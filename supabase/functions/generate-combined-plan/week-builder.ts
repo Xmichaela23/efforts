@@ -393,6 +393,12 @@ export function buildWeek(
   if (!thursdaySlot?.isRest) {
     if (hasTri) {
       if (!isRecovery) {
+        if (recoveryRebuildWeek1) {
+          // Post-marathon week 1: one easy aerobic swim only (no threshold/CSS blocks).
+          const easyYd = Math.min(2800, Math.max(1500, Math.round(swimYards * 0.32)));
+          thursdaySlot!.sessions.push(easySwim('Thursday', easyYd, servedGoal));
+          thursdayHasSwim = true;
+        } else {
         // Quality swim in build/race_specific, easy swim in taper (§6.2)
         const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
         const maintYd  = Math.max(1200, Math.round(swimYards * 0.40));
@@ -407,6 +413,7 @@ export function buildWeek(
             : qualitySwim
         );
         thursdayHasSwim = true;
+        }
       }
     } else if (!isRecovery) {
       // Run-only plan: easy run or second easy session
