@@ -13,6 +13,7 @@ import {
 } from '../_shared/planning-context.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
+import { mergeCombinedSchedulePrefs } from '../_shared/combined-schedule-prefs.ts';
 import {
   calculateEffortScore,
   estimateVdotFromBasePace,
@@ -473,6 +474,11 @@ function mergeTrainingPrefsWithArcDefaults(
       const intent = normalizeTrainingIntent((tp as { training_intent?: unknown }).training_intent, 'completion');
       tp.tri_approach = intent === 'performance' ? 'race_peak' : 'base_first';
     }
+    if (!String(tp.strength_protocol ?? '').trim()) {
+      const focus = String(tp.strength_focus ?? '').toLowerCase();
+      if (focus === 'power') tp.strength_protocol = 'neural_speed';
+      else if (focus === 'maintenance') tp.strength_protocol = 'durability';
+    }
   }
   return tp;
 }
@@ -577,6 +583,20 @@ async function buildCombinedPlan(
     ?? primaryGoalPrefs?.tri_approach
     ?? (primaryGoalType === 'speed' ? 'race_peak' : 'base_first');
 
+  const combinedSchedulePrefs = mergeCombinedSchedulePrefs(
+    primaryGoalPrefs as Record<string, unknown>,
+    newGoal.training_prefs as Record<string, unknown>,
+  );
+  const explicitEquipment = String(
+    (newGoal.training_prefs as Record<string, unknown>)?.equipment_type
+      ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_type
+      ?? '',
+  ).trim();
+  const resolvedEquipmentType: 'home_gym' | 'commercial_gym' =
+    explicitEquipment === 'home_gym' || explicitEquipment === 'commercial_gym'
+      ? explicitEquipment
+      : (hasCommercialGym ? 'commercial_gym' : 'home_gym');
+
   // base_first always defaults to 2:1 loading (completion-focused, slower recovery).
   // race_peak defers to fitness level (beginner→2:1, intermediate/advanced→3:1).
   const loadingPattern = triApproach === 'base_first'
@@ -595,9 +615,25 @@ async function buildCombinedPlan(
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,
       loading_pattern: loadingPattern,
-      equipment_type: hasCommercialGym ? 'commercial_gym' : 'home_gym',
+      equipment_type: resolvedEquipmentType,
       tri_approach: triApproach,
       swim_volume_multiplier,
+      rest_days: combinedSchedulePrefs.rest_days ?? [],
+      ...(combinedSchedulePrefs.long_run_day !== undefined
+        ? { long_run_day: combinedSchedulePrefs.long_run_day }
+        : {}),
+      ...(combinedSchedulePrefs.long_ride_day !== undefined
+        ? { long_ride_day: combinedSchedulePrefs.long_ride_day }
+        : {}),
+      ...(combinedSchedulePrefs.swim_easy_day !== undefined
+        ? { swim_easy_day: combinedSchedulePrefs.swim_easy_day }
+        : {}),
+      ...(combinedSchedulePrefs.swim_quality_day !== undefined
+        ? { swim_quality_day: combinedSchedulePrefs.swim_quality_day }
+        : {}),
+      ...(combinedSchedulePrefs.strength_protocol
+        ? { strength_protocol: combinedSchedulePrefs.strength_protocol }
+        : {}),
       ...(combinedTransition?.transition_mode ? { transition_mode: combinedTransition.transition_mode } : {}),
       ...(combinedTransition?.structural_load_hint
         ? { structural_load_hint: combinedTransition.structural_load_hint }

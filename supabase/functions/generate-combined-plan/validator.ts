@@ -5,7 +5,7 @@
 // the plan is rejected and the caller receives an error.
 
 import type {
-  GeneratedWeek, PhaseBlock, PlanValidation,
+  GeneratedWeek, PhaseBlock, PlanValidation, AthleteState,
 } from './types.ts';
 import {
   MAINTENANCE_FLOORS, rampThresholds, projectedCTL,
@@ -104,7 +104,11 @@ function checkTapersPresent(weeks: GeneratedWeek[], blocks: PhaseBlock[]): boole
 
 // ── Check 7: Maintenance floors met ──────────────────────────────────────────
 // §2.2 — Non-recovery weeks must not drop below minimum sessions per sport.
-function checkMaintenanceFloors(weeks: GeneratedWeek[], hasTriGoal: boolean): boolean {
+function checkMaintenanceFloors(
+  weeks: GeneratedWeek[],
+  hasTriGoal: boolean,
+  transitionMode?: AthleteState['transition_mode'],
+): boolean {
   const nonRecovery = weeks.filter(w => !w.isRecovery && w.phase !== 'recovery' && w.phase !== 'taper');
   for (const w of nonRecovery) {
     for (const [sport, floor] of Object.entries(MAINTENANCE_FLOORS)) {
@@ -115,6 +119,10 @@ function checkMaintenanceFloors(weeks: GeneratedWeek[], hasTriGoal: boolean): bo
         // Bike floor only applies when bike is in the plan at all.
         if (sport === 'swim' && !hasTriGoal) continue;
         if (sport === 'bike' && w.sport_raw_tss.bike === 0 && !hasTriGoal) continue;
+        // Post-race rebuild: weeks 1–2 intentionally drop strength (and may soften volume).
+        if (sport === 'strength' && transitionMode === 'recovery_rebuild' && w.weekNum <= 2) {
+          continue;
+        }
         return false;
       }
     }
@@ -237,6 +245,7 @@ export function validatePlan(
   weeklyHours: number,
   loadingPattern: '3:1' | '2:1',
   hasTriGoal: boolean,
+  transitionMode?: AthleteState['transition_mode'],
 ): PlanValidation {
   return {
     no_consecutive_hard_days:     checkNoConsecutiveHardDays(weeks),
@@ -245,7 +254,7 @@ export function validatePlan(
     ramp_rate_safe:               checkRampRate(weeks, initialCTL),
     recovery_weeks_present:       checkRecoveryWeeks(weeks, loadingPattern),
     tapers_present:               checkTapersPresent(weeks, blocks),
-    maintenance_floors_met:       checkMaintenanceFloors(weeks, hasTriGoal),
+    maintenance_floors_met:       checkMaintenanceFloors(weeks, hasTriGoal, transitionMode),
     post_race_recovery_inserted:  checkPostRaceRecovery(blocks),
     brick_placement_valid:        checkBrickPlacement(weeks),
     run_impact_multiplier_applied: checkRunMultiplierApplied(weeks),

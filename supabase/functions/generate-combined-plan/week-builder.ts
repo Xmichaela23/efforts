@@ -323,6 +323,27 @@ export function buildWeek(
     }
   }
 
+  // ── Swim calendar (defaults: easy Mon, quality Thu; avoids long ride/run days) ──
+  const swimEasyIdx =
+    athleteState.swim_easy_day != null ? (athleteState.swim_easy_day + 6) % 7 : DAYS_OF_WEEK.indexOf('Monday');
+  const swimQualityIdx =
+    athleteState.swim_quality_day != null
+      ? (athleteState.swim_quality_day + 6) % 7
+      : DAYS_OF_WEEK.indexOf('Thursday');
+  let swimEasyDay = DAYS_OF_WEEK[swimEasyIdx] ?? 'Monday';
+  let swimQualityDay = DAYS_OF_WEEK[swimQualityIdx] ?? 'Thursday';
+  if (swimEasyDay === swimQualityDay) swimQualityDay = 'Thursday';
+  const qualitySwimBlocked = new Set<string>([longRideDay, longRunActualDay, ...restDayNames]);
+  if (qualitySwimBlocked.has(swimQualityDay)) {
+    for (let step = 1; step <= 6; step++) {
+      const cand = adjDay(swimQualityDay, step);
+      if (!qualitySwimBlocked.has(cand)) {
+        swimQualityDay = cand;
+        break;
+      }
+    }
+  }
+
   // ── TUESDAY: Bike quality ─────────────────────────────────────────────────
   const tuesdaySlot = grid.get('Tuesday');
   if (!recoveryRebuildWeek1 && !tuesdaySlot?.isRest && hasTri) {
@@ -387,54 +408,46 @@ export function buildWeek(
     }
   }
 
-  // ── THURSDAY: Swim quality ────────────────────────────────────────────────
-  // §6.2: "Retain swim volume longest" — spec explicitly keeps swim even in taper.
-  // For marathon-primary blocks (swimPct ≈ 0), add a maintenance easy swim to
-  // prevent detraining (§2.2 floor: min 1 swim/week for triathlon athletes).
-  //
-  // Note: The 2nd brick (race_specific) was removed from Thursday. Spec says
-  // "1-2 bricks/week" — we use 1 brick for recreational athletes to keep the
-  // 80/20 hard budget achievable (two protected HARD bricks would exceed it).
-  let thursdayHasSwim = false;
-  const thursdaySlot = grid.get('Thursday');
-  if (!thursdaySlot?.isRest) {
+  // ── Quality swim day (default Thu; §6.2 — retain swim volume in taper) ───
+  // Marathon-primary blocks (swimPct ≈ 0): maintenance easy swim only.
+  let qualitySwimPlaced = false;
+  const qualitySwimSlot = grid.get(swimQualityDay);
+  if (!qualitySwimSlot?.isRest) {
     if (hasTri) {
       if (!isRecovery) {
         if (recoveryRebuildWeek1) {
-          // Post-marathon week 1: one easy aerobic swim only (no threshold/CSS blocks).
           const easyYd = Math.min(2800, Math.max(1500, Math.round(swimYards * 0.32)));
-          thursdaySlot!.sessions.push(easySwim('Thursday', easyYd, servedGoal));
-          thursdayHasSwim = true;
+          qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, easyYd, servedGoal));
+          qualitySwimPlaced = true;
         } else {
-        // Quality swim in build/race_specific, easy swim in taper (§6.2)
-        const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
-        const maintYd  = Math.max(1200, Math.round(swimYards * 0.40));
-        // base_first: CSS aerobic pace (comfortable race speed, not maximal threshold)
-        // race_peak:  CSS threshold pace (lactate challenge, 10s rest intervals)
-        const qualitySwim = triApproach === 'base_first'
-          ? cssAerobicSwim('Thursday', tSwimYd, servedGoal)
-          : thresholdSwim('Thursday', tSwimYd, servedGoal);
-        thursdaySlot!.sessions.push(
-          phase === 'taper' || swimPct === 0
-            ? easySwim('Thursday', maintYd, servedGoal)   // maintenance in taper/marathon blocks
-            : qualitySwim
-        );
-        thursdayHasSwim = true;
+          const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
+          const maintYd = Math.max(1200, Math.round(swimYards * 0.40));
+          const qualitySwim = triApproach === 'base_first'
+            ? cssAerobicSwim(swimQualityDay, tSwimYd, servedGoal)
+            : thresholdSwim(swimQualityDay, tSwimYd, servedGoal);
+          qualitySwimSlot!.sessions.push(
+            phase === 'taper' || swimPct === 0 ? easySwim(swimQualityDay, maintYd, servedGoal) : qualitySwim,
+          );
+          qualitySwimPlaced = true;
         }
       }
-    } else if (!isRecovery) {
-      // Run-only plan: easy run or second easy session
-      const easyMi = Math.max(4, Math.round(longRunMiles * 0.40));
-      thursdaySlot!.sessions.push(easyRun('Thursday', easyMi, servedGoal));
     }
   }
 
-  // ── MONDAY: Easy recovery swim ────────────────────────────────────────────
-  // Skip if Monday is rest day — Thursday swim is the maintenance session.
-  const mondaySlot = grid.get('Monday');
-  if (!mondaySlot?.isRest && hasTri && !isRecovery && !recoveryRebuildWeek1) {
+  // Run-only: mid-week easy run (fixed Thursday — not tied to swim prefs)
+  const thursdayRunSlot = grid.get('Thursday');
+  if (!hasTri && !thursdayRunSlot?.isRest && !isRecovery) {
+    const easyMi = Math.max(4, Math.round(longRunMiles * 0.40));
+    thursdayRunSlot!.sessions.push(easyRun('Thursday', easyMi, servedGoal));
+  }
+
+  // ── Easy aerobic swim (default Mon) ─────────────────────────────────────────
+  const easySwimSlot = grid.get(swimEasyDay);
+  if (!easySwimSlot?.isRest && hasTri && !isRecovery && !recoveryRebuildWeek1) {
     const recSwimYd = Math.max(1200, Math.round(swimYards * 0.40));
-    mondaySlot!.sessions.push(easySwim('Monday', recSwimYd, servedGoal));
+    if (swimEasyDay !== swimQualityDay || !qualitySwimPlaced) {
+      easySwimSlot!.sessions.push(easySwim(swimEasyDay, recSwimYd, servedGoal));
+    }
   }
 
   // ── FRIDAY: Easy run (cross-sport recovery credit — §4.4) ─────────────────
@@ -467,8 +480,8 @@ export function buildWeek(
     const limiterSport: 'swim' | 'bike' | 'run' =
       (['swim', 'bike', 'run'].includes(limiterGoal?.sport ?? '') ? limiterGoal!.sport : 'run') as 'swim' | 'bike' | 'run';
 
-    // Blocked days: rest days + brick days + Sunday (long run)
-    const blocked = new Set([...brickDaysInGrid, longRideDay, longRunDay, ...restDayNames]);
+    // Blocked days: rest + brick + long ride + long run (actual calendar day)
+    const blocked = new Set([...brickDaysInGrid, longRideDay, longRunActualDay, ...restDayNames]);
 
     // weekInPhase: how many weeks into this phase are we?
     const weekInPhase = Math.max(1, weekNum - block.startWeek + 1);
@@ -481,7 +494,16 @@ export function buildWeek(
       if (strSlot) {
         const equipmentType = athleteState.equipment_type ?? 'commercial_gym';
         if (hasTri) {
-          strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 0, equipmentType }));
+          strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, {
+            weekInPhase,
+            isRecovery,
+            limiterSport,
+            sessionIndex: 0,
+            equipmentType,
+            longRideDayName: longRideDay,
+            longRunDayName: longRunActualDay,
+            strengthProtocolId: athleteState.strength_protocol,
+          }));
         } else {
           strSlot.sessions.push(runStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, equipmentType }));
         }
@@ -497,7 +519,16 @@ export function buildWeek(
         if (strSlot2) {
           const equipmentType2 = athleteState.equipment_type ?? 'commercial_gym';
           if (hasTri) {
-            strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, limiterSport, sessionIndex: 1, equipmentType: equipmentType2 }));
+            strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, {
+              weekInPhase,
+              isRecovery,
+              limiterSport,
+              sessionIndex: 1,
+              equipmentType: equipmentType2,
+              longRideDayName: longRideDay,
+              longRunDayName: longRunActualDay,
+              strengthProtocolId: athleteState.strength_protocol,
+            }));
           } else {
             strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, equipmentType: equipmentType2 }));
           }

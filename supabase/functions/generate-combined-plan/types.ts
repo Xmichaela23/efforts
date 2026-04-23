@@ -27,10 +27,16 @@ export interface AthleteState {
   weekly_hours_available: number;
   loading_pattern: LoadingPattern;
   limiter_sport?: Sport;
-  /** 0=Sunday … 6=Saturday */
-  rest_days: number[];
+  /** 0=Sunday … 6=Saturday (defaults to [] if omitted in API payload) */
+  rest_days?: number[];
   long_run_day?: number;
   long_ride_day?: number;
+  /** 0=Sunday … 6=Saturday. Default easy swim: Monday. */
+  swim_easy_day?: number;
+  /** Quality/CSS/threshold swim day. Default: Thursday. */
+  swim_quality_day?: number;
+  /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
+  strength_protocol?: string;
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**

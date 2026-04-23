@@ -48,8 +48,13 @@ Deno.serve(async (req: Request) => {
     const loadingPattern = athlete_state.loading_pattern ?? '3:1';
     const startDate = start_date ? new Date(start_date) : new Date();
 
+    const state: AthleteState = {
+      ...athlete_state,
+      rest_days: athlete_state.rest_days ?? [],
+    };
+
     // ── Build phase timeline ────────────────────────────────────────────────
-    let { blocks, totalWeeks } = buildPhaseTimeline(goals, startDate, athlete_state);
+    let { blocks, totalWeeks } = buildPhaseTimeline(goals, startDate, state);
     blocks = applyLoadingPattern(blocks, loadingPattern);
 
     if (totalWeeks < 2) {
@@ -58,11 +63,11 @@ Deno.serve(async (req: Request) => {
 
     // ── Generate each week ─────────────────────────────────────────────────
     const generatedWeeks = [];
-    let prevWeightedTSS = athlete_state.current_ctl * 7; // baseline = CTL * 7
+    let prevWeightedTSS = state.current_ctl * 7; // baseline = CTL * 7
 
     for (let w = 1; w <= totalWeeks; w++) {
       const block = blockForWeek(blocks, w);
-      const week = buildWeek(w, block, prevWeightedTSS, goals, athlete_state, athlete_memory);
+      const week = buildWeek(w, block, prevWeightedTSS, goals, state, athlete_memory);
       generatedWeeks.push(week);
       prevWeightedTSS = week.total_weighted_tss;
     }
@@ -71,10 +76,11 @@ Deno.serve(async (req: Request) => {
     const hasTriGoal = goals.some(g => ['triathlon', 'tri'].includes((g.sport ?? '').toLowerCase()));
     const validation = validatePlan(
       generatedWeeks, blocks,
-      athlete_state.current_ctl,
-      athlete_state.weekly_hours_available,
+      state.current_ctl,
+      state.weekly_hours_available,
       loadingPattern,
       hasTriGoal,
+      state.transition_mode,
     );
     const failures = failedChecks(validation);
     if (failures.length > 0) {
@@ -113,10 +119,16 @@ Deno.serve(async (req: Request) => {
       plan_type: 'multi_sport',
       discipline: 'multi',
       approach: 'combined_80_20',
-      tri_approach: athlete_state.tri_approach ?? null,  // 'base_first' | 'race_peak' — read by coach narrative
-      transition_mode: athlete_state.transition_mode ?? null,
-      structural_load_hint: athlete_state.structural_load_hint ?? null,
-      swim_volume_multiplier: athlete_state.swim_volume_multiplier ?? null,
+      tri_approach: state.tri_approach ?? null,  // 'base_first' | 'race_peak' — read by coach narrative
+      transition_mode: state.transition_mode ?? null,
+      structural_load_hint: state.structural_load_hint ?? null,
+      swim_volume_multiplier: state.swim_volume_multiplier ?? null,
+      long_run_day: state.long_run_day ?? null,
+      long_ride_day: state.long_ride_day ?? null,
+      swim_easy_day: state.swim_easy_day ?? null,
+      swim_quality_day: state.swim_quality_day ?? null,
+      strength_protocol: state.strength_protocol ?? null,
+      rest_days: state.rest_days ?? [],
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
       sport: 'multi_sport',
@@ -124,7 +136,7 @@ Deno.serve(async (req: Request) => {
       duration_weeks: totalWeeks,
       loading_pattern: loadingPattern,
       weekly_tss_target: Math.round(
-        scaledWeeklyTSS('build', athlete_state.current_ctl, athlete_state.weekly_hours_available, 1.0)
+        scaledWeeklyTSS('build', state.current_ctl, state.weekly_hours_available, 1.0)
       ),
       phases: blocks
         .filter((b, i, arr) => i === 0 || b.phase !== arr[i - 1].phase || b.primaryGoalId !== arr[i - 1].primaryGoalId)

@@ -6,7 +6,7 @@
 
 import type { PlannedSession, Phase, Intensity } from './types.ts';
 import type { Sport } from './types.ts';
-import { estimateSessionTSS, weightedTSS } from './science.ts';
+import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK } from './science.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
@@ -524,22 +524,48 @@ export function triathlonStrength(
     limiterSport?: 'swim' | 'bike' | 'run';
     sessionIndex?: number; // 0 = lower/posterior, 1 = upper/swim
     equipmentType?: 'home_gym' | 'commercial_gym';
+    /** Calendar long sessions — drives strength placement (default Sat/Sun). */
+    longRideDayName?: string;
+    longRunDayName?: string;
+    /** Protocol id (triathlon, neural_speed, durability, …). Default: triathlon. */
+    strengthProtocolId?: string;
   },
 ): PlannedSession {
+  const longRide = options?.longRideDayName ?? 'Saturday';
+  const longRun = options?.longRunDayName ?? 'Sunday';
+  const longSessionDays = [...new Set([longRide, longRun])];
+  const easySessionDays = [...DAYS_OF_WEEK].filter(
+    (d) => !longSessionDays.includes(d) && d !== 'Tuesday',
+  );
+
   const ctx: ProtocolContext = {
     weekIndex: 1,
     weekInPhase: options?.weekInPhase ?? 1,
     phase: toStrengthPhase(phase),
     totalWeeks: 20,
     isRecovery: options?.isRecovery ?? false,
-    primarySchedule: { longSessionDays: ['Saturday', 'Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
+    primarySchedule: {
+      longSessionDays,
+      qualitySessionDays: ['Tuesday', 'Thursday'],
+      easySessionDays,
+    },
     userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },
     strengthFrequency: 2,
     constraints: {},
     triathlonContext: { limiterSport: options?.limiterSport ?? 'run' },
   };
 
-  const sessions = triathlonProtocol.createWeekSessions(ctx);
+  const pid = options?.strengthProtocolId?.trim();
+  let protocol = triathlonProtocol;
+  if (pid && pid !== 'triathlon') {
+    try {
+      protocol = getProtocol(pid);
+    } catch {
+      protocol = triathlonProtocol;
+    }
+  }
+
+  const sessions = protocol.createWeekSessions(ctx);
   // sessionIndex 0 = lower/posterior chain, 1 = upper/swim
   const idx = options?.sessionIndex ?? 0;
   const chosen = sessions[Math.min(idx, sessions.length - 1)] ?? sessions[0];
