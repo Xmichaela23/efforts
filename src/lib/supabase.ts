@@ -37,9 +37,15 @@ export function getStoredUserId(): string | null {
     if (parts.length !== 3) return null;
     const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
-    const payload = JSON.parse(atob(b64 + pad)) as { sub?: string; role?: string };
+    const payload = JSON.parse(atob(b64 + pad)) as { sub?: string; role?: string; aud?: string | string[] };
     const sub = typeof payload?.sub === 'string' ? payload.sub.trim() : '';
-    if (!sub || payload?.role !== 'authenticated') return null;
+    if (!sub) return null;
+    const role = typeof payload.role === 'string' ? payload.role : '';
+    const audRaw = payload.aud;
+    const aud = Array.isArray(audRaw) ? audRaw[0] : typeof audRaw === 'string' ? audRaw : '';
+    const isAuthed = role === 'authenticated' || aud === 'authenticated';
+    const isAnon = role === 'anon' || aud === 'anon';
+    if (!isAuthed || isAnon) return null;
     return sub;
   } catch {
     return null;

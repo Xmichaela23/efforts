@@ -71,10 +71,14 @@ function authenticatedSubFromBearer(req: Request): string | null {
   try {
     const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
-    const json = JSON.parse(atob(b64 + pad)) as { role?: string; sub?: string };
+    const json = JSON.parse(atob(b64 + pad)) as { role?: string; sub?: string; aud?: string | string[] };
     const role = typeof json?.role === 'string' ? json.role : '';
+    const audRaw = json.aud;
+    const aud = Array.isArray(audRaw) ? audRaw[0] : typeof audRaw === 'string' ? audRaw : '';
     const sub = typeof json?.sub === 'string' ? json.sub.trim() : '';
-    if (role === 'authenticated' && UUID_RE.test(sub)) return sub;
+    const isAuthed = role === 'authenticated' || aud === 'authenticated';
+    const isAnon = role === 'anon' || aud === 'anon';
+    if (isAuthed && !isAnon && UUID_RE.test(sub)) return sub;
   } catch {
     /* invalid JWT */
   }
