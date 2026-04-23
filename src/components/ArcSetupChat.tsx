@@ -157,6 +157,23 @@ function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
   return out;
 }
 
+/** Deep-merge `season_priorities` so partial Arc updates do not wipe other disciplines. */
+function mergeAthleteIdentityPatches(
+  prev: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...prev, ...patch };
+  const pSp = prev.season_priorities;
+  const nSp = patch.season_priorities;
+  if (nSp != null && typeof nSp === 'object' && !Array.isArray(nSp)) {
+    out.season_priorities =
+      pSp != null && typeof pSp === 'object' && !Array.isArray(pSp)
+        ? { ...(pSp as Record<string, unknown>), ...(nSp as Record<string, unknown>) }
+        : { ...(nSp as Record<string, unknown>) };
+  }
+  return out;
+}
+
 /** Raw arc_setup goals: at least one event with a YYYY-MM-DD (before normalize drops invalid rows). */
 function payloadHasDatedEventGoal(payload: ArcSetupPayload | null | undefined): boolean {
   if (!payload?.goals || !Array.isArray(payload.goals)) return false;
@@ -224,12 +241,9 @@ async function persistArcSetup(
         return { ok: false, error: fe.message };
       }
       const prev = (ub?.athlete_identity as Record<string, unknown>) || {};
-      const merged: Record<string, unknown> = {
-        ...prev,
-        ...(idPatch || {}),
-        confirmed_by_user: true,
-        arc_setup_confirmed_at: new Date().toISOString(),
-      };
+      const merged = mergeAthleteIdentityPatches(prev, (idPatch || {}) as Record<string, unknown>);
+      merged.confirmed_by_user = true;
+      merged.arc_setup_confirmed_at = new Date().toISOString();
       if (hasDefaultIntent) {
         merged.default_intent = normalizeTrainingIntent(payload.default_intent, 'completion');
       }

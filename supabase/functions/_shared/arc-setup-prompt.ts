@@ -103,6 +103,23 @@ Map the athlete’s answer to **each triathlon \`event\` goal’s** \`training_p
 
 Save as: \`"strength_intent": "support" | "performance"\` on the **A-priority tri goal** (and any other tri \`event\` goals if they share the same answer).
 
+**Athlete identity (same turn as \`<arc_setup>\`):** When you set \`strength_intent\` from this fork, you **must** also write an \`athlete_identity\` object inside \`<arc_setup>\` (the app merges it into \`user_baselines.athlete_identity\`). That lets the server backfill future plan builds without re-asking. Include:
+- \`training_intent\` — same family as **TRAINING INTENT** / \`default_intent\` when you set one (e.g. \`"performance"\`, \`"completion"\`).
+- \`season_priorities\` — object with optional string values (coach read, not enums): \`strength\` (**must** match the tri strength fork: \`"support"\` or \`"performance"\`), and as inferable from the thread: \`run\`, \`bike\`, \`swim\` (e.g. \`"performance"\`, \`"build"\`, \`"minimal"\`, \`"maintenance"\`).
+
+Example shape (values must follow the conversation, not this template blindly):
+\`\`\`json
+"athlete_identity": {
+  "training_intent": "performance",
+  "season_priorities": {
+    "strength": "performance",
+    "run": "performance",
+    "bike": "build",
+    "swim": "minimal"
+  }
+}
+\`\`\`
+
 **Frequency:** Default **2×/week** for tri build unless they explicitly ask for 3×. Do not bump frequency just because they chose **performance** intent.
 
 ### TRAINING DAYS (required before <arc_setup> for tri — do not skip, do not assume)
@@ -296,14 +313,14 @@ ${SWIM_PACE}
 - **Multi-discipline completeness** — same as **What to lock**; swim alone is not a full season.
 - When the athlete is ready to commit, or you have a clear picture, add ONE block exactly like this (valid JSON inside the tag, no markdown fences):
 <arc_setup>
-{ "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion" } } ], "athlete_identity": { ... }, "strength_frequency": 2, "strength_focus": "general" }
+{ "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion", "strength_intent": "performance", "preferred_days": { "long_ride": "saturday", "long_run": "sunday", "strength": ["monday","wednesday"], "swim": ["monday","thursday"] } } } ], "athlete_identity": { "training_intent": "performance", "season_priorities": { "strength": "performance", "run": "performance", "bike": "build", "swim": "minimal" } }, "strength_frequency": 2, "strength_focus": "general" }
 </arc_setup>
 - goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). **For every triathlon event goal, always set \`sport\` to \`"triathlon"\` and \`distance\` to a clear label** (e.g. \`"70.3"\`) — the app uses these to **build the calendar plan** after save. "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate. **Event goals: set \`training_prefs.training_intent\`** (see **TRAINING INTENT**). Per-goal training_prefs may override top-level strength fields.
 - **Combined calendar:** Prefer the structured object \`training_prefs.preferred_days\` (\`long_ride\`, \`long_run\`, \`strength\`[], \`swim\`[]) — the server maps it to the plan engine. You may also set legacy keys (\`longRunDay\`, \`swim_easy_day\`, etc.) if needed. **Tri goals must include** \`strength_intent\` (\`support\` | \`performance\`) **and** \`preferred_days\` before the save card appears. **Gym:** \`equipment_type\`: \`"home_gym"\` | \`"commercial_gym"\`. Optional \`strength_protocol\` (\`triathlon\`, \`neural_speed\`, \`durability\`, \`upper_aesthetics\`) still applies for session shape when set.
 - **Tri / multi-event season — do not add extra \`capacity\` goals** for "run threshold," "strength," or "get stronger" when those are **already** the point of the block: put swim/strength/run intent in each **event** goal’s \`training_prefs\`, \`notes\`, or top-level \`strength_frequency\` / \`strength_focus\` instead. Standalone \`capacity\` goals **do not** get an automatic training plan in the app — they show "No plan linked" and confuse athletes who expect a full schedule. Reserve \`capacity\` for truly separate metric goals the user asked for explicitly.
 - Optional top-level \`default_intent\` (same four values as \`training_prefs.training_intent\`) for a season default stored on \`athlete_identity\`.
 - Optional top-level keys strength_frequency (0–3) and strength_focus (general | power | maintenance) — see STRENGTH section. Omit both if unknown. When present, they are saved to each goal’s training_prefs for plan generation.
-- athlete_identity: flat JSON; merge with existing only for keys you can justify from the chat. Do not stuff inferred equipment here to justify naming it in prose. \`default_intent\` is also written here when you set the top-level \`default_intent\` key.
+- athlete_identity: flat JSON merged into baselines on save. **Always** include \`athlete_identity\` when tri \`strength_intent\` is set — at minimum \`season_priorities.strength\` (\`"support"\` | \`"performance"\`) plus \`training_intent\` when known. \`season_priorities\` merges with existing keys (e.g. a later season can update only \`strength\`). Do not stuff inferred equipment here. Top-level \`default_intent\` is also copied to identity when you set it.
 - Outside <arc_setup>, the athlete only sees a tiny human reply; the tag is also processed separately. Do not wrap your entire reply in the tag; only the JSON lives inside <arc_setup>.
 - Never put markdown code fences around <arc_setup>.
 `.trim();
