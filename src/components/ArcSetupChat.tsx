@@ -17,10 +17,16 @@ import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIn
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
+/** Keep system context fresh; limit conversational noise (and tokens). */
+const MAX_THREAD_MESSAGES_FOR_API = 8;
+
 function threadForApi(thread: ChatMessage[]): { role: 'user' | 'assistant'; content: string }[] {
-  const t = thread.map((m) => ({ role: m.role, content: m.content }));
-  if (t[0]?.role === 'assistant') t.shift();
-  return t;
+  const recent = thread.slice(-MAX_THREAD_MESSAGES_FOR_API);
+  const mapped = recent.map((m) => ({ role: m.role, content: m.content }));
+  while (mapped.length > 0 && mapped[0]?.role === 'assistant') {
+    mapped.shift();
+  }
+  return mapped;
 }
 
 function isValidGoalType(t: unknown): t is GoalInsert['goal_type'] {
@@ -310,6 +316,8 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     summaryLine: string;
     goalPreviews: string[];
   } | null>(null);
+  /** Latest `<arc_setup>` payload from the model (sticky until replaced) — echoed to server to reduce re-asks / drift */
+  const lastDraftArcSetupRef = useRef<ArcSetupPayload | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -342,8 +350,14 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     const today = focusDate && /^\d{4}-\d{2}-\d{2}/.test(focusDate) ? focusDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
 
     try {
+      const draftEcho = lastDraftArcSetupRef.current;
       const { data, error: fnErr } = await supabase.functions.invoke('arc-setup-chat', {
-        body: { user_id: userId, messages: api, focus_date: today },
+        body: {
+          user_id: userId,
+          messages: api,
+          focus_date: today,
+          ...(draftEcho ? { draft_arc_setup: draftEcho } : {}),
+        },
       });
       if (fnErr) {
         setError(fnErr.message || 'Request failed');
@@ -360,6 +374,9 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         return;
       }
       const { displayText, payload } = parseArcSetupFromAssistant(text);
+      if (payload) {
+        lastDraftArcSetupRef.current = payload;
+      }
       const show = displayText || (payload ? 'Here’s a draft we can save—check the card below.' : '');
       setMessages((prev) => [...prev, { role: 'assistant', content: show }]);
       setSaveBanner(null);

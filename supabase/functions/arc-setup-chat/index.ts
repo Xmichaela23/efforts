@@ -38,6 +38,8 @@ Deno.serve(async (req) => {
       user_id?: string;
       messages?: ConversationMessage[];
       focus_date?: string;
+      /** Latest parsed `<arc_setup>` JSON from the client — reinjected into system prompt to limit drift */
+      draft_arc_setup?: unknown;
     };
     const userId = body.user_id;
     if (!userId || typeof userId !== 'string') {
@@ -77,7 +79,14 @@ Deno.serve(async (req) => {
     const cacheRows = await loadWebSearchRaceCache(supabase, userId);
     const cacheSection = formatRaceCacheForSystemPrompt(cacheRows);
 
-    const system = buildArcSetupSystemPrompt(arc, { raceCacheSection: cacheSection });
+    const draftArcSetup =
+      body.draft_arc_setup != null && typeof body.draft_arc_setup === 'object' && !Array.isArray(body.draft_arc_setup)
+        ? body.draft_arc_setup
+        : undefined;
+    const system = buildArcSetupSystemPrompt(arc, {
+      raceCacheSection: cacheSection,
+      ...(draftArcSetup ? { draftArcSetup } : {}),
+    });
 
     const { text, lastContent, lastUsage } = await callClaudeArcSetupConversation({
       system,

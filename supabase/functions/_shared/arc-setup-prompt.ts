@@ -222,13 +222,74 @@ function fiveKBlock(arc: ArcContext): string {
 export type ArcSetupPromptOptions = {
   /** Pre-formatted CACHED RACE RESEARCH block (optional). */
   raceCacheSection?: string;
+  /**
+   * Latest `<arc_setup>` JSON from this chat (client echo). Keeps per-goal prefs visible so the model does not re-ask or drift.
+   */
+  draftArcSetup?: unknown;
 };
+
+/** Short bullet list from last draft payload for the system prompt (per-goal `training_prefs`, real Arc shape). */
+export function buildConfirmedSoFarSection(draft: unknown): string {
+  if (draft == null || typeof draft !== 'object' || Array.isArray(draft)) return '';
+  const o = draft as Record<string, unknown>;
+  const goals = o.goals;
+  if (!Array.isArray(goals) || goals.length === 0) return '';
+
+  const lines: string[] = [];
+  const sf = o.strength_frequency;
+  if (sf === 0 || sf === 1 || sf === 2 || sf === 3) {
+    lines.push(`- Top-level strength_frequency: ${sf}`);
+  }
+  const focus = o.strength_focus;
+  if (focus === 'general' || focus === 'power' || focus === 'maintenance') {
+    lines.push(`- Top-level strength_focus: ${focus}`);
+  }
+
+  for (const g of goals) {
+    if (!g || typeof g !== 'object' || Array.isArray(g)) continue;
+    const gr = g as Record<string, unknown>;
+    const name = typeof gr.name === 'string' && gr.name.trim() ? gr.name.trim() : 'Unnamed goal';
+    const td =
+      typeof gr.target_date === 'string' && gr.target_date.trim() ? gr.target_date.trim().slice(0, 10) : '';
+    const pr = gr.priority === 'B' || gr.priority === 'C' ? String(gr.priority) : 'A';
+    lines.push(`- ${name}${td ? ` on ${td}` : ''} (priority ${pr})`);
+    const tp = gr.training_prefs;
+    if (tp && typeof tp === 'object' && !Array.isArray(tp)) {
+      const tpr = tp as Record<string, unknown>;
+      const ti = tpr.training_intent ?? tpr.trainingIntent;
+      if (typeof ti === 'string' && ti.trim()) {
+        lines.push(`  - Training intent (${name}): ${ti.trim()}`);
+      }
+      const si = tpr.strength_intent ?? tpr.strengthIntent;
+      if (si === 'support' || si === 'performance') {
+        lines.push(`  - Strength intent (${name}): ${si}`);
+      }
+      const pd = tpr.preferred_days ?? tpr.preferredDays;
+      if (pd && typeof pd === 'object' && !Array.isArray(pd)) {
+        lines.push(`  - Preferred days (${name}): ${JSON.stringify(pd)}`);
+      }
+    }
+  }
+
+  if (lines.length === 0) return '';
+
+  return [
+    '## CONFIRMED SO FAR (latest <arc_setup> draft in this chat — not saved until the athlete taps Looks right on the card)',
+    'The latest structured draft from you already includes:',
+    ...lines,
+    '',
+    'Do not re-ask about anything listed above unless the athlete explicitly changes it.',
+    'Advance to what is still missing, refine with at most one question if needed, or confirm and close.',
+  ].join('\n');
+}
 
 /**
  * Full system prompt for season arc setup. `arc` is the live `ArcContext` from getArcContext.
  */
 export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPromptOptions): string {
   const cacheBlock = (opts?.raceCacheSection && opts.raceCacheSection.trim()) ? `${opts.raceCacheSection}\n\n` : '';
+  const confirmedBlockRaw = buildConfirmedSoFarSection(opts?.draftArcSetup);
+  const confirmedBlock = confirmedBlockRaw ? `${confirmedBlockRaw}\n\n` : '';
   const arcJson = JSON.stringify(
     {
       athlete_identity: arc.athlete_identity,
@@ -262,7 +323,7 @@ ${SCOPE_SEASON_ONLY}
 ## Context (JSON, from the athlete's record; may be partial)
 ${arcJson}
 
-## Learned run paces (units)
+${confirmedBlock}## Learned run paces (units)
 When \`run_pace_for_coach\` is present, quote \`per_mile\` or \`per_km\` from it. The numeric \`value\` inside \`learned_fitness.run_threshold_pace_sec_per_km\` / \`run_easy_pace_sec_per_km\` is **seconds per km** (from workout \`avg_pace\`), not per mile. **Do not** format that \`value\` as a pace in /mi. Example error: 371 s/km is **not** 6:11/mi; it is about 6:11/km and about 9:57/mi (same math as the Training Baselines screen).
 
 ${ARC_KNOWLEDGE}
