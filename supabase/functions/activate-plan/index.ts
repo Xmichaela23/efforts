@@ -123,7 +123,7 @@ function deriveStrengthExercises(tokens: string[], baselines: any): any[] {
     }
 
     const getAccessoryRatio = (movement: string): number => {
-      const m = movement.toLowerCase()
+      const m = String(movement ?? '').toLowerCase()
       // Primary lifts default to 1.0
       if (/bench|squat|deadlift|dead_lift|ohp|overhead/.test(m)) return 1.0
       // Upper body pull (bench reference)
@@ -150,7 +150,7 @@ function deriveStrengthExercises(tokens: string[], baselines: any): any[] {
     }
 
     const getPrimary1RM = (movement: string): number | undefined => {
-      const m = movement.toLowerCase()
+      const m = String(movement ?? '').toLowerCase()
       if (/bench/.test(m)) return oneRM.bench
       if (/squat/.test(m)) return oneRM.squat
       if (/deadlift|dead_lift/.test(m)) return oneRM.deadlift

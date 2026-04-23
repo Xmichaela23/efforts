@@ -47,7 +47,8 @@ function getGoalTypeIcon(t: string) {
 }
 
 function getSportIcon(s: string | null) {
-  return s ? SPORT_ICONS[s.toLowerCase()] ?? null : null;
+  if (s == null || s === '') return null;
+  return SPORT_ICONS[String(s).toLowerCase()] ?? null;
 }
 
 function inferSportFromPlanConfig(config: any, planType?: string): string {
@@ -461,8 +462,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   }
 
   function findConflictPlan(goal: Goal) {
-    if (!goal.sport) return null;
-    const sport = goal.sport.toLowerCase();
+    const sport = String(goal.sport ?? '').toLowerCase();
+    if (!sport) return null;
     return currentPlans.find(p =>
       !p.goal_id && p.status === 'active' && inferSportFromPlanConfig(p.config || {}, p.plan_type) === sport
     ) ?? null;
@@ -552,10 +553,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setGoalFlowError(null);
 
     const sameSportGoal = activeGoals.find(
-      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
+      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === String(eventSport ?? '').toLowerCase()
     );
     const crossSportGoal = !sameSportGoal
-      ? activeGoals.find(g => g.goal_type === 'event' && g.sport && (g.sport || '').toLowerCase() !== eventSport.toLowerCase())
+      ? activeGoals.find(g => g.goal_type === 'event' && g.sport && (g.sport || '').toLowerCase() !== String(eventSport ?? '').toLowerCase())
       : null;
 
     const conflictGoal = sameSportGoal ?? crossSportGoal ?? null;
@@ -876,7 +877,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Existing goal prompt */}
       {existingGoalPrompt && !existingGoalPrompt.action && (() => {
-        const isCrossSport = (existingGoalPrompt.existing.sport || '').toLowerCase() !== eventSport.toLowerCase();
+        const isCrossSport = (existingGoalPrompt.existing.sport || '').toLowerCase() !== String(eventSport ?? '').toLowerCase();
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
             <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b0b0c]/95 p-5 shadow-2xl">
@@ -1120,7 +1121,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function renderEventForm() {
     const hasSameSportActiveGoal = activeGoals.some(
-      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === eventSport.toLowerCase()
+      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === String(eventSport ?? '').toLowerCase()
     );
     const requiresDistance = Boolean(DISTANCE_OPTIONS[eventSport]);
 

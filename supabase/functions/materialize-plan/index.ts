@@ -37,12 +37,12 @@ function applyAdjustment(
     return { weight: calculatedWeight, adjusted: false };
   }
   
-  const normalizedName = exerciseName.toLowerCase().trim();
+  const normalizedName = String(exerciseName ?? '').toLowerCase().trim();
   
   // Find matching active adjustment for this exercise and date
   const adjustment = adjustments.find(adj => {
     if (adj.status !== 'active') return false;
-    const adjName = adj.exercise_name.toLowerCase().trim();
+    const adjName = String(adj.exercise_name ?? '').toLowerCase().trim();
     if (adjName !== normalizedName && !normalizedName.includes(adjName) && !adjName.includes(normalizedName)) return false;
     if (adj.applies_from > workoutDate) return false;
     if (adj.applies_until && adj.applies_until < workoutDate) return false;
@@ -235,7 +235,7 @@ function pctWeight(oneRm: number | null, pct?: number, isMetric = false): number
 
 // Smart exercise type detection (matches client-side logic)
 function isDumbbellExercise(exerciseName: string): boolean {
-  const name = exerciseName.toLowerCase();
+  const name = String(exerciseName ?? '').toLowerCase();
   
   // Explicit dumbbell naming
   if (name.includes('dumbbell') || name.includes('db ')) return true;
@@ -577,7 +577,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     }
   }
   
-  return { name: resultName, notes };
+  return { name: resultName == null || resultName === '' ? 'exercise' : String(resultName), notes };
 }
 
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }

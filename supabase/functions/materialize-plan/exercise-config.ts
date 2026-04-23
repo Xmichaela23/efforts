@@ -1006,7 +1006,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
  * Look up exercise configuration, with fuzzy matching fallback
  */
 export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
-  const normalized = exerciseName.toLowerCase().trim();
+  const normalized = String(exerciseName ?? '').toLowerCase().trim();
   
   // Exact match first
   if (EXERCISE_CONFIG[normalized]) {
@@ -1077,7 +1077,7 @@ export function calculatePrescribedWeight(
   }
   
   // Special handling for dips: calculate total load, then subtract bodyweight
-  const exerciseNameLower = exerciseName.toLowerCase();
+  const exerciseNameLower = String(exerciseName ?? '').toLowerCase();
   if ((exerciseNameLower === 'dips' || exerciseNameLower === 'dip') && config.primaryRef === 'bench') {
     // Calculate target total load (bodyweight + added weight)
     const inferred1RM = base1RM * config.ratio; // Dip 1RM = 90% of bench

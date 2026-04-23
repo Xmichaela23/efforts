@@ -164,12 +164,23 @@ async function persistArcSetup(
         }
         return base;
       });
-      const { data: insertedGoals, error } = await supabase.from('goals').insert(rows).select('id');
+      // DEBUG — remove before ship
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        console.log('[arc-save] auth user id:', authData.user?.id);
+      } catch {
+        console.log('[arc-save] auth user id: (getUser failed; see stored id)', getStoredUserId());
+      }
+      console.log('[arc-save] goals to insert:', JSON.stringify(rows, null, 2));
+      const { data, error } = await supabase.from('goals').insert(rows).select();
+      console.log('[arc-save] insert data:', data);
+      console.log('[arc-save] insert error:', error);
       if (error) {
+        console.error('GOALS INSERT FAILED:', error.message, (error as { details?: string }).details, (error as { hint?: string }).hint);
         console.error('[arc-setup] goal insert', error);
         return { ok: false, error: error.message };
       }
-      const newGoalIds = (insertedGoals || []).map((r: { id: string }) => r.id).filter(Boolean);
+      const newGoalIds = (data || []).map((r: { id: string }) => r.id).filter(Boolean);
       if (newGoalIds.length > 0) {
         const { error: reErr } = await supabase.functions.invoke('refresh-goal-race-projections', {
           body: { goal_ids: newGoalIds },
