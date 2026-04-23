@@ -30,12 +30,30 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
  * This helper is safe for all environments: it reads the JWT payload that the
  * Supabase auth module already stores in localStorage after sign-in.
  */
+function userIdFromAccessToken(accessToken: string | undefined): string | null {
+  if (!accessToken || typeof accessToken !== 'string') return null;
+  const parts = accessToken.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+    const payload = JSON.parse(atob(b64 + pad)) as { sub?: string; role?: string };
+    const sub = typeof payload?.sub === 'string' ? payload.sub.trim() : '';
+    if (!sub || payload?.role !== 'authenticated') return null;
+    return sub;
+  } catch {
+    return null;
+  }
+}
+
 export function getStoredUserId(): string | null {
   try {
     const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { user?: { id?: string } };
-    return parsed?.user?.id ?? null;
+    const parsed = JSON.parse(raw) as { user?: { id?: string }; access_token?: string };
+    const fromUser = parsed?.user?.id ?? null;
+    if (fromUser) return fromUser;
+    return userIdFromAccessToken(parsed?.access_token);
   } catch {
     return null;
   }

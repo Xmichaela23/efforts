@@ -57,6 +57,47 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Prefer JWT `sub` when the caller presents an authenticated access token.
+ * The client also sends `user_id` in the JSON body; if that drifts from the
+ * session (stale localStorage shape, partial session restore), goal lookups
+ * return zero rows and the UI shows "Goal not found".
+ */
+function resolveUserIdFromRequest(req: Request, bodyUserId: unknown): string {
+  const fromBody = typeof bodyUserId === 'string' ? bodyUserId.trim() : '';
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  const token = m?.[1]?.trim();
+  if (!token) return fromBody;
+  const parts = token.split('.');
+  if (parts.length !== 3) return fromBody;
+  try {
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+    const json = JSON.parse(atob(b64 + pad));
+    const role = typeof json?.role === 'string' ? json.role : '';
+    const sub = typeof json?.sub === 'string' ? json.sub.trim() : '';
+    if (role === 'authenticated' && UUID_RE.test(sub)) {
+      if (fromBody && fromBody !== sub) {
+        console.warn('[create-goal-and-materialize-plan] body user_id !== JWT sub; using sub', { fromBody, sub });
+      }
+      return sub;
+    }
+  } catch {
+    /* malformed JWT — fall back to body */
+  }
+  return fromBody;
+}
+
+function trimId(id: unknown): string | undefined {
+  if (id == null) return undefined;
+  const s = String(id).trim();
+  return s.length > 0 ? s : undefined;
+}
+
 const DISTANCE_TO_API: Record<string, string> = {
   '5K': '5k',
   '10K': '10k',
@@ -597,8 +638,16 @@ Deno.serve(async (req: Request) => {
   let createdPlanId: string | null = null;
 
   try {
-    const payload = (await req.json()) as CreateGoalRequest;
-    const { user_id, mode = 'create', action, existing_goal_id, replace_goal_id, replace_plan_id, plan_id, goal, plan_start_date } = payload || ({} as CreateGoalRequest);
+    const raw = ((await req.json()) as CreateGoalRequest) || ({} as CreateGoalRequest);
+    const user_id = resolveUserIdFromRequest(req, raw.user_id);
+    const mode = String(raw.mode ?? 'create').trim() as RequestMode;
+    const action = raw.action;
+    const existing_goal_id = trimId(raw.existing_goal_id);
+    const replace_goal_id = trimId(raw.replace_goal_id);
+    const replace_plan_id = trimId(raw.replace_plan_id);
+    const plan_id = trimId(raw.plan_id);
+    const goal = raw.goal;
+    const plan_start_date = raw.plan_start_date;
 
     if (!user_id) throw new AppError('missing_user_id', 'user_id required');
     if (!['create', 'build_existing', 'link_existing'].includes(mode)) throw new AppError('invalid_mode', 'mode must be create, build_existing, or link_existing');
@@ -625,8 +674,8 @@ Deno.serve(async (req: Request) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    // Extract combine flag from payload (set by UI "Build combined plan" option)
-    const combine = !!(payload as any)?.combine;
+    // Extract combine flag from body (set by UI "Build combined plan" / season build)
+    const combine = !!(raw as CreateGoalRequest & { combine?: boolean }).combine;
 
     if (mode === 'create') {
       if (!goal?.name || !goal?.target_date || !goal?.sport) throw new AppError('missing_goal_fields', 'goal name, target_date, and sport are required');
