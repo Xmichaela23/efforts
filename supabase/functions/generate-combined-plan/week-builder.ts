@@ -188,6 +188,7 @@ export function buildWeek(
   const primaryGoal = goals.find(g => g.id === block.primaryGoalId) ?? goals[0];
   const hasTri = goals.some(g => ['triathlon', 'tri'].includes(g.sport?.toLowerCase()));
   const hasRun = goals.some(g => g.sport?.toLowerCase() === 'run');
+  const triApproach = athleteState.tri_approach ?? 'race_peak';
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
 
   // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier)
@@ -306,7 +307,6 @@ export function buildWeek(
   }
 
   // ── TUESDAY: Bike quality ─────────────────────────────────────────────────
-  const triApproach  = athleteState.tri_approach ?? 'race_peak';
   const tuesdaySlot = grid.get('Tuesday');
   if (!tuesdaySlot?.isRest && hasTri) {
     if (phase === 'taper') {
