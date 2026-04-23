@@ -58,6 +58,14 @@ export function useGoals() {
     refreshGoals();
   }, [refreshGoals]);
 
+  useEffect(() => {
+    const onInvalidate = () => {
+      void refreshGoals();
+    };
+    window.addEventListener('goals:invalidate', onInvalidate);
+    return () => window.removeEventListener('goals:invalidate', onInvalidate);
+  }, [refreshGoals]);
+
   const addGoal = useCallback(async (goal: GoalInsert): Promise<Goal | null> => {
     try {
       const userId = getStoredUserId();

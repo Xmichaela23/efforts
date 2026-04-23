@@ -28,6 +28,20 @@ function mapStrengthFocusToProtocol(focus: string | undefined): string {
   return 'durability';
 }
 
+/** Matches `create-goal-and-materialize-plan` / manual Add Goal: beginner | intermediate | advanced */
+function defaultTrainingFitness(raw: unknown): 'beginner' | 'intermediate' | 'advanced' {
+  const s = String(raw ?? '').toLowerCase().trim();
+  if (s === 'beginner' || s === 'intermediate' || s === 'advanced') return s;
+  return 'intermediate';
+}
+
+/** training_prefs.goal_type: complete vs speed (not the DB column `goals.goal_type` = event) */
+function defaultTrainingGoalType(raw: unknown): 'complete' | 'speed' {
+  const s = String(raw ?? '').toLowerCase().trim();
+  if (s === 'speed' || s === 'performance') return 'speed';
+  return 'complete';
+}
+
 function coalesceStrengthFrequency(
   g: Record<string, unknown>,
   parent?: { strength_frequency?: 0 | 1 | 2 | 3 },
@@ -88,6 +102,15 @@ function normalizeGoalInput(
           );
         }
       }
+      // Auto-build requires `training_prefs.fitness` + `training_prefs.goal_type` for run/tri events.
+      const sportLower = typeof g.sport === 'string' ? g.sport.toLowerCase() : '';
+      const needsBuildPrefs =
+        goal_type === 'event' &&
+        (sportLower === 'run' || sportLower === 'triathlon' || sportLower === 'tri');
+      if (needsBuildPrefs) {
+        tp.fitness = defaultTrainingFitness(tp.fitness);
+        tp.goal_type = defaultTrainingGoalType(tp.goal_type);
+      }
       return tp;
     })(),
     notes: typeof g.notes === 'string' ? g.notes : null,
@@ -134,10 +157,17 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
         }
         return base;
       });
-      const { error } = await supabase.from('goals').insert(rows);
+      const { data: insertedGoals, error } = await supabase.from('goals').insert(rows).select('id');
       if (error) {
         console.error('[arc-setup] goal insert', error);
         return { ok: false, error: error.message };
+      }
+      const newGoalIds = (insertedGoals || []).map((r: { id: string }) => r.id).filter(Boolean);
+      if (newGoalIds.length > 0) {
+        const { error: reErr } = await supabase.functions.invoke('refresh-goal-race-projections', {
+          body: { goal_ids: newGoalIds },
+        });
+        if (reErr) console.warn('[arc-setup] refresh-goal-race-projections', reErr.message);
       }
     }
 
@@ -188,6 +218,7 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
 
     try {
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      window.dispatchEvent(new CustomEvent('goals:invalidate'));
     } catch {}
     return { ok: true };
   } catch (e) {
