@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Target, Calendar, CalendarRange, TrendingUp, Plus, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List } from 'lucide-react';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
@@ -69,6 +69,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   currentPlans = [], completedPlans = [],
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { useImperial } = useAppContext();
   const coachWeek = useCoachWeekContext();
   const { goals, loading, addGoal, deleteGoal, updateGoal, refreshGoals } = useGoals();
@@ -99,6 +100,27 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [courseUploadBusy, setCourseUploadBusy] = useState<string | null>(null);
   const [pendingCourseGoalId, setPendingCourseGoalId] = useState<string | null>(null);
   const goalsCourseFileRef = useRef<HTMLInputElement>(null);
+
+  /** After "Plan my season" save — step 2 is Build plan (unless auto-build already ran). */
+  const [arcSetupBanner, setArcSetupBanner] = useState<{
+    planBuilt: boolean;
+    hadGoalInserts: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const st = location.state as { fromArcSetup?: boolean; planBuilt?: boolean; hadGoalInserts?: boolean } | null;
+    if (st?.fromArcSetup) {
+      setArcSetupBanner({
+        planBuilt: !!st.planBuilt,
+        hadGoalInserts: st.hadGoalInserts !== false,
+      });
+      try {
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch {
+        void 0;
+      }
+    }
+  }, [location.state, location.pathname, navigate]);
 
   useEffect(() => {
     const uid = readStoredUserId();
@@ -999,6 +1021,26 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <X className="h-5 w-5" />
         </button>
       </div>
+
+      {arcSetupBanner && (
+        <div className="mx-4 mb-3 rounded-2xl border border-teal-500/40 bg-gradient-to-b from-teal-950/80 to-zinc-950/60 px-4 py-3.5 shadow-[0_0_0_1px_rgba(20,184,166,0.12)]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-teal-300/90">Season saved</p>
+          <p className="text-[15px] text-white/85 leading-snug mt-1.5">
+            {arcSetupBanner.planBuilt
+              ? 'Your training plan is building — check Home for workouts soon. You can still review goals below.'
+              : arcSetupBanner.hadGoalInserts
+                ? 'Step 2: tap Build plan on each race goal below to generate your calendar.'
+                : 'Your profile is updated. Add a race goal, then tap Build plan when you are ready.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => setArcSetupBanner(null)}
+            className="mt-2.5 text-sm font-medium text-teal-200/80 hover:text-teal-100/95"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">

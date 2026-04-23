@@ -159,7 +159,7 @@ function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
 
 async function persistArcSetup(
   payload: ArcSetupPayload,
-): Promise<{ ok: boolean; error?: string; planBuilt?: boolean }> {
+): Promise<{ ok: boolean; error?: string; planBuilt?: boolean; hadGoalInserts?: boolean }> {
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
@@ -179,6 +179,7 @@ async function persistArcSetup(
   }
 
   let planBuilt = false;
+  let hadGoalInserts = false;
   try {
     if (validGoals.length > 0) {
       const rows = validGoals.map((row) => {
@@ -189,23 +190,14 @@ async function persistArcSetup(
         }
         return base;
       });
-      // DEBUG — remove before ship
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        console.log('[arc-save] auth user id:', authData.user?.id);
-      } catch {
-        console.log('[arc-save] auth user id: (getUser failed; see stored id)', getStoredUserId());
-      }
-      console.log('[arc-save] goals to insert:', JSON.stringify(rows, null, 2));
       const { data, error } = await supabase.from('goals').insert(rows).select();
-      console.log('[arc-save] insert data:', data);
-      console.log('[arc-save] insert error:', error);
       if (error) {
         console.error('GOALS INSERT FAILED:', error.message, (error as { details?: string }).details, (error as { hint?: string }).hint);
         console.error('[arc-setup] goal insert', error);
         return { ok: false, error: error.message };
       }
       const newGoalIds = (data || []).map((r: { id: string }) => r.id).filter(Boolean);
+      hadGoalInserts = newGoalIds.length > 0;
       if (newGoalIds.length > 0) {
         const { error: reErr } = await supabase.functions.invoke('refresh-goal-race-projections', {
           body: { goal_ids: newGoalIds },
@@ -272,7 +264,7 @@ async function persistArcSetup(
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
       window.dispatchEvent(new CustomEvent('goals:invalidate'));
     } catch {}
-    return { ok: true, planBuilt };
+    return { ok: true, planBuilt, hadGoalInserts };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
     return { ok: false, error: msg };
@@ -291,6 +283,7 @@ type ArcSetupChatProps = {
  * Optional `<arc_setup>` confirmation card.
  */
 export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -394,18 +387,22 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     if (!pendingSetup) return;
     setSending(true);
     setError(null);
-    const { ok, error: pe, planBuilt } = await persistArcSetup(pendingSetup.payload);
+    const { ok, error: pe, planBuilt, hadGoalInserts } = await persistArcSetup(pendingSetup.payload);
     setSending(false);
     if (!ok) {
       setError(pe || 'Save failed');
       return;
     }
     setPendingSetup(null);
-    setSaveBanner(
-      planBuilt
-        ? 'Saved. Goals updated — your training plan is building. Check Home; finish projections appear on Goals as they load.'
-        : 'Saved. Your goals and profile are updated.',
-    );
+    setSaveBanner(null);
+    // Step 1 (arc) done — send athlete to Goals for step 2 (build plan) or to see the schedule if auto-build ran.
+    navigate('/goals', {
+      state: {
+        fromArcSetup: true,
+        planBuilt: !!planBuilt,
+        hadGoalInserts: hadGoalInserts !== false,
+      },
+    });
   };
 
   const onClarify = () => {
