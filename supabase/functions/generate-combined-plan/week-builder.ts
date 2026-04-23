@@ -191,6 +191,11 @@ export function buildWeek(
   const triApproach = athleteState.tri_approach ?? 'race_peak';
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
 
+  /** Week 1 after a recent marathon / race (from Arc + create-goal `recovery_rebuild`). */
+  const recoveryRebuildWeek1 =
+    weekNum === 1 &&
+    (athleteState.transition_mode === 'recovery_rebuild' || athleteState.structural_load_hint === 'low');
+
   // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier)
   const baseTSS = scaledWeeklyTSS(phase, athleteState.current_ctl, athleteState.weekly_hours_available, block.tssMultiplier);
 
@@ -225,7 +230,7 @@ export function buildWeek(
     : DAYS_OF_WEEK.indexOf('Saturday');
   const longRideDay = DAYS_OF_WEEK[longRideDayIdx] ?? 'Saturday';
 
-  const bricksThisWeek = BRICKS_PER_WEEK[phase];
+  const bricksThisWeek = recoveryRebuildWeek1 ? 0 : BRICKS_PER_WEEK[phase];
 
   // ── Determine run distance and bike hours from TSS budget distribution ──
   const dist = block.sportDistribution;
@@ -247,20 +252,28 @@ export function buildWeek(
   const swimTotalMin = Math.max(30, Math.round((swimBudget / 42) * 60));
 
   // Derive long run miles from typical 9:30/mi easy pace
-  const longRunMinutes = isRecovery
+  let longRunMinutes = isRecovery
     ? Math.min(60, Math.round(runTotalMin * 0.50))
     : phase === 'taper'
       ? Math.min(75, Math.round(runTotalMin * 0.55))
       : Math.min(150, Math.round(runTotalMin * 0.60));
-  const longRunMiles = Math.max(4, Math.round(longRunMinutes / 9.5));
+  let longRunMiles = Math.max(4, Math.round(longRunMinutes / 9.5));
 
   // Long ride hours
-  const longRideMinutes = isRecovery
+  let longRideMinutes = isRecovery
     ? Math.min(75, Math.round(bikeTotalMin * 0.60))
     : phase === 'taper'
       ? Math.min(90, Math.round(bikeTotalMin * 0.55))
       : Math.min(240, Math.round(bikeTotalMin * 0.65));
-  const longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
+  let longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
+
+  if (recoveryRebuildWeek1) {
+    // Post-marathon week 1: cap leg load; swim sessions left as computed (low impact).
+    longRunMinutes = Math.min(longRunMinutes, 30);
+    longRideMinutes = Math.min(longRideMinutes, 60);
+    longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(longRunMinutes / 10)));
+    longRideHours = Math.min(1, Math.max(0.5, longRideMinutes / 60));
+  }
 
   // Swim yards (average ~2.0 yd/sec net = 120 yd/min; with rest ~80 yd/min effective)
   const swimYards = Math.max(1200, Math.round(swimTotalMin * 80 / (hasTri ? 1 : 2)));
@@ -308,7 +321,7 @@ export function buildWeek(
 
   // ── TUESDAY: Bike quality ─────────────────────────────────────────────────
   const tuesdaySlot = grid.get('Tuesday');
-  if (!tuesdaySlot?.isRest && hasTri) {
+  if (!recoveryRebuildWeek1 && !tuesdaySlot?.isRest && hasTri) {
     if (phase === 'taper') {
       tuesdaySlot!.sessions.push(bikeOpeners('Tuesday', servedGoal));
     } else if (triApproach === 'base_first') {
@@ -338,7 +351,7 @@ export function buildWeek(
 
   // ── WEDNESDAY: Run quality ────────────────────────────────────────────────
   const wednesdaySlot = grid.get('Wednesday');
-  if (!wednesdaySlot?.isRest) {
+  if (!recoveryRebuildWeek1 && !wednesdaySlot?.isRest) {
     if (phase === 'taper') {
       const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
       wednesdaySlot!.sessions.push(easyRun('Wednesday', taperRunMi, servedGoal));
@@ -405,7 +418,7 @@ export function buildWeek(
   // ── MONDAY: Easy recovery swim ────────────────────────────────────────────
   // Skip if Monday is rest day — Thursday swim is the maintenance session.
   const mondaySlot = grid.get('Monday');
-  if (!mondaySlot?.isRest && hasTri && !isRecovery) {
+  if (!mondaySlot?.isRest && hasTri && !isRecovery && !recoveryRebuildWeek1) {
     const recSwimYd = Math.max(1200, Math.round(swimYards * 0.40));
     mondaySlot!.sessions.push(easySwim('Monday', recSwimYd, servedGoal));
   }
@@ -413,12 +426,15 @@ export function buildWeek(
   // ── FRIDAY: Easy run (cross-sport recovery credit — §4.4) ─────────────────
   const fridaySlot = grid.get('Friday');
   if (!fridaySlot?.isRest && !isRecovery && !['taper', 'recovery'].includes(phase)) {
-    const easyMi = Math.max(3, Math.round(longRunMiles * 0.30));
+    const easyMi = recoveryRebuildWeek1
+      ? Math.min(30, Math.max(3, Math.round(longRunMiles * 0.35)))
+      : Math.max(3, Math.round(longRunMiles * 0.30));
     fridaySlot!.sessions.push(easyRun('Friday', easyMi, servedGoal));
   }
 
   // ── STRENGTH ──────────────────────────────────────────────────────────────
-  const strFreq = phase === 'base' ? 2 : phase === 'taper' || phase === 'recovery' ? 0 : 1;
+  let strFreq = phase === 'base' ? 2 : phase === 'taper' || phase === 'recovery' ? 0 : 1;
+  if (recoveryRebuildWeek1) strFreq = 0;
 
   if (strFreq >= 1) {
     // Identify brick days in the current grid to pass to the protocol placement
@@ -481,7 +497,7 @@ export function buildWeek(
   const remaining  = weeklyTSSBudget - currentTSS;
 
   // Add a mid-week easy bike if budget remains and plan is triathlon-focused
-  if (remaining > 50 && hasTri && !isRecovery) {
+  if (remaining > 50 && hasTri && !isRecovery && !recoveryRebuildWeek1) {
     const midRideSlot = grid.get('Wednesday');
     if (midRideSlot && !midRideSlot.isRest && midRideSlot.sessions.length === 1) {
       const midRideHr = Math.max(0.75, Math.min(1.5, remaining * 0.50 / 55));

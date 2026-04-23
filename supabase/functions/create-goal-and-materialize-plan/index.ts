@@ -493,6 +493,11 @@ async function buildCombinedPlan(
   newGoalId: string,
   newGoal: { name: string; target_date: string; sport: string; distance: string | null; training_prefs: Record<string, any> },
   fitness: string,
+  /** Propagate Arc post-marathon / recent-race recovery into generate-combined-plan. */
+  combinedTransition?: {
+    transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
+    structural_load_hint?: 'low' | 'normal';
+  },
 ): Promise<{ plan_id: string } | null> {
 
   // Gather all active event goals (including the just-created one)
@@ -587,6 +592,10 @@ async function buildCombinedPlan(
       loading_pattern: loadingPattern,
       equipment_type: hasCommercialGym ? 'commercial_gym' : 'home_gym',
       tri_approach: triApproach,
+      ...(combinedTransition?.transition_mode ? { transition_mode: combinedTransition.transition_mode } : {}),
+      ...(combinedTransition?.structural_load_hint
+        ? { structural_load_hint: combinedTransition.structural_load_hint }
+        : {}),
     },
   });
 
@@ -815,6 +824,9 @@ Deno.serve(async (req: Request) => {
         const combinedResult = await buildCombinedPlan(
           supabase, functionsBaseUrl, serviceKey,
           user_id, createdGoalId, resolvedGoal!, fitness,
+          postRaceRecovery.apply
+            ? { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' }
+            : undefined,
         );
         if (combinedResult) {
           createdPlanId = combinedResult.plan_id;
@@ -1153,6 +1165,9 @@ Deno.serve(async (req: Request) => {
       const combinedResult = await buildCombinedPlan(
         supabase, functionsBaseUrl, serviceKey,
         user_id, createdGoalId, resolvedGoal!, fitness,
+        postRaceRecovery.apply
+          ? { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' }
+          : undefined,
       );
       if (combinedResult) {
         createdPlanId = combinedResult.plan_id;

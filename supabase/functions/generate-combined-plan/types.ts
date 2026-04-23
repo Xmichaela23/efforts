@@ -41,6 +41,13 @@ export interface AthleteState {
    * race_peak   — Standard 8/8 split, threshold+VO2 quality, race-pace bricks, 3:1.
    */
   tri_approach?: 'base_first' | 'race_peak';
+  /**
+   * From goal flow / Arc post-race context. When `recovery_rebuild` (especially week 1),
+   * combined plan caps run/bike endurance and drops strength intensity.
+   */
+  transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
+  /** Explicit low structural load (e.g. post-marathon). Week 1 honors hard caps even if phase is "build". */
+  structural_load_hint?: 'low' | 'normal';
 }
 
 export interface AthleteMemory {
