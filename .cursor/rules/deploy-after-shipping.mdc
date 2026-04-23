@@ -1,0 +1,20 @@
+---
+description: User does not deploy manually; agent must ship Supabase functions and push frontend.
+alwaysApply: true
+---
+
+# Deploy (user does not deploy)
+
+The user **does not run deploys**. After any change that affects production:
+
+1. **Supabase Edge Functions** — Deploy every function you touched (or its callers). From repo root, use the linked project ref in `supabase/.temp/linked-project.json` (currently `yyriamwvtvzlkumqrvpm`):
+
+   ```bash
+   supabase functions deploy <name> [<name> ...] --project-ref yyriamwvtvzlkumqrvpm
+   ```
+
+   Typical Arc / combined-plan stack: `arc-setup-chat`, `generate-combined-plan`, `create-goal-and-materialize-plan`.
+
+2. **Frontend** — Netlify builds from `main`. **Commit** and **`git push origin main`** so the site picks up client changes.
+
+Do not end a shipping task with “you should deploy”; run deploy and push yourself when credentials/network allow.
