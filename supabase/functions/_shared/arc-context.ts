@@ -48,6 +48,17 @@ export interface AthleteMemorySummary {
   confidence_score: number | null;
 }
 
+/** Pre-formatted paces for LLM prompts; avoids mistaking `run_*_pace_sec_per_km` as sec/mi. */
+export interface RunPaceForCoach {
+  /**
+   * `learned_fitness` stores running paces as **seconds per km**.
+   * `per_mile` = that value × 1.609 (do not re-label per-km mm:ss as /mi).
+   */
+  _unit_note: 'run threshold/easy paces in JSON are sec/km. Use per_km and per_mile only.';
+  threshold?: { sec_per_km: number; per_km: string; per_mile: string };
+  easy?: { sec_per_km: number; per_km: string; per_mile: string };
+}
+
 /**
  * When manual 5K in `performance_numbers` is much slower than a rough 5K implied by
  * learned threshold pace, coaches / prompts can suggest updating the saved race time.
@@ -141,6 +152,11 @@ export interface ArcContext {
 
   /** Active (non-retired) shoes and bikes from `gear` — same source as the Gear screen. */
   gear: ArcGearSummary;
+  /**
+   * Learned run paces (threshold/easy) as both /km and /mi for prompts.
+   * Do not ask the model to format `run_*_pace_sec_per_km` to /mi by hand; use this object.
+   */
+  run_pace_for_coach: RunPaceForCoach | null;
 
   user_id: string;
   built_at: string;
@@ -233,6 +249,46 @@ function formatGapDurationSec(gap: number): string {
   const s = a % 60;
   if (m === 0) return `${s} seconds`;
   return s > 0 ? `${m}m ${s}s` : `${m} minutes`;
+}
+
+/** Strava/Garmin-style: `avg_pace` and learned paces = seconds per km. */
+const PACE_KM_TO_MI = 1.60934;
+
+function formatMmSsPaceFromSecPerUnit(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '—';
+  const t = Math.round(totalSeconds);
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * For arc / coach prompts: same math as `TrainingBaselines` `formatPace(secPerKm)` so the
+ * model is never tempted to call `value` 371 "6:11/mi" (that is 6:11/**km** ≈ 9:57/mi).
+ */
+function buildRunPaceForCoach(learnedFitness: LearnedFitness | null): RunPaceForCoach | null {
+  if (!learnedFitness) return null;
+  const one = (key: 'run_threshold_pace_sec_per_km' | 'run_easy_pace_sec_per_km') => {
+    const raw = learnedFitness[key];
+    const o =
+      raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as { value?: unknown }) : null;
+    const secKm = o?.value;
+    if (typeof secKm !== 'number' || !Number.isFinite(secKm) || secKm <= 0) return null;
+    const secMi = secKm * PACE_KM_TO_MI;
+    return {
+      sec_per_km: Math.round(secKm * 10) / 10,
+      per_km: `${formatMmSsPaceFromSecPerUnit(secKm)}/km`,
+      per_mile: `${formatMmSsPaceFromSecPerUnit(secMi)}/mi`,
+    };
+  };
+  const threshold = one('run_threshold_pace_sec_per_km');
+  const easy = one('run_easy_pace_sec_per_km');
+  if (!threshold && !easy) return null;
+  return {
+    _unit_note: 'run threshold/easy paces in JSON are sec/km. Use per_km and per_mile only.',
+    threshold: threshold ?? undefined,
+    easy: easy ?? undefined,
+  };
 }
 
 function impliedFiveKFromThresholdSecPerKm(thresholdSecPerKm: number): number {
@@ -651,6 +707,8 @@ export async function getArcContext(
     console.log('[getArcContext] performance_numbers swim (swimPace100 or swim_pace_100_yd):', sp['swimPace100'] ?? sp['swim_pace_100_yd']);
   }
 
+  const run_pace_for_coach = buildRunPaceForCoach(learned_fitness);
+
   return {
     athlete_identity,
     learned_fitness,
@@ -666,6 +724,7 @@ export async function getArcContext(
     athlete_memory,
     swim_training_from_workouts,
     gear,
+    run_pace_for_coach,
     user_id: userId,
     built_at
   };

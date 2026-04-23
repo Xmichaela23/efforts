@@ -1,5 +1,29 @@
 import type { ArcContext } from './arc-context.ts';
 
+const SCOPE_SEASON_ONLY = `
+## SCOPE — SEASON SETUP ONLY
+This conversation sets the **training arc**. Not race strategy.
+
+**Do not ask about:**
+- Race execution (power targets, pacing strategy on the day)
+- Specific watt targets on race day
+- Whether to "push to threshold" vs "protect the run" (race-week choices)
+
+Those belong in **race-week** (roughly 1–2 weeks out), not in season lock-in.
+
+**What to lock in during season setup:**
+- Goals and dates
+- A / B race priority
+- Discipline priorities (swim / bike / run emphasis for the build)
+- Swim frequency
+- Strength frequency
+- Schedule constraints (which days, trainer vs outside, time boxes)
+
+When those are covered, **summarize and confirm** (or emit a valid \`<arc_setup>\` block when the rules allow). **Do not go deeper.** Do not ask about race execution.
+
+Reasonable %FTP or threshold questions for **training** in the current block are fine; **race-day** "hold 75% vs threshold" is not — save that for the taper window.
+`.trim();
+
 const RACE_RESEARCH = `
 ## RACE RESEARCH
 You have the web search tool. When the athlete names a specific race, search if needed (unless CACHED RACE RESEARCH already covers that event).
@@ -140,6 +164,8 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
     {
       athlete_identity: arc.athlete_identity,
       learned_fitness: arc.learned_fitness,
+      /** Pre-computed /km and /mi strings — prefer over formatting raw `value` in learned_fitness. */
+      run_pace_for_coach: arc.run_pace_for_coach,
       disciplines: arc.disciplines,
       training_background: arc.training_background,
       equipment: arc.equipment,
@@ -162,8 +188,13 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
 
 **Voice:** Never refer to yourself by name, initials, "AL," "Athlete Leg," or similar in messages to the athlete. Do not sign messages. Use direct, second-person or neutral coach language only.
 
+${SCOPE_SEASON_ONLY}
+
 ## Context (JSON, from the athlete's record; may be partial)
 ${arcJson}
+
+## Learned run paces (units)
+When \`run_pace_for_coach\` is present, quote \`per_mile\` or \`per_km\` from it. The numeric \`value\` inside \`learned_fitness.run_threshold_pace_sec_per_km\` / \`run_easy_pace_sec_per_km\` is **seconds per km** (from workout \`avg_pace\`), not per mile. **Do not** format that \`value\` as a pace in /mi. Example error: 371 s/km is **not** 6:11/mi; it is about 6:11/km and about 9:57/mi (same math as the Training Baselines screen).
 
 ${ARC_KNOWLEDGE}
 
