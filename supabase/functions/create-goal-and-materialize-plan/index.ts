@@ -479,6 +479,11 @@ function mergeTrainingPrefsWithArcDefaults(
       if (focus === 'power') tp.strength_protocol = 'neural_speed';
       else if (focus === 'maintenance') tp.strength_protocol = 'durability';
     }
+    if (tp.strength_intent !== 'support' && tp.strength_intent !== 'performance') {
+      const focus = String(tp.strength_focus ?? '').toLowerCase();
+      if (focus === 'power') tp.strength_intent = 'performance';
+      else if (focus === 'maintenance') tp.strength_intent = 'support';
+    }
   }
   return tp;
 }
@@ -633,6 +638,12 @@ async function buildCombinedPlan(
         : {}),
       ...(combinedSchedulePrefs.strength_protocol
         ? { strength_protocol: combinedSchedulePrefs.strength_protocol }
+        : {}),
+      ...(combinedSchedulePrefs.strength_intent
+        ? { strength_intent: combinedSchedulePrefs.strength_intent }
+        : {}),
+      ...(combinedSchedulePrefs.strength_preferred_days?.length
+        ? { strength_preferred_days: combinedSchedulePrefs.strength_preferred_days }
         : {}),
       ...(combinedTransition?.transition_mode ? { transition_mode: combinedTransition.transition_mode } : {}),
       ...(combinedTransition?.structural_load_hint

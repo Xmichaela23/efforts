@@ -77,6 +77,8 @@ export interface ProtocolContext {
   // Optional triathlon-specific context (read only by the triathlon protocol;
   // all other protocols ignore this field entirely)
   triathlonContext?: {
+    /** Arc / goal: support = tri accessory emphasis; performance = compounds + heavier %1RM. */
+    strengthIntent?: 'support' | 'performance';
     /** Athlete's weakest discipline — shifts exercise emphasis each session. */
     limiterSport?: 'swim' | 'bike' | 'run';
     /** Which sport dominates TSS this week — used for emphasis decisions. */

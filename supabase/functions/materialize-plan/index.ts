@@ -86,6 +86,51 @@ function strength1RMFromLearned(
   return perfOk;
 }
 
+type StrengthIntentMat = 'support' | 'performance' | null;
+
+/** Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower). */
+function resolveStrengthPercentForLift(
+  exerciseName: string,
+  explicitPercent: number | undefined,
+  strengthIntent: StrengthIntentMat,
+): number {
+  const n = String(exerciseName || '').toLowerCase();
+  if (strengthIntent === 'performance') {
+    const base = typeof explicitPercent === 'number' && explicitPercent > 0 ? explicitPercent : 0.7;
+    return Math.max(0.6, Math.min(0.85, base));
+  }
+  if (strengthIntent === 'support') {
+    let p = typeof explicitPercent === 'number' && explicitPercent > 0
+      ? Math.min(explicitPercent, 0.6)
+      : 0.5;
+    p = Math.min(0.6, p);
+    if (n.includes('bench') || (n.includes('squat') && !n.includes('goblet'))) {
+      p = Math.min(p, 0.45);
+    }
+    return p;
+  }
+  const base = typeof explicitPercent === 'number' && explicitPercent > 0 ? explicitPercent : 0.7;
+  return Math.max(0.6, Math.min(0.85, base));
+}
+
+async function loadStrengthIntentForPlan(
+  trainingPlanId: string | null | undefined,
+  supabase: ReturnType<typeof createClient>,
+): Promise<StrengthIntentMat> {
+  if (!trainingPlanId) return null;
+  try {
+    const { data: planRow } = await supabase.from('plans').select('goal_id').eq('id', trainingPlanId).maybeSingle();
+    const gid = planRow?.goal_id as string | undefined;
+    if (!gid) return null;
+    const { data: gRow } = await supabase.from('goals').select('training_prefs').eq('id', gid).maybeSingle();
+    const si = (gRow?.training_prefs as Record<string, unknown> | null)?.strength_intent;
+    if (si === 'support' || si === 'performance') return si;
+  } catch (e) {
+    console.warn('[materialize-plan] loadStrengthIntentForPlan:', e);
+  }
+  return null;
+}
+
 type Baselines = { 
   ftp?: number; 
   fiveK_pace?: any; fiveKPace?: any; fiveK?: any; 
@@ -939,7 +984,12 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   return out;
 }
 
-function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdjustment[] = []): { steps: any[]; total_s: number } {
+function expandTokensForRow(
+  row: any,
+  baselines: Baselines,
+  adjustments: PlanAdjustment[] = [],
+  strengthIntent: StrengthIntentMat = null,
+): { steps: any[]; total_s: number } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
   const workoutDate = row?.date || new Date().toISOString().split('T')[0];
@@ -1017,7 +1067,11 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             resolved_from = undefined;
           } else if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
-            const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70; // Default 70%
+            const targetPercent = resolveStrengthPercentForLift(
+              name,
+              typeof percentRaw === 'number' ? percentRaw : undefined,
+              strengthIntent,
+            );
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, reps);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
@@ -1038,9 +1092,15 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             const isMetric = !!(baselines as any).isMetric;
             const wUnit = isMetric ? 'kg' : 'lb';
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
+            let resolvedPctLegacy0: number | undefined = undefined;
             if (parsed.weight != null) prescribed = parsed.weight;
-            else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
-              const scaled = inferred1RM * percentRaw * repScaleFor(reps);
+            else if (inferred1RM != null) {
+              resolvedPctLegacy0 = resolveStrengthPercentForLift(
+                name,
+                typeof percentRaw === 'number' ? percentRaw : undefined,
+                strengthIntent,
+              );
+              const scaled = inferred1RM * resolvedPctLegacy0 * repScaleFor(reps);
               prescribed = roundToIncrement(scaled, isMetric);
             }
             if (prescribed != null && isDumbbellExercise(name)) {
@@ -1054,7 +1114,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
               baselineMissing = true;
               requiredBaseline = pick.ref;
             }
-            percent_1rm = (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
+            percent_1rm = resolvedPctLegacy0 ?? (typeof percentRaw==='number' ? percentRaw : (parsed.percent_1rm != null ? parsed.percent_1rm : undefined));
             resolved_from = pick.ref || undefined;
           }
           
@@ -1145,7 +1205,11 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             resolved_from = undefined;
           } else if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
-            const targetPercent = typeof percentRaw === 'number' ? percentRaw : 0.70;
+            const targetPercent = resolveStrengthPercentForLift(
+              name,
+              typeof percentRaw === 'number' ? percentRaw : undefined,
+              strengthIntent,
+            );
             const result = calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
@@ -1166,9 +1230,15 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
             const ratio = pick.ratio;
             const inferred1RM = (base1RM != null && ratio != null) ? base1RM * ratio : base1RM;
             const parsed = parseWeightInput((ex as any)?.weight, inferred1RM);
+            let resolvedPctLegacy: number | undefined = undefined;
             if (parsed.weight != null) prescribed = parsed.weight;
-            else if (inferred1RM != null && typeof percentRaw === 'number' && percentRaw>0) {
-              const scaled = inferred1RM * (percentRaw as number) * repScaleFor(typeof reps==='number'? reps : undefined);
+            else if (inferred1RM != null) {
+              resolvedPctLegacy = resolveStrengthPercentForLift(
+                name,
+                typeof percentRaw === 'number' ? percentRaw : undefined,
+                strengthIntent,
+              );
+              const scaled = inferred1RM * resolvedPctLegacy * repScaleFor(typeof reps==='number'? reps : undefined);
               prescribed = roundToIncrement(scaled, isMetric);
             }
             if (prescribed != null && isDumbbellExercise(name)) {
@@ -1834,12 +1904,14 @@ Deno.serve(async (req) => {
       console.error(`❌ Error loading plan adjustments:`, e);
     }
 
+    const strengthIntent = await loadStrengthIntentForPlan(rows[0]?.training_plan_id, supabase);
+
     let count = 0;
     for (const row of rows) {
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
         const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
-        const { steps, total_s } = expandTokensForRow(row, baselines, adjustments);
+        const { steps, total_s } = expandTokensForRow(row, baselines, adjustments, strengthIntent);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist

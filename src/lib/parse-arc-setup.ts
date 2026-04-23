@@ -34,6 +34,38 @@ export function coachVisibleProseSeeksReply(visible: string): boolean {
   return /[?？]\s*$/.test(t);
 }
 
+/**
+ * Triathlon event goals must have strength_intent + preferred_days (long ride/run, strength[], swim[])
+ * before the confirm card appears — matches Arc coach instructions.
+ */
+export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload | null): boolean {
+  if (!payload?.goals || !Array.isArray(payload.goals)) return false;
+  const goals = payload.goals as Record<string, unknown>[];
+  const triEventGoals = goals.filter(
+    (g) =>
+      String(g?.goal_type ?? '').toLowerCase() === 'event' &&
+      ['triathlon', 'tri'].includes(String(g?.sport ?? '').toLowerCase()),
+  );
+  if (triEventGoals.length === 0) return true;
+  return triEventGoals.every((g) => {
+    const tp = g.training_prefs;
+    if (!tp || typeof tp !== 'object' || Array.isArray(tp)) return false;
+    const prefs = tp as Record<string, unknown>;
+    const si = prefs.strength_intent ?? prefs.strengthIntent;
+    if (si !== 'support' && si !== 'performance') return false;
+    const pd = prefs.preferred_days ?? prefs.preferredDays;
+    if (!pd || typeof pd !== 'object' || Array.isArray(pd)) return false;
+    const pdo = pd as Record<string, unknown>;
+    if (pdo.long_ride == null && pdo.longRide == null) return false;
+    if (pdo.long_run == null && pdo.longRun == null) return false;
+    const st = pdo.strength;
+    if (!Array.isArray(st) || st.length === 0) return false;
+    const sw = pdo.swim;
+    if (!Array.isArray(sw) || sw.length === 0) return false;
+    return true;
+  });
+}
+
 export function parseArcSetupFromAssistant(raw: string): {
   displayText: string;
   payload: ArcSetupPayload | null;

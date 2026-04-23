@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import {
+  arcEventGoalsHaveRequiredTrainingPrefs,
   coachVisibleProseSeeksReply,
   parseArcSetupFromAssistant,
   type ArcSetupPayload,
@@ -360,6 +361,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         payload != null &&
         userTurnCount >= 3 &&
         !stillAsking &&
+        arcEventGoalsHaveRequiredTrainingPrefs(payload) &&
         (payloadHasDatedEventGoal(payload) || hasId);
       if (canShowConfirmCard) {
         const goalPreviews = validGoals.map(

@@ -529,6 +529,7 @@ export function triathlonStrength(
     longRunDayName?: string;
     /** Protocol id (triathlon, neural_speed, durability, …). Default: triathlon. */
     strengthProtocolId?: string;
+    strengthIntent?: 'support' | 'performance';
   },
 ): PlannedSession {
   const longRide = options?.longRideDayName ?? 'Saturday';
@@ -552,7 +553,10 @@ export function triathlonStrength(
     userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },
     strengthFrequency: 2,
     constraints: {},
-    triathlonContext: { limiterSport: options?.limiterSport ?? 'run' },
+    triathlonContext: {
+      limiterSport: options?.limiterSport ?? 'run',
+      strengthIntent: options?.strengthIntent,
+    },
   };
 
   const pid = options?.strengthProtocolId?.trim();

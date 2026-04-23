@@ -486,8 +486,17 @@ export function buildWeek(
     // weekInPhase: how many weeks into this phase are we?
     const weekInPhase = Math.max(1, weekNum - block.startWeek + 1);
 
-    // Slot 1: first non-blocked day starting Monday
-    const candidates1 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d));
+    const prefStrength = (athleteState.strength_preferred_days ?? [])
+      .map((d) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase())
+      .filter(Boolean);
+    const prefSet = new Set(prefStrength);
+
+    // Slot 1: first non-blocked day starting Monday (honor preferred strength days when possible)
+    let candidates1 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d));
+    if (prefSet.size > 0) {
+      const preferred = candidates1.filter(d => prefSet.has(d));
+      if (preferred.length > 0) candidates1 = preferred;
+    }
     const strDay = candidates1[0];
     if (strDay) {
       const strSlot = grid.get(strDay);
@@ -503,6 +512,7 @@ export function buildWeek(
             longRideDayName: longRideDay,
             longRunDayName: longRunActualDay,
             strengthProtocolId: athleteState.strength_protocol,
+            strengthIntent: athleteState.strength_intent,
           }));
         } else {
           strSlot.sessions.push(runStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, equipmentType }));
@@ -512,7 +522,11 @@ export function buildWeek(
 
     // Slot 2 (base phase only): second non-blocked day
     if (strFreq >= 2 && strDay) {
-      const candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d) && d !== strDay);
+      let candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d) && d !== strDay);
+      if (prefSet.size > 0) {
+        const preferred2 = candidates2.filter(d => prefSet.has(d));
+        if (preferred2.length > 0) candidates2 = preferred2;
+      }
       const strDay2 = candidates2[0];
       if (strDay2) {
         const strSlot2 = grid.get(strDay2);
@@ -528,6 +542,7 @@ export function buildWeek(
               longRideDayName: longRideDay,
               longRunDayName: longRunActualDay,
               strengthProtocolId: athleteState.strength_protocol,
+              strengthIntent: athleteState.strength_intent,
             }));
           } else {
             strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, equipmentType: equipmentType2 }));

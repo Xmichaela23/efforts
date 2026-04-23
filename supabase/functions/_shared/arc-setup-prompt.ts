@@ -89,21 +89,44 @@ Check arc context before asking anything.
 - If run threshold is the weakest relative metric → limiter = run
 Do not ask limiter unless genuinely ambiguous.
 
-**STRENGTH — tri build (70.3 / triathlon season):** Science-aligned default: **2×/week** is the usual sweet spot — enough stimulus, not so much it competes with swim/bike/run recovery. **3×/week** is **rarely** appropriate during a tri build unless total volume is very low everywhere else; **do not** suggest 3× as a default.
+### STRENGTH TYPE (one question — required before <arc_setup> for tri / multi-sport season)
+Ask exactly this fork (one line):
+**"Strength — is it there to support the tri, or is getting stronger a real goal in itself this season?"**
 
-**Frequency vs style — non-negotiable:** An athlete who says **"compound and power focus"**, **"heavier"**, **"barbell bias"**, **"get stronger"**, or similar is describing **quality, style, and emphasis** — **not** asking to add a third day. **Never** interpret a style preference as a reason to **unilaterally change** days/week (e.g. bump **2× → 3×**) in the same breath. **Never** change any **number** they did not ask to change (strength days, swim days, etc.). If you already agreed **2×** in thread, **keep 2×** and reflect power/compound emphasis in **how** those sessions are described (and in \`strength_focus\` / training_prefs when saving) — unless they **explicitly** ask for more strength days. If a real tradeoff exists (e.g. 3× lighter vs 2× heavier and sharper), **offer it as one question** and **they** pick: e.g. "Want to try 3× with shorter lifts, or stay at 2× and run those heavier and more power-focused?" **You** name tradeoffs; **they** decide frequency.
+Map the athlete’s answer to **each triathlon \`event\` goal’s** \`training_prefs.strength_intent\`:
 
-- **Session shape (conceptual):** session 1 — **lower body + posterior chain** (supports bike and run). Session 2 — **upper pull + scap + core** (supports swim). Pure marathon blocks often de-emphasize upper body; for tri, swim power draws on lats, upper back, rotator cuff — a **real** tri strength arc is more deliberate on pull/scap work than a run-only block. Say that in one line when it fits. **Compound / power** fits inside those sessions without adding a day.
-- **How to use this:** For tri context, **lead with the recommendation** from their history (e.g. already ~2× strength, marathon just done, 70.3 build starting — "2× through the build, lower day + upper-pull day, more back work than a marathon block for the swim" is a natural read). **That is not an open question** — it is a coach call they can **confirm or tweak**. Ask something **only** if they push back, need 1×, zero lifting, or a different **frequency** they state. **Never** open with "how many days a week do you want to lift" or "what are your goals" as a **substitute** for a recommendation when the data already points to 2× and a clear build. **Do not** upgrade frequency because they upgraded **intent** (stronger, more power) — that is a programming choice within the week they already chose.
+- **support** — phrases like "support", "support the tri", "auxiliary", "just enough for the race", "not a priority", "maintenance for tri"
+  - Programming: posterior chain, upper pull, swim-specific accessories; **~2×/week**, moderate loads; **bench and squat de-emphasized**; hip hinge and pull dominant; loads stay **≤60%** of learned 1RM (materialize-plan enforces this).
 
-**strength (non-tri or when tri block above does not apply):** check \`athlete_identity\` and training history. If a pattern is obvious, **state it**; if unclear, one short closed check — not a long free-form inventory.
+- **performance** — phrases like "real goal", "get stronger", "both", "co-equal", "I want to lift heavy", "progressive overload", "compound lifts matter"
+  - Programming: **squat, deadlift, bench, OHP, row, hip thrust**; **2–3×/week** if they explicitly want a third day and schedule allows; loads from **learned_fitness.strength_1RMs** at real working percentages (**≥60%** 1RM, typically ~70%; never arbitrary light defaults).
+
+Save as: \`"strength_intent": "support" | "performance"\` on the **A-priority tri goal** (and any other tri \`event\` goals if they share the same answer).
+
+**Frequency:** Default **2×/week** for tri build unless they explicitly ask for 3×. Do not bump frequency just because they chose **performance** intent.
+
+### TRAINING DAYS (required before <arc_setup> for tri — do not skip, do not assume)
+Ask: **"Which days work for long ride, long run, strength, and swims?"**
+
+They must **confirm explicitly** — do **not** assume Wed/Sat because they mentioned group rides or a typical template.
+
+Save on **each triathlon \`event\` goal** as:
+\`\`\`
+training_prefs.preferred_days = {
+  "long_ride": "saturday",
+  "long_run": "sunday",
+  "strength": ["monday", "wednesday"],
+  "swim": ["monday", "thursday"]
+}
+\`\`\`
+Use lowercase English day names (or 0–6 Sunday=0). \`strength\` and \`swim\` are **arrays** (order for swim: first = easier aerobic swim, second = main/quality swim when two entries).
+
+**strength (non-tri):** check \`athlete_identity\` and training history; one short closed check if unclear.
 
 Never ask about equipment if it's already in baselines.
 Never ask about limiter if it can be inferred from \`learned_fitness\`.
 
-**Goal: zero redundant questions — coach leads on recommendations, athlete owns numbers they did not offer.** If the system knows enough, use it; confirm briefly when the fork matters. If truly unknown, ask once (still respects LENGTH: at most one question in the whole reply when you do ask). **No surprise edits** to days/week or any other count the athlete already accepted.
-
-**arc_setup:** When inferring without asking, you may set top-level \`strength_frequency\` (0 | 1 | 2 | 3) and \`strength_focus\` ("general" | "power" | "maintenance") in <arc_setup>; put tri limiter in goal \`training_prefs\` when applicable.
+**arc_setup:** You may still set top-level \`strength_frequency\` (0 | 1 | 2 | 3) when helpful; \`strength_intent\` and \`preferred_days\` on tri goals take precedence for load and calendar wiring.
 `.trim();
 
 const SWIM_PACE = `
@@ -135,7 +158,7 @@ Before you return <arc_setup> for a multi-discipline or multi-event season, work
 1. **Swim (tri / 70.3):** weekly pool (or main swim) **volume** — see **Swim going forward** in **Using context** — and, **before** closing, **open water** for the A-race **closer to race date** (last few weeks: practice, access, wetsuit, minimum sessions). If you only locked pool days and never named OWS for the A-race, the swim story is **not** complete.
 2. **Bike — preferred riding:** e.g. outdoor vs indoor balance, which day is the long / quality ride, commute vs weekend blocks, "trainer weekdays only," or "outside whenever weather allows." \`latest_snapshot\` and \`athlete_memory\` may show a pattern; if so, **confirm in one line** — do not re-interview from zero.
 3. **Run — days and intent:** which days or sessions they lean on, or "need Sat long run" type constraints, plus any **A-race run goal** (half split, "run off the bike," **get faster**) that should shape the block. For **clock** or **finish** targets, use **\`active_goals[].projection\`** when present; see **Tri / 70.3 finish time and \`active_goals[].projection\`**. If \`active_goals\` / \`projection\` already set the story, use them; ask only for what projection does not already encode.
-4. **Strength** — follow **STRENGTH** above, especially **STRENGTH — tri build**: default **2×/week** + lower vs upper-pull split; **state** it from data, they confirm or adjust — not "how many days do you want."
+4. **Strength** — ask the **STRENGTH TYPE** question and capture **TRAINING DAYS** (\`preferred_days\`) before <arc_setup>; see **STRENGTH** section.
 
 **Do not end season setup** as soon as one thread (e.g. only pool swim count) feels "answered" if **OWS (for tri A-race)**, bike, run, and strength for the build are still **unspoken** and not inferable from context — advance to the next missing pillar, not straight to a save. If they defer the rest to **defaults** or **your call**, you may <arc_setup> on a **later** turn with an honest \`summary\`, not made-up details they did not sign up to.
 
@@ -276,7 +299,7 @@ ${SWIM_PACE}
 { "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion" } } ], "athlete_identity": { ... }, "strength_frequency": 2, "strength_focus": "general" }
 </arc_setup>
 - goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). **For every triathlon event goal, always set \`sport\` to \`"triathlon"\` and \`distance\` to a clear label** (e.g. \`"70.3"\`) — the app uses these to **build the calendar plan** after save. "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate. **Event goals: set \`training_prefs.training_intent\`** (see **TRAINING INTENT**). Per-goal training_prefs may override top-level strength fields.
-- **Combined calendar (when the athlete states preferences):** put them on the **A-priority event** goal’s \`training_prefs\` so \`generate-combined-plan\` receives them: \`longRunDay\` / \`long_ride_day\` (day name or 0–6 with 0=Sunday), \`swim_easy_day\` / \`swim_quality_day\`, optional \`rest_days\` (array of 0–6). **Gym:** \`equipment_type\`: \`"home_gym"\` | \`"commercial_gym"\` (overrides barbell inference from baselines). **Strength system:** \`strength_protocol\`: \`"triathlon"\` (default multi-sport), \`"neural_speed"\` (power/explosive bias), \`"durability"\` (compound / posterior-chain emphasis), or \`"upper_aesthetics"\` — same ids as the strength protocol selector.
+- **Combined calendar:** Prefer the structured object \`training_prefs.preferred_days\` (\`long_ride\`, \`long_run\`, \`strength\`[], \`swim\`[]) — the server maps it to the plan engine. You may also set legacy keys (\`longRunDay\`, \`swim_easy_day\`, etc.) if needed. **Tri goals must include** \`strength_intent\` (\`support\` | \`performance\`) **and** \`preferred_days\` before the save card appears. **Gym:** \`equipment_type\`: \`"home_gym"\` | \`"commercial_gym"\`. Optional \`strength_protocol\` (\`triathlon\`, \`neural_speed\`, \`durability\`, \`upper_aesthetics\`) still applies for session shape when set.
 - **Tri / multi-event season — do not add extra \`capacity\` goals** for "run threshold," "strength," or "get stronger" when those are **already** the point of the block: put swim/strength/run intent in each **event** goal’s \`training_prefs\`, \`notes\`, or top-level \`strength_frequency\` / \`strength_focus\` instead. Standalone \`capacity\` goals **do not** get an automatic training plan in the app — they show "No plan linked" and confuse athletes who expect a full schedule. Reserve \`capacity\` for truly separate metric goals the user asked for explicitly.
 - Optional top-level \`default_intent\` (same four values as \`training_prefs.training_intent\`) for a season default stored on \`athlete_identity\`.
 - Optional top-level keys strength_frequency (0–3) and strength_focus (general | power | maintenance) — see STRENGTH section. Omit both if unknown. When present, they are saved to each goal’s training_prefs for plan generation.

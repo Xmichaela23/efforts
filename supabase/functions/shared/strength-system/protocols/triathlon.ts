@@ -60,6 +60,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
   const freq = strengthFrequency ?? 2;
+  const strengthIntent = context.triathlonContext?.strengthIntent;
 
   const phaseName = String(phase?.name ?? '').toLowerCase();
 
@@ -80,14 +81,20 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
   if (phaseName === 'base') {
     return freq >= 2
-      ? [createBasePosteriorChain(tier, limiter, weekInPhase), createBaseUpperSwim(tier, limiter, weekInPhase)]
-      : [createBasePosteriorChain(tier, limiter, weekInPhase)];
+      ? [
+        createBasePosteriorChain(tier, limiter, weekInPhase, strengthIntent),
+        createBaseUpperSwim(tier, limiter, weekInPhase, strengthIntent),
+      ]
+      : [createBasePosteriorChain(tier, limiter, weekInPhase, strengthIntent)];
   }
 
   if (phaseName === 'build') {
     return freq >= 2
-      ? [createBuildExplosiveLower(tier, limiter, weekInPhase), createBuildSwimPower(tier, limiter, weekInPhase)]
-      : [createBuildExplosiveLower(tier, limiter, weekInPhase)];
+      ? [
+        createBuildExplosiveLower(tier, limiter, weekInPhase, strengthIntent),
+        createBuildSwimPower(tier, limiter, weekInPhase),
+      ]
+      : [createBuildExplosiveLower(tier, limiter, weekInPhase, strengthIntent)];
   }
 
   // race_specific — maintenance only, single session
@@ -102,6 +109,7 @@ function createBasePosteriorChain(
   tier: EquipmentTier,
   limiter: LimiterSport,
   weekInPhase: number,
+  strengthIntent?: 'support' | 'performance',
 ): IntentSession {
   const wip   = Math.max(1, weekInPhase);
   const early = wip <= 2;
@@ -125,6 +133,17 @@ function createBasePosteriorChain(
       sets, reps: '10/leg',
       weight: 'Heaviest available', target_rir: rir,
       notes: '2s lowering, touch-and-go',
+    });
+  }
+
+  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
+    exercises.splice(1, 0, {
+      name: 'Barbell Back Squat',
+      sets,
+      reps: early ? 8 : 6,
+      weight: early ? '68% 1RM' : '72% 1RM',
+      target_rir: rir,
+      notes: 'Own the depth — stay braced',
     });
   }
 
@@ -190,6 +209,7 @@ function createBaseUpperSwim(
   tier: EquipmentTier,
   limiter: LimiterSport,
   weekInPhase: number,
+  strengthIntent?: 'support' | 'performance',
 ): IntentSession {
   const wip   = Math.max(1, weekInPhase);
   const sets  = wip <= 2 ? 3 : 4;
@@ -224,6 +244,17 @@ function createBaseUpperSwim(
     });
   }
 
+  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
+    exercises.push({
+      name: 'Barbell Bench Press',
+      sets: 3,
+      reps: 8,
+      weight: '65% 1RM',
+      target_rir: rir,
+      notes: 'Touch and drive — scapulae pinned',
+    });
+  }
+
   // ── Scapular stability (critical for all disciplines) ────────────────────
   exercises.push({
     name: 'Face Pulls',
@@ -237,6 +268,17 @@ function createBaseUpperSwim(
     weight: 'Light-moderate band',
     notes: 'Keep arms straight, pull to chest height',
   });
+
+  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
+    exercises.push({
+      name: 'Standing Barbell Overhead Press',
+      sets: 3,
+      reps: 8,
+      weight: '62% 1RM',
+      target_rir: rir,
+      notes: 'Glutes tight — press in a slight arc',
+    });
+  }
 
   // ── Swim-limiter: extra shoulder health work ───────────────────────────────
   if (limiter === 'swim') {
@@ -286,6 +328,7 @@ function createBuildExplosiveLower(
   tier: EquipmentTier,
   limiter: LimiterSport,
   weekInPhase: number,
+  strengthIntent?: 'support' | 'performance',
 ): IntentSession {
   const sets = 4;
   const rir  = 1; // working hard in Build
@@ -300,6 +343,17 @@ function createBuildExplosiveLower(
     target_rir: rir,
     notes: 'Reset fully between reps — quality over speed',
   });
+
+  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
+    exercises.push({
+      name: 'Conventional Deadlift',
+      sets: 3,
+      reps: 5,
+      weight: '75% 1RM',
+      target_rir: rir,
+      notes: 'Hinge — reset tension each rep',
+    });
+  }
 
   // ── Single-leg power ──────────────────────────────────────────────────────
   exercises.push({

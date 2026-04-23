@@ -128,6 +128,8 @@ Deno.serve(async (req: Request) => {
       swim_easy_day: state.swim_easy_day ?? null,
       swim_quality_day: state.swim_quality_day ?? null,
       strength_protocol: state.strength_protocol ?? null,
+      strength_intent: state.strength_intent ?? null,
+      strength_preferred_days: state.strength_preferred_days ?? null,
       rest_days: state.rest_days ?? [],
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),

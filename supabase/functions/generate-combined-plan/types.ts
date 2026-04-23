@@ -37,6 +37,10 @@ export interface AthleteState {
   swim_quality_day?: number;
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
+  /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */
+  strength_intent?: 'support' | 'performance';
+  /** Preferred weekdays for strength (e.g. ["Monday","Wednesday"]) from preferred_days.strength. */
+  strength_preferred_days?: string[];
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**
