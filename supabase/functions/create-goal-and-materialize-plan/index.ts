@@ -488,6 +488,61 @@ function mergeTrainingPrefsWithArcDefaults(
   return tp;
 }
 
+/** Default schedule when Arc/client omitted `preferred_days` (Sun=0 week-builder convention). */
+const DEFAULT_TRI_PREFERRED_DAYS = {
+  long_ride: 'saturday',
+  long_run: 'sunday',
+  strength: ['monday', 'wednesday'],
+  swim: ['monday', 'thursday'],
+} as const;
+
+function inferStrengthIntentFromAthleteIdentity(arc: ArcContext): 'support' | 'performance' {
+  const id = arc.athlete_identity;
+  if (!id || typeof id !== 'object') return 'support';
+  const rawSp = (id as Record<string, unknown>).season_priorities;
+  if (rawSp && typeof rawSp === 'object' && !Array.isArray(rawSp)) {
+    const st = String((rawSp as Record<string, unknown>).strength ?? '').toLowerCase().trim();
+    if (st === 'performance') return 'performance';
+  }
+  return 'support';
+}
+
+/**
+ * Defense in depth: ensure tri goals have `strength_intent` and `preferred_days` before any generator runs.
+ * Mutates `trainingPrefs` in place. Returns human-readable notes for logging (empty if nothing changed).
+ */
+function backfillTriTrainingPrefsDefenseInDepth(
+  trainingPrefs: Record<string, unknown>,
+  arc: ArcContext,
+): string[] {
+  const notes: string[] = [];
+  const si = trainingPrefs.strength_intent ?? trainingPrefs.strengthIntent;
+  if (si !== 'support' && si !== 'performance') {
+    trainingPrefs.strength_intent = inferStrengthIntentFromAthleteIdentity(arc);
+    notes.push(`strength_intent→${trainingPrefs.strength_intent}`);
+  }
+  const pdRaw = trainingPrefs.preferred_days ?? trainingPrefs.preferredDays;
+  const pd = pdRaw && typeof pdRaw === 'object' && !Array.isArray(pdRaw) ? (pdRaw as Record<string, unknown>) : null;
+  const hasPreferred =
+    pd != null &&
+    (pd.long_ride != null || pd.longRide != null) &&
+    (pd.long_run != null || pd.longRun != null) &&
+    Array.isArray(pd.strength) &&
+    pd.strength.length > 0 &&
+    Array.isArray(pd.swim) &&
+    pd.swim.length > 0;
+  if (!hasPreferred) {
+    trainingPrefs.preferred_days = {
+      long_ride: DEFAULT_TRI_PREFERRED_DAYS.long_ride,
+      long_run: DEFAULT_TRI_PREFERRED_DAYS.long_run,
+      strength: [...DEFAULT_TRI_PREFERRED_DAYS.strength],
+      swim: [...DEFAULT_TRI_PREFERRED_DAYS.swim],
+    };
+    notes.push('preferred_days→defaults');
+  }
+  return notes;
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -610,6 +665,29 @@ async function buildCombinedPlan(
 
   const focusForCombined = new Date().toISOString().slice(0, 10);
   const arcForCombined = await getArcContext(supabase, user_id, focusForCombined);
+
+  for (const g of allEventGoals || []) {
+    const sp = String(g.sport || '').toLowerCase();
+    if (sp !== 'triathlon' && sp !== 'tri') continue;
+    const prev = g.training_prefs;
+    const base =
+      prev && typeof prev === 'object' && !Array.isArray(prev)
+        ? { ...(prev as Record<string, unknown>) }
+        : {};
+    const notes = backfillTriTrainingPrefsDefenseInDepth(base, arcForCombined);
+    if (notes.length > 0) {
+      console.log(`[create-goal] combined plan training_prefs backfill goal ${g.id}:`, notes.join(', '));
+      console.log('[build] training_prefs after backfill:', base);
+      const { error: upErr } = await supabase
+        .from('goals')
+        .update({ training_prefs: base, updated_at: new Date().toISOString() })
+        .eq('id', g.id)
+        .eq('user_id', user_id);
+      if (upErr) console.warn('[buildCombinedPlan] goals training_prefs backfill update', upErr.message);
+      (g as { training_prefs: Record<string, unknown> }).training_prefs = base;
+    }
+  }
+
   const swim_volume_multiplier = swimVolumeMultiplierFromArcWorkouts(arcForCombined.swim_training_from_workouts);
 
   // Call the combined plan engine
@@ -797,7 +875,17 @@ Deno.serve(async (req: Request) => {
         resolvedGoal.sport,
         arcForPlanning,
       );
+      const sportForBackfill = String(resolvedGoal.sport || '').toLowerCase();
+      if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
+        const backfillNotes = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
+        if (backfillNotes.length > 0) {
+          console.log('[create-goal] training_prefs server backfill:', backfillNotes.join(', '));
+        }
+      }
       resolvedGoal = { ...resolvedGoal, training_prefs: mergedPrefs };
+      if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
+        console.log('[build] training_prefs after backfill:', mergedPrefs);
+      }
       if (mode === 'build_existing' && existing_goal_id) {
         await supabase
           .from('goals')
