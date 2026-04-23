@@ -70,6 +70,22 @@ function applyAdjustment(
   return { weight: adjustedWeight, adjusted: true, adjustmentId: adjustment.id };
 }
 
+/** Prefer exercise_log–derived 1RM (medium/high confidence) over stale performance_numbers. */
+function strength1RMFromLearned(
+  perfVal: number | null | undefined,
+  learned: { value?: number; confidence?: string } | null | undefined,
+): number | undefined {
+  const v = learned?.value;
+  const conf = String(learned?.confidence ?? '').toLowerCase();
+  const okVal = Number.isFinite(v) && (v as number) > 0;
+  const perfOk =
+    Number.isFinite(perfVal as number) && (perfVal as number) > 0 ? (perfVal as number) : undefined;
+  if (!okVal) return perfOk;
+  if (conf === 'high' || conf === 'medium') return v as number;
+  if (perfOk == null) return v as number;
+  return perfOk;
+}
+
 type Baselines = { 
   ftp?: number; 
   fiveK_pace?: any; fiveKPace?: any; fiveK?: any; 
@@ -1768,18 +1784,27 @@ Deno.serve(async (req) => {
         isMetric: ub?.units === 'metric',
       } as any;
 
-      // Merge learned strength 1RMs when performance_numbers is missing for that lift
+      // Strength: learned 1RMs (from exercise_log via compute-facts) override stale performance_numbers
+      // when confidence is medium/high; otherwise fill only missing perf fields.
       const learned = (typeof ub?.learned_fitness === 'string' ? JSON.parse(ub.learned_fitness || '{}') : ub?.learned_fitness) || {};
       const strength = learned?.strength_1rms || {};
-      const ok = (s: any) => (s?.confidence === 'high' || s?.confidence === 'medium') && Number.isFinite(s?.value);
-      if (ok(strength.squat) && (baselines.squat == null || baselines.squat === 0))
-        baselines.squat = strength.squat.value;
-      if (ok(strength.bench_press) && (baselines.bench == null || baselines.bench === 0))
-        baselines.bench = strength.bench_press.value;
-      if (ok(strength.deadlift) && (baselines.deadlift == null || baselines.deadlift === 0))
-        baselines.deadlift = strength.deadlift.value;
-      if (ok(strength.overhead_press) && (baselines.overheadPress1RM == null && baselines.ohp == null && baselines.overhead == null))
-        baselines.overheadPress1RM = strength.overhead_press.value;
+      const sq = strength1RMFromLearned((baselines as any).squat, strength.squat);
+      if (sq != null) (baselines as any).squat = sq;
+      const bn = strength1RMFromLearned((baselines as any).bench, strength.bench_press);
+      if (bn != null) (baselines as any).bench = bn;
+      let dl = strength1RMFromLearned((baselines as any).deadlift, strength.deadlift);
+      if (dl == null || dl === 0) {
+        const trap = strength1RMFromLearned(null, strength.trap_bar_deadlift);
+        if (trap != null) dl = trap;
+      }
+      if (dl != null) (baselines as any).deadlift = dl;
+      const ohpLearned = strength1RMFromLearned(
+        (baselines as any).overheadPress1RM ?? (baselines as any).ohp ?? (baselines as any).overhead,
+        strength.overhead_press,
+      );
+      if (ohpLearned != null) (baselines as any).overheadPress1RM = ohpLearned;
+      const hip = strength1RMFromLearned((baselines as any).hipThrust, strength.hip_thrust);
+      if (hip != null) (baselines as any).hipThrust = hip;
       if (ub?.effort_paces) {
         console.log(`[Paces] Found effort_paces from PlanWizard:`, baselines.effort_paces);
         console.log(`[Paces] Effort Score: ${ub?.effort_score || 'not set'}, Source: ${ub?.effort_paces_source || 'unknown'}`);

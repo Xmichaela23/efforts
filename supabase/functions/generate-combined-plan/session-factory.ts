@@ -327,6 +327,88 @@ export function brick(
   return [bikeSession, runSession];
 }
 
+/** Parse total yards from swim session title (e.g. "… — 2400 yd"). */
+function parseYardsFromSessionName(name: string): number | null {
+  const m = String(name).match(/(\d[\d,]*)\s*yd/i);
+  if (!m) return null;
+  return parseInt(m[1].replace(/,/g, ''), 10);
+}
+
+/**
+ * Replace a quality session with a genuine easy prescription (same day, goal, ~duration)
+ * so name, steps_preset, and description match EASY after 80/20 enforcement.
+ */
+export function downgradedEasyAerobicFrom(s: PlannedSession): PlannedSession {
+  const dur = Math.max(25, s.duration);
+  const day = s.day;
+  const goalId = s.serves_goal;
+  const timing = s.timing;
+
+  let next: PlannedSession;
+  if (s.type === 'run') {
+    const miles = Math.max(3, Math.round(dur / 9.5));
+    next = easyRun(day, miles, goalId);
+  } else if (s.type === 'bike') {
+    const hours = Math.max(0.5, dur / 60);
+    next = easyBike(day, hours, goalId);
+  } else if (s.type === 'swim') {
+    const ydFromName = parseYardsFromSessionName(s.name);
+    const yd = Math.max(1200, ydFromName ?? Math.round(dur * 38));
+    next = easySwim(day, yd, goalId);
+  } else {
+    next = s;
+  }
+
+  if (timing) next = { ...next, timing };
+  next.description = `[Adjusted to EASY — 80/20 budget] ${next.description}`;
+  return next;
+}
+
+/**
+ * Adjacent HARD days: swap HARD for a sustainable moderate session so copy matches intensity.
+ */
+export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession {
+  const day = s.day;
+  const goalId = s.serves_goal;
+  const timing = s.timing;
+  let next: PlannedSession;
+
+  if (s.type === 'bike') {
+    if (s.tags?.includes('vo2max')) {
+      const m = s.name.match(/(\d+)\s*[×x]\s*5/);
+      const reps = m ? Math.max(2, Math.min(4, parseInt(m[1], 10) - 1)) : 3;
+      next = tempoBike(day, reps, 5, goalId);
+    } else if (s.tags?.includes('threshold') || /threshold/i.test(s.name)) {
+      const m = s.name.match(/(\d+)\s*[×x]\s*(\d+)/);
+      const intervals = m ? Math.max(2, Math.min(4, parseInt(m[1], 10))) : 3;
+      const minEach = m ? Math.min(15, parseInt(m[2], 10)) : 12;
+      next = sweetSpotBike(day, intervals, minEach, goalId);
+    } else {
+      next = tempoBike(day, 3, 12, goalId);
+    }
+  } else if (s.type === 'run' && s.tags?.includes('intervals')) {
+    const m = s.name.match(/(\d+)\s*[×x]/);
+    const tempoMi = m ? Math.max(2, Math.min(5, parseInt(m[1], 10) - 1)) : 3;
+    next = tempoRun(day, tempoMi, 1.5, goalId);
+  } else if (s.type === 'swim' && (s.tags?.includes('threshold') || /threshold/i.test(s.name))) {
+    const yd = parseYardsFromSessionName(s.name) ?? Math.max(1800, s.duration * 40);
+    next = cssAerobicSwim(day, yd, goalId);
+  } else {
+    next = {
+      ...s,
+      intensity_class: 'MODERATE',
+      zone_targets: 'Z3 steady',
+      description:
+        'Moderate sustained effort (Z3 — comfortably hard). ' + s.description,
+      tags: [...(s.tags ?? []).filter(t => !['vo2max', 'intervals'].includes(t)), 'steady_state'],
+    };
+  }
+
+  if (timing) next = { ...next, timing };
+  next.description = `[Downgraded to Moderate — hard/easy day spacing] ${next.description}`;
+  return next;
+}
+
 // ── Strength sessions ─────────────────────────────────────────────────────────
 //
 // triathlonStrength and runStrength now route through the shared protocol

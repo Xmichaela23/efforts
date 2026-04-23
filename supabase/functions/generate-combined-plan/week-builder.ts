@@ -19,6 +19,7 @@ import {
   longRide, thresholdBike, vo2Bike, sweetSpotBike, tempoBike, easyBike, bikeOpeners,
   thresholdSwim, cssAerobicSwim, easySwim,
   brick, triathlonStrength, runStrength,
+  downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -71,11 +72,7 @@ function enforceHardEasy(grid: WeekGrid): void {
       // Downgrade this day's HARD sessions to MODERATE
       for (const s of slot.sessions) {
         if (s.intensity_class === 'HARD') {
-          s.intensity_class = 'MODERATE';
-          s.zone_targets = s.zone_targets.replace(/Z4|Z5|intervals/gi, 'Z3');
-          s.name = s.name.replace(/Threshold|Intervals|VO2/i, 'Steady-State');
-          s.description = '[Downgraded to Moderate — hard/easy rule] ' + s.description;
-          s.tags = [...s.tags.filter(t => !['threshold','intervals','vo2max'].includes(t)), 'steady_state'];
+          Object.assign(s, downgradedHardToModerateFrom(s));
         }
       }
     }
@@ -129,13 +126,9 @@ function enforce8020(grid: WeekGrid, phase: Phase): void {
         if (s.type !== sport || s.intensity_class === 'EASY' || isProtected) continue;
 
         const before = effectiveHardMin(s);
-        // Downgrade directly to EASY — the hard/easy day enforcement (Step 4)
-        // already handled HARD→MODERATE transitions for consecutive-day violations.
-        // This step is purely about the weekly time-in-zone budget.
-        s.intensity_class = 'EASY';
-        s.zone_targets = 'Z2';
-        s.description = `[Adjusted to EASY — 80/20 budget] ` + s.description;
-        hardMin -= before; // effectiveHardMin of EASY = 0
+        // Replace with a real easy session so name, tokens, and description match EASY.
+        Object.assign(s, downgradedEasyAerobicFrom(s));
+        hardMin -= before;
       }
     }
   }
@@ -195,6 +188,10 @@ export function buildWeek(
   const recoveryRebuildWeek1 =
     weekNum === 1 &&
     (athleteState.transition_mode === 'recovery_rebuild' || athleteState.structural_load_hint === 'low');
+
+  /** Week 2 post-marathon (`recovery_rebuild`): mid-week run stays aerobic — no intervals/tempo/MP. */
+  const recoveryRebuildWeek2EasyRunOnly =
+    weekNum === 2 && athleteState.transition_mode === 'recovery_rebuild';
 
   // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier)
   const baseTSS = scaledWeeklyTSS(phase, athleteState.current_ctl, athleteState.weekly_hours_available, block.tssMultiplier);
@@ -359,7 +356,10 @@ export function buildWeek(
   // ── WEDNESDAY: Run quality ────────────────────────────────────────────────
   const wednesdaySlot = grid.get('Wednesday');
   if (!recoveryRebuildWeek1 && !wednesdaySlot?.isRest) {
-    if (phase === 'taper') {
+    if (recoveryRebuildWeek2EasyRunOnly) {
+      const easyMi = Math.max(4, Math.round(longRunMiles * 0.35));
+      wednesdaySlot!.sessions.push(easyRun('Wednesday', easyMi, servedGoal));
+    } else if (phase === 'taper') {
       const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
       wednesdaySlot!.sessions.push(easyRun('Wednesday', taperRunMi, servedGoal));
     } else if (triApproach === 'base_first') {
