@@ -9,6 +9,7 @@ import {
   type ArcSetupPayload,
 } from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
+import { autoBuildAfterArcGoalInsert } from '@/lib/autoBuildArcGoals';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
@@ -131,7 +132,9 @@ function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
   return out;
 }
 
-async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean; error?: string }> {
+async function persistArcSetup(
+  payload: ArcSetupPayload,
+): Promise<{ ok: boolean; error?: string; planBuilt?: boolean }> {
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
@@ -147,6 +150,7 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
     return { ok: false, error: 'Nothing to save.' };
   }
 
+  let planBuilt = false;
   try {
     if (validGoals.length > 0) {
       const rows = validGoals.map((row) => {
@@ -168,6 +172,12 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
           body: { goal_ids: newGoalIds },
         });
         if (reErr) console.warn('[arc-setup] refresh-goal-race-projections', reErr.message);
+        planBuilt = await autoBuildAfterArcGoalInsert(newGoalIds);
+        if (!planBuilt) {
+          console.warn(
+            '[arc-setup] auto-build did not run or failed; user can use Build plan on the Goals screen.',
+          );
+        }
       }
     }
 
@@ -220,7 +230,7 @@ async function persistArcSetup(payload: ArcSetupPayload): Promise<{ ok: boolean;
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
       window.dispatchEvent(new CustomEvent('goals:invalidate'));
     } catch {}
-    return { ok: true };
+    return { ok: true, planBuilt };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
     return { ok: false, error: msg };
@@ -342,14 +352,18 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     if (!pendingSetup) return;
     setSending(true);
     setError(null);
-    const { ok, error: pe } = await persistArcSetup(pendingSetup.payload);
+    const { ok, error: pe, planBuilt } = await persistArcSetup(pendingSetup.payload);
     setSending(false);
     if (!ok) {
       setError(pe || 'Save failed');
       return;
     }
     setPendingSetup(null);
-    setSaveBanner('Saved. Your goals and profile are updated.');
+    setSaveBanner(
+      planBuilt
+        ? 'Saved. Goals updated — your training plan is building. Check Home; finish projections appear on Goals as they load.'
+        : 'Saved. Your goals and profile are updated.',
+    );
   };
 
   const onClarify = () => {
