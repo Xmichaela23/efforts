@@ -9,7 +9,6 @@ import {
   type ArcSetupPayload,
 } from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
-import { autoBuildAfterArcGoalInsert } from '@/lib/autoBuildArcGoals';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs';
 import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
@@ -157,9 +156,20 @@ function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
   return out;
 }
 
+/** Raw arc_setup goals: at least one event with a YYYY-MM-DD (before normalize drops invalid rows). */
+function payloadHasDatedEventGoal(payload: ArcSetupPayload | null | undefined): boolean {
+  if (!payload?.goals || !Array.isArray(payload.goals)) return false;
+  return payload.goals.some((g) => {
+    if (typeof g !== 'object' || g === null) return false;
+    const o = g as Record<string, unknown>;
+    if (o.goal_type !== 'event') return false;
+    return typeof o.target_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(o.target_date);
+  });
+}
+
 async function persistArcSetup(
   payload: ArcSetupPayload,
-): Promise<{ ok: boolean; error?: string; planBuilt?: boolean; hadGoalInserts?: boolean }> {
+): Promise<{ ok: boolean; error?: string }> {
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
@@ -178,8 +188,6 @@ async function persistArcSetup(
     return { ok: false, error: 'Nothing to save.' };
   }
 
-  let planBuilt = false;
-  let hadGoalInserts = false;
   try {
     if (validGoals.length > 0) {
       const rows = validGoals.map((row) => {
@@ -197,18 +205,11 @@ async function persistArcSetup(
         return { ok: false, error: error.message };
       }
       const newGoalIds = (data || []).map((r: { id: string }) => r.id).filter(Boolean);
-      hadGoalInserts = newGoalIds.length > 0;
       if (newGoalIds.length > 0) {
         const { error: reErr } = await supabase.functions.invoke('refresh-goal-race-projections', {
           body: { goal_ids: newGoalIds },
         });
         if (reErr) console.warn('[arc-setup] refresh-goal-race-projections', reErr.message);
-        planBuilt = await autoBuildAfterArcGoalInsert(newGoalIds);
-        if (!planBuilt) {
-          console.warn(
-            '[arc-setup] auto-build did not run or failed; user can use Build plan on the Goals screen.',
-          );
-        }
       }
     }
 
@@ -264,7 +265,7 @@ async function persistArcSetup(
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
       window.dispatchEvent(new CustomEvent('goals:invalidate'));
     } catch {}
-    return { ok: true, planBuilt, hadGoalInserts };
+    return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
     return { ok: false, error: msg };
@@ -354,14 +355,13 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         !Array.isArray(payload.athlete_identity) &&
         Object.keys(payload.athlete_identity as object).length > 0;
       const userTurnCount = nextThread.filter((m) => m.role === 'user').length;
-      const allowReadyToSave = userTurnCount >= 2;
       const stillAsking = coachVisibleProseSeeksReply(displayText);
-      if (
-        payload &&
-        (validGoals.length > 0 || hasId) &&
-        allowReadyToSave &&
-        !stillAsking
-      ) {
+      const canShowConfirmCard =
+        payload != null &&
+        userTurnCount >= 3 &&
+        !stillAsking &&
+        (payloadHasDatedEventGoal(payload) || hasId);
+      if (canShowConfirmCard) {
         const goalPreviews = validGoals.map(
           (g) => [g.name, g.goal_type, g.target_date || ''].filter(Boolean).join(' · ')
         );
@@ -387,7 +387,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     if (!pendingSetup) return;
     setSending(true);
     setError(null);
-    const { ok, error: pe, planBuilt, hadGoalInserts } = await persistArcSetup(pendingSetup.payload);
+    const { ok, error: pe } = await persistArcSetup(pendingSetup.payload);
     setSending(false);
     if (!ok) {
       setError(pe || 'Save failed');
@@ -395,14 +395,8 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     }
     setPendingSetup(null);
     setSaveBanner(null);
-    // Step 1 (arc) done — send athlete to Goals for step 2 (build plan) or to see the schedule if auto-build ran.
-    navigate('/goals', {
-      state: {
-        fromArcSetup: true,
-        planBuilt: !!planBuilt,
-        hadGoalInserts: hadGoalInserts !== false,
-      },
-    });
+    // Step 1 (arc) done — athlete builds plans per goal on the Goals screen (explicit Build Plan, no auto-build).
+    navigate('/goals', { state: { fromArcSetup: true } });
   };
 
   const onClarify = () => {

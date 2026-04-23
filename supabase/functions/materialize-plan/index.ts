@@ -590,7 +590,7 @@ function minutesTokenToSeconds(tok: string): number | null {
 
 function expandRunToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = [];
-  const lower = tok.toLowerCase();
+  const lower = String(tok ?? '').toLowerCase();
   
   // Helper: convert miles to meters
   const milesToMeters = (mi: number) => Math.round(mi * 1609.34);
@@ -850,7 +850,7 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
 }
 
 function expandBikeToken(tok: string, baselines: Baselines): any[] {
-  const out: any[] = []; const lower = tok.toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
+  const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {
     if (!ftp) return undefined;
@@ -977,7 +977,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           const equipmentNotes = substituted.notes;
           
           // Debug band exercises
-          if (name.toLowerCase().includes('band') && originalName.toLowerCase().includes('face pull')) {
+          if (String(name ?? '').toLowerCase().includes('band') && originalName.toLowerCase().includes('face pull')) {
             console.log(`🎯 Face Pulls substitution:`, { originalName, weight: (ex as any)?.weight, extractedPercent: percentRaw, finalNotes: equipmentNotes });
           }
           
@@ -1066,7 +1066,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           }
           
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
-          if (name.toLowerCase().includes('band')) {
+          if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
           steps.push({ id: uid(), kind:'strength', strength });
@@ -1194,7 +1194,7 @@ function expandTokensForRow(row: any, baselines: Baselines, adjustments: PlanAdj
           }
           
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight } as any;
-          if (name.toLowerCase().includes('band')) {
+          if (String(name ?? '').toLowerCase().includes('band')) {
             console.log(`🎸 Band exercise created:`, { name, notes: equipmentNotes, hasNotes: !!equipmentNotes });
           }
           steps.push({ id: uid(), kind:'strength', strength });
@@ -1884,7 +1884,7 @@ Deno.serve(async (req) => {
           }
           
           // Debug: Log band exercises before DB write
-          const bandSteps = v3.filter((st:any) => st?.kind === 'strength' && st?.strength?.name?.toLowerCase().includes('band'));
+          const bandSteps = v3.filter((st:any) => st?.kind === 'strength' && String(st?.strength?.name ?? '').toLowerCase().includes('band'));
           if (bandSteps.length > 0) {
             console.log(`💾 Writing ${bandSteps.length} band exercises to DB:`, bandSteps.map((st:any) => ({ name: st.strength.name, notes: st.strength.notes })));
           }

@@ -8,7 +8,6 @@ import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-
 // Local alias so existing call-sites inside this file don't need renaming
 const readStoredUserId = getStoredUserId;
 
@@ -82,6 +81,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [saving, setSaving] = useState(false);
   const [buildingGoalId, setBuildingGoalId] = useState<string | null>(null);
   const [buildError, setBuildError] = useState<{ goalId: string; message: string } | null>(null);
+  /** Brief confirmation after a successful `build_existing` (cleared after a few seconds). */
+  const [planReadyGoalId, setPlanReadyGoalId] = useState<string | null>(null);
   const [currentBaselines, setCurrentBaselines] = useState<any>(null);
   const [currentSnapshot, setCurrentSnapshot] = useState<any>(null);
   const [conflictDialog, setConflictDialog] = useState<{ goal: Goal; conflictPlan: typeof currentPlans[0] } | null>(null);
@@ -101,19 +102,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [pendingCourseGoalId, setPendingCourseGoalId] = useState<string | null>(null);
   const goalsCourseFileRef = useRef<HTMLInputElement>(null);
 
-  /** After "Plan my season" save — step 2 is Build plan (unless auto-build already ran). */
-  const [arcSetupBanner, setArcSetupBanner] = useState<{
-    planBuilt: boolean;
-    hadGoalInserts: boolean;
-  } | null>(null);
-
+  // Clear `fromArcSetup` navigation state so back/forward does not re-apply; goals list is the control center.
   useEffect(() => {
-    const st = location.state as { fromArcSetup?: boolean; planBuilt?: boolean; hadGoalInserts?: boolean } | null;
+    const st = location.state as { fromArcSetup?: boolean } | null;
     if (st?.fromArcSetup) {
-      setArcSetupBanner({
-        planBuilt: !!st.planBuilt,
-        hadGoalInserts: st.hadGoalInserts !== false,
-      });
       try {
         navigate(location.pathname, { replace: true, state: {} });
       } catch {
@@ -518,7 +510,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       onPlanBuilt?.();
-      refreshGoals();
+      await refreshGoals();
+      setPlanReadyGoalId(goal.id);
+      window.setTimeout(() => {
+        setPlanReadyGoalId((prev) => (prev === goal.id ? null : prev));
+      }, 6000);
       return { success: true };
     } catch (err: any) {
       console.error('Build plan failed:', err);
@@ -719,29 +715,86 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           </div>
         </button>
 
-        <div className="ml-[44px] mt-1">
+        <div className="ml-0 sm:ml-[44px] mt-2">
           {linkedPlan ? (
-            <button className="flex items-center gap-1 text-sm text-white/60 hover:text-white/80 transition-colors" onClick={() => onSelectPlan?.(linkedPlan.id)}>
-              <span>Plan: {linkedPlan.name}{linkedPlan.currentWeek != null && ` · Week ${linkedPlan.currentWeek}`}</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          ) : buildingGoalId === goal.id ? (
-            <div className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" />Building your plan...</div>
+            <div className="space-y-1.5">
+              {planReadyGoalId === goal.id && (
+                <p className="text-sm font-medium text-teal-300/95">Plan ready</p>
+              )}
+              <button
+                type="button"
+                className="flex w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] sm:inline-flex sm:w-auto sm:py-2"
+                onClick={() => onSelectPlan?.(linkedPlan.id)}
+              >
+                <span className="min-w-0">
+                  Plan: {linkedPlan.name}
+                  {linkedPlan.currentWeek != null && <span className="text-white/45"> · Week {linkedPlan.currentWeek}</span>}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
+              </button>
+            </div>
           ) : (() => {
             const conflictPlan = goal.goal_type === 'event' ? findConflictPlan(goal) : null;
 
-            if (goal.goal_type === 'event' && conflictPlan) return (
-              <div className="space-y-2">
-                <p className="text-xs text-white/40">You have an active plan: <span className="text-white/60">{conflictPlan.name}</span></p>
-                <div className="flex gap-2">
-                  <button className="rounded-lg bg-white/[0.08] border border-white/10 px-3 py-1.5 text-xs font-medium text-white/60 hover:bg-white/[0.12] transition-all" onClick={() => handleLinkPlan(conflictPlan.id, goal.id)}>Link existing plan</button>
-                  <button className="rounded-lg bg-white/[0.12] border border-white/15 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/[0.18] transition-all" onClick={() => handleBuildPlan(goal)}>End it · Build new →</button>
+            if (goal.goal_type === 'event' && conflictPlan) {
+              return (
+                <div className="space-y-2">
+                  <p className="text-xs text-white/40">
+                    You have an active plan: <span className="text-white/60">{conflictPlan.name}</span>
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      className="rounded-xl bg-white/[0.08] border border-white/10 px-3 py-2.5 text-xs font-medium text-white/60 hover:bg-white/[0.12] transition-all"
+                      disabled={buildingGoalId === goal.id}
+                      onClick={() => handleLinkPlan(conflictPlan.id, goal.id)}
+                    >
+                      Link existing plan
+                    </button>
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={buildingGoalId === goal.id}
+                      onClick={() => handleBuildPlan(goal)}
+                    >
+                      {buildingGoalId === goal.id ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin opacity-90" />
+                          Ending & building…
+                        </>
+                      ) : (
+                        <>
+                          <CalendarRange className="h-5 w-5 opacity-90" />
+                          Build Plan
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-            if (goal.goal_type === 'event') return (
-              <button className="text-sm text-white/50 hover:text-white/70 transition-colors" onClick={() => handleBuildPlan(goal)}>No plan yet · Build Plan →</button>
-            );
+              );
+            }
+            if (goal.goal_type === 'event') {
+              return (
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={buildingGoalId === goal.id}
+                  onClick={() => handleBuildPlan(goal)}
+                >
+                  {buildingGoalId === goal.id ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin opacity-90" />
+                      Building…
+                    </>
+                  ) : (
+                    <>
+                      <CalendarRange className="h-5 w-5 opacity-90" />
+                      Build Plan
+                    </>
+                  )}
+                </button>
+              );
+            }
             return <p className="text-sm text-white/25">No plan linked</p>;
           })()}
           {buildError?.goalId === goal.id && <p className="mt-1 text-xs text-red-400/70">{buildError.message}</p>}
@@ -1021,26 +1074,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <X className="h-5 w-5" />
         </button>
       </div>
-
-      {arcSetupBanner && (
-        <div className="mx-4 mb-3 rounded-2xl border border-teal-500/40 bg-gradient-to-b from-teal-950/80 to-zinc-950/60 px-4 py-3.5 shadow-[0_0_0_1px_rgba(20,184,166,0.12)]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-300/90">Season saved</p>
-          <p className="text-[15px] text-white/85 leading-snug mt-1.5">
-            {arcSetupBanner.planBuilt
-              ? 'Your training plan is building — check Home for workouts soon. You can still review goals below.'
-              : arcSetupBanner.hadGoalInserts
-                ? 'Step 2: tap Build plan on each race goal below to generate your calendar.'
-                : 'Your profile is updated. Add a race goal, then tap Build plan when you are ready.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => setArcSetupBanner(null)}
-            className="mt-2.5 text-sm font-medium text-teal-200/80 hover:text-teal-100/95"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
