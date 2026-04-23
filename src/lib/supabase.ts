@@ -18,23 +18,15 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
-/**
- * Authenticated user id = JWT `sub` from the persisted session access token.
- * Same claim the Edge Functions should use from the `Authorization` header — one pipeline.
- *
- * NEVER use supabase.auth.getUser() or supabase.auth.getSession() in components
- * or hooks that run on iOS — those calls trigger an XHR-based token refresh which
- * fails in WKWebView. Read the blob + decode the token locally instead.
- */
-export function getStoredUserId(): string | null {
+const SESSION_USER_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** `sub` from access_token when it is a logged-in user JWT; otherwise null. */
+function parseAuthedSubFromAccessToken(accessToken: string | undefined): string | null {
+  if (!accessToken || typeof accessToken !== 'string') return null;
+  const parts = accessToken.split('.');
+  if (parts.length !== 3) return null;
   try {
-    const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { access_token?: string };
-    const accessToken = parsed?.access_token;
-    if (!accessToken || typeof accessToken !== 'string') return null;
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) return null;
     const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
     const payload = JSON.parse(atob(b64 + pad)) as { sub?: string; role?: string; aud?: string | string[] };
@@ -47,6 +39,43 @@ export function getStoredUserId(): string | null {
     const isAnon = role === 'anon' || aud === 'anon';
     if (!isAuthed || isAnon) return null;
     return sub;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Signed-in user id for filters and edge `user_id` body fields.
+ *
+ * Prefer JWT `sub` (matches Edge `requireUserIdFromRequest` + `Authorization`).
+ * Fall back to `session.user.id` when the token is missing or not yet in the blob
+ * (Capacitor / WKWebView can persist `user` before `access_token` is readable).
+ *
+ * NEVER use supabase.auth.getUser() / getSession() on iOS — use this + the blob.
+ */
+export function getStoredUserId(): string | null {
+  try {
+    const raw = localStorage.getItem(`sb-yyriamwvtvzlkumqrvpm-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { user?: { id?: string }; access_token?: string };
+
+    const sub = parseAuthedSubFromAccessToken(parsed.access_token);
+    const fromUser =
+      typeof parsed.user?.id === 'string' && SESSION_USER_ID_RE.test(parsed.user.id.trim())
+        ? parsed.user.id.trim()
+        : null;
+
+    if (sub && fromUser && sub !== fromUser) {
+      try {
+        console.warn('[getStoredUserId] session user.id !== JWT sub; using sub', { fromUser, sub });
+      } catch {
+        void 0;
+      }
+      return sub;
+    }
+    if (sub) return sub;
+    if (fromUser) return fromUser;
+    return null;
   } catch {
     return null;
   }
