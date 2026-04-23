@@ -52,7 +52,7 @@ export async function recomputeRaceProjectionsForUser(
 
   const { data: baseline, error: bErr } = await supabase
     .from('user_baselines')
-    .select('athlete_identity, learned_fitness')
+    .select('athlete_identity, learned_fitness, performance_numbers, birthday, gender')
     .eq('user_id', userId)
     .maybeSingle();
   if (bErr) {
@@ -61,6 +61,13 @@ export async function recomputeRaceProjectionsForUser(
   }
   const learned_fitness = (baseline?.learned_fitness as LearnedFitness) || null;
   const athlete_identity = (baseline?.athlete_identity as AthleteIdentity) || null;
+  const performance_numbers =
+    baseline?.performance_numbers != null && typeof baseline.performance_numbers === 'object' && !Array.isArray(baseline.performance_numbers)
+      ? (baseline.performance_numbers as Record<string, unknown>)
+      : null;
+  const profile_birthday =
+    baseline?.birthday != null ? String(baseline.birthday).slice(0, 10) : null;
+  const profile_gender = baseline?.gender != null ? String(baseline.gender) : null;
 
   let gq = supabase
     .from('goals')
@@ -152,6 +159,9 @@ export async function recomputeRaceProjectionsForUser(
     const projection: RaceProjection = projectRaceSplits({
       learned_fitness,
       athlete_identity,
+      performance_numbers,
+      profile_birthday,
+      profile_gender,
       goal: { distance, target_date: targetDate, sport },
       course_data,
       prior_result,

@@ -67,6 +67,15 @@ Never ask about limiter if it can be inferred from \`learned_fitness\`.
 **arc_setup:** When inferring without asking, you may set top-level \`strength_frequency\` (0 | 1 | 2 | 3) and \`strength_focus\` ("general" | "power" | "maintenance") in <arc_setup>; put tri limiter in goal \`training_prefs\` when applicable.
 `.trim();
 
+const SWIM_PACE = `
+## Swim pace and equipment (read before asking)
+- **\`performance_numbers\`:** Training Baselines saves **\`swimPace100\`** as mm:ss per **100 yd** (e.g. 2:30). **\`equipment.swimming\`** lists pull buoy, paddles, etc. Use both in reasoning; do not ask the athlete to repeat them if present.
+- **\`learned_fitness.swim_pace_per_100m\`:** When present with enough sessions, it is **primary** for pace; otherwise use **\`swimPace100\`**, converted conceptually, then age-group / projection defaults the server already applied — **never** ask for a raw "what is your 100" from scratch.
+- If **\`swimPace100\`** (or learned swim) is present: reference it in one short clause, e.g. "Your logged pace is 2:30/100 yd — still about right after time off, or slower than that now?" (plain text, per LENGTH).
+- If **no** manual or learned swim pace in context: **do not** open-end. State a defensible starting band the projection math already implies (e.g. age-group or conservative pool equivalent + open water) in **your** words — not a quiz — e.g. "Without recent swim data we will plan from a ~2:35–2:45/100 yd class starting point and tighten it once you are back in the water."
+- **Never** ask the athlete to invent a pace with no anchor when defaults already exist in projection / baselines.
+`.trim();
+
 const PROJECTION_FINISH = `
 ## Tri / 70.3 finish time and \`active_goals[].projection\`
 For \`event\` tri goals, \`active_goals[].projection\` (when set) is a **server** v1 object with **explainable splits**: typically \`swim_min\`, \`t1_t2_min\`, \`bike_min\`, \`run_min\`, \`total_min\`, plus \`projection_notes\`, \`confidence\`, and \`assumptions\` when present.
@@ -133,6 +142,7 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
       athlete_memory: arc.athlete_memory,
       /** Rolling swim session facts from completed workouts — use before asking swim-volume questions. */
       swim_training_from_workouts: arc.swim_training_from_workouts,
+      performance_numbers: arc.performance_numbers,
     },
     null,
     2
@@ -158,6 +168,8 @@ ${SEASON_PLANNER_COVERAGE}
 ${RACE_RESEARCH}
 
 ${PROJECTION_FINISH}
+
+${SWIM_PACE}
 
 ## Tone (outward voice)
 - Matter-of-fact, not a pep talk. No effusive openers: never "Love it", "amazing", "great choice", "perfect", "thrilled", or similar.

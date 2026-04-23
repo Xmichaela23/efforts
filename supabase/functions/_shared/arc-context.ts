@@ -116,6 +116,10 @@ export interface ArcContext {
    */
   equipment: Record<string, unknown> | null;
   /**
+   * `user_baselines.performance_numbers` — e.g. `swimPace100`, FTP, 5K; used for projections + AL.
+   */
+  performance_numbers: Record<string, unknown> | null;
+  /**
    * Populated when we have a manual 5K and a sufficiently confident learned threshold;
    * `should_prompt` is true when the gap exceeds a small threshold (e.g. ~90s).
    */
@@ -642,12 +646,18 @@ export async function getArcContext(
     );
   }
 
+  const sp = performance_numbers as Record<string, unknown> | null;
+  if (sp && (sp['swimPace100'] != null || sp['swim_pace_100_yd'] != null)) {
+    console.log('[getArcContext] performance_numbers swim (swimPace100 or swim_pace_100_yd):', sp['swimPace100'] ?? sp['swim_pace_100_yd']);
+  }
+
   return {
     athlete_identity,
     learned_fitness,
     disciplines,
     training_background,
     equipment,
+    performance_numbers,
     five_k_nudge,
     active_goals,
     recent_completed_events,

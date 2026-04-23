@@ -13,6 +13,12 @@ export interface ProjectionInputs {
   athlete_identity: AthleteIdentity | null;
   /** Optional; reserved for later models */
   athlete_memory?: unknown;
+  /** `user_baselines.performance_numbers` (e.g. `swimPace100` mm:ss from Training Baselines) */
+  performance_numbers?: Record<string, unknown> | null;
+  /** `user_baselines.birthday` (YYYY-MM-DD) when not inside athlete_identity */
+  profile_birthday?: string | null;
+  /** `user_baselines.gender` */
+  profile_gender?: string | null;
   goal: { distance: string; target_date: string; sport: string };
   course_data?: CourseData | null;
   prior_result?: {
@@ -50,7 +56,161 @@ const BIKE_WEEKLY_RATE = 0.008; // 0.8% per week
 const SWIM_DORMANT_DAYS = 90;
 const SWIM_DORMANT_PENALTY = 0.15;
 const SWIM_FLOOR_MIN = 35;
-const SWIM_DEFAULT_NO_PRIOR = 45;
+/** 70.3 swim: 1.2 mi in meters (projection v1) */
+const SWIM_703_DISTANCE_M = 1931;
+/** Open water / navigation + conditions (applied to pool-based pace → race swim time) */
+const OPEN_WATER_SWIM_FACTOR = 1.1;
+/**
+ * Median sec/100m (pool) by age+gender for 70.3 tri swim modeling — not race truth, a defensible default.
+ * Keys: M18-24, M25-29, …, F18-24, …
+ */
+export const AGE_GROUP_SWIM_MEDIANS: Record<string, number> = {
+  'M18-24': 95,
+  'M25-29': 98,
+  'M30-34': 100,
+  'M35-39': 103,
+  'M40-44': 106,
+  'M45-49': 109,
+  'M50-54': 113,
+  'M55-59': 118,
+  'M60-64': 124,
+  'M65+': 130,
+  'F18-24': 103,
+  'F25-29': 106,
+  'F30-34': 109,
+  'F35-39': 112,
+  'F40-44': 115,
+  'F45-49': 118,
+  'F50-54': 122,
+  'F55-59': 128,
+  'F60-64': 135,
+  'F65+': 142,
+};
+
+/** Fallback OW swim minutes when no age / no data (rusty, middle-of-pack default) */
+const SWIM_FALLBACK_OW_MIN = 48;
+
+/**
+ * 5-year age band key for AGE_GROUP_SWIM_MEDIANS (e.g. 57 → M55-59, gender M|F).
+ */
+export function getAgeGroupKey(age: number, gender: 'M' | 'F'): string {
+  if (!Number.isFinite(age) || age < 12) return 'M40-44';
+  if (age >= 65) return gender === 'F' ? 'F65+' : 'M65+';
+  if (age < 25) {
+    return gender === 'F' ? 'F18-24' : 'M18-24';
+  }
+  const start = 5 * Math.floor(age / 5);
+  return `${gender}${start}-${start + 4}`;
+}
+
+function ageFromBirthYmd(ymd: string | null | undefined, ref: Date): number | null {
+  if (!ymd || !/^\d{4}-\d{2}-\d{2}/.test(ymd)) return null;
+  const b = new Date(ymd.slice(0, 10) + 'T12:00:00Z');
+  if (!Number.isFinite(b.getTime())) return null;
+  let a = ref.getUTCFullYear() - b.getUTCFullYear();
+  const md = ref.getUTCMonth() - b.getUTCMonth();
+  if (md < 0 || (md === 0 && ref.getUTCDate() < b.getUTCDate())) a -= 1;
+  return a;
+}
+
+function genderMF(ai: AthleteIdentity | null, profileGender: string | null | undefined): 'M' | 'F' {
+  const raw = (ai as Record<string, unknown> | null)?.['gender'] ?? profileGender;
+  const s = String(raw || '').toLowerCase();
+  if (s === 'f' || s === 'female') return 'F';
+  return 'M';
+}
+
+function birthYmdFromIdentity(ai: AthleteIdentity | null, profile: string | null | undefined): string | null {
+  if (profile && /^\d{4}-\d{2}-\d{2}/.test(profile)) return profile.slice(0, 10);
+  if (!ai || typeof ai !== 'object') return null;
+  const o = ai as Record<string, unknown>;
+  for (const k of ['birthday', 'birth_date', 'dob', 'date_of_birth']) {
+    const v = o[k];
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  }
+  return null;
+}
+
+function parseMMSSToSeconds(s: string | null | undefined): number | null {
+  if (s == null || !String(s).trim()) return null;
+  const t = String(s).trim();
+  const parts = t.split(':').map((p) => parseInt(p, 10));
+  if (parts.some((x) => !Number.isFinite(x))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+/** sec/100 yd (pool input) → sec/100m for same swimming speed */
+function secPer100YdToSecPer100M(secYd: number): number {
+  return secYd * (100 / 91.44);
+}
+
+/** Pool-time minutes for 70.3 distance from sec/100m, then open-water race factor */
+function ow703SwimMinFromSecPer100M(sec100m: number): number {
+  const poolMin = (SWIM_703_DISTANCE_M / 100) * (sec100m / 60);
+  return poolMin * OPEN_WATER_SWIM_FACTOR;
+}
+
+function learnedSwimPaceFromSessions(lf: LearnedFitness | null): { value: number; ok: boolean } {
+  if (!lf || typeof lf !== 'object' || Array.isArray(lf)) return { value: 0, ok: false };
+  const m = (lf as Record<string, unknown>)['swim_pace_per_100m'];
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return { value: 0, ok: false };
+  const o = m as { value?: unknown; sample_count?: unknown; confidence?: string };
+  const sc = Number(o.sample_count) || 0;
+  if (sc < 3) return { value: 0, ok: false };
+  const c = String(o.confidence || '').toLowerCase();
+  if (c === 'low' && sc < 5) return { value: 0, ok: false };
+  const v = Number(o.value);
+  if (!Number.isFinite(v) || v < 50 || v > 600) return { value: 0, ok: false };
+  return { value: v, ok: true };
+}
+
+function performanceNumbersSwimSecPer100m(perf: Record<string, unknown> | null | undefined): number | null {
+  if (!perf) return null;
+  const p =
+    (perf as Record<string, unknown>)['swimPace100'] ??
+    (perf as Record<string, unknown>)['swim_pace_100_yd'] ??
+    (perf as Record<string, unknown>)['swim_pace_100yd'];
+  const secYd = parseMMSSToSeconds(p != null ? String(p) : null);
+  if (secYd == null) return null;
+  return secPer100YdToSecPer100M(secYd);
+}
+
+/**
+ * No prior race: resolve 70.3 OW swim leg (minutes) in priority order.
+ */
+function resolveNoPrior703SwimOwMin(
+  inputs: ProjectionInputs,
+  today: Date,
+  outAssumptions: string[],
+): { swimOWMin: number; source: string } {
+  const lf = inputs.learned_fitness;
+  const ls = learnedSwimPaceFromSessions(lf);
+  if (ls.ok) {
+    outAssumptions.push('Swim: pace from completed swim data (swim_pace_per_100m, ≥3 sessions).');
+    return { swimOWMin: ow703SwimMinFromSecPer100M(ls.value), source: 'learned' };
+  }
+  const perf = inputs.performance_numbers;
+  const mPerf = performanceNumbersSwimSecPer100m(perf);
+  if (mPerf != null) {
+    outAssumptions.push('Swim: manual 100 yd pace (Training Baselines) → 100m + 70.3 distance + 10% open water.');
+    return { swimOWMin: ow703SwimMinFromSecPer100M(mPerf), source: 'performance_numbers' };
+  }
+  const ymd = birthYmdFromIdentity(inputs.athlete_identity, inputs.profile_birthday ?? null);
+  const age = ymd != null ? ageFromBirthYmd(ymd, today) : null;
+  const g = genderMF(inputs.athlete_identity, inputs.profile_gender ?? null);
+  if (age != null && age >= 15 && age < 100) {
+    const key = getAgeGroupKey(age, g);
+    const med = AGE_GROUP_SWIM_MEDIANS[key] ?? AGE_GROUP_SWIM_MEDIANS['M40-44'] ?? 106;
+    outAssumptions.push(
+      `Swim: no pace on file — age-group default (${key} median ~${(med / 60).toFixed(1)} min/100m pool) + 10% open water for 1.2 mi.`,
+    );
+    return { swimOWMin: ow703SwimMinFromSecPer100M(med), source: 'age_group' };
+  }
+  outAssumptions.push('Swim: no birthday/pace on file — conservative ~48 min open water placeholder until baselines or swims lock in.');
+  return { swimOWMin: SWIM_FALLBACK_OW_MIN, source: 'fallback' };
+}
 
 function learnedMetric(
   m: unknown,
@@ -140,8 +300,9 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
       t1t2Min = totalMin * R703.t1t2;
     }
   } else {
-    assumptions.push('No anchor race within 3y — splits from learned fitness / defaults; confidence is limited.');
-    swimMin = SWIM_DEFAULT_NO_PRIOR;
+    assumptions.push('No anchor race within 3y — bike/run from learned metrics; swim from pace pipeline (see assumptions).');
+    const resolved = resolveNoPrior703SwimOwMin(inputs, today, assumptions);
+    swimMin = resolved.swimOWMin;
     bikeMin = 180;
     runMin = thr.ok ? (HM_KM * thr.value * RUN_FATIGUE_ON_BIKE) / 60 : 120;
     t1t2Min = 10;
@@ -182,9 +343,6 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
   }
   const reintro = Math.min(Math.max(0, swimMin - SWIM_FLOOR_MIN), Math.floor(wk / 2));
   swimMin = Math.max(SWIM_FLOOR_MIN, swimMin - reintro);
-  if (!anchored && swimMin >= SWIM_DEFAULT_NO_PRIOR - 1) {
-    assumptions.push('Swim: default ~45m placeholder — low confidence if no prior race.');
-  }
 
   // Total
   t1t2Min = Math.max(3, t1t2Min);

@@ -108,6 +108,9 @@ interface LearnedFitnessProfile {
   ride_threshold_hr: LearnedMetric | null;
   ride_max_hr_observed: LearnedMetric | null;
   ride_ftp_estimated: LearnedMetric | null;
+
+  /** Median sec/100m from ≥3 completed swim workouts (replaces manual swim pace in projections when confident) */
+  swim_pace_per_100m: LearnedMetric | null;
   
   // Meta
   workouts_analyzed: number;
@@ -231,6 +234,7 @@ Deno.serve(async (req) => {
     // ==========================================================================
 
     const rideProfile = analyzeRides(rides);
+    const swimProfile = analyzeSwims(allWorkouts);
 
     // ==========================================================================
     // BUILD LEARNED PROFILE
@@ -259,6 +263,8 @@ Deno.serve(async (req) => {
       ride_threshold_hr: rideProfile.threshold_hr,
       ride_max_hr_observed: rideProfile.max_hr_observed,
       ride_ftp_estimated: rideProfile.ftp_estimated,
+
+      swim_pace_per_100m: swimProfile.swim_pace_per_100m,
       
       // Meta: count run+ride sessions in window (all included rows, not only those with HR)
       workouts_analyzed: runRideSessions,
@@ -291,10 +297,13 @@ Deno.serve(async (req) => {
       return {};
     };
     const existing = parseJsonb(existingBaselines?.learned_fitness);
-    const mergedLearned = {
+    const mergedLearned: Record<string, unknown> = {
       ...learnedProfile,
-      strength_1rms: existing?.strength_1rms
+      strength_1rms: existing?.strength_1rms,
     };
+    if (learnedProfile.swim_pace_per_100m == null && existing?.swim_pace_per_100m) {
+      mergedLearned.swim_pace_per_100m = existing.swim_pace_per_100m;
+    }
 
     const existingIdentity = parseJsonb((existingBaselines as any)?.athlete_identity);
     const userConfirmed = existingIdentity?.confirmed_by_user === true;
@@ -989,6 +998,40 @@ function extractHRMetric(workouts: WorkoutRecord[], source: string): LearnedMetr
     confidence: validHRs.length >= 5 ? 'high' : (validHRs.length >= 3 ? 'medium' : 'low'),
     source: source,
     sample_count: validHRs.length
+  };
+}
+
+interface SwimAnalysisResult {
+  swim_pace_per_100m: LearnedMetric | null;
+}
+
+/**
+ * Median sec/100m from completed swims with useful distance+time (≥3 sessions to publish).
+ */
+function analyzeSwims(all: WorkoutRecord[]): SwimAnalysisResult {
+  const swims = all.filter((w) => normType(workoutTypeFromRow(w)) === 'swim');
+  const paces: number[] = [];
+  for (const w of swims) {
+    const dist = Number(w.distance) || 0;
+    const mov = Number(w.moving_time) || Number(w.duration) || 0;
+    if (dist < 100 || dist > 200_000 || mov < 30) continue;
+    const secPer100m = mov / (dist / 100);
+    if (!Number.isFinite(secPer100m) || secPer100m < 40 || secPer100m > 600) continue;
+    paces.push(secPer100m);
+  }
+  console.log(`  🏊 Swim sessions (usable pace): ${paces.length} of ${swims.length} swim rows`);
+  if (paces.length < 3) {
+    return { swim_pace_per_100m: null };
+  }
+  const sorted = [...paces].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  return {
+    swim_pace_per_100m: {
+      value: Math.round(median),
+      confidence: paces.length >= 5 ? 'high' : 'medium',
+      source: `median sec/100m from ${paces.length} swim sessions`,
+      sample_count: paces.length,
+    },
   };
 }
 
