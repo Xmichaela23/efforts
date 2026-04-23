@@ -11,6 +11,7 @@ import {
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
+import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
 import {
   calculateEffortScore,
   estimateVdotFromBasePace,
@@ -333,6 +334,26 @@ function mergeTrainingPrefsWithArcDefaults(
     if (!String(tp.goal_type ?? '').trim()) tp.goal_type = 'complete';
   }
 
+  if (isTri || isRun) {
+    const arcDef =
+      arc.athlete_identity && typeof arc.athlete_identity === 'object' && arc.athlete_identity !== null
+        ? (arc.athlete_identity as Record<string, unknown>)['default_intent']
+        : null;
+    const sp = String(tp.goal_type ?? 'complete').toLowerCase() === 'speed' ? 'performance' : 'completion';
+    const tid = (tp as { training_intent?: unknown }).training_intent;
+    if (!String(tid ?? '').trim() && arcDef != null) {
+      const ni = normalizeTrainingIntent(arcDef, sp);
+      (tp as { training_intent: string }).training_intent = ni;
+      tp.goal_type = trainingIntentToPrefsGoalType(ni);
+    } else if (String(tid ?? '').trim()) {
+      const ni = normalizeTrainingIntent(tid, sp);
+      (tp as { training_intent: string }).training_intent = ni;
+      tp.goal_type = trainingIntentToPrefsGoalType(ni);
+    } else {
+      (tp as { training_intent: string }).training_intent = sp;
+    }
+  }
+
   if (isTri) {
     if (tp.strength_frequency == null || Number.isNaN(Number(tp.strength_frequency))) {
       tp.strength_frequency = 2;
@@ -346,8 +367,8 @@ function mergeTrainingPrefsWithArcDefaults(
       tp.limiter_sport = inferLimiterSportFromArc(arc);
     }
     if (!String(tp.tri_approach ?? '').trim()) {
-      const gt = String(tp.goal_type ?? '').toLowerCase();
-      tp.tri_approach = gt === 'speed' || gt === 'performance' ? 'race_peak' : 'base_first';
+      const intent = normalizeTrainingIntent((tp as { training_intent?: unknown }).training_intent, 'completion');
+      tp.tri_approach = intent === 'performance' ? 'race_peak' : 'base_first';
     }
   }
   return tp;
@@ -622,7 +643,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const fitness = String(resolvedGoal?.training_prefs?.fitness || 'intermediate').toLowerCase();
-    const goalType = String(resolvedGoal?.training_prefs?.goal_type || 'complete').toLowerCase();
+    const tPrefs = resolvedGoal?.training_prefs as { training_intent?: unknown; goal_type?: unknown } | undefined;
+    const goalType = (() => {
+      if (tPrefs && tPrefs.training_intent != null && String(tPrefs.training_intent).trim()) {
+        return trainingIntentToPrefsGoalType(
+          normalizeTrainingIntent(tPrefs.training_intent, 'completion'),
+        );
+      }
+      return String(tPrefs?.goal_type || 'complete').toLowerCase();
+    })();
     const postRaceRecovery = findPostRaceRecoveryContext(arcForPlanning.recent_completed_events, sport);
 
     // ── Triathlon path ────────────────────────────────────────────────────
@@ -740,6 +769,10 @@ Deno.serve(async (req: Request) => {
         equipment_type: hasBarbellCapability(triBaseline?.equipment?.strength ?? []) ? 'commercial_gym' : 'home_gym',
         // Limiter sport from training prefs (used to shift strength emphasis)
         limiter_sport: resolvedGoal?.training_prefs?.limiter_sport ?? undefined,
+        training_intent: normalizeTrainingIntent(
+          (resolvedGoal?.training_prefs as { training_intent?: unknown } | undefined)?.training_intent,
+          goalType === 'speed' ? 'performance' : 'completion',
+        ),
         // Approach: 'base_first' for completion athletes, 'race_peak' for performance.
         // Derived from goal type if not explicitly set in training_prefs.
         approach: resolvedGoal?.training_prefs?.tri_approach

@@ -11,6 +11,7 @@ export type RaceResearchRow = {
 
 /**
  * Load prior web_search cache rows for this user so the model can avoid redundant searches.
+ * Requires `race_courses.race_date` and `race_courses.course_data` (see migrations/20260422200000_race_courses_research_cache.sql).
  */
 export async function loadWebSearchRaceCache(supabase: Supabase, userId: string): Promise<RaceResearchRow[]> {
   const { data, error } = await supabase

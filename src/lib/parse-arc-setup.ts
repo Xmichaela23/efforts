@@ -1,9 +1,16 @@
+import type { TrainingIntent } from '@/lib/training-intent';
+
 const ARC_SETUP_RE = /<arc_setup>\s*([\s\S]*?)\s*<\/arc_setup>/i;
 
 export type ArcSetupPayload = {
   summary?: string;
   goals?: unknown[];
   athlete_identity?: Record<string, unknown>;
+  /**
+   * Arc-level default for `training_prefs.training_intent` when a goal omits it.
+   * @see `src/lib/training-intent.ts`
+   */
+  default_intent?: TrainingIntent;
   /** Optional top-level; merged into each goal's training_prefs when saving */
   strength_frequency?: 0 | 1 | 2 | 3;
   strength_focus?: 'general' | 'power' | 'maintenance';

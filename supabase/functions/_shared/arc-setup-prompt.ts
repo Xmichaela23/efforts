@@ -142,6 +142,22 @@ Before you return <arc_setup> for a multi-discipline or multi-event season, work
 This section does not override **LENGTH** (two sentences) or **at most one question**; it tells you *what* to cover across turns, not to cram a checklist into one message.
 `.trim();
 
+const TRAINING_INTENT = `
+## TRAINING INTENT (inferred — never a direct "what is your intent" form question)
+**Infer and encode** so plan generation can calibrate load and recovery.
+
+- For **each \`event\` goal**, set \`training_prefs.training_intent\` to exactly one of: \`"performance"\` | \`"completion"\` | \`"comeback"\` | \`"first_race"\`.
+- **Optionally** set top-level \`default_intent\` to the same enum when it applies to the **whole** season; per-goal \`training_prefs\` may still override for mixed seasons (e.g. performance A-race, completion B-race).
+
+**Reads (use conversation + context, not a keyword table):**
+- \`performance\` — PR hunt, "getting faster", sub-X, racing the clock, serious build.
+- \`completion\` — finish healthy, durability over speed, "good day" more than a PR.
+- \`comeback\` — returning from injury or long layoff; **conservative ramp** and respect holes in training history.
+- \`first_race\` — debut at the distance or first tri; skills and exposure over optimization.
+
+**Do not** ask "What is your training intent?" Only **confirm in \`summary\` text** if two interpretations are **equally** likely from the thread. The app has no separate intent UI.
+`.trim();
+
 function fiveKBlock(arc: ArcContext): string {
   const n = arc.five_k_nudge;
   if (!n?.should_prompt) return '';
@@ -214,6 +230,8 @@ ${STRENGTH}
 
 ${SEASON_PLANNER_COVERAGE}
 
+${TRAINING_INTENT}
+
 ${RACE_RESEARCH}
 
 ${PROJECTION_FINISH}
@@ -254,12 +272,13 @@ ${SWIM_PACE}
 - **Multi-discipline completeness** — same as **What to lock**; swim alone is not a full season.
 - When the athlete is ready to commit, or you have a clear picture, add ONE block exactly like this (valid JSON inside the tag, no markdown fences):
 <arc_setup>
-{ "summary": "…", "goals": [ ... ], "athlete_identity": { ... }, "strength_frequency": 2, "strength_focus": "general" }
+{ "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion" } } ], "athlete_identity": { ... }, "strength_frequency": 2, "strength_focus": "general" }
 </arc_setup>
-- goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). **For every triathlon event goal, always set \`sport\` to \`"triathlon"\` and \`distance\` to a clear label** (e.g. \`"70.3"\`) — the app uses these to **build the calendar plan** after save. "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate. Per-goal training_prefs may override top-level strength fields.
+- goals: array of objects. Each should include at least "name" and "goal_type" (one of: event, capacity, maintenance). For event goals include when known: "target_date" (YYYY-MM-DD), "sport" (e.g. run, ride, swim, triathlon), "distance" (e.g. marathon, half, 5k, 70.3). **For every triathlon event goal, always set \`sport\` to \`"triathlon"\` and \`distance\` to a clear label** (e.g. \`"70.3"\`) — the app uses these to **build the calendar plan** after save. "priority" A/B/C if inferable, default A. "notes" is optional. For capacity use "target_metric" / "target_value" as appropriate. **Event goals: set \`training_prefs.training_intent\`** (see **TRAINING INTENT**). Per-goal training_prefs may override top-level strength fields.
 - **Tri / multi-event season — do not add extra \`capacity\` goals** for "run threshold," "strength," or "get stronger" when those are **already** the point of the block: put swim/strength/run intent in each **event** goal’s \`training_prefs\`, \`notes\`, or top-level \`strength_frequency\` / \`strength_focus\` instead. Standalone \`capacity\` goals **do not** get an automatic training plan in the app — they show "No plan linked" and confuse athletes who expect a full schedule. Reserve \`capacity\` for truly separate metric goals the user asked for explicitly.
+- Optional top-level \`default_intent\` (same four values as \`training_prefs.training_intent\`) for a season default stored on \`athlete_identity\`.
 - Optional top-level keys strength_frequency (0–3) and strength_focus (general | power | maintenance) — see STRENGTH section. Omit both if unknown. When present, they are saved to each goal’s training_prefs for plan generation.
-- athlete_identity: flat JSON; merge with existing only for keys you can justify from the chat. Do not stuff inferred equipment here to justify naming it in prose.
+- athlete_identity: flat JSON; merge with existing only for keys you can justify from the chat. Do not stuff inferred equipment here to justify naming it in prose. \`default_intent\` is also written here when you set the top-level \`default_intent\` key.
 - Outside <arc_setup>, the athlete only sees a tiny human reply; the tag is also processed separately. Do not wrap your entire reply in the tag; only the JSON lives inside <arc_setup>.
 - Never put markdown code fences around <arc_setup>.
 `.trim();

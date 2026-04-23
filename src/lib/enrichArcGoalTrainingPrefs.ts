@@ -1,5 +1,6 @@
 import type { GoalInsert } from '@/hooks/useGoals';
 import type { ArcContextPayload } from '@/lib/fetch-arc-context';
+import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
 
 function hasBarbellCapability(strengthEquipment: string[]): boolean {
   return (
@@ -40,6 +41,25 @@ export function enrichGoalInsertWithArcContext(row: GoalInsert, arc: ArcContextP
   if (!String(tp.fitness ?? '').trim()) tp.fitness = 'intermediate';
   if (!String(tp.goal_type ?? '').trim()) tp.goal_type = 'complete';
 
+  const arcIdentity = (arc as { athlete_identity?: Record<string, unknown> | null })?.athlete_identity;
+  const goalSpeedFallback = (String(tp.goal_type).toLowerCase() === 'speed' ? 'performance' : 'completion') as TrainingIntent;
+  const intentOnRow = (tp as { training_intent?: unknown }).training_intent;
+  if (!String(intentOnRow ?? '').trim()) {
+    const def =
+      arcIdentity && typeof arcIdentity === 'object' && arcIdentity !== null ? arcIdentity['default_intent'] : null;
+    if (def != null) {
+      const ni = normalizeTrainingIntent(def, goalSpeedFallback);
+      (tp as { training_intent: string }).training_intent = ni;
+      tp.goal_type = trainingIntentToPrefsGoalType(ni);
+    } else {
+      (tp as { training_intent: string }).training_intent = goalSpeedFallback;
+    }
+  } else {
+    const ni = normalizeTrainingIntent(intentOnRow, goalSpeedFallback);
+    (tp as { training_intent: string }).training_intent = ni;
+    tp.goal_type = trainingIntentToPrefsGoalType(ni);
+  }
+
   if (isTri) {
     if (tp.strength_frequency == null || Number.isNaN(Number(tp.strength_frequency))) {
       tp.strength_frequency = 2;
@@ -53,8 +73,11 @@ export function enrichGoalInsertWithArcContext(row: GoalInsert, arc: ArcContextP
       tp.limiter_sport = inferLimiterFromArc(arc);
     }
     if (!String(tp.tri_approach ?? '').trim()) {
-      const gt = String(tp.goal_type ?? '').toLowerCase();
-      tp.tri_approach = gt === 'speed' || gt === 'performance' ? 'race_peak' : 'base_first';
+      const intent = normalizeTrainingIntent(
+        (tp as { training_intent?: unknown }).training_intent,
+        goalSpeedFallback,
+      );
+      tp.tri_approach = intent === 'performance' ? 'race_peak' : 'base_first';
     }
   }
 

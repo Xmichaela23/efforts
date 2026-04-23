@@ -19,6 +19,9 @@
  */
 export type TriApproach = 'base_first' | 'race_peak';
 
+/** Mirrors `goals.training_prefs.training_intent` — shapes load and recovery when set. */
+export type TrainingIntent = 'performance' | 'completion' | 'comeback' | 'first_race';
+
 export interface GenerateTriPlanRequest {
   user_id: string;
   /** sprint | olympic | 70.3 | ironman */
@@ -58,6 +61,8 @@ export interface GenerateTriPlanRequest {
   equipment_type?: 'home_gym' | 'commercial_gym';
   /** Athlete's weakest triathlon discipline — shifts strength exercise emphasis. */
   limiter_sport?: 'swim' | 'bike' | 'run';
+  /** From goal training_prefs; e.g. comeback → more frequent recovery weeks. */
+  training_intent?: TrainingIntent;
 
   units?: 'imperial' | 'metric';
 
@@ -116,6 +121,7 @@ export interface TriGeneratorParams {
   current_acwr?: number;
   volume_trend?: 'building' | 'holding' | 'declining';
   transition_mode?: string;
+  training_intent?: TrainingIntent;
 
   strength_frequency?: number;
 

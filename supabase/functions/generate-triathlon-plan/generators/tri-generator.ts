@@ -16,6 +16,7 @@ import {
   TriWeeklySummary,
   TRI_VOLUME,
   TriDistance,
+  type TrainingIntent,
 } from '../types.ts';
 
 import { triathlonProtocol } from '../../shared/strength-system/protocols/triathlon.ts';
@@ -189,7 +190,12 @@ export class TriathlonGenerator {
     // Recovery week interval:
     //   base_first → 2:1 (every 3rd week) — slower-recovering completion athletes
     //   race_peak  → 3:1 (every 4th week) — progressive overload for performance
-    const recoveryInterval = approach === 'base_first' ? 3 : 4;
+    //   comeback / first_race → more frequent recovery (every 2nd week) — conservative ramp
+    const intent = this.params.training_intent as TrainingIntent | undefined;
+    const recoveryInterval = (() => {
+      if (intent === 'comeback' || intent === 'first_race') return 2;
+      return approach === 'base_first' ? 3 : 4;
+    })();
     const taperStart = phases.find(p => p.name === 'Taper')?.start_week ?? d;
     const recovery_weeks: number[] = [];
     for (let w = recoveryInterval; w < taperStart; w += recoveryInterval) {

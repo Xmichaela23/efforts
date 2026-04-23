@@ -43,6 +43,12 @@ export function validateRequest(req: GenerateTriPlanRequest): ValidationResult {
       ![0, 1, 2].includes(req.strength_frequency))
     errors.push('strength_frequency must be 0, 1, or 2');
 
+  const validIntent = ['performance', 'completion', 'comeback', 'first_race'] as const;
+  if (req.training_intent !== undefined &&
+      !validIntent.includes(req.training_intent as (typeof validIntent)[number])) {
+    errors.push(`training_intent must be one of: ${validIntent.join(', ')}`);
+  }
+
   return { valid: errors.length === 0, errors, warnings };
 }
 

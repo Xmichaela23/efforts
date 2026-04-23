@@ -13,6 +13,7 @@ import { autoBuildAfterArcGoalInsert } from '@/lib/autoBuildArcGoals';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs';
 import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
+import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
@@ -39,11 +40,16 @@ function defaultTrainingFitness(raw: unknown): 'beginner' | 'intermediate' | 'ad
   return 'intermediate';
 }
 
-/** training_prefs.goal_type: complete vs speed (not the DB column `goals.goal_type` = event) */
+/** Legacy training_prefs.goal_type before training_intent (complete vs speed; not the DB column `goals.goal_type` = event) */
 function defaultTrainingGoalType(raw: unknown): 'complete' | 'speed' {
   const s = String(raw ?? '').toLowerCase().trim();
   if (s === 'speed' || s === 'performance') return 'speed';
   return 'complete';
+}
+
+function inferIntentFromLegacyPrefs(tp: Record<string, unknown>, g: Record<string, unknown>): TrainingIntent {
+  if (defaultTrainingGoalType(tp.goal_type ?? g.goal_type) === 'speed') return 'performance';
+  return 'completion';
 }
 
 function coalesceStrengthFrequency(
@@ -59,7 +65,11 @@ function coalesceStrengthFrequency(
 
 function normalizeGoalInput(
   g: Record<string, unknown>,
-  parent?: { strength_frequency?: 0 | 1 | 2 | 3; strength_focus?: string },
+  parent?: {
+    strength_frequency?: 0 | 1 | 2 | 3;
+    strength_focus?: string;
+    default_intent?: string;
+  },
 ): GoalInsert | null {
   const name = typeof g.name === 'string' && g.name.trim() ? g.name.trim() : null;
   if (!name) return null;
@@ -119,7 +129,12 @@ function normalizeGoalInput(
         (sportLower === 'run' || sportLower === 'triathlon' || sportLower === 'tri');
       if (needsBuildPrefs) {
         tp.fitness = defaultTrainingFitness(tp.fitness);
-        tp.goal_type = defaultTrainingGoalType(tp.goal_type);
+        const intent = normalizeTrainingIntent(
+          g.training_intent ?? parent?.default_intent,
+          inferIntentFromLegacyPrefs(tp, g),
+        );
+        (tp as Record<string, unknown>).training_intent = intent;
+        tp.goal_type = trainingIntentToPrefsGoalType(intent);
       }
       return tp;
     })(),
@@ -132,6 +147,7 @@ function collectValidGoals(payload: ArcSetupPayload): GoalInsert[] {
   const parent = {
     strength_frequency: payload.strength_frequency,
     strength_focus: payload.strength_focus,
+    default_intent: payload.default_intent,
   };
   for (const g of Array.isArray(payload.goals) ? payload.goals : []) {
     if (typeof g !== 'object' || g === null) continue;
@@ -152,11 +168,13 @@ async function persistArcSetup(
   const idPatch = (payload.athlete_identity && typeof payload.athlete_identity === 'object' && !Array.isArray(payload.athlete_identity))
     ? (payload.athlete_identity as Record<string, unknown>)
     : null;
+  const hasDefaultIntent =
+    payload.default_intent != null && String(payload.default_intent).trim() !== '';
   const hadGoalSlots = Array.isArray(payload.goals) && payload.goals.length > 0;
   if (hadGoalSlots && validGoals.length === 0 && !idPatch) {
     return { ok: false, error: 'No valid goals in the draft. Ask the coach to resend a proper <arc_setup> block.' };
   }
-  if (validGoals.length === 0 && !idPatch) {
+  if (validGoals.length === 0 && !idPatch && !hasDefaultIntent) {
     return { ok: false, error: 'Nothing to save.' };
   }
 
@@ -202,7 +220,7 @@ async function persistArcSetup(
       }
     }
 
-    if (idPatch) {
+    if (idPatch || hasDefaultIntent) {
       const { data: ub, error: fe } = await supabase
         .from('user_baselines')
         .select('id, athlete_identity')
@@ -214,10 +232,13 @@ async function persistArcSetup(
       const prev = (ub?.athlete_identity as Record<string, unknown>) || {};
       const merged: Record<string, unknown> = {
         ...prev,
-        ...idPatch,
+        ...(idPatch || {}),
         confirmed_by_user: true,
         arc_setup_confirmed_at: new Date().toISOString(),
       };
+      if (hasDefaultIntent) {
+        merged.default_intent = normalizeTrainingIntent(payload.default_intent, 'completion');
+      }
       if (ub?.id) {
         const { error: ue } = await supabase
           .from('user_baselines')

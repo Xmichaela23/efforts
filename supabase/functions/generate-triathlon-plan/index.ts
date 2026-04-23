@@ -74,6 +74,7 @@ Deno.serve(async (req: Request) => {
       current_acwr:                request.current_acwr,
       volume_trend:                request.volume_trend,
       transition_mode:             request.transition_mode,
+      training_intent:             request.training_intent,
       strength_frequency:          request.strength_frequency ?? 0,
       equipment_type:              request.equipment_type,
       limiter_sport:               request.limiter_sport,
