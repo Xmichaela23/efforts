@@ -35,7 +35,8 @@ export function coachVisibleProseSeeksReply(visible: string): boolean {
 }
 
 /**
- * Triathlon event goals must have strength_intent + preferred_days (long ride/run, strength[], swim[])
+ * Triathlon event goals must have strength_intent + preferred_days (long ride/run, strength[], swim[],
+ * quality_run + easy_run for weekly run rhythm)
  * before the confirm card appears — matches Arc coach instructions.
  */
 export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload | null): boolean {
@@ -62,6 +63,21 @@ export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload 
     if (!Array.isArray(st) || st.length === 0) return false;
     const sw = pdo.swim;
     if (!Array.isArray(sw) || sw.length === 0) return false;
+    const qRun =
+      pdo.quality_run ??
+      pdo.qualityRun ??
+      pdo.tempo_run ??
+      pdo.tempoRun ??
+      pdo.run_quality ??
+      pdo.runQuality;
+    const eRun =
+      pdo.easy_run ??
+      pdo.easyRun ??
+      pdo.mid_week_easy_run ??
+      pdo.midWeekEasyRun ??
+      pdo.recovery_run ??
+      pdo.recoveryRun;
+    if (qRun == null || eRun == null) return false;
     return true;
   });
 }

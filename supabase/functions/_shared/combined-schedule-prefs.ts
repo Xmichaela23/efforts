@@ -108,12 +108,24 @@ export function parsePreferredDaysPatch(
       return idx !== undefined ? titleCaseWeekdayFromIndex(idx) : String(x).trim();
     }).filter((s) => s.length > 0);
   }
+  const qRun = parseSunFirstDayIndex(
+    o.quality_run ?? o.qualityRun ?? o.tempo_run ?? o.tempoRun ?? o.run_quality,
+  );
+  const eRun = parseSunFirstDayIndex(
+    o.easy_run ?? o.easyRun ?? o.mid_week_easy_run ?? o.midWeekEasyRun ?? o.recovery_run,
+  );
+  if (qRun !== undefined) patch.run_quality_day = qRun;
+  if (eRun !== undefined) patch.run_easy_day = eRun;
   return patch;
 }
 
 export interface CombinedSchedulePrefs {
   long_run_day?: number;
   long_ride_day?: number;
+  /** Mid-week tempo / threshold / intervals (tri combined template). 0=Sun … 6=Sat */
+  run_quality_day?: number;
+  /** Mid-week easy aerobic run. 0=Sun … 6=Sat */
+  run_easy_day?: number;
   swim_easy_day?: number;
   swim_quality_day?: number;
   rest_days?: number[];
@@ -158,6 +170,8 @@ export function mergeCombinedSchedulePrefs(
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
     if (pdPatch.swim_easy_day !== undefined) out.swim_easy_day = pdPatch.swim_easy_day;
     if (pdPatch.swim_quality_day !== undefined) out.swim_quality_day = pdPatch.swim_quality_day;
+    if (pdPatch.run_quality_day !== undefined) out.run_quality_day = pdPatch.run_quality_day;
+    if (pdPatch.run_easy_day !== undefined) out.run_easy_day = pdPatch.run_easy_day;
     if (pdPatch.strength_preferred_days?.length) {
       out.strength_preferred_days = pdPatch.strength_preferred_days;
     }

@@ -35,6 +35,10 @@ export interface AthleteState {
   swim_easy_day?: number;
   /** Quality/CSS/threshold swim day. Default: Thursday. */
   swim_quality_day?: number;
+  /** Mid-week run quality (tempo / threshold / intervals). Default: Wednesday. */
+  run_quality_day?: number;
+  /** Mid-week easy aerobic run. Default: Friday. */
+  run_easy_day?: number;
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */

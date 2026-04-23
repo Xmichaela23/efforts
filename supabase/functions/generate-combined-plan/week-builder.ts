@@ -346,6 +346,20 @@ export function buildWeek(
     }
   }
 
+  const runQualityIdx =
+    athleteState.run_quality_day != null
+      ? (athleteState.run_quality_day + 6) % 7
+      : DAYS_OF_WEEK.indexOf('Wednesday');
+  let runQualityDay = DAYS_OF_WEEK[runQualityIdx] ?? 'Wednesday';
+  const runEasyIdx =
+    athleteState.run_easy_day != null
+      ? (athleteState.run_easy_day + 6) % 7
+      : DAYS_OF_WEEK.indexOf('Friday');
+  let runEasyDay = DAYS_OF_WEEK[runEasyIdx] ?? 'Friday';
+  if (runQualityDay === runEasyDay) {
+    runEasyDay = adjDay(runEasyDay, 1);
+  }
+
   // ── TUESDAY: Bike quality ─────────────────────────────────────────────────
   const tuesdaySlot = grid.get('Tuesday');
   if (!recoveryRebuildWeek1 && !tuesdaySlot?.isRest && hasTri) {
@@ -376,36 +390,36 @@ export function buildWeek(
     }
   }
 
-  // ── WEDNESDAY: Run quality ────────────────────────────────────────────────
-  const wednesdaySlot = grid.get('Wednesday');
-  if (!recoveryRebuildWeek1 && !wednesdaySlot?.isRest) {
+  // ── Run quality (default Wednesday; from Arc `preferred_days.quality_run`) ──
+  const runQualitySlot = grid.get(runQualityDay);
+  if (!recoveryRebuildWeek1 && !runQualitySlot?.isRest) {
     if (recoveryRebuildWeek2EasyRunOnly) {
       const easyMi = Math.max(4, Math.round(longRunMiles * 0.35));
-      wednesdaySlot!.sessions.push(easyRun('Wednesday', easyMi, servedGoal));
+      runQualitySlot!.sessions.push(easyRun(runQualityDay, easyMi, servedGoal));
     } else if (phase === 'taper') {
       const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
-      wednesdaySlot!.sessions.push(easyRun('Wednesday', taperRunMi, servedGoal));
+      runQualitySlot!.sessions.push(easyRun(runQualityDay, taperRunMi, servedGoal));
     } else if (triApproach === 'base_first') {
       // base_first: Z3 tempo throughout — no intervals until Race-Specific.
       if (phase === 'race_specific') {
         const rpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
-        wednesdaySlot!.sessions.push(marathonPaceRun('Wednesday', rpMiles, servedGoal)); // race-pace comfort
+        runQualitySlot!.sessions.push(marathonPaceRun(runQualityDay, rpMiles, servedGoal)); // race-pace comfort
       } else {
         // Build and Base: tempo (Z3) — builds muscular endurance safely
         const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
-        wednesdaySlot!.sessions.push(tempoRun('Wednesday', tempoMi, 1.5, servedGoal));
+        runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
       }
     } else {
       // race_peak: VO2 intervals in build, marathon pace in RS
       if (phase === 'race_specific') {
         const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
-        wednesdaySlot!.sessions.push(marathonPaceRun('Wednesday', mpMiles, servedGoal));
+        runQualitySlot!.sessions.push(marathonPaceRun(runQualityDay, mpMiles, servedGoal));
       } else if (phase === 'build') {
         const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
-        wednesdaySlot!.sessions.push(tempoRun('Wednesday', tempoMi, 1.5, servedGoal));
+        runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
       } else {
         // Base: easy intervals to introduce neuromuscular load
-        wednesdaySlot!.sessions.push(intervalRun('Wednesday', 6, phase, servedGoal));
+        runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
       }
     }
   }
@@ -452,13 +466,13 @@ export function buildWeek(
     }
   }
 
-  // ── FRIDAY: Easy run (cross-sport recovery credit — §4.4) ─────────────────
-  const fridaySlot = grid.get('Friday');
-  if (!fridaySlot?.isRest && !isRecovery && !['taper', 'recovery'].includes(phase)) {
+  // ── Mid-week easy run (default Friday; from Arc `preferred_days.easy_run`) ─
+  const runEasySlot = grid.get(runEasyDay);
+  if (!runEasySlot?.isRest && !isRecovery && !['taper', 'recovery'].includes(phase)) {
     const easyMi = recoveryRebuildWeek1
       ? Math.min(30, Math.max(3, Math.round(longRunMiles * 0.35)))
       : Math.max(3, Math.round(longRunMiles * 0.30));
-    fridaySlot!.sessions.push(easyRun('Friday', easyMi, servedGoal));
+    runEasySlot!.sessions.push(easyRun(runEasyDay, easyMi, servedGoal));
   }
 
   // ── STRENGTH ──────────────────────────────────────────────────────────────

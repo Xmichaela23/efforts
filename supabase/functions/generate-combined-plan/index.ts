@@ -130,6 +130,8 @@ Deno.serve(async (req: Request) => {
       long_ride_day: state.long_ride_day ?? null,
       swim_easy_day: state.swim_easy_day ?? null,
       swim_quality_day: state.swim_quality_day ?? null,
+      run_quality_day: state.run_quality_day ?? null,
+      run_easy_day: state.run_easy_day ?? null,
       strength_protocol: state.strength_protocol ?? null,
       strength_intent: state.strength_intent ?? null,
       strength_preferred_days: state.strength_preferred_days ?? null,

@@ -492,6 +492,8 @@ function mergeTrainingPrefsWithArcDefaults(
 const DEFAULT_TRI_PREFERRED_DAYS = {
   long_ride: 'saturday',
   long_run: 'sunday',
+  quality_run: 'wednesday',
+  easy_run: 'friday',
   strength: ['monday', 'wednesday'],
   swim: ['monday', 'thursday'],
 } as const;
@@ -535,10 +537,23 @@ function backfillTriTrainingPrefsDefenseInDepth(
     trainingPrefs.preferred_days = {
       long_ride: DEFAULT_TRI_PREFERRED_DAYS.long_ride,
       long_run: DEFAULT_TRI_PREFERRED_DAYS.long_run,
+      quality_run: DEFAULT_TRI_PREFERRED_DAYS.quality_run,
+      easy_run: DEFAULT_TRI_PREFERRED_DAYS.easy_run,
       strength: [...DEFAULT_TRI_PREFERRED_DAYS.strength],
       swim: [...DEFAULT_TRI_PREFERRED_DAYS.swim],
     };
     notes.push('preferred_days→defaults');
+  } else if (pd) {
+    let touched = false;
+    if (pd.quality_run == null && pd.qualityRun == null) {
+      pd.quality_run = DEFAULT_TRI_PREFERRED_DAYS.quality_run;
+      touched = true;
+    }
+    if (pd.easy_run == null && pd.easyRun == null) {
+      pd.easy_run = DEFAULT_TRI_PREFERRED_DAYS.easy_run;
+      touched = true;
+    }
+    if (touched) notes.push('preferred_days→run_days_defaults');
   }
   return notes;
 }
@@ -713,6 +728,12 @@ async function buildCombinedPlan(
         : {}),
       ...(combinedSchedulePrefs.swim_quality_day !== undefined
         ? { swim_quality_day: combinedSchedulePrefs.swim_quality_day }
+        : {}),
+      ...(combinedSchedulePrefs.run_quality_day !== undefined
+        ? { run_quality_day: combinedSchedulePrefs.run_quality_day }
+        : {}),
+      ...(combinedSchedulePrefs.run_easy_day !== undefined
+        ? { run_easy_day: combinedSchedulePrefs.run_easy_day }
         : {}),
       ...(combinedSchedulePrefs.strength_protocol
         ? { strength_protocol: combinedSchedulePrefs.strength_protocol }
