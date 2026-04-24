@@ -205,6 +205,12 @@ Athletes should **feel** swim, bike, run, and strength **addressed in turn**, no
 - **Races-only messages:** You may confirm dates and A/B priority in the same beat **only if** the athlete already named the races; still end that turn with the **next** question on **swim** (not strength). Do not assign A/B from dates and immediately ask strength before bike/run have appeared.
 - **"Your call" / defaults:** If they defer, state defaults **per pillar across successive turns** (swim proposal → next message bike → …), not every discipline in one reply.
 
+## Schedule commits — no duplicate questions
+- Before each reply, read the **thread** and **DRAFT LOCK-IN**. If \`quality_bike\` / \`easy_bike\`, \`quality_run\` / \`easy_run\`, \`long_ride\`, \`long_run\`, \`swim\`[], or \`strength\`[] are **already decided** (explicit weekdays + athlete ack, or already in DRAFT LOCK-IN), **do not** ask for that block again.
+- **Short acks** (\`yes\`, \`either\`, \`that's fine\`, \`works\`, \`ok\`) mean **yes to your immediately previous concrete proposal** — restate the weekdays you are locking in one short clause, then ask only the **next** still-missing piece (e.g. after bike is locked, ask run — not bike again).
+- **Banned:** Bike quality/easy days were agreed (e.g. Tuesday quality, Thursday easy + "yes"), then after run setup you ask again which days for quality bike and easy bike.
+- **Group rides / commutes** (e.g. Wednesday group ride) **consume** that day's bike story — fold into \`preferred_days\` and **do not** treat mid-week bike as unset unless the **solo** quality or easy slot is still missing.
+
 **Do not end season setup** as soon as one thread (e.g. only pool swim count) feels "answered" if **OWS (for tri A-race)**, bike, run, and strength for the build are still **unspoken** and not inferable from context — advance to the **next pillar in order**, not straight to a save. If they defer the rest to **defaults** or **your call**, you may <arc_setup> on a **later** turn with an honest \`summary\`, not made-up details they did not sign up to.
 
 This section does not override **LENGTH** (two sentences) or **at most one question**; it requires **which** question you ask each turn and **forbids** stacking unrelated disciplines into one coach message.
@@ -318,7 +324,8 @@ export function buildConfirmedSoFarSection(draft: unknown): string {
   return [
     '## DRAFT LOCK-IN (last <arc_setup> in this chat only; not saved until Looks right)',
     ...lines,
-    'Do not re-litigate lines above unless the athlete changes them. Stay terse; one question max.',
+    'Do not re-litigate lines above unless the athlete changes them. Also honor weekdays already agreed in the **visible thread** even if this draft is stale — no duplicate questions for the same days.',
+    'Stay terse; one question max.',
   ].join('\n');
 }
 
@@ -423,6 +430,7 @@ ${SWIM_PACE}
 - **<arc_setup> when the *season story* is ready, not when one keyword lands:** For tri/70.3, do not emit <arc_setup> while big pillars (at least swim posture, bike preference, run pattern/goal, strength — per **What to lock before <arc_setup>**) are still **unset** in meaning and not in context, unless the athlete has clearly deferred the rest. After they answer a substantive point, your next turn usually **moves the arc forward** (next pillar, or a confirm that ends in \`?\` if the app should hold the save card) — not <arc_setup> the same moment you finally understood their *words*. Do not jump ahead; do not re-litigate their phrasing.
 - **Multi-discipline completeness** — same as **What to lock**; swim alone is not a full season.
 - **Discipline break-out:** Follow **Discipline pacing** in **What to lock before <arc_setup>**. Do not ask **STRENGTH TYPE** in the same turn as the first swim-limit read if **bike** and **run** pillars have not yet had a focused turn (or a one-line confirm from context). Do not merge swim + strength + bike + run into one reply.
+- **No schedule re-asks:** Follow **Schedule commits — no duplicate questions**. Never ask again for bike or run weekdays that the thread or DRAFT LOCK-IN already settled.
 - When the athlete is ready to commit, or you have a clear picture, add ONE block exactly like this (valid JSON inside the tag, no markdown fences):
 <arc_setup>
 { "summary": "…", "default_intent": "performance", "goals": [ { "name": "…", "goal_type": "event", "training_prefs": { "training_intent": "completion", "strength_intent": "performance", "equipment_type": "home_gym", "preferred_days": { "long_ride": "saturday", "quality_bike": "tuesday", "easy_bike": "wednesday", "long_run": "sunday", "quality_run": "thursday", "easy_run": "friday", "strength": ["monday","wednesday"], "swim": ["friday","sunday"] } } } ], "athlete_identity": { "training_intent": "performance", "season_priorities": { "strength": "performance", "run": "performance", "bike": "build", "swim": "minimal" } }, "strength_frequency": 2, "strength_focus": "general" }
