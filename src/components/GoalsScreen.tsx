@@ -761,7 +761,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const isExpanded = expandedGoalId === goal.id;
     const pastRaceDate = goal.goal_type === 'event' ? formatPastRaceDate(goal.target_date) : null;
     const pastRaceTime = goal.goal_type === 'event' ? formatPastRaceTime(goal.current_value) : null;
-    const isPastRaceResult = goal.goal_type === 'event' && goal.status === 'completed' && !!pastRaceTime;
+    const isInactiveEvent = goal.goal_type === 'event' && goal.status !== 'active';
+    const isPastRaceResult = isInactiveEvent && !!pastRaceTime;
     const displayName = isPastRaceResult
       ? [goal.name, pastRaceDate, pastRaceTime].filter(Boolean).join(' ')
       : goal.name;
@@ -814,11 +815,34 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
         <div className="ml-0 sm:ml-[44px] mt-2">
           {goal.status !== 'active' ? (
-            <p className="text-xs text-white/40 leading-relaxed">
-              {isPastRaceResult
-                ? 'Saved from your official elapsed race result.'
-                : 'This goal is no longer active.'}
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-white/40 leading-relaxed">
+                {isPastRaceResult
+                  ? 'Saved from your official elapsed race result.'
+                  : 'This goal is no longer active.'}
+              </p>
+              {isInactiveEvent && !isPastRaceResult && (
+                <button
+                  type="button"
+                  className="w-full rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-xs font-medium text-amber-100/90 hover:bg-amber-500/15 transition-all"
+                  onClick={() => {
+                    navigate('/profile/athletic-record?addRace=1', {
+                      state: {
+                        athleticRecordAddRace: {
+                          goalId: goal.id,
+                          name: goal.name,
+                          date: goal.target_date || undefined,
+                          distance: goal.distance || undefined,
+                          sport: goal.sport || undefined,
+                        },
+                      },
+                    });
+                  }}
+                >
+                  Add elapsed result
+                </button>
+              )}
+            </div>
           ) : linkedPlan ? (
             <div className="space-y-1.5">
               {planReadyGoalId === goal.id && (

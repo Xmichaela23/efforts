@@ -42,6 +42,7 @@ type RaceRow = {
 };
 
 type AddRacePrefill = {
+  goalId?: string;
   name?: string;
   date?: string;
   distance?: string;
@@ -222,6 +223,37 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+      } else if (addPrefill?.goalId) {
+        const { data: existing } = await supabase
+          .from('goals')
+          .select('training_prefs')
+          .eq('id', addPrefill.goalId)
+          .eq('user_id', uid)
+          .maybeSingle();
+        const currentPrefs =
+          existing?.training_prefs && typeof existing.training_prefs === 'object'
+            ? (existing.training_prefs as Record<string, unknown>)
+            : {};
+        const { error } = await supabase
+          .from('goals')
+          .update({
+            status: 'completed',
+            current_value: sec,
+            training_prefs: {
+              ...currentPrefs,
+              manual_athletic_record: true,
+              race_result: {
+                actual_seconds: sec,
+                time_source: 'manual_elapsed',
+                completed_at: new Date().toISOString(),
+              },
+            },
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', addPrefill.goalId)
+          .eq('user_id', uid);
+        if (error) throw error;
+        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
       } else {
         const { error } = await supabase.from('goals').insert({
           user_id: uid,
@@ -414,19 +446,21 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
       >
         <DialogContent className="bg-zinc-900 border border-white/10 text-white max-w-md">
           <DialogHeader>
-            <DialogTitle>{addPrefill?.planId ? 'Save race result' : 'Add race result'}</DialogTitle>
+            <DialogTitle>{addPrefill?.planId || addPrefill?.goalId ? 'Save race result' : 'Add race result'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-xs text-white/50">
               {addPrefill?.planId
                 ? 'My Record saves this elapsed-first race result and moves the plan to past.'
+                : addPrefill?.goalId
+                  ? 'My Record saves this elapsed result to the existing past goal.'
                 : <>Enter <span className="text-amber-200/80">elapsed</span> (chip) time, not moving time.</>}
             </p>
             <label className="block text-xs text-white/60">Name</label>
             <input
               value={addName}
               onChange={(e) => setAddName(e.target.value)}
-              disabled={Boolean(addPrefill?.planId)}
+              disabled={Boolean(addPrefill?.planId || addPrefill?.goalId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded"
               placeholder="City Marathon 2026"
             />
@@ -435,14 +469,14 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
               type="date"
               value={addDate}
               onChange={(e) => setAddDate(e.target.value)}
-              disabled={Boolean(addPrefill?.planId)}
+              disabled={Boolean(addPrefill?.planId || addPrefill?.goalId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded"
             />
             <label className="block text-xs text-white/60">Distance</label>
             <select
               value={addDistance}
               onChange={(e) => setAddDistance(e.target.value)}
-              disabled={Boolean(addPrefill?.planId)}
+              disabled={Boolean(addPrefill?.planId || addPrefill?.goalId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded"
             >
               <option value="5K">5K</option>
