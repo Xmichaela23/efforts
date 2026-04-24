@@ -1,4 +1,5 @@
 import type { ArcContext } from './arc-context.ts';
+import { SCHEDULE_RULES } from './arc-setup-schedule-rules.ts';
 
 const SCOPE_SEASON_ONLY = `
 ## SCOPE — SEASON SETUP ONLY
@@ -397,6 +398,8 @@ ${REGISTER_AND_TESTABILITY}
 ${COACHING_DOCTRINE}
 
 ${ENGINE_VOCAB}
+
+${SCHEDULE_RULES}
 
 ${SCOPE_SEASON_ONLY}
 
