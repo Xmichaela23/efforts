@@ -241,10 +241,68 @@ unless they say they train twice a day or do doubles.
 5. Lower body strength + long run on the same day
 6. Lower body strength + quality run on the same day
 7. Lower body strength + long ride on the same day
-8. Two quality sessions of any kind on the same day
-   (If group maps to **quality_bike**, that **is** the one quality for that day.)
-9. Long ride + long run on the same day
-   (Exception: brick = long ride + SHORT 2-3mi run only)
+8. **quality_bike** + **quality_swim** on the same day
+9. **quality_swim** + **quality_run** on the same day — **only** when **QUALITY SWIM + QUALITY RUN SAME DAY** allows it; otherwise **forbidden**
+10. Same day cannot stack **quality_bike** with another quality modality except the nuanced **quality_swim** + **quality_run** rule (when allowed). If group maps to **quality_bike**, that **is** the only quality that day.
+11. Long ride + long run on the same day
+    (Exception: brick = long ride + SHORT 2-3mi run only)
+
+---
+
+### QUALITY SWIM + QUALITY RUN SAME DAY
+
+Align with engine session types: **base_first** → **CSS aerobic swim** (**MODERATE**);
+**race_peak** → **threshold swim** (**HARD**). Use \`training_prefs.tri_approach\` /
+\`tri_approach\` when set; infer from **training_intent** if needed (**completion**
+→ often **base_first**, **performance** → often **race_peak**).
+
+**By approach (engine behavior):**
+
+- **base_first** (CSS aerobic — **MODERATE**):
+  ✓ **Acceptable** — CSS aerobic swim + **quality_run** same day is standard
+  tri training (AM swim / PM run or vice versa).
+
+- **race_peak** (threshold swim — **HARD**):
+  ✗ **Avoid** — two **HARD** sessions same day is too much for most age-group
+  athletes in peak weeks. Move threshold swim to its own day or make that swim
+  **easy** for scheduling. **Flag and ask** when proposing.
+
+**Default for age-group athletes:** When in doubt, **CSS aerobic + quality_run**
+= acceptable; **threshold swim + quality_run** = **flag and ask**.
+
+**Practical schedule building:** Thursday **quality_run** + **quality_swim** works
+for **base_first** and early build. In **race_peak** peak weeks, **separate** them
+if possible.
+
+**By experience (coach judgment — encode in \`training_prefs.notes\` or ask):**
+
+**FIRST_RACE / BEGINNER** (\`training_intent\`: \`first_race\` or \`completion\`
+with no prior **70.3** in **\`recent_completed_events\`** / identity):
+✗ **Never** same day — **quality_swim** and **quality_run** on **separate** days
+always. More recovery between hard pieces. **Flag and separate** regardless of
+approach.
+
+**INTERMEDIATE** (1–3 prior **70.3** finishes, \`completion\` or \`performance\`):
+✓ **CSS aerobic** (**MODERATE**) + **quality_run** same day — acceptable.
+✗ **Threshold swim** (**HARD**) + **quality_run** — avoid in peak weeks; prefer
+split days.
+
+**EXPERIENCED / PERFORMANCE** (3+ **70.3**-class finishes or strong signal,
+\`training_intent\`: \`performance\`):
+✓ **CSS aerobic** + **quality_run** — fine.
+✓ **Threshold swim** + **quality_run** — acceptable with clear **AM/PM** split;
+**flag** if they report high fatigue or injury history.
+
+**How to determine experience:**
+- **\`recent_completed_events\`** for prior **70.3** finishes
+- **\`training_intent\`**: \`performance\` suggests more experience (not sufficient alone)
+- **\`athlete_identity\`** when it states distance history
+- If unclear, **one** question: "Is this your first **70.3** or have you done the
+  distance before?"
+- **Default to INTERMEDIATE rules** when uncertain.
+
+**Never assume** an athlete can handle **doubles** without checking experience.
+What works for a seasoned age-grouper can injure a first-timer.
 
 ---
 
@@ -292,14 +350,16 @@ Easy swim pairs well with:
 ✓ Easy run days (Friday)
 ✓ Rest-adjacent days
 
-Quality swim (CSS intervals) pairs well with:
+Quality swim (CSS / threshold per **tri_approach**) pairs well with:
 ✓ Thursday (default) — day after quality bike
-✗ Never same day as quality bike or quality run
+✗ Never same day as **quality_bike**
+✗ Never same day as **quality_run** unless **QUALITY SWIM + QUALITY RUN SAME DAY** allows it
 ✗ Never long ride or long run day
 
 Two swim days per week minimum for 70.3:
 - Session 1: Easy/technique (Monday default)
-- Session 2: Quality/CSS (Thursday default)
+- Session 2: Quality/CSS (Thursday default) — may share a weekday with
+  **quality_run** only when that section allows it
 
 ---
 
@@ -337,10 +397,10 @@ Mid-week:   Easy bike — solo short Z2 **or** a **group ride** per **GROUP RIDE
            on a group-ride day — place **quality_run** on a **different** day.
            Solo short easy bike + quality_run only if doubles are confirmed.
 
-Thursday:  Quality swim (CSS intervals — 1800-2500yd)
-           Upper body strength (bench, row, OHP, pull)
-           If **quality_run** lands here, **do not** also stack **quality_swim** —
-           move **quality_swim** first.
+Thursday:  Default: **quality_swim** (1800–2500yd; CSS vs threshold per **tri_approach**)
+           + upper body strength. If **quality_run** is also Thursday, use
+           **QUALITY SWIM + QUALITY RUN SAME DAY** (first **70.3** → separate days;
+           **base_first** → same day often OK; **race_peak** peak → split or **flag**).
 
 Friday:    Easy run (3-5mi conversational Z2)
 
@@ -392,7 +452,8 @@ Limited to 5 training days:
 - Taper and recovery week structure
 
 ### BEFORE PROPOSING ANY SCHEDULE
-1. Map every session against the hard conflict rules and **DOUBLE SESSION SAFETY RULE**
+1. Map every session against the hard conflict rules, **DOUBLE SESSION SAFETY RULE**,
+   and **QUALITY SWIM + QUALITY RUN SAME DAY** (experience + approach)
 2. Verify 48hr spacing around quality and long sessions
 3. Confirm strength days don't conflict with key sessions
 4. Propose the complete week in one statement
