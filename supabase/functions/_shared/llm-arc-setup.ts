@@ -1,9 +1,9 @@
 /**
- * AL arc setup: Sonnet + optional Anthropic web search, including pause_turn continuation.
+ * Arc setup: Opus (highest-stakes seasonal conversation) + optional Anthropic web search, including pause_turn continuation.
  */
 import { MODELS, type ConversationMessage } from './llm.ts';
 
-const SONNET = MODELS.sonnet;
+const ARC_SETUP_MODEL = MODELS.opus;
 
 const WEB_SEARCH_TOOL = {
   type: 'web_search_20250305' as const,
@@ -106,7 +106,7 @@ export async function callClaudeArcSetupConversation(opts: {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: SONNET,
+        model: ARC_SETUP_MODEL,
         system: opts.system,
         messages: workingMessages,
         max_tokens: opts.maxTokens ?? 4096,

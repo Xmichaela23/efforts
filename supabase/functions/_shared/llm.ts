@@ -15,14 +15,16 @@ export type LLMOptions = {
   user: string;
   maxTokens?: number;
   temperature?: number;
-  /** Override model — defaults to COACH_MODEL (haiku). Pass 'sonnet' for higher quality. */
-  model?: 'haiku' | 'sonnet' | string;
+  /** Override model — defaults to haiku. Pass 'sonnet' or 'opus' for higher quality. */
+  model?: 'haiku' | 'sonnet' | 'opus' | string;
 };
 
 // Model aliases — update here to roll all functions forward at once
 export const MODELS = {
   haiku: 'claude-haiku-4-5-20251001',
   sonnet: 'claude-sonnet-4-6',
+  /** Season arc setup only — higher reasoning for multi-constraint scheduling. */
+  opus: 'claude-opus-4-6',
 } as const;
 
 const DEFAULT_MODEL: keyof typeof MODELS = 'haiku';
@@ -39,7 +41,7 @@ export async function callLLM(opts: LLMOptions): Promise<string | null> {
   }
 
   const modelId =
-    opts.model === 'haiku' || opts.model === 'sonnet'
+    opts.model === 'haiku' || opts.model === 'sonnet' || opts.model === 'opus'
       ? MODELS[opts.model]
       : (opts.model ?? MODELS[DEFAULT_MODEL]);
 
@@ -85,7 +87,7 @@ export async function callClaudeConversation(opts: {
   messages: ConversationMessage[];
   maxTokens?: number;
   temperature?: number;
-  model?: 'haiku' | 'sonnet' | string;
+  model?: 'haiku' | 'sonnet' | 'opus' | string;
 }): Promise<string | null> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) {
@@ -102,7 +104,7 @@ export async function callClaudeConversation(opts: {
   }
 
   const modelId =
-    opts.model === 'haiku' || opts.model === 'sonnet'
+    opts.model === 'haiku' || opts.model === 'sonnet' || opts.model === 'opus'
       ? MODELS[opts.model]
       : (opts.model ?? MODELS[DEFAULT_MODEL]);
 
