@@ -14,6 +14,7 @@ import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
+import { useAppContext } from '@/contexts/AppContext';
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -161,6 +162,8 @@ function RaceSection({
   courseBusy,
   onAddCourse,
   onViewStrategy,
+  /** When set, RACE shows official chip time and hides the training “Projected” model. */
+  officialResult,
 }: {
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
@@ -176,6 +179,7 @@ function RaceSection({
   courseBusy: boolean;
   onAddCourse: () => void;
   onViewStrategy: () => void;
+  officialResult: { actual_seconds: number; goal_target_seconds: number | null } | null;
 }) {
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
@@ -197,6 +201,38 @@ function RaceSection({
       : statedSec != null
         ? fmtGoalClock(statedSec)
         : projection?.plan_goal_display ?? null;
+  if (officialResult) {
+    return (
+      <div className="px-3 py-3 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase">RACE</span>
+          <span className="text-[11px] text-white/55">{distLabel} · result on file</span>
+        </div>
+        {statedGoalDisplay != null && (
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[10px] text-white/45 leading-snug">Your goal</p>
+            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
+              {statedGoalDisplay}
+            </span>
+          </div>
+        )}
+        <div className="flex flex-col gap-0.5">
+          <p className="text-[10px] text-white/45 leading-snug">Completed</p>
+          <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
+            {fmtGoalClock(officialResult.actual_seconds)}
+          </span>
+          <p className="text-[10px] text-white/40 leading-snug max-w-[min(100%,320px)]">
+            Official finish: elapsed (chip) time, not moving time. Training “projected” time is hidden once this result is saved.
+          </p>
+        </div>
+        {officialResult.goal_target_seconds != null && (
+          <p className="text-[11px] text-white/50">
+            {fmtSignedDeltaVsGoal(officialResult.actual_seconds, officialResult.goal_target_seconds)}
+          </p>
+        )}
+      </div>
+    );
+  }
   /** Server fitness clock — prefer full race_readiness so headline matches delta + sections (same model path). */
   const projectedFromTraining =
     rr?.predicted_finish_display ??
@@ -434,6 +470,7 @@ export default function StateTab({
   onSelectWorkout?: (workout: any) => void;
 }) {
   const { data, loading, error, refresh, revalidating } = coachData;
+  const { refreshPlans } = useAppContext();
   const coachBusy = loading || Boolean(revalidating);
   const { liftTrends } = useExerciseLog(8);
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
@@ -445,6 +482,10 @@ export default function StateTab({
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
   const [raceCompleteBusy, setRaceCompleteBusy] = useState(false);
   const [raceCompleteError, setRaceCompleteError] = useState<string | null>(null);
+  const [fetchedOfficialResult, setFetchedOfficialResult] = useState<{
+    actual_seconds: number;
+    goal_target_seconds: number | null;
+  } | null>(null);
 
   const raceReadiness = pickRaceReadinessFromCoachData(data as CoachWeekContextV1 | null);
   const raceFinishProjection = pickRaceFinishProjectionV1FromCoachData(data as CoachWeekContextV1 | null);
@@ -525,6 +566,45 @@ export default function StateTab({
     raceReadiness ? 1 : 0,
   ]);
 
+  useEffect(() => {
+    if (!resolvedGoalId) {
+      setFetchedOfficialResult(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data: row, error: rowErr } = await supabase
+        .from('goals')
+        .select('status, current_value, target_time, goal_type')
+        .eq('id', resolvedGoalId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (rowErr || !row) {
+        setFetchedOfficialResult(null);
+        return;
+      }
+      if (
+        String((row as { goal_type?: string }).goal_type) === 'event' &&
+        String((row as { status?: string }).status) === 'completed' &&
+        typeof (row as { current_value?: number }).current_value === 'number' &&
+        (row as { current_value: number }).current_value > 0
+      ) {
+        const cv = (row as { current_value: number }).current_value;
+        const tt = (row as { target_time?: number | null }).target_time;
+        setFetchedOfficialResult({
+          actual_seconds: Math.round(cv),
+          goal_target_seconds:
+            tt != null && Number.isFinite(Number(tt)) && Number(tt) > 0 ? Math.round(Number(tt)) : null,
+        });
+      } else {
+        setFetchedOfficialResult(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedGoalId]);
+
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -599,6 +679,21 @@ export default function StateTab({
   const raceYmdForActivePlan =
     goalLinkedToPlan?.target_date?.slice(0, 10) ||
     (activePlanEntry?.race_date ? String(activePlanEntry.race_date).slice(0, 10) : null);
+
+  const lastCompletedRace = data.last_completed_race ?? null;
+  const officialFromCoach =
+    lastCompletedRace &&
+    ((resolvedGoalId && lastCompletedRace.goal_id === resolvedGoalId) ||
+      (pe?.id && lastCompletedRace.goal_id === pe.id) ||
+      (goalLinkedToPlan?.id && lastCompletedRace.goal_id === goalLinkedToPlan.id) ||
+      (projGid && lastCompletedRace.goal_id === projGid))
+      ? {
+          actual_seconds: lastCompletedRace.actual_seconds,
+          goal_target_seconds: lastCompletedRace.goal_target_seconds,
+        }
+      : null;
+  const officialForRace = fetchedOfficialResult ?? officialFromCoach;
+  const showTopLastRaceCard = Boolean(lastCompletedRace && !officialForRace);
   const showRecordRaceComplete =
     Boolean(
       wsv.plan.has_active_plan &&
@@ -607,7 +702,8 @@ export default function StateTab({
         asYmd >= raceYmdForActivePlan &&
         goalLinkedToPlan &&
         isRunPrimary(goalLinkedToPlan) &&
-        String(goalLinkedToPlan.goal_type || 'event') === 'event',
+        String(goalLinkedToPlan.goal_type || 'event') === 'event' &&
+        !officialForRace,
     );
 
   async function onRecordRaceComplete() {
@@ -634,6 +730,7 @@ export default function StateTab({
       try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+      void refreshPlans?.();
       refresh();
     } catch (e) {
       setRaceCompleteError((e as Error)?.message || String(e));
@@ -739,7 +836,6 @@ export default function StateTab({
   // ── NEXT row ─────────────────────────────────────────────────────────────
   const sessionsRemaining = data.week?.key_sessions_remaining ?? [];
   const nextSessions = sessionsRemaining.slice(0, 3);
-  const lastCompletedRace = data.last_completed_race ?? null;
 
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
@@ -809,7 +905,7 @@ export default function StateTab({
         {/* LOAD — full-width gauge + sparkline */}
         <LoadBar load={load} loadStatus={loadStatus} readinessState={readiness} weekIntent={week.intent} />
 
-        {lastCompletedRace && (
+        {showTopLastRaceCard && lastCompletedRace && (
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
             <p className="text-[10px] font-semibold tracking-[0.12em] text-white/50 uppercase">Last race</p>
             <p className="text-[12px] text-white/80">
@@ -997,7 +1093,7 @@ export default function StateTab({
         </div>
 
         {/* RACE — show when active plan or projection/readiness/goal meta exists (same finish anchor as terrain when available). */}
-        {(wsv.plan?.has_active_plan || raceFinishProjection || raceReadiness || goalMeta) && (
+        {(wsv.plan?.has_active_plan || raceFinishProjection || raceReadiness || goalMeta || officialForRace) && (
           <RaceSection
             projection={raceFinishProjection}
             rr={raceReadiness}
@@ -1023,6 +1119,7 @@ export default function StateTab({
                   }
                 : undefined
             }
+            officialResult={officialForRace}
           />
         )}
 
