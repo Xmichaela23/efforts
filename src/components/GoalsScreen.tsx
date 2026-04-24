@@ -50,6 +50,21 @@ function getSportIcon(s: string | null) {
   return SPORT_ICONS[String(s).toLowerCase()] ?? null;
 }
 
+function formatPastRaceDate(date: string | null): string | null {
+  if (!date) return null;
+  return format(new Date(date + 'T12:00:00'), 'M/d/yy');
+}
+
+function formatPastRaceTime(seconds: number | null | undefined): string | null {
+  if (seconds == null || !Number.isFinite(Number(seconds)) || Number(seconds) <= 0) return null;
+  const total = Math.round(Number(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return s === 0 ? `${h}:${String(m).padStart(2, '0')}` : `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function inferSportFromPlanConfig(config: any, planType?: string): string {
   if (config?.sport) return String(config.sport).toLowerCase();
   const dist = String(config?.distance || '').toLowerCase();
@@ -744,6 +759,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const paceTargetSec =
       coachPredCard ?? resolveEventTargetTimeSeconds(goal, linkedPlan?.config as Record<string, unknown> | undefined);
     const isExpanded = expandedGoalId === goal.id;
+    const pastRaceDate = goal.goal_type === 'event' ? formatPastRaceDate(goal.target_date) : null;
+    const pastRaceTime = goal.goal_type === 'event' ? formatPastRaceTime(goal.current_value) : null;
+    const isPastRaceResult = goal.goal_type === 'event' && goal.status === 'completed' && !!pastRaceTime;
+    const displayName = isPastRaceResult
+      ? [goal.name, pastRaceDate, pastRaceTime].filter(Boolean).join(' ')
+      : goal.name;
 
     return (
       <div key={goal.id} className={`rounded-2xl border p-4 transition-all duration-200 ${isExpanded ? 'border-white/20 bg-white/[0.06]' : 'border-white/10 bg-white/[0.04]'}`}>
@@ -755,11 +776,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-lg font-medium text-white/90 truncate">{goal.name}</span>
+                <span className="text-lg font-medium text-white/90 truncate">{displayName}</span>
                 {goal.priority !== 'A' && <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">{goal.priority}</span>}
                 {goal.status === 'paused' && <span className="shrink-0 rounded-full bg-yellow-500/15 px-2 py-0.5 text-[11px] font-medium text-yellow-400/70">Paused</span>}
+                {isPastRaceResult && <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-300/80">Past</span>}
               </div>
-              {goal.goal_type === 'event' && goal.target_date && (
+              {isPastRaceResult ? (
+                <div className="mt-1 flex items-center gap-2 text-sm text-white/45">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>Elapsed finish time</span>
+                </div>
+              ) : goal.goal_type === 'event' && goal.target_date && (
                 <div className="mt-1 flex items-center gap-2 text-sm text-white/50">
                   <Calendar className="h-3.5 w-3.5" />
                   <span>{format(new Date(goal.target_date + 'T12:00:00'), 'MMM d, yyyy')}</span>
@@ -786,7 +813,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         </button>
 
         <div className="ml-0 sm:ml-[44px] mt-2">
-          {linkedPlan ? (
+          {goal.status !== 'active' ? (
+            <p className="text-xs text-white/40 leading-relaxed">
+              {isPastRaceResult
+                ? 'Saved from your official elapsed race result.'
+                : 'This goal is no longer active.'}
+            </p>
+          ) : linkedPlan ? (
             <div className="space-y-1.5">
               {planReadyGoalId === goal.id && (
                 <p className="text-sm font-medium text-teal-300/95">Plan ready</p>
