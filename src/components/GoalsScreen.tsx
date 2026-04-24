@@ -65,6 +65,15 @@ function formatPastRaceTime(seconds: number | null | undefined): string | null {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function parseElapsedRaceTimeInput(input: string): number | null {
+  const parts = input.trim().split(':').map((p) => Number.parseInt(p, 10));
+  if (parts.length < 2 || parts.length > 3 || parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  // Race cards accept H:MM for marathon-style results such as "4:44".
+  if (parts[0] <= 12 && parts[1] < 60) return parts[0] * 3600 + parts[1] * 60;
+  return parts[0] * 60 + parts[1];
+}
+
 function inferSportFromPlanConfig(config: any, planType?: string): string {
   if (config?.sport) return String(config.sport).toLowerCase();
   const dist = String(config?.distance || '').toLowerCase();
@@ -825,18 +834,38 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 <button
                   type="button"
                   className="w-full rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-xs font-medium text-amber-100/90 hover:bg-amber-500/15 transition-all"
-                  onClick={() => {
-                    navigate('/profile/athletic-record?addRace=1', {
-                      state: {
-                        athleticRecordAddRace: {
-                          goalId: goal.id,
-                          name: goal.name,
-                          date: goal.target_date || undefined,
-                          distance: goal.distance || undefined,
-                          sport: goal.sport || undefined,
+                  onClick={async () => {
+                    const input = window.prompt('Elapsed finish time (H:MM or H:MM:SS)', '4:44');
+                    if (input == null) return;
+                    const seconds = parseElapsedRaceTimeInput(input);
+                    if (seconds == null || seconds <= 0) {
+                      window.alert('Enter elapsed time like 4:44 or 4:44:00.');
+                      return;
+                    }
+                    const currentPrefs =
+                      goal.training_prefs && typeof goal.training_prefs === 'object'
+                        ? goal.training_prefs
+                        : {};
+                    const updated = await updateGoal(goal.id, {
+                      status: 'completed',
+                      current_value: seconds,
+                      training_prefs: {
+                        ...currentPrefs,
+                        manual_athletic_record: true,
+                        race_result: {
+                          actual_seconds: seconds,
+                          time_source: 'manual_elapsed',
+                          completed_at: new Date().toISOString(),
                         },
                       },
                     });
+                    if (!updated) {
+                      window.alert('Could not save elapsed result. Please try again.');
+                      return;
+                    }
+                    try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch {}
+                    try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                    refreshGoals();
                   }}
                 >
                   Add elapsed result
