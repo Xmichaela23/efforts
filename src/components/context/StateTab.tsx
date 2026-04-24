@@ -955,12 +955,15 @@ export default function StateTab({
           ...(postRaceUnofficial?.workoutId ? { workout_id: postRaceUnofficial.workoutId } : {}),
         },
       });
-      if (fnErr) throw fnErr;
-      const errBody =
-        fnData && typeof fnData === 'object' && 'error' in fnData
-          ? String((fnData as { error?: string }).error || '')
-          : '';
-      if (errBody) throw new Error(errBody);
+      const payload = fnData as { error?: string; success?: boolean } | null;
+      const serverError =
+        (payload && typeof payload.error === 'string' && payload.error.trim() ? payload.error : '') || '';
+      if (fnErr) {
+        throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
+      }
+      if (serverError && !payload?.success) {
+        throw new Error(serverError);
+      }
       try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }

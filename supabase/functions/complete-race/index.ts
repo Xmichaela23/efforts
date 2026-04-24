@@ -106,25 +106,30 @@ Deno.serve(async (req) => {
     if (wErr) throw wErr
     const rows = Array.isArray(wrows) ? wrows : []
 
+    const runish = (t: string) => {
+      const x = (t || '').toLowerCase()
+      return x === 'run' || x === 'running' || !x
+    }
+
     let pick: (typeof rows)[0] | null = null
     if (workoutIdOpt) {
       pick = rows.find((r) => String(r.id) === workoutIdOpt) || null
       if (!pick) {
-        const { data: one } = await supabase
+        const { data: one, error: oneErr } = await supabase
           .from('workouts')
-          .select('id, date, type, workout_status, moving_time, elapsed_time, duration, computed, name')
+          .select('id, user_id, date, type, workout_status, moving_time, elapsed_time, duration, computed, name')
           .eq('user_id', userId)
           .eq('id', workoutIdOpt)
           .eq('workout_status', 'completed')
           .maybeSingle()
-        if (one && normDate((one as { date?: string }).date) === raceDate) pick = one as (typeof rows)[0]
+        if (oneErr) throw oneErr
+        if (one && runish(String((one as { type?: string }).type || ''))) {
+          // If the client sent workout_id, use that activity (date on goal/plan can disagree with the log by a day or TZ).
+          pick = one as (typeof rows)[0]
+        }
       }
     }
     if (!pick) {
-      const runish = (t: string) => {
-        const x = (t || '').toLowerCase()
-        return x === 'run' || x === 'running' || !x
-      }
       const runs = rows.filter((r) => runish(String((r as { type?: string }).type || '')))
       if (runs.length === 1) {
         pick = runs[0]
