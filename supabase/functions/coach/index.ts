@@ -78,7 +78,7 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 26;
+const COACH_PAYLOAD_VERSION = 27;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2405,6 +2405,44 @@ Deno.serve(async (req) => {
       console.warn('[coach] primary_race_readiness failed (non-fatal):', prrErr?.message ?? prrErr);
     }
 
+    let last_completed_race: CoachWeekContextResponseV1['last_completed_race'] = null;
+    try {
+      const { data: lcrRows, error: lcrErr } = await supabaseService
+        .from('goals')
+        .select('id, name, target_date, status, current_value, goal_type, target_time, training_prefs')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .eq('goal_type', 'event')
+        .not('current_value', 'is', null)
+        .order('target_date', { ascending: false, nullsFirst: false })
+        .limit(1);
+      if (lcrErr) throw lcrErr;
+      const lcr = Array.isArray(lcrRows) ? lcrRows[0] : null;
+      if (lcr && typeof lcr.current_value === 'number' && Number.isFinite(lcr.current_value) && lcr.current_value > 0) {
+        const tp = (lcr.training_prefs as Record<string, unknown> | null | undefined) || {};
+        const rr = (tp as { race_result?: { completed_at?: string } })?.race_result;
+        const completedAt =
+          typeof rr?.completed_at === 'string' && rr.completed_at.trim()
+            ? String(rr.completed_at)
+            : lcr.target_date
+              ? String(lcr.target_date).slice(0, 10) + 'T12:00:00.000Z'
+              : asOfDate + 'T12:00:00.000Z';
+        const tts = lcr.target_time;
+        const goalTargetSec =
+          tts != null && Number.isFinite(Number(tts)) && Number(tts) > 0 ? Math.round(Number(tts)) : null;
+        last_completed_race = {
+          goal_id: String(lcr.id),
+          name: String(lcr.name || 'Race'),
+          target_date: lcr.target_date ? String(lcr.target_date).slice(0, 10) : asOfDate,
+          goal_target_seconds: goalTargetSec,
+          actual_seconds: Math.round(lcr.current_value),
+          completed_at: completedAt,
+        };
+      }
+    } catch (lcrE: any) {
+      console.warn('[coach] last_completed_race failed (non-fatal):', lcrE?.message ?? lcrE);
+    }
+
     // Unified finish projection (State + Course Strategy). User's plan-wizard target lives on
     // `plans.config.target_time` (see generate-run-plan); read that first, then goal/plan DB.
     // Goal id: race_courses / primary_event / plan link (resolveRunGoalIdForRace), else active plan's goal_id.
@@ -4313,6 +4351,7 @@ ${narrativeFacts.join('\n')}`;
       athlete_snapshot: athleteSnapshot,
       race_readiness: raceReadiness,
       primary_race_readiness,
+      last_completed_race,
       race_finish_projection_v1: raceFinishProjectionV1,
       coach_payload_version: COACH_PAYLOAD_VERSION,
     };

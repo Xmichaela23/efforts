@@ -59,6 +59,19 @@ function fmtGoalClock(totalSec: number): string {
   return `${mi}:${String(s).padStart(2, '0')}`;
 }
 
+/** +MM:SS or +H:MM:SS vs a reference time (actual − goal; negative delta = faster than goal). */
+function fmtSignedDeltaVsGoal(actualSec: number, goalSec: number): string {
+  const d = actualSec - goalSec;
+  if (d === 0) return 'on goal';
+  const sign = d < 0 ? '−' : '+';
+  const ad = Math.abs(Math.round(d));
+  const h = Math.floor(ad / 3600);
+  const mi = Math.floor((ad % 3600) / 60);
+  const s = ad % 60;
+  const body = h > 0 ? `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${mi}:${String(s).padStart(2, '0')}`;
+  return `${sign}${body} vs goal`;
+}
+
 function isRunPrimary(pe: { sport?: string | null } | null | undefined): boolean {
   if (!pe) return false;
   const s = String(pe.sport || '').toLowerCase();
@@ -430,6 +443,8 @@ export default function StateTab({
   const [strategyModalOpen, setStrategyModalOpen] = useState(false);
   const [strategyCourseId, setStrategyCourseId] = useState<string | null>(null);
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
+  const [raceCompleteBusy, setRaceCompleteBusy] = useState(false);
+  const [raceCompleteError, setRaceCompleteError] = useState<string | null>(null);
 
   const raceReadiness = pickRaceReadinessFromCoachData(data as CoachWeekContextV1 | null);
   const raceFinishProjection = pickRaceFinishProjectionV1FromCoachData(data as CoachWeekContextV1 | null);
@@ -579,6 +594,54 @@ export default function StateTab({
     activePlans?.[0]?.plan_target_finish_seconds ??
     null;
 
+  const asYmd = data.as_of_date?.slice(0, 10) || '';
+  const activePlanEntry = activePlanId ? activePlans?.find(p => p.plan_id === activePlanId) : undefined;
+  const raceYmdForActivePlan =
+    goalLinkedToPlan?.target_date?.slice(0, 10) ||
+    (activePlanEntry?.race_date ? String(activePlanEntry.race_date).slice(0, 10) : null);
+  const showRecordRaceComplete =
+    Boolean(
+      wsv.plan.has_active_plan &&
+        activePlanId &&
+        raceYmdForActivePlan &&
+        asYmd >= raceYmdForActivePlan &&
+        goalLinkedToPlan &&
+        isRunPrimary(goalLinkedToPlan) &&
+        String(goalLinkedToPlan.goal_type || 'event') === 'event',
+    );
+
+  async function onRecordRaceComplete() {
+    if (!activePlanId || raceCompleteBusy) return;
+    if (
+      !window.confirm(
+        'Use the elapsed (chip) time from your completed race run for this day, mark the goal complete, and close the plan? Future planned workouts for this plan will be removed.',
+      )
+    ) {
+      return;
+    }
+    setRaceCompleteBusy(true);
+    setRaceCompleteError(null);
+    try {
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
+        body: { plan_id: activePlanId },
+      });
+      if (fnErr) throw fnErr;
+      const errBody =
+        fnData && typeof fnData === 'object' && 'error' in fnData
+          ? String((fnData as { error?: string }).error || '')
+          : '';
+      if (errBody) throw new Error(errBody);
+      try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+      refresh();
+    } catch (e) {
+      setRaceCompleteError((e as Error)?.message || String(e));
+    } finally {
+      setRaceCompleteBusy(false);
+    }
+  }
+
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -676,6 +739,7 @@ export default function StateTab({
   // ── NEXT row ─────────────────────────────────────────────────────────────
   const sessionsRemaining = data.week?.key_sessions_remaining ?? [];
   const nextSessions = sessionsRemaining.slice(0, 3);
+  const lastCompletedRace = data.last_completed_race ?? null;
 
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
@@ -744,6 +808,58 @@ export default function StateTab({
 
         {/* LOAD — full-width gauge + sparkline */}
         <LoadBar load={load} loadStatus={loadStatus} readinessState={readiness} weekIntent={week.intent} />
+
+        {lastCompletedRace && (
+          <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
+            <p className="text-[10px] font-semibold tracking-[0.12em] text-white/50 uppercase">Last race</p>
+            <p className="text-[12px] text-white/80">
+              <span className="text-white/60">{lastCompletedRace.name}</span>
+              <span className="text-white/40"> · {fmtDate(lastCompletedRace.target_date)}</span>
+            </p>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <span className="text-[20px] font-semibold tabular-nums text-white/90">
+                {fmtGoalClock(lastCompletedRace.actual_seconds)}
+              </span>
+              <span className="text-[11px] text-white/45">actual (elapsed / chip)</span>
+            </div>
+            {lastCompletedRace.goal_target_seconds != null && (
+              <p className="text-[11px] text-white/50">
+                Goal {fmtGoalClock(lastCompletedRace.goal_target_seconds)}
+                <Dot />
+                <span
+                  className={
+                    lastCompletedRace.actual_seconds <= lastCompletedRace.goal_target_seconds
+                      ? 'text-emerald-400/90'
+                      : 'text-amber-400/85'
+                  }
+                >
+                  {fmtSignedDeltaVsGoal(
+                    lastCompletedRace.actual_seconds,
+                    lastCompletedRace.goal_target_seconds,
+                  )}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {showRecordRaceComplete && (
+          <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-2">
+            <p className="text-[10px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
+            <p className="text-[11px] text-white/55 leading-snug">
+              Log your race as a completed run, then record your result. We use <span className="text-white/70">elapsed time</span> (chip time), not moving time. Your goal moves to completed and this plan ends.
+            </p>
+            <button
+              type="button"
+              onClick={() => { void onRecordRaceComplete(); }}
+              disabled={raceCompleteBusy || coachBusy}
+              className="w-full rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-[13px] font-medium text-amber-100/95 hover:bg-amber-500/15 active:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              {raceCompleteBusy ? 'Recording…' : 'Record race result & close plan'}
+            </button>
+            {raceCompleteError && <p className="text-[11px] text-red-400/90">{raceCompleteError}</p>}
+          </div>
+        )}
 
         {/* BODY */}
         <div className="px-3 py-3">

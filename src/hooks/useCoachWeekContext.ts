@@ -306,6 +306,15 @@ export type CoachWeekContextV1 = {
     tactical_instruction: string;
     projection: string;
   } | null;
+  /** Chip/elapsed result on last completed event goal; State tab shows actual vs goal. */
+  last_completed_race?: {
+    goal_id: string;
+    name: string;
+    target_date: string;
+    goal_target_seconds: number | null;
+    actual_seconds: number;
+    completed_at: string;
+  } | null;
   interference: {
     aerobic: string;
     structural: string;

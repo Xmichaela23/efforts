@@ -34,8 +34,9 @@ function minutesToSeconds(m: unknown): number | null {
   return Math.round(n * 60);
 }
 
+/** Chip / official time prefers elapsed over moving. */
 function finishSecondsFromRow(w: WorkoutFinishRow): number | null {
-  return minutesToSeconds(w.moving_time) ?? minutesToSeconds(w.elapsed_time);
+  return minutesToSeconds(w.elapsed_time) ?? minutesToSeconds(w.moving_time);
 }
 
 function isCompletedWorkout(w: WorkoutFinishRow): boolean {

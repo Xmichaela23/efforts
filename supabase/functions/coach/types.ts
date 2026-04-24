@@ -183,6 +183,20 @@ export type CoachWeekContextResponseV1 = {
     tactical_instruction: string;
     projection: string;
   } | null;
+  /**
+   * Most recent completed event goal with an official result on `goals.current_value` (chip/elapsed seconds).
+   * Used in State: actual time vs goal target; not shown when the athlete has no such completion yet.
+   */
+  last_completed_race?: {
+    goal_id: string;
+    name: string;
+    target_date: string;
+    /** Goal target clock at completion time (`goals.target_time`); null if unset. */
+    goal_target_seconds: number | null;
+    actual_seconds: number;
+    /** When the result was recorded (ISO) or `target_date` if unknown. */
+    completed_at: string;
+  } | null;
   training_state: {
     // Deterministic, plan-aware topline (frontend should render this verbatim)
     code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';
