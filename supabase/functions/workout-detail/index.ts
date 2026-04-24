@@ -192,6 +192,35 @@ function raceReadinessWithBudget<T>(p: Promise<T | null>): Promise<T | null> {
   });
 }
 
+async function overlaySavedRaceResultFromGoal(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  sessionDetailV1: any,
+): Promise<void> {
+  const race = sessionDetailV1?.race;
+  const goalId = race?.goal_id ? String(race.goal_id) : null;
+  if (!goalId) return;
+
+  const { data: goal, error } = await supabase
+    .from('goals')
+    .select('current_value, target_time, status')
+    .eq('id', goalId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error || !goal || String(goal.status) !== 'completed') return;
+
+  const savedActual = Number(goal.current_value);
+  if (Number.isFinite(savedActual) && savedActual > 0) {
+    race.actual_seconds = Math.round(savedActual);
+    race.time_source = 'goals.current_value';
+  }
+
+  const savedTarget = Number(goal.target_time);
+  if (Number.isFinite(savedTarget) && savedTarget > 0) {
+    race.goal_time_seconds = Math.round(savedTarget);
+  }
+}
+
 async function runSessionDetailPipelineAndPersist(
   supabase: ReturnType<typeof createClient>,
   userId: string,
@@ -465,6 +494,10 @@ async function runSessionDetailPipelineAndPersist(
       readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
       readinessUnavailable,
     });
+
+    if (sessionDetailV1?.race?.is_goal_race) {
+      await overlaySavedRaceResultFromGoal(supabase, userId, sessionDetailV1);
+    }
 
     if (sessionDetailV1 && planCtxForSession) {
       try {
