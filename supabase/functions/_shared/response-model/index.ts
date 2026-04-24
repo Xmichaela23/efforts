@@ -30,6 +30,8 @@ export type {
   GoalSummary,
   WeekHeadline,
   OverallTrainingRead,
+  EmptyState,
+  ArcInputsForResponse,
   BlockHeadline,
   WeeklySignalInputs,
   BaselineNorms,

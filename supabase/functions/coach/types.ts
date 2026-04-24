@@ -316,6 +316,17 @@ export type CoachWeekContextResponseV1 = {
       /** Deterministic taper/race-window cues from logged training + plan (not LLM). */
       grounded_race_week_guidance_v1?: { title: string; bullets: string[] };
     };
+    /**
+     * Server-authored State header copy when no plan is active. Arc-grounded.
+     * Replaces hard-coded `aimlessHeadline` / `aimlessSubtext` / "No current goals — Create new goal" client strings.
+     * Null when a plan is running — in that case the header uses `intent_summary` + `coach.narrative`.
+     */
+    empty_state?: {
+      headline: string;
+      subtitle: string;
+      cta_label: string;
+      cta_action: 'create_goal' | 'plan_season' | 'none';
+    } | null;
     load: {
       wtd_planned_load: number | null;
       wtd_actual_load: number | null;

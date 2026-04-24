@@ -68,6 +68,7 @@ import {
   resolveWeekStartDowFromPlanConfig,
   weekStartOf,
 } from '../_shared/plan-week.ts';
+import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -78,7 +79,8 @@ const corsHeaders: Record<string, string> = {
 /** Cached rows below this version are ignored (full recompute). Bump when adding response fields (e.g. overall_training_read on response_model). */
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
-const COACH_PAYLOAD_VERSION = 27;
+/** v28: Wire coach to ArcContext + add Arc-aware overall_training_read + weekly_state_v1.empty_state. */
+const COACH_PAYLOAD_VERSION = 28;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -882,6 +884,12 @@ Deno.serve(async (req) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ── Arc: single source of athlete truth (identity, learned fitness, goals, plan, snapshot, memory).
+    // Per `.cursor/rules/arc-intelligence-layer.mdc`: coach must load ArcContext before deriving athlete state.
+    // Loaded after the cache check so cache hits don't pay this cost; populated before any baselines /
+    // goals / plans / response-model derivation downstream so everything below speaks from the same Arc.
+    const arc: ArcContext = await getArcContext(supabaseService, userId, asOfDate);
+
     // Use service-role reads for plan + goal lists. The `supabase` client forwards the user JWT,
     // so PostgREST applies RLS — goals can return [] while plans still load, leaving goal_context
     // empty and breaking race_readiness / race_finish_projection_v1 despite data existing (Gate A).
@@ -1445,21 +1453,14 @@ Deno.serve(async (req) => {
 
     // =========================================================================
     // Baselines + 28d personal norms (to avoid generic thresholds)
+    // Baselines come from ArcContext — a single source of athlete truth shared with
+    // generate-training-context, arc-setup-chat, and create-goal-and-materialize-plan.
     // =========================================================================
-    const { data: ub, error: ubErr } = await supabase
-      .from('user_baselines')
-      .select('performance_numbers,effort_paces,learned_fitness,dismissed_suggestions,units')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (ubErr) throw ubErr;
-
-    const userUnits = String((ub as any)?.units || 'imperial').toLowerCase();
+    const userUnits = String(arc.units || 'imperial').toLowerCase();
     const isImperial = userUnits !== 'metric';
     const wUnit = isImperial ? 'lb' : 'kg';
 
-    const learnedFitness = (() => {
-      try { return typeof (ub as any)?.learned_fitness === 'string' ? JSON.parse((ub as any).learned_fitness) : ((ub as any)?.learned_fitness || null); } catch { return (ub as any)?.learned_fitness || null; }
-    })();
+    const learnedFitness = arc.learned_fitness as Record<string, any> | null;
     const learningStatus = learnedFitness?.learning_status ? String(learnedFitness.learning_status) : null;
 
     // 28d norms (use completed workouts only)
@@ -1521,12 +1522,12 @@ Deno.serve(async (req) => {
       execution_score_sample_size: normExecution.length,
     };
 
-    const dismissed = (ub as any)?.dismissed_suggestions || null;
+    const dismissed = arc.dismissed_suggestions as Record<string, any> | null;
     const dismissedDrift = (dismissed?.baseline_drift as Record<string, string>) || {};
 
     const baselines: CoachWeekContextResponseV1['baselines'] = {
-      performance_numbers: (ub as any)?.performance_numbers || null,
-      effort_paces: (ub as any)?.effort_paces || null,
+      performance_numbers: arc.performance_numbers || null,
+      effort_paces: arc.effort_paces || null,
       learned_fitness: learnedFitness || null,
       learning_status: learningStatus,
       norms_28d: norms28d,
@@ -1537,7 +1538,7 @@ Deno.serve(async (req) => {
     // Plan-aware guardrails:
     // - Hide during transition window, recovery/taper intent, or near-race window.
     // - Require meaningful sample count so suggestions are stable and goal-relevant.
-    const perf = (ub as any)?.performance_numbers || {};
+    const perf = (arc.performance_numbers || {}) as Record<string, any>;
     const strength = learnedFitness?.strength_1rms || {};
     const raceDateIso = String(
       planConfig?.race_date ||
@@ -1969,6 +1970,27 @@ Deno.serve(async (req) => {
       completionPct: wtdCompletionRatio != null ? Math.round(wtdCompletionRatio * 100) : null,
       existingAthleteContext: athleteContextStr,
       discipline_mix: disciplineMixWtd,
+      // Arc-grounded inputs: drive overall_training_read + empty_state from real athlete state
+      // (current phase, recent races, goal stack, active plan) instead of generic templates.
+      arc: {
+        current_phase: (() => {
+          const cp = (arc.athlete_identity as Record<string, unknown> | null)?.current_phase;
+          if (cp === 'recovery' || cp === 'build' || cp === 'maintenance' || cp === 'taper' || cp === 'unknown') {
+            return cp;
+          }
+          return null;
+        })(),
+        active_goals: arc.active_goals.map((g) => ({
+          id: g.id,
+          name: g.name,
+          target_date: g.target_date,
+          sport: g.sport,
+          distance: g.distance,
+          goal_type: g.goal_type,
+        })),
+        recent_completed_events: arc.recent_completed_events,
+        active_plan: arc.active_plan,
+      },
     });
 
     const goalPrediction = (() => {
@@ -2287,7 +2309,7 @@ Deno.serve(async (req) => {
     };
 
     const mergedEffortPacesForRace = mergedEffortPacesForCoach(
-      (ub as any)?.effort_paces,
+      arc.effort_paces,
       activePlan?.config as Record<string, unknown> | null | undefined,
     );
 
@@ -2359,7 +2381,7 @@ Deno.serve(async (req) => {
           const rrComputed = computeRaceReadiness({
             learnedFitness: learnedFitness || null,
             effortPaces: mergedEffortPacesForRace,
-            performanceNumbers: (ub as any)?.performance_numbers || null,
+            performanceNumbers: arc.performance_numbers || null,
             primaryEvent: {
               id: runGoalForReadiness.id,
               name: runGoalForReadiness.name,
@@ -2553,7 +2575,7 @@ Deno.serve(async (req) => {
           const rrComputed = computeRaceReadiness({
             learnedFitness: learnedFitness || null,
             effortPaces: mergedEffortPacesForRace,
-            performanceNumbers: (ub as any)?.performance_numbers || null,
+            performanceNumbers: arc.performance_numbers || null,
             primaryEvent: {
               id: mg.id,
               name: mg.name,
@@ -3598,8 +3620,8 @@ Deno.serve(async (req) => {
         // ── Athlete performance baselines ─────────────────────────────────────
         // Without these, the LLM guesses whether a 200W ride is hard or easy.
         // With them it can say "your 210W average was 88% of your FTP — solid tempo."
-        const perfNums = (ub as any)?.performance_numbers || {};
-        const effortPaces = (ub as any)?.effort_paces || {};
+        const perfNums = (arc.performance_numbers || {}) as Record<string, any>;
+        const effortPaces = (arc.effort_paces || {}) as Record<string, any>;
         const baselineLines: string[] = [];
         const ftpVal = perfNums?.ftp || perfNums?.bike_ftp || null;
         if (ftpVal) baselineLines.push(`Bike FTP: ${Math.round(ftpVal)}W`);
@@ -4288,6 +4310,7 @@ ${narrativeFacts.join('\n')}`;
       run_session_types_7d: runSessionTypes7d,
       response_model: weeklyResponseModel,
       race_finish_projection_v1: raceFinishProjectionV1,
+      empty_state: weeklyResponseModel.empty_state ?? null,
     };
 
     const response: CoachWeekContextResponseV1 = {

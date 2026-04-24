@@ -178,6 +178,51 @@ export type OverallTrainingRead = {
   tone: 'positive' | 'warning' | 'neutral' | 'info';
 };
 
+/**
+ * Server-authored copy for the State header when the athlete has no active plan, no upcoming
+ * event, and no recent race result. Replaces hard-coded client strings (`aimlessHeadline`,
+ * `aimlessSubtext`, "No current goals — Create new goal").
+ *
+ * Arc-grounded: phase, recent races, and goal stack drive the wording so the client just renders.
+ */
+export type EmptyState = {
+  headline: string;
+  subtitle: string;
+  cta_label: string;
+  cta_action: 'create_goal' | 'plan_season' | 'none';
+};
+
+/**
+ * Subset of ArcContext that the response model needs. Defined here (not imported from
+ * arc-context.ts) to keep `_shared/response-model` independent of edge-function types.
+ */
+export type ArcInputsForResponse = {
+  current_phase: 'recovery' | 'build' | 'maintenance' | 'taper' | 'unknown' | null;
+  active_goals: Array<{
+    id: string;
+    name: string;
+    target_date: string | null;
+    sport: string | null;
+    distance: string | null;
+    goal_type?: string | null;
+  }>;
+  recent_completed_events: Array<{
+    id: string;
+    name: string;
+    sport: string;
+    distance: string;
+    target_date: string;
+    days_ago: number;
+    finish_time_seconds: number | null;
+  }>;
+  active_plan: {
+    plan_id: string;
+    week_number: number | null;
+    phase: string | null;
+    discipline: string | null;
+  } | null;
+};
+
 export type BlockHeadline = {
   text: string;       // "Your aerobic fitness is improving and strength is progressing."
   subtext: string;
@@ -200,6 +245,8 @@ export type WeeklyResponseState = {
   visible_signals: VisibleSignal[];
   /** Holistic week line; clients show only when they render no endurance visible_signals. */
   overall_training_read: OverallTrainingRead;
+  /** Server-authored State header copy when no plan/goal/event is active. Null when a plan or event drives the screen. */
+  empty_state: EmptyState | null;
   context_prompt: ContextPrompt;
   goal_summary: GoalSummary | null;
   plan_context: {

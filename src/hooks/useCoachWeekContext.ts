@@ -368,6 +368,16 @@ export type CoachWeekContextV1 = {
       plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
       grounded_race_week_guidance_v1?: { title: string; bullets: string[] };
     };
+    /**
+     * Server-authored State header copy for the "no plan / no goal" state. Arc-grounded.
+     * Render verbatim when present and no plan/event is active. Null when a plan is running.
+     */
+    empty_state?: {
+      headline: string;
+      subtitle: string;
+      cta_label: string;
+      cta_action: 'create_goal' | 'plan_season' | 'none';
+    } | null;
     load: {
       wtd_planned_load: number | null;
       wtd_actual_load: number | null;

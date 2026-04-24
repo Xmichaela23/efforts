@@ -1049,14 +1049,16 @@ export default function StateTab({
 
   const hasUpcomingEvent = Boolean(pe || goalMeta || raceFinishProjection || raceReadiness);
   const isAimless = !wsv.plan.has_active_plan && !hasUpcomingEvent && !officialForRace && !postRaceUnofficial;
-  const aimlessHeadline =
-    readiness === 'fatigued' || readiness === 'overreached'
-      ? 'No active plan — recover this week.'
-      : readiness === 'fresh'
-        ? 'No active plan — easy aerobic week, stay consistent.'
-        : 'No active plan — keep it general fitness.';
+  // Arc-grounded empty-state copy authored by coach (response model). Falls back to a minimal
+  // generic line only if the server payload is missing the field (e.g. older cache row).
+  const serverEmptyState = wsv.empty_state ?? null;
+  const aimlessHeadline = serverEmptyState?.headline ?? 'No active plan — keep it general fitness.';
   const aimlessSubtext =
+    serverEmptyState?.subtitle ??
     'Mostly easy aerobic work + one harder day, plus your usual strength. Avoid stacking hard sessions until you set a goal.';
+  const aimlessCtaLabel = serverEmptyState?.cta_label ?? 'No current goals — Create new goal';
+  const aimlessCtaAction = serverEmptyState?.cta_action ?? 'create_goal';
+  const aimlessCtaTarget = aimlessCtaAction === 'plan_season' ? '/goals' : '/goals';
 
   return (
     <div className="pt-1 pb-4">
@@ -1073,13 +1075,15 @@ export default function StateTab({
             <>
               <span className="text-[14px] font-medium text-white/85 leading-snug">{aimlessHeadline}</span>
               <span className="text-[12px] text-white/50 leading-snug">{aimlessSubtext}</span>
-              <button
-                type="button"
-                onClick={() => navigate('/goals')}
-                className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[12px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
-              >
-                No current goals — Create new goal
-              </button>
+              {aimlessCtaAction !== 'none' && (
+                <button
+                  type="button"
+                  onClick={() => navigate(aimlessCtaTarget)}
+                  className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[12px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
+                >
+                  {aimlessCtaLabel}
+                </button>
+              )}
             </>
           ) : (
             <>

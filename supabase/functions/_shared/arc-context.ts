@@ -132,6 +132,12 @@ export interface ArcContext {
    * `user_baselines.performance_numbers` — e.g. `swimPace100`, FTP, 5K; used for projections + AL.
    */
   performance_numbers: Record<string, unknown> | null;
+  /** `user_baselines.effort_paces` — Plan Wizard / Daniels-style pace anchors (steady, race, etc.). */
+  effort_paces: Record<string, unknown> | null;
+  /** `user_baselines.units` — 'imperial' | 'metric'; coach uses this for weight unit display. */
+  units: string | null;
+  /** `user_baselines.dismissed_suggestions` — UI-suppression map (e.g. `{ baseline_drift: { ... } }`). */
+  dismissed_suggestions: Record<string, unknown> | null;
   /**
    * Populated when we have a manual 5K and a sufficiently confident learned threshold;
    * `should_prompt` is true when the gap exceeds a small threshold (e.g. ~90s).
@@ -585,7 +591,7 @@ export async function getArcContext(
     await Promise.all([
     supabase
       .from('user_baselines')
-      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers, equipment')
+      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers, equipment, effort_paces, units, dismissed_suggestions')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase
@@ -660,6 +666,10 @@ export async function getArcContext(
     equipmentRaw != null && typeof equipmentRaw === 'object' && !Array.isArray(equipmentRaw)
       ? (equipmentRaw as Record<string, unknown>)
       : null;
+
+  const effort_paces = parseJsonObject(baseline?.effort_paces);
+  const units = baseline?.units != null && typeof baseline.units === 'string' ? (baseline.units as string) : null;
+  const dismissed_suggestions = parseJsonObject(baseline?.dismissed_suggestions);
 
   const active_goals: Goal[] = (Array.isArray(goalsRes?.data) ? goalsRes.data : []).map((r: Record<string, unknown>) =>
     toGoalRow(r)
@@ -748,6 +758,9 @@ export async function getArcContext(
     training_background,
     equipment,
     performance_numbers,
+    effort_paces,
+    units,
+    dismissed_suggestions,
     five_k_nudge,
     active_goals,
     recent_completed_events,
