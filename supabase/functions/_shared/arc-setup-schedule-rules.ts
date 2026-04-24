@@ -19,6 +19,21 @@ long ride until you know Saturday is free.
 
 ---
 
+### TRAINING DAY BUDGET (how many days / week)
+
+**Always** confirm how many days per week the athlete trains (**4–7**; **five**
+is common and fully supported). **Never** assume a **seven-day** plan without
+asking or seeing it in context.
+
+- Save **\`training_prefs.days_per_week\`** (integer) on tri **event** goals.
+- Optional **\`training_prefs.rest_days\`** — array of off days (weekday names
+  or 0=Sun…6=Sat). If omitted, the server infers **rest_days** from
+  **days_per_week**, avoiding **long_run** and **long_ride** when possible.
+- When they choose **five** (or fewer) training days, follow **COMPRESSED SCHEDULE**
+  priority — protect long + quality, trim easy first.
+
+---
+
 ### WEEKEND WORKER TEMPLATE
 If Saturday and/or Sunday are work days, rebuild the week:
 

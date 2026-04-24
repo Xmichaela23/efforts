@@ -86,6 +86,13 @@ export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload 
       pdo.mid_week_quality_bike;
     const eBike = pdo.easy_bike ?? pdo.easyBike ?? pdo.bike_easy ?? pdo.bikeEasy ?? pdo.mid_week_easy_bike;
     if (qBike == null || eBike == null) return false;
+    const dpwRaw = prefs.days_per_week ?? prefs.daysPerWeek;
+    let dpwNum = NaN;
+    if (typeof dpwRaw === 'number' && Number.isFinite(dpwRaw)) dpwNum = Math.round(dpwRaw);
+    else if (typeof dpwRaw === 'string' && /^\s*\d+\s*$/.test(dpwRaw)) {
+      dpwNum = parseInt(dpwRaw.trim(), 10);
+    }
+    if (!Number.isFinite(dpwNum) || dpwNum < 4 || dpwNum > 7) return false;
     return true;
   });
 }

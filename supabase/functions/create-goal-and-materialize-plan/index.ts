@@ -13,7 +13,11 @@ import {
 } from '../_shared/planning-context.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
-import { mergeCombinedSchedulePrefs } from '../_shared/combined-schedule-prefs.ts';
+import {
+  deriveRestDaysForBudget,
+  mergeCombinedSchedulePrefs,
+  readDaysPerWeekFromPrefs,
+} from '../_shared/combined-schedule-prefs.ts';
 import {
   calculateEffortScore,
   estimateVdotFromBasePace,
@@ -674,6 +678,16 @@ async function buildCombinedPlan(
     primaryGoalPrefs as Record<string, unknown>,
     newGoal.training_prefs as Record<string, unknown>,
   );
+  const dpwCombined =
+    readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
+    readDaysPerWeekFromPrefs(primaryGoalPrefs as Record<string, unknown>);
+  const resolvedRestDays = deriveRestDaysForBudget(
+    dpwCombined,
+    combinedSchedulePrefs.rest_days,
+    combinedSchedulePrefs.long_run_day,
+    combinedSchedulePrefs.long_ride_day,
+  );
+  combinedSchedulePrefs.rest_days = resolvedRestDays;
   const explicitEquipment = String(
     (newGoal.training_prefs as Record<string, unknown>)?.equipment_type
       ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_type

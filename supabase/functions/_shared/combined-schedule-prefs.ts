@@ -58,6 +58,66 @@ function pickRestDays(obj: Record<string, unknown> | null | undefined): number[]
   return out.length > 0 ? [...new Set(out)] : undefined;
 }
 
+/** Read `training_prefs.days_per_week` (4–7). */
+export function readDaysPerWeekFromPrefs(
+  prefs: Record<string, unknown> | null | undefined,
+): number | undefined {
+  if (!prefs) return undefined;
+  const v = prefs.days_per_week ?? prefs.daysPerWeek;
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const n = Math.round(v);
+    if (n >= 4 && n <= 7) return n;
+  }
+  if (typeof v === 'string' && /^\s*\d+\s*$/.test(v)) {
+    const n = parseInt(v.trim(), 10);
+    if (n >= 4 && n <= 7) return n;
+  }
+  return undefined;
+}
+
+/**
+ * When `days_per_week` < 7 and `rest_days` missing or wrong length, pick off days
+ * (Sun-first indices) avoiding long run / long ride when set.
+ */
+export function deriveRestDaysForBudget(
+  daysPerWeek: number | undefined,
+  existingRestDays: number[] | undefined,
+  longRunSunFirst: number | undefined,
+  longRideSunFirst: number | undefined,
+): number[] {
+  const sortU = (a: number[]) => [...new Set(a)].sort((x, y) => x - y);
+  if (daysPerWeek == null || !Number.isFinite(daysPerWeek)) {
+    return sortU(existingRestDays ?? []);
+  }
+  const n = Math.round(daysPerWeek);
+  if (n >= 7) {
+    if (existingRestDays?.length) return sortU(existingRestDays);
+    return [];
+  }
+  if (n < 4) return sortU(existingRestDays ?? []);
+  const need = 7 - n;
+  if (existingRestDays && existingRestDays.length === need) {
+    return sortU(existingRestDays);
+  }
+  const avoid = new Set<number>();
+  if (longRunSunFirst != null && longRunSunFirst >= 0 && longRunSunFirst <= 6) {
+    avoid.add(longRunSunFirst);
+  }
+  if (longRideSunFirst != null && longRideSunFirst >= 0 && longRideSunFirst <= 6) {
+    avoid.add(longRideSunFirst);
+  }
+  const order = [1, 4, 2, 5, 3, 0, 6];
+  const picked: number[] = [];
+  for (const d of order) {
+    if (picked.length >= need) break;
+    if (!avoid.has(d)) picked.push(d);
+  }
+  for (let d = 0; d <= 6 && picked.length < need; d++) {
+    if (!picked.includes(d)) picked.push(d);
+  }
+  return sortU(picked.slice(0, need));
+}
+
 function pickStrengthProtocol(obj: Record<string, unknown> | null | undefined): string | undefined {
   if (!obj) return undefined;
   const v = obj.strength_protocol ?? obj.strengthProtocol;
