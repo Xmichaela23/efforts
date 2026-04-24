@@ -835,6 +835,24 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                   type="button"
                   className="w-full rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-xs font-medium text-amber-100/90 hover:bg-amber-500/15 transition-all"
                   onClick={async () => {
+                    if (linkedPlan?.id) {
+                      const { data, error } = await supabase.functions.invoke('complete-race', {
+                        body: { plan_id: linkedPlan.id },
+                      });
+                      const msg =
+                        (data && typeof data === 'object' && typeof (data as any).error === 'string'
+                          ? (data as any).error
+                          : '') || error?.message || '';
+                      if (error || msg) {
+                        window.alert(msg || 'Could not save elapsed result from the race workout.');
+                        return;
+                      }
+                      try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch {}
+                      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                      refreshGoals();
+                      return;
+                    }
                     const input = window.prompt('Elapsed finish time (H:MM or H:MM:SS)', '4:44');
                     if (input == null) return;
                     const seconds = parseElapsedRaceTimeInput(input);

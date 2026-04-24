@@ -8,7 +8,7 @@ export type WorkoutTimeRow = {
   moving_time?: unknown;
   elapsed_time?: unknown;
   duration?: unknown;
-  computed?: { overall?: { duration_s_moving?: number; duration_s?: number } };
+  computed?: { overall?: { duration_s_elapsed?: number; duration_s_moving?: number; duration_s?: number } };
 };
 
 function minutesToSeconds(m: unknown): number | null {
@@ -19,11 +19,13 @@ function minutesToSeconds(m: unknown): number | null {
 
 /** Prefer elapsed → moving → computed duration (overall). */
 export function actualFinishSecondsPreferElapsed(w: WorkoutTimeRow): number | null {
+  const co = w.computed?.overall;
+  const exactElapsed = Number(co?.duration_s_elapsed);
+  if (Number.isFinite(exactElapsed) && exactElapsed > 0) return Math.round(exactElapsed);
   const e = minutesToSeconds(w.elapsed_time);
   if (e != null) return e;
   const mv = minutesToSeconds(w.moving_time);
   if (mv != null) return mv;
-  const co = w.computed?.overall;
   const ds = Number(co?.duration_s ?? co?.duration_s_moving);
   if (Number.isFinite(ds) && ds > 0) return Math.round(ds);
   const d = Number(w.duration);

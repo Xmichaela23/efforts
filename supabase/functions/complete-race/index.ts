@@ -73,15 +73,16 @@ Deno.serve(async (req) => {
 
     const { data: goal, error: gErr } = await supabase
       .from('goals')
-      .select('id, name, user_id, status, goal_type, target_date, target_time, sport, training_prefs')
+      .select('id, name, user_id, status, goal_type, target_date, target_time, current_value, sport, training_prefs')
       .eq('id', plan.goal_id)
       .maybeSingle()
     if (gErr) throw gErr
     if (!goal || String(goal.user_id) !== String(userId)) {
       return new Response(JSON.stringify({ error: 'Goal not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
-    if (String(goal.status) !== 'active') {
-      return new Response(JSON.stringify({ error: 'Goal is not active' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    const goalStatus = String(goal.status)
+    if (!['active', 'paused', 'cancelled', 'completed'].includes(goalStatus)) {
+      return new Response(JSON.stringify({ error: `Goal status ${goalStatus} cannot be completed as a race` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
     if (String(goal.goal_type) !== 'event') {
       return new Response(JSON.stringify({ error: 'Only event goals can be completed as a race' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
