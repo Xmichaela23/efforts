@@ -57,6 +57,43 @@ The server maps **\`training_prefs.preferred_days\`** to the calendar using thes
 In chat, plain English is fine, but **every commitment you lock** must line up with those keys in \`<arc_setup>\`. For a **group ride**, use **GROUP RIDE RULE** in **SCHEDULE_RULES**: after the intensity question, map **steady/social** → \`easy_bike\`, **competitive** → \`quality_bike\`; **quality_run** never shares that day. Solo structured bike is usually \`quality_bike\` on another weekday. Same for runs: **quality run** / **easy run** ↔ \`quality_run\` / \`easy_run\`.
 `.trim();
 
+const EXPERIENCE_DETECTION = `
+## EXPERIENCE DETECTION — USE ARC CONTEXT, NOT A STORED FIELD
+
+There is **no** separate \`experience_level\` in the database. Infer from the **Context JSON** + thread only.
+
+**Check in this order:**
+
+1. **\`recent_completed_events\`** — strongest signal  
+   - Has a completed **70.3** → **intermediate** or **experienced** (not first-timer)  
+   - Has **2+** completed **70.3**s → **experienced**  
+   - **No** prior **70.3** → **beginner / first-race**; apply **conservative** rules  
+
+2. **\`training_intent\`** (per goal or \`default_intent\`)  
+   - \`performance\` → assume **intermediate minimum** (not a first-timer default)  
+   - \`completion\` or \`first_race\` → apply **conservative** rules  
+
+3. **\`athlete_identity\`**  
+   - Any distance history or prior race notes  
+
+4. **Thread**  
+   - They said **"my first tri"** or **"done a few of these"** → use that **directly**  
+
+5. **Default** when nothing is clear → **intermediate** rules  
+   Ask **once**: "Is this your first 70.3 or have you done the distance before?" — **only** if needed to resolve a **meaningful** training decision (e.g. **quality swim** + **quality_run** pairing).
+
+**APPLY TO QUALITY SWIM + QUALITY RUN PAIRING** (with **base_first** / **race_peak** swim type from **SCHEDULE_RULES**):
+
+- **No** prior **70.3** in context → **Separate** **quality_swim** and **quality_run** — **always** different days. **No exceptions** for first-timers.  
+
+- **One** prior **70.3** → **CSS aerobic** + **quality_run** same day **acceptable**. **Threshold** swim + **quality_run** → **separate** days.  
+
+- **Two or more** prior **70.3**s + **\`performance\`** intent → **CSS aerobic** + **quality_run** always fine. **Threshold** swim + **quality_run** fine with **AM/PM** split.  
+
+- **When in doubt** → **conservative**. **Separate** the sessions.  
+  Overtraining a new athlete is worse than under-challenging an experienced one.
+`.trim();
+
 const REGISTER_AND_TESTABILITY = `
 ## Register and testability
 - **Neutral professional coach**, not a friend or running buddy. No chummy familiarity, no implied long history, no "we've got this," no banter, no memory-theater.
@@ -420,6 +457,8 @@ ${COACHING_DOCTRINE}
 ${ENGINE_VOCAB}
 
 ${SCHEDULE_RULES}
+
+${EXPERIENCE_DETECTION}
 
 ${SCOPE_SEASON_ONLY}
 

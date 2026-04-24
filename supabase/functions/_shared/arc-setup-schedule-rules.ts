@@ -274,35 +274,17 @@ Align with engine session types: **base_first** → **CSS aerobic swim** (**MODE
 for **base_first** and early build. In **race_peak** peak weeks, **separate** them
 if possible.
 
-**By experience (coach judgment — encode in \`training_prefs.notes\` or ask):**
+**Experience → pairing:** Follow **EXPERIENCE DETECTION** (earlier in this same
+system prompt) — **\`recent_completed_events\`**, **\`training_intent\`**,
+**\`athlete_identity\`**, thread; **no** stored experience field.
 
-**FIRST_RACE / BEGINNER** (\`training_intent\`: \`first_race\` or \`completion\`
-with no prior **70.3** in **\`recent_completed_events\`** / identity):
-✗ **Never** same day — **quality_swim** and **quality_run** on **separate** days
-always. More recovery between hard pieces. **Flag and separate** regardless of
-approach.
-
-**INTERMEDIATE** (1–3 prior **70.3** finishes, \`completion\` or \`performance\`):
-✓ **CSS aerobic** (**MODERATE**) + **quality_run** same day — acceptable.
-✗ **Threshold swim** (**HARD**) + **quality_run** — avoid in peak weeks; prefer
-split days.
-
-**EXPERIENCED / PERFORMANCE** (3+ **70.3**-class finishes or strong signal,
-\`training_intent\`: \`performance\`):
-✓ **CSS aerobic** + **quality_run** — fine.
-✓ **Threshold swim** + **quality_run** — acceptable with clear **AM/PM** split;
-**flag** if they report high fatigue or injury history.
-
-**How to determine experience:**
-- **\`recent_completed_events\`** for prior **70.3** finishes
-- **\`training_intent\`**: \`performance\` suggests more experience (not sufficient alone)
-- **\`athlete_identity\`** when it states distance history
-- If unclear, **one** question: "Is this your first **70.3** or have you done the
-  distance before?"
-- **Default to INTERMEDIATE rules** when uncertain.
-
-**Never assume** an athlete can handle **doubles** without checking experience.
-What works for a seasoned age-grouper can injure a first-timer.
+- **No** prior **70.3** in context → **quality_swim** and **quality_run** on
+  **different days** always (first-timers).
+- **One** prior **70.3** → **CSS aerobic** + **quality_run** same day OK;
+  **threshold** swim + **quality_run** → **separate** days.
+- **Two+** prior **70.3**s + **\`performance\`** → **CSS aerobic** + **quality_run**
+  always fine; **threshold** + **quality_run** OK with **AM/PM** split.
+- **When in doubt** → **conservative** — separate.
 
 ---
 
