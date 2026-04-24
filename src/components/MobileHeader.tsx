@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle } from 'lucide-react';
+import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle, Trophy } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,7 @@ interface MobileHeaderProps {
   onLogout?: () => void;
   /** Custom menu item handlers */
   onTrainingBaselinesClick?: () => void;
+  onAthleticRecordClick?: () => void;
   onConnectionsClick?: () => void;
   onGearClick?: () => void;
   onImportClick?: () => void;
@@ -35,6 +36,7 @@ export function MobileHeader({
   wordmarkSize = 26,
   onLogout,
   onTrainingBaselinesClick,
+  onAthleticRecordClick,
   onConnectionsClick,
   onGearClick,
   onImportClick,
@@ -64,6 +66,12 @@ export function MobileHeader({
       <DropdownMenuItem onClick={onTrainingBaselinesClick || (() => navigate('/baselines'))}>
         <Activity className="mr-2 h-4 w-4" />
         Training Baselines
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
+      >
+        <Trophy className="mr-2 h-4 w-4" />
+        Athletic Record
       </DropdownMenuItem>
       <DropdownMenuItem>
         <User className="mr-2 h-4 w-4" />

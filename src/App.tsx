@@ -34,6 +34,7 @@ const App = () => (
 <Routes>
 <Route path="/" element={<Index />} />
 <Route path="/goals" element={<Index />} />
+<Route path="/profile/athletic-record" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
