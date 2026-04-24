@@ -182,6 +182,7 @@ function RaceSection({
    * Replaces the big “Projected” block until the user records an official result and ends the plan.
    */
   postRaceUnofficial,
+  recordOfficialCta,
 }: {
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
@@ -203,6 +204,7 @@ function RaceSection({
     modelProjected?: { seconds: number; display: string } | null;
   } | null;
   postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
+  recordOfficialCta: { onClick: () => void; busy: boolean; error: string | null } | null;
 }) {
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
@@ -306,9 +308,29 @@ function RaceSection({
             </p>
           </div>
         )}
-        <p className="text-[10px] text-amber-200/60 leading-snug">
-          To close this plan, record your result above with “Record race result & close plan” (uses the same elapsed-first rule as your official time).
-        </p>
+        {recordOfficialCta && (
+          <div className="pt-1 space-y-2">
+            <p className="text-[10px] font-semibold tracking-[0.1em] text-amber-300/85 uppercase">Close this plan</p>
+            <p className="text-[10px] text-white/50 leading-snug">
+              Saves your official time (elapsed-first, same as above) and moves this plan to past.
+            </p>
+            <button
+              type="button"
+              onClick={recordOfficialCta.onClick}
+              disabled={recordOfficialCta.busy}
+              className="w-full rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-[13px] font-medium text-amber-100/95 hover:bg-amber-500/15 active:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              {recordOfficialCta.busy ? 'Recording…' : 'Record race result & close plan'}
+            </button>
+            {recordOfficialCta.error && <p className="text-[11px] text-red-400/90">{recordOfficialCta.error}</p>}
+          </div>
+        )}
+        {!recordOfficialCta && (
+          <p className="text-[10px] text-amber-200/60 leading-snug">
+            To close the plan, scroll up to the “Race day” section under the load bar, or go to the{' '}
+            <span className="text-white/70">Goals</span> tab and use “View all plans” to end the plan.
+          </p>
+        )}
       </div>
     );
   }
@@ -912,6 +934,8 @@ export default function StateTab({
         String(goalLinkedToPlan.goal_type || 'event') === 'event' &&
         !officialForRace,
     );
+  /** Top amber bar would duplicate the in-RACE button after race day (post-race view scrolls that far). */
+  const showAmberRecordBar = showRecordRaceComplete && !postRaceUnofficial;
 
   async function onRecordRaceComplete() {
     if (!activePlanId || raceCompleteBusy) return;
@@ -948,6 +972,17 @@ export default function StateTab({
       setRaceCompleteBusy(false);
     }
   }
+
+  const recordOfficialCta =
+    postRaceUnofficial && activePlanId && wsv.plan.has_active_plan && !officialForRace
+      ? {
+          onClick: () => {
+            void onRecordRaceComplete();
+          },
+          busy: raceCompleteBusy || coachBusy,
+          error: raceCompleteError,
+        }
+      : null;
 
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1149,7 +1184,7 @@ export default function StateTab({
           </div>
         )}
 
-        {showRecordRaceComplete && (
+        {showAmberRecordBar && (
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-2">
             <p className="text-[10px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
             <p className="text-[11px] text-white/55 leading-snug">
@@ -1331,6 +1366,7 @@ export default function StateTab({
             }
             officialResult={officialForRace}
             postRaceUnofficial={officialForRace ? null : postRaceUnofficial}
+            recordOfficialCta={recordOfficialCta}
           />
         )}
 
