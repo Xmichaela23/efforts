@@ -499,6 +499,60 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     return [...ids];
   };
 
+  const autoEndedPlansRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (loading) return;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const stalePlanIds = new Set<string>();
+    for (const g of goals) {
+      if (g.goal_type !== 'event') continue;
+      const hasResult = g.current_value != null && g.current_value > 0;
+      const racePast = !!g.target_date && String(g.target_date).slice(0, 10) < todayIso;
+      const inactive = g.status !== 'active';
+      if (!(hasResult || (inactive && racePast))) continue;
+      for (const pid of findStaleActivePlanIdsForGoal(g)) {
+        if (!autoEndedPlansRef.current.has(pid)) stalePlanIds.add(pid);
+      }
+    }
+    if (stalePlanIds.size === 0) return;
+    let cancelled = false;
+    (async () => {
+      let didEnd = false;
+      for (const planId of stalePlanIds) {
+        autoEndedPlansRef.current.add(planId);
+        try {
+          const { data, error } = await supabase.functions.invoke('end-plan', {
+            body: { plan_id: planId },
+          });
+          const serverErr =
+            (data && typeof data === 'object' && typeof (data as any).error === 'string'
+              ? (data as any).error
+              : '') || '';
+          if (error || (serverErr && !(data as any)?.success)) {
+            console.warn('[GoalsScreen] auto end-plan failed', {
+              planId,
+              err: error?.message || serverErr,
+            });
+            continue;
+          }
+          didEnd = true;
+        } catch (e) {
+          console.warn('[GoalsScreen] auto end-plan threw', e);
+        }
+      }
+      if (cancelled) return;
+      if (didEnd) {
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('plans:invalidate')); } catch { /* ignore */ }
+        try { refreshPlans?.(); } catch { /* ignore */ }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, goals, currentPlans, refreshPlans]);
+
   useEffect(() => {
     if (loading) return;
     const uid = getStoredUserId();
