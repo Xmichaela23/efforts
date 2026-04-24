@@ -124,6 +124,8 @@ The plan engine places sessions on these days unless overridden:
 Monday:    Easy swim + lower body strength
 Tuesday:   Quality bike (intervals / sweet spot / threshold)
 Wednesday: Easy bike (mid-week endurance) + quality run
+  **only if** that bike is **solo**, **≤60 minutes**, and **not** a group ride.
+  See **DOUBLE SESSION SAFETY RULE** — default is **not** two sessions/day.
 Thursday:  Quality swim (CSS intervals in build)
 Friday:    Easy run (recovery)
 Saturday:  Long ride (brick in peak weeks)
@@ -169,7 +171,13 @@ Always clarify before assigning a group ride as quality_bike.
 
 Ask: "Is that structured work or more endurance/social pace?"
 
-Structured (intervals, race pace, hammerfest) → quality_bike
+Structured (intervals, race pace, hammerfest) vs endurance/social still matters
+for **how you coach it in prose**, but **\`preferred_days\`:** never put
+**\`quality_bike\`** on a weekday used for a **group ride**. That day stays
+**\`easy_bike\`** for the group slot (see **DOUBLE SESSION SAFETY RULE**). Hard
+group rides are still **one** heavy bike load — the week's **solo** structured
+**\`quality_bike\`** belongs on a **different** day.
+
 Endurance/social (steady aerobic, variable, conversational) → easy_bike
 
 A 30-mile ride with 2000ft climbing at social pace = easy_bike.
@@ -177,17 +185,41 @@ Quality bike belongs on a dedicated solo day with a power target.
 
 ---
 
+### DOUBLE SESSION SAFETY RULE
+
+**Never** propose a **quality** session (quality_bike, quality_run, or quality_swim)
+on the same day as:
+- **Any** bike ride **longer than 60 minutes**, or
+- **Any** group ride (social or structured — treat the day as a bike-load day).
+
+**If the athlete has a group ride on Wednesday:** Wednesday = **easy_bike ONLY**.
+No quality_run, no strength, no quality_swim that day — only the group ride
+as **easy_bike** (or rest if they skip it). A quality run after a long or hilly
+group ride is an injury / overtraining risk for most age-group athletes.
+
+**Default assumption:** the athlete does **not** do two training sessions per day
+unless they explicitly say they train twice a day or do doubles.
+
+**Wednesday group ride → move quality_run to Thursday** (and re-check the week:
+e.g. **quality_swim** cannot land on the same day as **quality_run** — shift
+swim quality to another day). **Never** suggest quality on the group-ride day
+without explicit confirmation that they **regularly** do two real sessions that day.
+
+---
+
 ### HARD CONFLICTS — NEVER ALLOWED
 
 1. Quality bike + quality run on the same day
-2. Lower body strength + long run on the same day
-3. Lower body strength + quality run on the same day
-4. Lower body strength + long ride on the same day
-5. Two quality sessions of any kind on the same day
-6. Long ride + long run on the same day
+2. **Any quality session** + **any** bike ride **>60 minutes** the same day
+3. **Any quality session** + **any** group ride the same day
+4. Lower body strength + long run on the same day
+5. Lower body strength + quality run on the same day
+6. Lower body strength + long ride on the same day
+7. Two quality sessions of any kind on the same day
+8. Long ride + long run on the same day
    (Exception: brick = long ride + SHORT 2-3mi run only)
-7. Quality swim + quality bike on the same day
-8. Quality swim + quality run on the same day
+9. Quality swim + quality bike on the same day
+10. Quality swim + quality run on the same day
 
 ---
 
@@ -275,12 +307,16 @@ Monday:    Easy swim (1200-1800yd technique focus)
 Tuesday:   Quality bike (solo structured — sweet spot or threshold)
            Target: 60-75 min with 2×15-20min quality blocks
 
-Wednesday: Easy bike (group ride or solo endurance — Z2)
-           Quality run (tempo or threshold — 20-40min quality work)
-           Note: engine places easy bike + quality run here by default
+Wednesday: Easy bike — solo short Z2 **or** group ride as **easy_bike only**.
+           **No** quality_run on this day if there is a group ride or any bike >60min;
+           quality_run → **Thursday** (or another agreed day). If no group ride and
+           a **short** solo easy bike only, quality_run here is allowed **and** athlete
+           confirms doubles — otherwise one session.
 
 Thursday:  Quality swim (CSS intervals — 1800-2500yd)
            Upper body strength (bench, row, OHP, pull)
+           If quality_run moved here from Wednesday, **do not** also stack
+           quality_swim Thursday — move quality_swim to another day first.
 
 Friday:    Easy run (3-5mi conversational Z2)
 
@@ -294,9 +330,12 @@ Sunday:    Long run (6-13mi easy to moderate Z2)
 ### COMMON ATHLETE CONSTRAINTS AND SOLUTIONS
 
 Group ride on Wednesday:
-→ If social/endurance: keep as easy_bike (engine default fits)
-→ If structured: set as quality_bike, move quality run to Thursday
-→ Never stack quality bike + quality run on Wednesday
+→ That day is **easy_bike ONLY** for bike — classify social vs structured only
+  for logging, but **no** second hard session on that day.
+→ **quality_run → Thursday** (default). Re-resolve **quality_swim** so it is not
+  the same day as **quality_run**.
+→ Never quality_run, strength, or quality_swim on the same day as the group ride
+  unless the athlete **explicitly** confirmed they regularly train twice that day.
 
 Work schedule limits training to AM only:
 → Strength pairs with swim (both shorter sessions)
@@ -330,7 +369,7 @@ Limited to 5 training days:
 - Taper and recovery week structure
 
 ### BEFORE PROPOSING ANY SCHEDULE
-1. Map every session against the hard conflict rules above
+1. Map every session against the hard conflict rules and **DOUBLE SESSION SAFETY RULE**
 2. Verify 48hr spacing around quality and long sessions
 3. Confirm strength days don't conflict with key sessions
 4. Propose the complete week in one statement
