@@ -52,6 +52,23 @@ function fmtDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 }
 
+/** Days from `ymd` to today (UTC-naive). Negative = future, positive = past. Null when invalid. */
+function daysSinceYmd(ymd: string | null | undefined): number | null {
+  if (!ymd) return null;
+  const target = new Date(`${String(ymd).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const today = new Date();
+  const a = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const b = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
+  return Math.round((a - b) / 86_400_000);
+}
+
+/** Race references stay in State for the race week, then disappear once 7 days have passed. */
+function isRaceWeekClosed(ymd: string | null | undefined): boolean {
+  const d = daysSinceYmd(ymd);
+  return d != null && d > 7;
+}
+
 /** Goal target finish clock from coach `goal_context.primary_event.target_time` (seconds). */
 function fmtGoalClock(totalSec: number): string {
   const h = Math.floor(totalSec / 3600);
@@ -898,7 +915,8 @@ export default function StateTab({
   const officialForRace = baseOfficial
     ? { ...baseOfficial, modelProjected: modelFromRr }
     : null;
-  const showTopLastRaceCard = Boolean(lastCompletedRace && !officialForRace);
+  const lastRaceClosed = lastCompletedRace ? isRaceWeekClosed(lastCompletedRace.target_date) : false;
+  const showTopLastRaceCard = Boolean(lastCompletedRace && !officialForRace && !lastRaceClosed);
   const showRecordRaceComplete =
     Boolean(
       wsv.plan.has_active_plan &&
@@ -1284,8 +1302,20 @@ export default function StateTab({
           </div>
         </div>
 
-        {/* RACE — show when active plan or projection/readiness/goal meta exists (same finish anchor as terrain when available). */}
-        {(wsv.plan?.has_active_plan || raceFinishProjection || raceReadiness || goalMeta || officialForRace || postRaceUnofficial) && (
+        {/* RACE — visible during the build and through race week; disappears 7 days after the race. */}
+        {(() => {
+          const hasRaceContent =
+            wsv.plan?.has_active_plan ||
+            raceFinishProjection ||
+            raceReadiness ||
+            goalMeta ||
+            officialForRace ||
+            postRaceUnofficial;
+          if (!hasRaceContent) return null;
+          const upcomingDays = daysSinceYmd(raceYmdForActivePlan);
+          const stillRaceWeek = upcomingDays == null || upcomingDays <= 7;
+          if (!stillRaceWeek) return null;
+          return (
           <RaceSection
             projection={raceFinishProjection}
             rr={raceReadiness}
@@ -1314,7 +1344,8 @@ export default function StateTab({
             officialResult={officialForRace}
             postRaceUnofficial={officialForRace ? null : postRaceUnofficial}
           />
-        )}
+          );
+        })()}
 
         {/* NEXT */}
         <div className="px-3 py-3">
