@@ -10,6 +10,11 @@
 // - Applies user plan_adjustments to modify prescribed weights
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import {
+  hasBarbellCapability,
+  hasCompound1RMSignals,
+  resolveStrengthEquipmentTypeForPlan,
+} from '../_shared/strength-equipment-tier.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 
@@ -1902,6 +1907,38 @@ Deno.serve(async (req) => {
     let baselines: Baselines = {};
     try {
       const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source, units').eq('user_id', userId).maybeSingle();
+
+      // Audit: strength tier + raw baselines (generate-combined-plan uses effectiveProtocolTier; materialize uses equipment list for substitutions)
+      const strengthEquipArr = Array.isArray(ub?.equipment?.strength) ? (ub.equipment.strength as string[]) : [];
+      let explicitGoalEquipmentType: string | undefined;
+      try {
+        const planIdRef = rows[0]?.training_plan_id;
+        if (planIdRef) {
+          const { data: planRow } = await supabase.from('plans').select('goal_id').eq('id', planIdRef).maybeSingle();
+          const gid = planRow?.goal_id as string | undefined;
+          if (gid) {
+            const { data: goalRow } = await supabase.from('goals').select('training_prefs').eq('id', gid).maybeSingle();
+            const tp = goalRow?.training_prefs as Record<string, unknown> | null | undefined;
+            const et = tp?.equipment_type ?? tp?.equipmentType;
+            if (et != null && String(et).trim()) explicitGoalEquipmentType = String(et).trim();
+          }
+        }
+      } catch (e) {
+        console.warn('[materialize] audit: could not load goal training_prefs.equipment_type:', e);
+      }
+      const hasFullBarbell = hasBarbellCapability(strengthEquipArr);
+      const compoundSignals = hasCompound1RMSignals(ub?.performance_numbers);
+      const effectiveProtocolTier = resolveStrengthEquipmentTypeForPlan(
+        explicitGoalEquipmentType,
+        strengthEquipArr,
+        ub?.performance_numbers,
+      );
+      console.log('[materialize] performance_numbers (raw user_baselines):', JSON.stringify(ub?.performance_numbers ?? null, null, 2));
+      console.log('[materialize] equipment.strength:', JSON.stringify(strengthEquipArr, null, 2));
+      console.log('[materialize] equipment_type (from linked goal.training_prefs):', explicitGoalEquipmentType ?? '(none)');
+      console.log('[materialize] hasFullBarbell:', hasFullBarbell);
+      console.log('[materialize] compound1rmSignals:', compoundSignals);
+      console.log('[materialize] effectiveProtocolTier (same rule as generate-combined-plan):', effectiveProtocolTier);
       
       // Recalculate effort_paces from effort_score if source is 'calculated' (fixes outdated paces)
       let effortPaces = ub?.effort_paces;

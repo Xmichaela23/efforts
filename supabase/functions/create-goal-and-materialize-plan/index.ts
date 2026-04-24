@@ -19,6 +19,10 @@ import {
   readDaysPerWeekFromPrefs,
 } from '../_shared/combined-schedule-prefs.ts';
 import {
+  hasBarbellCapability,
+  resolveStrengthEquipmentTypeForPlan,
+} from '../_shared/strength-equipment-tier.ts';
+import {
   calculateEffortScore,
   estimateVdotFromBasePace,
   estimateVdotFromPace,
@@ -392,68 +396,6 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
     throw new AppError('downstream_function_failed', detail, 400);
   }
   return payload;
-}
-
-// ── Equipment capability helper ───────────────────────────────────────────────
-//
-// "commercial_gym" in the protocol system means "has barbell access and a rack".
-// A user qualifies if they have a commercial membership OR if their home gym
-// includes a barbell + plates, or a squat rack / power cage.
-// "Barbell + plates" alone covers deadlifts, rows, hip thrusts — still gets
-// the full barbell protocol. Only true bodyweight/band setups get home_gym tier.
-//
-function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
-  if (!Array.isArray(strengthEquipment)) return [];
-  return strengthEquipment.map((s) => String(s).toLowerCase());
-}
-
-function hasBarbellCapability(strengthEquipment: string[]): boolean {
-  const n = normStrengthEquipmentStrings(strengthEquipment);
-  const some = (sub: string) => n.some((s) => s.includes(sub));
-  return (
-    some('commercial gym') ||
-    (some('barbell') && some('plate')) ||
-    some('squat rack') ||
-    some('power cage')
-  );
-}
-
-/** Two+ logged manual compounds → treat as barbell-capable even if equipment list is stale. */
-function hasCompound1RMSignals(performanceNumbers: unknown): boolean {
-  const p =
-    performanceNumbers && typeof performanceNumbers === 'object' && !Array.isArray(performanceNumbers)
-      ? (performanceNumbers as Record<string, unknown>)
-      : null;
-  if (!p) return false;
-  const ok = (v: unknown) => {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0;
-  };
-  const hits = [
-    ok(p.squat ?? p.squat1RM ?? p.squat_1rm),
-    ok(p.deadlift ?? p.dead_lift),
-    ok(p.bench ?? p.bench_press ?? p.benchPress),
-    ok(p.overheadPress1RM ?? p.ohp ?? p.overhead_press ?? p.overhead),
-  ].filter(Boolean).length;
-  return hits >= 2;
-}
-
-/**
- * Resolves athlete_state.equipment_type for generate-combined-plan / triathlon generator.
- * Arc often saves home_gym for "I train at home" even when baselines list a full barbell setup —
- * those athletes must still get the barbell-tier protocol and %1RM prescriptions.
- */
-function resolveStrengthEquipmentTypeForPlan(
-  explicitEquipmentType: unknown,
-  strengthEquipment: string[],
-  performanceNumbers: unknown,
-): 'home_gym' | 'commercial_gym' {
-  if (hasBarbellCapability(strengthEquipment) || hasCompound1RMSignals(performanceNumbers)) {
-    return 'commercial_gym';
-  }
-  const ex = String(explicitEquipmentType ?? '').trim().toLowerCase();
-  if (ex === 'home_gym' || ex === 'commercial_gym') return ex;
-  return 'home_gym';
 }
 
 function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
