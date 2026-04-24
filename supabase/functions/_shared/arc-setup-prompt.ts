@@ -289,6 +289,8 @@ export type ArcSetupPromptOptions = {
    * Latest `<arc_setup>` JSON from this chat (client echo). Keeps per-goal prefs visible so the model does not re-ask or drift.
    */
   draftArcSetup?: unknown;
+  /** QA: context JSON was scrubbed — do not assume a saved weekly schedule from it. */
+  freshSetup?: boolean;
 };
 
 /** One-line schedule summary for draft reinjection (avoids huge JSON blobs in the system prompt). */
@@ -372,8 +374,14 @@ export function buildConfirmedSoFarSection(draft: unknown): string {
  */
 export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPromptOptions): string {
   const cacheBlock = (opts?.raceCacheSection && opts.raceCacheSection.trim()) ? `${opts.raceCacheSection}\n\n` : '';
-  const confirmedBlockRaw = buildConfirmedSoFarSection(opts?.draftArcSetup);
+  const confirmedBlockRaw = opts?.freshSetup ? '' : buildConfirmedSoFarSection(opts?.draftArcSetup);
   const confirmedBlock = confirmedBlockRaw ? `${confirmedBlockRaw}\n\n` : '';
+  const freshBlock = opts?.freshSetup
+    ? `## FRESH_SETUP (clean slate for this session)
+The athlete turned on **clean slate** testing. Omitted from the context JSON on purpose: per-goal \`training_prefs\` / \`projection\`, \`swim_training_from_workouts\`, \`latest_snapshot\`, \`athlete_memory\`, \`active_plan\`, \`recent_completed_events\`, and \`five_k_nudge\`. **Do not** infer a weekly schedule (group ride day, swim days, long ride) from this payload — treat those as unknown until they say so in the thread. **DRAFT LOCK-IN** is disabled for this session.
+
+`
+    : '';
   const arcJson = JSON.stringify(
     {
       athlete_identity: arc.athlete_identity,
@@ -403,7 +411,7 @@ export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPrompt
 **Voice:** Never refer to yourself by name, initials, "AL," "Athlete Leg," or similar in messages to the athlete. Do not sign messages. Use direct, second-person or neutral coach language only.
 
 ${REGISTER_AND_TESTABILITY}
-
+${freshBlock}
 ${COACHING_DOCTRINE}
 
 ${ENGINE_VOCAB}

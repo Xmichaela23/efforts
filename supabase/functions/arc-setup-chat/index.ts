@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getArcContext } from '../_shared/arc-context.ts';
+import { arcContextForFreshSetup, getArcContext } from '../_shared/arc-context.ts';
 import { buildArcSetupSystemPrompt } from '../_shared/arc-setup-prompt.ts';
 import type { ConversationMessage } from '../_shared/llm.ts';
 import {
@@ -40,6 +40,8 @@ Deno.serve(async (req) => {
       focus_date?: string;
       /** Latest parsed `<arc_setup>` JSON from the client — reinjected into system prompt to limit drift */
       draft_arc_setup?: unknown;
+      /** QA: omit saved schedule / snapshots from context; no draft lock-in */
+      fresh_setup?: boolean;
     };
     const userId = body.user_id;
     if (!userId || typeof userId !== 'string') {
@@ -74,18 +76,24 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const arc = await getArcContext(supabase, userId, focusDateISO);
+    const freshSetup = body.fresh_setup === true;
+    let arc = await getArcContext(supabase, userId, focusDateISO);
+    if (freshSetup) arc = arcContextForFreshSetup(arc);
 
-    const cacheRows = await loadWebSearchRaceCache(supabase, userId);
+    const cacheRows = freshSetup ? [] : await loadWebSearchRaceCache(supabase, userId);
     const cacheSection = formatRaceCacheForSystemPrompt(cacheRows);
 
     const draftArcSetup =
-      body.draft_arc_setup != null && typeof body.draft_arc_setup === 'object' && !Array.isArray(body.draft_arc_setup)
+      !freshSetup &&
+      body.draft_arc_setup != null &&
+      typeof body.draft_arc_setup === 'object' &&
+      !Array.isArray(body.draft_arc_setup)
         ? body.draft_arc_setup
         : undefined;
     const system = buildArcSetupSystemPrompt(arc, {
       raceCacheSection: cacheSection,
       ...(draftArcSetup ? { draftArcSetup } : {}),
+      ...(freshSetup ? { freshSetup: true } : {}),
     });
 
     const { text, lastContent, lastUsage } = await callClaudeArcSetupConversation({

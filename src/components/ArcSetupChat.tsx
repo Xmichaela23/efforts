@@ -307,6 +307,8 @@ type ArcSetupChatProps = {
 export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  /** QA: hide saved schedule / draft from the coach — see `fresh_setup` on arc-setup-chat */
+  const [freshSetup, setFreshSetup] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -350,12 +352,13 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     const today = focusDate && /^\d{4}-\d{2}-\d{2}/.test(focusDate) ? focusDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
 
     try {
-      const draftEcho = lastDraftArcSetupRef.current;
+      const draftEcho = freshSetup ? null : lastDraftArcSetupRef.current;
       const { data, error: fnErr } = await supabase.functions.invoke('arc-setup-chat', {
         body: {
           user_id: userId,
           messages: api,
           focus_date: today,
+          ...(freshSetup ? { fresh_setup: true } : {}),
           ...(draftEcho ? { draft_arc_setup: draftEcho } : {}),
         },
       });
@@ -459,6 +462,43 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
             <p className="mt-2.5 text-[17px] leading-relaxed text-white/60">
               Races, goals, and limits—this flow shapes your arc. Type below to start.
             </p>
+            <label className="mt-4 flex items-start gap-3 cursor-pointer select-none rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 shrink-0 rounded border-white/30 bg-zinc-900 text-teal-500 focus:ring-teal-500/40"
+                checked={freshSetup}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  if (on) {
+                    setMessages([]);
+                    setPendingSetup(null);
+                    setSaveBanner(null);
+                    lastDraftArcSetupRef.current = null;
+                  }
+                  setFreshSetup(on);
+                }}
+              />
+              <span className="text-[15px] leading-snug text-white/70">
+                <span className="font-medium text-white/85">Clean slate (test prompts)</span>
+                <span className="block mt-1 text-white/55">
+                  Hides saved training days, draft lock-in, and recent training snapshots from the coach for this chat.
+                  Your account data is unchanged.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
+
+        {freshSetup && !showIntroBanner && (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-amber-200/90 px-0.5 py-2 border-b border-amber-500/20">
+            <span>Clean slate on — saved schedule and draft hidden from the coach.</span>
+            <button
+              type="button"
+              className="shrink-0 text-amber-100/90 underline underline-offset-2 decoration-amber-400/50"
+              onClick={() => setFreshSetup(false)}
+            >
+              Turn off
+            </button>
           </div>
         )}
 

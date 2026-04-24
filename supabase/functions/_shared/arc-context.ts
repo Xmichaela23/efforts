@@ -164,6 +164,27 @@ export interface ArcContext {
   built_at: string;
 }
 
+/**
+ * Remove saved schedule prefs and “already know you” signals from context so arc-setup
+ * can be exercised like a first-time flow (QA / testing). Does not change the database.
+ */
+export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
+  return {
+    ...arc,
+    active_goals: arc.active_goals.map((g) => ({
+      ...g,
+      training_prefs: null,
+      projection: null,
+    })),
+    athlete_memory: null,
+    latest_snapshot: null,
+    swim_training_from_workouts: null,
+    active_plan: null,
+    recent_completed_events: [],
+    five_k_nudge: null,
+  };
+}
+
 function parseGoalTrainingPrefs(value: unknown): Record<string, unknown> | null {
   if (value == null) return null;
   if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
