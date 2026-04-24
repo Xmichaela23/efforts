@@ -17,6 +17,7 @@ export type StrengthProtocolId =
   | 'neural_speed'
   | 'upper_aesthetics'
   | 'triathlon'
+  | 'triathlon_performance'
   | 'minimum_dose';
 
 export type StrengthProtocolProfile = {
@@ -45,6 +46,7 @@ export type StrengthProtocolProfile = {
 // neural      – low rep, heavy loads, tighter tolerances, faster reaction
 // upper_aesth – hybrid: neural lower + hypertrophy upper
 // triathlon   – similar to durability, extra interference tolerance
+// tri_perf    – periodized tri compounds; slightly tighter than tri support
 // minimum     – maintenance; progression only when clearly underloaded
 // ---------------------------------------------------------------------------
 
@@ -71,6 +73,12 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
     defaultTargetRir: { lower: 2.5, upper: 2.5 },
     progression: { minDeviation: 0.5, minGainPct: 0.03 },
     deload:      { maxDeviation: -1.0, minSessions: 3 },
+  },
+
+  triathlon_performance: {
+    defaultTargetRir: { lower: 2, upper: 2 },
+    progression: { minDeviation: 0.35, minGainPct: 0.025 },
+    deload:      { maxDeviation: -0.75, minSessions: 3 },
   },
 
   minimum_dose: {

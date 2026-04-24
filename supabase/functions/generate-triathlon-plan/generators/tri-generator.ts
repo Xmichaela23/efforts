@@ -20,6 +20,7 @@ import {
 } from '../types.ts';
 
 import { triathlonProtocol } from '../../shared/strength-system/protocols/triathlon.ts';
+import { triathlonPerformanceProtocol } from '../../shared/strength-system/protocols/triathlon_performance.ts';
 import type { ProtocolContext } from '../../shared/strength-system/protocols/types.ts';
 
 // ============================================================================
@@ -787,6 +788,9 @@ export class TriathlonGenerator {
 
     const protocolPhaseName = phaseNameMap[phase.name] ?? phase.name ?? 'Base';
 
+    const usePerformanceStrength =
+      this.params.goal === 'performance' || this.params.training_intent === 'performance';
+
     const ctx: ProtocolContext = {
       weekIndex: weekInPhase,
       weekInPhase,
@@ -804,10 +808,12 @@ export class TriathlonGenerator {
       triathlonContext: {
         limiterSport: limiter,
         brickDays,
+        strengthIntent: usePerformanceStrength ? 'performance' : 'support',
       },
     };
 
-    const sessions = triathlonProtocol.createWeekSessions(ctx);
+    const protocol = usePerformanceStrength ? triathlonPerformanceProtocol : triathlonProtocol;
+    const sessions = protocol.createWeekSessions(ctx);
     const intent = sessions[Math.min(sessionIndex, sessions.length - 1)];
     if (!intent) return null;
 

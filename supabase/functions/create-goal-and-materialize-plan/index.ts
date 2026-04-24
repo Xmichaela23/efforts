@@ -566,6 +566,31 @@ function backfillTriTrainingPrefsDefenseInDepth(
   return notes;
 }
 
+/**
+ * For combined tri plans: keep explicit non-tri strength protocols (neural_speed, …);
+ * otherwise map `strength_intent` → triathlon vs triathlon_performance.
+ */
+function resolveCombinedTriStrengthProtocol(
+  rawProtocol: string | undefined,
+  strengthIntent: string | undefined,
+): string {
+  const p = String(rawProtocol ?? '').trim();
+  const nonTri = new Set([
+    'neural_speed',
+    'durability',
+    'upper_aesthetics',
+    'minimum_dose',
+    'upper_priority_hybrid',
+    'foundation_durability',
+    'performance_neural',
+  ]);
+  if (p && nonTri.has(p)) return p;
+  if (p === 'triathlon_performance') return 'triathlon_performance';
+  if (p === 'triathlon') return 'triathlon';
+  if (strengthIntent === 'performance') return 'triathlon_performance';
+  return 'triathlon';
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -721,6 +746,15 @@ async function buildCombinedPlan(
 
   const swim_volume_multiplier = swimVolumeMultiplierFromArcWorkouts(arcForCombined.swim_training_from_workouts);
 
+  const resolvedCombinedStrengthProtocol = resolveCombinedTriStrengthProtocol(
+    combinedSchedulePrefs.strength_protocol != null
+      ? String(combinedSchedulePrefs.strength_protocol)
+      : undefined,
+    combinedSchedulePrefs.strength_intent != null
+      ? String(combinedSchedulePrefs.strength_intent)
+      : undefined,
+  );
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -757,9 +791,7 @@ async function buildCombinedPlan(
       ...(combinedSchedulePrefs.bike_easy_day !== undefined
         ? { bike_easy_day: combinedSchedulePrefs.bike_easy_day }
         : {}),
-      ...(combinedSchedulePrefs.strength_protocol
-        ? { strength_protocol: combinedSchedulePrefs.strength_protocol }
-        : {}),
+      strength_protocol: resolvedCombinedStrengthProtocol,
       ...(combinedSchedulePrefs.strength_intent
         ? { strength_intent: combinedSchedulePrefs.strength_intent }
         : {}),

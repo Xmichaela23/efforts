@@ -7,7 +7,9 @@
 import type { PlannedSession, Phase, Intensity, PlannedStrengthExercise } from './types.ts';
 import type { Sport } from './types.ts';
 import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK } from './science.ts';
+import type { StrengthProtocol } from '../shared/strength-system/protocols/types.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
+import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
 import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
@@ -418,6 +420,25 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
 //   - Brick-day awareness (caller passes brickDays; protocol placement avoids them)
 //   - Taper sensitivity (taper phase → neural priming only)
 
+/** Tri combined plans: non-tri protocols (neural_speed, …) override; else performance → triathlon_performance, support → triathlon. */
+function resolveTriCombinedStrengthProtocol(options: {
+  strengthProtocolId?: string;
+  strengthIntent?: 'support' | 'performance';
+}): StrengthProtocol {
+  const raw = options.strengthProtocolId?.trim() ?? '';
+  if (raw && raw !== 'triathlon' && raw !== 'triathlon_performance') {
+    try {
+      return getProtocol(raw);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (raw === 'triathlon_performance') return triathlonPerformanceProtocol;
+  if (raw === 'triathlon') return triathlonProtocol;
+  if (options.strengthIntent === 'performance') return triathlonPerformanceProtocol;
+  return triathlonProtocol;
+}
+
 // Maps combined-plan phase names to the StrengthPhase format
 function toStrengthPhase(phase: Phase): { name: string; start_week: number; end_week: number; weeks_in_phase: number } {
   const nameMap: Record<Phase, string> = {
@@ -524,6 +545,9 @@ function buildStrengthSteps(intent: IntentSession): string[] {
     'calf raises (bilateral)': 'st_acc_calf_raises_3x15',
     'bulgarian split squat': 'st_acc_split_squat_4x6',
     'rear-foot elevated split squat': 'st_acc_split_squat_4x6',
+    'bench press': 'st_acc_bench_press_3x8',
+    'barbell row': 'st_acc_barbell_row_3x8',
+    'standing barbell overhead press': 'st_acc_overhead_press_3x8',
   };
 
   for (const ex of (intent.exercises ?? [])) {
@@ -585,15 +609,10 @@ export function triathlonStrength(
     },
   };
 
-  const pid = options?.strengthProtocolId?.trim();
-  let protocol = triathlonProtocol;
-  if (pid && pid !== 'triathlon') {
-    try {
-      protocol = getProtocol(pid);
-    } catch {
-      protocol = triathlonProtocol;
-    }
-  }
+  const protocol = resolveTriCombinedStrengthProtocol({
+    strengthProtocolId: options?.strengthProtocolId,
+    strengthIntent: options?.strengthIntent,
+  });
 
   const sessions = protocol.createWeekSessions(ctx);
   // sessionIndex 0 = lower/posterior chain, 1 = upper/swim

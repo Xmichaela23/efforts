@@ -10,9 +10,16 @@ import { foundationDurabilityProtocol } from './foundation-durability.ts';
 import { performanceNeuralProtocol } from './performance-neural.ts';
 import { minimumDoseProtocol } from './minimum-dose.ts';
 import { triathlonProtocol } from './triathlon.ts';
+import { triathlonPerformanceProtocol } from './triathlon_performance.ts';
 
 // Canonical protocol IDs (new canonical format)
-export type ProtocolId = 'durability' | 'neural_speed' | 'upper_aesthetics' | 'minimum_dose' | 'triathlon';
+export type ProtocolId =
+  | 'durability'
+  | 'neural_speed'
+  | 'upper_aesthetics'
+  | 'minimum_dose'
+  | 'triathlon'
+  | 'triathlon_performance';
 
 // Legacy IDs (temporary backward compatibility - TODO: Remove after 2025-03-01)
 type LegacyProtocolId = 'upper_priority_hybrid' | 'foundation_durability' | 'performance_neural';
@@ -26,7 +33,13 @@ type LegacyProtocolId = 'upper_priority_hybrid' | 'foundation_durability' | 'per
  */
 export function normalizeProtocolId(protocolId: string): ProtocolId {
   // Supported protocols (runtime list - excludes minimum_dose until frontend supports it)
-  const canonical = new Set<ProtocolId>(['durability', 'neural_speed', 'upper_aesthetics', 'triathlon']);
+  const canonical = new Set<ProtocolId>([
+    'durability',
+    'neural_speed',
+    'upper_aesthetics',
+    'triathlon',
+    'triathlon_performance',
+  ]);
   
   // If already canonical, return as-is
   if (canonical.has(protocolId as ProtocolId)) {
@@ -55,7 +68,13 @@ export function normalizeProtocolId(protocolId: string): ProtocolId {
  * Note: minimum_dose is not in the supported runtime list (deferred)
  */
 export function isValidProtocol(protocolId: string): boolean {
-  const canonical = new Set<ProtocolId>(['durability', 'neural_speed', 'upper_aesthetics', 'triathlon']);
+  const canonical = new Set<ProtocolId>([
+    'durability',
+    'neural_speed',
+    'upper_aesthetics',
+    'triathlon',
+    'triathlon_performance',
+  ]);
   const legacyProtocols: LegacyProtocolId[] = ['upper_priority_hybrid', 'foundation_durability', 'performance_neural'];
   return canonical.has(protocolId as ProtocolId) 
     || legacyProtocols.includes(protocolId as LegacyProtocolId);
@@ -78,7 +97,7 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
   
   // Validate normalized ID is valid (runtime check - excludes minimum_dose)
   if (!isValidProtocol(canonicalId)) {
-    const available = ['durability', 'neural_speed', 'upper_aesthetics'].join(', ');
+    const available = ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon', 'triathlon_performance'].join(', ');
     throw new Error(`Invalid strength_protocol: "${protocolId}" (normalized: "${canonicalId}"). Available: ${available}`);
   }
   
@@ -96,6 +115,8 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
       return minimumDoseProtocol;
     case 'triathlon':
       return triathlonProtocol;
+    case 'triathlon_performance':
+      return triathlonPerformanceProtocol;
     default:
       // Should not reach here due to validation, but TypeScript needs this
       throw new Error(`Protocol "${canonicalId}" is not implemented`);
@@ -107,5 +128,5 @@ export function getProtocol(protocolId?: string): StrengthProtocol {
  * Note: minimum_dose is excluded until frontend support is added
  */
 export function listProtocols(): ProtocolId[] {
-  return ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon'];
+  return ['durability', 'neural_speed', 'upper_aesthetics', 'triathlon', 'triathlon_performance'];
 }
