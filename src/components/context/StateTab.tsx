@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type {
   CoachWeekContextV1,
@@ -14,7 +15,6 @@ import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
-import { useAppContext } from '@/contexts/AppContext';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 
 type CoachDataProp = {
@@ -204,7 +204,7 @@ function RaceSection({
     modelProjected?: { seconds: number; display: string } | null;
   } | null;
   postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
-  recordOfficialCta: { onClick: () => void; busy: boolean; error: string | null } | null;
+  recordOfficialCta: { onClick: () => void; disabled?: boolean } | null;
 }) {
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
@@ -310,19 +310,18 @@ function RaceSection({
         )}
         {recordOfficialCta && (
           <div className="pt-1 space-y-2">
-            <p className="text-[10px] font-semibold tracking-[0.1em] text-amber-300/85 uppercase">Close this plan</p>
+            <p className="text-[10px] font-semibold tracking-[0.1em] text-amber-300/85 uppercase">Save to My Record</p>
             <p className="text-[10px] text-white/50 leading-snug">
-              Saves your official time (elapsed-first, same as above) and moves this plan to past.
+              Opens Athletic Record, where your elapsed-first result is saved and this plan moves to past.
             </p>
             <button
               type="button"
               onClick={recordOfficialCta.onClick}
-              disabled={recordOfficialCta.busy}
+              disabled={recordOfficialCta.disabled}
               className="w-full rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-[13px] font-medium text-amber-100/95 hover:bg-amber-500/15 active:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
             >
-              {recordOfficialCta.busy ? 'Recording…' : 'Record race result & close plan'}
+              Open My Record
             </button>
-            {recordOfficialCta.error && <p className="text-[11px] text-red-400/90">{recordOfficialCta.error}</p>}
           </div>
         )}
         {!recordOfficialCta && (
@@ -570,8 +569,8 @@ export default function StateTab({
   onClose?: () => void;
   onSelectWorkout?: (workout: any) => void;
 }) {
+  const navigate = useNavigate();
   const { data, loading, error, refresh, revalidating } = coachData;
-  const { refreshPlans } = useAppContext();
   const coachBusy = loading || Boolean(revalidating);
   const { liftTrends } = useExerciseLog(8);
   const [adjustingLift, setAdjustingLift] = useState<string | null>(null);
@@ -581,8 +580,6 @@ export default function StateTab({
   const [strategyModalOpen, setStrategyModalOpen] = useState(false);
   const [strategyCourseId, setStrategyCourseId] = useState<string | null>(null);
   const stateCourseFileRef = useRef<HTMLInputElement>(null);
-  const [raceCompleteBusy, setRaceCompleteBusy] = useState(false);
-  const [raceCompleteError, setRaceCompleteError] = useState<string | null>(null);
   const [fetchedOfficialResult, setFetchedOfficialResult] = useState<{
     actual_seconds: number;
     goal_target_seconds: number | null;
@@ -937,53 +934,27 @@ export default function StateTab({
   /** Top amber bar would duplicate the in-RACE button after race day (post-race view scrolls that far). */
   const showAmberRecordBar = showRecordRaceComplete && !postRaceUnofficial;
 
-  async function onRecordRaceComplete() {
-    if (!activePlanId || raceCompleteBusy) return;
-    if (
-      !window.confirm(
-        'Use the elapsed (chip) time from your completed race run for this day, mark the goal complete, and close the plan? Future planned workouts for this plan will be removed.',
-      )
-    ) {
-      return;
-    }
-    setRaceCompleteBusy(true);
-    setRaceCompleteError(null);
-    try {
-      const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
-        body: {
-          plan_id: activePlanId,
-          ...(postRaceUnofficial?.workoutId ? { workout_id: postRaceUnofficial.workoutId } : {}),
+  function openAthleticRecordRaceResult() {
+    navigate('/profile/athletic-record?addRace=1', {
+      state: {
+        athleticRecordAddRace: {
+          name: goalLinkedToPlan?.name || goalMeta?.name || raceReadiness?.goal?.name || 'Race result',
+          date: raceYmdForActivePlan || asYmd,
+          distance: planWizardDistance || goalMeta?.distance || raceReadiness?.goal?.distance || 'marathon',
+          sport: 'run',
+          planId: activePlanId || undefined,
+          workoutId: postRaceUnofficial?.workoutId || undefined,
+          elapsedSeconds: postRaceUnofficial?.loggedSeconds || undefined,
         },
-      });
-      const payload = fnData as { error?: string; success?: boolean } | null;
-      const serverError =
-        (payload && typeof payload.error === 'string' && payload.error.trim() ? payload.error : '') || '';
-      if (fnErr) {
-        throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
-      }
-      if (serverError && !payload?.success) {
-        throw new Error(serverError);
-      }
-      try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
-      void refreshPlans?.();
-      refresh();
-    } catch (e) {
-      setRaceCompleteError((e as Error)?.message || String(e));
-    } finally {
-      setRaceCompleteBusy(false);
-    }
+      },
+    });
   }
 
   const recordOfficialCta =
     postRaceUnofficial && activePlanId && wsv.plan.has_active_plan && !officialForRace
       ? {
-          onClick: () => {
-            void onRecordRaceComplete();
-          },
-          busy: raceCompleteBusy || coachBusy,
-          error: raceCompleteError,
+          onClick: openAthleticRecordRaceResult,
+          disabled: coachBusy,
         }
       : null;
 
@@ -1191,17 +1162,16 @@ export default function StateTab({
           <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-2">
             <p className="text-[10px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
             <p className="text-[11px] text-white/55 leading-snug">
-              Log your race as a completed run, then record your result. We use <span className="text-white/70">elapsed time</span> (chip time), not moving time. Your goal moves to completed and this plan ends.
+              Log your race as a completed run, then finish it in My Record. We use <span className="text-white/70">elapsed time</span> (chip time), not moving time. Your goal moves to completed and this plan ends.
             </p>
             <button
               type="button"
-              onClick={() => { void onRecordRaceComplete(); }}
-              disabled={raceCompleteBusy || coachBusy}
+              onClick={openAthleticRecordRaceResult}
+              disabled={coachBusy}
               className="w-full rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-[13px] font-medium text-amber-100/95 hover:bg-amber-500/15 active:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
             >
-              {raceCompleteBusy ? 'Recording…' : 'Record race result & close plan'}
+              Open My Record
             </button>
-            {raceCompleteError && <p className="text-[11px] text-red-400/90">{raceCompleteError}</p>}
           </div>
         )}
 

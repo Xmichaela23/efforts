@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Trophy, Plus, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 
 function fmtGoalClock(totalSec: number): string {
@@ -41,8 +41,19 @@ type RaceRow = {
   training_prefs: Record<string, unknown> | null;
 };
 
+type AddRacePrefill = {
+  name?: string;
+  date?: string;
+  distance?: string;
+  sport?: string;
+  planId?: string;
+  workoutId?: string;
+  elapsedSeconds?: number;
+};
+
 export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [races, setRaces] = useState<RaceRow[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -59,6 +70,8 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const [addDistance, setAddDistance] = useState('marathon');
   const [addTime, setAddTime] = useState('');
   const [addSaving, setAddSaving] = useState(false);
+  const [addPrefill, setAddPrefill] = useState<AddRacePrefill | null>(null);
+  const handledAddRaceRef = useRef(false);
 
   const load = useCallback(async () => {
     const uid = getStoredUserId();
@@ -121,6 +134,20 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (handledAddRaceRef.current || !new URLSearchParams(location.search).has('addRace')) return;
+    handledAddRaceRef.current = true;
+    const prefill = ((location.state as { athleticRecordAddRace?: AddRacePrefill } | null)?.athleticRecordAddRace || null);
+    setAddPrefill(prefill);
+    if (prefill?.name) setAddName(prefill.name);
+    if (prefill?.date) setAddDate(prefill.date.slice(0, 10));
+    if (prefill?.distance) setAddDistance(prefill.distance);
+    if (typeof prefill?.elapsedSeconds === 'number' && prefill.elapsedSeconds > 0) {
+      setAddTime(fmtGoalClock(prefill.elapsedSeconds));
+    }
+    setAddOpen(true);
+  }, [location.search, location.state]);
+
   const hasContent =
     races.length > 0 ||
     (typeof pn.ftp === 'number' && pn.ftp > 0) ||
@@ -170,27 +197,49 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     const uid = getStoredUserId();
     if (!uid) return;
     const sec = parseTimeToSeconds(addTime);
-    if (!addName.trim() || !addDate || sec == null || sec <= 0) {
+    if (!addPrefill?.planId && (!addName.trim() || !addDate || sec == null || sec <= 0)) {
       window.alert('Enter name, date, and finish time (e.g. 4:38:00 or 45:30). Times are elapsed / chip, not moving.');
       return;
     }
     setAddSaving(true);
     try {
-      const { error } = await supabase.from('goals').insert({
-        user_id: uid,
-        name: addName.trim(),
-        goal_type: 'event',
-        target_date: addDate,
-        distance: addDistance,
-        sport: 'run',
-        status: 'completed',
-        current_value: sec,
-        training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
-      } as any);
-      if (error) throw error;
+      if (addPrefill?.planId) {
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
+          body: {
+            plan_id: addPrefill.planId,
+            ...(addPrefill.workoutId ? { workout_id: addPrefill.workoutId } : {}),
+          },
+        });
+        const payload = fnData as { error?: string; success?: boolean } | null;
+        const serverError =
+          (payload && typeof payload.error === 'string' && payload.error.trim() ? payload.error : '') || '';
+        if (fnErr) {
+          throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
+        }
+        if (serverError && !payload?.success) {
+          throw new Error(serverError);
+        }
+        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+      } else {
+        const { error } = await supabase.from('goals').insert({
+          user_id: uid,
+          name: addName.trim(),
+          goal_type: 'event',
+          target_date: addDate,
+          distance: addDistance,
+          sport: 'run',
+          status: 'completed',
+          current_value: sec,
+          training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
+        } as any);
+        if (error) throw error;
+      }
       setAddOpen(false);
       setAddName('');
       setAddTime('');
+      setAddPrefill(null);
       await load();
     } catch (e) {
       window.alert((e as Error)?.message || 'Could not save');
@@ -356,17 +405,28 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         </div>
       )}
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          setAddOpen(open);
+          if (!open) setAddPrefill(null);
+        }}
+      >
         <DialogContent className="bg-zinc-900 border border-white/10 text-white max-w-md">
           <DialogHeader>
-            <DialogTitle>Add race result</DialogTitle>
+            <DialogTitle>{addPrefill?.planId ? 'Save race result' : 'Add race result'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-xs text-white/50">Enter <span className="text-amber-200/80">elapsed</span> (chip) time, not moving time.</p>
+            <p className="text-xs text-white/50">
+              {addPrefill?.planId
+                ? 'My Record saves this elapsed-first race result and moves the plan to past.'
+                : <>Enter <span className="text-amber-200/80">elapsed</span> (chip) time, not moving time.</>}
+            </p>
             <label className="block text-xs text-white/60">Name</label>
             <input
               value={addName}
               onChange={(e) => setAddName(e.target.value)}
+              disabled={Boolean(addPrefill?.planId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded"
               placeholder="City Marathon 2026"
             />
@@ -375,12 +435,14 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
               type="date"
               value={addDate}
               onChange={(e) => setAddDate(e.target.value)}
+              disabled={Boolean(addPrefill?.planId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded"
             />
             <label className="block text-xs text-white/60">Distance</label>
             <select
               value={addDistance}
               onChange={(e) => setAddDistance(e.target.value)}
+              disabled={Boolean(addPrefill?.planId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded"
             >
               <option value="5K">5K</option>
@@ -393,8 +455,9 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
             <input
               value={addTime}
               onChange={(e) => setAddTime(e.target.value)}
+              disabled={Boolean(addPrefill?.planId)}
               className="w-full h-9 px-2 text-sm bg-white/[0.08] border border-white/20 rounded tabular-nums"
-              placeholder="4:38:00 or 45:30"
+              placeholder={addPrefill?.planId ? 'Read from completed race log' : '4:38:00 or 45:30'}
             />
           </div>
           <DialogFooter>
@@ -409,7 +472,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
               className="bg-amber-600 hover:bg-amber-500"
               type="button"
             >
-              {addSaving ? 'Saving…' : 'Save'}
+              {addSaving ? 'Saving…' : addPrefill?.planId ? 'Save result & close plan' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
