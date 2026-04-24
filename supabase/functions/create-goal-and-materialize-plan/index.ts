@@ -402,12 +402,58 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
 // "Barbell + plates" alone covers deadlifts, rows, hip thrusts — still gets
 // the full barbell protocol. Only true bodyweight/band setups get home_gym tier.
 //
+function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
+  if (!Array.isArray(strengthEquipment)) return [];
+  return strengthEquipment.map((s) => String(s).toLowerCase());
+}
+
 function hasBarbellCapability(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  const some = (sub: string) => n.some((s) => s.includes(sub));
   return (
-    strengthEquipment.includes('Commercial gym') ||
-    strengthEquipment.includes('Barbell + plates') ||
-    strengthEquipment.includes('Squat rack / Power cage')
+    some('commercial gym') ||
+    (some('barbell') && some('plate')) ||
+    some('squat rack') ||
+    some('power cage')
   );
+}
+
+/** Two+ logged manual compounds → treat as barbell-capable even if equipment list is stale. */
+function hasCompound1RMSignals(performanceNumbers: unknown): boolean {
+  const p =
+    performanceNumbers && typeof performanceNumbers === 'object' && !Array.isArray(performanceNumbers)
+      ? (performanceNumbers as Record<string, unknown>)
+      : null;
+  if (!p) return false;
+  const ok = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0;
+  };
+  const hits = [
+    ok(p.squat ?? p.squat1RM ?? p.squat_1rm),
+    ok(p.deadlift ?? p.dead_lift),
+    ok(p.bench ?? p.bench_press ?? p.benchPress),
+    ok(p.overheadPress1RM ?? p.ohp ?? p.overhead_press ?? p.overhead),
+  ].filter(Boolean).length;
+  return hits >= 2;
+}
+
+/**
+ * Resolves athlete_state.equipment_type for generate-combined-plan / triathlon generator.
+ * Arc often saves home_gym for "I train at home" even when baselines list a full barbell setup —
+ * those athletes must still get the barbell-tier protocol and %1RM prescriptions.
+ */
+function resolveStrengthEquipmentTypeForPlan(
+  explicitEquipmentType: unknown,
+  strengthEquipment: string[],
+  performanceNumbers: unknown,
+): 'home_gym' | 'commercial_gym' {
+  if (hasBarbellCapability(strengthEquipment) || hasCompound1RMSignals(performanceNumbers)) {
+    return 'commercial_gym';
+  }
+  const ex = String(explicitEquipmentType ?? '').trim().toLowerCase();
+  if (ex === 'home_gym' || ex === 'commercial_gym') return ex;
+  return 'home_gym';
 }
 
 function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
@@ -470,6 +516,10 @@ function mergeTrainingPrefsWithArcDefaults(
       const raw = arc.equipment as { strength?: string[] } | null | undefined;
       const arr = Array.isArray(raw?.strength) ? raw.strength : [];
       tp.equipment_type = hasBarbellCapability(arr) ? 'commercial_gym' : 'home_gym';
+    } else if (String(tp.equipment_type).trim().toLowerCase() === 'home_gym') {
+      const raw = arc.equipment as { strength?: string[] } | null | undefined;
+      const arr = Array.isArray(raw?.strength) ? raw.strength : [];
+      if (hasBarbellCapability(arr)) tp.equipment_type = 'commercial_gym';
     }
     if (!String(tp.limiter_sport ?? '').trim()) {
       tp.limiter_sport = inferLimiterSportFromArc(arc);
@@ -663,7 +713,6 @@ async function buildCombinedPlan(
   });
 
   const combinedStrengthEquipment: string[] = combinedBaseline?.equipment?.strength ?? [];
-  const hasCommercialGym = hasBarbellCapability(combinedStrengthEquipment);
 
   // Resolve approach for the combined plan.
   // The primary event goal drives the approach; defaults to the same logic as standalone.
@@ -688,15 +737,14 @@ async function buildCombinedPlan(
     combinedSchedulePrefs.long_ride_day,
   );
   combinedSchedulePrefs.rest_days = resolvedRestDays;
-  const explicitEquipment = String(
+  const explicitEquipmentType =
     (newGoal.training_prefs as Record<string, unknown>)?.equipment_type
-      ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_type
-      ?? '',
-  ).trim();
-  const resolvedEquipmentType: 'home_gym' | 'commercial_gym' =
-    explicitEquipment === 'home_gym' || explicitEquipment === 'commercial_gym'
-      ? explicitEquipment
-      : (hasCommercialGym ? 'commercial_gym' : 'home_gym');
+    ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_type;
+  const resolvedEquipmentType = resolveStrengthEquipmentTypeForPlan(
+    explicitEquipmentType,
+    combinedStrengthEquipment,
+    combinedBaseline?.performance_numbers,
+  );
 
   // base_first always defaults to 2:1 loading (completion-focused, slower recovery).
   // race_peak defers to fitness level (beginner→2:1, intermediate/advanced→3:1).
@@ -1081,8 +1129,11 @@ Deno.serve(async (req: Request) => {
         days_per_week:    resolvedGoal?.training_prefs?.days_per_week ?? undefined,
         // Triathlon plans support 0/1/2 strength days — cap UI value of 3 to 2
         strength_frequency: Math.min(2, Number(resolvedGoal?.training_prefs?.strength_frequency ?? 0)),
-        // Equipment: commercial_gym if they have a commercial membership OR barbell+rack at home
-        equipment_type: hasBarbellCapability(triBaseline?.equipment?.strength ?? []) ? 'commercial_gym' : 'home_gym',
+        equipment_type: resolveStrengthEquipmentTypeForPlan(
+          resolvedGoal?.training_prefs?.equipment_type,
+          triBaseline?.equipment?.strength ?? [],
+          triBaseline?.performance_numbers,
+        ),
         // Limiter sport from training prefs (used to shift strength emphasis)
         limiter_sport: resolvedGoal?.training_prefs?.limiter_sport ?? undefined,
         training_intent: normalizeTrainingIntent(
@@ -1433,10 +1484,11 @@ Deno.serve(async (req: Request) => {
     if (resolvedGoal?.training_prefs?.strength_protocol && resolvedGoal.training_prefs.strength_protocol !== 'none') {
       generateBody.strength_protocol = resolvedGoal.training_prefs.strength_protocol;
       generateBody.strength_frequency = resolvedGoal.training_prefs.strength_frequency || 2;
-      // Derive tier from user_baselines equipment — commercial gym gets barbell tier,
-      // home gym stays bodyweight. Falls back to 'strength_power' if baseline unavailable.
-      const runEquipmentType = hasBarbellCapability(baseline?.equipment?.strength ?? [])
-        ? 'commercial_gym' : 'home_gym';
+      const runEquipmentType = resolveStrengthEquipmentTypeForPlan(
+        resolvedGoal?.training_prefs?.equipment_type,
+        baseline?.equipment?.strength ?? [],
+        baseline?.performance_numbers,
+      );
       generateBody.strength_tier = runEquipmentType === 'commercial_gym' ? 'strength_power' : 'injury_prevention';
       generateBody.equipment_type = runEquipmentType;
     }

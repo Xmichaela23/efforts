@@ -1087,6 +1087,14 @@ export function getExerciseConfig(exerciseName: string): ExerciseConfig | null {
   return bestScore > 0 ? best : null;
 }
 
+function firstPositiveBaseline(...vals: unknown[]): number | null {
+  for (const v of vals) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
 /**
  * Get the baseline 1RM value for an exercise
  * Handles multiple field name variants for compatibility
@@ -1099,17 +1107,20 @@ export function getBaseline1RM(
   
   switch (config.primaryRef) {
     case 'squat': 
-      return Number.isFinite(baselines?.squat) ? baselines.squat : null;
+      return firstPositiveBaseline(baselines?.squat, baselines?.squat1RM, baselines?.squat_1rm);
     case 'deadlift': 
-      return Number.isFinite(baselines?.deadlift) ? baselines.deadlift : null;
+      return firstPositiveBaseline(baselines?.deadlift, baselines?.dead_lift);
     case 'bench': 
-      return Number.isFinite(baselines?.bench) ? baselines.bench : null;
+      return firstPositiveBaseline(baselines?.bench, baselines?.bench_press, baselines?.benchPress);
     case 'overhead': 
-      // Check multiple field name variants (ohp, overheadPress1RM, overhead, overhead_press)
-      const ohp = baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead ?? baselines?.overhead_press;
-      return Number.isFinite(ohp) ? ohp : null;
+      return firstPositiveBaseline(
+        baselines?.overheadPress1RM,
+        baselines?.ohp,
+        baselines?.overhead_press,
+        baselines?.overhead,
+      );
     case 'hipThrust': 
-      return Number.isFinite(baselines?.hipThrust) ? baselines.hipThrust : null;
+      return firstPositiveBaseline(baselines?.hipThrust, baselines?.hip_thrust);
     default: return null;
   }
 }

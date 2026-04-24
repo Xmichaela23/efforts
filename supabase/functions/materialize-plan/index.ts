@@ -70,20 +70,20 @@ function applyAdjustment(
   return { weight: adjustedWeight, adjusted: true, adjustmentId: adjustment.id };
 }
 
-/** Prefer exercise_log–derived 1RM (medium/high confidence) over stale performance_numbers. */
-function strength1RMFromLearned(
+/** Manual performance_numbers first, then exercise_log 1RM, then defaultLb (conservative anchor). */
+function mergeAnchor1RmLb(
   perfVal: number | null | undefined,
   learned: { value?: number; confidence?: string } | null | undefined,
-): number | undefined {
+  defaultLb: number,
+): number {
+  if (Number.isFinite(perfVal as number) && (perfVal as number) > 0) {
+    return Math.round(perfVal as number);
+  }
   const v = learned?.value;
-  const conf = String(learned?.confidence ?? '').toLowerCase();
-  const okVal = Number.isFinite(v) && (v as number) > 0;
-  const perfOk =
-    Number.isFinite(perfVal as number) && (perfVal as number) > 0 ? (perfVal as number) : undefined;
-  if (!okVal) return perfOk;
-  if (conf === 'high' || conf === 'medium') return v as number;
-  if (perfOk == null) return v as number;
-  return perfOk;
+  if (Number.isFinite(v as number) && (v as number) > 0) {
+    return Math.round(v as number);
+  }
+  return defaultLb;
 }
 
 type StrengthIntentMat = 'support' | 'performance' | null;
@@ -297,15 +297,22 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
 }
 
 // Strength helpers: map exercise name to baseline key and compute prescribed weight
+function firstPositive1RM(...vals: unknown[]): number | null {
+  for (const v of vals) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
 function oneRmFromBaselines(b: any, exerciseName: string): number | null {
   try {
     const n = String(exerciseName || '').toLowerCase();
-    if (n.includes('bench')) return Number.isFinite(b?.bench) ? b.bench : null;
-    if (n.includes('deadlift')) return Number.isFinite(b?.deadlift) ? b.deadlift : null;
-    if (n.includes('squat')) return Number.isFinite(b?.squat) ? b.squat : null;
+    if (n.includes('bench')) return firstPositive1RM(b?.bench, b?.bench_press, b?.benchPress);
+    if (n.includes('deadlift')) return firstPositive1RM(b?.deadlift, b?.dead_lift);
+    if (n.includes('squat')) return firstPositive1RM(b?.squat, b?.squat1RM, b?.squat_1rm);
     if (n.includes('overhead') || n.includes('ohp') || (n.includes('press') && !n.includes('bench'))) {
-      const v = b?.overheadPress1RM ?? b?.ohp ?? b?.overhead_press;
-      return Number.isFinite(v) ? v : null;
+      return firstPositive1RM(b?.overheadPress1RM, b?.ohp, b?.overhead_press, b?.overhead);
     }
     // Unknown or bodyweight: no 1RM baseline
     return null;
@@ -491,10 +498,15 @@ function getAccessoryRatio(movement: string): number {
 
 function pickPrimary1RMAndBase(name: string, baselines: any): { base: number | null; ref: 'bench'|'squat'|'deadlift'|'overhead'|null; ratio: number; unilateral: boolean } {
   const n = String(name || '').toLowerCase();
-  const bench = Number.isFinite(baselines?.bench) ? baselines.bench as number : null;
-  const squat = Number.isFinite(baselines?.squat) ? baselines.squat as number : null;
-  const deadlift = Number.isFinite(baselines?.deadlift) ? baselines.deadlift as number : null;
-  const overhead = Number.isFinite(baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead) ? (baselines?.overheadPress1RM ?? baselines?.ohp ?? baselines?.overhead) as number : null;
+  const bench = firstPositive1RM(baselines?.bench, baselines?.bench_press, baselines?.benchPress);
+  const squat = firstPositive1RM(baselines?.squat, baselines?.squat1RM, baselines?.squat_1rm);
+  const deadlift = firstPositive1RM(baselines?.deadlift, baselines?.dead_lift);
+  const overhead = firstPositive1RM(
+    baselines?.overheadPress1RM,
+    baselines?.ohp,
+    baselines?.overhead_press,
+    baselines?.overhead,
+  );
   const unilateral = /(single|bulgarian|split|one arm|one leg|unilateral|pistol)/i.test(n);
 
   // Get accessory ratio for all exercises
@@ -1932,27 +1944,59 @@ Deno.serve(async (req) => {
         isMetric: ub?.units === 'metric',
       } as any;
 
-      // Strength: learned 1RMs (from exercise_log via compute-facts) override stale performance_numbers
-      // when confidence is medium/high; otherwise fill only missing perf fields.
+      // Strength 1RM: manual performance_numbers wins, then learned_fitness.strength_1rms, then defaults.
       const learned = (typeof ub?.learned_fitness === 'string' ? JSON.parse(ub.learned_fitness || '{}') : ub?.learned_fitness) || {};
       const strength = learned?.strength_1rms || {};
-      const sq = strength1RMFromLearned((baselines as any).squat, strength.squat);
-      if (sq != null) (baselines as any).squat = sq;
-      const bn = strength1RMFromLearned((baselines as any).bench, strength.bench_press);
-      if (bn != null) (baselines as any).bench = bn;
-      let dl = strength1RMFromLearned((baselines as any).deadlift, strength.deadlift);
-      if (dl == null || dl === 0) {
-        const trap = strength1RMFromLearned(null, strength.trap_bar_deadlift);
-        if (trap != null) dl = trap;
-      }
-      if (dl != null) (baselines as any).deadlift = dl;
-      const ohpLearned = strength1RMFromLearned(
-        (baselines as any).overheadPress1RM ?? (baselines as any).ohp ?? (baselines as any).overhead,
-        strength.overhead_press,
+      const perfRaw =
+        ub?.performance_numbers && typeof ub.performance_numbers === 'object' && !Array.isArray(ub.performance_numbers)
+          ? (ub.performance_numbers as Record<string, unknown>)
+          : {};
+      const perfSquat = Number(perfRaw.squat ?? perfRaw.squat1RM ?? perfRaw.squat_1rm);
+      const perfBench = Number(perfRaw.bench ?? perfRaw.bench_press ?? perfRaw.benchPress);
+      const perfDl = Number(perfRaw.deadlift ?? perfRaw.dead_lift);
+      const perfOhp = Number(
+        perfRaw.overheadPress1RM ?? perfRaw.ohp ?? perfRaw.overhead_press ?? perfRaw.overhead,
       );
-      if (ohpLearned != null) (baselines as any).overheadPress1RM = ohpLearned;
-      const hip = strength1RMFromLearned((baselines as any).hipThrust, strength.hip_thrust);
-      if (hip != null) (baselines as any).hipThrust = hip;
+
+      (baselines as any).squat = mergeAnchor1RmLb(
+        Number.isFinite(perfSquat) && perfSquat > 0 ? perfSquat : undefined,
+        strength.squat,
+        135,
+      );
+      (baselines as any).bench = mergeAnchor1RmLb(
+        Number.isFinite(perfBench) && perfBench > 0 ? perfBench : undefined,
+        strength.bench_press,
+        135,
+      );
+      let dlMerged = mergeAnchor1RmLb(
+        Number.isFinite(perfDl) && perfDl > 0 ? perfDl : undefined,
+        strength.deadlift,
+        0,
+      );
+      if (dlMerged <= 0) {
+        dlMerged = mergeAnchor1RmLb(undefined, strength.trap_bar_deadlift, 0);
+      }
+      if (dlMerged <= 0) dlMerged = 135;
+      (baselines as any).deadlift = dlMerged;
+      (baselines as any).overheadPress1RM = mergeAnchor1RmLb(
+        Number.isFinite(perfOhp) && perfOhp > 0 ? perfOhp : undefined,
+        strength.overhead_press,
+        95,
+      );
+      const perfHip = Number(perfRaw.hipThrust ?? perfRaw.hip_thrust);
+      const dlNum = (baselines as any).deadlift as number;
+      (baselines as any).hipThrust = mergeAnchor1RmLb(
+        Number.isFinite(perfHip) && perfHip > 0 ? perfHip : undefined,
+        strength.hip_thrust,
+        Math.max(75, Math.round(dlNum * 0.55)),
+      );
+      console.log('[materialize-plan] strength 1RM (manual > learned > default):', {
+        squat: (baselines as any).squat,
+        bench: (baselines as any).bench,
+        deadlift: (baselines as any).deadlift,
+        overheadPress1RM: (baselines as any).overheadPress1RM,
+        hipThrust: (baselines as any).hipThrust,
+      });
       if (ub?.effort_paces) {
         console.log(`[Paces] Found effort_paces from PlanWizard:`, baselines.effort_paces);
         console.log(`[Paces] Effort Score: ${ub?.effort_score || 'not set'}, Source: ${ub?.effort_paces_source || 'unknown'}`);
