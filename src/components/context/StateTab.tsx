@@ -182,7 +182,6 @@ function RaceSection({
    * Replaces the big “Projected” block until the user records an official result and ends the plan.
    */
   postRaceUnofficial,
-  recordOfficialCta,
 }: {
   projection: RaceFinishProjectionV1 | null;
   rr: RaceReadinessV1 | null;
@@ -204,7 +203,6 @@ function RaceSection({
     modelProjected?: { seconds: number; display: string } | null;
   } | null;
   postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
-  recordOfficialCta: { onClick: () => void; disabled?: boolean } | null;
 }) {
   const distLabel = planWizardRaceDistanceDisplay(
     planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
@@ -308,28 +306,9 @@ function RaceSection({
             </p>
           </div>
         )}
-        {recordOfficialCta && (
-          <div className="pt-1 space-y-2">
-            <p className="text-[10px] font-semibold tracking-[0.1em] text-amber-300/85 uppercase">Save to My Record</p>
-            <p className="text-[10px] text-white/50 leading-snug">
-              Opens Athletic Record, where your elapsed-first result is saved and this plan moves to past.
-            </p>
-            <button
-              type="button"
-              onClick={recordOfficialCta.onClick}
-              disabled={recordOfficialCta.disabled}
-              className="w-full rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-[13px] font-medium text-amber-100/95 hover:bg-amber-500/15 active:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Open My Record
-            </button>
-          </div>
-        )}
-        {!recordOfficialCta && (
-          <p className="text-[10px] text-amber-200/60 leading-snug">
-            To close the plan, scroll up to the “Race day” section under the load bar, or go to the{' '}
-            <span className="text-white/70">Goals</span> tab and use “View all plans” to end the plan.
-          </p>
-        )}
+        <p className="text-[10px] text-white/40 leading-snug">
+          Race result auto-saves to My Record once your run is logged. The plan then moves to past on its own.
+        </p>
       </div>
     );
   }
@@ -934,30 +913,6 @@ export default function StateTab({
   /** Top amber bar would duplicate the in-RACE button after race day (post-race view scrolls that far). */
   const showAmberRecordBar = showRecordRaceComplete && !postRaceUnofficial;
 
-  function openAthleticRecordRaceResult() {
-    navigate('/profile/athletic-record?addRace=1', {
-      state: {
-        athleticRecordAddRace: {
-          name: goalLinkedToPlan?.name || goalMeta?.name || raceReadiness?.goal?.name || 'Race result',
-          date: raceYmdForActivePlan || asYmd,
-          distance: planWizardDistance || goalMeta?.distance || raceReadiness?.goal?.distance || 'marathon',
-          sport: 'run',
-          planId: activePlanId || undefined,
-          workoutId: postRaceUnofficial?.workoutId || undefined,
-          elapsedSeconds: postRaceUnofficial?.loggedSeconds || undefined,
-        },
-      },
-    });
-  }
-
-  const recordOfficialCta =
-    postRaceUnofficial && activePlanId && wsv.plan.has_active_plan && !officialForRace
-      ? {
-          onClick: openAthleticRecordRaceResult,
-          disabled: coachBusy,
-        }
-      : null;
-
   async function handleStateCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -1074,6 +1029,17 @@ export default function StateTab({
   // ── Cross-training signal (server-computed) ──────────────────────────────
   const crossTrainingSignal = load.cross_training_signal ?? null;
 
+  const hasUpcomingEvent = Boolean(pe || goalMeta || raceFinishProjection || raceReadiness);
+  const isAimless = !wsv.plan.has_active_plan && !hasUpcomingEvent && !officialForRace && !postRaceUnofficial;
+  const aimlessHeadline =
+    readiness === 'fatigued' || readiness === 'overreached'
+      ? 'No active plan — recover this week.'
+      : readiness === 'fresh'
+        ? 'No active plan — easy aerobic week, stay consistent.'
+        : 'No active plan — keep it general fitness.';
+  const aimlessSubtext =
+    'Mostly easy aerobic work + one harder day, plus your usual strength. Avoid stacking hard sessions until you set a goal.';
+
   return (
     <div className="pt-1 pb-4">
       {/* ── Header ── */}
@@ -1085,13 +1051,29 @@ export default function StateTab({
               <span className={`text-[11px] uppercase tracking-wider font-semibold ${readinessColor}`}>· {readinessLabel}</span>
             )}
           </div>
-          {intentSummary && (
-            <span className="text-[14px] font-medium text-white/85 leading-snug">{intentSummary}</span>
+          {isAimless ? (
+            <>
+              <span className="text-[14px] font-medium text-white/85 leading-snug">{aimlessHeadline}</span>
+              <span className="text-[12px] text-white/50 leading-snug">{aimlessSubtext}</span>
+              <button
+                type="button"
+                onClick={() => navigate('/goals')}
+                className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[12px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
+              >
+                No current goals — Create new goal
+              </button>
+            </>
+          ) : (
+            <>
+              {intentSummary && (
+                <span className="text-[14px] font-medium text-white/85 leading-snug">{intentSummary}</span>
+              )}
+              {weekNarrative && (
+                <span className="text-[12px] text-white/50 leading-snug">{weekNarrative}</span>
+              )}
+            </>
           )}
-          {weekNarrative && (
-            <span className="text-[12px] text-white/50 leading-snug">{weekNarrative}</span>
-          )}
-          {raceWeekGuidance && raceWeekGuidance.bullets.length > 0 && (
+          {!isAimless && raceWeekGuidance && raceWeekGuidance.bullets.length > 0 && (
             <div
               className="mt-2 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5"
               role="region"
@@ -1159,19 +1141,11 @@ export default function StateTab({
         )}
 
         {showAmberRecordBar && (
-          <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-2">
+          <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
             <p className="text-[10px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
             <p className="text-[11px] text-white/55 leading-snug">
-              Log your race as a completed run, then finish it in My Record. We use <span className="text-white/70">elapsed time</span> (chip time), not moving time. Your goal moves to completed and this plan ends.
+              Log your race as a completed run. We&apos;ll auto-save the elapsed (chip) result to My Record and end this plan — no extra tap needed.
             </p>
-            <button
-              type="button"
-              onClick={openAthleticRecordRaceResult}
-              disabled={coachBusy}
-              className="w-full rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2.5 text-left text-[13px] font-medium text-amber-100/95 hover:bg-amber-500/15 active:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Open My Record
-            </button>
           </div>
         )}
 
@@ -1339,7 +1313,6 @@ export default function StateTab({
             }
             officialResult={officialForRace}
             postRaceUnofficial={officialForRace ? null : postRaceUnofficial}
-            recordOfficialCta={recordOfficialCta}
           />
         )}
 
