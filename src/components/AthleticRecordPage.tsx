@@ -73,6 +73,12 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const [addSaving, setAddSaving] = useState(false);
   const [addPrefill, setAddPrefill] = useState<AddRacePrefill | null>(null);
   const handledAddRaceRef = useRef(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<
+    | { kind: 'saving'; name: string }
+    | { kind: 'saved'; name: string; seconds: number }
+    | { kind: 'error'; name: string; message: string }
+    | null
+  >(null);
 
   const load = useCallback(async () => {
     const uid = getStoredUserId();
@@ -146,8 +152,50 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     if (typeof prefill?.elapsedSeconds === 'number' && prefill.elapsedSeconds > 0) {
       setAddTime(fmtGoalClock(prefill.elapsedSeconds));
     }
-    setAddOpen(true);
-  }, [location.search, location.state]);
+
+    const elapsed = typeof prefill?.elapsedSeconds === 'number' ? prefill.elapsedSeconds : null;
+    const canAutoSave =
+      Boolean(prefill?.planId) ||
+      (Boolean(prefill?.goalId) && elapsed != null && elapsed > 0);
+
+    if (!canAutoSave) {
+      setAddOpen(true);
+      return;
+    }
+
+    const uid = getStoredUserId();
+    if (!uid) {
+      setAddOpen(true);
+      return;
+    }
+
+    const displayName = prefill?.name?.trim() || 'race';
+    setAutoSaveStatus({ kind: 'saving', name: displayName });
+    void (async () => {
+      try {
+        await persistRaceResult({
+          uid,
+          prefill,
+          seconds: elapsed,
+          manual: { name: displayName, date: prefill?.date || '', distance: prefill?.distance || 'marathon' },
+        });
+        await load();
+        setAutoSaveStatus({
+          kind: 'saved',
+          name: displayName,
+          seconds: elapsed ?? 0,
+        });
+        setAddPrefill(null);
+      } catch (e) {
+        setAutoSaveStatus({
+          kind: 'error',
+          name: displayName,
+          message: (e as Error)?.message || 'Could not save',
+        });
+        setAddOpen(true);
+      }
+    })();
+  }, [location.search, location.state, persistRaceResult, load]);
 
   const hasContent =
     races.length > 0 ||
@@ -194,40 +242,37 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     </div>
   );
 
-  async function saveManualRace() {
-    const uid = getStoredUserId();
-    if (!uid) return;
-    const sec = parseTimeToSeconds(addTime);
-    if (!addPrefill?.planId && (!addName.trim() || !addDate || sec == null || sec <= 0)) {
-      window.alert('Enter name, date, and finish time (e.g. 4:38:00 or 45:30). Times are elapsed / chip, not moving.');
-      return;
-    }
-    setAddSaving(true);
-    try {
-      if (addPrefill?.planId) {
+  const persistRaceResult = useCallback(
+    async (input: {
+      uid: string;
+      prefill: AddRacePrefill | null;
+      seconds: number | null;
+      manual: { name: string; date: string; distance: string };
+    }) => {
+      const { uid, prefill, seconds, manual } = input;
+      if (prefill?.planId) {
         const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
           body: {
-            plan_id: addPrefill.planId,
-            ...(addPrefill.workoutId ? { workout_id: addPrefill.workoutId } : {}),
+            plan_id: prefill.planId,
+            ...(prefill.workoutId ? { workout_id: prefill.workoutId } : {}),
           },
         });
         const payload = fnData as { error?: string; success?: boolean } | null;
         const serverError =
           (payload && typeof payload.error === 'string' && payload.error.trim() ? payload.error : '') || '';
-        if (fnErr) {
-          throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
-        }
-        if (serverError && !payload?.success) {
-          throw new Error(serverError);
-        }
+        if (fnErr) throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
+        if (serverError && !payload?.success) throw new Error(serverError);
         try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
-      } else if (addPrefill?.goalId) {
+        return;
+      }
+      if (prefill?.goalId) {
+        if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
         const { data: existing } = await supabase
           .from('goals')
           .select('training_prefs')
-          .eq('id', addPrefill.goalId)
+          .eq('id', prefill.goalId)
           .eq('user_id', uid)
           .maybeSingle();
         const currentPrefs =
@@ -238,36 +283,57 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
           .from('goals')
           .update({
             status: 'completed',
-            current_value: sec,
+            current_value: seconds,
             training_prefs: {
               ...currentPrefs,
               manual_athletic_record: true,
               race_result: {
-                actual_seconds: sec,
+                actual_seconds: seconds,
                 time_source: 'manual_elapsed',
                 completed_at: new Date().toISOString(),
               },
             },
             updated_at: new Date().toISOString(),
           } as any)
-          .eq('id', addPrefill.goalId)
+          .eq('id', prefill.goalId)
           .eq('user_id', uid);
         if (error) throw error;
         try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
-      } else {
-        const { error } = await supabase.from('goals').insert({
-          user_id: uid,
-          name: addName.trim(),
-          goal_type: 'event',
-          target_date: addDate,
-          distance: addDistance,
-          sport: 'run',
-          status: 'completed',
-          current_value: sec,
-          training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
-        } as any);
-        if (error) throw error;
+        return;
       }
+      if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
+      const { error } = await supabase.from('goals').insert({
+        user_id: uid,
+        name: manual.name.trim(),
+        goal_type: 'event',
+        target_date: manual.date,
+        distance: manual.distance,
+        sport: 'run',
+        status: 'completed',
+        current_value: seconds,
+        training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
+      } as any);
+      if (error) throw error;
+    },
+    [],
+  );
+
+  async function saveManualRace() {
+    const uid = getStoredUserId();
+    if (!uid) return;
+    const sec = parseTimeToSeconds(addTime);
+    if (!addPrefill?.planId && (!addName.trim() || !addDate || sec == null || sec <= 0)) {
+      window.alert('Enter name, date, and finish time (e.g. 4:38:00 or 45:30). Times are elapsed / chip, not moving.');
+      return;
+    }
+    setAddSaving(true);
+    try {
+      await persistRaceResult({
+        uid,
+        prefill: addPrefill,
+        seconds: sec,
+        manual: { name: addName, date: addDate, distance: addDistance },
+      });
       setAddOpen(false);
       setAddName('');
       setAddTime('');
@@ -289,6 +355,57 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
           <p className="text-xs text-white/40 mt-2">Last updated: {new Date(lastUpdated).toLocaleDateString()}</p>
         )}
       </div>
+
+      {autoSaveStatus && (
+        <div
+          className={
+            autoSaveStatus.kind === 'error'
+              ? 'mb-4 p-3 rounded-xl border border-red-400/30 bg-red-500/10 text-sm text-red-100 flex items-start gap-2'
+              : autoSaveStatus.kind === 'saved'
+                ? 'mb-4 p-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 text-sm text-emerald-100 flex items-start gap-2'
+                : 'mb-4 p-3 rounded-xl border border-white/10 bg-white/[0.04] text-sm text-white/80 flex items-center gap-2'
+          }
+        >
+          {autoSaveStatus.kind === 'saving' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              <span>Saving {autoSaveStatus.name} result…</span>
+            </>
+          ) : autoSaveStatus.kind === 'saved' ? (
+            <>
+              <Trophy className="w-4 h-4 shrink-0 text-emerald-300" />
+              <span>
+                Saved <span className="font-semibold">{autoSaveStatus.name}</span>
+                {autoSaveStatus.seconds > 0 && (
+                  <> · <span className="tabular-nums">{fmtGoalClock(Math.round(autoSaveStatus.seconds))}</span></>
+                )}{' '}
+                to your record. Plan moved to past.
+              </span>
+              <button
+                type="button"
+                className="ml-auto text-xs text-emerald-200/80 hover:text-emerald-100"
+                onClick={() => setAutoSaveStatus(null)}
+              >
+                Dismiss
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="shrink-0">⚠</span>
+              <span>
+                Couldn&apos;t auto-save {autoSaveStatus.name}: {autoSaveStatus.message}. The form is open below so you can save manually.
+              </span>
+              <button
+                type="button"
+                className="ml-auto text-xs text-red-200/80 hover:text-red-100"
+                onClick={() => setAutoSaveStatus(null)}
+              >
+                Dismiss
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-10">

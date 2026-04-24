@@ -371,8 +371,74 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         }
       }
     }
+    const completedMap = new Map<string, (typeof completedPlans)[0]>();
+    for (const p of completedPlans) {
+      if (p.goal_id) completedMap.set(p.goal_id, p);
+      const served = (p.config as { goals_served?: string[] } | undefined)?.goals_served;
+      if (Array.isArray(served)) {
+        for (const gid of served) {
+          if (typeof gid === 'string' && !completedMap.has(gid)) completedMap.set(gid, p);
+        }
+      }
+    }
+    for (const [gid, p] of completedMap) {
+      if (!map.has(gid)) map.set(gid, p);
+    }
     return map;
-  }, [currentPlans]);
+  }, [currentPlans, completedPlans]);
+
+  const autoBackfilledGoalsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (loading) return;
+    const candidates = goals.filter(
+      (g) =>
+        g.goal_type === 'event' &&
+        g.status !== 'active' &&
+        (g.current_value == null || g.current_value <= 0) &&
+        plansByGoalId.has(g.id) &&
+        !autoBackfilledGoalsRef.current.has(g.id),
+    );
+    if (candidates.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      let didAnyComplete = false;
+      for (const g of candidates) {
+        const plan = plansByGoalId.get(g.id);
+        if (!plan?.id) continue;
+        autoBackfilledGoalsRef.current.add(g.id);
+        try {
+          const { data, error } = await supabase.functions.invoke('complete-race', {
+            body: { plan_id: plan.id },
+          });
+          const serverErr =
+            (data && typeof data === 'object' && typeof (data as any).error === 'string'
+              ? (data as any).error
+              : '') || '';
+          if (error || (serverErr && !(data as any)?.success)) {
+            console.warn('[GoalsScreen] auto-backfill complete-race failed', {
+              goalId: g.id,
+              planId: plan.id,
+              err: error?.message || serverErr,
+            });
+            continue;
+          }
+          didAnyComplete = true;
+        } catch (e) {
+          console.warn('[GoalsScreen] auto-backfill threw', e);
+        }
+      }
+      if (cancelled) return;
+      if (didAnyComplete) {
+        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+        refreshGoals();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, goals, plansByGoalId, refreshGoals]);
 
   // Only active plans not linked to any goal
   const activeUnlinkedPlans = useMemo(

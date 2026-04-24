@@ -64,8 +64,9 @@ Deno.serve(async (req) => {
     if (!plan || String(plan.user_id) !== String(userId)) {
       return new Response(JSON.stringify({ error: 'Plan not found' }), { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
-    if (String(plan.status) !== 'active') {
-      return new Response(JSON.stringify({ error: 'Plan is not active' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
+    const planStatus = String(plan.status)
+    if (!['active', 'paused', 'completed', 'ended'].includes(planStatus)) {
+      return new Response(JSON.stringify({ error: `Plan status ${planStatus} cannot be completed as a race` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
     }
     if (!plan.goal_id) {
       return new Response(JSON.stringify({ error: 'Plan has no linked goal' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } })
