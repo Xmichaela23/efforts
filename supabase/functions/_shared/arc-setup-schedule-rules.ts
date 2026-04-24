@@ -206,6 +206,10 @@ aerobic development, motivation, and road skills a trainer cannot replace.
 **quality_run** (and **quality_swim**) **move** to a **non–group-ride** day;
 re-check the week so two qualities do not collide on the same day.
 
+**Ask the intensity question at most once per group ride.** After they answer
+(including **both** / **mixed** / **a little of each**), **map** to **easy_bike**
+or **quality_bike** and **never** ask that same question again in a later turn.
+
 ---
 
 ### DOUBLE SESSION SAFETY RULE

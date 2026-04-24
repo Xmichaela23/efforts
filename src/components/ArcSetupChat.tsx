@@ -17,8 +17,11 @@ import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIn
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
-/** Keep system context fresh; limit conversational noise, familiarity drift, and tokens. */
-const MAX_THREAD_MESSAGES_FOR_API = 5;
+/**
+ * Messages sent to arc-setup-chat (sliding window). Too few turns drop earlier
+ * locks (group-ride intensity, swim frequency) and the model re-asks the same questions.
+ */
+const MAX_THREAD_MESSAGES_FOR_API = 24;
 
 function threadForApi(thread: ChatMessage[]): { role: 'user' | 'assistant'; content: string }[] {
   const recent = thread.slice(-MAX_THREAD_MESSAGES_FOR_API);
