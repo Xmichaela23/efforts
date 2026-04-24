@@ -1308,7 +1308,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : showAllPlans ? (
-            <div className="pt-4">
+            <div className="pt-4 flex min-h-0 flex-1 flex-col">
               <AllPlansInterface
                 onClose={handleBackToDashboard}
                 onSelectPlan={handlePlanSelect}

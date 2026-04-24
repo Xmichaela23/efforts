@@ -1746,7 +1746,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       : 0;
 
     return (
-      <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+      <div className="space-y-6 pr-0.5 pb-4">
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <button onClick={handleBack} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
             <ArrowLeft className="h-3.5 w-3.5" />
@@ -2225,12 +2230,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </>
         )}
       </div>
+        </div>
+      </div>
     );
   }
 
   // Plans List View
   return (
-    <div className="space-y-6 overflow-x-hidden" style={{fontFamily: 'Inter, sans-serif', touchAction: 'pan-y', overscrollBehaviorX: 'contain'}}>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', overscrollBehaviorX: 'contain' as const }}
+      >
+    <div className="space-y-6 overflow-x-hidden pr-0.5 pb-4">
       <div className="flex items-center justify-between">
         <button onClick={onClose} className="flex items-center gap-2 p-0 h-auto text-white/60 hover:text-white transition-colors">
           <ArrowLeft className="h-4 w-4" />
@@ -2373,6 +2385,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           <p className="text-white/60 mb-4">Use "Build me a plan" in the Builder tab to create your first training plan, or create individual workouts in the Builder tab</p>
         </div>
       )}
+    </div>
+      </div>
     </div>
   );
 };
