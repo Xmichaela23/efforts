@@ -141,6 +141,85 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     void load();
   }, [load]);
 
+  // Declared before the auto-save effect so the effect's dep array can reference it
+  // without hitting a temporal dead zone (otherwise React renders blank screen with
+  // "Cannot access 'X' before initialization" because deps are read during render).
+  const persistRaceResult = useCallback(
+    async (input: {
+      uid: string;
+      prefill: AddRacePrefill | null;
+      seconds: number | null;
+      manual: { name: string; date: string; distance: string };
+    }) => {
+      const { uid, prefill, seconds, manual } = input;
+      if (prefill?.planId) {
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
+          body: {
+            plan_id: prefill.planId,
+            ...(prefill.workoutId ? { workout_id: prefill.workoutId } : {}),
+          },
+        });
+        const payload = fnData as { error?: string; success?: boolean } | null;
+        const serverError =
+          (payload && typeof payload.error === 'string' && payload.error.trim() ? payload.error : '') || '';
+        if (fnErr) throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
+        if (serverError && !payload?.success) throw new Error(serverError);
+        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+        return;
+      }
+      if (prefill?.goalId) {
+        if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
+        const { data: existing } = await supabase
+          .from('goals')
+          .select('training_prefs')
+          .eq('id', prefill.goalId)
+          .eq('user_id', uid)
+          .maybeSingle();
+        const currentPrefs =
+          existing?.training_prefs && typeof existing.training_prefs === 'object'
+            ? (existing.training_prefs as Record<string, unknown>)
+            : {};
+        const { error } = await supabase
+          .from('goals')
+          .update({
+            status: 'completed',
+            current_value: seconds,
+            training_prefs: {
+              ...currentPrefs,
+              manual_athletic_record: true,
+              race_result: {
+                actual_seconds: seconds,
+                time_source: 'manual_elapsed',
+                completed_at: new Date().toISOString(),
+              },
+            },
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', prefill.goalId)
+          .eq('user_id', uid);
+        if (error) throw error;
+        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
+        return;
+      }
+      if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
+      const { error } = await supabase.from('goals').insert({
+        user_id: uid,
+        name: manual.name.trim(),
+        goal_type: 'event',
+        target_date: manual.date,
+        distance: manual.distance,
+        sport: 'run',
+        status: 'completed',
+        current_value: seconds,
+        training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
+      } as any);
+      if (error) throw error;
+    },
+    [],
+  );
+
   useEffect(() => {
     if (handledAddRaceRef.current || !new URLSearchParams(location.search).has('addRace')) return;
     handledAddRaceRef.current = true;
@@ -240,82 +319,6 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         </li>
       </ul>
     </div>
-  );
-
-  const persistRaceResult = useCallback(
-    async (input: {
-      uid: string;
-      prefill: AddRacePrefill | null;
-      seconds: number | null;
-      manual: { name: string; date: string; distance: string };
-    }) => {
-      const { uid, prefill, seconds, manual } = input;
-      if (prefill?.planId) {
-        const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
-          body: {
-            plan_id: prefill.planId,
-            ...(prefill.workoutId ? { workout_id: prefill.workoutId } : {}),
-          },
-        });
-        const payload = fnData as { error?: string; success?: boolean } | null;
-        const serverError =
-          (payload && typeof payload.error === 'string' && payload.error.trim() ? payload.error : '') || '';
-        if (fnErr) throw new Error(serverError || (fnErr as Error).message || 'complete-race failed');
-        if (serverError && !payload?.success) throw new Error(serverError);
-        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
-        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
-        return;
-      }
-      if (prefill?.goalId) {
-        if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
-        const { data: existing } = await supabase
-          .from('goals')
-          .select('training_prefs')
-          .eq('id', prefill.goalId)
-          .eq('user_id', uid)
-          .maybeSingle();
-        const currentPrefs =
-          existing?.training_prefs && typeof existing.training_prefs === 'object'
-            ? (existing.training_prefs as Record<string, unknown>)
-            : {};
-        const { error } = await supabase
-          .from('goals')
-          .update({
-            status: 'completed',
-            current_value: seconds,
-            training_prefs: {
-              ...currentPrefs,
-              manual_athletic_record: true,
-              race_result: {
-                actual_seconds: seconds,
-                time_source: 'manual_elapsed',
-                completed_at: new Date().toISOString(),
-              },
-            },
-            updated_at: new Date().toISOString(),
-          } as any)
-          .eq('id', prefill.goalId)
-          .eq('user_id', uid);
-        if (error) throw error;
-        try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
-        return;
-      }
-      if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
-      const { error } = await supabase.from('goals').insert({
-        user_id: uid,
-        name: manual.name.trim(),
-        goal_type: 'event',
-        target_date: manual.date,
-        distance: manual.distance,
-        sport: 'run',
-        status: 'completed',
-        current_value: seconds,
-        training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
-      } as any);
-      if (error) throw error;
-    },
-    [],
   );
 
   async function saveManualRace() {
