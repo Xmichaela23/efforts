@@ -94,7 +94,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { useImperial } = useAppContext();
+  const { useImperial, refreshPlans } = useAppContext();
   const coachWeek = useCoachWeekContext();
   const { goals, loading, addGoal, deleteGoal, updateGoal, refreshGoals } = useGoals();
 
@@ -478,6 +478,27 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     return { ok: true, sec: bestSec };
   };
 
+  const findStaleActivePlanIdsForGoal = (goal: Goal): string[] => {
+    const ids = new Set<string>();
+    const goalNameNorm = String(goal.name || '').trim().toLowerCase();
+    for (const p of currentPlans) {
+      if (p.status !== 'active' && p.status !== 'paused') continue;
+      let matches = false;
+      if (p.goal_id && p.goal_id === goal.id) matches = true;
+      const served = (p.config as { goals_served?: string[] } | undefined)?.goals_served;
+      if (Array.isArray(served) && served.includes(goal.id)) matches = true;
+      if (!matches && goalNameNorm) {
+        const planName = String(p.name || '').trim().toLowerCase();
+        const raceName = String((p.config as { race_name?: string } | undefined)?.race_name || '')
+          .trim()
+          .toLowerCase();
+        if (planName.includes(goalNameNorm) || raceName === goalNameNorm) matches = true;
+      }
+      if (matches) ids.add(p.id);
+    }
+    return [...ids];
+  };
+
   useEffect(() => {
     if (loading) return;
     const uid = getStoredUserId();
@@ -493,6 +514,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     let cancelled = false;
     (async () => {
       let didAnyComplete = false;
+      let didEndAnyPlan = false;
       for (const g of candidates) {
         autoBackfilledGoalsRef.current.add(g.id);
         setBackfillStatus((s) => ({ ...s, [g.id]: { kind: 'saving' } }));
@@ -502,6 +524,28 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         if (result.ok) {
           didAnyComplete = true;
           setBackfillStatus((s) => ({ ...s, [g.id]: { kind: 'idle' } }));
+          const stalePlanIds = findStaleActivePlanIdsForGoal(g);
+          for (const planId of stalePlanIds) {
+            try {
+              const { data, error } = await supabase.functions.invoke('end-plan', {
+                body: { plan_id: planId },
+              });
+              const serverErr =
+                (data && typeof data === 'object' && typeof (data as any).error === 'string'
+                  ? (data as any).error
+                  : '') || '';
+              if (error || (serverErr && !(data as any)?.success)) {
+                console.warn('[GoalsScreen] auto end-plan failed', {
+                  planId,
+                  err: error?.message || serverErr,
+                });
+              } else {
+                didEndAnyPlan = true;
+              }
+            } catch (e) {
+              console.warn('[GoalsScreen] end-plan threw', e);
+            }
+          }
         } else if (result.reason === 'no_workout') {
           setBackfillStatus((s) => ({ ...s, [g.id]: { kind: 'no_workout' } }));
         } else {
@@ -512,17 +556,21 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         }
       }
       if (cancelled) return;
-      if (didAnyComplete) {
+      if (didAnyComplete || didEndAnyPlan) {
         try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
+        try { window.dispatchEvent(new CustomEvent('plans:invalidate')); } catch { /* ignore */ }
         refreshGoals();
+        if (didEndAnyPlan) {
+          try { refreshPlans?.(); } catch { /* ignore */ }
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loading, goals, plansByGoalId, refreshGoals]);
+  }, [loading, goals, plansByGoalId, currentPlans, refreshGoals]);
 
   // Only active plans not linked to any goal
   const activeUnlinkedPlans = useMemo(
