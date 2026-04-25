@@ -100,7 +100,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   const [showAddGoal, setShowAddGoal] = useState(false);
   // Default to past goals expanded so completed events are visible immediately.
-  const [expandedGoalId, setExpandedGoalId] = useState<string | null>('__past');
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [showCapacityForm, setShowCapacityForm] = useState(false);
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
