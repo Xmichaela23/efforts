@@ -20,6 +20,7 @@ import {
   buildRaceFinishProjectionV1,
   pickRaceFinishProjectionV1ForCourseGoal,
 } from '../_shared/resolve-server-predicted-finish.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -224,17 +225,29 @@ Deno.serve(async (req) => {
   const smoothed = smoothElevation(rawProfile, 2);
   const chart = downsampleChart(smoothed, CHART_POINTS);
 
+  // Arc-aware fitness: use learned paces from actual training history, fall back to
+  // performance_numbers for new users without sufficient learned data.
+  const arc = await getArcContext(supabase, user.id, new Date().toISOString());
+  const pfc = arc.run_pace_for_coach;
+  const pn = (arc.performance_numbers || {}) as Record<string, unknown>;
+
+  const KM_TO_MI = 1.609344;
+  const easySec: number | null =
+    pfc?.easy?.sec_per_km != null
+      ? Math.round(pfc.easy.sec_per_km * KM_TO_MI)
+      : parsePaceToSecPerMi(pn.easy_pace ?? pn.easyPace ?? pn.easy_pace_sec_per_mi);
+  const threshSec: number | null =
+    pfc?.threshold?.sec_per_km != null
+      ? Math.round(pfc.threshold.sec_per_km * KM_TO_MI)
+      : parsePaceToSecPerMi(pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi ?? pn.fiveK_pace);
+  const maxHr = Number(pn.max_heart_rate ?? pn.maxHeartRate ?? 0) || null;
+
+  // HR zones not yet in ArcContext — read separately.
   const { data: baseline } = await supabase
     .from('user_baselines')
-    .select('performance_numbers, configured_hr_zones')
+    .select('configured_hr_zones')
     .eq('user_id', user.id)
     .maybeSingle();
-  const pn = (baseline?.performance_numbers || {}) as Record<string, unknown>;
-  const easySec = parsePaceToSecPerMi(pn.easy_pace ?? pn.easyPace ?? pn.easy_pace_sec_per_mi);
-  const threshSec = parsePaceToSecPerMi(
-    pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi ?? pn.fiveK_pace,
-  );
-  const maxHr = Number(pn.max_heart_rate ?? pn.maxHeartRate ?? 0) || null;
   const cz = baseline?.configured_hr_zones as Record<string, unknown> | null;
   const zonesArr = (cz?.zones as Array<{ min?: number; max?: number | null }>) || [];
   const hrZonesForHash: Record<string, string> = {};

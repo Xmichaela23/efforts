@@ -34,6 +34,7 @@ import {
   pickRaceFinishProjectionV1ForCourseGoal,
 } from '../_shared/resolve-server-predicted-finish.ts';
 import { fetchRaceWeatherArchive } from '../_shared/fetch-race-weather-archive.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -199,12 +200,27 @@ Deno.serve(async (req) => {
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
 
-  const { data: coachCacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
-  const coachPl = coachCacheRow?.payload as Record<string, unknown> | undefined;
-  const unified = coachPl ? pickRaceFinishProjectionV1ForCourseGoal(coachPl, String(course.goal_id)) : null;
+  // For completed goals, anchor to the actual race result (what the athlete ran), not the
+  // aspirational target — so prescribed zones reflect race-day fitness and the debrief can
+  // compare actual HR/pace against realistic bands.
+  const isCompletedGoal = String(goal.status) === 'completed';
+  const tp = (goal.training_prefs as Record<string, unknown> | null) ?? {};
+  const rr = (tp as { race_result?: { actual_seconds?: number } }).race_result;
+  const completedActualSec =
+    isCompletedGoal && rr?.actual_seconds != null && Number.isFinite(Number(rr.actual_seconds)) && Number(rr.actual_seconds) > 0
+      ? Math.round(Number(rr.actual_seconds))
+      : null;
 
-  const anchor =
-    unified != null
+  let anchor: { seconds: number; kind: string } | null = null;
+
+  if (completedActualSec != null) {
+    // Completed race: zones built from what was actually run — honest retrospective.
+    anchor = { seconds: completedActualSec, kind: 'completed_actual' };
+  } else {
+    const { data: coachCacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
+    const coachPl = coachCacheRow?.payload as Record<string, unknown> | undefined;
+    const unified = coachPl ? pickRaceFinishProjectionV1ForCourseGoal(coachPl, String(course.goal_id)) : null;
+    anchor = unified != null
       ? { seconds: unified.anchor_seconds, kind: unified.source_kind }
       : await resolvePaceAnchorForCourse(
           supabase,
@@ -220,6 +236,7 @@ Deno.serve(async (req) => {
           String(course.goal_id),
           planGoalSec,
         );
+  }
 
   if (anchor == null) {
     return new Response(
@@ -234,7 +251,11 @@ Deno.serve(async (req) => {
   const goalTimeSec = anchor.seconds;
 
   let pacingContextLines = '';
-  if (
+  if (anchor.kind === 'completed_actual') {
+    pacingContextLines =
+      `- Pace anchor: official race result ${fmtFinishClock(anchor.seconds)} — this is a post-race retrospective strategy. Zones reflect actual race-day fitness.\n` +
+      (planGoalSec != null ? `- Athlete's stated goal was ${fmtFinishClock(planGoalSec)} (for context only).\n` : '');
+  } else if (
     (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) ||
     (anchor.kind === 'fitness_floors_stated_goal' && planGoalSec != null)
   ) {
@@ -261,18 +282,33 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Segmentation produced no segments' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
+  // Arc gives us learned paces from actual training history — more accurate than manually
+  // entered performance_numbers, which may be stale. Fall back to performance_numbers
+  // when learned values are absent (new users / insufficient data).
+  const arc = await getArcContext(supabase, user.id, new Date().toISOString());
+  const pfc = arc.run_pace_for_coach;
+  const pn = (arc.performance_numbers || {}) as Record<string, unknown>;
+
+  // Learned paces are stored as sec/km; course-strategy helpers use sec/mi.
+  const KM_TO_MI = 1.609344;
+  const easySec: number | null =
+    pfc?.easy?.sec_per_km != null
+      ? Math.round(pfc.easy.sec_per_km * KM_TO_MI)
+      : parsePaceToSecPerMi(pn.easy_pace ?? pn.easyPace ?? pn.easy_pace_sec_per_mi);
+  const threshSec: number | null =
+    pfc?.threshold?.sec_per_km != null
+      ? Math.round(pfc.threshold.sec_per_km * KM_TO_MI)
+      : parsePaceToSecPerMi(
+          pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi ?? pn.fiveK_pace ?? pn.fiveK_pace_sec_per_mi,
+        );
+  const maxHr = Number(pn.max_heart_rate ?? pn.maxHeartRate ?? 0) || null;
+
+  // HR zones not yet in ArcContext — read separately.
   const { data: baseline } = await supabase
     .from('user_baselines')
-    .select('performance_numbers, configured_hr_zones')
+    .select('configured_hr_zones')
     .eq('user_id', user.id)
     .maybeSingle();
-
-  const pn = (baseline?.performance_numbers || {}) as Record<string, unknown>;
-  const easySec = parsePaceToSecPerMi(pn.easy_pace ?? pn.easyPace ?? pn.easy_pace_sec_per_mi);
-  const threshSec = parsePaceToSecPerMi(
-    pn.threshold_pace ?? pn.thresholdPace ?? pn.threshold_pace_sec_per_mi ?? pn.fiveK_pace ?? pn.fiveK_pace_sec_per_mi,
-  );
-  const maxHr = Number(pn.max_heart_rate ?? pn.maxHeartRate ?? 0) || null;
   const cz = baseline?.configured_hr_zones as Record<string, unknown> | null;
   const zonesArr = (cz?.zones as Array<{ min?: number; max?: number | null }>) || [];
   const zStr = zonesArr.length
