@@ -32,6 +32,25 @@ function threadForApi(thread: ChatMessage[]): { role: 'user' | 'assistant'; cont
   return mapped;
 }
 
+/** Heuristic: coach is asking the athlete to confirm a performance / "faster time" read (State → confirm). */
+function looksLikePerformanceIntentConfirmation(visible: string): boolean {
+  const t = visible.trim();
+  if (!t) return false;
+  const seeksConfirm = /[?？]\s*$|right\?|sound right|good\?/i.test(t) || /—\s*right\?/i.test(t);
+  if (!seeksConfirm) return false;
+  return (
+    /chasing a faster/i.test(t) ||
+    /faster time/i.test(t) ||
+    /faster 70\.3/i.test(t) ||
+    /performance build/i.test(t) ||
+    /(going|want to go) faster/i.test(t) ||
+    (/\bPR\b/i.test(t) && /right\?/i.test(t))
+  );
+}
+
+const COMPLETION_INTENT_USER_MESSAGE =
+  "I'd like completion intent instead: a strong, healthy finish with durability and conservative load — not chasing a faster time. Please set training intent to completion for this A-race.";
+
 function isValidGoalType(t: unknown): t is GoalInsert['goal_type'] {
   return t === 'event' || t === 'capacity' || t === 'maintenance';
 }
@@ -321,6 +340,8 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     summaryLine: string;
     goalPreviews: string[];
   } | null>(null);
+  /** Which assistant message (index) shows the training-intent ⓘ explainer. */
+  const [intentInfoOpenIdx, setIntentInfoOpenIdx] = useState<number | null>(null);
   /** Latest `<arc_setup>` payload from the model (sticky until replaced) — echoed to server to reduce re-asks / drift */
   const lastDraftArcSetupRef = useRef<ArcSetupPayload | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -337,8 +358,8 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     scrollToBottom();
   }, [messages, pendingSetup, scrollToBottom]);
 
-  const send = async () => {
-    const t = draft.trim();
+  const sendUserMessage = async (rawText: string) => {
+    const t = rawText.trim();
     if (!t || sending) return;
     const userId = getStoredUserId();
     if (!userId) {
@@ -346,7 +367,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       return;
     }
     setError(null);
-    setDraft('');
+    setIntentInfoOpenIdx(null);
     setSending(true);
     const nextThread = [...messages, { role: 'user' as const, content: t }];
     setMessages(nextThread);
@@ -420,6 +441,13 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     } finally {
       setSending(false);
     }
+  };
+
+  const send = async () => {
+    const t = draft.trim();
+    if (!t) return;
+    setDraft('');
+    await sendUserMessage(t);
   };
 
   const onConfirm = async () => {
@@ -505,18 +533,61 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
           </div>
         )}
 
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={
-              m.role === 'user'
-                ? 'w-fit max-w-[min(100%,24rem)] ml-auto pl-3.5 pr-3.5 py-2.5 text-[17px] leading-relaxed text-white/90 bg-white/[0.08] rounded-xl border border-white/[0.1] break-words [overflow-wrap:anywhere]'
-                : 'text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere] min-w-0 pr-1'
-            }
-          >
-            {m.content}
-          </div>
-        ))}
+        {messages.map((m, i) => {
+          if (m.role === 'user') {
+            return (
+              <div
+                key={i}
+                className="w-fit max-w-[min(100%,24rem)] ml-auto pl-3.5 pr-3.5 py-2.5 text-[17px] leading-relaxed text-white/90 bg-white/[0.08] rounded-xl border border-white/[0.1] break-words [overflow-wrap:anywhere]"
+              >
+                {m.content}
+              </div>
+            );
+          }
+          const showIntentInfo = looksLikePerformanceIntentConfirmation(m.content);
+          return (
+            <div key={i} className="min-w-0 pr-1">
+              <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
+                <span className="align-baseline">{m.content}</span>
+                {showIntentInfo && (
+                  <button
+                    type="button"
+                    className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
+                    aria-label="What performance and completion intent mean"
+                    aria-expanded={intentInfoOpenIdx === i}
+                    onClick={() => setIntentInfoOpenIdx((v) => (v === i ? null : i))}
+                  >
+                    ⓘ
+                  </button>
+                )}
+              </div>
+              {showIntentInfo && intentInfoOpenIdx === i && (
+                <div
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  role="region"
+                  aria-label="Training intent options"
+                >
+                  <p>
+                    <span className="text-white/90 font-medium">Performance</span> — chasing a faster time. Higher
+                    quality load, time targets, more intensity.
+                  </p>
+                  <p>
+                    <span className="text-white/90 font-medium">Completion</span> — strong healthy finish. Durability
+                    focus, conservative load, finish well.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(COMPLETION_INTENT_USER_MESSAGE)}
+                    className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 w-full sm:w-auto"
+                  >
+                    Change intent
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {saveBanner && (
           <p className="text-base text-teal-200/90 py-1 break-words leading-relaxed">{saveBanner}</p>
