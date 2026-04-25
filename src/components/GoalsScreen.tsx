@@ -99,7 +99,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const { goals, loading, addGoal, deleteGoal, updateGoal, refreshGoals } = useGoals();
 
   const [showAddGoal, setShowAddGoal] = useState(false);
-  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
+  // Default to past goals expanded so completed events are visible immediately.
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>('__past');
   const [showEventForm, setShowEventForm] = useState(false);
   const [showCapacityForm, setShowCapacityForm] = useState(false);
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
@@ -1604,7 +1605,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             )}
 
             {inactiveGoals.length > 0 && (
-              <button className="flex items-center gap-2 text-sm text-white/30 hover:text-white/50 transition-colors py-2" onClick={() => setExpandedGoalId(prev => prev === '__past' ? null : '__past')}>
+              <button className="flex items-center gap-2 text-sm text-white/50 hover:text-white/70 transition-colors py-2 mt-2" onClick={() => setExpandedGoalId(prev => prev === '__past' ? null : '__past')}>
                 <ChevronDown className={`h-4 w-4 transition-transform ${expandedGoalId === '__past' ? 'rotate-0' : '-rotate-90'}`} />
                 Past goals ({inactiveGoals.length})
               </button>
