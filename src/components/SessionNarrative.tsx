@@ -587,7 +587,7 @@ export default function SessionNarrative({
             // True weather (temp, humidity) is a separate row or part of CONDITIONS when no terrain exists.
             const rawLabel = String(r.label ?? '');
             const value = String(r.value ?? '');
-            const isTerrainData = rawLabel === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value);
+            const isTerrainData = rawLabel.toUpperCase() === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value);
             const label = isTerrainData ? 'TERRAIN' : rawLabel;
             return (
               <div key={i}>
