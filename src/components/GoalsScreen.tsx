@@ -9,6 +9,7 @@ import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
+import { useToast } from '@/components/ui/use-toast';
 // Local alias so existing call-sites inside this file don't need renaming
 const readStoredUserId = getStoredUserId;
 
@@ -97,6 +98,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const { useImperial, refreshPlans } = useAppContext();
   const coachWeek = useCoachWeekContext();
   const { goals, loading, addGoal, deleteGoal, updateGoal, refreshGoals } = useGoals();
+  const { toast } = useToast();
 
   const [showAddGoal, setShowAddGoal] = useState(false);
   // Default to past goals expanded so completed events are visible immediately.
@@ -207,6 +209,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       fd.append('file', file);
       fd.append('name', `${goal.name} course`);
       fd.append('goal_id', gid);
+      const rd = goal.target_date != null ? String(goal.target_date).slice(0, 10) : '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(rd)) fd.append('race_date', rd);
       const { data, error } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
       if (error || !data?.course_id) {
         window.alert(error?.message || 'Upload failed');
@@ -903,8 +907,22 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   async function handleDeleteGoal(goal: Goal) {
     if (!confirm(`Delete "${goal.name}"?`)) return;
-    await deleteGoal(goal.id);
     setExpandedGoalId(null);
+    toast({
+      title: 'Removing race',
+      description: `Tearing down plan and rebuilding around remaining races…`,
+      duration: 15000,
+    });
+    const result = await deleteGoal(goal.id);
+    toast({
+      title: result.ok ? 'Done' : 'Delete failed',
+      description: result.message,
+      duration: 6000,
+    });
+    if (result.ok) {
+      try { await refreshPlans?.(); } catch {}
+      try { await refreshGoals(); } catch {}
+    }
   }
 
   async function handleTogglePause(goal: Goal) {

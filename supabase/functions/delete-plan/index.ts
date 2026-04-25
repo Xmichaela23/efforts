@@ -73,6 +73,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Coach cache holds plan-week reactions and a snapshotted plan_contract; force revalidate
+    if (userId) {
+      try {
+        await supabase
+          .from('coach_cache')
+          .update({ invalidated_at: new Date().toISOString() })
+          .eq('user_id', userId)
+      } catch (e) {
+        console.warn('[delete-plan] coach_cache invalidate:', e)
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, deleted_plan_id: planId }), { headers: { ...cors, 'Content-Type':'application/json' } })
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { ...cors, 'Content-Type':'application/json' } })

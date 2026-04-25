@@ -112,27 +112,28 @@ export function useGoals() {
     }
   }, []);
 
-  const deleteGoal = useCallback(async (id: string): Promise<boolean> => {
+  const deleteGoal = useCallback(async (id: string): Promise<{ ok: boolean; message: string }> => {
     try {
       const userId = getStoredUserId();
-      if (!userId) return false;
-      // Clear the goal link on any plans before deleting to avoid dangling goal_id references.
-      await supabase
-        .from('plans')
-        .update({ goal_id: null })
-        .eq('goal_id', id)
-        .eq('user_id', userId);
-      const { error } = await supabase
-        .from('goals')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId);
+      if (!userId) return { ok: false, message: 'Not signed in.' };
+      // Server-side cascade: tears down linked plan(s), invalidates coach cache,
+      // recomputes projections on remaining goals, and (when the deleted goal
+      // was on a combined plan with siblings) rebuilds the season plan.
+      const { data, error } = await supabase.functions.invoke('delete-goal', {
+        body: { goal_id: id, user_id: userId },
+      });
       if (error) throw error;
+      const payload = (data ?? {}) as { success?: boolean; message?: string; error?: string };
+      if (!payload.success) {
+        return { ok: false, message: String(payload.error || 'Delete failed.') };
+      }
       setGoals((prev) => prev.filter((g) => g.id !== id));
-      return true;
+      window.dispatchEvent(new CustomEvent('plans:invalidate'));
+      window.dispatchEvent(new CustomEvent('goals:invalidate'));
+      return { ok: true, message: String(payload.message || 'Goal removed.') };
     } catch (err) {
       console.error('Error deleting goal:', err);
-      return false;
+      return { ok: false, message: err instanceof Error ? err.message : 'Delete failed.' };
     }
   }, []);
 
