@@ -606,12 +606,18 @@ export default function SessionNarrative({
         <>
           {technicalInsightsForRender.length > 0 && (
             <div className="space-y-2">
-              {technicalInsightsForRender.map((t, i: number) => (
+              {technicalInsightsForRender.map((t, i: number) => {
+                const rawLabel = String(t.label ?? '');
+                const value = String(t.value ?? '');
+                const isTerrainData = rawLabel.toUpperCase() === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value);
+                const label = isTerrainData ? 'TERRAIN' : rawLabel;
+                return (
                 <div key={i}>
-                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(t.label ?? '')}</span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(t.value ?? '')}</p>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
+                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{value}</p>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {hasPlanImpactForRender && (
