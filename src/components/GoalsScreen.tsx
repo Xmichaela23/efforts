@@ -1554,7 +1554,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </div>
             ))}
           </div>
-        ) : activeGoals.length === 0 && activeUnlinkedPlans.length === 0 ? (
+        ) : activeGoals.length === 0 && activeUnlinkedPlans.length === 0 && inactiveGoals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Target className="h-10 w-10 text-white/20 mb-4" />
             <p className="text-white/50 text-base">No goals yet</p>
