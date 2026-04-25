@@ -61,7 +61,7 @@ Write four labeled sections. Each section label is on its own line in brackets, 
 {What happened in the final miles: pace trend, HR trend, what it means physiologically. 1–2 sentences.}
 
 [TAKEAWAY]
-{One concrete line about what to carry forward, anchored to what the course strategy zones prescribed. Do not invent generic advice if the zones already defined targets for those miles.}
+{One concrete line about what to carry forward. Do not assume the athlete will race this specific course again — frame advice as a general principle or "on a course like this." Anchor to what the data or course strategy zones showed. Do not invent generic advice if the zones already defined targets for those miles.}
 
 CLOSE — STRATEGY-ANCHORED, NOT GENERIC:
 - End with one concrete line about what to adjust next time on THIS course. The line MUST be anchored to what the course strategy actually prescribed. Do not invent generic pacing advice ("start 15–20 seconds slower in miles 1–3") if a prescribed zone for those miles already exists in COURSE STRATEGY ZONES.

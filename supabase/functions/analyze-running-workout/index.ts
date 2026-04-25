@@ -2474,12 +2474,26 @@ Deno.serve(async (req) => {
           const debriefRaceName = goalRaceCompletionMatch.matched && goalRaceCompletionMatch.eventName
             ? String(goalRaceCompletionMatch.eventName)
             : String(wAny.name ?? 'Race');
+          // If goalRaceCompletion didn't find a projection, try training_prefs.race_result.projected_seconds directly.
+          let debriefProjectedSec = goalRaceCompletionMatch.fitnessProjectionSeconds ?? null;
+          if (debriefProjectedSec == null && goalRaceCompletionMatch.goalId) {
+            try {
+              const { data: gtp } = await supabase
+                .from('goals')
+                .select('training_prefs')
+                .eq('id', goalRaceCompletionMatch.goalId)
+                .maybeSingle();
+              const snap = Number((gtp as any)?.training_prefs?.race_result?.projected_seconds);
+              if (Number.isFinite(snap) && snap > 0) debriefProjectedSec = Math.round(snap);
+            } catch { /* non-fatal */ }
+          }
+
           const debrief = await generateRaceDebrief({
             workoutName: debriefRaceName,
             elapsedSeconds: elapsedSec,
             movingSeconds: movingSec,
             goalSeconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,
-            projectedSeconds: goalRaceCompletionMatch.fitnessProjectionSeconds ?? null,
+            projectedSeconds: debriefProjectedSec,
             avgHR: avgHr > 0 ? avgHr : 0,
             maxHR: maxHr > 0 ? maxHr : 0,
             intensityFactor: ifVal,
