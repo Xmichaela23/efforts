@@ -263,11 +263,12 @@ Deno.serve(async (req) => {
     let baselines: any = {};
     let effortPaces: any = null;
     let learnedFitness: any = null;
+    let configuredHrZones: any = null;
     let userUnits = 'imperial'; // default
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, units, effort_paces, learned_fitness')
+        .select('performance_numbers, units, effort_paces, learned_fitness, configured_hr_zones')
         .eq('user_id', workout.user_id)
         .single();
       
@@ -277,6 +278,7 @@ Deno.serve(async (req) => {
       baselines = userBaselines?.performance_numbers || {};
       effortPaces = (userBaselines as any)?.effort_paces || null;
       learnedFitness = (userBaselines as any)?.learned_fitness || null;
+      configuredHrZones = (userBaselines as any)?.configured_hr_zones || null;
       console.log('📊 User baselines found:', baselines);
     } catch (error) {
       console.log('⚠️ No user baselines found, using defaults');
@@ -985,9 +987,25 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Provide user-specific HR zones when we have a learned threshold HR baseline.
+    // Provide user-specific HR zones — use configured_hr_zones (same source as Training Baselines)
+    // so debrief zone references match exactly what every other surface shows.
+    // Fall back to Friel %LTHR computed from learned threshold HR if no configured zones.
     const hrZonesFromBaseline = (() => {
       try {
+        // Priority 1: configured_hr_zones (what Training Baselines and coach display)
+        const czArr = (configuredHrZones as any)?.zones as Array<{ min?: number; max?: number | null }> | undefined;
+        if (Array.isArray(czArr) && czArr.length >= 4) {
+          // zones[0]=Z1, [1]=Z2, [2]=Z3, [3]=Z4, [4]=Z5
+          const get = (i: number) => czArr[i];
+          const z1Max = Number(get(0)?.max ?? get(1)?.min ?? 0) - 1;
+          const z2Max = Number(get(1)?.max ?? 0);
+          const z3Max = Number(get(2)?.max ?? 0);
+          const z4Max = Number(get(3)?.max ?? 0);
+          if (z1Max > 0 && z2Max > z1Max && z3Max > z2Max && z4Max > z3Max) {
+            return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
+          }
+        }
+        // Priority 2: Friel %LTHR from learned threshold HR
         const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
         if (!Number.isFinite(thr) || thr <= 0) return undefined;
         const z1Max = Math.round(thr * 0.75);
@@ -1817,9 +1835,15 @@ Deno.serve(async (req) => {
     // Structured adherence summary (verdict + technical insights + plan impact)
     const aerobicCeilingBpm = (() => {
       try {
+        // Use configured Z2 max if available (same source as Training Baselines)
+        const czArr = (configuredHrZones as any)?.zones as Array<{ max?: number | null }> | undefined;
+        if (Array.isArray(czArr) && czArr.length >= 2) {
+          const z2Max = Number(czArr[1]?.max ?? 0);
+          if (z2Max > 0) return z2Max;
+        }
         const thr = Number((learnedFitness as any)?.run_threshold_hr?.value ?? (learnedFitness as any)?.runThresholdHr?.value);
         if (!Number.isFinite(thr) || thr <= 0) return null;
-        return Math.round(thr * 0.85); // match fact-packet Z2 ceiling
+        return Math.round(thr * 0.85);
       } catch {
         return null;
       }

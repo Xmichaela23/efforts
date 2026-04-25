@@ -47,7 +47,21 @@ HEART RATE — DO NOT ROMANTICIZE DRIFT:
 VOICE:
 - Direct, human, like a coach talking to one person. No report tone.
 - No idioms, no slogans, no "real talk," no filler praise, no motivational clichés.
-- One paragraph, 5–6 sentences, no headers, no bullets.
+
+OUTPUT FORMAT — follow exactly:
+Write four labeled sections. Each section label is on its own line in brackets, followed by 1–3 sentences of plain prose. No bullets, no sub-headers inside sections. A blank line between sections.
+
+[EXECUTION]
+{First sentence: race name + actual finish + projection gap if available. Second sentence: the single most important pacing or execution fact.}
+
+[CONDITIONS]
+{Weather and terrain impact. Decompose late-race HR into causes: heat load, drift, terrain — as the data supports. 1–3 sentences.}
+
+[FINISH]
+{What happened in the final miles: pace trend, HR trend, what it means physiologically. 1–2 sentences.}
+
+[TAKEAWAY]
+{One concrete line about what to carry forward, anchored to what the course strategy zones prescribed. Do not invent generic advice if the zones already defined targets for those miles.}
 
 CLOSE — STRATEGY-ANCHORED, NOT GENERIC:
 - End with one concrete line about what to adjust next time on THIS course. The line MUST be anchored to what the course strategy actually prescribed. Do not invent generic pacing advice ("start 15–20 seconds slower in miles 1–3") if a prescribed zone for those miles already exists in COURSE STRATEGY ZONES.
@@ -382,7 +396,7 @@ export async function generateRaceDebrief(
     const narrative = await callLLM({
       system: RACE_DEBRIEF_SYSTEM_PROMPT,
       user: facts,
-      maxTokens: 700,
+      maxTokens: 900,
       temperature: 0.2,
       model: 'sonnet',
     });

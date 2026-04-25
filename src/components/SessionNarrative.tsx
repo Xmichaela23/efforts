@@ -408,6 +408,21 @@ export default function SessionNarrative({
   const raceDebriefText = (typeof sd?.race_debrief_text === 'string' && sd.race_debrief_text.trim()) || '';
   const hasNarrative = narrativeText.length > 0;
   const hasRaceDebrief = raceDebriefText.length > 0;
+
+  // Parse labeled sections: [LABEL]\ntext\n\n[LABEL]\ntext...
+  const raceDebriefSections = (() => {
+    if (!raceDebriefText) return null;
+    const parts = raceDebriefText.split(/\[([A-Z]+)\]\s*/);
+    // parts: ['', 'EXECUTION', 'text...', 'CONDITIONS', 'text...', ...]
+    if (parts.length < 3) return null;
+    const sections: { label: string; text: string }[] = [];
+    for (let i = 1; i < parts.length - 1; i += 2) {
+      const label = parts[i].trim();
+      const text = parts[i + 1].trim();
+      if (label && text) sections.push({ label, text });
+    }
+    return sections.length >= 2 ? sections : null;
+  })();
   const hasSummaryBullets = summaryBullets.length > 0;
 
   const trend = sd?.trend ?? null;
@@ -492,11 +507,24 @@ export default function SessionNarrative({
         </button>
       </div>
       {hasRaceDebrief && (
-        <div>
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-            Race debrief
-          </span>
-          <p className="text-sm text-gray-300 leading-relaxed mt-1">{raceDebriefText}</p>
+        <div className="space-y-4">
+          {raceDebriefSections ? (
+            raceDebriefSections.map(({ label, text }) => (
+              <div key={label}>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                  {label}
+                </span>
+                <p className="text-sm text-gray-300 leading-relaxed mt-1">{text}</p>
+              </div>
+            ))
+          ) : (
+            <div>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                Race debrief
+              </span>
+              <p className="text-sm text-gray-300 leading-relaxed mt-1">{raceDebriefText}</p>
+            </div>
+          )}
         </div>
       )}
       {sd?.forward_context && (sd.forward_context.headline || sd.forward_context.body) && (
