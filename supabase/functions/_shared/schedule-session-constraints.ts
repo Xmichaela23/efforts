@@ -213,7 +213,8 @@ export const PLACEMENT_ALGORITHM_TEXT = [
 
 export const EXPERIENCE_MODIFIER_TEXT = [
   'Performance (training_intent performance, or experienced prior 70.3+): may allow quality_swim + quality_run same day with AM/PM split; may allow upper_body_strength + quality_bike same day when the matrix would otherwise be strict on doubles.',
-  'Completion / first_race: apply the matrix strictly; separate quality modalities onto different days; no same-day exceptions unless explicitly confirmed for doubles.',
+  'Performance + co-equal strength (strength_intent performance on tri goals): when the week is dense (e.g. 7 days), **quality_run in the morning + lower_body_strength in the evening** can be one **consolidated hard day**; **quality_run + upper_body_strength** is already matrix-friendly. **Sequential rules** (e.g. 48h between hard leg hits) still govern the full week — do not break recovery to stack junk.',
+  'Completion / first_race: apply the matrix strictly; separate quality and heavy lower-body work onto different days unless the athlete explicitly confirms doubles.',
 ].join('\n');
 
 export const AL_BEHAVIOR_TEXT = [

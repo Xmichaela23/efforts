@@ -64,6 +64,7 @@ function looksLikeStrengthIntentFork(visible: string): boolean {
   if (!/strength|lift(ing)?|gym|squat|1rm|gains/i.test(t)) return false;
   const hasEitherOr =
     /—\s*or|–\s*or|-\s*or| or are you| or do you|,\s*or(?=\s)/i.test(t) ||
+    /support the tri or a real|or a real co-?equal|which —\s*support|which—\s*support|or co-equal alongside/i.test(t) ||
     (/support/i.test(t) && /(co-?equal|co-equal|pushing it|powerlifting|separate)/i.test(t)) ||
     (/(twice|2×|2x|a week)/i.test(t) && /(co-?equal|or are you)/i.test(t));
   if (!hasEitherOr) return false;
