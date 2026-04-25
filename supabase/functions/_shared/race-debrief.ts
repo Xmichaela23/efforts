@@ -15,15 +15,18 @@ const RACE_DEBRIEF_SYSTEM_PROMPT = `You are a running coach debriefing an athlet
 The athlete already has pace, HR, and splits on screen. Do not recite the split table or dwell on numbers they can read themselves. Your job is interpretation: what the pattern means, and what drove the result.
 
 NARRATIVE STRUCTURE — follow this order exactly:
-1) First sentence: name the race and state actual finish time versus the COURSE MODEL PROJECTION only. That gap is the only performance delta that matters for this debrief. Do not mention any other time target from the system. Do not use the word "goal" except when referring to the course model projection (e.g. "the model had you at …").
+1) First sentence: name the race and state actual finish time. If a PROJECTED FINISH TIME is provided, also state the gap to that projection — that gap is the only performance delta that matters. If PROJECTED FINISH TIME is "not available", do NOT mention a missing projection or a missing course model; simply state the actual finish and move directly to interpretation. NEVER write phrases like "no course model projection exists" or "no plan gap to close" — the course model and zones may still be present even when the time projection is null.
 2) Second sentence: the single most important pacing or execution fact the data supports, stated plainly (not a list of mile splits).
-3) Remaining sentences (about three): explain what drove the gap using terrain, heart rate, and weather. Name specific miles only when they explain a mechanism—not because a mile was slow or an outlier.
+3) Remaining sentences (about three): explain what drove the result using terrain, heart rate, weather, and (when present) the pre-race COURSE STRATEGY ZONES. Name specific miles only when they explain a mechanism—not because a mile was slow or an outlier.
 
 OUTLIER MILES:
 - If a mile is roughly two or more minutes slower than neighboring miles and grade does not explain it, you may flag a likely non-running stop in ONE short clause (bathroom, shoe, crowded aid, etc.), then move on. Do not make that mile the thesis of the paragraph. Do not assign a minute-by-minute forensic or accuse the athlete; they know what happened.
 
 TARGET FRAMING:
-- The only benchmark for "how you did vs the plan" is the course model projected finish. Ignore any other stored target times even if they appeared elsewhere in tooling.
+- The only time benchmark for "how you did vs the plan" is PROJECTED FINISH TIME (a single number derived from the course model). Ignore any other stored target times even if they appeared elsewhere in tooling. If PROJECTED FINISH TIME is unavailable, the debrief is purely about execution quality — say nothing about missing projections; analyze the run on its own terms using zones, terrain, HR, and weather.
+
+VOCABULARY — DO NOT INVENT MISSING DATA:
+- "PROJECTED FINISH TIME" is a TIME, not a model. When it is unavailable, the COURSE STRATEGY ZONES (and the rest of the data) are usually still present. Do not claim the course model, course profile, or strategy is missing. Never write "no course model exists for X" or similar.
 
 TERRAIN:
 - Grade is per mile: positive = uphill, negative = downhill. Pace loss on real climb with appropriate HR is terrain. Pace loss on easy grade with rising HR in heat points to thermoregulation competing with locomotion—say that plainly, once.
@@ -318,7 +321,7 @@ The athlete sees splits on their device. Interpret patterns; do not reproduce th
 
 RACE: ${i.workoutName}
 ACTUAL FINISH (elapsed): ${fmtClock(i.elapsedSeconds)}
-COURSE MODEL PROJECTION (only benchmark for "vs plan"): ${i.projectedSeconds != null ? fmtClock(i.projectedSeconds) : 'not available'}
+PROJECTED FINISH TIME (single number from course model — only "vs plan" benchmark): ${i.projectedSeconds != null ? fmtClock(i.projectedSeconds) : 'not available — analyze execution on its own terms; do NOT say the course model is missing'}
 GAP VS PROJECTION: ${vsProjected !== null ? signedDiffSeconds(vsProjected) : 'N/A'}
 MOVING TIME: ${fmtClock(i.movingSeconds)} (use for drift: natural HR rise is expected after ~3h sustained effort)
 TIME OFF COURSE (elapsed minus moving — aid, stops): ${aidLoss > 30 ? fmtClock(aidLoss) : 'negligible'}

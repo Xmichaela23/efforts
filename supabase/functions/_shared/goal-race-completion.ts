@@ -85,13 +85,15 @@ export async function fetchGoalRaceCompletionForWorkout(
       let raceDate: string | null = normDate(g?.target_date);
 
       if (!raceDate) {
-        // goal.target_date is null — look it up from the linked plan's config
+        // goal.target_date is null — look it up from the linked plan's config.
+        // Include 'ended' / 'paused' so debriefs still resolve after complete-race
+        // transitions the plan to 'ended'.
         const { data: planRow } = await supabase
           .from('plans')
           .select('config')
           .eq('goal_id', goalId)
           .eq('user_id', userId)
-          .in('status', ['active', 'completed'])
+          .in('status', ['active', 'paused', 'completed', 'ended'])
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -125,11 +127,13 @@ export async function fetchGoalRaceCompletionForWorkout(
     }
 
     // ── PATH 1: plans table — race_date + goal_id ─────────────────────────────
+    // Include 'ended' / 'paused' so the debrief still finds the linked plan
+    // (and therefore the projection) after complete-race ends the plan.
     const { data: plans, error: plansError } = await supabase
       .from('plans')
       .select('id, goal_id, config')
       .eq('user_id', userId)
-      .in('status', ['active', 'completed'])
+      .in('status', ['active', 'paused', 'completed', 'ended'])
       .order('updated_at', { ascending: false })
       .limit(5);
 

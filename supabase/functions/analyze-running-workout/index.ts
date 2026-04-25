@@ -2429,8 +2429,14 @@ Deno.serve(async (req) => {
         });
 
         if (splits.length >= 8 && elapsedSec > 120) {
+          // When the workout is a matched goal race, ground the debrief in the
+          // event name (e.g. "Ojai Valley Marathon") rather than the activity
+          // title (often "Morning Run") so the LLM and copy stay race-aware.
+          const debriefRaceName = goalRaceCompletionMatch.matched && goalRaceCompletionMatch.eventName
+            ? String(goalRaceCompletionMatch.eventName)
+            : String(wAny.name ?? 'Race');
           const debrief = await generateRaceDebrief({
-            workoutName: String(wAny.name ?? goalRaceCompletionMatch.eventName ?? 'Race'),
+            workoutName: debriefRaceName,
             elapsedSeconds: elapsedSec,
             movingSeconds: movingSec,
             goalSeconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,

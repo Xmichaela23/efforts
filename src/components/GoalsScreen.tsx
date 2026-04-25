@@ -1246,31 +1246,41 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           {buildError?.goalId === goal.id && <p className="mt-1 text-xs text-red-400/70">{buildError.message}</p>}
         </div>
 
-        {!isExpanded && goal.status === 'active' && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
-          <div className="ml-[44px] mt-2">
-            <button
-              type="button"
-              disabled={courseUploadBusy === goal.id}
-              onClick={() => {
-                if (courseByGoal[goal.id]) {
-                  setStrategyModalCourseId(courseByGoal[goal.id].id);
-                  setStrategyModalOpen(true);
-                } else if (paceTargetSec != null) {
-                  setPendingCourseGoalId(goal.id);
-                  goalsCourseFileRef.current?.click();
-                } else {
-                  setExpandedGoalId(goal.id);
-                }
-              }}
-              className="text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 disabled:opacity-40"
-            >
-              {courseByGoal[goal.id]
-                ? 'View terrain strategy →'
-                : courseUploadBusy === goal.id
-                  ? 'Uploading…'
-                  : 'Add terrain course (GPX) →'}
-            </button>
-          </div>
+        {!isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
+          (() => {
+            const hasCourse = !!courseByGoal[goal.id];
+            const isActive = goal.status === 'active';
+            // Active goals: full affordance (view existing or upload new).
+            // Completed/paused goals: keep the course visible if one exists,
+            // but no upload CTA — you can't change history.
+            if (!hasCourse && !isActive) return null;
+            return (
+              <div className="ml-[44px] mt-2">
+                <button
+                  type="button"
+                  disabled={courseUploadBusy === goal.id}
+                  onClick={() => {
+                    if (hasCourse) {
+                      setStrategyModalCourseId(courseByGoal[goal.id].id);
+                      setStrategyModalOpen(true);
+                    } else if (paceTargetSec != null) {
+                      setPendingCourseGoalId(goal.id);
+                      goalsCourseFileRef.current?.click();
+                    } else {
+                      setExpandedGoalId(goal.id);
+                    }
+                  }}
+                  className="text-left text-[12px] text-sky-400/85 hover:text-sky-300/90 disabled:opacity-40"
+                >
+                  {hasCourse
+                    ? 'View terrain strategy →'
+                    : courseUploadBusy === goal.id
+                      ? 'Uploading…'
+                      : 'Add terrain course (GPX) →'}
+                </button>
+              </div>
+            );
+          })()
         )}
 
         {isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
