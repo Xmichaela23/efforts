@@ -37,7 +37,8 @@ function priorFromLastImDistanceRace(
   if (o.completed === false) return undefined;
   const distPart = o.distance != null ? String(o.distance) : o.distance_key != null ? String(o.distance_key) : '';
   if (normalizeGoalDistanceKey(distPart) !== goalKey) return undefined;
-  const dateStr = o.date != null ? String(o.date).trim().slice(0, 10) : '';
+  const dateRaw = o.race_date != null ? o.race_date : o.date;
+  const dateStr = dateRaw != null ? String(dateRaw).trim().slice(0, 10) : '';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return undefined;
   const pMs = new Date(dateStr + 'T12:00:00Z').getTime();
   if (!Number.isFinite(pMs) || pMs > Date.now() || Date.now() - pMs > THREE_Y_MS) return undefined;

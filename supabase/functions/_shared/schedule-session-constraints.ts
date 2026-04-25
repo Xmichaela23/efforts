@@ -75,6 +75,101 @@ export function areSameDayCompatible(a: MatrixSessionKind, b: MatrixSessionKind)
   return !!SAME_DAY_COMPATIBLE[a]?.[b];
 }
 
+/** Same-day roles including swim quality (not a 9×9 row; uses easy_swim column where needed). */
+export type ScheduleSlotKind = MatrixSessionKind | 'quality_swim' | 'race_event';
+
+/**
+ * Map a 9×9 or quality_swim kind to the matrix row used for pairwise checks.
+ * `quality_swim` uses the same pairings as `easy_swim` vs the nine matrix kinds.
+ */
+function matrixRowForSlot(k: ScheduleSlotKind): MatrixSessionKind {
+  return k === 'quality_swim' ? 'easy_swim' : k === 'race_event' ? 'easy_run' : k;
+}
+
+/** Pairwise same-day check for engine + arc (includes quality_swim and race). */
+export function areScheduleSlotsCompatible(a: ScheduleSlotKind, b: ScheduleSlotKind): boolean {
+  if (a === 'race_event' || b === 'race_event') return true;
+  if (a === b) return true;
+
+  const ma = matrixRowForSlot(a);
+  const mb = matrixRowForSlot(b);
+  return !!SAME_DAY_COMPATIBLE[ma]?.[mb];
+}
+
+export type PlannedSessionLike = {
+  type: string;
+  name: string;
+  tags?: string[];
+  description?: string;
+};
+
+/**
+ * Map a combined-plan session to a schedule slot for matrix checks.
+ * Engine uses coarse `type` + tags + name. Brick legs share the `brick` tag but are
+ * still mapped via bike/run rules for cross-session checks; **both** tagged `brick` is
+ * whitelisted in `arePlannedSessionsCompatible`.
+ */
+export function plannedSessionToScheduleSlot(s: PlannedSessionLike): ScheduleSlotKind {
+  const tags = Array.isArray(s.tags) ? s.tags.map((t) => String(t).toLowerCase()) : [];
+  const n = `${s.name} ${s.description ?? ''}`.toLowerCase();
+  const ty = String(s.type || '').toLowerCase();
+
+  if (tags.includes('tri_race') || tags.includes('race_day')) return 'race_event';
+
+  if (ty === 'strength') {
+    if (/\(upper\)|upper body|upper —|bench|row|pull|face pull|band pull|lat pull|overhead|push-up|inverted|pallof|curl|press(?!ur)/i.test(n) &&
+      !/\(lower\)|deadlift|squat|hip thrust|rdl|step-up|split squat|goblet|calf|lower body/i.test(n)) {
+      return 'upper_body_strength';
+    }
+    if (/\(lower\)|lower body|deadlift|squat|hip thrust|rdl|step-up|split|leg|posterior|neural/i.test(n)) {
+      return 'lower_body_strength';
+    }
+    return 'lower_body_strength';
+  }
+
+  if (ty === 'swim') {
+    if (tags.includes('quality') || tags.includes('threshold') || tags.includes('css_aerobic')) return 'quality_swim';
+    return 'easy_swim';
+  }
+
+  if (ty === 'run') {
+    if (tags.includes('long_run')) return 'long_run';
+    if (tags.includes('quality') || tags.includes('intervals')) return 'quality_run';
+    if (tags.includes('marathon_pace') || tags.includes('race_specific')) return 'quality_run';
+    return 'easy_run';
+  }
+
+  if (ty === 'bike' || ty === 'ride' || ty === 'cycling') {
+    if (tags.includes('long_ride')) return 'long_ride';
+    if (tags.includes('quality') || tags.includes('vo2') || tags.includes('sweet') || tags.includes('threshold') || tags.includes('tempo')) {
+      return 'quality_bike';
+    }
+    return 'easy_bike';
+  }
+
+  if (ty === 'walk' || ty === 'hike') return 'easy_run';
+
+  return 'easy_bike';
+}
+
+/**
+ * Two planned sessions on the same day: compatible with the product matrix / extensions.
+ * Brick legs (both tagged) always pass. Involving a brick and a third session uses normal rules
+ * (brick is not a matrix row — brick+brick only whitelisted here).
+ */
+export function arePlannedSessionsCompatible(s1: PlannedSessionLike, s2: PlannedSessionLike): boolean {
+  const t1 = Array.isArray(s1.tags) ? s1.tags : [];
+  const t2 = Array.isArray(s2.tags) ? s2.tags : [];
+  if (t1.includes('brick') && t2.includes('brick')) return true;
+
+  const a = plannedSessionToScheduleSlot(s1);
+  const b = plannedSessionToScheduleSlot(s2);
+  if ((t1.includes('brick') || t2.includes('brick')) && t1.includes('brick') !== t2.includes('brick')) {
+    return true;
+  }
+  return areScheduleSlotsCompatible(a, b);
+}
+
 /** Markdown table for system prompts (9×9). */
 export function formatSameDayMatrixMarkdown(): string {
   const header =

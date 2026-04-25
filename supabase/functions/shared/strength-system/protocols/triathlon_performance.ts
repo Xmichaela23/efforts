@@ -42,7 +42,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   }
 
   if (phaseName === 'taper') {
-    return [createPerfTaperSession(tier)];
+    return [perfTaperSession(tier)];
   }
 
   if (phaseName === 'recovery') {

@@ -37,7 +37,14 @@ export interface RaceProjection {
   bike_min: number;
   run_min: number;
   total_min: number;
+  /** Total finish time in seconds (same as total_min * 60, rounded). */
+  total_sec: number;
   confidence: 'low' | 'medium' | 'high';
+  /**
+   * True when a valid prior-70.3 finish in window was used for **context** (sanity check
+   * vs current projection and/or leg-share fallback). **Not** "projection equals prior" —
+   * the primary model is current learned_fitness and baselines.
+   */
   anchored_to_prior: boolean;
   prior_result_date?: string;
   assumptions: string[];
@@ -248,8 +255,34 @@ function isSeventyThreeGoal(dist: string, sport: string): boolean {
   return d.includes('70.3') || d.includes('70_3') || d.includes('half iron');
 }
 
+/** Leg fractions from prior race; falls back to default 70.3 model ratios. */
+function prior703LegFractions(
+  prior: NonNullable<ProjectionInputs['prior_result']>,
+): { swim: number; bike: number; run: number; t1t2: number } {
+  const s = prior.splits;
+  if (!s) {
+    return { swim: R703.swim, bike: R703.bike, run: R703.run, t1t2: R703.t1t2 };
+  }
+  const t1 = s.t1_t2_min ?? 0;
+  const sum = s.swim_min + s.bike_min + s.run_min + t1;
+  if (!(sum > 0)) {
+    return { swim: R703.swim, bike: R703.bike, run: R703.run, t1t2: R703.t1t2 };
+  }
+  return {
+    swim: s.swim_min / sum,
+    bike: s.bike_min / sum,
+    run: s.run_min / sum,
+    t1t2: t1 / sum,
+  };
+}
+
+const PRIOR_VS_PRIMARY_PCT = 0.15;
+
 /**
  * Public entry: build a v1 tri projection from explicit inputs.
+ * **Primary** model: current `learned_fitness` + baselines. **Prior** result (if any):
+ * sanity-check vs that total, and **split-ratio** swim (and run/bike fallbacks only when
+ * a metric is missing — never the prior as the headline anchor).
  * Alias: `buildProjectRaceSplits` (same function).
  */
 export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
@@ -265,70 +298,82 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
 
   const thr = learnedMetric(inputs.learned_fitness?.run_threshold_pace_sec_per_km);
   const ftp = learnedMetric(inputs.learned_fitness?.ride_ftp_estimated);
+  const ls = learnedSwimPaceFromSessions(inputs.learned_fitness);
+  const perfSw = performanceNumbersSwimSecPer100m(inputs.performance_numbers);
 
   const prior0 = inputs.prior_result;
   const priorDateMs = prior0?.race_date
     ? new Date(prior0.race_date.slice(0, 10) + 'T12:00:00Z').getTime()
     : NaN;
   const priorAgeOk =
-    prior0 &&
+    !!prior0 &&
+    prior0.total_seconds > 0 &&
     Number.isFinite(priorDateMs) &&
     today.getTime() - priorDateMs <= THREE_Y_MS &&
     today.getTime() >= priorDateMs;
+  const prior = priorAgeOk && prior0 ? prior0 : null;
+  const priorTotalMin = prior ? prior.total_seconds / 60 : 0;
+  const priorFr = prior ? prior703LegFractions(prior) : null;
 
+  const priorResultDate = prior ? prior.race_date.slice(0, 10) : undefined;
+  let usedPriorSwimRatio = false;
+
+  // ── Swim: learned > baselines > prior split share (if no swim pace) > age / fallback
   let swimMin: number;
-  let bikeMin: number;
-  let runMin: number;
-  let t1t2Min: number;
-  let anchored = false;
-  let priorResultDate: string | undefined;
-
-  if (prior0 && priorAgeOk && prior0.total_seconds > 0) {
-    anchored = true;
-    priorResultDate = prior0.race_date.slice(0, 10);
-    const totalMin = prior0.total_seconds / 60;
-    if (prior0.splits) {
-      swimMin = prior0.splits.swim_min;
-      bikeMin = prior0.splits.bike_min;
-      runMin = prior0.splits.run_min;
-      t1t2Min = prior0.splits.t1_t2_min ?? totalMin * R703.t1t2;
-    } else {
-      assumptions.push('Prior splits estimated from default 70.3 ratios (11% / 51% / 35% / 3%).');
-      swimMin = totalMin * R703.swim;
-      bikeMin = totalMin * R703.bike;
-      runMin = totalMin * R703.run;
-      t1t2Min = totalMin * R703.t1t2;
-    }
+  if (ls.ok) {
+    swimMin = ow703SwimMinFromSecPer100M(ls.value);
+    assumptions.push('Swim: pace from completed swim data (swim_pace_per_100m, ≥3 sessions).');
+  } else if (perfSw != null) {
+    swimMin = ow703SwimMinFromSecPer100M(perfSw);
+    assumptions.push('Swim: manual 100 yd pace (Training Baselines) → 100m + 70.3 distance + 10% open water.');
+  } else if (prior && priorFr) {
+    swimMin = priorTotalMin * priorFr.swim;
+    usedPriorSwimRatio = true;
+    assumptions.push(
+      'Swim: leg time from prior 70.3 split ratios — no ≥3 session swim or baseline pace; bike/run from current data.',
+    );
   } else {
-    assumptions.push('No anchor race within 3y — bike/run from learned metrics; swim from pace pipeline (see assumptions).');
     const resolved = resolveNoPrior703SwimOwMin(inputs, today, assumptions);
     swimMin = resolved.swimOWMin;
-    bikeMin = 180;
-    runMin = thr.ok ? (HM_KM * thr.value * RUN_FATIGUE_ON_BIKE) / 60 : 120;
-    t1t2Min = 10;
   }
 
-  // Run: prefer current threshold
+  // ── Run: current threshold > prior share (only if no threshold) > 120
+  let runMin: number;
   if (thr.ok) {
     runMin = (HM_KM * thr.value * RUN_FATIGUE_ON_BIKE) / 60;
     assumptions.push('Run leg uses learned threshold pace with +8% fatigue vs standalone HM pace.');
-  } else if (anchored) {
-    assumptions.push('No confident learned run threshold — run split kept from prior distribution.');
+  } else if (prior && priorFr) {
+    runMin = priorTotalMin * priorFr.run;
+    assumptions.push('Run: no confident learned run threshold — leg share from prior 70.3 as fallback (not a pace target).');
+  } else {
+    runMin = 120;
   }
 
-  // Bike: time improvement from training weeks, then elevation
-  if (anchored) {
-    const improve = Math.min(BIKE_WEEKLY_IMPROV_CAP, wk * BIKE_WEEKLY_RATE);
-    bikeMin = bikeMin * (1 - improve);
-  } else if (ftp.ok) {
-    // No prior: still scale a neutral bike placeholder slightly with weeks (FTP as fitness proxy is weak for time; keep conservative)
-    const improve = Math.min(BIKE_WEEKLY_IMPROV_CAP, wk * BIKE_WEEKLY_RATE);
+  // ── Bike: FTP-based proxy > prior share (if no FTP) > neutral placeholder
+  const improve = Math.min(BIKE_WEEKLY_IMPROV_CAP, wk * BIKE_WEEKLY_RATE);
+  let bikeMin: number;
+  if (ftp.ok) {
+    bikeMin = Math.max(90, 160 * (1 - improve * 0.5));
+    assumptions.push('Bike: v1 time from FTP + training-weeks offset (placeholder curve).');
+  } else if (prior && priorFr) {
+    bikeMin = Math.max(60, priorTotalMin * priorFr.bike * (1 - improve));
+    assumptions.push('Bike: no FTP on file — prior race bike share scaled by build weeks (not a repeat of that finish).');
+  } else {
     bikeMin = Math.max(90, 160 * (1 - improve * 0.5));
   }
 
+  // ── T1/T2: default model ratio for prior-total, else 10m placeholder
+  let t1t2Min: number;
+  if (prior && priorFr) {
+    t1t2Min = priorTotalMin * priorFr.t1t2;
+  } else {
+    t1t2Min = 10;
+  }
+
+  // Elevation
   const elevM = Number(inputs.course_data?.elevation_gain_m);
   if (Number.isFinite(elevM) && elevM > 0) {
-    const pen = (elevM / 100) * 1; // +1 min / 100 m
+    const pen = (elevM / 100) * 1;
     bikeMin += pen;
     assumptions.push(`Bike elevation penalty +${pen.toFixed(1)} min (~${Math.round(elevM)} m gain in course data).`);
   }
@@ -344,7 +389,6 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
   const reintro = Math.min(Math.max(0, swimMin - SWIM_FLOOR_MIN), Math.floor(wk / 2));
   swimMin = Math.max(SWIM_FLOOR_MIN, swimMin - reintro);
 
-  // Total
   t1t2Min = Math.max(3, t1t2Min);
   let total = swimMin + t1t2Min + bikeMin + runMin;
   if (!Number.isFinite(total) || total < 30) {
@@ -352,24 +396,53 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
     assumptions.push('Sanity check applied to total time.');
   }
 
-  // Confidence
-  let confidence: RaceProjection['confidence'] = 'low';
-  if (anchored && thr.ok && ftp.ok) confidence = 'high';
-  else if (anchored || (thr.ok && ftp.ok) || (anchored && (thr.ok || ftp.ok))) confidence = 'medium';
-
-  if (anchored && priorResultDate) {
-    notes.push(`Anchored to your ${formatHMSFromMinutes(prior0!.total_seconds / 60)} from ${priorResultDate}.`);
+  const totalSec = Math.round(total * 60);
+  const priorSec = prior ? prior.total_seconds : 0;
+  if (prior && priorSec > 0) {
+    const deltaSec = totalSec - priorSec;
+    const rel = Math.abs(deltaSec / priorSec);
+    if (rel > PRIOR_VS_PRIMARY_PCT) {
+      const priorClock = formatHMSFromMinutes(priorSec / 60);
+      const pd = priorResultDate ?? '';
+      if (deltaSec > 0) {
+        notes.push(
+          `Slower than your ${priorClock} at ${pd} — current model is ~${(rel * 100).toFixed(0)}% over that time (swim rebuilding, course, or form vs that day are common reasons; projection is from today’s data).`,
+        );
+      } else {
+        notes.push(
+          `Faster than your ${priorClock} at ${pd} — current model is ~${(rel * 100).toFixed(0)}% under that time (e.g. run or bike up vs that race; projection is from today’s data).`,
+        );
+      }
+    } else {
+      const pd = priorResultDate ?? '';
+      notes.push(
+        `~${(rel * 100).toFixed(0)}% from your ${formatHMSFromMinutes(
+          priorSec / 60,
+        )} at ${pd} — plausibility check only; primary total is from current fitness.`,
+      );
+    }
+  }
+  if (usedPriorSwimRatio) {
+    notes.push('Swim split from prior race ratio — limited recent swim data; total still driven by bike/run and baselines.');
   }
   if (ftp.ok) {
     notes.push(
-      `Bike split ~${Math.round(bikeMin)}m with current FTP trajectory (~${Math.round(ftp.value)}W reference).`,
+      `Bike ~${Math.round(bikeMin)}m with FTP reference (~${Math.round(ftp.value)}W) — v1; not a prior-time anchor.`,
     );
   }
   if (swimDays != null && swimDays > SWIM_DORMANT_DAYS) {
     notes.push('Swim may need reintroduction — estimate is conservative.');
   }
 
-  const projection_notes = notes.slice(0, 3);
+  // Confidence: primary from current metrics, not from prior
+  let confidence: RaceProjection['confidence'] = 'low';
+  if (ls.ok && thr.ok && ftp.ok) confidence = 'high';
+  else if ((thr.ok && ftp.ok) || (ls.ok && (thr.ok || ftp.ok)) || (thr.ok && ls.ok)) confidence = 'medium';
+  if (usedPriorSwimRatio && confidence === 'high') confidence = 'medium';
+
+  const projection_notes = notes
+    .filter((s) => s.length > 0)
+    .slice(0, 3);
 
   return {
     swim_min: round1(swimMin),
@@ -377,8 +450,9 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
     bike_min: round1(bikeMin),
     run_min: round1(runMin),
     total_min: round1(total),
+    total_sec: totalSec,
     confidence,
-    anchored_to_prior: anchored,
+    anchored_to_prior: Boolean(prior),
     prior_result_date: priorResultDate,
     assumptions,
     projection_notes,

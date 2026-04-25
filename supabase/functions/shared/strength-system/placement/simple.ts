@@ -18,9 +18,8 @@ import {
   getPlacementStrategy,
   mapApproachToMethodology,
   normalizeWeekday,
-  type PlacementContext,
 } from './strategy.ts';
-import type { Weekday, Slot } from './types.ts';
+import type { Weekday, Slot, PlacementContext } from './types.ts';
 
 const SUN_RING: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 

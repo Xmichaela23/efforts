@@ -214,7 +214,11 @@ export interface ProtocolGuardrail {
 // PLACEMENT POLICY
 // ============================================================================
 
-export type PlacementPolicyId = 'long_run_dominant' | 'quality_dominant' | 'balanced';
+export type PlacementPolicyId =
+  | 'long_run_dominant'
+  | 'quality_dominant'
+  | 'balanced'
+  | 'methodology_aware';
 
 /**
  * Placement policy assigns intent sessions to days

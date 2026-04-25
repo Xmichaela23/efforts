@@ -21,6 +21,21 @@ import {
   type ForwardContextV1,
 } from './types.ts';
 
+/**
+ * Rubric for Arc / AL when a prior 70.3+ (or similar) finish exists in identity or
+ * history. The **primary** `goals.projection` total is from **current** learned_fitness
+ * and baselines; a past result is a **sanity check** and **split-ratio hint** when swim
+ * data is thin (see `race-projections` v1) — not the headline anchor. Import or paste
+ * into prompts that reason about tri finish times next to `projection` JSON.
+ */
+export const PRIOR_FINISH_PROJECTION_AL_RUBRIC = [
+  'Never say "targeting your prior time" or "we will use your old finish as the goal."',
+  'Always lead with where current fitness points: total and splits are driven by today’s data first.',
+  'Then reference the prior in plain language: plausibility, what changed (e.g. run up, swim dormant), and that the model may sit above or below the old clock for good reasons.',
+  'Good: "Current fitness points to about [X]. Your [e.g. 5:56] at [race, year] is useful context — run is stronger than then but swim needs rebuilding, so the total lands near [X] for those offsetting reasons."',
+  'Bad: "You went [old time] before, so we are targeting [old time]."',
+].join(' ');
+
 // ── Distance helpers ─────────────────────────────────────────────────────────
 
 /** Canonical run-distance lookup (meters). Lower-cased keys; permissive matches. */
@@ -243,8 +258,8 @@ function inferPostRacePhase(
   justFinished: JustFinishedRace | null,
 ): string {
   // If Arc tells us, trust it.
-  const phase = arc.athlete_identity?.current_phase ?? null;
-  if (phase) return phase;
+  const phase = arc.athlete_identity?.current_phase;
+  if (typeof phase === 'string' && phase.trim()) return phase;
   // Otherwise default by goal distance: marathons → recovery, halfs/shorter → build.
   if (justFinished?.distance_meters != null && justFinished.distance_meters >= 30000) {
     return 'recovery';

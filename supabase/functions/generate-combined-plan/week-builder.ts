@@ -14,6 +14,7 @@ import {
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS,
 } from './science.ts';
+import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, marathonPaceRun,
   longRide, thresholdBike, vo2Bike, sweetSpotBike, tempoBike, easyBike, bikeOpeners,
@@ -21,6 +22,7 @@ import {
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
+import { arePlannedSessionsCompatible } from '../_shared/schedule-session-constraints.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,8 +55,8 @@ function dayIntensity(slot: DaySlot): Intensity | null {
 }
 
 // Numerically index days so we can check adjacency
-function adjDay(day: string, delta: number): string {
-  const idx = DAY_INDEX[day];
+function adjDay(day: string, delta: number): DayOfWeek {
+  const idx = DAY_INDEX[day] ?? 0;
   return DAYS_OF_WEEK[(idx + delta + 7) % 7];
 }
 
@@ -134,6 +136,62 @@ function enforce8020(grid: WeekGrid, phase: Phase): void {
       }
     }
   }
+}
+
+// ── Same-day matrix (9×9 + extensions) — post placement ---------------------------------
+// One source of truth: `_shared/schedule-session-constraints.ts` (used by AL prompts + engine).
+
+interface SameDayValidationResult {
+  valid: boolean;
+  conflicts: string[];
+}
+
+function validateWeekGridSameDayMatrix(grid: WeekGrid): SameDayValidationResult {
+  const conflicts: string[] = [];
+  for (const [day, slot] of grid) {
+    const sessions = slot.sessions;
+    for (let i = 0; i < sessions.length; i++) {
+      for (let j = i + 1; j < sessions.length; j++) {
+        if (!arePlannedSessionsCompatible(sessions[i], sessions[j])) {
+          conflicts.push(
+            `${day}: "${sessions[i].name}" [${sessions[i].type}] + "${sessions[j].name}" [${sessions[j].type}]`,
+          );
+        }
+      }
+    }
+  }
+  return { valid: conflicts.length === 0, conflicts };
+}
+
+/** Prefer dropping strength on a clashing day (movable) before returning the grid. */
+function tryResolveSameDayMatrixConflicts(grid: WeekGrid): string[] {
+  const actions: string[] = [];
+  for (let pass = 0; pass < 32; pass++) {
+    if (validateWeekGridSameDayMatrix(grid).valid) break;
+    let removed = false;
+    outer: for (const [day, slot] of grid) {
+      const list = slot.sessions;
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          if (arePlannedSessionsCompatible(list[i], list[j])) continue;
+          if (list[i].type === 'strength') {
+            const [rm] = list.splice(i, 1);
+            actions.push(`removed strength on ${day}: ${rm.name}`);
+            removed = true;
+            break outer;
+          }
+          if (list[j].type === 'strength') {
+            const [rm] = list.splice(j, 1);
+            actions.push(`removed strength on ${day}: ${rm.name}`);
+            removed = true;
+            break outer;
+          }
+        }
+      }
+    }
+    if (!removed) break;
+  }
+  return actions;
 }
 
 // ── TSS summary helpers ───────────────────────────────────────────────────────
@@ -632,16 +690,16 @@ export function buildWeek(
     if (slot && !slot.isRest) {
       const gRace = goals.find((g) => g.id === raceThisWeek.goalId) ?? primaryGoal;
       const projMin = 330;
-      const rawT = Math.round(estimateSessionTSS('ride', 'MODERATE', projMin) * 0.9);
+      const rawT = Math.round(estimateSessionTSS('bike', 'MODERATE', projMin) * 0.9);
       slot.sessions = [{
         day: d,
-        type: 'ride',
+        type: 'bike',
         name: gRace.event_name,
         description:
           'Race day — 70.3: 1.2 mi swim, 56 mi bike, 13.1 mi run. No add-on training; execute pacing and fueling. Typical finish ~5:00–6:00.',
         duration: projMin,
         tss: rawT,
-        weighted_tss: weightedTSS('ride', rawT),
+        weighted_tss: weightedTSS('bike', rawT),
         intensity_class: 'MODERATE',
         steps_preset: [],
         tags: ['tri_race', 'race_day', 'event', 'no_extra_training'],
@@ -656,6 +714,20 @@ export function buildWeek(
 
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
   enforce8020(grid, phase);
+
+  // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
+  const sameDayPre = validateWeekGridSameDayMatrix(grid);
+  if (!sameDayPre.valid) {
+    console.warn('[week-builder] same-day schedule conflicts detected:', sameDayPre.conflicts);
+    const res = tryResolveSameDayMatrixConflicts(grid);
+    if (res.length > 0) {
+      console.warn('[week-builder] same-day auto-resolution (strength removal):', res);
+    }
+    const sameDayPost = validateWeekGridSameDayMatrix(grid);
+    if (!sameDayPost.valid) {
+      console.warn('[week-builder] same-day schedule conflicts after resolution:', sameDayPost.conflicts);
+    }
+  }
 
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 

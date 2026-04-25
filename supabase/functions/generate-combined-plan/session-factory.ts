@@ -466,16 +466,19 @@ function intentToPlanned(
   const rawEx = intent.exercises ?? [];
   const strengthEx: PlannedStrengthExercise[] | undefined =
     rawEx.length > 0
-      ? rawEx.map((ex) => ({
-        name: String(ex?.name ?? 'Exercise'),
-        sets: typeof ex?.sets === 'number' ? ex.sets : undefined,
-        reps: ex?.reps as number | string | undefined,
-        weight: ex?.weight as string | number | undefined,
-        percent_1rm: typeof ex?.percent_1rm === 'number' ? ex.percent_1rm : undefined,
-        load: ex?.load as { percent_1rm?: number } | undefined,
-        target_rir: typeof ex?.target_rir === 'number' ? ex.target_rir : undefined,
-        notes: typeof ex?.notes === 'string' ? ex.notes : undefined,
-      }))
+      ? rawEx.map((ex) => {
+        const e = ex as unknown as Record<string, unknown>;
+        return {
+          name: String(e?.name ?? 'Exercise'),
+          sets: typeof e?.sets === 'number' ? e.sets as number : undefined,
+          reps: e?.reps as number | string | undefined,
+          weight: e?.weight as string | number | undefined,
+          percent_1rm: typeof e?.percent_1rm === 'number' ? (e.percent_1rm as number) : undefined,
+          load: e?.load as { percent_1rm?: number } | undefined,
+          target_rir: typeof e?.target_rir === 'number' ? (e.target_rir as number) : undefined,
+          notes: typeof e?.notes === 'string' ? (e.notes as string) : undefined,
+        };
+      })
       : undefined;
 
   const tokenSteps = buildStrengthSteps(intent);
