@@ -71,10 +71,30 @@ function looksLikeStrengthIntentFork(visible: string): boolean {
   return /[?？]/.test(t) || /season\s*\?/i.test(t);
 }
 
+/** State → confirm (good) strength-type line: co-equal vs support phrasing, not day-picking. */
+function looksLikeStrengthIntentStateConfirm(visible: string): boolean {
+  if (looksLikePerformanceIntentConfirmation(visible)) return false;
+  const t = visible.trim();
+  if (!t) return false;
+  if (looksLikeStrengthIntentFork(visible)) return false;
+  if (!/right\?|sound right|good\?|works\?|does that work\?|[?？]\s*$/i.test(t)) return false;
+  if (
+    /which days|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(t) &&
+    /\bfor strength\b|strength (days|on)/i.test(t)
+  ) {
+    return false;
+  }
+  return (
+    /strength as a co-?equal|co-equal goal alongside|co-equal goal this season|push strength as a co-?equal/i.test(t) ||
+    /strength is there to support|not a separate powerlifting|support the tri — not|support the tri, not|support the tri —|auxiliary to the tri|just maintenance\. right/i.test(t) ||
+    (/^strength\b/i.test(t) && /co-?equal|support the tri|powerlifting|maintenance(?!$)/i.test(t))
+  );
+}
+
 type AssistantMessageDisclosure = 'strength_fork' | 'training_intent';
 
 function assistantMessageDisclosure(visible: string): AssistantMessageDisclosure | null {
-  if (looksLikeStrengthIntentFork(visible)) return 'strength_fork';
+  if (looksLikeStrengthIntentFork(visible) || looksLikeStrengthIntentStateConfirm(visible)) return 'strength_fork';
   if (looksLikePerformanceIntentConfirmation(visible)) return 'training_intent';
   return null;
 }
