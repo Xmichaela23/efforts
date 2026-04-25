@@ -2316,6 +2316,9 @@ Deno.serve(async (req) => {
         : null;
 
     let raceDebriefNew: string | null = null;
+    // Hoisted out of the inner try so the persist step below can snapshot it
+    // into workout_analysis.course_strategy_zones (defense-in-depth read path).
+    let courseStrategyZonesUsed: CourseStrategyZoneLine[] | null = null;
     if (goalRaceCompletionMatch.matched) {
       try {
         const wAny = workout as Record<string, unknown>;
@@ -2417,6 +2420,18 @@ Deno.serve(async (req) => {
             courseStrategyZones = z.length > 0 ? z : null;
           }
         }
+
+        // Defense-in-depth: race_courses can be wiped or have its goal_id detached
+        // (FK is ON DELETE SET NULL). If we have nothing live but a previous run
+        // already snapshotted the zones into workout_analysis, use that copy.
+        if (!courseStrategyZones) {
+          const snap = (prevWa as Record<string, unknown> | null | undefined)?.course_strategy_zones;
+          if (Array.isArray(snap) && snap.length > 0) {
+            courseStrategyZones = snap as CourseStrategyZoneLine[];
+            console.log('[analyze-running-workout] using snapshotted course_strategy_zones from prior workout_analysis');
+          }
+        }
+        courseStrategyZonesUsed = courseStrategyZones;
 
         const activityWeather = parseWorkoutWeatherDataBlob(wAny.weather_data);
         const devC = wAny.avg_temperature;
@@ -2547,6 +2562,13 @@ Deno.serve(async (req) => {
         heart_rate_summary: hrAnalysisResult.summary,
         is_goal_race: goalRaceCompletionMatch.matched === true,
         race_debrief_text: race_debrief_text ?? null,
+        // Snapshot the course strategy zones used for this debrief so the
+        // strategy survives later loss of the race_courses row (deletion,
+        // goal replacement, or migration). Read-back falls back to this
+        // snapshot when race_courses returns nothing.
+        course_strategy_zones: courseStrategyZonesUsed ?? (
+          (prevWa as Record<string, unknown> | null | undefined)?.course_strategy_zones ?? null
+        ),
       },
       analysis_status: 'complete',
       analyzed_at: new Date().toISOString()
