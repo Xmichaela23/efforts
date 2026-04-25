@@ -51,6 +51,33 @@ function looksLikePerformanceIntentConfirmation(visible: string): boolean {
 const COMPLETION_INTENT_USER_MESSAGE =
   "I'd like completion intent instead: a strong, healthy finish with durability and conservative load — not chasing a faster time. Please set training intent to completion for this A-race.";
 
+/** Coach presented an either/or (support vs co-equal) instead of a single read+confirm. */
+const STRENGTH_SUPPORT_USER_MESSAGE =
+  'Use strength in support of tri — not a separate powerlifting block. Set strength_intent to "support" on my tri goal(s) and keep season strength as auxiliary to swim/bike/run.';
+
+const STRENGTH_COEQUAL_USER_MESSAGE =
+  'I want to push strength as a co-equal goal this season, not just maintenance. Set strength_intent to "performance" on my tri goal(s) and treat lifting as a real focus alongside the three sports.';
+
+function looksLikeStrengthIntentFork(visible: string): boolean {
+  const t = visible.trim();
+  if (!t) return false;
+  if (!/strength|lift(ing)?|gym|squat|1rm|gains/i.test(t)) return false;
+  const hasEitherOr =
+    /—\s*or|–\s*or|-\s*or| or are you| or do you|,\s*or(?=\s)/i.test(t) ||
+    (/support/i.test(t) && /(co-?equal|co-equal|pushing it|powerlifting|separate)/i.test(t)) ||
+    (/(twice|2×|2x|a week)/i.test(t) && /(co-?equal|or are you)/i.test(t));
+  if (!hasEitherOr) return false;
+  return /[?？]/.test(t) || /season\s*\?/i.test(t);
+}
+
+type AssistantMessageDisclosure = 'strength_fork' | 'training_intent';
+
+function assistantMessageDisclosure(visible: string): AssistantMessageDisclosure | null {
+  if (looksLikeStrengthIntentFork(visible)) return 'strength_fork';
+  if (looksLikePerformanceIntentConfirmation(visible)) return 'training_intent';
+  return null;
+}
+
 function isValidGoalType(t: unknown): t is GoalInsert['goal_type'] {
   return t === 'event' || t === 'capacity' || t === 'maintenance';
 }
@@ -544,16 +571,20 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
               </div>
             );
           }
-          const showIntentInfo = looksLikePerformanceIntentConfirmation(m.content);
+          const disc = assistantMessageDisclosure(m.content);
           return (
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
                 <span className="align-baseline">{m.content}</span>
-                {showIntentInfo && (
+                {disc && (
                   <button
                     type="button"
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
-                    aria-label="What performance and completion intent mean"
+                    aria-label={
+                      disc === 'strength_fork'
+                        ? 'What support vs co-equal strength means'
+                        : 'What performance and completion training intent mean'
+                    }
                     aria-expanded={intentInfoOpenIdx === i}
                     onClick={() => setIntentInfoOpenIdx((v) => (v === i ? null : i))}
                   >
@@ -561,7 +592,41 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                   </button>
                 )}
               </div>
-              {showIntentInfo && intentInfoOpenIdx === i && (
+              {disc === 'strength_fork' && intentInfoOpenIdx === i && (
+                <div
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  role="region"
+                  aria-label="Strength on the plan"
+                >
+                  <p>
+                    <span className="text-white/90 font-medium">Support</span> — strength supports swim/bike/run. Fewer
+                    “lift-first” weeks; room for tri quality. Maps to a durability-minded strength block.
+                  </p>
+                  <p>
+                    <span className="text-white/90 font-medium">Co-equal</span> — serious strength progression with tri;
+                    more emphasis on the gym as its own target. Heavier, more session density when the week allows.
+                  </p>
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(STRENGTH_SUPPORT_USER_MESSAGE)}
+                      className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
+                    >
+                      Use support
+                    </button>
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(STRENGTH_COEQUAL_USER_MESSAGE)}
+                      className="text-sm font-medium px-3 py-2 rounded-lg bg-teal-500/15 text-teal-100/95 border border-teal-500/35 hover:bg-teal-500/25 disabled:opacity-50 flex-1 min-w-0"
+                    >
+                      Use co-equal
+                    </button>
+                  </div>
+                </div>
+              )}
+              {disc === 'training_intent' && intentInfoOpenIdx === i && (
                 <div
                   className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
                   role="region"

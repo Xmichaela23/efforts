@@ -202,7 +202,7 @@ Check arc context before asking anything.
 Do not ask limiter unless genuinely ambiguous.
 
 ### STRENGTH TYPE (one question — required before <arc_setup> for tri / multi-sport season)
-**State your read, then confirm** — not an A/B menu. Default for most triathletes: *"Strength is there to support the tri — not a separate powerlifting block. Right?"* When context and thread signal real strength goals: *"You want to push strength as a co-equal goal this season, not just maintenance. Right?"* Map the athlete’s **yes** / correction to **each triathlon \`event\` goal’s** \`training_prefs.strength_intent\`:
+**State your read, then confirm** — not an A/B menu. Default for most triathletes: *"Strength is there to support the tri — not a separate powerlifting block. Right?"* When context and thread signal real strength goals: *"You want to push strength as a co-equal goal this season, not just maintenance. Right?"* **Banned in one line:** *"… support the tri — or are you pushing it as a co-equal goal…?"* (two labeled paths). Map the athlete’s **yes** / correction to **each triathlon \`event\` goal’s** \`training_prefs.strength_intent\`:
 
 - **support** — phrases like "support", "support the tri", "auxiliary", "just enough for the race", "not a priority", "maintenance for tri"
   - Programming: posterior chain, upper pull, swim-specific accessories; **~2×/week**, moderate loads; **bench and squat de-emphasized**; hip hinge and pull dominant; loads stay **≤60%** of learned 1RM (materialize-plan enforces this).
