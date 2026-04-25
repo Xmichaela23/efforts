@@ -163,30 +163,44 @@ Deno.serve(async (req) => {
   let goalTimeMismatchBlurb: string | null = null;
 
   if (course.goal_id) {
-    // Prefer unified projection from coach_cache (parity with State); else same resolver as coach.
-    const { data: cacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
-    const pl = cacheRow?.payload as Record<string, unknown> | undefined;
-    const cachedRfp = pl ? pickRaceFinishProjectionV1ForCourseGoal(pl, String(course.goal_id)) : null;
+    const { data: gPred, error: gPredErr } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('id', course.goal_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (gPredErr) console.warn('[course-detail] goals select', gPredErr.message);
 
-    if (cachedRfp) {
-      primarySec = cachedRfp.anchor_seconds;
-      goalTimeSource = cachedRfp.source_kind === 'plan_target' ? 'plan' : 'predicted';
-      const hasPlan = cachedRfp.plan_goal_seconds != null && cachedRfp.plan_goal_seconds > 0;
-      const dupPlanHeadline =
-        cachedRfp.source_kind === 'plan_target' && cachedRfp.anchor_seconds === cachedRfp.plan_goal_seconds;
-      planTargetTimeStr = hasPlan && !dupPlanHeadline ? cachedRfp.plan_goal_display : null;
-      goalTimeMismatchBlurb = cachedRfp.mismatch_blurb;
-    } else {
-      const { data: gPred, error: gPredErr } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('id', course.goal_id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (gPredErr) {
-        console.warn('[course-detail] goals select for projection', gPredErr.message);
+    const gr = (gPred ?? {}) as Record<string, unknown>;
+    const isCompleted = String(gr.status ?? '') === 'completed';
+
+    // For completed goals: use the pre-race projection snapshot stored at race time
+    // (same value State shows as "Projected X"). This keeps all screens consistent.
+    if (isCompleted) {
+      const tp = (gr.training_prefs ?? {}) as Record<string, unknown>;
+      const rr = (tp.race_result ?? {}) as Record<string, unknown>;
+      const snapSec = Number(rr.projected_seconds);
+      if (Number.isFinite(snapSec) && snapSec > 0) {
+        primarySec = Math.round(snapSec);
+        goalTimeSource = 'predicted';
+      }
+    }
+
+    // Active goals (or completed without a snapshot): coach_cache → buildRaceFinishProjectionV1
+    if (primarySec == null) {
+      const { data: cacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
+      const pl = cacheRow?.payload as Record<string, unknown> | undefined;
+      const cachedRfp = pl ? pickRaceFinishProjectionV1ForCourseGoal(pl, String(course.goal_id)) : null;
+
+      if (cachedRfp) {
+        primarySec = cachedRfp.anchor_seconds;
+        goalTimeSource = cachedRfp.source_kind === 'plan_target' ? 'plan' : 'predicted';
+        const hasPlan = cachedRfp.plan_goal_seconds != null && cachedRfp.plan_goal_seconds > 0;
+        const dupPlanHeadline =
+          cachedRfp.source_kind === 'plan_target' && cachedRfp.anchor_seconds === cachedRfp.plan_goal_seconds;
+        planTargetTimeStr = hasPlan && !dupPlanHeadline ? cachedRfp.plan_goal_display : null;
+        goalTimeMismatchBlurb = cachedRfp.mismatch_blurb;
       } else if (gPred) {
-        const gr = gPred as Record<string, unknown>;
         const built = await buildRaceFinishProjectionV1(
           supabase,
           user.id,
