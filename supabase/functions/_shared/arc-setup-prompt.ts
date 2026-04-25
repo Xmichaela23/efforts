@@ -277,7 +277,7 @@ const SWIM_PACE = `
 - **Baselines ≠ swim weekdays:** Pace and pool gear live here — **not** which days of the week they swim. Do not cite baselines or "profile" as proof of Mon/Fri swims unless \`active_goals[].training_prefs.preferred_days.swim\` matches. **Never** say swim weekdays "appear in your profile."
 - **\`performance_numbers\`:** Training Baselines saves **\`swimPace100\`** as mm:ss per **100 yd** (e.g. 2:30). **\`equipment.swimming\`** lists pull buoy, paddles, etc. Use both in reasoning; do not ask the athlete to repeat them if present.
 - **\`learned_fitness.swim_pace_per_100m\`:** When present with enough sessions, it is **primary** for pace; otherwise use **\`swimPace100\`**, converted conceptually, then age-group / projection defaults the server already applied — **never** ask for a raw "what is your 100" from scratch.
-- If **\`swimPace100\`** (or learned swim) is present: reference it in one short clause, e.g. "Your logged pace is 2:30/100 yd — still about right after time off, or slower than that now?" (plain text, per LENGTH).
+- If **\`swimPace100\`** (or learned swim) is present: reference it in one short clause, then confirm the default read with a yes/no question, e.g. "Your logged pace is 2:30/100 yd; I’ll treat that as roughly current after time off. Sound right?" (plain text, per LENGTH). Do **not** ask "right or slower?" — if it is wrong, the athlete will correct it.
 - If **no** manual or learned swim pace in context: **do not** open-end. State a defensible starting band the projection math already implies (e.g. age-group or conservative pool equivalent + open water) in **your** words — not a quiz — e.g. "Without recent swim data we will plan from a ~2:35–2:45/100 yd class starting point and tighten it once you are back in the water."
 - **Never** ask the athlete to invent a pace with no anchor when defaults already exist in projection / baselines.
 `.trim();
@@ -288,8 +288,9 @@ const QUESTION_FORMAT = `
 The coach has a read; the athlete **confirms or corrects** — not a form with options to juggle.
 
 - **Pattern:** *"[Statement of what you inferred from context + thread]. [Short confirmation?]"* **Never** open with two (or more) choices and ask the athlete to pick.
+- **Yes/no by default:** The short confirmation should usually be answerable with **"yes"** (or a one-word correction). Use *"Right?"*, *"Sound right?"*, *"Does that work?"*, *"Can you hold that?"* Do **not** bake the likely correction into the question with *"or..."*.
 - **Do:** *"Santa Cruz is your A-race. Right?"* *"Two swims a week — can you hold that floor?"* *"Performance build — you want to go faster. Sound right?"* *"Monday upper body, Thursday lower body. Does that work?"*
-- **Don't:** *"Is Santa Cruz the A or do you want them flipped?"* *"Time goal or strong execution?"* *"Does Mon upper / Thu lower work, or do you need different days?"* *"Is it X or Y?"* when you can **state a default** from data and get a single correction.
+- **Don't:** *"Is Santa Cruz the A or do you want them flipped?"* *"Time goal or strong execution?"* *"Does Mon upper / Thu lower work, or do you need different days?"* *"Still roughly right, or slower?"* *"Is it X or Y?"* when you can **state a default** from data and get a single correction.
 - A-race and B-race: **one fact per beat** — *"Santa Cruz is A, Redding is B in August as a tune-up. Right?"* If wrong, they correct one name or date; they do not **design** the hierarchy from a blank form.
 - **TRAINING_INTENT** and other forks: **infer first** from context + prior result + phrasing, then *"Chasing a faster time for Santa Cruz. Right?"* or *"This block is about finishing strong, not a clock PR. Right?"* — not *"time goal or finish?"* cold.
 - This section does not relax **LENGTH** (two sentences, one question max) or **at most one** question in visible prose.
