@@ -41,6 +41,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
+    // Idempotent — if plan is already ended return success immediately.
+    const { data: existing } = await supabase.from('plans').select('status').eq('id', planId).maybeSingle()
+    if (existing?.status === 'ended' || existing?.status === 'completed') {
+      return new Response(
+        JSON.stringify({ success: true, plan_id: planId, deleted_count: 0, tombstone: null, message: 'Plan already ended.' }),
+        { headers: { ...cors, 'Content-Type': 'application/json' } },
+      )
+    }
+
     const { deleted_count, tombstone } = await executeEndPlan(supabase, planId, 'user_ended')
     const tw: any = tombstone
     const totalWeeks = Number(tw?.total_weeks || 0)
