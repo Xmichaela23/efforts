@@ -1,0 +1,35 @@
+---
+description: Lower-body strength may only pair with easy endurance; never with quality, long, or brick; auto-pick day
+alwaysApply: true
+---
+
+# Lower body strength — pairing and placement
+
+When placing **lower-body** strength sessions in combined / tri / multi-sport plans (or extending placement logic), follow these **pairing** rules. Do not surface ambiguous placement to the user as a blocker.
+
+## Same day as lower body — allowed
+
+- Easy bike  
+- Easy run  
+- Easy swim  
+
+(Only **easy** aerobic sessions — they do not compete for lower-body CNS/structural recovery the same way quality or long work does.)
+
+## Same day as lower body — **never**
+
+- Quality bike (intervals, threshold, sweet spot, tempo, VO2, etc.)  
+- Quality run  
+- Quality swim  
+- Long ride  
+- Long run  
+- Brick  
+
+## When no obvious day exists
+
+- **Scan the week** for any day that has **only** easy bike, easy run, and/or easy swim (and rest), with **none** of the blocked session types above.  
+- **Place lower-body strength there** and **document the choice in code or comments** (e.g. “paired with easy aerobic only”).  
+- **Propose a single concrete placement** in implementation. **Do not** add UX or copy that asks the athlete to pick or resolve a conflict; the system must resolve it algorithmically.
+
+## Upper body
+
+- This rule is specific to **lower body / neural / heavy leg** prescriptions. Upper-body strength pairing may follow the existing product rules elsewhere unless contradicted by task scope.
