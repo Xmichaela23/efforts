@@ -53,6 +53,27 @@ interface SessionNarrativeProps {
     narrative_text?: string | null;
     /** Goal-race LLM debrief (additive). */
     race_debrief_text?: string | null;
+    /**
+     * Server-authored "What this means for future races" block (goal-race only).
+     * Built from ArcContext: next goal, phase, projection. Render verbatim.
+     */
+    forward_context?: {
+      eyebrow: string;
+      headline: string;
+      body: string;
+      projection_line: string | null;
+      next_goal: {
+        id: string;
+        name: string;
+        target_date: string;
+        sport: string | null;
+        distance: string | null;
+        days_until: number;
+        weeks_until: number;
+        is_multisport: boolean;
+      } | null;
+      current_phase: string | null;
+    } | null;
     summary?: { title?: string; bullets?: string[] };
     analysis_details?: { rows?: Array<{ label: string; value: string }> };
     adherence?: {
@@ -475,6 +496,26 @@ export default function SessionNarrative({
             Race debrief
           </span>
           <p className="text-sm text-gray-300 leading-relaxed mt-1">{raceDebriefText}</p>
+        </div>
+      )}
+      {sd?.forward_context && (sd.forward_context.headline || sd.forward_context.body) && (
+        <div>
+          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+            {sd.forward_context.eyebrow || 'What this means for future races'}
+          </span>
+          <p className="text-sm font-semibold text-gray-100 leading-snug mt-1">
+            {sd.forward_context.headline}
+          </p>
+          {sd.forward_context.body && (
+            <p className="text-sm text-gray-300 leading-relaxed mt-1">
+              {sd.forward_context.body}
+            </p>
+          )}
+          {sd.forward_context.projection_line && (
+            <p className="text-sm text-teal-300/90 leading-relaxed mt-2">
+              {sd.forward_context.projection_line}
+            </p>
+          )}
         </div>
       )}
       {hasNarrative && (

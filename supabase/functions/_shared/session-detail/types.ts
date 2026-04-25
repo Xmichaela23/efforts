@@ -215,6 +215,14 @@ export type SessionDetailV1 = {
     prescription: string | null;
   } | null;
 
+  /**
+   * Forward-looking Arc context for the post-race debrief: what does this
+   * result *mean* for the athlete's next race? Server-authored copy, dumb client.
+   *
+   * Populated only on goal-race sessions when ArcContext is available. Null otherwise.
+   */
+  forward_context?: ForwardContextV1 | null;
+
   display: {
     show_adherence_chips: boolean;
     interval_display_reason: string | null;
@@ -263,6 +271,40 @@ export type SessionDetailV1 = {
     } | null;
   } | null;
 }
+
+// ── Forward context: "what this means for future races" ──────────────────
+// Built from ArcContext (active_goals, current_phase, recent_completed_events)
+// after a goal race so the debrief can speak to what comes next, not just what
+// happened. All copy is server-authored — the client renders verbatim.
+export type ForwardContextNextGoal = {
+  id: string;
+  name: string;
+  target_date: string;
+  sport: string | null;
+  distance: string | null;
+  days_until: number;
+  weeks_until: number;
+  /** True when next race is multi-sport (tri/duathlon) → run leg is a fraction. */
+  is_multisport: boolean;
+};
+
+export type ForwardContextV1 = {
+  /** Eyebrow shown above the block, e.g. "What this means for future races". */
+  eyebrow: string;
+  /** Short bold lead, e.g. "Run fitness confirmed." */
+  headline: string;
+  /** Body paragraph, 1–3 sentences. */
+  body: string;
+  /**
+   * Optional projection line, e.g. "Projected Santa Cruz run leg: ~2:18
+   * based on this result." Null when no next race or insufficient data.
+   */
+  projection_line: string | null;
+  /** The next race we're projecting onto (null when none). */
+  next_goal: ForwardContextNextGoal | null;
+  /** Athlete phase at debrief time (recovery/build/...). */
+  current_phase: string | null;
+};
 
 // ── Interval row: fully resolved, ready to render ─────────────────────────
 export type IntervalRow = {

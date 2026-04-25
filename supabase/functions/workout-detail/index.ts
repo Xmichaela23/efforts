@@ -17,6 +17,8 @@ import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readi
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 import { generateRaceNarrative } from '../_shared/race-narrative.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
+import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
 
 type DetailOptions = {
   include_gps?: boolean;
@@ -66,8 +68,15 @@ function msFromTimestampField(v: unknown): number | null {
  * `session_detail_updated_at` is set by merge_session_detail_v1_into_workout_analysis (JSONB on workouts).
  */
 function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analysis: Record<string, unknown>): boolean {
-  const sessionDetail = analysis?.session_detail_v1;
+  const sessionDetail = analysis?.session_detail_v1 as Record<string, unknown> | undefined;
   if (!sessionDetail || typeof sessionDetail !== 'object') return true;
+
+  // Schema upgrade: goal-race payloads written before forward_context shipped
+  // are missing the field entirely. Treat as stale so they refresh once.
+  const race = (sessionDetail as any)?.race;
+  if (race?.is_goal_race && !('forward_context' in sessionDetail)) {
+    return true;
+  }
 
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
@@ -619,6 +628,40 @@ async function runSessionDetailPipelineAndPersist(
         }
       } catch (rnErr: unknown) {
         console.warn('[race-narrative] skipped:', rnErr instanceof Error ? rnErr.message : rnErr);
+      }
+    }
+
+    // Forward context: "What this means for future races".
+    // Wires Arc into the post-race debrief so it can speak to what comes next,
+    // not just what happened. Goal-race only; never blocks the debrief.
+    if (sessionDetailV1?.race?.is_goal_race) {
+      try {
+        const todayYmd = new Date().toISOString().slice(0, 10);
+        // Use today (or the workout date, whichever is later) so we don't
+        // recommend a race that already happened between race day and now.
+        const forwardAsOf = todayYmd > asOfDate ? todayYmd : asOfDate;
+        const arc = await getArcContext(supabase, userId, forwardAsOf);
+        const forward = buildForwardContext({
+          arc,
+          sessionDetailV1,
+          asOfDate: forwardAsOf,
+        });
+        if (forward) {
+          sessionDetailV1.forward_context = forward;
+          console.log(
+            '[forward-context] set: next_goal=',
+            forward.next_goal?.name ?? 'none',
+            'phase=', forward.current_phase,
+            'projection=', forward.projection_line ?? 'n/a',
+          );
+        } else {
+          sessionDetailV1.forward_context = null;
+        }
+      } catch (fcErr: unknown) {
+        console.warn(
+          '[forward-context] skipped:',
+          fcErr instanceof Error ? fcErr.message : fcErr,
+        );
       }
     }
   } catch (snapErr: any) {
