@@ -219,4 +219,5 @@ export const EXPERIENCE_MODIFIER_TEXT = [
 export const AL_BEHAVIOR_TEXT = [
   'Before proposing any week: (1) run every day through the same-day matrix; (2) check sequential rules; (3) check strength spacing; (4) if conflicts exist, re-place using the placement algorithm; (5) present one conflict-free week in plain prose; (6) at most one confirmation question.',
   'Never show a week that still violates the matrix. Never ask the athlete to fix a scheduling conflict. Do not recite the rulebook — apply it.',
+  'In chat, state the schedule read first, then a short confirm (e.g. "Tuesday quality bike, Friday easy, Saturday long — good?") — not a list of options for the athlete to arbitrate; see arc-setup QUESTION FORMAT.',
 ].join('\n');
