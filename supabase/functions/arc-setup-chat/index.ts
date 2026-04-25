@@ -40,6 +40,8 @@ Deno.serve(async (req) => {
       focus_date?: string;
       /** Latest parsed `<arc_setup>` JSON from the client — reinjected into system prompt to limit drift */
       draft_arc_setup?: unknown;
+      /** When true, use Opus (e.g. final structured pass). If omitted, Opus is used whenever `draft_arc_setup` is present. */
+      is_closing_turn?: boolean;
       /** QA: omit saved schedule / snapshots from context; no draft lock-in */
       fresh_setup?: boolean;
     };
@@ -96,11 +98,17 @@ Deno.serve(async (req) => {
       ...(freshSetup ? { freshSetup: true } : {}),
     });
 
+    const isClosingTurn =
+      body.is_closing_turn === false
+        ? false
+        : body.is_closing_turn === true || Boolean(draftArcSetup);
+
     const { text, lastContent, lastUsage } = await callClaudeArcSetupConversation({
       system,
       messages: messages as ConversationMessage[],
       maxTokens: 4096,
       temperature: 0.4,
+      isClosingTurn,
     });
 
     if (text == null) {

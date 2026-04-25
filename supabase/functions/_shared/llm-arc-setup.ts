@@ -1,9 +1,9 @@
 /**
- * Arc setup: Opus (highest-stakes seasonal conversation) + optional Anthropic web search, including pause_turn continuation.
+ * Arc setup: **Sonnet** for most interview turns, **Opus** when the client signals the
+ * “structured output / draft iteration” pass (e.g. `draft_arc_setup` echo). Optional Anthropic
+ * web search, including pause_turn continuation.
  */
 import { MODELS, type ConversationMessage } from './llm.ts';
-
-const ARC_SETUP_MODEL = MODELS.opus;
 
 const WEB_SEARCH_TOOL = {
   type: 'web_search_20250305' as const,
@@ -70,6 +70,11 @@ export async function callClaudeArcSetupConversation(opts: {
   messages: ConversationMessage[];
   maxTokens?: number;
   temperature?: number;
+  /**
+   * When true, use Opus (final / high-stakes structured output). When false, Sonnet.
+   * Caller typically sets this when the UI echoes a parsed `<arc_setup>` draft.
+   */
+  isClosingTurn?: boolean;
 }): Promise<{
   text: string | null;
   hadWebSearchTool: boolean;
@@ -86,6 +91,8 @@ export async function callClaudeArcSetupConversation(opts: {
     console.warn('[llm-arc-setup] first message must be user');
     return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: null, lastUsage: null };
   }
+
+  const model = opts.isClosingTurn ? MODELS.opus : MODELS.sonnet;
 
   let workingMessages: AnthropicMessage[] = messagesToApiShape(opts.messages);
   let data: {
@@ -106,7 +113,7 @@ export async function callClaudeArcSetupConversation(opts: {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: ARC_SETUP_MODEL,
+        model,
         system: opts.system,
         messages: workingMessages,
         max_tokens: opts.maxTokens ?? 4096,
