@@ -208,21 +208,31 @@ Deno.serve(async (req) => {
   const isCompletedGoal = String(goal.status) === 'completed';
   const tp = (goal.training_prefs as Record<string, unknown> | null) ?? {};
   const rr = (tp as { race_result?: { actual_seconds?: number } }).race_result;
-  const completedActualSec =
-    isCompletedGoal && rr?.actual_seconds != null && Number.isFinite(Number(rr.actual_seconds)) && Number(rr.actual_seconds) > 0
-      ? Math.round(Number(rr.actual_seconds))
-      : null;
+  // For completed goals: prefer race_result.actual_seconds, fall back to current_value
+  // (current_value is set by complete-race when race_result.actual_seconds may not have been persisted)
+  const completedActualSec = isCompletedGoal
+    ? (() => {
+        const fromRR = rr?.actual_seconds != null && Number.isFinite(Number(rr.actual_seconds)) && Number(rr.actual_seconds) > 0
+          ? Math.round(Number(rr.actual_seconds)) : null;
+        const fromCV = (goal as Record<string, unknown>).current_value != null
+          && Number.isFinite(Number((goal as Record<string, unknown>).current_value))
+          && Number((goal as Record<string, unknown>).current_value) > 0
+          ? Math.round(Number((goal as Record<string, unknown>).current_value)) : null;
+        return fromRR ?? fromCV;
+      })()
+    : null;
 
   // Arc canonical projection — recompute-goal-race-projections is the single writer.
+  // For active goals, read from arc.active_goals. For completed goals, read directly from goals.projection.
   const arcGoal = arc.active_goals.find((g) => g.id === String(course.goal_id));
-  const arcProjSec =
-    arcGoal?.projection != null
-      ? (() => {
-          const p = arcGoal.projection as Record<string, unknown>;
-          const s = Number(p.total_sec);
-          return Number.isFinite(s) && s > 0 ? Math.round(s) : null;
-        })()
-      : null;
+  const rawProjection = arcGoal?.projection ?? (goal as Record<string, unknown>).projection ?? null;
+  const arcProjSec = rawProjection != null
+    ? (() => {
+        const p = rawProjection as Record<string, unknown>;
+        const s = Number(p.total_sec);
+        return Number.isFinite(s) && s > 0 ? Math.round(s) : null;
+      })()
+    : null;
 
   let anchor: { seconds: number; kind: string } | null = null;
 
