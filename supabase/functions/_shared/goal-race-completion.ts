@@ -149,7 +149,7 @@ export async function fetchGoalRaceCompletionForWorkout(
         if (plan.goal_id) {
           const { data: gRow } = await supabase
             .from('goals')
-            .select('id, name, target_date, distance, target_time, race_readiness_projection')
+            .select('id, name, target_date, distance, target_time, race_readiness_projection, training_prefs')
             .eq('id', plan.goal_id)
             .maybeSingle();
           g = gRow;
@@ -184,9 +184,12 @@ export async function fetchGoalRaceCompletionForWorkout(
         // Fitness projection: goal.race_readiness_projection → coach_cache.race_finish_projection_v1
         // (coach cache may have been computed pre-race even if race_finish_projection_v1.goal_id now differs)
         const cachedProj = cacheRow?.payload?.race_finish_projection_v1 ?? null;
+        // Priority: race_readiness_projection → coach_cache → training_prefs.race_result.projected_seconds (snapshot)
+        const tpSnap = (g as any)?.training_prefs?.race_result?.projected_seconds;
         const fitnessProjectionSeconds =
           rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) :
           cachedProj?.fitness_projection_seconds != null ? Number(cachedProj.fitness_projection_seconds) :
+          tpSnap != null && Number.isFinite(Number(tpSnap)) && Number(tpSnap) > 0 ? Math.round(Number(tpSnap)) :
           null;
         const fitnessProjectionDisplay =
           rrp?.predicted_finish_display ??
@@ -239,9 +242,13 @@ export async function fetchGoalRaceCompletionForWorkout(
     let fitnessProjectionSeconds: number | null = null;
     let fitnessProjectionDisplay: string | null = null;
     try {
-      const { data: pr } = await supabase.from('goals').select('race_readiness_projection').eq('id', g.id).single();
+      const { data: pr } = await supabase.from('goals').select('race_readiness_projection, training_prefs').eq('id', g.id).single();
       const rrp = pr?.race_readiness_projection ?? null;
-      fitnessProjectionSeconds = rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) : null;
+      const tpSnap = (pr as any)?.training_prefs?.race_result?.projected_seconds;
+      fitnessProjectionSeconds =
+        rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) :
+        tpSnap != null && Number.isFinite(Number(tpSnap)) && Number(tpSnap) > 0 ? Math.round(Number(tpSnap)) :
+        null;
       fitnessProjectionDisplay = rrp?.predicted_finish_display ?? null;
     } catch { /* optional */ }
 
