@@ -58,6 +58,7 @@ interface SessionNarrativeProps {
      * Built from ArcContext: next goal, phase, projection. Render verbatim.
      */
     forward_context?: {
+      copy_version?: number;
       eyebrow: string;
       headline: string;
       body: string;

@@ -19,6 +19,7 @@ import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
 import { generateRaceNarrative } from '../_shared/race-narrative.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
+import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
 
 type DetailOptions = {
   include_gps?: boolean;
@@ -73,9 +74,13 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analys
 
   // Schema upgrade: goal-race payloads written before forward_context shipped
   // are missing the field entirely. Treat as stale so they refresh once.
+  // Also treat older copy_version as stale so voice/copy changes propagate.
   const race = (sessionDetail as any)?.race;
-  if (race?.is_goal_race && !('forward_context' in sessionDetail)) {
-    return true;
+  if (race?.is_goal_race) {
+    const fc = (sessionDetail as any)?.forward_context;
+    if (!fc) return true;
+    const cv = Number(fc?.copy_version);
+    if (!Number.isFinite(cv) || cv < FORWARD_CONTEXT_COPY_VERSION) return true;
   }
 
   const writtenMs =

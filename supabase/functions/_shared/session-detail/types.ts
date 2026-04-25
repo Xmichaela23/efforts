@@ -288,7 +288,12 @@ export type ForwardContextNextGoal = {
   is_multisport: boolean;
 };
 
+/** Bump when forward-context copy/voice changes. Drives one-time cache refresh. */
+export const FORWARD_CONTEXT_COPY_VERSION = 2;
+
 export type ForwardContextV1 = {
+  /** Server-side copy version. Stale when < FORWARD_CONTEXT_COPY_VERSION. */
+  copy_version: number;
   /** Eyebrow shown above the block, e.g. "What this means for future races". */
   eyebrow: string;
   /** Short bold lead, e.g. "Run fitness confirmed." */

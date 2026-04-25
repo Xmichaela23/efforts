@@ -15,9 +15,10 @@
 
 import type { ArcContext, CompletedEvent, Goal } from '../arc-context.ts';
 import { riegelProjectTime } from '../riegel.ts';
-import type {
-  ForwardContextNextGoal,
-  ForwardContextV1,
+import {
+  FORWARD_CONTEXT_COPY_VERSION,
+  type ForwardContextNextGoal,
+  type ForwardContextV1,
 } from './types.ts';
 
 // ── Distance helpers ─────────────────────────────────────────────────────────
@@ -307,45 +308,42 @@ export function buildForwardContext(args: {
   }
 
   // Compose phase-aware copy.
+  // Voice: dry, factual, coaching language. No slogans, no idioms, no
+  // inspirational phrasing. Same tone as the rest of the coach output.
   const eyebrow = 'What this means for future races';
   let headline = '';
   let body = '';
 
   const finishedDistanceCanon = canonicalRunLabel(justFinished.distance_meters);
-  const negativeSplitConfirmed = hasNegativeSplitInsight(sessionDetailV1);
+  const weeksWord = (n: number) => (n === 1 ? 'week' : 'weeks');
 
   // CASE A: there IS a next goal.
   if (nextGoal) {
     if (nextGoal.is_multisport) {
       // Just ran a stand-alone race; next race is a tri/du.
-      const confirmer = negativeSplitConfirmed
-        ? 'Run fitness is confirmed — a negative split on this effort is a strong signal.'
-        : `Run fitness is locked in from this ${finishedDistanceCanon ?? 'race'}.`;
-      headline = `Run leg at ${nextGoal.name} is your weapon.`;
-      body = `${confirmer} Focus shifts to bike and swim now — the run is the leg you can rely on. ${nextGoal.weeks_until} ${nextGoal.weeks_until === 1 ? 'week' : 'weeks'} to ${nextGoal.name}.`;
+      headline = `${nextGoal.name} run leg is established.`;
+      body = `Run fitness from this ${finishedDistanceCanon ?? 'race'} carries directly to ${nextGoal.name}. Focus the next ${nextGoal.weeks_until} ${weeksWord(nextGoal.weeks_until)} on bike and swim.`;
     } else if (currentPhase === 'recovery') {
-      headline = `Recovery first, then ${nextGoal.name}.`;
-      body = `Easy aerobic work only this week — no quality sessions until load normalizes. Then ${nextGoal.weeks_until} ${nextGoal.weeks_until === 1 ? 'week' : 'weeks'} to build for ${nextGoal.name}.`;
+      headline = `Recovery this week. ${nextGoal.name} in ${nextGoal.weeks_until} ${weeksWord(nextGoal.weeks_until)}.`;
+      body = `Easy aerobic only — no quality sessions until load normalizes. Build for ${nextGoal.name} resumes next week.`;
     } else {
       // Same-discipline next race in build/maintenance.
-      headline = `On track for ${nextGoal.name}.`;
-      const confirmer = negativeSplitConfirmed
-        ? 'A controlled negative split on this effort is a strong signal.'
-        : `Today's ${finishedDistanceCanon ?? 'race'} is the floor we build from.`;
-      body = `${confirmer} ${nextGoal.weeks_until} ${nextGoal.weeks_until === 1 ? 'week' : 'weeks'} to ${nextGoal.name} — train through it, sharpen as you go.`;
+      headline = `${nextGoal.weeks_until} ${weeksWord(nextGoal.weeks_until)} to ${nextGoal.name}.`;
+      body = `This ${finishedDistanceCanon ?? 'race'} sets the current fitness reference. Build continues; race-specific sharpening in the final 3–4 weeks.`;
     }
   } else {
     // CASE B: no next goal queued.
     if (currentPhase === 'recovery') {
-      headline = 'Recovery first.';
-      body = 'Easy aerobic work only this week. When the body feels itself again, set your next race — your fitness is real and ready to be aimed at something.';
+      headline = 'Recovery this week.';
+      body = 'Easy aerobic only. Add a goal when ready and the arc will build toward it.';
     } else {
-      headline = 'Fitness is real. Aim it.';
-      body = 'No next race set. Pick the season target now while this fitness is fresh — you have a hard floor to build from.';
+      headline = 'No next race set.';
+      body = 'This result gives you a solid baseline. Add a goal and the arc will build toward it.';
     }
   }
 
   return {
+    copy_version: FORWARD_CONTEXT_COPY_VERSION,
     eyebrow,
     headline,
     body,
@@ -365,21 +363,6 @@ function canonicalRunLabel(distanceMeters: number | null): string | null {
   if (distanceMeters >= 4500 && distanceMeters <= 5500) return '5K';
   if (distanceMeters >= 49000 && distanceMeters <= 51000) return '50K';
   return null;
-}
-
-function hasNegativeSplitInsight(sessionDetailV1: any): boolean {
-  const insights: Array<{ label?: unknown; value?: unknown }> = Array.isArray(sessionDetailV1?.adherence?.technical_insights)
-    ? sessionDetailV1.adherence.technical_insights
-    : [];
-  for (const row of insights) {
-    const v = String(row?.value ?? '').toLowerCase();
-    if (v.includes('negative split')) return true;
-  }
-  const debrief = String(sessionDetailV1?.race_debrief_text ?? '').toLowerCase();
-  if (debrief.includes('negative split')) return true;
-  const narrative = String(sessionDetailV1?.narrative_text ?? '').toLowerCase();
-  if (narrative.includes('negative split')) return true;
-  return false;
 }
 
 // Re-export distance helpers used by tests (if any).
