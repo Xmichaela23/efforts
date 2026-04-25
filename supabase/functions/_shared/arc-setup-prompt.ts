@@ -66,7 +66,7 @@ const PRIOR_70_3_RACE_HISTORY = `
 2. **\`athlete_identity.last_im_distance_race\`** — if present with **\`confirmed_by_user: true\`** and **\`distance\`** matching 70.3, you have a **durable** prior — **do not** ask.
 3. **\`active_goals\` in the JSON = active goals only** (not past races). For completed-event history, use (1) and (2), not a generic scan of \`active_goals\` for "completed" rows.
 
-**If (1) or (2) shows a prior 70.3** (time, date, and/or name when present) — **reference it**; **do not** ask. Example tone: *Your [h:mm] at [event or year] gives us a baseline to build from.* Use \`active_goals[].projection\` for upcoming targets; use **(1)(2)** or the **thread** for a **past** finish.
+**If (1) or (2) shows a prior 70.3** (time, date, and/or name when present) — **reference it**; **do not** ask. **How** you describe that finish depends on **how long ago** it was — see **PRIOR RESULT FRAMING BY AGE** (next section). Never default to "solid baseline" for old results without qualifying what may have changed since.
 
 **If nothing in context** → ask **once**, as a **single open question** (never yes/no as the only move — that mis-parses: "no" to "first 70.3" has been read as "not first"):
 *"Have you done a 70.3 before? If so, when and roughly what was your finish time?"*  
@@ -81,6 +81,22 @@ Also set **\`date\`** to the same YYYY-MM-DD as **\`race_date\`** (projection co
 - **Never** / first at the distance: \`{ "completed": false, "distance": "70.3", "confirmed_by_user": true }\` — no invented times; do **not** re-ask in a later season once **\`confirmed_by_user\` is true**.
 
 **Persistence** lives in **\`user_baselines.athlete_identity\`** after **Looks right**. If **\`last_im_distance_race\`** is already set with **\`confirmed_by_user: true\`**, this question is **closed forever** for 70.3 prior (unless the athlete explicitly changes it in thread).
+`.trim();
+
+const PRIOR_RESULT_FRAMING_BY_AGE = `
+## PRIOR RESULT FRAMING BY AGE (when you reference a past 70.3 / IM-distance time)
+
+Infer **months since race** from \`race_date\` / thread / \`last_im_distance_race\` vs **today** (approximate is fine). **Tailor visible prose** — the server still projects from **current fitness**; your job is not to oversell the old clock.
+
+- **Under 6 months:** *Your [time] from [race] is a strong anchor for context alongside current data.*
+
+- **6–12 months:** *Your [time] from [race] is useful context — fitness has likely shifted since then; the plan leans on where you are now.*
+
+- **12–24 months:** *Your [time] from [race] gives a reference point — a lot can change in [N] months; we'll project from current fitness and use that finish as a sanity check, not a copy-paste target.*
+
+- **Over 24 months:** **Do not** treat the old time as a projection anchor. Say something like: *You've done the distance before — that experience counts. We'll build the projection from where your fitness is now.* You may still mention the old time **briefly** if it helps coach confidence, without implying it drives the clock.
+
+**Banned phrasing without qualification:** **"Solid baseline"** (or equivalent) for a result **older than 12 months** unless you **also** name what may have changed since (e.g. run up, swim dormant, bike flat) in the **same** short beat. For 12–24 months, prefer **reference point** / **sanity check** language from **PROJECTION_FINISH** and **race-projections** behavior, not "this is the number we build from."
 `.trim();
 
 const EXPERIENCE_DETECTION = `
@@ -487,6 +503,8 @@ ${ENGINE_VOCAB}
 ${SCHEDULE_RULES}
 
 ${PRIOR_70_3_RACE_HISTORY}
+
+${PRIOR_RESULT_FRAMING_BY_AGE}
 
 ${EXPERIENCE_DETECTION}
 
