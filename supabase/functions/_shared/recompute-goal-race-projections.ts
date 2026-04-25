@@ -1,5 +1,7 @@
 /**
  * Fetches baselines, goals, course, prior finishes, and last swim; writes goals.projection.
+ * Arc's single projection writer — handles both tri and run goals.
+ * All downstream consumers (course-strategy, coach, State) read from goals.projection via Arc.
  */
 import {
   isTriEventGoal,
@@ -8,6 +10,7 @@ import {
   type RaceProjection,
 } from './race-projections.ts';
 import type { AthleteIdentity, LearnedFitness } from './arc-context.ts';
+import { computeRaceReadiness } from './race-readiness/index.ts';
 
 const THREE_Y_MS = 3 * 365.25 * 24 * 60 * 60 * 1000;
 
@@ -69,6 +72,13 @@ export async function recomputeRaceProjectionsForUser(
     baseline?.birthday != null ? String(baseline.birthday).slice(0, 10) : null;
   const profile_gender = baseline?.gender != null ? String(baseline.gender) : null;
 
+  const { data: effortPacesRow } = await supabase
+    .from('user_baselines')
+    .select('effort_paces')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const effort_paces = effortPacesRow?.effort_paces as Record<string, unknown> | null ?? null;
+
   let gq = supabase
     .from('goals')
     .select('id, name, distance, target_date, sport, status, target_time')
@@ -109,11 +119,77 @@ export async function recomputeRaceProjectionsForUser(
     const gr = g as Record<string, unknown>;
     const sport = gr.sport != null ? String(gr.sport) : '';
     const distance = gr.distance != null ? String(gr.distance) : '';
-    if (!isTriEventGoal(sport, distance)) continue;
-
     const gid = String(gr.id);
     const targetDate = gr.target_date != null ? String(gr.target_date) : null;
     if (!targetDate) continue;
+
+    // ── RUN GOALS: VDOT/Daniels engine ────────────────────────────────────────
+    if (!isTriEventGoal(sport, distance)) {
+      const sportLower = sport.toLowerCase();
+      if (sportLower !== 'run' && sportLower !== 'running' && sportLower !== '') {
+        // Non-run, non-tri: skip (strength, etc.)
+        continue;
+      }
+      const targetTimeSec = gr.target_time != null && Number.isFinite(Number(gr.target_time)) ? Number(gr.target_time) : null;
+      const weeksOut = weeksUntil(today, targetDate);
+      const readiness = computeRaceReadiness({
+        learnedFitness: learned_fitness,
+        effortPaces: effort_paces,
+        performanceNumbers: performance_numbers,
+        primaryEvent: {
+          id: gid,
+          name: String(gr.name ?? ''),
+          distance: distance || null,
+          target_date: targetDate,
+          target_time: targetTimeSec,
+          sport: sport || null,
+        },
+        weeksOut,
+        weeklyReadinessLabel: null,
+        readinessDrivers: [],
+        hrDriftAvgBpm: null,
+        hrDriftNorm28dBpm: null,
+        easyRunDecouplingPct: null,
+      });
+      if (!readiness) continue;
+
+      const totalMin = Math.round(readiness.predicted_finish_time_seconds / 60 * 10) / 10;
+      const racePaceSecPerMi = readiness.predicted_finish_time_seconds / (
+        (() => {
+          const d = distance.toLowerCase();
+          if (d === 'marathon') return 26.2;
+          if (d === 'half marathon' || d === 'half') return 13.1;
+          if (d === '10k') return 6.2137;
+          if (d === '5k') return 3.1069;
+          return 26.2;
+        })()
+      );
+
+      // Unified projection shape — all surfaces read this.
+      const runProjection: Record<string, unknown> = {
+        total_min: totalMin,
+        total_sec: readiness.predicted_finish_time_seconds,
+        run_leg_min: totalMin,
+        run_target_pace_sec_per_mi: Math.round(racePaceSecPerMi),
+        confidence: readiness.data_source === 'observed' ? 'high' : 'medium',
+        engine: 'vdot',
+        current_vdot: readiness.current_vdot,
+        fitness_date: today,
+        predicted_finish_display: readiness.predicted_finish_display,
+      };
+
+      const { error: runUErr } = await supabase
+        .from('goals')
+        .update({ projection: runProjection, updated_at: new Date().toISOString() })
+        .eq('id', gid)
+        .eq('user_id', userId);
+      if (runUErr) {
+        console.warn(`[recompute-goal-race-projections] run update ${gid}`, runUErr.message);
+      }
+      continue;
+    }
+
+    // ── TRI GOALS: splits model ───────────────────────────────────────────────
 
     const { data: rc } = await supabase
       .from('race_courses')

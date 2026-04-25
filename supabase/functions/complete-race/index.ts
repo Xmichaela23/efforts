@@ -224,6 +224,15 @@ Deno.serve(async (req) => {
       console.warn('[complete-race] coach_cache invalidate', e)
     }
 
+    // Recompute Arc projections for all remaining active goals now that fitness
+    // is confirmed by a race result. Non-fatal — best effort.
+    try {
+      const { recomputeRaceProjectionsForUser } = await import('../_shared/recompute-goal-race-projections.ts')
+      await recomputeRaceProjectionsForUser(supabase, userId)
+    } catch (e) {
+      console.warn('[complete-race] recompute projections (non-fatal)', e)
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

@@ -200,9 +200,11 @@ Deno.serve(async (req) => {
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
 
-  // For completed goals, anchor to the actual race result (what the athlete ran), not the
-  // aspirational target — so prescribed zones reflect race-day fitness and the debrief can
-  // compare actual HR/pace against realistic bands.
+  // Anchor resolution priority:
+  // 1. Completed goals: actual race result (honest retrospective zones)
+  // 2. Arc goals.projection.total_sec (single authoritative projection, written by recompute-goal-race-projections)
+  // 3. coach_cache race_finish_projection_v1 (backward compat)
+  // 4. resolvePaceAnchorForCourse fallback
   const isCompletedGoal = String(goal.status) === 'completed';
   const tp = (goal.training_prefs as Record<string, unknown> | null) ?? {};
   const rr = (tp as { race_result?: { actual_seconds?: number } }).race_result;
@@ -211,11 +213,24 @@ Deno.serve(async (req) => {
       ? Math.round(Number(rr.actual_seconds))
       : null;
 
+  // Arc canonical projection — recompute-goal-race-projections is the single writer.
+  const arcGoal = arc.active_goals.find((g) => g.id === String(course.goal_id));
+  const arcProjSec =
+    arcGoal?.projection != null
+      ? (() => {
+          const p = arcGoal.projection as Record<string, unknown>;
+          const s = Number(p.total_sec);
+          return Number.isFinite(s) && s > 0 ? Math.round(s) : null;
+        })()
+      : null;
+
   let anchor: { seconds: number; kind: string } | null = null;
 
   if (completedActualSec != null) {
-    // Completed race: zones built from what was actually run — honest retrospective.
     anchor = { seconds: completedActualSec, kind: 'completed_actual' };
+  } else if (arcProjSec != null) {
+    // Arc projection is authoritative for active goals.
+    anchor = { seconds: arcProjSec, kind: 'arc_projection' };
   } else {
     const { data: coachCacheRow } = await supabase.from('coach_cache').select('payload').eq('user_id', user.id).maybeSingle();
     const coachPl = coachCacheRow?.payload as Record<string, unknown> | undefined;
@@ -262,6 +277,10 @@ Deno.serve(async (req) => {
     pacingContextLines =
       `- Pace anchor (current-fitness finish projection): ${fmtFinishClock(anchor.seconds)} — segment bands must aggregate to this finish time, not the plan time.\n` +
       `- Stated plan / goal target (aspirational): ${fmtFinishClock(planGoalSec)}.\n`;
+  } else if (anchor.kind === 'arc_projection') {
+    pacingContextLines =
+      `- Pace anchor: Arc fitness projection ${fmtFinishClock(anchor.seconds)} (VDOT from learned threshold pace — authoritative).\n` +
+      (planGoalSec != null && planGoalSec !== anchor.seconds ? `- Athlete goal target: ${fmtFinishClock(planGoalSec)} (aspirational, for context only).\n` : '');
   } else if (anchor.kind === 'coach_readiness') {
     pacingContextLines = `- Pace anchor: current-fitness finish projection ${fmtFinishClock(anchor.seconds)}.\n`;
   } else if (anchor.kind === 'plan_target') {
