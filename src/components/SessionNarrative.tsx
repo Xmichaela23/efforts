@@ -580,21 +580,31 @@ export default function SessionNarrative({
       {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (
         <RouteSparkline route={sd.terrain.route} />
       )}
-      {hasAnalysisDetails && (
+      {/* Old-format analysis rows — suppressed when structured debrief sections exist (they are the complete debrief). */}
+      {hasAnalysisDetails && !raceDebriefSections && (
         <div className="space-y-1.5">
-          {analysisRows.slice(0, 8).map((r, i) => (
-            <div key={i}>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{String(r.label ?? '')}</span>
-              <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{String(r.value ?? '')}</p>
-            </div>
-          ))}
+          {analysisRows.slice(0, 8).map((r, i) => {
+            // "CONDITIONS" in old-format blocks contains elevation/course profile — label as TERRAIN.
+            // True weather (temp, humidity) is a separate row or part of CONDITIONS when no terrain exists.
+            const rawLabel = String(r.label ?? '');
+            const value = String(r.value ?? '');
+            const isTerrainData = rawLabel === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value);
+            const label = isTerrainData ? 'TERRAIN' : rawLabel;
+            return (
+              <div key={i}>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
+                <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{value}</p>
+              </div>
+            );
+          })}
         </div>
       )}
       {sd?.race_readiness && isLlmRaceReadinessShape(sd.race_readiness) && (
         <RaceReadinessBlock rr={sd.race_readiness} />
       )}
       {nextSession && <NextUp session={nextSession} />}
-      {!hasNarrative && hasStructuredForRender && (
+      {/* Technical insights (HEART RATE etc.) — suppressed when structured debrief sections exist. */}
+      {!hasNarrative && hasStructuredForRender && !raceDebriefSections && (
         <>
           {technicalInsightsForRender.length > 0 && (
             <div className="space-y-2">
