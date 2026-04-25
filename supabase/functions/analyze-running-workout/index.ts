@@ -24,6 +24,7 @@ import {
   type CourseStrategyZoneLine,
   type RawCourseSegmentRow,
 } from '../_shared/race-debrief.ts';
+import { runPostRaceFeedbackChain } from '../_shared/race-feedback.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -2564,6 +2565,73 @@ Deno.serve(async (req) => {
     }
 
     console.log(`✅ Running analysis complete for workout ${workout_id}`);
+
+    // ── Post-race feedback chain ─────────────────────────────────────────────
+    // After a goal race finishes, push the result back into the intelligence
+    // layer: nudge learned_fitness threshold pace if Riegel materially diverges,
+    // recompute athlete memory, refresh full learned profile. Best-effort.
+    // Idempotent on (goal_id, finish_seconds) via workout_analysis.post_race_feedback.
+    if (goalRaceCompletionMatch.matched && !updateError) {
+      try {
+        const distMRaw = Number(workout?.computed?.overall?.distance_m);
+        const distanceMeters = Number.isFinite(distMRaw) && distMRaw > 0
+          ? distMRaw
+          : (Number(workout?.distance) > 0 ? Number(workout.distance) * 1000 : 0);
+        const elapsedRaw = Number(workout?.computed?.overall?.duration_s_elapsed);
+        const elapsedMin = Number(workout?.elapsed_time);
+        const finishSeconds = Number.isFinite(elapsedRaw) && elapsedRaw > 0
+          ? Math.round(elapsedRaw)
+          : (Number.isFinite(elapsedMin) && elapsedMin > 0 ? Math.round(elapsedMin * 60) : 0);
+
+        if (finishSeconds > 0 && distanceMeters > 0) {
+          const feedback = await runPostRaceFeedbackChain({
+            supabase,
+            supabaseUrl: Deno.env.get('SUPABASE_URL') ?? '',
+            serviceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            input: {
+              userId: workout.user_id,
+              workoutId: workout_id,
+              goalId: goalRaceCompletionMatch.goalId ?? null,
+              finishSeconds,
+              distanceMeters,
+              prevWorkoutAnalysis: prevWa ?? null,
+            },
+          });
+
+          if (feedback.skippedIdempotent) {
+            console.log('[post-race-feedback] skipped (already applied for this finish)');
+          } else if (feedback.ran && feedback.marker) {
+            const { error: markerErr } = await supabase
+              .from('workouts')
+              .update({
+                workout_analysis: {
+                  ...updatePayload.workout_analysis,
+                  post_race_feedback: feedback.marker,
+                },
+              })
+              .eq('id', workout_id);
+            if (markerErr) {
+              console.warn('[post-race-feedback] marker persist failed:', markerErr.message ?? markerErr);
+            }
+            console.log(
+              '[post-race-feedback] applied:',
+              'pace_updated=', feedback.paceUpdated,
+              'delta=', feedback.marker.pace_delta_pct,
+              'memory=', feedback.memoryRecomputed,
+              'profile=', feedback.profileRelearned,
+              'errors=', feedback.errors.length ? feedback.errors : 'none',
+            );
+          }
+        } else {
+          console.log('[post-race-feedback] skipped (finish or distance unavailable)');
+        }
+      } catch (fbErr: unknown) {
+        console.warn(
+          '[post-race-feedback] chain failed (non-fatal):',
+          fbErr instanceof Error ? fbErr.message : fbErr,
+        );
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,

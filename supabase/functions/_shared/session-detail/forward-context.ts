@@ -14,6 +14,7 @@
 // =============================================================================
 
 import type { ArcContext, CompletedEvent, Goal } from '../arc-context.ts';
+import { riegelProjectTime } from '../riegel.ts';
 import type {
   ForwardContextNextGoal,
   ForwardContextV1,
@@ -139,13 +140,12 @@ function fmtClockApprox(seconds: number): string {
   return fmtClock(rounded);
 }
 
-// ── Riegel projection ────────────────────────────────────────────────────────
+// ── Multisport run-leg adjustment ────────────────────────────────────────────
 
-/** Riegel: T2 = T1 * (D2/D1)^1.06. Standard endurance distance scaling. */
-const RIEGEL_EXPONENT = 1.06;
 /** Run-off-the-bike penalty for triathlon run legs. ~6% conservative. */
 const MULTISPORT_RUN_PENALTY = 1.06;
 
+/** Project a run finish time onto a target distance, with optional tri penalty. */
 function projectRunTime(args: {
   raceFinishSeconds: number;
   raceDistanceMeters: number;
@@ -153,9 +153,11 @@ function projectRunTime(args: {
   multisportPenalty: boolean;
 }): number {
   const { raceFinishSeconds, raceDistanceMeters, targetDistanceMeters, multisportPenalty } = args;
-  if (raceFinishSeconds <= 0 || raceDistanceMeters <= 0 || targetDistanceMeters <= 0) return 0;
-  const ratio = targetDistanceMeters / raceDistanceMeters;
-  let projected = raceFinishSeconds * Math.pow(ratio, RIEGEL_EXPONENT);
+  let projected = riegelProjectTime({
+    knownTimeSeconds: raceFinishSeconds,
+    knownDistanceMeters: raceDistanceMeters,
+    targetDistanceMeters,
+  });
   if (multisportPenalty) projected *= MULTISPORT_RUN_PENALTY;
   return projected;
 }
