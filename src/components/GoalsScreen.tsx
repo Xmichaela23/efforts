@@ -1604,12 +1604,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               </>
             )}
 
-            {inactiveGoals.length > 0 && (
-              <button className="flex items-center gap-2 text-sm text-white/50 hover:text-white/70 transition-colors py-2 mt-2" onClick={() => setExpandedGoalId(prev => prev === '__past' ? null : '__past')}>
-                <ChevronDown className={`h-4 w-4 transition-transform ${expandedGoalId === '__past' ? 'rotate-0' : '-rotate-90'}`} />
-                Past goals ({inactiveGoals.length})
-              </button>
-            )}
             {expandedGoalId === '__past' && inactiveGoals.map(renderGoalCard)}
           </div>
         )}
@@ -1631,6 +1625,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         <button onClick={() => setShowAddGoal(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] py-3 text-white/70 font-medium hover:bg-white/[0.10] transition-all">
           <Plus className="h-5 w-5" />Add Goal
         </button>
+        {inactiveGoals.length > 0 && (
+          <button
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-xs text-white/55 hover:text-white/80 transition-colors"
+            onClick={() => setExpandedGoalId(prev => prev === '__past' ? null : '__past')}
+          >
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expandedGoalId === '__past' ? 'rotate-0' : '-rotate-90'}`} />
+            <span>
+              Past goals <span className="text-white/40">({inactiveGoals.length})</span>
+            </span>
+          </button>
+        )}
         {completedPlans.length > 0 && (
           <button
             onClick={() => onViewAllPlans?.()}
