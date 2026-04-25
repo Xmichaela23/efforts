@@ -580,8 +580,7 @@ export default function SessionNarrative({
       {sd?.terrain?.route && sd.terrain.route.history.length >= 2 && (
         <RouteSparkline route={sd.terrain.route} />
       )}
-      {/* Old-format analysis rows — suppressed when structured debrief sections exist (they are the complete debrief). */}
-      {hasAnalysisDetails && !raceDebriefSections && (
+      {hasAnalysisDetails && (
         <div className="space-y-1.5">
           {analysisRows.slice(0, 8).map((r, i) => {
             // "CONDITIONS" in old-format blocks contains elevation/course profile — label as TERRAIN.
@@ -603,8 +602,7 @@ export default function SessionNarrative({
         <RaceReadinessBlock rr={sd.race_readiness} />
       )}
       {nextSession && <NextUp session={nextSession} />}
-      {/* Technical insights (HEART RATE etc.) — suppressed when structured debrief sections exist. */}
-      {!hasNarrative && hasStructuredForRender && !raceDebriefSections && (
+      {!hasNarrative && hasStructuredForRender && (
         <>
           {technicalInsightsForRender.length > 0 && (
             <div className="space-y-2">
