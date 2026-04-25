@@ -80,7 +80,8 @@ const corsHeaders: Record<string, string> = {
 /** Bump when adding/changing top-level coach fields so coach_cache rows recompute (not served stale). */
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
 /** v28: Wire coach to ArcContext + add Arc-aware overall_training_read + weekly_state_v1.empty_state. */
-const COACH_PAYLOAD_VERSION = 28;
+/** v29: Add last_completed_race.projected_seconds (course-model projection at race time). */
+const COACH_PAYLOAD_VERSION = 29;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -2442,7 +2443,9 @@ Deno.serve(async (req) => {
       const lcr = Array.isArray(lcrRows) ? lcrRows[0] : null;
       if (lcr && typeof lcr.current_value === 'number' && Number.isFinite(lcr.current_value) && lcr.current_value > 0) {
         const tp = (lcr.training_prefs as Record<string, unknown> | null | undefined) || {};
-        const rr = (tp as { race_result?: { completed_at?: string } })?.race_result;
+        const rr = (tp as {
+          race_result?: { completed_at?: string; projected_seconds?: number | string | null };
+        })?.race_result;
         const completedAt =
           typeof rr?.completed_at === 'string' && rr.completed_at.trim()
             ? String(rr.completed_at)
@@ -2452,11 +2455,19 @@ Deno.serve(async (req) => {
         const tts = lcr.target_time;
         const goalTargetSec =
           tts != null && Number.isFinite(Number(tts)) && Number(tts) > 0 ? Math.round(Number(tts)) : null;
+        // Projection at the time of the race (snapshotted by complete-race or repaired manually).
+        // Stored as `training_prefs.race_result.projected_seconds`. Surfaced so the State tab can
+        // render actual / goal / projected together — the projection is the deterministic course
+        // model number, the goal is the athlete's intent, the actual is what they ran.
+        const projRaw = rr?.projected_seconds;
+        const projNum = projRaw != null ? Number(projRaw) : NaN;
+        const projectedSec = Number.isFinite(projNum) && projNum > 0 ? Math.round(projNum) : null;
         last_completed_race = {
           goal_id: String(lcr.id),
           name: String(lcr.name || 'Race'),
           target_date: lcr.target_date ? String(lcr.target_date).slice(0, 10) : asOfDate,
           goal_target_seconds: goalTargetSec,
+          projected_seconds: projectedSec,
           actual_seconds: Math.round(lcr.current_value),
           completed_at: completedAt,
         };

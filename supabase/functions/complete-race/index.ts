@@ -157,6 +157,29 @@ Deno.serve(async (req) => {
     }
 
     const trainingPrefs = (typeof goal.training_prefs === 'object' && goal.training_prefs) ? (goal.training_prefs as Record<string, unknown>) : {}
+
+    // Snapshot the course-model projection at race time. Read BEFORE we invalidate
+    // coach_cache below so the value reflects pre-race-result fitness, not the
+    // recomputed projection that would include the race result itself.
+    let projectedSecondsAtRace: number | null = null
+    let projectedSource: string | null = null
+    try {
+      const { data: cacheRow } = await supabase
+        .from('coach_cache')
+        .select('payload')
+        .eq('user_id', userId)
+        .maybeSingle()
+      const rfp = (cacheRow?.payload as { race_finish_projection_v1?: { goal_id?: string | null; fitness_projection_seconds?: number | null } } | null)?.race_finish_projection_v1
+      const matchesGoal = rfp && (!rfp.goal_id || String(rfp.goal_id) === String(goal.id))
+      const fps = matchesGoal ? Number(rfp?.fitness_projection_seconds) : NaN
+      if (Number.isFinite(fps) && fps > 0) {
+        projectedSecondsAtRace = Math.round(fps)
+        projectedSource = 'coach_cache.race_finish_projection_v1'
+      }
+    } catch (e) {
+      console.warn('[complete-race] projection snapshot read failed (non-fatal)', e)
+    }
+
     const nextPrefs = {
       ...trainingPrefs,
       race_result: {
@@ -165,6 +188,16 @@ Deno.serve(async (req) => {
         time_source: 'elapsed_preferred',
         completed_at: new Date().toISOString(),
         plan_id: String(planId),
+        // Course-model projection captured at race time. Coach surfaces this on
+        // last_completed_race.projected_seconds so State can render actual / goal /
+        // projection together. Survives later loss of race_courses or coach_cache.
+        ...(projectedSecondsAtRace != null
+          ? {
+              projected_seconds: projectedSecondsAtRace,
+              projected_seconds_source: projectedSource,
+              projected_seconds_recorded_at: new Date().toISOString(),
+            }
+          : {}),
       },
     }
 

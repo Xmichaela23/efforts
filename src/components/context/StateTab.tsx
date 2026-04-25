@@ -103,6 +103,19 @@ function fmtSignedDeltaVsModel(actualSec: number, modelSec: number): string {
   return `${sign}${body} vs model`;
 }
 
+/** +MM:SS / −H:MM:SS vs the course-model projection (actual − projected). */
+function fmtSignedDeltaVsProjection(actualSec: number, projSec: number): string {
+  const d = actualSec - projSec;
+  if (d === 0) return 'on projection';
+  const sign = d < 0 ? '−' : '+';
+  const ad = Math.abs(Math.round(d));
+  const h = Math.floor(ad / 3600);
+  const mi = Math.floor((ad % 3600) / 60);
+  const s = ad % 60;
+  const body = h > 0 ? `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${mi}:${String(s).padStart(2, '0')}`;
+  return `${sign}${body} vs projection`;
+}
+
 function isRunPrimary(pe: { sport?: string | null } | null | undefined): boolean {
   if (!pe) return false;
   const s = String(pe.sport || '').toLowerCase();
@@ -1155,6 +1168,24 @@ export default function StateTab({
                   {fmtSignedDeltaVsGoal(
                     lastCompletedRace.actual_seconds,
                     lastCompletedRace.goal_target_seconds,
+                  )}
+                </span>
+              </p>
+            )}
+            {lastCompletedRace.projected_seconds != null && (
+              <p className="text-[11px] text-white/50">
+                Projected {fmtGoalClock(lastCompletedRace.projected_seconds)}
+                <Dot />
+                <span
+                  className={
+                    lastCompletedRace.actual_seconds <= lastCompletedRace.projected_seconds
+                      ? 'text-emerald-400/90'
+                      : 'text-amber-400/85'
+                  }
+                >
+                  {fmtSignedDeltaVsProjection(
+                    lastCompletedRace.actual_seconds,
+                    lastCompletedRace.projected_seconds,
                   )}
                 </span>
               </p>

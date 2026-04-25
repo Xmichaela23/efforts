@@ -193,6 +193,12 @@ export type CoachWeekContextResponseV1 = {
     target_date: string;
     /** Goal target clock at completion time (`goals.target_time`); null if unset. */
     goal_target_seconds: number | null;
+    /**
+     * Course-model finish projection captured at race time
+     * (`goals.training_prefs.race_result.projected_seconds`).
+     * Lets the client render actual / goal / projection side-by-side without re-deriving math.
+     */
+    projected_seconds?: number | null;
     actual_seconds: number;
     /** When the result was recorded (ISO) or `target_date` if unknown. */
     completed_at: string;
