@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
+  try {
   const url = Deno.env.get('SUPABASE_URL')!;
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(url, key);
@@ -377,4 +378,11 @@ Deno.serve(async (req) => {
   };
 
   return new Response(JSON.stringify(payload), { headers: { ...cors, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    console.error('[course-detail] unhandled error', e)
+    return new Response(
+      JSON.stringify({ error: String(e) }),
+      { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } },
+    )
+  }
 });

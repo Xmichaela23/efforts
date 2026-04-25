@@ -146,6 +146,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
+  try {
   const url = Deno.env.get('SUPABASE_URL')!;
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(url, key);
@@ -199,6 +200,9 @@ Deno.serve(async (req) => {
   }
 
   const planGoalSec = await resolveGoalTargetTimeSeconds(supabase, user.id, String(course.goal_id));
+
+  // Arc: learned paces + active-goal projections. Called here so anchor logic can use it.
+  const arc = await getArcContext(supabase, user.id, new Date().toISOString());
 
   // Anchor resolution priority:
   // 1. Completed goals: actual race result (honest retrospective zones)
@@ -311,10 +315,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Segmentation produced no segments' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  // Arc gives us learned paces from actual training history — more accurate than manually
-  // entered performance_numbers, which may be stale. Fall back to performance_numbers
-  // when learned values are absent (new users / insufficient data).
-  const arc = await getArcContext(supabase, user.id, new Date().toISOString());
+  // Arc paces already loaded above — use learned values, fall back to performance_numbers.
   const pfc = arc.run_pace_for_coach;
   const pn = (arc.performance_numbers || {}) as Record<string, unknown>;
 
@@ -589,4 +590,11 @@ Deno.serve(async (req) => {
   return new Response(JSON.stringify({ ok: true, course_id: courseId, display_groups: groups.length }), {
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
+  } catch (e) {
+    console.error('[course-strategy] unhandled error', e)
+    return new Response(
+      JSON.stringify({ error: String(e) }),
+      { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } },
+    )
+  }
 });
