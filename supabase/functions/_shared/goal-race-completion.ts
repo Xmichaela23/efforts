@@ -149,7 +149,7 @@ export async function fetchGoalRaceCompletionForWorkout(
         if (plan.goal_id) {
           const { data: gRow } = await supabase
             .from('goals')
-            .select('id, name, target_date, distance, target_time, race_readiness_projection, training_prefs')
+            .select('id, name, target_date, distance, target_time, projection, training_prefs')
             .eq('id', plan.goal_id)
             .maybeSingle();
           g = gRow;
@@ -159,7 +159,7 @@ export async function fetchGoalRaceCompletionForWorkout(
         if (!g) {
           const { data: gRows } = await supabase
             .from('goals')
-            .select('id, name, target_date, distance, target_time, race_readiness_projection')
+            .select('id, name, target_date, distance, target_time, projection, training_prefs')
             .eq('user_id', userId)
             .eq('goal_type', 'event');
           // pick any goal whose target_date matches, or just take the first event goal
@@ -172,8 +172,6 @@ export async function fetchGoalRaceCompletionForWorkout(
         // Even if no goal row, synthesize from plan config — plan is enough to confirm this is the race
         const eventName = g?.name ?? plan.config?.race_name ?? plan.name ?? 'Race';
         const goalId = g?.id ? String(g.id) : undefined;
-        const rrp = g?.race_readiness_projection ?? null;
-
         // Goal time: goal.target_time → plan.config.target_time → plan.config.target_finish_time_seconds
         const goalTimeSeconds =
           g?.target_time != null ? Number(g.target_time) :
@@ -181,18 +179,20 @@ export async function fetchGoalRaceCompletionForWorkout(
           plan.config?.target_finish_time_seconds != null ? Number(plan.config.target_finish_time_seconds) :
           null;
 
-        // Fitness projection: goal.race_readiness_projection → coach_cache.race_finish_projection_v1
-        // (coach cache may have been computed pre-race even if race_finish_projection_v1.goal_id now differs)
+        // Fitness projection priority:
+        // 1. goals.projection.total_min (arc consolidated projection)
+        // 2. coach_cache.race_finish_projection_v1 (pre-race coach snapshot)
+        // 3. training_prefs.race_result.projected_seconds (post-race snapshot from complete-race)
+        const arcProj = (g as any)?.projection ?? null;
+        const arcProjSec = arcProj?.total_min != null ? Math.round(Number(arcProj.total_min) * 60) : null;
         const cachedProj = cacheRow?.payload?.race_finish_projection_v1 ?? null;
-        // Priority: race_readiness_projection → coach_cache → training_prefs.race_result.projected_seconds (snapshot)
         const tpSnap = (g as any)?.training_prefs?.race_result?.projected_seconds;
         const fitnessProjectionSeconds =
-          rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) :
+          arcProjSec != null && arcProjSec > 0 ? arcProjSec :
           cachedProj?.fitness_projection_seconds != null ? Number(cachedProj.fitness_projection_seconds) :
           tpSnap != null && Number.isFinite(Number(tpSnap)) && Number(tpSnap) > 0 ? Math.round(Number(tpSnap)) :
           null;
         const fitnessProjectionDisplay =
-          rrp?.predicted_finish_display ??
           cachedProj?.fitness_projection_display ??
           null;
 
@@ -214,7 +214,7 @@ export async function fetchGoalRaceCompletionForWorkout(
     // ── PATH 2: direct goals query ────────────────────────────────────────────
     const { data: rows, error: goalsError } = await supabase
       .from('goals')
-      .select('id, name, target_date, distance, target_time')
+      .select('id, name, target_date, distance, target_time, projection, training_prefs')
       .eq('user_id', userId)
       .eq('goal_type', 'event')
       .not('target_date', 'is', null);
@@ -239,18 +239,14 @@ export async function fetchGoalRaceCompletionForWorkout(
     candidates.sort((a: any, b: any) => rank(String(a.priority || 'C')) - rank(String(b.priority || 'C')));
     const g = candidates[0];
 
-    let fitnessProjectionSeconds: number | null = null;
-    let fitnessProjectionDisplay: string | null = null;
-    try {
-      const { data: pr } = await supabase.from('goals').select('race_readiness_projection, training_prefs').eq('id', g.id).single();
-      const rrp = pr?.race_readiness_projection ?? null;
-      const tpSnap = (pr as any)?.training_prefs?.race_result?.projected_seconds;
-      fitnessProjectionSeconds =
-        rrp?.predicted_finish_time_seconds != null ? Number(rrp.predicted_finish_time_seconds) :
-        tpSnap != null && Number.isFinite(Number(tpSnap)) && Number(tpSnap) > 0 ? Math.round(Number(tpSnap)) :
-        null;
-      fitnessProjectionDisplay = rrp?.predicted_finish_display ?? null;
-    } catch { /* optional */ }
+    const arcProj2 = (g as any)?.projection ?? null;
+    const arcProjSec2 = arcProj2?.total_min != null ? Math.round(Number(arcProj2.total_min) * 60) : null;
+    const tpSnap2 = (g as any)?.training_prefs?.race_result?.projected_seconds;
+    const fitnessProjectionSeconds: number | null =
+      arcProjSec2 != null && arcProjSec2 > 0 ? arcProjSec2 :
+      tpSnap2 != null && Number.isFinite(Number(tpSnap2)) && Number(tpSnap2) > 0 ? Math.round(Number(tpSnap2)) :
+      null;
+    const fitnessProjectionDisplay: string | null = null;
 
     console.log(`[goal-race-completion] PATH2 MATCH: goal=${g.id} name=${g.name}`);
     return {
