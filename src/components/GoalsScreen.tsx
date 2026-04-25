@@ -1250,10 +1250,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           (() => {
             const hasCourse = !!courseByGoal[goal.id];
             const isActive = goal.status === 'active';
-            // Active goals: full affordance (view existing or upload new).
-            // Completed/paused goals: keep the course visible if one exists,
-            // but no upload CTA — you can't change history.
-            if (!hasCourse && !isActive) return null;
+            // Always show the terrain affordance for run event goals — terrain is course
+            // data (not a result) so it's valid to add or re-add it after the race.
+            // The only case where we hide is if the goal is cancelled/archived entirely.
             return (
               <div className="ml-[44px] mt-2">
                 <button
