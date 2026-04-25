@@ -110,6 +110,15 @@ export interface EventRelationship {
   gapWeeks: number;
 }
 
+/** Calendar match for a goal’s event inside a 1-based plan week (combined multi-race). */
+export interface RaceAnchor {
+  goalId: string;
+  eventName: string;
+  eventDate: string; // YYYY-MM-DD
+  planWeek: number; // 1-based
+  dayName: string; // e.g. "Saturday" — matches `DAYS_OF_WEEK` in week-builder
+}
+
 // ── Sessions ─────────────────────────────────────────────────────────────────
 
 /** Serialized on plan rows for materialize-plan strength expansion. */

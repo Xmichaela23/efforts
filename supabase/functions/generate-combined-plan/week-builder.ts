@@ -6,13 +6,13 @@
 
 import type {
   PlannedSession, GeneratedWeek, Phase, PhaseBlock, GoalInput,
-  AthleteState, AthleteMemory,
+  AthleteState, AthleteMemory, RaceAnchor,
 } from './types.ts';
 import type { Sport, Intensity } from './types.ts';
 import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
-  rampThresholds,
+  rampThresholds, estimateSessionTSS, weightedTSS,
 } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, marathonPaceRun,
@@ -176,10 +176,13 @@ export function buildWeek(
   goals: GoalInput[],
   athleteState: AthleteState,
   athleteMemory?: AthleteMemory,
+  options?: { totalWeeks?: number; raceAnchors?: RaceAnchor[] },
 ): GeneratedWeek {
 
   const phase = block.phase;
   const isRecovery = block.isRecovery;
+  const raceAnchors = options?.raceAnchors ?? [];
+  const raceThisWeek = raceAnchors.find((a) => a.planWeek === weekNum);
   const primaryGoal = goals.find(g => g.id === block.primaryGoalId) ?? goals[0];
   const hasTri = goals.some(g => ['triathlon', 'tri'].includes(g.sport?.toLowerCase()));
   const hasRun = goals.some(g => g.sport?.toLowerCase() === 'run');
@@ -230,6 +233,8 @@ export function buildWeek(
   const longRideDay = DAYS_OF_WEEK[longRideDayIdx] ?? 'Saturday';
 
   const bricksThisWeek = recoveryRebuildWeek1 ? 0 : BRICKS_PER_WEEK[phase];
+  // Race week: no brick stress; all load is the event itself
+  const effectiveBricks = raceThisWeek ? 0 : bricksThisWeek;
 
   // ── Determine run distance and bike hours from TSS budget distribution ──
   const dist = block.sportDistribution;
@@ -262,6 +267,11 @@ export function buildWeek(
       : Math.min(150, Math.round(runTotalMin * 0.60));
   let longRunMiles = Math.max(4, Math.round(longRunMinutes / 9.5));
 
+  if (raceThisWeek) {
+    longRunMinutes = Math.min(longRunMinutes, 45);
+    longRunMiles = Math.max(3, Math.min(longRunMiles, 5));
+  }
+
   // Long ride hours
   let longRideMinutes = isRecovery
     ? Math.min(75, Math.round(bikeTotalMin * 0.60))
@@ -269,6 +279,10 @@ export function buildWeek(
       ? Math.min(90, Math.round(bikeTotalMin * 0.55))
       : Math.min(240, Math.round(bikeTotalMin * 0.65));
   let longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
+
+  if (raceThisWeek) {
+    longRideHours = Math.min(longRideHours, 1.0);
+  }
 
   if (recoveryRebuildWeek1) {
     // Post-marathon week 1: cap leg load; swim sessions left as computed (low impact).
@@ -300,7 +314,7 @@ export function buildWeek(
 
   const longRideSlot = grid.get(longRideDay);
   if (!longRideSlot?.isRest && hasTri) {
-    if (bricksThisWeek >= 1 && phase !== 'base') {
+    if (effectiveBricks >= 1 && phase !== 'base') {
       const brickRunMin = Math.max(15, Math.round(longRunMiles * 0.20) * 10);
       const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMin, effectiveBrickPhase, servedGoal);
       longRideSlot!.sessions.push(bkBike, bkRun);
@@ -393,7 +407,7 @@ export function buildWeek(
   }
 
   const bikeQualitySlot = grid.get(bikeQualityDay);
-  if (!recoveryRebuildWeek1 && !bikeQualitySlot?.isRest && hasTri) {
+  if (!recoveryRebuildWeek1 && !isRecovery && !bikeQualitySlot?.isRest && hasTri) {
     const bq = bikeQualityDay;
     if (phase === 'taper') {
       bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
@@ -422,7 +436,7 @@ export function buildWeek(
 
   // ── Run quality (default Wednesday; from Arc `preferred_days.quality_run`) ──
   const runQualitySlot = grid.get(runQualityDay);
-  if (!recoveryRebuildWeek1 && !runQualitySlot?.isRest) {
+  if (!recoveryRebuildWeek1 && !isRecovery && !runQualitySlot?.isRest) {
     if (recoveryRebuildWeek2EasyRunOnly) {
       const easyMi = Math.max(4, Math.round(longRunMiles * 0.35));
       runQualitySlot!.sessions.push(easyRun(runQualityDay, easyMi, servedGoal));
@@ -608,6 +622,32 @@ export function buildWeek(
     if (midRideSlot && !midRideSlot.isRest && midRideSlot.sessions.length === 1) {
       const midRideHr = Math.max(0.75, Math.min(1.5, remaining * 0.50 / 55));
       midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
+    }
+  }
+
+  // ── Race day (chronological tri B + A) — one session; replaces anything else that day
+  if (raceThisWeek) {
+    const d = raceThisWeek.dayName;
+    const slot = grid.get(d);
+    if (slot && !slot.isRest) {
+      const gRace = goals.find((g) => g.id === raceThisWeek.goalId) ?? primaryGoal;
+      const projMin = 330;
+      const rawT = Math.round(estimateSessionTSS('ride', 'MODERATE', projMin) * 0.9);
+      slot.sessions = [{
+        day: d,
+        type: 'ride',
+        name: gRace.event_name,
+        description:
+          'Race day — 70.3: 1.2 mi swim, 56 mi bike, 13.1 mi run. No add-on training; execute pacing and fueling. Typical finish ~5:00–6:00.',
+        duration: projMin,
+        tss: rawT,
+        weighted_tss: weightedTSS('ride', rawT),
+        intensity_class: 'MODERATE',
+        steps_preset: [],
+        tags: ['tri_race', 'race_day', 'event', 'no_extra_training'],
+        zone_targets: 'race',
+        serves_goal: gRace.id,
+      }];
     }
   }
 

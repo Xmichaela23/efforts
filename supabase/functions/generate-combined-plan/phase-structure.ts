@@ -3,15 +3,12 @@
 // Determines the multi-event phase timeline.
 // §2.3 Priority rules, §6.3 taper overlap, §7.1 phase definitions.
 
-import type { GoalInput, PhaseBlock, Phase, EventRelationship, AthleteState } from './types.ts';
+import type { GoalInput, PhaseBlock, Phase, EventRelationship, AthleteState, RaceAnchor } from './types.ts';
 import {
   TAPER_WEEKS,
   RECOVERY_DAYS_POST_RACE,
-  PHASE_TSS_RANGES,
-  BRICKS_PER_WEEK,
   blockWeekMultiplier,
   getBaseDistribution,
-  scaledWeeklyTSS,
 } from './science.ts';
 import type { Sport } from './types.ts';
 
@@ -26,6 +23,15 @@ function addWeeks(date: Date, weeks: number): Date {
 }
 
 function ceilDiv(a: number, b: number) { return Math.ceil(a / b); }
+
+/** ISO date → weekday name (UTC noon, for stable YYYY-MM-DD parsing). */
+export function eventDayNameFromIso(iso: string): string {
+  const [y, m, d] = String(iso).split('T')[0].split('-').map(Number);
+  if (!y || !m || !d) return 'Sunday';
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return names[dt.getUTCDay()] ?? 'Sunday';
+}
 
 // §6.3  What type of multi-event overlap is this?
 export function classifyEventRelationship(gapWeeks: number): EventRelationship['type'] {
@@ -47,7 +53,7 @@ export function buildPhaseTimeline(
   goals: GoalInput[],
   startDate: Date,
   athleteState: AthleteState,
-): { blocks: PhaseBlock[]; totalWeeks: number } {
+): { blocks: PhaseBlock[]; totalWeeks: number; raceAnchors: RaceAnchor[] } {
 
   // Sort A-priority goals by date, then B, then C
   const priority = { A: 0, B: 1, C: 2 };
@@ -70,7 +76,45 @@ export function buildPhaseTimeline(
 
   const blocks: PhaseBlock[] = [];
 
-  if (aGoals.length === 1 || classifyEventRelationship(
+  // Chronological tri goals (includes B-priority) — two 70.3s must not use “A-only” timeline
+  const chronoTri = sortedGoals
+    .filter(g => ['triathlon', 'tri'].includes(String(g.sport || '').toLowerCase()))
+    .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+
+  const raceAnchors: RaceAnchor[] = chronoTri.map((g) => {
+    const pw = weeksUntil(startDate, new Date(g.event_date));
+    return {
+      goalId: g.id,
+      eventName: g.event_name,
+      eventDate: g.event_date,
+      planWeek: pw,
+      dayName: eventDayNameFromIso(g.event_date),
+    };
+  });
+
+  if (chronoTri.length >= 2) {
+    const g1 = chronoTri[0];
+    const g2 = chronoTri[1];
+    const w1 = weeksUntil(startDate, new Date(g1.event_date));
+    const w2 = weeksUntil(startDate, new Date(g2.event_date));
+    if (w1 >= 1 && w2 > w1) {
+      // First race: own macrocycle ending week w1
+      buildSingleEventBlocks(g1, 1, w1, blocks, athleteState);
+      // Post-race: easy aerobic only
+      const recW = Math.max(1, Math.ceil((RECOVERY_DAYS_POST_RACE[g1.distance] ?? 7) / 7));
+      const recStart = w1 + 1;
+      const recEnd = w1 + recW;
+      insertRecoveryBlock(recStart, recEnd, g1.id, blocks, athleteState);
+      // Second race: build + taper in remaining weeks (no quality after w1 in this plan)
+      const secondStart = recEnd + 1;
+      if (secondStart <= w2) {
+        buildAbbreviatedBlocks(g2, secondStart, w2, blocks, athleteState);
+      }
+    } else {
+      // Overlapping / degenerate dates: single A timeline
+      buildSingleEventBlocks(lastAGoal, 1, totalWeeks, blocks, athleteState);
+    }
+  } else if (aGoals.length === 1 || classifyEventRelationship(
     weeksUntil(new Date(aGoals[0].event_date), new Date(aGoals[1]?.event_date ?? aGoals[0].event_date))
   ) === 'sequential') {
     // Single A-race or sequential (> 16 weeks apart): each gets its own full cycle
@@ -78,7 +122,7 @@ export function buildPhaseTimeline(
     if (aGoals.length > 1) {
       // After first A-race: recovery + new cycle for the second
       const firstRaceWeek = weeksUntil(startDate, new Date(aGoals[0].event_date));
-      const recoveryWeeks = Math.ceil(RECOVERY_DAYS_POST_RACE[aGoals[0].distance] ?? 7 / 7);
+      const recoveryWeeks = Math.ceil((RECOVERY_DAYS_POST_RACE[aGoals[0].distance] ?? 7) / 7);
       const secondStart = firstRaceWeek + recoveryWeeks + 1;
       const secondEnd   = weeksUntil(startDate, new Date(aGoals[1].event_date));
       if (secondStart <= secondEnd) {
@@ -87,31 +131,46 @@ export function buildPhaseTimeline(
       }
     }
   } else if (aGoals.length >= 2) {
-    const firstEnd  = weeksUntil(startDate, new Date(aGoals[0].event_date));
-    const secondEnd = weeksUntil(startDate, new Date(aGoals[1].event_date));
+    // Sort A-goals by event date (not by priority) for gap math
+    const aChrono = [...aGoals].sort(
+      (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+    const firstEnd  = weeksUntil(startDate, new Date(aChrono[0].event_date));
+    const secondEnd = weeksUntil(startDate, new Date(aChrono[1].event_date));
     const gapWeeks  = secondEnd - firstEnd;
     const rel       = classifyEventRelationship(gapWeeks);
 
     if (rel === 'overlapping') {
       // 8–16 week gap: full cycle to first, recovery, abbreviated build, taper to second
-      buildSingleEventBlocks(aGoals[0], 1, firstEnd, blocks, athleteState);
-      const recWeeks = Math.ceil((RECOVERY_DAYS_POST_RACE[aGoals[0].distance] ?? 7) / 7);
-      insertRecoveryBlock(firstEnd + 1, firstEnd + recWeeks, aGoals[0].id, blocks, athleteState);
+      buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
+      const recWeeks = Math.ceil((RECOVERY_DAYS_POST_RACE[aChrono[0].distance] ?? 7) / 7);
+      insertRecoveryBlock(firstEnd + 1, firstEnd + recWeeks, aChrono[0].id, blocks, athleteState);
       const buildStart = firstEnd + recWeeks + 1;
-      buildAbbreviatedBlocks(aGoals[1], buildStart, secondEnd, blocks, athleteState);
+      buildAbbreviatedBlocks(aChrono[1], buildStart, secondEnd, blocks, athleteState);
     } else if (rel === 'compressed') {
       // 4–8 week gap: shared peak, separate tapers
-      buildSharedPeakBlocks(aGoals[0], aGoals[1], 1, firstEnd, secondEnd, blocks, athleteState);
+      buildSharedPeakBlocks(aChrono[0], aChrono[1], 1, firstEnd, secondEnd, blocks, athleteState);
     } else {
-      // < 4 weeks: single taper, first race is B-effort
-      buildSinglePeakBlocks(aGoals[0], aGoals[1], 1, secondEnd, blocks, athleteState);
+      // Tight schedule: one macrocycle to the *later* race is wrong for the *earlier* race
+      if (aChrono[0] && aChrono[1] && firstEnd < secondEnd) {
+        buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
+        const recW = Math.max(1, Math.ceil((RECOVERY_DAYS_POST_RACE[aChrono[0].distance] ?? 7) / 7));
+        const recStart = firstEnd + 1;
+        const recEnd = firstEnd + recW;
+        insertRecoveryBlock(recStart, recEnd, aChrono[0].id, blocks, athleteState);
+        const secondStart = recEnd + 1;
+        if (secondStart <= secondEnd) {
+          buildAbbreviatedBlocks(aChrono[1], secondStart, secondEnd, blocks, athleteState);
+        }
+      } else {
+        buildSingleEventBlocks(aChrono[1] ?? aGoals[0], 1, secondEnd, blocks, athleteState);
+      }
     }
   }
 
   // Ensure we have blocks covering all weeks
-  fillGaps(blocks, totalWeeks, aGoals[aGoals.length - 1], athleteState);
+  fillGaps(blocks, totalWeeks, lastAGoal, athleteState);
 
-  return { blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), totalWeeks };
+  return { blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), totalWeeks, raceAnchors };
 }
 
 // ── Phase builder helpers ─────────────────────────────────────────────────────
@@ -214,15 +273,6 @@ function buildSharedPeakBlocks(
   pushBlockRange(blocks, 'taper', g2Week - taper2, g2Week - 1, g2, dist2, as);
 }
 
-function buildSinglePeakBlocks(
-  g1: GoalInput, g2: GoalInput,
-  startWeek: number, endWeek: number,
-  blocks: PhaseBlock[], as: AthleteState,
-) {
-  // Single taper targets the second (further) race; first is B-race effort
-  buildSingleEventBlocks(g2, startWeek, endWeek, blocks, as);
-}
-
 // ── Mesocycle recovery-week insertion ────────────────────────────────────────
 // Applies 3:1 or 2:1 loading pattern to existing build/base/rs blocks.
 export function applyLoadingPattern(blocks: PhaseBlock[], pattern: '3:1' | '2:1'): PhaseBlock[] {
@@ -292,7 +342,10 @@ function pushBlockRange(
 
 // Fill any week gaps with base-phase blocks.
 function fillGaps(blocks: PhaseBlock[], totalWeeks: number, primaryGoal: GoalInput, as: AthleteState) {
-  const covered = new Set(blocks.map(b => b.startWeek));
+  const covered = new Set<number>();
+  for (const b of blocks) {
+    for (let w = b.startWeek; w <= b.endWeek; w++) covered.add(w);
+  }
   const dist = getBaseDistribution(primaryGoal.sport, primaryGoal.distance, as.limiter_sport as Sport | undefined);
   for (let w = 1; w <= totalWeeks; w++) {
     if (!covered.has(w)) {

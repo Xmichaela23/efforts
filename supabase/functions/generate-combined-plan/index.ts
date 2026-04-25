@@ -54,7 +54,8 @@ Deno.serve(async (req: Request) => {
     };
 
     // ── Build phase timeline ────────────────────────────────────────────────
-    let { blocks, totalWeeks } = buildPhaseTimeline(goals, startDate, state);
+    const { blocks: builtBlocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, state);
+    let blocks = builtBlocks;
     blocks = applyLoadingPattern(blocks, loadingPattern);
 
     if (totalWeeks < 2) {
@@ -67,7 +68,10 @@ Deno.serve(async (req: Request) => {
 
     for (let w = 1; w <= totalWeeks; w++) {
       const block = blockForWeek(blocks, w);
-      const week = buildWeek(w, block, prevWeightedTSS, goals, state, athlete_memory);
+      const week = buildWeek(w, block, prevWeightedTSS, goals, state, athlete_memory, {
+        totalWeeks,
+        raceAnchors,
+      });
       generatedWeeks.push(week);
       prevWeightedTSS = week.total_weighted_tss;
     }
@@ -138,6 +142,7 @@ Deno.serve(async (req: Request) => {
       strength_intent: state.strength_intent ?? null,
       strength_preferred_days: state.strength_preferred_days ?? null,
       rest_days: state.rest_days ?? [],
+      race_anchors: Array.isArray(raceAnchors) && raceAnchors.length > 0 ? raceAnchors : null,
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
       sport: 'multi_sport',
