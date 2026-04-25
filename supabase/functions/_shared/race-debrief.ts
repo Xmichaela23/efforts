@@ -49,12 +49,19 @@ VOICE:
 - No idioms, no slogans, no "real talk," no filler praise, no motivational clichés.
 - One paragraph, 5–6 sentences, no headers, no bullets.
 
-CLOSE:
-- End with one concrete line about what to adjust next time on this course (section of the race, pacing habit, or conditions strategy)—not a lecture.
+CLOSE — STRATEGY-ANCHORED, NOT GENERIC:
+- End with one concrete line about what to adjust next time on THIS course. The line MUST be anchored to what the course strategy actually prescribed. Do not invent generic pacing advice ("start 15–20 seconds slower in miles 1–3") if a prescribed zone for those miles already exists in COURSE STRATEGY ZONES.
+- Decision tree for the closing line when COURSE STRATEGY ZONES are provided:
+  (a) If actual HR/pace in the relevant miles fell INSIDE the prescribed zone's HR band → the strategy itself is what to revisit ("the Conservative zone you executed at HR 130–138 was the right call; consider extending it through mile 5 next time before opening up").
+  (b) If actual HR/pace EXCEEDED the prescribed zone's HR band → name the deviation and the zone by name ("your prescribed Conservative band was 125–135 bpm in miles 1–3; you ran 136–137 — that's the dial-back next time").
+  (c) If actual was BELOW the prescribed band → say so plainly ("you ran the Cruise miles under the prescribed band — there's room to push that section harder next time").
+- Never recommend a numeric pace or HR adjustment for a segment without first checking it against the prescribed zone for that segment. If the strategy already called for what you're about to recommend, recognize the strategy was right and the execution matched — don't repeat the same instruction back to the athlete as if it's new.
 
-COURSE ZONES (from pre-race strategy):
-- Segments may be listed with effort zones: Conservative, Cruise, Caution, Push (from course strategy generation). When actual HR and pace align with what that zone implied, that is execution matching the plan—not drift or toughness.
-- When HR or stress exceeds what the zone and HR band suggested for a segment, that is where to explain why (heat, terrain, pace, or stop time). Use the zone labels and mile ranges together with per-mile grade; do not ignore zones and only use raw grade.`;
+COURSE ZONES (from pre-race strategy) — USE THEM, DON'T IGNORE THEM:
+- Segments may be listed with effort zones: Conservative, Cruise, Caution, Push (from course strategy generation). Refer to them by zone name ("the Conservative miles", "the Push section through 19–22") when discussing execution.
+- When actual HR and pace align with what that zone implied, that is execution matching the plan — not drift or toughness. Say it that way: "you executed the Caution zone at the prescribed HR band."
+- When HR or stress exceeds what the zone and HR band suggested for a segment, that is where to explain why (heat, terrain, pace, or stop time) AND where to anchor the closing advice.
+- Do not collapse the strategy into raw grade analysis. Zones, mile ranges, and HR bands are all signal; reference them.`;
 
 export type RawCourseSegmentRow = {
   segment_order: number;
