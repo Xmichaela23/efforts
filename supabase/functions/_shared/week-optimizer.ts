@@ -191,21 +191,19 @@ function canPlaceWithModifier(
  * Sequential rules between adjacent days (mirrors SEQUENTIAL_RULES_TEXT).
  * Returns false when placing `kind` on `day` would violate.
  *
- * EXPERIENCE MODIFIER overrides:
- *  - performance + co-equal strength → quality_run *after* quality_bike day
- *    is allowed (consolidated hard block); trade-off recorded by caller.
+ * EXPERIENCE MODIFIER for same-day stacks is handled in \`canPlaceWithModifier\`,
+ * not here — adjacent-day quality_bike ↔ quality_run is always forbidden.
  */
 function sequentialOk(
   days: Record<DayName, SessionSlot[]>,
   day: DayName,
   kind: SessionKind,
-  athlete: WeekOptimizerInputs['athlete'],
+  _athlete: WeekOptimizerInputs['athlete'],
 ): boolean {
-  const isPerf = athlete.training_intent === 'performance';
-  const isCoEq = athlete.strength_intent === 'performance';
-
   const prevSlots = days[dayBefore(day)] ?? [];
   const prevKinds = prevSlots.map((s) => s.kind);
+  const nextSlots = days[dayAfter(day)] ?? [];
+  const nextKinds = nextSlots.map((s) => s.kind);
 
   const isHigh = (k: SessionKind) =>
     k === 'long_ride' || k === 'long_run' ||
@@ -224,18 +222,22 @@ function sequentialOk(
     if (kind !== 'long_ride' && isHigh(kind)) return false;
   }
 
-  // Prev day was quality_bike → today: no quality_bike, no quality_run
-  // (override: performance + co-equal strength may stack quality_run + lower_body
-  // on day-after-quality_bike per EXPERIENCE MODIFIER).
+  // Prev day was quality_bike → today: no quality_bike, no quality_run (strict:
+  // SCHEDULE_RULES sequential quality ban — no performance bypass).
   if (prevKinds.includes('quality_bike')) {
     if (kind === 'quality_bike') return false;
-    if (kind === 'quality_run' && !(isPerf && isCoEq)) return false;
+    if (kind === 'quality_run') return false;
   }
   // Prev day was quality_run → today: no quality_bike, no quality_run.
   if (prevKinds.includes('quality_run')) {
     if (kind === 'quality_run') return false;
-    if (kind === 'quality_bike' && !isPerf) return false;
+    if (kind === 'quality_bike') return false;
   }
+  // Next day already has quality_bike → today cannot be quality_run (easy day
+  // before anchored hammer / group ride). Symmetric guard for quality_bike
+  // placement after a quality_run day.
+  if (nextKinds.includes('quality_bike') && kind === 'quality_run') return false;
+  if (nextKinds.includes('quality_run') && kind === 'quality_bike') return false;
 
   // 48h gap before next lower-leg-heavy work after lower_body_strength.
   if (kind === 'lower_body_strength' || kind === 'long_run') {
@@ -253,6 +255,11 @@ function sequentialOk(
   }
 
   return true;
+}
+
+/** Days that must not host lower_body_strength (leg sovereignty / recovery). */
+function lowerBodyBlockedDays(longRide: DayName, longRun: DayName): Set<DayName> {
+  return new Set<DayName>([longRide, longRun, dayBefore(longRide), dayBefore(longRun)]);
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -276,6 +283,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
   place(days, longRide, 'long_ride');
   place(days, longRun, 'long_run');
+  const noLowerBody = lowerBodyBlockedDays(longRide, longRun);
 
   const qualityBikeAnchor = asAnchor(inputs.anchors?.quality_bike);
   const groupRun = inputs.anchors?.group_run;
@@ -341,14 +349,9 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   if (!qualityRunDay) {
     const prio: DayName[] = [];
     if (qualityBikeDay) {
-      // EXPERIENCE MODIFIER: performance + co-equal strength → prefer day-after
-      // quality_bike for stacked quality_run + lower_body. Otherwise Wed+2.
-      if (isPerf && isCoEq) {
-        prio.push(dayAfter(qualityBikeDay));        // e.g. Thu after Wed
-        prio.push(nDaysAfter(qualityBikeDay, 2));   // fallback Fri
-      } else {
-        prio.push(nDaysAfter(qualityBikeDay, 2));   // optimal Wed+2
-      }
+      // Never the calendar day immediately after quality_bike (sequential quality ban).
+      prio.push(nDaysAfter(qualityBikeDay, 2)); // e.g. Fri when QB is Wed
+      prio.push(dayBefore(qualityBikeDay)); // only valid if sequential + lookahead pass (often easy-only Tue)
     }
     prio.push(nDaysAfter(longRide, -2));            // 2 days before long_ride
     for (const d of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayName[]) {
@@ -370,11 +373,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       if (c === dayBefore(longRide) && isPerf) {
         trade_offs.push(
           `quality_run on ${c} sits the day before long_ride (${longRide}); back-to-back HIGH days — performance modifier.`,
-        );
-      }
-      if (qualityBikeDay && c === dayAfter(qualityBikeDay) && isPerf && isCoEq) {
-        trade_offs.push(
-          `quality_run on ${c} follows quality_bike (${qualityBikeDay}) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
         );
       }
       break;
@@ -473,6 +471,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       for (const c of lowerCandidates) {
         if (upperDay && c === upperDay) continue;
         if (c === longRide || c === longRun) continue;
+        if (noLowerBody.has(c)) continue;
         if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
         if (!sequentialOk(days, c, 'lower_body_strength', inputs.athlete)) continue;
         // 2x/week strength: ≥3 days between sessions.
@@ -516,6 +515,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       for (const c of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayName[]) {
         if (strengthDays.includes(c)) continue;
         if (c === longRide || c === longRun) continue;
+        if (thirdKind === 'lower_body_strength' && noLowerBody.has(c)) continue;
         if (!canPlace(days, c, thirdKind)) continue;
         if (!sequentialOk(days, c, thirdKind, inputs.athlete)) continue;
         const ok = strengthDays.every((s) => {

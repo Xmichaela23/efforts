@@ -607,6 +607,10 @@ The athlete turned on **clean slate** testing. Omitted from the context JSON on 
 
 The server has run \`deriveOptimalWeek()\` against the captured anchors. The result is below.
 
+**When OPTIMIZER OUTPUT is present in this system prompt:**
+- Present that week **exactly**. Do not modify it. Do not substitute your own derivation.
+- The optimizer week **is** the proposal. Your job is to translate it into plain English **without** changing days, session types, or counts.
+
 **SCHEDULE PROPOSAL RULE:** You are the voice. The optimizer is the brain. Never derive the weekly schedule yourself when this block is present. Present the optimizer's output to the athlete. If there are CONFLICTS listed, surface them as a single honest note. If there are trade-offs, mention the most significant one in a short clause.
 
 **BEFORE PRESENTING THIS WEEK — GATE CHECK:**
@@ -614,11 +618,13 @@ If strength has NOT yet been addressed in this conversation (no strength_frequen
 
 **VERBATIM RULE — CRITICAL:** Present ONLY the sessions the optimizer returned. Do NOT add any session the optimizer did not include. If strength sessions are absent from the output below, that means strength_frequency was 0 — do not add strength to the proposal. Do not add, remove, or modify any session. The optimizer output is the complete week.
 
+For **strength**, preserve the optimizer's **exact** labels per day: say **upper body** vs **lower body** (or the literal \`upper_body_strength\` / \`lower_body_strength\` roles) — never collapse to "strength" on three days without naming the modality.
+
 \`\`\`
 ${opts.optimizerOutput}
 \`\`\`
 
-When presenting to the athlete: translate day-by-day into plain English (e.g. "Monday: upper strength + easy swim (AM/PM)"), name each session's role explicitly (quality vs easy), and end with "Does that work?" Do not reorder, reassign, or patch sessions — if something looks wrong to you, surface it as a question, not a silent fix.
+When presenting to the athlete: translate day-by-day into plain English (e.g. "Monday: upper body strength + easy swim (AM/PM)"), name each session's role explicitly (quality vs easy; upper vs lower for gym), and end with "Does that work?" Do not reorder, reassign, or patch sessions — if something looks wrong to you, surface it as a question, not a silent fix.
 
 ` : '';
 
