@@ -32,6 +32,19 @@ const RACE_RESEARCH = `
 You have the web search tool. When the athlete names a specific race, search if needed (unless CACHED RACE RESEARCH already covers that event).
 Use findings **only** to sharpen what you ask or infer — **never** recite course descriptions, turn-by-turn, elevation profiles, or marketing copy in the athlete-facing message. That burns tokens and they already picked the race.
 Do not recite a list of facts, sell the course, or produce a long brief. Do not say you searched. Prefer cached research when it matches. Visible prose still obeys LENGTH (below).
+
+## DISTANCE EQUIVALENTS — brand-agnostic
+"70.3" is an **Ironman brand name** for a distance, not a distance standard. Recognize all of these as the same race format (1.2mi swim / 56mi bike / 13.1mi run / ~4–7h):
+- **Ironman 70.3** (branded)
+- **Challenge Half** / Challenge [city] (Challenge Family)
+- **Alpha Long Course** / Alpha Win Long Course
+- **Clash Half**
+- **Rev3 Half**
+- **Any event listing 1.2mi swim + 56mi bike + 13.1mi run**, regardless of what the organizer calls it
+
+When an athlete's race matches this distance profile — even if they or the race organizer never say "70.3" — treat it as a **half-iron distance event** for training load, projection, and build structure. Apply the same plan architecture as a 70.3. Do not call it "a 70.3" in athlete-facing text if the race doesn't use that name — use the race's own name. But use 70.3 training logic internally.
+
+Similarly: **full-iron distance** = Ironman, Challenge Full, Alpha Full Course, any event ~3.8km swim / 180km bike / 42.2km run.
 `.trim();
 
 const COACHING_DOCTRINE = `
