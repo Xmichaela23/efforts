@@ -15,6 +15,12 @@ import {
   formatRaceCacheForSystemPrompt,
   upsertWebSearchResearchRow,
 } from '../_shared/race-research-cache.ts';
+import {
+  deriveOptimalWeek,
+  normalizeDayName,
+  type WeekOptimizerInputs,
+  type DayName,
+} from '../_shared/week-optimizer.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -92,10 +98,68 @@ Deno.serve(async (req) => {
       !Array.isArray(body.draft_arc_setup)
         ? body.draft_arc_setup
         : undefined;
+    // ── Optimizer: if draft has enough anchors, run deriveOptimalWeek and
+    // inject the validated week so AL presents it instead of deriving its own.
+    let optimizerOutput: string | undefined;
+    try {
+      const draft = draftArcSetup as Record<string, unknown> | undefined;
+      const goals = Array.isArray(draft?.goals) ? draft!.goals as unknown[] : [];
+      const tp = (goals[0] as Record<string, unknown> | undefined)?.training_prefs as Record<string, unknown> | undefined;
+      const pd = tp?.preferred_days as Record<string, unknown> | undefined;
+      if (pd && typeof pd === 'object') {
+        const toDay = (v: unknown): DayName | undefined => {
+          const s = typeof v === 'string' ? normalizeDayName(v) : undefined;
+          return s as DayName | undefined;
+        };
+        const swimArr = Array.isArray(pd.swim) ? pd.swim as string[] : [];
+        const strengthArr = Array.isArray(pd.strength) ? pd.strength as string[] : [];
+        const daysPerWeek = typeof tp?.days_per_week === 'number' ? tp.days_per_week : 5;
+        const inputs: WeekOptimizerInputs = {
+          anchors: {
+            ...(toDay(pd.long_ride) ? { long_ride: toDay(pd.long_ride)! } : {}),
+            ...(toDay(pd.long_run) ? { long_run: toDay(pd.long_run)! } : {}),
+            ...(toDay(pd.quality_bike) ? { quality_bike: toDay(pd.quality_bike)! } : {}),
+          },
+          preferences: {
+            swims_per_week: Math.min(3, swimArr.length) as 0 | 1 | 2 | 3,
+            strength_frequency: Math.min(3, strengthArr.length) as 0 | 1 | 2 | 3,
+            training_days: Math.min(7, Math.max(4, daysPerWeek)) as 4 | 5 | 6 | 7,
+          },
+          athlete: {
+            training_intent: (tp?.training_intent as WeekOptimizerInputs['athlete']['training_intent']) ?? undefined,
+            strength_intent: (tp?.strength_intent as WeekOptimizerInputs['athlete']['strength_intent']) ?? undefined,
+          },
+        };
+        // Only run if at least one anchor is present (enough to be useful)
+        const hasAnchors = Object.values(inputs.anchors ?? {}).some(v => v != null);
+        if (hasAnchors) {
+          const result = deriveOptimalWeek(inputs);
+          const lines: string[] = [];
+          const ALL_DAYS: DayName[] = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+          for (const day of ALL_DAYS) {
+            const slots = result.days[day];
+            if (slots && slots.length > 0) {
+              const parts = slots.map(s => `${s.kind} [${s.fatigue}]${s.note ? ` — ${s.note}` : ''}`);
+              lines.push(`  ${day}: ${parts.join(' + ')}`);
+            } else if (!result.rest_days.includes(day)) {
+              lines.push(`  ${day}: rest`);
+            }
+          }
+          if (result.rest_days.length) lines.push(`  rest days: ${result.rest_days.join(', ')}`);
+          if (result.trade_offs.length) lines.push(`  trade-offs: ${result.trade_offs.join('; ')}`);
+          if (result.conflicts.length) lines.push(`  CONFLICTS: ${result.conflicts.join('; ')}`);
+          optimizerOutput = lines.join('\n');
+        }
+      }
+    } catch (e) {
+      console.warn('[arc-setup-chat] optimizer skipped:', e instanceof Error ? e.message : String(e));
+    }
+
     const system = buildArcSetupSystemPrompt(arc, {
       raceCacheSection: cacheSection,
       ...(draftArcSetup ? { draftArcSetup } : {}),
       ...(freshSetup ? { freshSetup: true } : {}),
+      ...(optimizerOutput ? { optimizerOutput } : {}),
     });
 
     const isClosingTurn =

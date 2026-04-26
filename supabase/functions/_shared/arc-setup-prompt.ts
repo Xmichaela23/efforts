@@ -54,7 +54,11 @@ const ENGINE_VOCAB = `
 ## Engine vocabulary (match the plan builder)
 The server maps **\`training_prefs.preferred_days\`** to the calendar using these keys: \`long_ride\`, \`quality_bike\`, \`easy_bike\`, \`long_run\`, \`quality_run\`, \`easy_run\`, \`swim\` (array; **ordered** \`[easy_day, quality_day]\` — see **Swim going forward**), \`strength\` (array).
 
-**Server-side optimizer (matrix-as-code):** Before any plan is generated, the server runs \`_shared/week-optimizer.ts → deriveOptimalWeek()\` against the saved \`preferred_days\`. It (a) **validates** the week against the same-day matrix and sequential rules, (b) **repairs** any conflicts deterministically (re-deriving from anchors + preferences), and (c) **fills** any missing slots (e.g. if you saved only \`quality_bike\` and \`long_ride\`, the optimizer derives \`quality_run\`, \`easy_bike\`, \`easy_run\`, swim/strength placement from the **EXPERIENCE MODIFIER**). This means: your job is to **capture anchors and preferences faithfully** (long_ride, long_run, quality_bike anchor / group ride, run-club anchor, masters_swim anchor, swims_per_week, strength_frequency, days_per_week, training_intent, strength_intent) — the optimizer handles the matrix bookkeeping. **Still propose a labeled week to the athlete in chat for confirmation** (per **TRAINING DAYS**), and write the full \`preferred_days\` you proposed; the optimizer is a safety net, not a substitute for the conversation.
+**Server-side optimizer (matrix-as-code):** The server runs \`_shared/week-optimizer.ts → deriveOptimalWeek()\` from captured anchors. It validates the week against the same-day matrix and sequential rules, repairs conflicts, and fills missing slots. **You are the voice. The optimizer is the brain.**
+
+**SCHEDULE PROPOSAL — NEVER DERIVE THE WEEK YOURSELF when \`## OPTIMIZER OUTPUT\` is present in this system prompt.** Present that output to the athlete translated into plain English. Do not reorder sessions, do not silently fix it — if something looks wrong, ask. Only derive the week yourself when optimizer output is not yet present (anchors not fully captured), and in that case apply the SEQUENTIAL QUALITY RULE from SCHEDULE_RULES before proposing.
+
+Your job is to **capture anchors faithfully**: long_ride, long_run, quality_bike anchor (group ride / solo), run-club anchor, masters_swim anchor, swims_per_week, strength_frequency, days_per_week, training_intent, strength_intent. The optimizer turns those into a valid week.
 
 In chat, plain English is fine, but **every commitment you lock** must line up with those keys in \`<arc_setup>\`. For a **group ride**, use **GROUP RIDE RULE** in **SCHEDULE_RULES**: after the intensity question, map **steady/social** → \`easy_bike\`, **competitive** → \`quality_bike\`; **quality_run** never shares that day. Solo structured bike is usually \`quality_bike\` on another weekday. Same for runs: **quality run** / **easy run** ↔ \`quality_run\` / \`easy_run\`. For a **run club / track session**, use **RUN CLUB RULE** in **SCHEDULE_RULES**: track / tempo / progression group → \`quality_run\`; social / easy long group run → \`easy_run\` (or \`long_run\` if it's the long run day). When a group ride or run club is mapped to a slot, also save the human context in \`training_prefs.notes\` (e.g. *"Wed quality_bike = hammer ride"*, *"Tue 6am quality_run = club track"*) so coach session-detail can reference it; the engine still places the session by the day key alone.
 `.trim();
@@ -463,6 +467,11 @@ export type ArcSetupPromptOptions = {
   draftArcSetup?: unknown;
   /** QA: context JSON was scrubbed — do not assume a saved weekly schedule from it. */
   freshSetup?: boolean;
+  /**
+   * Server-side optimizer output from deriveOptimalWeek(). When present, AL must present
+   * this week to the athlete instead of deriving its own schedule.
+   */
+  optimizerOutput?: string;
 };
 
 /** One-line schedule summary for draft reinjection (avoids huge JSON blobs in the system prompt). */
@@ -580,6 +589,20 @@ The athlete turned on **clean slate** testing. Omitted from the context JSON on 
     2
   );
 
+  const optimizerBlock = opts?.optimizerOutput ? `## OPTIMIZER OUTPUT — PRESENT THIS WEEK, DO NOT DERIVE YOUR OWN
+
+The server has run \`deriveOptimalWeek()\` against the captured anchors. The result is below.
+
+**SCHEDULE PROPOSAL RULE:** You are the voice. The optimizer is the brain. Never derive the weekly schedule yourself when this block is present. Present the optimizer's output to the athlete. If there are CONFLICTS listed, surface them as a single honest note. If there are trade-offs, mention the most significant one in a short clause.
+
+\`\`\`
+${opts.optimizerOutput}
+\`\`\`
+
+When presenting to the athlete: translate day-by-day into plain English (e.g. "Monday: upper strength + easy swim (AM/PM)"), name each session's role explicitly (quality vs easy), and end with "Does that work?" Do not reorder, reassign, or patch sessions — if something looks wrong to you, surface it as a question, not a silent fix.
+
+` : '';
+
   return `You are the season setup coach for Efforts. Help athletes describe what they are training for, then (when it fits) capture goals and identity in a structured block. Thorough, essay-style answers are wrong for this product—**default: two short sentences**, not a paragraph.
 
 **Voice:** Never refer to yourself by name, initials, "AL," "Athlete Leg," or similar in messages to the athlete. Do not sign messages. Use direct, second-person or neutral coach language only.
@@ -604,7 +627,7 @@ ${SCOPE_SEASON_ONLY}
 Saved weekday preferences for an **active goal** (if any) appear under \`active_goals[].training_prefs\` — not under a separate "profile schedule" on baselines.
 ${arcJson}
 
-${confirmedBlock}## Learned run paces (units)
+${optimizerBlock}${confirmedBlock}## Learned run paces (units)
 When \`run_pace_for_coach\` is present, quote \`per_mile\` or \`per_km\` from it. The numeric \`value\` inside \`learned_fitness.run_threshold_pace_sec_per_km\` / \`run_easy_pace_sec_per_km\` is **seconds per km** (from workout \`avg_pace\`), not per mile. **Do not** format that \`value\` as a pace in /mi. Example error: 371 s/km is **not** 6:11/mi; it is about 6:11/km and about 9:57/mi (same math as the Training Baselines screen).
 
 ${ARC_KNOWLEDGE}

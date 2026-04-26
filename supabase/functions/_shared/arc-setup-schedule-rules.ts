@@ -85,9 +85,25 @@ Align with \`base_first\` vs \`race_peak\` and **EXPERIENCE DETECTION** in this 
 ### 80/20 AND ENGINE
 The plan engine enforces TSS and polarized mix. Do not add extra **quality** beyond what the week can absorb; if budget is tight, easy trims first.
 
+### SEQUENTIAL QUALITY RULE — EXPLICIT BAN
+
+**quality_run and quality_bike can never fall on consecutive days.** Both are HIGH fatigue. Back-to-back HIGH days are a violation.
+
+Before proposing any week, check every adjacent-day pair:
+- If **day N = quality_run** and **day N+1 = quality_bike** → move quality_run one day earlier or later.
+- If **day N = quality_bike** and **day N+1 = quality_run** → move quality_run one day later.
+- The day immediately before a quality_bike anchor must be easy or rest.
+- The day immediately before a quality_run must not be quality_bike.
+
+**Example violation:** Tuesday quality_run → Wednesday quality_bike (group hammer ride). The Wednesday anchor is fixed. Move quality_run to Thursday.
+
+**Correct repair:** Wednesday quality_bike (anchored) → Tuesday easy → Thursday quality_run.
+
+If the optimizer output is present in this turn, it has already applied these rules. Present it unchanged.
+
 ### BEFORE PROPOSING (checklist)
 1. Every populated day: pairwise **matrix** check for all session kinds that day.  
-2. **Sequential** rules across adjacent days.  
+2. **Sequential** rules across adjacent days — especially SEQUENTIAL QUALITY RULE above.  
 3. **Strength** spacing (2× / 3× rules + 48h from hard leg days).  
 4. **Group ride** and **doubles** rules.  
 5. If any conflict: **re-place** silently using **PLACEMENT ALGORITHM**; **never** ask the athlete to fix the calendar.  
