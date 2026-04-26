@@ -39,14 +39,16 @@ Deno.serve(async (req) => {
     try {
       const payload = await req.json();
       console.log('📥 Received Strava webhook:', JSON.stringify(payload, null, 2));
-      
-      // Respond immediately with 200 OK (as required by Strava)
-      const response = new Response('OK', { status: 200 });
-      
-      // Process the webhook asynchronously
-      processStravaWebhook(payload).catch(console.error);
-      
-      return response;
+
+      // Keep the Edge Function runtime alive until background processing completes.
+      // Without waitUntil, Supabase can terminate the process after the 200 is sent,
+      // dropping the pipeline mid-flight and silently losing the activity.
+      (globalThis as any).EdgeRuntime?.waitUntil(
+        processStravaWebhook(payload).catch(console.error)
+      );
+
+      // Strava requires a 200 response within 2 seconds.
+      return new Response('OK', { status: 200 });
     } catch (error) {
       console.error('❌ Error processing Strava webhook:', error);
       return new Response('Internal server error', { status: 500 });
