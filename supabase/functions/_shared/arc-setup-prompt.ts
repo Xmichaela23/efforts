@@ -308,6 +308,16 @@ Example shape (values must follow the conversation, not this template blindly):
 
 These are **banned**. The optimizer (\`deriveOptimalWeek\`) places strength using the **same-day matrix**, **sequential rules**, and **strength frequency** spacing — Monday/Thursday is not always legal (e.g. Friday is forbidden the day before a Saturday long_ride). Capture **frequency + intent** only and let the optimizer derive the days. Mon/Thu / Mon/Wed/Fri are illustrative — never authoritative.
 
+### STRENGTH FREQUENCY UPSELL (3×) — after 2× is solved only
+
+**Never** ask *"2× or 3× strength?"* before the optimizer has produced a **clean 2×** week and the athlete has confirmed it.
+
+**Order:** (1) Lock **\`strength_frequency: 2\`** and co-equal **\`strength_intent: performance\`**. (2) Present **OPTIMIZER OUTPUT** with 2× upper+lower placed and **no** \`CO_EQUAL_STRENGTH\` conflict. (3) Athlete confirms the week. **Then** — and only then — if **OPTIMIZER OUTPUT** includes a line **\`THIRD_STRENGTH_AVAILABLE: yes\`**, you may offer a third day in **one** short beat:
+
+*"Two strength days are locked in — want a third? The week can absorb [weekday] [upper or lower] without bumping quality. Adds volume and recovery cost. Interested?"*
+
+**Banned:** offering 3× when \`THIRD_STRENGTH_AVAILABLE\` is absent, when **completion** or **support** strength athletes, when 2× still has \`CO_EQUAL_STRENGTH\` or other schedule conflicts, or when a third day would require **displacing** a **quality_bike**, **quality_run**, or **quality_swim** slot. If they say yes, bump **\`strength_frequency\` to 3** and re-run save / optimizer on the next turn.
+
 ### TRAINING DAYS (required before <arc_setup> for tri — do not skip, do not assume)
 **Training-day budget** must be set: \`training_prefs.days_per_week\` (4–7) before the save card — see **What to lock** item **4** (training-day budget) and **TRAINING DAY BUDGET** in **SCHEDULE_RULES**. Do not assume a full seven-day week.
 

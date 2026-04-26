@@ -191,7 +191,7 @@ export function formatSameDayMatrixMarkdown(): string {
 
 export const SEQUENTIAL_RULES_TEXT = [
   'After long_ride → the next day must be LOW fatigue only (easy_bike, easy_run, easy_swim) or complete rest — no quality, no long, no brick, no lower_body_strength.',
-  'After long_run → same: next day LOW only or rest.',
+  'After long_run → next day: prefer easy_swim or rest — not easy_run (back-to-back run tissue load). easy_run only as last resort with an explicit trade-off.',
   'After lower_body_strength → 48 hours before the next lower_body_strength, quality_run, or long_run; keep spacing from long_ride and quality_bike per recovery.',
   'Lower_body_strength → not on the calendar day immediately before long_ride or long_run (upper body may be).',
   'After quality_bike → next calendar day: no quality_bike and no quality_run.',

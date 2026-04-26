@@ -112,6 +112,11 @@ export interface OptimalWeek {
   trade_offs: string[];
   /** Unresolvable issues — non-empty means the caller should surface to athlete. */
   conflicts: string[];
+  /**
+   * True when 2× co-equal strength landed cleanly and a third session fits
+   * without displacing quality or breaking spacing — for arc-setup upsell only.
+   */
+  can_offer_third_strength?: boolean;
 }
 
 // ── Internal helpers ────────────────────────────────────────────────────────
@@ -135,6 +140,23 @@ function emptyWeek(): Record<DayName, SessionSlot[]> {
   const o = {} as Record<DayName, SessionSlot[]>;
   for (const d of ALL_DAYS) o[d] = [];
   return o;
+}
+
+function cloneDays(d: Record<DayName, SessionSlot[]>): Record<DayName, SessionSlot[]> {
+  const o = emptyWeek();
+  for (const day of ALL_DAYS) {
+    o[day] = d[day].map((s) => ({ ...s }));
+  }
+  return o;
+}
+
+/** Shoulder / pull load: avoid quality_swim stacked with upper-body lifting. */
+function dayHasUpperStrength(slots: SessionSlot[]): boolean {
+  return slots.some((s) => s.kind === 'upper_body_strength');
+}
+
+function dayHasQualitySwim(slots: SessionSlot[]): boolean {
+  return slots.some((s) => s.kind === 'quality_swim');
 }
 
 function place(
@@ -194,11 +216,14 @@ function canPlaceWithModifier(
  * EXPERIENCE MODIFIER for same-day stacks is handled in \`canPlaceWithModifier\`,
  * not here — adjacent-day quality_bike ↔ quality_run is always forbidden.
  */
+type SequentialRelax = { allow_easy_run_after_long_run?: boolean };
+
 function sequentialOk(
   days: Record<DayName, SessionSlot[]>,
   day: DayName,
   kind: SessionKind,
   _athlete: WeekOptimizerInputs['athlete'],
+  relax?: SequentialRelax,
 ): boolean {
   const prevSlots = days[dayBefore(day)] ?? [];
   const prevKinds = prevSlots.map((s) => s.kind);
@@ -219,6 +244,8 @@ function sequentialOk(
     if (kind !== 'long_run' && isHigh(kind)) return false;
   }
   if (prevKinds.includes('long_run')) {
+    // Day after long_run: prefer swim or rest — not easy_run (same tissue, back-to-back run stress).
+    if (kind === 'easy_run' && !relax?.allow_easy_run_after_long_run) return false;
     if (kind !== 'long_ride' && isHigh(kind)) return false;
   }
 
@@ -347,39 +374,36 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     groupRun?.intensity === 'quality' ? groupRun.day : undefined;
 
   if (!qualityRunDay) {
+    /** Hard-banned days for quality_run (never day before long_ride; never bracketing anchored quality_bike). */
+    const blockedQr = new Set<DayName>([longRide, longRun, dayBefore(longRide)]);
+    if (qualityBikeDay) {
+      blockedQr.add(qualityBikeDay);
+      blockedQr.add(dayBefore(qualityBikeDay));
+      blockedQr.add(dayAfter(qualityBikeDay));
+    }
+
     const prio: DayName[] = [];
     if (qualityBikeDay) {
-      // Never the calendar day immediately after quality_bike (sequential quality ban).
-      prio.push(nDaysAfter(qualityBikeDay, 2)); // e.g. Fri when QB is Wed
-      prio.push(dayBefore(qualityBikeDay)); // only valid if sequential + lookahead pass (often easy-only Tue)
+      prio.push(nDaysAfter(qualityBikeDay, 2));
+      prio.push(dayBefore(qualityBikeDay));
     }
-    prio.push(nDaysAfter(longRide, -2));            // 2 days before long_ride
-    for (const d of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayName[]) {
+    prio.push(nDaysAfter(longRide, -2));
+    for (const d of ALL_DAYS) {
       if (!prio.includes(d)) prio.push(d);
     }
 
     for (const c of prio) {
-      if (c === longRide || c === longRun) continue;
-      if (qualityBikeDay && c === qualityBikeDay) continue;
+      if (blockedQr.has(c)) continue;
       if (!canPlace(days, c, 'quality_run')) continue;
       if (!sequentialOk(days, c, 'quality_run', inputs.athlete)) continue;
-      // Day before long_ride / long_run → only allow for performance, with trade-off.
-      if (c === dayBefore(longRide) && !isPerf) continue;
-      if (c === dayBefore(longRun) && !isPerf) continue;
 
       qualityRunDay = c;
       place(days, c, 'quality_run');
-
-      if (c === dayBefore(longRide) && isPerf) {
-        trade_offs.push(
-          `quality_run on ${c} sits the day before long_ride (${longRide}); back-to-back HIGH days — performance modifier.`,
-        );
-      }
       break;
     }
     if (!qualityRunDay) {
       conflicts.push(
-        'quality_run: no valid day found — try moving long_ride/long_run, or removing the quality_bike anchor to free up Tuesday/Thursday.',
+        'quality_run: no valid day found — anchored quality_bike + long_ride/long_run may leave no legal slot; try moving group ride, long ride, or long run.',
       );
       trade_offs.push('Quality run dropped from week — current anchors leave no recovery slot.');
     }
@@ -403,87 +427,137 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     trade_offs.push('Mid-week easy bike dropped — schedule too dense.');
   }
 
-  // ── easy_run (prefer Friday for pre-weekend recovery) ────────────────────
+  const strengthFreq = inputs.preferences.strength_frequency;
+  /** Co-equal 2–3×: place gym before easy_run so Mon is not stolen by easy_run before lower can land. */
+  const placeStrengthBeforeEasyRun = strengthFreq >= 2 && isCoEq;
+  const strengthDays: DayName[] = [];
   let easyRunDay: DayName | undefined;
-  const easyRunOrder: DayName[] = ['friday', 'monday', 'tuesday', 'wednesday', 'thursday'];
-  // Pass 1: prefer empty + matrix-compatible.
-  for (const c of easyRunOrder) {
-    if (c === longRide || c === longRun) continue;
-    if (qualityRunDay && c === qualityRunDay) continue;
-    if (days[c].length > 0) continue;
-    if (!canPlace(days, c, 'easy_run')) continue;
-    easyRunDay = c;
-    break;
-  }
-  // Pass 2: any matrix-compatible day (allow stacking with LOW sessions).
-  if (!easyRunDay) {
+
+  const placeEasyRun = (): void => {
+    const easyRunOrder: DayName[] = ['friday', 'monday', 'tuesday', 'wednesday', 'thursday'];
+    const dAfterLongRun = dayAfter(longRun);
+    let picked: DayName | undefined;
     for (const c of easyRunOrder) {
       if (c === longRide || c === longRun) continue;
+      if (c === dAfterLongRun) continue;
       if (qualityRunDay && c === qualityRunDay) continue;
+      if (days[c].length > 0) continue;
       if (!canPlace(days, c, 'easy_run')) continue;
-      easyRunDay = c;
+      if (!sequentialOk(days, c, 'easy_run', inputs.athlete)) continue;
+      picked = c;
       break;
     }
-  }
-  if (easyRunDay) {
-    place(days, easyRunDay, 'easy_run');
-  } else {
-    conflicts.push(
-      'easy_run: no matrix-clean weekday available — try removing a strength session or moving the quality_run.',
-    );
-    trade_offs.push('Mid-week easy run dropped — schedule too dense.');
+    if (!picked) {
+      for (const c of easyRunOrder) {
+        if (c === longRide || c === longRun) continue;
+        if (c === dAfterLongRun) continue;
+        if (qualityRunDay && c === qualityRunDay) continue;
+        if (!canPlace(days, c, 'easy_run')) continue;
+        if (!sequentialOk(days, c, 'easy_run', inputs.athlete)) continue;
+        picked = c;
+        break;
+      }
+    }
+    if (!picked && dAfterLongRun !== longRide && dAfterLongRun !== longRun &&
+      (!qualityRunDay || dAfterLongRun !== qualityRunDay)) {
+      if (canPlace(days, dAfterLongRun, 'easy_run') &&
+        sequentialOk(days, dAfterLongRun, 'easy_run', inputs.athlete, { allow_easy_run_after_long_run: true })) {
+        picked = dAfterLongRun;
+        trade_offs.push(
+          `easy_run on ${dAfterLongRun} immediately follows long_run (${longRun}) — last resort; prefer swim or rest that day when possible.`,
+        );
+      }
+    }
+    if (picked) {
+      easyRunDay = picked;
+      place(days, picked, 'easy_run');
+    } else {
+      conflicts.push(
+        'easy_run: no matrix-clean weekday available — try removing a strength session or moving the quality_run.',
+      );
+      trade_offs.push('Mid-week easy run dropped — schedule too dense.');
+    }
+  };
+
+  if (!placeStrengthBeforeEasyRun) {
+    placeEasyRun();
   }
 
   // ── Strength placement ──────────────────────────────────────────────────
-  const strengthDays: DayName[] = [];
-  const strengthFreq = inputs.preferences.strength_frequency;
+  const placeThirdStrengthIfNeeded = (): void => {
+    if (strengthFreq < 3 || strengthDays.length < 2) return;
+    const existingKinds = strengthDays.map((d) =>
+      days[d].find((s) => s.kind === 'upper_body_strength' || s.kind === 'lower_body_strength')?.kind,
+    );
+    const lowerCount = existingKinds.filter((k) => k === 'lower_body_strength').length;
+    const upperCount = existingKinds.filter((k) => k === 'upper_body_strength').length;
+    const thirdKind: SessionKind = upperCount > lowerCount ? 'lower_body_strength' : 'upper_body_strength';
 
-  if (strengthFreq >= 1) {
-    // Upper body: Monday preferred (post-long-run, doesn't compete with legs).
-    let upperDay: DayName | undefined;
-    for (const c of ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'] as DayName[]) {
+    let thirdDay: DayName | undefined;
+    for (const c of ALL_DAYS) {
+      if (strengthDays.includes(c)) continue;
       if (c === longRide || c === longRun) continue;
-      if (!canPlace(days, c, 'upper_body_strength')) continue;
-      if (!sequentialOk(days, c, 'upper_body_strength', inputs.athlete)) continue;
-      upperDay = c;
+      if (thirdKind === 'lower_body_strength' && noLowerBody.has(c)) continue;
+      if (!canPlace(days, c, thirdKind)) continue;
+      if (!sequentialOk(days, c, thirdKind, inputs.athlete)) continue;
+      const ok = strengthDays.every((s) => {
+        const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[s]);
+        const wrap = Math.min(gap, 7 - gap);
+        return wrap >= 2;
+      });
+      if (!ok) continue;
+      thirdDay = c;
       break;
     }
-    if (upperDay) {
-      place(days, upperDay, 'upper_body_strength');
-      strengthDays.push(upperDay);
+    if (thirdDay) {
+      place(days, thirdDay, thirdKind);
+      strengthDays.push(thirdDay);
     } else {
       conflicts.push(
-        'upper_body_strength: no matrix-clean weekday found — try reducing strength to 0× or removing a quality session.',
+        `lower_body_strength (session 3 of 3): no day with required 2-day spacing — 48h pre-sovereign rule also blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 2× strength or dropping a swim/easy session.`,
       );
-      trade_offs.push(
-        `Strength frequency reduced from ${strengthFreq}× to 0× — anchors leave no compatible slot.`,
-      );
+      trade_offs.push('Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.');
     }
+  };
 
-    if (strengthFreq >= 2) {
-      // Lower body: stack with quality_run (AM/PM) for performance + co-equal,
-      // else 48h-clear day per STRENGTH_FREQUENCY (3 days from upper).
-      const lowerCandidates: DayName[] = isPerf && isCoEq && qualityRunDay
-        ? [qualityRunDay, 'thursday', 'friday', 'tuesday']
-        : ['thursday', 'friday', 'tuesday', 'wednesday'];
+  if (strengthFreq >= 1) {
+    if (strengthFreq >= 2 && isCoEq) {
+      const upperOrder: DayName[] = ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'];
+      const lowerCandidatesBase: DayName[] = isPerf && qualityRunDay
+        ? [qualityRunDay, 'thursday', 'friday', 'tuesday', 'wednesday', 'monday']
+        : ['thursday', 'friday', 'tuesday', 'wednesday', 'monday'];
 
+      let upperDay: DayName | undefined;
       let lowerDay: DayName | undefined;
-      for (const c of lowerCandidates) {
-        if (upperDay && c === upperDay) continue;
-        if (c === longRide || c === longRun) continue;
-        if (noLowerBody.has(c)) continue;
-        if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
-        if (!sequentialOk(days, c, 'lower_body_strength', inputs.athlete)) continue;
-        // 2x/week strength: ≥3 days between sessions.
-        if (upperDay) {
-          const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[upperDay]);
+
+      for (const uc of upperOrder) {
+        if (uc === longRide || uc === longRun) continue;
+        if (dayHasQualitySwim(days[uc])) continue;
+        if (!canPlace(days, uc, 'upper_body_strength')) continue;
+        if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
+
+        const trial = cloneDays(days);
+        place(trial, uc, 'upper_body_strength');
+
+        for (const lc of lowerCandidatesBase) {
+          if (lc === uc) continue;
+          if (lc === longRide || lc === longRun) continue;
+          if (noLowerBody.has(lc)) continue;
+          if (!canPlaceWithModifier(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
+          if (!sequentialOk(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
+          const gap = Math.abs(DAY_INDEX[lc] - DAY_INDEX[uc]);
           const wrap = Math.min(gap, 7 - gap);
           if (wrap < 3) continue;
+          upperDay = uc;
+          lowerDay = lc;
+          break;
         }
-        lowerDay = c;
-        break;
+        if (lowerDay) break;
       }
-      if (lowerDay) {
+
+      if (upperDay && lowerDay) {
+        place(days, upperDay, 'upper_body_strength');
+        strengthDays.push(upperDay);
         const stacking = qualityRunDay === lowerDay && isPerf && isCoEq;
         place(days, lowerDay, 'lower_body_strength', stacking ? { timing: 'PM' } : {});
         strengthDays.push(lowerDay);
@@ -492,51 +566,79 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             `lower_body_strength stacked with quality_run on ${lowerDay} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
           );
         }
+        placeThirdStrengthIfNeeded();
       } else {
         conflicts.push(
-          `lower_body_strength (session 2 of 2): no valid day found — 48h pre-sovereign rule blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 1× strength, dropping a quality session, or moving long_ride/long_run.`,
-        );
-        trade_offs.push(
-          `Strength frequency reduced from ${strengthFreq}× to 1× — week too dense for ${strengthFreq}× without conflict.`,
+          'CO_EQUAL_STRENGTH: 2× lifting was requested with co-equal (performance) intent, but no valid upper+lower pair fits the anchors. Do not treat 1× as sufficient — adjust the week (e.g. move easy_run after strength, trim swim, or shift long days) or get explicit athlete confirmation to downgrade.',
         );
       }
-    }
-
-    if (strengthFreq >= 3) {
-      // Third session: alternate kind, ≥2 days from existing.
-      const existingKinds = strengthDays.map((d) =>
-        days[d].find((s) => s.kind === 'upper_body_strength' || s.kind === 'lower_body_strength')?.kind,
-      );
-      const lowerCount = existingKinds.filter((k) => k === 'lower_body_strength').length;
-      const upperCount = existingKinds.filter((k) => k === 'upper_body_strength').length;
-      const thirdKind: SessionKind = upperCount > lowerCount ? 'lower_body_strength' : 'upper_body_strength';
-
-      let thirdDay: DayName | undefined;
-      for (const c of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayName[]) {
-        if (strengthDays.includes(c)) continue;
+    } else {
+      let upperDay: DayName | undefined;
+      for (const c of ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'] as DayName[]) {
         if (c === longRide || c === longRun) continue;
-        if (thirdKind === 'lower_body_strength' && noLowerBody.has(c)) continue;
-        if (!canPlace(days, c, thirdKind)) continue;
-        if (!sequentialOk(days, c, thirdKind, inputs.athlete)) continue;
-        const ok = strengthDays.every((s) => {
-          const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[s]);
-          const wrap = Math.min(gap, 7 - gap);
-          return wrap >= 2;
-        });
-        if (!ok) continue;
-        thirdDay = c;
+        if (dayHasQualitySwim(days[c])) continue;
+        if (!canPlace(days, c, 'upper_body_strength')) continue;
+        if (!sequentialOk(days, c, 'upper_body_strength', inputs.athlete)) continue;
+        upperDay = c;
         break;
       }
-      if (thirdDay) {
-        place(days, thirdDay, thirdKind);
-        strengthDays.push(thirdDay);
+      if (upperDay) {
+        place(days, upperDay, 'upper_body_strength');
+        strengthDays.push(upperDay);
       } else {
         conflicts.push(
-          `lower_body_strength (session 3 of 3): no day with required 2-day spacing — 48h pre-sovereign rule also blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 2× strength or dropping a swim/easy session.`,
+          'upper_body_strength: no matrix-clean weekday found — try reducing strength to 0× or removing a quality session.',
         );
-        trade_offs.push('Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.');
+        trade_offs.push(
+          `Strength frequency reduced from ${strengthFreq}× to 0× — anchors leave no compatible slot.`,
+        );
       }
+
+      if (strengthFreq >= 2) {
+        const lowerCandidates: DayName[] = isPerf && qualityRunDay
+          ? [qualityRunDay, 'thursday', 'friday', 'tuesday']
+          : ['thursday', 'friday', 'tuesday', 'wednesday'];
+
+        let lowerDay: DayName | undefined;
+        for (const c of lowerCandidates) {
+          if (upperDay && c === upperDay) continue;
+          if (c === longRide || c === longRun) continue;
+          if (noLowerBody.has(c)) continue;
+          if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
+          if (!sequentialOk(days, c, 'lower_body_strength', inputs.athlete)) continue;
+          if (upperDay) {
+            const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[upperDay]);
+            const wrap = Math.min(gap, 7 - gap);
+            if (wrap < 3) continue;
+          }
+          lowerDay = c;
+          break;
+        }
+        if (lowerDay) {
+          const stacking = qualityRunDay === lowerDay && isPerf && isCoEq;
+          place(days, lowerDay, 'lower_body_strength', stacking ? { timing: 'PM' } : {});
+          strengthDays.push(lowerDay);
+          if (stacking) {
+            trade_offs.push(
+              `lower_body_strength stacked with quality_run on ${lowerDay} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
+            );
+          }
+        } else {
+          conflicts.push(
+            `lower_body_strength (session 2 of 2): no valid day found — 48h pre-sovereign rule blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 1× strength, dropping a quality session, or moving long_ride/long_run.`,
+          );
+          trade_offs.push(
+            `Strength frequency reduced from ${strengthFreq}× to 1× — week too dense for ${strengthFreq}× without conflict.`,
+          );
+        }
+      }
+
+      placeThirdStrengthIfNeeded();
     }
+  }
+
+  if (placeStrengthBeforeEasyRun) {
+    placeEasyRun();
   }
 
   strengthDays.sort((a, b) => DAY_INDEX[a] - DAY_INDEX[b]);
@@ -582,6 +684,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     let picked: DayName | undefined;
     for (const c of ordered) {
       if (!canPlace(days, c, kind)) continue;
+      if (kind === 'quality_swim' && dayHasUpperStrength(days[c])) continue;
       picked = c;
       break;
     }
@@ -645,6 +748,39 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     }
   }
 
+  // ── Third-strength upsell (arc-setup only): 2× co-equal landed clean + room for 3× ──
+  let can_offer_third_strength = false;
+  if (
+    isPerf && isCoEq &&
+    strengthFreq === 2 &&
+    strengthDays.length === 2 &&
+    !conflicts.some((c) => c.startsWith('CO_EQUAL_STRENGTH'))
+  ) {
+    const trial = cloneDays(days);
+    const sd = [...strengthDays];
+    const existingKinds = sd.map((d) =>
+      trial[d].find((s) => s.kind === 'upper_body_strength' || s.kind === 'lower_body_strength')?.kind,
+    );
+    const lowerCount = existingKinds.filter((k) => k === 'lower_body_strength').length;
+    const upperCount = existingKinds.filter((k) => k === 'upper_body_strength').length;
+    const thirdKind: SessionKind = upperCount > lowerCount ? 'lower_body_strength' : 'upper_body_strength';
+    for (const c of ALL_DAYS) {
+      if (sd.includes(c)) continue;
+      if (c === longRide || c === longRun) continue;
+      if (thirdKind === 'lower_body_strength' && noLowerBody.has(c)) continue;
+      if (trial[c].some((s) => s.kind === 'quality_bike' || s.kind === 'quality_run')) continue;
+      if (!canPlace(trial, c, thirdKind)) continue;
+      if (!sequentialOk(trial, c, thirdKind, inputs.athlete)) continue;
+      const ok = sd.every((s) => {
+        const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[s]);
+        return Math.min(gap, 7 - gap) >= 2;
+      });
+      if (!ok) continue;
+      can_offer_third_strength = true;
+      break;
+    }
+  }
+
   // ── Build preferred_days ────────────────────────────────────────────────
   // Scrub stale assignments: rest-day displacement may have cleared a day that
   // a `*Day` variable still references. Only emit a key when the day actually
@@ -677,6 +813,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     preferred_days,
     trade_offs,
     conflicts,
+    ...(can_offer_third_strength ? { can_offer_third_strength: true } : {}),
   };
 }
 

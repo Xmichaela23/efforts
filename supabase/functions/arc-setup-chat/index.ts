@@ -163,6 +163,11 @@ Deno.serve(async (req) => {
         if (result.rest_days.length) lines.push(`  rest days: ${result.rest_days.join(', ')}`);
         if (result.trade_offs.length) lines.push(`  trade-offs: ${result.trade_offs.join('; ')}`);
         if (result.conflicts.length) lines.push(`  CONFLICTS: ${result.conflicts.join('; ')}`);
+        if (result.can_offer_third_strength) {
+          lines.push(
+            '  THIRD_STRENGTH_AVAILABLE: yes (performance + co-equal 2× week is clean; a third lift fits without displacing quality sessions — see STRENGTH FREQUENCY UPSELL).',
+          );
+        }
         optimizerOutput = lines.join('\n');
       }
     } catch (e) {
