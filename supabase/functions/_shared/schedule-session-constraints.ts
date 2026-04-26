@@ -209,7 +209,7 @@ export const PLACEMENT_ALGORITHM_TEXT = [
   '1) Place anchors first: long_ride (default Saturday), long_run (default Sunday), race days (fixed dates).',
   '2) Place quality: quality_bike (e.g. Tuesday or group-ride day), quality_run (e.g. Thursday), quality_swim (separate from conflicting quality_run unless EXPERIENCE MODIFIER allows).',
   '3) Place easy: easy_bike, easy_run, easy_swim around hard days.',
-  '4) Place strength: for each candidate day, require SAME_DAY_COMPATIBLE with everything already on that day; enforce SEQUENTIAL_RULES; enforce STRENGTH_FREQUENCY rules; pick the first valid day(s). Propose a resolution — do not ask the athlete to arbitrate schedule conflicts.',
+  '4) Place strength: for each candidate day, require SAME_DAY_COMPATIBLE with everything already on that day; enforce SEQUENTIAL_RULES; enforce STRENGTH_FREQUENCY rules; pick the first valid day(s). Propose a resolution — do not ask the athlete to arbitrate schedule conflicts. Strength weekday selection is the optimizer\'s job; never ask the athlete which days to lift on.',
   '5) Validate the full week: if anything conflicts, adjust silently until the week passes all gates; only then present. One confirmation question at most.',
 ].join('\n');
 
