@@ -6,7 +6,9 @@
 // `preferred_days` payload that:
 //
 //   - passes the same-day matrix from schedule-session-constraints.ts
-//   - honors sequential rules (after long days, after quality, lower-body 48h)
+//   - honors sequential rules (after long days, after quality,
+//     lower-body 48h BOTH directions: not within 2 days after lower_body, AND
+//     not the day before long_ride / long_run)
 //   - encodes swim role ordering [easy_day, quality_day] (parser convention
 //     in combined-schedule-prefs.ts)
 //   - respects the training-day budget by emitting `rest_days`
@@ -240,6 +242,14 @@ function sequentialOk(
     const twoBackKinds = (days[nDaysAfter(day, -2)] ?? []).map((s) => s.kind);
     if (prevKinds.includes('lower_body_strength')) return false;
     if (twoBackKinds.includes('lower_body_strength')) return false;
+  }
+
+  // 48h gap BEFORE sovereign days: lower_body_strength the day before long_ride
+  // or long_run leaves only 24h for leg recovery — block it.
+  // (Upper body is unaffected; legs are not the limiter for upper work.)
+  if (kind === 'lower_body_strength') {
+    const nextKinds = (days[dayAfter(day)] ?? []).map((s) => s.kind);
+    if (nextKinds.includes('long_ride') || nextKinds.includes('long_run')) return false;
   }
 
   return true;
@@ -485,7 +495,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         }
       } else {
         conflicts.push(
-          'lower_body_strength (session 2 of 2): no valid day found with required 3-day spacing from upper — consider reducing to 1× strength, dropping a quality session, or moving long_ride/long_run.',
+          `lower_body_strength (session 2 of 2): no valid day found — 48h pre-sovereign rule blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 1× strength, dropping a quality session, or moving long_ride/long_run.`,
         );
         trade_offs.push(
           `Strength frequency reduced from ${strengthFreq}× to 1× — week too dense for ${strengthFreq}× without conflict.`,
@@ -522,7 +532,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         strengthDays.push(thirdDay);
       } else {
         conflicts.push(
-          'lower_body_strength (session 3 of 3): no day with required 2-day spacing — consider reducing to 2× strength or dropping a swim/easy session.',
+          `lower_body_strength (session 3 of 3): no day with required 2-day spacing — 48h pre-sovereign rule also blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 2× strength or dropping a swim/easy session.`,
         );
         trade_offs.push('Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.');
       }
