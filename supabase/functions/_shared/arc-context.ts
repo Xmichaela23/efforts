@@ -15,6 +15,28 @@ export type AthleteIdentity = Record<string, unknown>;
 /** JSON payload from `user_baselines.learned_fitness` */
 export type LearnedFitness = Record<string, unknown>;
 
+export type ArcRaceCourseLeg = 'swim' | 'bike' | 'run' | 'full';
+
+/** One summary per `race_courses.leg` for this goal (tri: up to three; run-only: usually `full`). */
+export interface ArcRaceCourseSummary {
+  id: string;
+  leg: ArcRaceCourseLeg;
+  name: string;
+  distance_m: number;
+  strategy_updated_at: string | null;
+  source: string;
+}
+
+/**
+ * `arc.active_goals[].courses` — linked GPX / strategy rows for pace terrain (tri = swim + bike + run).
+ */
+export interface ActiveGoalCourseBundle {
+  swim: ArcRaceCourseSummary | null;
+  bike: ArcRaceCourseSummary | null;
+  run: ArcRaceCourseSummary | null;
+  full: ArcRaceCourseSummary | null;
+}
+
 export interface Goal {
   id: string;
   name: string;
@@ -31,6 +53,8 @@ export interface Goal {
   projection: Record<string, unknown> | null;
   /** Per-goal prefs (e.g. `preferred_days`) — included so Arc chat is grounded in saved goals */
   training_prefs: Record<string, unknown> | null;
+  /** Per-leg race_courses (GPX) for this event goal */
+  courses: ActiveGoalCourseBundle | null;
 }
 
 export interface ActivePlanSummary {
@@ -181,6 +205,7 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
       ...g,
       training_prefs: null,
       projection: null,
+      courses: { swim: null, bike: null, run: null, full: null },
     })),
     athlete_memory: null,
     latest_snapshot: null,
@@ -213,6 +238,7 @@ function toGoalRow(r: Record<string, unknown>): Goal {
     current_value: r.current_value != null && Number.isFinite(Number(r.current_value)) ? Number(r.current_value) : null,
     projection: proj && typeof proj === 'object' && !Array.isArray(proj) ? (proj as Record<string, unknown>) : null,
     training_prefs: parseGoalTrainingPrefs(r.training_prefs),
+    courses: null,
   };
 }
 
@@ -674,6 +700,52 @@ export async function getArcContext(
   const active_goals: Goal[] = (Array.isArray(goalsRes?.data) ? goalsRes.data : []).map((r: Record<string, unknown>) =>
     toGoalRow(r)
   );
+
+  const emptyBundle = (): ActiveGoalCourseBundle => ({
+    swim: null,
+    bike: null,
+    run: null,
+    full: null,
+  });
+  if (active_goals.length) {
+    const gids = active_goals.map((g) => g.id);
+    const { data: rcRows, error: rcErr } = await supabase
+      .from('race_courses')
+      .select('id, goal_id, leg, name, distance_m, strategy_updated_at, source')
+      .eq('user_id', userId)
+      .in('goal_id', gids);
+    if (rcErr) {
+      console.warn('[getArcContext] race_courses for goals', rcErr.message);
+    }
+    const byGid = new Map<string, ActiveGoalCourseBundle>();
+    for (const id of gids) byGid.set(id, emptyBundle());
+    for (const r of Array.isArray(rcRows) ? rcRows : []) {
+      const o = r as Record<string, unknown>;
+      const gid = o.goal_id != null ? String(o.goal_id) : '';
+      if (!gid) continue;
+      const leg = String(o.leg || 'full').toLowerCase();
+      if (!['swim', 'bike', 'run', 'full'].includes(leg)) continue;
+      const b = byGid.get(gid) ?? emptyBundle();
+      const row: ArcRaceCourseSummary = {
+        id: String(o.id),
+        leg: leg as ArcRaceCourseLeg,
+        name: o.name != null ? String(o.name) : 'Course',
+        distance_m: Number.isFinite(Number(o.distance_m)) ? Number(o.distance_m) : 0,
+        strategy_updated_at: o.strategy_updated_at != null ? String(o.strategy_updated_at) : null,
+        source: o.source != null ? String(o.source) : 'gpx',
+      };
+      if (leg === 'swim') b.swim = row;
+      if (leg === 'bike') b.bike = row;
+      if (leg === 'run') b.run = row;
+      if (leg === 'full') b.full = row;
+      byGid.set(gid, b);
+    }
+    for (const g of active_goals) {
+      g.courses = byGid.get(g.id) ?? emptyBundle();
+    }
+  } else {
+    for (const g of active_goals) g.courses = emptyBundle();
+  }
 
   let active_plan: ActivePlanSummary | null = null;
   const planRow = Array.isArray(plansRes?.data) && plansRes.data[0] ? plansRes.data[0] : null;

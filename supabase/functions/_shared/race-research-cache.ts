@@ -72,6 +72,7 @@ export async function upsertWebSearchResearchRow(
   const row = {
     user_id: userId,
     goal_id: null,
+    leg: 'full',
     name,
     source: 'web_search',
     source_id: null,

@@ -124,7 +124,7 @@ function enforce8020(grid: WeekGrid, phase: Phase): void {
     for (const slot of grid.values()) {
       for (const s of slot.sessions) {
         if (hardMin <= maxAllowed) break;
-        const isProtected = s.tags?.some(t =>
+        const isProtected = s.type === 'race' || s.tags?.some(t =>
           ['brick', 'long_run', 'long_ride', 'quality'].includes(t),
         );
         if (s.type !== sport || s.intensity_class === 'EASY' || isProtected) continue;
@@ -197,7 +197,7 @@ function tryResolveSameDayMatrixConflicts(grid: WeekGrid): string[] {
 // ── TSS summary helpers ───────────────────────────────────────────────────────
 
 function computeWeekMetrics(sessions: PlannedSession[], weekNum: number, phase: Phase, isRecovery: boolean): GeneratedWeek {
-  const sport_raw_tss: Record<Sport, number> = { run: 0, bike: 0, swim: 0, strength: 0 };
+  const sport_raw_tss: Record<Sport, number> = { run: 0, bike: 0, swim: 0, strength: 0, race: 0 };
   let total_raw = 0, total_weighted = 0, z12min = 0, z3min = 0;
 
   for (const s of sessions) {
@@ -341,6 +341,9 @@ export function buildWeek(
   if (raceThisWeek) {
     longRideHours = Math.min(longRideHours, 1.0);
   }
+  if (hasTri) {
+    longRideHours = Math.min(2.5, longRideHours);
+  }
 
   if (recoveryRebuildWeek1) {
     // Post-marathon week 1: cap leg load; swim sessions left as computed (low impact).
@@ -371,7 +374,7 @@ export function buildWeek(
     : phase;
 
   const longRideSlot = grid.get(longRideDay);
-  if (!longRideSlot?.isRest && hasTri) {
+  if (!longRideSlot?.isRest && hasTri && !raceThisWeek) {
     if (effectiveBricks >= 1 && phase !== 'base') {
       const brickRunMin = Math.max(15, Math.round(longRunMiles * 0.20) * 10);
       const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMin, effectiveBrickPhase, servedGoal);
@@ -388,7 +391,7 @@ export function buildWeek(
     ? adjDay(longRunDay, -1)  // shift to Friday if Saturday has brick
     : longRunDay;
   const lrSlot = grid.get(longRunActualDay);
-  if (!lrSlot?.isRest) {
+  if (!lrSlot?.isRest && !raceThisWeek) {
     if (phase === 'race_specific' && hasRun) {
       const mpMiles = Math.max(4, Math.round(longRunMiles * 0.60));
       lrSlot!.sessions.push(marathonPaceRun(longRunActualDay, mpMiles, servedGoal));
@@ -678,7 +681,7 @@ export function buildWeek(
   if (remaining > 50 && hasTri && !isRecovery && !recoveryRebuildWeek1) {
     const midRideSlot = grid.get(bikeEasyDay);
     if (midRideSlot && !midRideSlot.isRest && midRideSlot.sessions.length === 1) {
-      const midRideHr = Math.max(0.75, Math.min(1.5, remaining * 0.50 / 55));
+      const midRideHr = Math.max(0.75, Math.min(2.5, remaining * 0.50 / 55));
       midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
     }
   }
@@ -689,17 +692,18 @@ export function buildWeek(
     const slot = grid.get(d);
     if (slot && !slot.isRest) {
       const gRace = goals.find((g) => g.id === raceThisWeek.goalId) ?? primaryGoal;
-      const projMin = 330;
-      const rawT = Math.round(estimateSessionTSS('bike', 'MODERATE', projMin) * 0.9);
+      const n = (gRace.event_name || '').toLowerCase();
+      const projMin = n.includes('santa cruz') ? 320 : 330;
+      const rawT = Math.round(estimateSessionTSS('race', 'MODERATE', projMin) * 0.9);
       slot.sessions = [{
         day: d,
-        type: 'bike',
+        type: 'race',
         name: gRace.event_name,
         description:
-          'Race day — 70.3: 1.2 mi swim, 56 mi bike, 13.1 mi run. No add-on training; execute pacing and fueling. Typical finish ~5:00–6:00.',
+          'Race day. Swim 1.2mi → Bike 56mi → Run 13.1mi. No add-on training; execute pacing and fueling.',
         duration: projMin,
         tss: rawT,
-        weighted_tss: weightedTSS('bike', rawT),
+        weighted_tss: weightedTSS('race', rawT),
         intensity_class: 'MODERATE',
         steps_preset: [],
         tags: ['tri_race', 'race_day', 'event', 'no_extra_training'],

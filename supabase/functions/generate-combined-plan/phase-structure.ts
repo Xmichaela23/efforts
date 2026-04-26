@@ -18,6 +18,37 @@ function weeksUntil(today: Date, target: Date): number {
   return Math.ceil((target.getTime() - today.getTime()) / (7 * 24 * 60 * 60 * 1000));
 }
 
+/** Parse YYYY-MM-DD to UTC noon (stable weekday). */
+function parseIsoToUtcNoon(iso: string): Date {
+  const [y, m, d] = String(iso).split('T')[0].split('-').map(Number);
+  if (!y || !m || !d) return new Date(iso);
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+}
+
+/** Monday 00:00 UTC of the calendar week that contains this instant. */
+function mondayUtcOfWeekContaining(d: Date): number {
+  const t = new Date(d.getTime());
+  const y = t.getUTCFullYear();
+  const mo = t.getUTCMonth();
+  const day = t.getUTCDate();
+  const x = new Date(Date.UTC(y, mo, day, 12, 0, 0));
+  const monOff = (x.getUTCDay() + 6) % 7;
+  x.setUTCDate(x.getUTCDate() - monOff);
+  x.setUTCHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
+/**
+ * 1-based plan week: same Monday-indexed week as `startDate` = week 1.
+ * Aligns `raceThisWeek` with the generator loop 1…N (not `ceil` weeks from start instant).
+ */
+export function planWeekForCalendarEvent(startDate: Date, eventDateIso: string): number {
+  const t0 = mondayUtcOfWeekContaining(startDate);
+  const t1 = mondayUtcOfWeekContaining(parseIsoToUtcNoon(eventDateIso));
+  const diffW = Math.floor((t1 - t0) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return Math.max(1, diffW);
+}
+
 function addWeeks(date: Date, weeks: number): Date {
   return new Date(date.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
 }
@@ -70,9 +101,10 @@ export function buildPhaseTimeline(
     aGoals.push(sortedGoals[0]);
   }
 
-  // Total plan length driven by the furthest A-goal
+  // Total plan length: end in the A-race week (Monday-indexed week = week 1 containing start)
   const lastAGoal = aGoals[aGoals.length - 1];
-  const totalWeeks = Math.min(52, Math.max(4, weeksUntil(startDate, new Date(lastAGoal.event_date))));
+  const aRaceWeek = planWeekForCalendarEvent(startDate, lastAGoal.event_date);
+  const totalWeeks = Math.min(52, Math.max(4, aRaceWeek));
 
   const blocks: PhaseBlock[] = [];
 
@@ -82,7 +114,7 @@ export function buildPhaseTimeline(
     .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
 
   const raceAnchors: RaceAnchor[] = chronoTri.map((g) => {
-    const pw = weeksUntil(startDate, new Date(g.event_date));
+    const pw = planWeekForCalendarEvent(startDate, g.event_date);
     return {
       goalId: g.id,
       eventName: g.event_name,
@@ -95,8 +127,8 @@ export function buildPhaseTimeline(
   if (chronoTri.length >= 2) {
     const g1 = chronoTri[0];
     const g2 = chronoTri[1];
-    const w1 = weeksUntil(startDate, new Date(g1.event_date));
-    const w2 = weeksUntil(startDate, new Date(g2.event_date));
+    const w1 = planWeekForCalendarEvent(startDate, g1.event_date);
+    const w2 = planWeekForCalendarEvent(startDate, g2.event_date);
     if (w1 >= 1 && w2 > w1) {
       // First race: own macrocycle ending week w1
       buildSingleEventBlocks(g1, 1, w1, blocks, athleteState);
@@ -118,13 +150,14 @@ export function buildPhaseTimeline(
     weeksUntil(new Date(aGoals[0].event_date), new Date(aGoals[1]?.event_date ?? aGoals[0].event_date))
   ) === 'sequential') {
     // Single A-race or sequential (> 16 weeks apart): each gets its own full cycle
-    buildSingleEventBlocks(aGoals[0], 1, weeksUntil(startDate, new Date(aGoals[0].event_date)), blocks, athleteState);
+    buildSingleEventBlocks(
+      aGoals[0], 1, planWeekForCalendarEvent(startDate, aGoals[0].event_date), blocks, athleteState);
     if (aGoals.length > 1) {
       // After first A-race: recovery + new cycle for the second
-      const firstRaceWeek = weeksUntil(startDate, new Date(aGoals[0].event_date));
+      const firstRaceWeek = planWeekForCalendarEvent(startDate, aGoals[0].event_date);
       const recoveryWeeks = Math.ceil((RECOVERY_DAYS_POST_RACE[aGoals[0].distance] ?? 7) / 7);
       const secondStart = firstRaceWeek + recoveryWeeks + 1;
-      const secondEnd   = weeksUntil(startDate, new Date(aGoals[1].event_date));
+      const secondEnd   = planWeekForCalendarEvent(startDate, aGoals[1].event_date);
       if (secondStart <= secondEnd) {
         insertRecoveryBlock(firstRaceWeek + 1, firstRaceWeek + recoveryWeeks, aGoals[0].id, blocks, athleteState);
         buildSingleEventBlocks(aGoals[1], secondStart, secondEnd - secondStart + 1, blocks, athleteState);
@@ -134,8 +167,8 @@ export function buildPhaseTimeline(
     // Sort A-goals by event date (not by priority) for gap math
     const aChrono = [...aGoals].sort(
       (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
-    const firstEnd  = weeksUntil(startDate, new Date(aChrono[0].event_date));
-    const secondEnd = weeksUntil(startDate, new Date(aChrono[1].event_date));
+    const firstEnd  = planWeekForCalendarEvent(startDate, aChrono[0].event_date);
+    const secondEnd = planWeekForCalendarEvent(startDate, aChrono[1].event_date);
     const gapWeeks  = secondEnd - firstEnd;
     const rel       = classifyEventRelationship(gapWeeks);
 
@@ -245,12 +278,27 @@ function buildAbbreviatedBlocks(
   blocks: PhaseBlock[],
   as: AthleteState,
 ) {
+  // Post–B-race A-race segment: no heavy `build` (threshold/VO2 peaks). Base + race-specific + taper only.
   const totalWeeks = endWeek - startWeek + 1;
-  const taperWks = Math.min(TAPER_WEEKS[goal.distance] ?? 2, Math.floor(totalWeeks / 2));
+  if (totalWeeks < 1) return;
   const dist = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
-  const buildEnd = endWeek - taperWks;
-  if (startWeek <= buildEnd) pushBlockRange(blocks, 'build', startWeek, buildEnd, goal, dist, as);
-  pushBlockRange(blocks, 'taper', buildEnd + 1, endWeek, goal, dist, as);
+  const taperWks = Math.min(TAPER_WEEKS[goal.distance] ?? 2, Math.max(1, Math.floor(totalWeeks * 0.45)));
+  const taperStartWeek = endWeek - taperWks + 1;
+  const preTaperEnd = taperStartWeek - 1;
+  if (preTaperEnd < startWeek) {
+    pushBlockRange(blocks, 'taper', startWeek, endWeek, goal, dist, as);
+    return;
+  }
+  const preTaperWeeks = preTaperEnd - startWeek + 1;
+  const rsWks = Math.min(3, Math.max(1, Math.floor(preTaperWeeks * 0.4)));
+  const rsStartWeek = preTaperEnd - rsWks + 1;
+  if (startWeek < rsStartWeek) {
+    pushBlockRange(blocks, 'base', startWeek, rsStartWeek - 1, goal, dist, as);
+  }
+  if (rsStartWeek <= preTaperEnd) {
+    pushBlockRange(blocks, 'race_specific', rsStartWeek, preTaperEnd, goal, dist, as);
+  }
+  pushBlockRange(blocks, 'taper', taperStartWeek, endWeek, goal, dist, as);
 }
 
 function buildSharedPeakBlocks(

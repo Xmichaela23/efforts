@@ -47,6 +47,19 @@ function priorFromLastImDistanceRace(
   return { total_seconds: Math.round(tt), race_date: dateStr };
 }
 
+/** Prefer bike leg course for tri elevation / research merge; else full; else any row. */
+function selectRaceCourseForTriProjection(
+  rows: { course_data?: unknown; elevation_gain_m?: number; leg?: string }[] | null,
+): { course_data?: unknown; elevation_gain_m?: number } | null {
+  if (!rows?.length) return null;
+  const L = (r: { leg?: string }) => String(r.leg || 'full');
+  const bike = rows.find((r) => L(r) === 'bike');
+  if (bike) return bike;
+  const full = rows.find((r) => L(r) === 'full');
+  if (full) return full;
+  return rows[0] ?? null;
+}
+
 export async function recomputeRaceProjectionsForUser(
   supabase: { from: (t: string) => any },
   userId: string,
@@ -192,14 +205,15 @@ export async function recomputeRaceProjectionsForUser(
 
     // ── TRI GOALS: splits model ───────────────────────────────────────────────
 
-    const { data: rc } = await supabase
+    const { data: rcRows } = await supabase
       .from('race_courses')
-      .select('course_data, elevation_gain_m')
+      .select('course_data, elevation_gain_m, leg')
       .eq('user_id', userId)
-      .eq('goal_id', gid)
-      .maybeSingle();
+      .eq('goal_id', gid);
 
-    const courseRow = rc as { course_data?: unknown; elevation_gain_m?: number } | null;
+    const courseRow = selectRaceCourseForTriProjection(rcRows || null) as
+      | { course_data?: unknown; elevation_gain_m?: number }
+      | null;
     const course_data = courseRow
       ? {
           ...(typeof courseRow.course_data === 'object' && courseRow.course_data !== null && !Array.isArray(courseRow.course_data)

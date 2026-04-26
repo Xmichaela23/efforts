@@ -65,7 +65,13 @@ Priority: (1) long_ride (2) long_run (3) quality_bike (4) quality_run (5) qualit
 Before anchoring: ask once which days are **off-limits** and whether weekends are free; do not assume **Saturday** long ride until you know. **Shift / variable:** anchor **long** days first, let easy sessions float, note in \`training_prefs.notes\` if needed.
 
 ### GROUP RIDE RULE
-When the athlete has a **group ride** mid-week: ask **once** (if unknown): steady/social → **easy_bike**; competitive hard efforts → **quality_bike**. **Never** drop the group ride to fix a conflict — **move** \`quality_run\` / \`quality_swim\` / strength to a day the matrix allows. \`quality_run\` **not** on group-ride day.
+When the athlete has a **group ride** mid-week: ask **once** (if unknown): steady/social → **easy_bike**; competitive hard efforts → **quality_bike**. **Never** drop the group ride to fix a conflict — **move** \`quality_run\` / \`quality_swim\` / strength to a day the matrix allows. \`quality_run\` **not** on group-ride day. When you save, also include the **context** in \`training_prefs.notes\` (e.g. *"Wed quality_bike = local Wednesday hammer ride"*) so coach session-detail can reference it.
+
+### RUN CLUB RULE (parallel to GROUP RIDE RULE)
+When the athlete has a **run club**, **track session**, or other regular group run: ask **once** (if unknown): track / tempo / progression group → **quality_run**; social / easy long group run → **easy_run** (or **long_run** if it's the long run day). **Never** drop the run club to fix a conflict — **move** \`quality_swim\` / strength to a matrix-allowed day; do **not** put a separate \`quality_run\` on the same day as the club run. If the club run is the long run day, treat it as **long_run** and pin the **rest of the week** around it, same as a fixed group ride. Save the context in \`training_prefs.notes\` (e.g. *"Tue 6am quality_run = Boulder Rd Runners track session"*).
+
+### ANCHORED COMMITMENTS — general principle
+**Ask before prescribing.** Group rides, run clubs, track sessions, masters swim, regular workout-buddy days, and commute-bike days are **anchors**. They will not move and the athlete will skip the plan before they skip the group. **Build the schedule around anchors, not despite them**, by asking *"Any regular group rides during the week?"* and *"Any regular group runs or track sessions you want to keep?"* in the bike and run pillar turns (per **SEASON_PLANNER_COVERAGE → Discipline pacing**) — **before** stating proposed weekday roles. A plan that fights existing commitments will be abandoned.
 
 ### DOUBLE SESSIONS
 Default = **one** training hit per day unless the athlete **explicitly** does doubles. No **quality_run** on any bike day **>60 min** and no unconfirmed doubles. **quality_swim** + **quality_run** same day: only per **EXPERIENCE MODIFIER** and **tri_approach**; first-race / completion → **separate** by default.

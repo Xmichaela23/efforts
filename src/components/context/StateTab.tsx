@@ -1001,6 +1001,13 @@ export default function StateTab({
       fd.append('file', file);
       fd.append('name', `${String(gRow?.name || raceReadiness?.goal?.name || 'Race')} course`);
       fd.append('goal_id', resolvedGoalId);
+      const rd =
+        gRow?.target_date != null
+          ? String(gRow.target_date).slice(0, 10)
+          : raceReadiness?.goal?.target_date != null
+            ? String(raceReadiness.goal.target_date).slice(0, 10)
+            : '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(rd)) fd.append('race_date', rd);
       const { data: up, error: upErr } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
       if (upErr || !up?.course_id) {
         window.alert(upErr?.message || 'Upload failed');

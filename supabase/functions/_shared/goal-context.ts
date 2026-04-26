@@ -126,7 +126,7 @@ function isRunGoalLite(g: GoalLite | null | undefined): boolean {
  * course-detail anchors to `race_courses.goal_id`. Coach must prefer the same goal or State diverges from terrain.
  *
  * Priority:
- * 1) Unique goal_id across user's race_courses (single uploaded course)
+ * 1) race_courses keyed by (goal_id, leg) — tri: swim + bike + run; run events: leg `full`
  * 2) activePlan.goal_id when present in race_courses (multi-course)
  * 3) primary_event (run)
  * 4) active plan linked goal + plan_id on goal rows

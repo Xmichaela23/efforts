@@ -1,7 +1,7 @@
 // generate-combined-plan/types.ts
 // All type definitions for the multi-sport combined plan engine.
 
-export type Sport = 'run' | 'bike' | 'swim' | 'strength';
+export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
 export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery';
 export type Priority = 'A' | 'B' | 'C';

@@ -35,6 +35,7 @@ import {
 } from '../_shared/resolve-server-predicted-finish.ts';
 import { fetchRaceWeatherArchive } from '../_shared/fetch-race-weather-archive.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
+import { findGoalForCourse } from '../_shared/match-goal-for-course.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -92,7 +93,10 @@ function extractDrift(wa: Record<string, unknown> | null): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
+type StrategyLeg = 'swim' | 'bike' | 'run' | 'full';
+
 function buildPrompt(params: {
+  roleIntro: string;
   segments: Record<string, unknown>[];
   easy: string;
   threshold: string;
@@ -102,8 +106,9 @@ function buildPrompt(params: {
   goalTime: string;
   impliedAvg: string;
   pacingContextLines: string;
+  legExtraInstructions: string;
 }): string {
-  return `You are a running coach building a race-day pacing strategy.
+  return `${params.roleIntro}
 
 Course segments (geometry):
 ${JSON.stringify(params.segments)}
@@ -116,6 +121,7 @@ Athlete profile:
 - Recent long run: ${params.longRun}
 - Race pacing target (anchor all pace bands to this finish time and implied average pace): ${params.goalTime} (${params.impliedAvg}/mi average)
 ${params.pacingContextLines}
+${params.legExtraInstructions}
 
 Instructions:
 1. Group adjacent segments of similar terrain into display groups. For a full marathon, target about 7 groups (roughly 6–9); scale down for shorter races. Do not merge distinct terrain episodes—if geometry separates a steep descent from different rolling flats, keep separate display groups rather than one mega-segment.
@@ -166,9 +172,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'course_id required' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  const { data: course, error: cErr } = await supabase
+  let { data: course, error: cErr } = await supabase
     .from('race_courses')
-    .select('id, user_id, goal_id, elevation_profile, distance_m, name, polyline')
+    .select('id, user_id, goal_id, leg, elevation_profile, distance_m, name, polyline, race_date')
     .eq('id', courseId)
     .maybeSingle();
 
@@ -177,7 +183,61 @@ Deno.serve(async (req) => {
   }
 
   if (!course.goal_id) {
-    return new Response(JSON.stringify({ error: 'Link this course to a goal before generating strategy' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+    const matched = await findGoalForCourse(supabase, user.id, {
+      courseName: String(course.name || 'Race course'),
+      courseDate: (course as { name: string; race_date?: string | null }).race_date ?? null,
+    });
+    if (matched) {
+      const leg = String((course as { leg?: string }).leg || 'full');
+      const { data: other } = await supabase
+        .from('race_courses')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('goal_id', matched.id)
+        .eq('leg', leg)
+        .neq('id', courseId)
+        .maybeSingle();
+      if (other?.id) {
+        await supabase.from('race_courses').update({ goal_id: null }).eq('id', other.id);
+        console.warn(
+          '[course-strategy] cleared goal_id on race_courses',
+          other.id,
+          'so course',
+          courseId,
+          'can link to',
+          matched.id,
+          'leg',
+          leg,
+        );
+      }
+      const { error: linkErr } = await supabase
+        .from('race_courses')
+        .update({ goal_id: matched.id })
+        .eq('id', courseId);
+      if (linkErr) {
+        console.error('[course-strategy] auto-link goal', linkErr);
+        return new Response(JSON.stringify({ error: 'Could not link course to goal' }), {
+          status: 500,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      course = { ...course, goal_id: matched.id };
+      console.warn('[course-strategy] auto-linked course', courseId, 'to goal', matched.id, matched.name);
+    } else {
+      console.warn(
+        '[course-strategy] no goal_id on course and no match by name/date:',
+        courseId,
+        String(course.name),
+        (course as { race_date?: string | null }).race_date,
+      );
+      return new Response(
+        JSON.stringify({
+          error:
+            'This course is not linked to a goal. Add goal_id, set race_date on the course, or use a name that matches an event goal.',
+        }),
+        { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } },
+      );
+    }
   }
 
   // Use select('*') so we still load the goal if race_readiness_projection column is not migrated yet.
@@ -305,6 +365,47 @@ Deno.serve(async (req) => {
       `- Pace anchor: baseline fitness projection ${fmtFinishClock(anchor.seconds)} (no coach cache match and no plan target in goal/plan config).\n`;
   }
 
+  const courseLeg: StrategyLeg = (() => {
+    const l = String((course as { leg?: string }).leg || 'full').toLowerCase();
+    if (l === 'swim' || l === 'bike' || l === 'run' || l === 'full') return l;
+    return 'full';
+  })();
+  const proj = (goal as Record<string, unknown>).projection as Record<string, unknown> | null;
+  let legTargetSec = goalTimeSec;
+  if (courseLeg === 'swim' && proj && typeof proj.swim_min === 'number') {
+    legTargetSec = Math.round(Number(proj.swim_min) * 60);
+  } else if (courseLeg === 'bike' && proj && typeof proj.bike_min === 'number') {
+    legTargetSec = Math.round(Number(proj.bike_min) * 60);
+  } else if (courseLeg === 'run' && proj && typeof proj.run_min === 'number') {
+    legTargetSec = Math.round(Number(proj.run_min) * 60);
+  } else if (courseLeg === 'swim') {
+    legTargetSec = Math.max(600, Math.round(goalTimeSec * 0.19));
+  } else if (courseLeg === 'bike') {
+    legTargetSec = Math.max(1200, Math.round(goalTimeSec * 0.5));
+  } else if (courseLeg === 'run') {
+    legTargetSec = Math.max(900, Math.round(goalTimeSec * 0.29));
+  }
+  if (courseLeg !== 'full') {
+    pacingContextLines +=
+      `- Leg strategy: **${courseLeg}** — split time ~${fmtFinishClock(legTargetSec)} from projection (full-race clock ${fmtFinishClock(goalTimeSec)}).\n`;
+  }
+  if (course.goal_id) {
+    const { data: legSiblings } = await supabase
+      .from('race_courses')
+      .select('id, name, leg, strategy_updated_at')
+      .eq('user_id', user.id)
+      .eq('goal_id', String(course.goal_id));
+    const sibSummary = (legSiblings || [])
+      .map((r) => {
+        const o = r as { leg?: string; name?: string };
+        return `${String(o.leg || '?')}:${String(o.name || '')}`;
+      })
+      .join(' | ');
+    if (sibSummary) {
+      pacingContextLines += `- Other course legs for this goal: ${sibSummary}.\n`;
+    }
+  }
+
   const rawProfile = normalizeElevationProfile(course.elevation_profile);
   if (rawProfile.length < 2) {
     return new Response(JSON.stringify({ error: 'Invalid elevation profile' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -387,13 +488,17 @@ Deno.serve(async (req) => {
   };
   const snapHash = await hashAthleteSnapshot(snapshot);
 
-  const distMi = goalDistanceMi(goal.distance as string);
+  const mFromRow = Number((course as { distance_m?: number }).distance_m) || 0;
+  const distMi = mFromRow > 0
+    ? mFromRow / 1609.344
+    : (goalDistanceMi(String(goal.distance || '')) || 26.2);
 
-  // Adjust goal time for course terrain before handing to LLM.
-  // Walk the elevation profile with +10 s/mi per 1% uphill (cap +60) / -6 s/mi per 1% downhill (cap -20).
-  let terrainGoalTimeSec = goalTimeSec;
-  if (distMi > 0 && smoothed.length >= 2) {
-    const flatPace = goalTimeSec / distMi;
+  const timeBaseForTerrain = courseLeg === 'full' ? goalTimeSec : legTargetSec;
+
+  // Adjust goal time for course terrain (bike/run; skip swim OWS grade heuristics here).
+  let terrainGoalTimeSec = courseLeg === 'swim' ? legTargetSec : timeBaseForTerrain;
+  if (courseLeg !== 'swim' && distMi > 0 && smoothed.length >= 2) {
+    const flatPace = timeBaseForTerrain / distMi;
     let accSec = 0;
     for (let i = 1; i < smoothed.length; i++) {
       const p1 = smoothed[i - 1];
@@ -405,15 +510,34 @@ Deno.serve(async (req) => {
       accSec += (flatPace + gradeAdj) * (segDistM / 1609.344);
     }
     const rounded = Math.round(accSec);
-    if (Math.abs(rounded - goalTimeSec) > 15) {
+    if (Math.abs(rounded - timeBaseForTerrain) > 15) {
       terrainGoalTimeSec = rounded;
-      pacingContextLines += `- Terrain-adjusted finish target: ${fmtFinishClock(terrainGoalTimeSec)} (grade-adjusted from flat projection ${fmtFinishClock(goalTimeSec)} based on course elevation profile).\n`;
+      pacingContextLines += `- Terrain-adjusted **leg** target: ${fmtFinishClock(terrainGoalTimeSec)} (from flat leg split ${fmtFinishClock(timeBaseForTerrain)} using course profile).\n`;
     }
   }
 
   const implied = impliedAvgPaceSecPerMi(terrainGoalTimeSec, distMi);
 
+  const ftpW = Number(pn.ftp ?? pn.ftp_watts ?? pn.ftpWatts) || null;
+  let roleIntro = 'You are a running coach building a race-day pacing strategy.';
+  let legExtraInstructions = '';
+  if (courseLeg === 'bike') {
+    roleIntro =
+      'You are a triathlon / time-trial bike pacing coach. Use the same JSON output schema; pace sec/mi fields represent **sustainable road effort** along the course (pair with %FTP in cues when the athlete has FTP).';
+    legExtraInstructions =
+      (ftpW ? `- Estimated FTP: ~${Math.round(ftpW)}W.\n` : '') +
+      '- Use elevation in segments; note fueling on long or late climbs.\n';
+  } else if (courseLeg === 'swim') {
+    roleIntro =
+      'You are an open-water swim coach. Use the same JSON output schema; map pace bands to **steady OWS effort** and sighting — segments may be short; reference buoys, turns, and conditions in cues.';
+    legExtraInstructions = '- Emphasize sighting, navigation, and even pacing; avoid run-specific mile markers in cues.\n';
+  } else if (courseLeg === 'run' && ['triathlon', 'tri'].includes(String(goal.sport || '').toLowerCase())) {
+    legExtraInstructions =
+      '- **Triathlon run leg** off the bike: expect elevated HR for a given pace; start conservative.\n';
+  }
+
   const prompt = buildPrompt({
+    roleIntro,
     segments: geometryToPromptSegments(geometry),
     easy: easySec != null ? fmtPaceClock(easySec) : 'unknown',
     threshold: threshSec != null ? fmtPaceClock(threshSec) : 'unknown',
@@ -425,6 +549,7 @@ Deno.serve(async (req) => {
     goalTime: fmtFinishClock(terrainGoalTimeSec),
     impliedAvg: fmtPaceClock(implied),
     pacingContextLines: pacingContextLines.trimEnd(),
+    legExtraInstructions: legExtraInstructions.trimEnd(),
   });
 
   const ph = await promptHash(prompt);

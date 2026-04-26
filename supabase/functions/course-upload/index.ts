@@ -1,6 +1,8 @@
 /**
  * course-upload — GPX → race_courses + course_segments (geometry only).
- * POST: multipart field "file" (.gpx) OR JSON { gpx_text, name?, goal_id? }
+ * POST: multipart "file" (.gpx) OR JSON { gpx_text, name?, goal_id?, race_date?, leg? }
+ * leg: swim | bike | run | full (optional — inferred from file + name; default full for single-discipline races).
+ * One row per (goal_id, leg) for triathlon; re-uploading the same leg replaces that leg only.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import {
@@ -10,6 +12,8 @@ import {
   segmentCourseFromProfile,
   profileToJson,
 } from '../_shared/course-segmentation.ts';
+import { findGoalForCourse } from '../_shared/match-goal-for-course.ts';
+import { inferRaceCourseLeg, normalizeRaceCourseLeg, type RaceCourseLeg } from '../_shared/infer-race-course-leg.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +59,9 @@ Deno.serve(async (req) => {
   let gpxText = '';
   let name = 'Race course';
   let goalId: string | null = null;
+  let raceDate: string | null = null;
+  let fileHint = '';
+  let legResolved: RaceCourseLeg = 'full';
 
   const ct = req.headers.get('content-type') || '';
   if (ct.includes('multipart/form-data')) {
@@ -63,15 +70,25 @@ Deno.serve(async (req) => {
     name = String(form.get('name') || name).slice(0, 200);
     const gid = form.get('goal_id');
     if (gid) goalId = String(gid);
+    const rd = form.get('race_date');
+    if (rd) raceDate = String(rd).trim().slice(0, 10);
+    const legParam = normalizeRaceCourseLeg(String(form.get('leg') || ''));
     if (file instanceof File) {
+      fileHint = file.name || '';
       gpxText = await file.text();
     }
+    legResolved = legParam ?? inferRaceCourseLeg(name, fileHint);
   } else {
     try {
       const body = await req.json();
       gpxText = String(body.gpx_text || body.gpx || '');
       if (body.name) name = String(body.name).slice(0, 200);
       if (body.goal_id) goalId = String(body.goal_id);
+      if (body.race_date) raceDate = String(body.race_date).trim().slice(0, 10);
+      const legParam = normalizeRaceCourseLeg(
+        body.leg != null && typeof body.leg === 'string' ? body.leg : null,
+      );
+      legResolved = legParam ?? inferRaceCourseLeg(name, body.file_name as string | undefined);
     } catch {
       return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
@@ -82,14 +99,34 @@ Deno.serve(async (req) => {
   }
 
   if (goalId) {
-    const { data: g, error: ge } = await supabase.from('goals').select('id, user_id').eq('id', goalId).maybeSingle();
+    const { data: g, error: ge } = await supabase.from('goals').select('id, user_id, target_date').eq('id', goalId).maybeSingle();
     if (ge || !g || g.user_id !== user.id) {
       return new Response(JSON.stringify({ error: 'Invalid goal_id' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
-    // Clear any existing row for this goal (unique partial index on goal_id) — check delete errors.
-    const { error: delErr } = await supabase.from('race_courses').delete().eq('goal_id', goalId);
+    if (!raceDate && g.target_date) {
+      raceDate = String(g.target_date).slice(0, 10);
+    }
+  } else {
+    const matched = await findGoalForCourse(supabase, user.id, {
+      courseName: name,
+      courseDate: raceDate,
+    });
+    if (matched) {
+      goalId = matched.id;
+      if (!raceDate && matched.target_date) {
+        raceDate = String(matched.target_date).slice(0, 10);
+      }
+    }
+  }
+
+  if (goalId) {
+    const { error: delErr } = await supabase
+      .from('race_courses')
+      .delete()
+      .eq('goal_id', goalId)
+      .eq('leg', legResolved);
     if (delErr) {
-      console.error('[course-upload] delete existing by goal_id', delErr);
+      console.error('[course-upload] delete existing by goal_id+leg', delErr);
       return new Response(JSON.stringify({ error: pgErr(delErr) }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
   }
@@ -113,11 +150,13 @@ Deno.serve(async (req) => {
       user_id: user.id,
       goal_id: goalId,
       name,
+      leg: legResolved,
       source: 'gpx',
       distance_m: totalM,
       elevation_gain_m: gain_m,
       elevation_loss_m: loss_m,
       elevation_profile: elevationJson,
+      ...(raceDate && /^\d{4}-\d{2}-\d{2}$/.test(raceDate) ? { race_date: raceDate } : {}),
     })
     .select('id')
     .single();
@@ -156,11 +195,17 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.warn('[course-upload] recompute goal projection', e);
     }
+  } else {
+    console.warn(
+      '[course-upload] no goal_id resolved (pass goal_id, race_date, or a name matching an event goal)',
+    );
   }
 
   return new Response(
     JSON.stringify({
       course_id: courseId,
+      goal_id: goalId,
+      leg: legResolved,
       distance_mi: Math.round((totalM / 1609.344) * 100) / 100,
       elevation_gain_ft: Math.round(gain_m * FT_PER_M),
       elevation_loss_ft: Math.round(loss_m * FT_PER_M),

@@ -112,10 +112,13 @@ Deno.serve(async (req) => {
 
   let courseId: string | null = null;
   let goalId: string | null = null;
+  let legParam: 'swim' | 'bike' | 'run' | 'full' | null = null;
   try {
     const body = await req.json() as Record<string, unknown>;
     courseId = body.course_id ? String(body.course_id) : null;
     goalId = body.goal_id ? String(body.goal_id) : null;
+    const l = body.leg != null ? String(body.leg).toLowerCase() : '';
+    if (l === 'swim' || l === 'bike' || l === 'run' || l === 'full') legParam = l;
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -125,8 +128,26 @@ Deno.serve(async (req) => {
   }
 
   if (!courseId && goalId) {
-    const { data: rc } = await supabase.from('race_courses').select('id').eq('goal_id', goalId).eq('user_id', user.id).maybeSingle();
+    const leg = legParam ?? 'full';
+    const { data: rc } = await supabase
+      .from('race_courses')
+      .select('id')
+      .eq('goal_id', goalId)
+      .eq('user_id', user.id)
+      .eq('leg', leg)
+      .maybeSingle();
     courseId = rc?.id ?? null;
+    if (!courseId && !legParam) {
+      const { data: rcFallback } = await supabase
+        .from('race_courses')
+        .select('id, leg')
+        .eq('goal_id', goalId)
+        .eq('user_id', user.id)
+        .order('leg', { ascending: true })
+        .limit(1);
+      const r0 = Array.isArray(rcFallback) && rcFallback[0] ? rcFallback[0] as { id: string } : null;
+      courseId = r0?.id ?? null;
+    }
   }
 
   if (!courseId) {
@@ -135,7 +156,7 @@ Deno.serve(async (req) => {
 
   const { data: course, error: cErr } = await supabase
     .from('race_courses')
-    .select('id, user_id, goal_id, name, distance_m, elevation_gain_m, elevation_loss_m, elevation_profile, strategy_updated_at, athlete_snapshot_hash')
+    .select('id, user_id, goal_id, name, leg, distance_m, elevation_gain_m, elevation_loss_m, elevation_profile, strategy_updated_at, athlete_snapshot_hash')
     .eq('id', courseId)
     .maybeSingle();
 

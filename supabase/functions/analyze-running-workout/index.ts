@@ -2406,9 +2406,7 @@ Deno.serve(async (req) => {
           conditions?: string | null;
         } | null = null;
         if (goalRaceCompletionMatch.goalId) {
-          const { data: rc } = await supabase
-            .from('race_courses')
-            .select(`
+          const rcSelect = `
               start_temp_f,
               finish_temp_f,
               humidity_pct,
@@ -2426,10 +2424,30 @@ Deno.serve(async (req) => {
                 target_hr_low,
                 target_hr_high
               )
-            `)
-            .eq('user_id', workout.user_id)
-            .eq('goal_id', goalRaceCompletionMatch.goalId)
-            .maybeSingle();
+            `;
+          let rc: Record<string, unknown> | null = null;
+          for (const leg of ['run', 'full'] as const) {
+            const { data: one } = await supabase
+              .from('race_courses')
+              .select(rcSelect)
+              .eq('user_id', workout.user_id)
+              .eq('goal_id', goalRaceCompletionMatch.goalId)
+              .eq('leg', leg)
+              .maybeSingle();
+            if (one) {
+              rc = one as Record<string, unknown>;
+              break;
+            }
+          }
+          if (!rc) {
+            const { data: rows } = await supabase
+              .from('race_courses')
+              .select(rcSelect)
+              .eq('user_id', workout.user_id)
+              .eq('goal_id', goalRaceCompletionMatch.goalId)
+              .limit(1);
+            rc = Array.isArray(rows) && rows[0] ? (rows[0] as Record<string, unknown>) : null;
+          }
           if (rc) {
             courseStrategyWeather = {
               start_temp_f: rc.start_temp_f,

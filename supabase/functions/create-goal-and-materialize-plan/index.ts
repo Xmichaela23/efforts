@@ -19,6 +19,15 @@ import {
   readDaysPerWeekFromPrefs,
 } from '../_shared/combined-schedule-prefs.ts';
 import {
+  deriveOptimalWeek,
+  normalizeDayName,
+  validatePreferredDays,
+  type AnchorWithIntensity,
+  type DayName,
+  type PreferredDaysOut,
+  type WeekOptimizerInputs,
+} from '../_shared/week-optimizer.ts';
+import {
   hasBarbellCapability,
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
@@ -484,18 +493,6 @@ function mergeTrainingPrefsWithArcDefaults(
   return tp;
 }
 
-/** Default schedule when Arc/client omitted `preferred_days` (Sun=0 week-builder convention). */
-const DEFAULT_TRI_PREFERRED_DAYS = {
-  long_ride: 'saturday',
-  long_run: 'sunday',
-  quality_bike: 'tuesday',
-  easy_bike: 'wednesday',
-  quality_run: 'wednesday',
-  easy_run: 'friday',
-  strength: ['monday', 'wednesday'],
-  swim: ['monday', 'thursday'],
-} as const;
-
 function inferStrengthIntentFromAthleteIdentity(arc: ArcContext): 'support' | 'performance' {
   const id = arc.athlete_identity;
   if (!id || typeof id !== 'object') return 'support';
@@ -507,9 +504,51 @@ function inferStrengthIntentFromAthleteIdentity(arc: ArcContext): 'support' | 'p
   return 'support';
 }
 
+function inferTrainingIntentFromPrefs(
+  trainingPrefs: Record<string, unknown>,
+): 'performance' | 'completion' | 'first_race' | 'comeback' | undefined {
+  const raw = trainingPrefs.training_intent ?? trainingPrefs.trainingIntent;
+  const s = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (s === 'performance' || s === 'completion' || s === 'first_race' || s === 'comeback') return s;
+  return undefined;
+}
+
+/** Pull a normalized day name from preferred_days under any of the accepted aliases. */
+function pdDay(pd: Record<string, unknown> | null, ...keys: string[]): DayName | undefined {
+  if (!pd) return undefined;
+  for (const k of keys) {
+    const v = normalizeDayName(pd[k]);
+    if (v) return v;
+  }
+  return undefined;
+}
+
+/** Pull a day-name array under any alias. */
+function pdDays(pd: Record<string, unknown> | null, ...keys: string[]): DayName[] | undefined {
+  if (!pd) return undefined;
+  for (const k of keys) {
+    const v = pd[k];
+    if (Array.isArray(v)) {
+      const out = v.map((x) => normalizeDayName(x)).filter((x): x is DayName => !!x);
+      if (out.length) return out;
+    }
+  }
+  return undefined;
+}
+
 /**
- * Defense in depth: ensure tri goals have `strength_intent` and `preferred_days` before any generator runs.
- * Mutates `trainingPrefs` in place. Returns human-readable notes for logging (empty if nothing changed).
+ * Defense in depth: ensure tri goals have `strength_intent` and a matrix-valid
+ * `preferred_days` before any generator runs. Replaces the legacy static
+ * DEFAULT_TRI_PREFERRED_DAYS fallback (which produced sequential conflicts) with
+ * the executable matrix-as-code derivation in `_shared/week-optimizer.ts`.
+ *
+ * Behavior:
+ *  - If `preferred_days` is missing → derive a complete week from anchors + prefs.
+ *  - If `preferred_days` is present and validates clean → leave it alone.
+ *  - If `preferred_days` is present but fails the matrix → re-derive, treating the
+ *    user's existing slots as anchors (so we honor the athlete's intent).
+ *
+ * Mutates `trainingPrefs` in place. Returns human-readable notes for logging.
  */
 function backfillTriTrainingPrefsDefenseInDepth(
   trainingPrefs: Record<string, unknown>,
@@ -521,47 +560,94 @@ function backfillTriTrainingPrefsDefenseInDepth(
     trainingPrefs.strength_intent = inferStrengthIntentFromAthleteIdentity(arc);
     notes.push(`strength_intent→${trainingPrefs.strength_intent}`);
   }
+
   const pdRaw = trainingPrefs.preferred_days ?? trainingPrefs.preferredDays;
-  const pd = pdRaw && typeof pdRaw === 'object' && !Array.isArray(pdRaw) ? (pdRaw as Record<string, unknown>) : null;
-  const hasPreferred =
+  const pd = pdRaw && typeof pdRaw === 'object' && !Array.isArray(pdRaw)
+    ? (pdRaw as Record<string, unknown>)
+    : null;
+
+  // ── Pull existing slots as anchors / preferences for the optimizer ───────
+  const longRide = pdDay(pd, 'long_ride', 'longRide');
+  const longRun = pdDay(pd, 'long_run', 'longRun');
+  const qualityBike = pdDay(pd, 'quality_bike', 'qualityBike', 'bike_quality');
+  const qualityRunDay = pdDay(pd, 'quality_run', 'qualityRun', 'run_quality');
+  const easyBikeDay = pdDay(pd, 'easy_bike', 'easyBike', 'bike_easy');
+  const easyRunDay = pdDay(pd, 'easy_run', 'easyRun', 'run_easy');
+  const swimDays = pdDays(pd, 'swim');
+  const strengthDaysIn = pdDays(pd, 'strength', 'strength_days');
+
+  const dpw = readDaysPerWeekFromPrefs(trainingPrefs) ?? 7;
+  const trainingDays = (Math.max(4, Math.min(7, Math.round(dpw))) as 4 | 5 | 6 | 7);
+  const swimsPerWeek = (() => {
+    const n = Math.max(0, Math.min(3, swimDays?.length ?? 2));
+    return n as 0 | 1 | 2 | 3;
+  })();
+  const strengthFreq = (() => {
+    const n = Math.max(0, Math.min(3, strengthDaysIn?.length ?? 2));
+    return n as 0 | 1 | 2 | 3;
+  })();
+  const restDaysIn = pdDays(trainingPrefs as Record<string, unknown>, 'rest_days', 'restDays');
+
+  const trainingIntent = inferTrainingIntentFromPrefs(trainingPrefs);
+  const strengthIntent = trainingPrefs.strength_intent === 'performance' ? 'performance' : 'support';
+
+  const inputs: WeekOptimizerInputs = {
+    anchors: {
+      ...(longRide ? { long_ride: longRide } : {}),
+      ...(longRun ? { long_run: longRun } : {}),
+      ...(qualityBike ? { quality_bike: qualityBike } : {}),
+    },
+    preferences: {
+      swims_per_week: swimsPerWeek,
+      strength_frequency: strengthFreq,
+      training_days: trainingDays,
+      ...(restDaysIn?.length ? { rest_days: restDaysIn } : {}),
+    },
+    athlete: {
+      ...(trainingIntent ? { training_intent: trainingIntent } : {}),
+      strength_intent: strengthIntent as 'performance' | 'support',
+    },
+  };
+
+  // ── Decide whether to derive ─────────────────────────────────────────────
+  const hasFullPreferred =
     pd != null &&
-    (pd.long_ride != null || pd.longRide != null) &&
-    (pd.long_run != null || pd.longRun != null) &&
-    Array.isArray(pd.strength) &&
-    pd.strength.length > 0 &&
-    Array.isArray(pd.swim) &&
-    pd.swim.length > 0;
-  if (!hasPreferred) {
-    trainingPrefs.preferred_days = {
-      long_ride: DEFAULT_TRI_PREFERRED_DAYS.long_ride,
-      long_run: DEFAULT_TRI_PREFERRED_DAYS.long_run,
-      quality_bike: DEFAULT_TRI_PREFERRED_DAYS.quality_bike,
-      easy_bike: DEFAULT_TRI_PREFERRED_DAYS.easy_bike,
-      quality_run: DEFAULT_TRI_PREFERRED_DAYS.quality_run,
-      easy_run: DEFAULT_TRI_PREFERRED_DAYS.easy_run,
-      strength: [...DEFAULT_TRI_PREFERRED_DAYS.strength],
-      swim: [...DEFAULT_TRI_PREFERRED_DAYS.swim],
-    };
-    notes.push('preferred_days→defaults');
-  } else if (pd) {
-    let touched = false;
-    if (pd.quality_run == null && pd.qualityRun == null) {
-      pd.quality_run = DEFAULT_TRI_PREFERRED_DAYS.quality_run;
-      touched = true;
-    }
-    if (pd.easy_run == null && pd.easyRun == null) {
-      pd.easy_run = DEFAULT_TRI_PREFERRED_DAYS.easy_run;
-      touched = true;
-    }
-    if (pd.quality_bike == null && pd.qualityBike == null && pd.bike_quality == null) {
-      pd.quality_bike = DEFAULT_TRI_PREFERRED_DAYS.quality_bike;
-      touched = true;
-    }
-    if (pd.easy_bike == null && pd.easyBike == null && pd.bike_easy == null) {
-      pd.easy_bike = DEFAULT_TRI_PREFERRED_DAYS.easy_bike;
-      touched = true;
-    }
-    if (touched) notes.push('preferred_days→run_bike_defaults');
+    longRide && longRun &&
+    qualityBike && easyBikeDay && qualityRunDay && easyRunDay &&
+    Array.isArray(strengthDaysIn) && strengthDaysIn.length > 0 &&
+    Array.isArray(swimDays) && swimDays.length > 0;
+
+  // Build a candidate normalized PreferredDaysOut from existing fields for validation.
+  const candidate: PreferredDaysOut = {
+    ...(longRide ? { long_ride: longRide } : {}),
+    ...(longRun ? { long_run: longRun } : {}),
+    ...(qualityBike ? { quality_bike: qualityBike } : {}),
+    ...(easyBikeDay ? { easy_bike: easyBikeDay } : {}),
+    ...(qualityRunDay ? { quality_run: qualityRunDay } : {}),
+    ...(easyRunDay ? { easy_run: easyRunDay } : {}),
+    ...(swimDays?.length ? { swim: swimDays } : {}),
+    ...(strengthDaysIn?.length ? { strength: strengthDaysIn } : {}),
+  };
+
+  const validationErrors = hasFullPreferred
+    ? validatePreferredDays(candidate, inputs.athlete)
+    : ['incomplete preferred_days'];
+
+  if (validationErrors.length === 0) {
+    // User-provided week is matrix-clean; nothing to do.
+    return notes;
+  }
+
+  // Derive a fresh, matrix-valid week.
+  const optimal = deriveOptimalWeek(inputs);
+  const merged: Record<string, unknown> = { ...optimal.preferred_days };
+  trainingPrefs.preferred_days = merged;
+  notes.push(`preferred_days→optimizer (${hasFullPreferred ? 'invalid input' : 'incomplete input'})`);
+  if (optimal.trade_offs.length) {
+    notes.push(`trade_offs: ${optimal.trade_offs.join(' | ')}`);
+  }
+  if (optimal.conflicts.length) {
+    notes.push(`conflicts: ${optimal.conflicts.join(' | ')}`);
   }
   return notes;
 }

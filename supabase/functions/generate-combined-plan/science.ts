@@ -14,6 +14,7 @@ export const SPORT_IMPACT_MULTIPLIER: Record<Sport, number> = {
   bike:     1.0,
   swim:     0.8,
   strength: 1.0, // treated as bike-equivalent systemic stress
+  race:     1.0, // multi-sport / tri event day (bike-like systemic cost)
 };
 
 // Strength TSS counts at 50% toward the weekly budget (§12.2 open question default)
@@ -37,6 +38,7 @@ export const TSS_PER_HOUR: Record<Sport, Record<Intensity, number>> = {
   bike:     { EASY: 50, MODERATE: 70, HARD: 100 },
   swim:     { EASY: 35, MODERATE: 55, HARD:  75 },
   strength: { EASY: 40, MODERATE: 55, HARD:  75 },
+  race:     { EASY: 50, MODERATE: 70, HARD: 100 },
 };
 
 export function estimateSessionTSS(
@@ -98,18 +100,18 @@ export function projectedCTL(currentCTL: number, weeklyWeightedTSS: number): num
 // ── §2.1  Sport distribution by triathlon distance ───────────────────────────
 // Values are midpoints; limiter_sport shift applied separately.
 export const TRI_SPORT_DIST: Record<string, Record<Sport, number>> = {
-  sprint:  { swim: 0.22, bike: 0.38, run: 0.32, strength: 0.08 },
-  olympic: { swim: 0.22, bike: 0.42, run: 0.30, strength: 0.06 },
-  '70.3':  { swim: 0.18, bike: 0.50, run: 0.26, strength: 0.06 },
-  ironman: { swim: 0.13, bike: 0.55, run: 0.26, strength: 0.06 },
+  sprint:  { swim: 0.22, bike: 0.38, run: 0.32, strength: 0.08, race: 0 },
+  olympic: { swim: 0.22, bike: 0.42, run: 0.30, strength: 0.06, race: 0 },
+  '70.3':  { swim: 0.18, bike: 0.50, run: 0.26, strength: 0.06, race: 0 },
+  ironman: { swim: 0.13, bike: 0.55, run: 0.26, strength: 0.06, race: 0 },
 };
 
 // For a run-only event, all non-strength budget goes to run.
 export const RUN_SPORT_DIST: Record<string, Record<Sport, number>> = {
-  marathon:      { run: 0.82, bike: 0.00, swim: 0.00, strength: 0.10, },
-  half_marathon: { run: 0.84, bike: 0.00, swim: 0.00, strength: 0.10, },
-  '10k':         { run: 0.86, bike: 0.00, swim: 0.00, strength: 0.10, },
-  '5k':          { run: 0.86, bike: 0.00, swim: 0.00, strength: 0.10, },
+  marathon:      { run: 0.82, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },
+  half_marathon: { run: 0.84, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },
+  '10k':         { run: 0.86, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },
+  '5k':          { run: 0.86, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },
 };
 
 // Blended distribution for multi-sport weeks (tri + run event concurrent).
