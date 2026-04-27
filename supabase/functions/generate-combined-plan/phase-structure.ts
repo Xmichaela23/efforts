@@ -282,7 +282,11 @@ function buildAbbreviatedBlocks(
   const totalWeeks = endWeek - startWeek + 1;
   if (totalWeeks < 1) return;
   const dist = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
-  const taperWks = Math.min(TAPER_WEEKS[goal.distance] ?? 2, Math.max(1, Math.floor(totalWeeks * 0.45)));
+  // Use as many taper weeks as the distance requires, up to the full available window.
+  // Math.floor(totalWeeks * 0.45) would give 0 for a 2-week window (floors 0.9 → 0),
+  // leaving week 19 as race_specific and firing VO2max 1 week before an A-race.
+  // Correct behavior: if fewer weeks are available than the distance calls for, taper all of them.
+  const taperWks = Math.min(TAPER_WEEKS[goal.distance] ?? 2, totalWeeks);
   const taperStartWeek = endWeek - taperWks + 1;
   const preTaperEnd = taperStartWeek - 1;
   if (preTaperEnd < startWeek) {
