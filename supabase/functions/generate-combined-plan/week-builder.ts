@@ -241,31 +241,40 @@ export function buildWeek(
   const isRecovery = block.isRecovery;
   const raceAnchors = options?.raceAnchors ?? [];
   const raceThisWeek = raceAnchors.find((a) => a.planWeek === weekNum);
-  for (const anchor of raceAnchors) {
-    console.log('[phase-structure] raceAnchor:', anchor.eventName,
-      'planWeek:', anchor.planWeek,
-      'currentWeek:', weekNum,
-      'match:', anchor.planWeek === weekNum);
-  }
-  if (weekNum === 1) {
-    console.log('[week-builder] athleteState.bikeQualityDay:', athleteState.bike_quality_day);
-    console.log('[week-builder] athleteState.runQualityDay:', athleteState.run_quality_day);
-    console.log('[week-builder] athleteState.longRideDay:', athleteState.long_ride_day);
-  }
+
   const primaryGoal = goals.find(g => g.id === block.primaryGoalId) ?? goals[0];
   const hasTri = goals.some(g => ['triathlon', 'tri'].includes(g.sport?.toLowerCase()));
   const hasRun = goals.some(g => g.sport?.toLowerCase() === 'run');
   const triApproach = athleteState.tri_approach ?? 'race_peak';
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
 
-  /** Week 1 after a recent marathon / race (from Arc + create-goal `recovery_rebuild`). */
+  // Diagnostic: log all day-preference state for every week so we can trace preferred_days flow.
+  console.log('[buildWeek] week', weekNum, {
+    bikeQualityDay: athleteState.bike_quality_day,
+    runQualityDay: athleteState.run_quality_day,
+    longRideDay: athleteState.long_ride_day,
+    longRunDay: athleteState.long_run_day,
+    strengthPreferredDays: athleteState.strength_preferred_days,
+    transition_mode: athleteState.transition_mode,
+    triApproach,
+    phase: block.phase,
+    isRecovery: block.isRecovery,
+  });
+
+  // Combined tri plans manage recovery through phase-structure isRecovery blocks.
+  // The recovery_rebuild flags below are for standalone run plans only; applying them
+  // to a multi-sport plan suppresses quality sessions in weeks 1-2 incorrectly.
+  /** Week 1 after a recent marathon / race — run plans only. */
   const recoveryRebuildWeek1 =
+    !hasTri &&
     weekNum === 1 &&
     (athleteState.transition_mode === 'recovery_rebuild' || athleteState.structural_load_hint === 'low');
 
-  /** Week 2 post-marathon (`recovery_rebuild`): mid-week run stays aerobic — no intervals/tempo/MP. */
+  /** Week 2 post-marathon — run plans only. */
   const recoveryRebuildWeek2EasyRunOnly =
-    weekNum === 2 && athleteState.transition_mode === 'recovery_rebuild';
+    !hasTri &&
+    weekNum === 2 &&
+    athleteState.transition_mode === 'recovery_rebuild';
 
   // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier)
   const baseTSS = scaledWeeklyTSS(phase, athleteState.current_ctl, athleteState.weekly_hours_available, block.tssMultiplier);

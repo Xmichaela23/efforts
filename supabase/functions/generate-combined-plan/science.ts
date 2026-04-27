@@ -188,7 +188,7 @@ export const TAPER_WEEKS: Record<string, number> = {
 export const RECOVERY_DAYS_POST_RACE: Record<string, number> = {
   sprint:        3,
   olympic:       5,
-  '70.3':        7,
+  '70.3':        14,
   ironman:       14,
   marathon:      10,
   half_marathon: 4,

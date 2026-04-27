@@ -1153,6 +1153,15 @@ Deno.serve(async (req: Request) => {
       // When the user explicitly chose "Build combined plan" (combine=true),
       // or when a second active event goal exists and action='keep', route
       // through generate-combined-plan for unified physiological optimization.
+      console.log('[create-goal] postRaceRecovery:', JSON.stringify({
+        apply: postRaceRecovery.apply,
+        ...(postRaceRecovery.apply
+          ? {
+              event: (postRaceRecovery as { event: { name: string; days_ago: number } }).event?.name,
+              days_ago: (postRaceRecovery as { event: { name: string; days_ago: number } }).event?.days_ago,
+            }
+          : {}),
+      }));
       if (combine && createdGoalId) {
         const combinedResult = await buildCombinedPlan(
           supabase, functionsBaseUrl, serviceKey,
