@@ -435,7 +435,14 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
         },
       });
       if (fnErr) {
-        setError(fnErr.message || 'Request failed');
+        // Try to read the actual error body the function sent (e.g. stop_reason from Anthropic).
+        // The Supabase SDK sets fnErr.context = the raw Response object; body not yet consumed.
+        try {
+          const errBody = await (fnErr as { context?: Response }).context?.json();
+          setError((errBody as { error?: string } | null)?.error || fnErr.message || 'Request failed');
+        } catch {
+          setError(fnErr.message || 'Request failed');
+        }
         return;
       }
       const dataErr = (data as { error?: string } | null)?.error;

@@ -6,9 +6,8 @@
 import { MODELS, type ConversationMessage } from './llm.ts';
 
 const WEB_SEARCH_TOOL = {
-  type: 'web_search_20250305' as const,
+  type: 'web_search_20260209' as const,
   name: 'web_search' as const,
-  max_uses: 5,
 };
 
 function extractTextFromContent(content: unknown): string {
