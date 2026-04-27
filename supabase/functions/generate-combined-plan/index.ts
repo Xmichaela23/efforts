@@ -66,6 +66,18 @@ Deno.serve(async (req: Request) => {
     const generatedWeeks = [];
     let prevWeightedTSS = state.current_ctl * 7; // baseline = CTL * 7
 
+    if (totalWeeks >= 1) {
+      console.log('[generate-combined-plan] athleteState before buildWeek:', {
+        bike_quality_day: state.bike_quality_day,
+        run_quality_day: state.run_quality_day,
+        long_ride_day: state.long_ride_day,
+        long_run_day: state.long_run_day,
+        strength_preferred_days: state.strength_preferred_days,
+        transition_mode: state.transition_mode,
+        tri_approach: state.tri_approach,
+      });
+    }
+
     for (let w = 1; w <= totalWeeks; w++) {
       const block = blockForWeek(blocks, w);
       const week = buildWeek(w, block, prevWeightedTSS, goals, state, athlete_memory, {

@@ -261,16 +261,16 @@ export function buildWeek(
     isRecovery: block.isRecovery,
   });
 
-  // Combined tri plans manage recovery through phase-structure isRecovery blocks.
-  // The recovery_rebuild flags below are for standalone run plans only; applying them
-  // to a multi-sport plan suppresses quality sessions in weeks 1-2 incorrectly.
-  /** Week 1 after a recent marathon / race — run plans only. */
+  // recoveryRebuildWeek1: suppresses strength + quality sessions and bricks in week 1 when the
+  // athlete is post-marathon / post-race. Applies to both run and tri plans — no heavy neural
+  // loading 8 days after a race regardless of sport. For tri plans only the session guards apply;
+  // the aggressive minute caps (30min run / 60min ride) are run-plan specific and skipped below.
   const recoveryRebuildWeek1 =
-    !hasTri &&
     weekNum === 1 &&
     (athleteState.transition_mode === 'recovery_rebuild' || athleteState.structural_load_hint === 'low');
 
-  /** Week 2 post-marathon — run plans only. */
+  // recoveryRebuildWeek2EasyRunOnly: swaps quality run for easy run in week 2.
+  // Only for standalone run plans — tri plans have quality sessions from week 2 onward.
   const recoveryRebuildWeek2EasyRunOnly =
     !hasTri &&
     weekNum === 2 &&
@@ -365,8 +365,9 @@ export function buildWeek(
     longRideHours = Math.min(2.5, longRideHours);
   }
 
-  if (recoveryRebuildWeek1) {
-    // Post-marathon week 1: cap leg load; swim sessions left as computed (low impact).
+  if (recoveryRebuildWeek1 && !hasTri) {
+    // Post-marathon week 1 (run plans only): cap leg load. Tri plans let the TSS budget
+    // govern session length — week 1 is already light in base phase.
     longRunMinutes = Math.min(longRunMinutes, 30);
     longRideMinutes = Math.min(longRideMinutes, 60);
     longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(longRunMinutes / 10)));
@@ -644,11 +645,14 @@ export function buildWeek(
       if (strSlot) {
         const equipmentType = athleteState.equipment_type ?? 'commercial_gym';
         if (hasTri) {
+          // Tri slot 1 (first preferred day, e.g. Monday) = upper body (index 1): lighter load
+          // before Wednesday quality bike. Slot 2 (Thursday) = lower body (index 0): AM/PM with
+          // quality run — matches the optimizer's Mon-upper / Thu-lower prescription.
           strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, {
             weekInPhase,
             isRecovery,
             limiterSport,
-            sessionIndex: 0,
+            sessionIndex: 1,
             equipmentType,
             longRideDayName: longRideDay,
             longRunDayName: longRunActualDay,
@@ -674,11 +678,13 @@ export function buildWeek(
         if (strSlot2) {
           const equipmentType2 = athleteState.equipment_type ?? 'commercial_gym';
           if (hasTri) {
+            // Tri slot 2 (second preferred day, e.g. Thursday) = lower body (index 0): pairs
+            // with quality run in the AM/PM performance exception.
             strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, {
               weekInPhase,
               isRecovery,
               limiterSport,
-              sessionIndex: 1,
+              sessionIndex: 0,
               equipmentType: equipmentType2,
               longRideDayName: longRideDay,
               longRunDayName: longRunActualDay,

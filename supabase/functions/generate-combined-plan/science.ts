@@ -176,7 +176,7 @@ export const BRICKS_PER_WEEK: Record<Phase, number> = {
 export const TAPER_WEEKS: Record<string, number> = {
   sprint:        1,
   olympic:       2,
-  '70.3':        2,
+  '70.3':        3,
   ironman:       3,
   marathon:      3,
   half_marathon: 1,
