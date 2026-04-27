@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
         ? false
         : body.is_closing_turn === true || Boolean(draftArcSetup);
 
-    const { text, lastContent, lastUsage } = await callClaudeArcSetupConversation({
+    const { text, lastContent, lastUsage, lastStopReason } = await callClaudeArcSetupConversation({
       system,
       messages: messages as ConversationMessage[],
       maxTokens: 4096,
@@ -195,8 +195,10 @@ Deno.serve(async (req) => {
     });
 
     if (text == null) {
+      const stopReason = lastStopReason ?? 'unknown';
+      console.error(`[arc-setup-chat] model returned null text. stop_reason=${stopReason}`);
       return new Response(
-        JSON.stringify({ error: 'Model unavailable. Check ANTHROPIC_API_KEY, web search enablement, and logs.' }),
+        JSON.stringify({ error: `Model unavailable (stop_reason: ${stopReason}). Check ANTHROPIC_API_KEY and logs.` }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

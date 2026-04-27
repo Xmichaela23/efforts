@@ -103,6 +103,9 @@ export async function callClaudeArcSetupConversation(opts: {
   let loops = 0;
   const maxLoops = 8;
 
+  let retries = 0;
+  const maxRetries = 2;
+
   while (loops < maxLoops) {
     loops += 1;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -124,8 +127,18 @@ export async function callClaudeArcSetupConversation(opts: {
     if (!resp.ok) {
       const errBody = await resp.text().catch(() => '');
       console.warn(`[llm-arc-setup] non-ok: ${resp.status} — ${errBody.slice(0, 400)}`);
-      return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: null, lastUsage: null };
+      // Retry on transient errors (429 rate-limit, 5xx service errors) up to maxRetries times.
+      if ((resp.status === 429 || resp.status >= 500) && retries < maxRetries) {
+        retries += 1;
+        const backoffMs = retries * 1500;
+        console.warn(`[llm-arc-setup] retrying in ${backoffMs}ms (attempt ${retries}/${maxRetries})`);
+        await new Promise((r) => setTimeout(r, backoffMs));
+        loops -= 1; // don't count retry against maxLoops
+        continue;
+      }
+      return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: String(resp.status), lastUsage: null };
     }
+    retries = 0; // reset on success
     data = (await resp.json()) as {
       content?: unknown;
       stop_reason?: string;
