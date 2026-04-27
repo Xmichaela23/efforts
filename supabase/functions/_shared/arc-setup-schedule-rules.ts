@@ -94,6 +94,7 @@ Before proposing any week, check every adjacent-day pair:
 - If **day N = quality_bike** and **day N+1 = quality_run** → move quality_run one day later.
 - The day immediately before a quality_bike anchor must be easy or rest.
 - The day immediately before a quality_run must not be quality_bike.
+- **Exception (optimizer only):** **performance** intent + **co-equal** strength (\`strength_intent: performance\`) may place **quality_run on the calendar day immediately after an anchored quality_bike** only when **lower_body_strength** is stacked same day (AM run / PM lift). Standalone quality_run is still forbidden the day after quality_bike.
 
 **Example violation:** Tuesday quality_run → Wednesday quality_bike (group hammer ride). The Wednesday anchor is fixed. Move quality_run to Thursday.
 
