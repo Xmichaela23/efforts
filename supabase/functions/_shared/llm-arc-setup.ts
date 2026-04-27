@@ -6,8 +6,9 @@
 import { MODELS, type ConversationMessage } from './llm.ts';
 
 const WEB_SEARCH_TOOL = {
-  type: 'web_search_20260209' as const,
+  type: 'web_search_20250305' as const,
   name: 'web_search' as const,
+  max_uses: 5,
 };
 
 function extractTextFromContent(content: unknown): string {
@@ -65,7 +66,12 @@ function messagesToApiShape(thread: ConversationMessage[]): AnthropicMessage[] {
  * Web search + optional pause_turn loop. Returns visible text for the app (all text blocks concatenated).
  */
 export async function callClaudeArcSetupConversation(opts: {
-  system: string;
+  /**
+   * Split system prompt from `buildArcSetupSystemPrompt`.
+   * `staticPart` is sent with `cache_control` (Anthropic prompt caching — ~10% cost on cache hits).
+   * `dynamicPart` (optimizer output + confirmed draft, changes each turn) is sent plain.
+   */
+  system: { staticPart: string; dynamicPart: string };
   messages: ConversationMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -79,16 +85,17 @@ export async function callClaudeArcSetupConversation(opts: {
   hadWebSearchTool: boolean;
   lastContent: unknown;
   lastStopReason: string | null;
+  lastErrorBody: string | null;
   lastUsage: unknown;
 }> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) {
     console.warn('[llm-arc-setup] ANTHROPIC_API_KEY not set');
-    return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: null, lastUsage: null };
+    return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: null, lastErrorBody: 'ANTHROPIC_API_KEY missing', lastUsage: null };
   }
   if (!opts.messages.length || opts.messages[0].role !== 'user') {
     console.warn('[llm-arc-setup] first message must be user');
-    return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: null, lastUsage: null };
+    return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: null, lastErrorBody: null, lastUsage: null };
   }
 
   const model = opts.isClosingTurn ? MODELS.opus : MODELS.sonnet;
@@ -104,6 +111,7 @@ export async function callClaudeArcSetupConversation(opts: {
 
   let retries = 0;
   const maxRetries = 2;
+  let lastErrorBody: string | null = null;
 
   while (loops < maxLoops) {
     loops += 1;
@@ -113,10 +121,22 @@ export async function callClaudeArcSetupConversation(opts: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
       },
       body: JSON.stringify({
         model,
-        system: opts.system,
+        // Prompt caching: staticPart (large, stable) is cached after first use.
+        // dynamicPart (optimizer output + confirmed draft) changes per turn — sent plain.
+        system: [
+          {
+            type: 'text',
+            text: opts.system.staticPart,
+            cache_control: { type: 'ephemeral' },
+          },
+          ...(opts.system.dynamicPart
+            ? [{ type: 'text', text: opts.system.dynamicPart }]
+            : []),
+        ],
         messages: workingMessages,
         max_tokens: opts.maxTokens ?? 4096,
         temperature: opts.temperature ?? 0.4,
@@ -126,6 +146,7 @@ export async function callClaudeArcSetupConversation(opts: {
     if (!resp.ok) {
       const errBody = await resp.text().catch(() => '');
       console.warn(`[llm-arc-setup] non-ok: ${resp.status} — ${errBody.slice(0, 400)}`);
+      lastErrorBody = errBody.slice(0, 400);
       // Retry on transient errors (429 rate-limit, 5xx service errors) up to maxRetries times.
       if ((resp.status === 429 || resp.status >= 500) && retries < maxRetries) {
         retries += 1;
@@ -135,7 +156,7 @@ export async function callClaudeArcSetupConversation(opts: {
         loops -= 1; // don't count retry against maxLoops
         continue;
       }
-      return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: String(resp.status), lastUsage: null };
+      return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: String(resp.status), lastErrorBody, lastUsage: null };
     }
     retries = 0; // reset on success
     data = (await resp.json()) as {
@@ -152,7 +173,7 @@ export async function callClaudeArcSetupConversation(opts: {
   }
 
   if (!data?.content) {
-    return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: data?.stop_reason ?? null, lastUsage: data?.usage };
+    return { text: null, hadWebSearchTool: false, lastContent: null, lastStopReason: data?.stop_reason ?? null, lastErrorBody, lastUsage: data?.usage };
   }
   const text = extractTextFromContent(data.content);
   const nReq = data.usage?.server_tool_use?.web_search_requests ?? 0;
@@ -162,6 +183,7 @@ export async function callClaudeArcSetupConversation(opts: {
     hadWebSearchTool: hadTool,
     lastContent: data.content,
     lastStopReason: data.stop_reason ?? null,
+    lastErrorBody,
     lastUsage: data.usage,
   };
 }

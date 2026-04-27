@@ -592,7 +592,16 @@ export function buildConfirmedSoFarSection(draft: unknown): string {
 /**
  * Full system prompt for season arc setup. `arc` is the live `ArcContext` from getArcContext.
  */
-export function buildArcSetupSystemPrompt(arc: ArcContext, opts?: ArcSetupPromptOptions): string {
+/**
+ * Returns the system prompt split for Anthropic prompt caching.
+ * `staticPart` — large, stable content (all coaching rules + athlete context). Send with
+ *   `cache_control: { type: "ephemeral" }` so turns 2+ pay ~10% input cost.
+ * `dynamicPart` — optimizer output + confirmed draft; changes each turn. Send plain (no cache).
+ */
+export function buildArcSetupSystemPrompt(
+  arc: ArcContext,
+  opts?: ArcSetupPromptOptions,
+): { staticPart: string; dynamicPart: string } {
   const cacheBlock = (opts?.raceCacheSection && opts.raceCacheSection.trim()) ? `${opts.raceCacheSection}\n\n` : '';
   const confirmedBlockRaw = opts?.freshSetup ? '' : buildConfirmedSoFarSection(opts?.draftArcSetup);
   const confirmedBlock = confirmedBlockRaw ? `${confirmedBlockRaw}\n\n` : '';
@@ -653,7 +662,13 @@ When presenting to the athlete: translate day-by-day into plain English (e.g. "M
 
 ` : '';
 
-  return `You are the season setup coach for Efforts. Help athletes describe what they are training for, then (when it fits) capture goals and identity in a structured block. Thorough, essay-style answers are wrong for this product—**default: two short sentences**, not a paragraph.
+  // ── Dynamic suffix: these two blocks change every turn as the draft evolves.
+  // Kept separate so the large static prefix can be Anthropic-cached.
+  const dynamicPart = [optimizerBlock.trim(), confirmedBlock.trim()]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const staticPart = `You are the season setup coach for Efforts. Help athletes describe what they are training for, then (when it fits) capture goals and identity in a structured block. Thorough, essay-style answers are wrong for this product—**default: two short sentences**, not a paragraph.
 
 **Voice:** Never refer to yourself by name, initials, "AL," "Athlete Leg," or similar in messages to the athlete. Do not sign messages. Use direct, second-person or neutral coach language only.
 
@@ -677,7 +692,7 @@ ${SCOPE_SEASON_ONLY}
 Saved weekday preferences for an **active goal** (if any) appear under \`active_goals[].training_prefs\` — not under a separate "profile schedule" on baselines.
 ${arcJson}
 
-${optimizerBlock}${confirmedBlock}## Learned run paces (units)
+## Learned run paces (units)
 When \`run_pace_for_coach\` is present, quote \`per_mile\` or \`per_km\` from it. The numeric \`value\` inside \`learned_fitness.run_threshold_pace_sec_per_km\` / \`run_easy_pace_sec_per_km\` is **seconds per km** (from workout \`avg_pace\`), not per mile. **Do not** format that \`value\` as a pace in /mi. Example error: 371 s/km is **not** 6:11/mi; it is about 6:11/km and about 9:57/mi (same math as the Training Baselines screen).
 
 ${ARC_KNOWLEDGE}
@@ -754,4 +769,6 @@ ${QUESTION_FORMAT}
 - Outside <arc_setup>, the athlete only sees a tiny human reply; the tag is also processed separately. Do not wrap your entire reply in the tag; only the JSON lives inside <arc_setup>.
 - Never put markdown code fences around <arc_setup>.
 `.trim();
+
+  return { staticPart, dynamicPart };
 }
