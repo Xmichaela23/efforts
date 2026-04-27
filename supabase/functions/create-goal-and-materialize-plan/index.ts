@@ -841,10 +841,41 @@ async function buildCombinedPlan(
       : undefined,
   );
 
+  // Re-derive combinedSchedulePrefs from the backfilled training_prefs so that
+  // optimizer-derived preferred_days (quality_bike, quality_run, etc.) actually
+  // flow into the athlete_state we send to generate-combined-plan.
+  const backfilledPrimaryPrefs =
+    (allEventGoals.find((g) => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+  const freshCombinedPrefs = mergeCombinedSchedulePrefs(
+    backfilledPrimaryPrefs as Record<string, unknown>,
+    newGoal.training_prefs as Record<string, unknown>,
+  );
+  const freshDpw =
+    readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
+    readDaysPerWeekFromPrefs(backfilledPrimaryPrefs as Record<string, unknown>);
+  freshCombinedPrefs.rest_days = deriveRestDaysForBudget(
+    freshDpw,
+    freshCombinedPrefs.rest_days,
+    freshCombinedPrefs.long_run_day,
+    freshCombinedPrefs.long_ride_day,
+  );
+  console.log('[buildCombinedPlan] freshCombinedPrefs after backfill:', JSON.stringify({
+    bike_quality_day: freshCombinedPrefs.bike_quality_day,
+    run_quality_day: freshCombinedPrefs.run_quality_day,
+    long_ride_day: freshCombinedPrefs.long_ride_day,
+    long_run_day: freshCombinedPrefs.long_run_day,
+    strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
+  }));
+
+  // Anchor the combined plan to the current week's Monday so planWeek
+  // calculations in generate-combined-plan are stable regardless of time-of-day.
+  const combinedPlanStartDate = currentWeekMondayISO();
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
     goals: goalsForCombined,
+    start_date: combinedPlanStartDate,
     athlete_state: {
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,
@@ -852,37 +883,37 @@ async function buildCombinedPlan(
       equipment_type: resolvedEquipmentType,
       tri_approach: triApproach,
       swim_volume_multiplier,
-      rest_days: combinedSchedulePrefs.rest_days ?? [],
-      ...(combinedSchedulePrefs.long_run_day !== undefined
-        ? { long_run_day: combinedSchedulePrefs.long_run_day }
+      rest_days: freshCombinedPrefs.rest_days ?? [],
+      ...(freshCombinedPrefs.long_run_day !== undefined
+        ? { long_run_day: freshCombinedPrefs.long_run_day }
         : {}),
-      ...(combinedSchedulePrefs.long_ride_day !== undefined
-        ? { long_ride_day: combinedSchedulePrefs.long_ride_day }
+      ...(freshCombinedPrefs.long_ride_day !== undefined
+        ? { long_ride_day: freshCombinedPrefs.long_ride_day }
         : {}),
-      ...(combinedSchedulePrefs.swim_easy_day !== undefined
-        ? { swim_easy_day: combinedSchedulePrefs.swim_easy_day }
+      ...(freshCombinedPrefs.swim_easy_day !== undefined
+        ? { swim_easy_day: freshCombinedPrefs.swim_easy_day }
         : {}),
-      ...(combinedSchedulePrefs.swim_quality_day !== undefined
-        ? { swim_quality_day: combinedSchedulePrefs.swim_quality_day }
+      ...(freshCombinedPrefs.swim_quality_day !== undefined
+        ? { swim_quality_day: freshCombinedPrefs.swim_quality_day }
         : {}),
-      ...(combinedSchedulePrefs.run_quality_day !== undefined
-        ? { run_quality_day: combinedSchedulePrefs.run_quality_day }
+      ...(freshCombinedPrefs.run_quality_day !== undefined
+        ? { run_quality_day: freshCombinedPrefs.run_quality_day }
         : {}),
-      ...(combinedSchedulePrefs.run_easy_day !== undefined
-        ? { run_easy_day: combinedSchedulePrefs.run_easy_day }
+      ...(freshCombinedPrefs.run_easy_day !== undefined
+        ? { run_easy_day: freshCombinedPrefs.run_easy_day }
         : {}),
-      ...(combinedSchedulePrefs.bike_quality_day !== undefined
-        ? { bike_quality_day: combinedSchedulePrefs.bike_quality_day }
+      ...(freshCombinedPrefs.bike_quality_day !== undefined
+        ? { bike_quality_day: freshCombinedPrefs.bike_quality_day }
         : {}),
-      ...(combinedSchedulePrefs.bike_easy_day !== undefined
-        ? { bike_easy_day: combinedSchedulePrefs.bike_easy_day }
+      ...(freshCombinedPrefs.bike_easy_day !== undefined
+        ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
         : {}),
       strength_protocol: resolvedCombinedStrengthProtocol,
-      ...(combinedSchedulePrefs.strength_intent
-        ? { strength_intent: combinedSchedulePrefs.strength_intent }
+      ...(freshCombinedPrefs.strength_intent
+        ? { strength_intent: freshCombinedPrefs.strength_intent }
         : {}),
-      ...(combinedSchedulePrefs.strength_preferred_days?.length
-        ? { strength_preferred_days: combinedSchedulePrefs.strength_preferred_days }
+      ...(freshCombinedPrefs.strength_preferred_days?.length
+        ? { strength_preferred_days: freshCombinedPrefs.strength_preferred_days }
         : {}),
       ...(combinedTransition?.transition_mode ? { transition_mode: combinedTransition.transition_mode } : {}),
       ...(combinedTransition?.structural_load_hint

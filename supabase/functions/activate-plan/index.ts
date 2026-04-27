@@ -85,6 +85,9 @@ function mapType(raw: string, hasMobilityExercises: boolean): 'run'|'ride'|'swim
   if (t === 'swim') return 'swim'
   if (t === 'strength' || t === 'lift' || t === 'weights') return 'strength'
   if (t === 'run' || t === 'walk') return 'run'
+  // Triathlon race day: store as 'ride' so the session lands on the calendar.
+  // Name and description carry all the race-day context.
+  if (t === 'race') return 'ride'
   return null
 }
 

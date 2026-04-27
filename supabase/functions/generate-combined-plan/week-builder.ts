@@ -241,6 +241,17 @@ export function buildWeek(
   const isRecovery = block.isRecovery;
   const raceAnchors = options?.raceAnchors ?? [];
   const raceThisWeek = raceAnchors.find((a) => a.planWeek === weekNum);
+  for (const anchor of raceAnchors) {
+    console.log('[phase-structure] raceAnchor:', anchor.eventName,
+      'planWeek:', anchor.planWeek,
+      'currentWeek:', weekNum,
+      'match:', anchor.planWeek === weekNum);
+  }
+  if (weekNum === 1) {
+    console.log('[week-builder] athleteState.bikeQualityDay:', athleteState.bike_quality_day);
+    console.log('[week-builder] athleteState.runQualityDay:', athleteState.run_quality_day);
+    console.log('[week-builder] athleteState.longRideDay:', athleteState.long_ride_day);
+  }
   const primaryGoal = goals.find(g => g.id === block.primaryGoalId) ?? goals[0];
   const hasTri = goals.some(g => ['triathlon', 'tri'].includes(g.sport?.toLowerCase()));
   const hasRun = goals.some(g => g.sport?.toLowerCase() === 'run');
@@ -677,11 +688,16 @@ export function buildWeek(
   const currentTSS = gridSessions(grid).reduce((s, x) => s + x.tss, 0);
   const remaining  = weeklyTSSBudget - currentTSS;
 
-  // Add a mid-week easy bike if budget remains and plan is triathlon-focused
-  if (remaining > 50 && hasTri && !isRecovery && !recoveryRebuildWeek1) {
+  // Add a mid-week easy bike if budget remains and plan is triathlon-focused.
+  // Never add secondary sessions in a race week — the race session owns the week.
+  if (remaining > 50 && hasTri && !isRecovery && !recoveryRebuildWeek1 && !raceThisWeek) {
     const midRideSlot = grid.get(bikeEasyDay);
     if (midRideSlot && !midRideSlot.isRest && midRideSlot.sessions.length === 1) {
-      const midRideHr = Math.max(0.75, Math.min(2.5, remaining * 0.50 / 55));
+      const calculatedHours = remaining * 0.50 / 55;
+      const midRideHr = Math.max(0.75, Math.min(2.5, calculatedHours));
+      if (calculatedHours > 2.5) {
+        console.warn('[week-builder] easy bike capped from', calculatedHours.toFixed(2), 'to 2.5');
+      }
       midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
     }
   }
