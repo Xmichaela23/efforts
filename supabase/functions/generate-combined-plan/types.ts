@@ -43,6 +43,12 @@ export interface AthleteState {
   bike_quality_day?: number;
   /** Mid-week easy aerobic bike (second ride). Default: Wednesday. */
   bike_easy_day?: number;
+  /**
+   * Optional label appended to the mid-week quality bike when the athlete rides with a
+   * recurring group ("Group Ride", "Hammer Ride"). Derived from training_prefs.notes.
+   * When set, the session name surfaces it so the calendar matches the athlete's reality.
+   */
+  bike_quality_label?: string;
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */

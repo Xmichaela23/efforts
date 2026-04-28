@@ -384,7 +384,8 @@ export function downgradedEasyAerobicFrom(s: PlannedSession): PlannedSession {
   }
 
   if (timing) next = { ...next, timing };
-  next.description = `[Adjusted to EASY — 80/20 budget] ${next.description}`;
+  // Internal pipeline tag — kept off the athlete-facing description.
+  next.tags = [...(next.tags ?? []), 'auto_adjusted_easy'];
   return next;
 }
 
@@ -429,7 +430,8 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
   }
 
   if (timing) next = { ...next, timing };
-  next.description = `[Downgraded to Moderate — hard/easy day spacing] ${next.description}`;
+  // Internal pipeline tag — kept off the athlete-facing description.
+  next.tags = [...(next.tags ?? []), 'auto_downgraded_moderate'];
   return next;
 }
 

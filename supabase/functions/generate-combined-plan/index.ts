@@ -69,9 +69,14 @@ Deno.serve(async (req: Request) => {
     if (totalWeeks >= 1) {
       console.log('[generate-combined-plan] athleteState before buildWeek:', {
         bike_quality_day: state.bike_quality_day,
+        bike_easy_day: state.bike_easy_day,
+        bike_quality_label: state.bike_quality_label,
         run_quality_day: state.run_quality_day,
+        run_easy_day: state.run_easy_day,
         long_ride_day: state.long_ride_day,
         long_run_day: state.long_run_day,
+        swim_easy_day: state.swim_easy_day,
+        swim_quality_day: state.swim_quality_day,
         strength_preferred_days: state.strength_preferred_days,
         strength_intent: state.strength_intent,
         transition_mode: state.transition_mode,

@@ -160,6 +160,11 @@ export function parsePreferredDaysPatch(
     const q = parseSunFirstDayIndex(swimRaw[1] ?? swimRaw[0]);
     if (e !== undefined) patch.swim_easy_day = e;
     if (q !== undefined) patch.swim_quality_day = q;
+    console.log('[combined-schedule-prefs] swim parse:', {
+      raw: swimRaw,
+      swim_easy_day: patch.swim_easy_day,
+      swim_quality_day: patch.swim_quality_day,
+    });
   }
   const strRaw = o.strength ?? o.strength_days;
   if (Array.isArray(strRaw) && strRaw.length > 0) {

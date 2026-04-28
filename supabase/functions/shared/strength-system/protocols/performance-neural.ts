@@ -59,7 +59,12 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return createTaperSessions(tier, weekIndex, totalWeeks);
   }
 
-  if (isRecovery) {
+  // Post-B-race recovery (Phase 4): movement-only, no spinal loading.
+  // Triggered ONLY when phase-structure has emitted a 'recovery' phase block
+  // (i.e. dedicated weeks after a B-race), not for ordinary mid-block deload weeks.
+  // Mid-block deloads (isRecovery=true under base/build/race_specific) fall through
+  // to the current phase's protocol, which already deloads load+volume internally.
+  if (phaseName === 'recovery') {
     return [createPerfRecoverySession(tier)];
   }
 

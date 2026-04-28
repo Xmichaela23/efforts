@@ -541,6 +541,17 @@ export function buildWeek(
         bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 2, 15, servedGoal));
       }
     }
+    // Athlete rides with a recurring group on this day → label the just-pushed
+    // session so the calendar reads "Group Ride — Threshold" instead of generic.
+    // taper bikeOpeners is not relabeled (race week, group rides skipped).
+    const label = athleteState.bike_quality_label;
+    if (label && phase !== 'taper') {
+      const last = bikeQualitySlot!.sessions[bikeQualitySlot!.sessions.length - 1];
+      if (last && !/group ride|hammer ride/i.test(last.name)) {
+        last.name = `${label} — ${last.name}`;
+        last.tags = [...(last.tags ?? []), 'group_ride'];
+      }
+    }
   }
 
   // ── Run quality (default Wednesday; from Arc `preferred_days.quality_run`) ──
@@ -567,15 +578,13 @@ export function buildWeek(
         runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
       }
     } else {
-      // race_peak: VO2 intervals in build, marathon pace in RS
+      // race_peak progression: structured intervals every phase except RS (race-specific
+      // uses race-pace running). intervalRun() periodizes pace+distance internally:
+      //   base: 6×800m @ 5km    build: 6×1200m @ 10km    race_specific: 4×1600m @ threshold
       if (phase === 'race_specific') {
         const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
         runQualitySlot!.sessions.push(marathonPaceRun(runQualityDay, mpMiles, servedGoal));
-      } else if (phase === 'build') {
-        const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
-        runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
       } else {
-        // Base: easy intervals to introduce neuromuscular load
         runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
       }
     }
@@ -647,7 +656,12 @@ export function buildWeek(
   }
 
   // ── STRENGTH ──────────────────────────────────────────────────────────────
-  let strFreq = phase === 'base' ? 2 : phase === 'taper' || phase === 'recovery' ? 0 : 1;
+  // Strength frequency by phase:
+  //   base: 2× (full hypertrophy programming)
+  //   build / race_specific: 1× (one focused neural/strength session — concurrent training cap)
+  //   taper / recovery: 1× (1×3 neural priming for taper, light movement-only for post-race recovery)
+  // recoveryRebuildWeek1 (post-marathon week 1) suppresses strength entirely — handled below.
+  let strFreq = phase === 'base' ? 2 : 1;
   if (recoveryRebuildWeek1) strFreq = 0;
 
   if (strFreq >= 1) {

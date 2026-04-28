@@ -677,6 +677,22 @@ function resolveCombinedTriStrengthProtocol(
   return 'triathlon';
 }
 
+/**
+ * Scan all event goals' training_prefs.notes for a recurring group/hammer ride
+ * mention. The mid-week quality bike is the athlete's group ride if they have one,
+ * so the session name should reflect that ("Group Ride — Threshold" not just
+ * "Bike Threshold"). Returns the matched label or null.
+ */
+function deriveBikeQualityLabel(goals: ReadonlyArray<{ training_prefs?: Record<string, unknown> | null }>): string | null {
+  for (const g of goals) {
+    const notes = String(g.training_prefs?.notes ?? '').toLowerCase();
+    if (!notes) continue;
+    if (/\bhammer\s+ride\b/.test(notes)) return 'Hammer Ride';
+    if (/\bgroup\s+ride\b/.test(notes)) return 'Group Ride';
+  }
+  return null;
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -907,6 +923,9 @@ async function buildCombinedPlan(
         : {}),
       ...(freshCombinedPrefs.bike_easy_day !== undefined
         ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
+        : {}),
+      ...(deriveBikeQualityLabel(allEventGoals)
+        ? { bike_quality_label: deriveBikeQualityLabel(allEventGoals) as string }
         : {}),
       strength_protocol: resolvedCombinedStrengthProtocol,
       ...(freshCombinedPrefs.strength_intent
