@@ -511,7 +511,12 @@ export function buildWeek(
   }
 
   const bikeQualitySlot = grid.get(bikeQualityDay);
-  if (!recoveryRebuildWeek1 && !isRecovery && !bikeQualitySlot?.isRest && hasTri) {
+  // Recovery weeks: replace bike quality with an easy aerobic ride (~45-60 min)
+  // — keep the frequency, drop the intensity. Same pattern below for run/swim.
+  if (!recoveryRebuildWeek1 && isRecovery && !bikeQualitySlot?.isRest && hasTri) {
+    const recBikeHr = Math.max(0.75, Math.min(1.0, bikeTotalMin * 0.20 / 55));
+    bikeQualitySlot!.sessions.push(easyBike(bikeQualityDay, recBikeHr, servedGoal));
+  } else if (!recoveryRebuildWeek1 && !isRecovery && !bikeQualitySlot?.isRest && hasTri) {
     const bq = bikeQualityDay;
     if (phase === 'taper') {
       bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
@@ -540,7 +545,11 @@ export function buildWeek(
 
   // ── Run quality (default Wednesday; from Arc `preferred_days.quality_run`) ──
   const runQualitySlot = grid.get(runQualityDay);
-  if (!recoveryRebuildWeek1 && !isRecovery && !runQualitySlot?.isRest) {
+  // Recovery weeks: replace run quality with an easy aerobic run at reduced mileage.
+  if (!recoveryRebuildWeek1 && isRecovery && !runQualitySlot?.isRest) {
+    const recEasyMi = Math.max(3, Math.round(longRunMiles * 0.40));
+    runQualitySlot!.sessions.push(easyRun(runQualityDay, recEasyMi, servedGoal));
+  } else if (!recoveryRebuildWeek1 && !isRecovery && !runQualitySlot?.isRest) {
     if (recoveryRebuildWeek2EasyRunOnly) {
       const easyMi = Math.max(4, Math.round(longRunMiles * 0.35));
       runQualitySlot!.sessions.push(easyRun(runQualityDay, easyMi, servedGoal));
@@ -578,49 +587,63 @@ export function buildWeek(
   const qualitySwimSlot = grid.get(swimQualityDay);
   if (!qualitySwimSlot?.isRest) {
     if (hasTri) {
-      if (!isRecovery) {
-        if (recoveryRebuildWeek1) {
-          const easyYd = Math.min(2800, Math.max(1500, Math.round(swimYards * 0.32)));
-          qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, easyYd, servedGoal));
-          qualitySwimPlaced = true;
-        } else {
-          const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
-          const maintYd = Math.max(1200, Math.round(swimYards * 0.40));
-          const qualitySwim = triApproach === 'base_first'
-            ? cssAerobicSwim(swimQualityDay, tSwimYd, servedGoal)
-            : thresholdSwim(swimQualityDay, tSwimYd, servedGoal);
-          qualitySwimSlot!.sessions.push(
-            phase === 'taper' || swimPct === 0 ? easySwim(swimQualityDay, maintYd, servedGoal) : qualitySwim,
-          );
-          qualitySwimPlaced = true;
-        }
+      if (isRecovery) {
+        // Recovery: easy aerobic swim at reduced volume — preserve feel + frequency.
+        const recYd = Math.max(1200, Math.round(swimYards * 0.40));
+        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, recYd, servedGoal));
+        qualitySwimPlaced = true;
+      } else if (recoveryRebuildWeek1) {
+        const easyYd = Math.min(2800, Math.max(1500, Math.round(swimYards * 0.32)));
+        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, easyYd, servedGoal));
+        qualitySwimPlaced = true;
+      } else {
+        const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
+        const maintYd = Math.max(1200, Math.round(swimYards * 0.40));
+        const qualitySwim = triApproach === 'base_first'
+          ? cssAerobicSwim(swimQualityDay, tSwimYd, servedGoal)
+          : thresholdSwim(swimQualityDay, tSwimYd, servedGoal);
+        qualitySwimSlot!.sessions.push(
+          phase === 'taper' || swimPct === 0 ? easySwim(swimQualityDay, maintYd, servedGoal) : qualitySwim,
+        );
+        qualitySwimPlaced = true;
       }
     }
   }
 
   // Run-only: mid-week easy run (fixed Thursday — not tied to swim prefs)
   const thursdayRunSlot = grid.get('Thursday');
-  if (!hasTri && !thursdayRunSlot?.isRest && !isRecovery) {
-    const easyMi = Math.max(4, Math.round(longRunMiles * 0.40));
+  if (!hasTri && !thursdayRunSlot?.isRest) {
+    const easyMi = isRecovery
+      ? Math.max(2, Math.round(longRunMiles * 0.30))
+      : Math.max(4, Math.round(longRunMiles * 0.40));
     thursdayRunSlot!.sessions.push(easyRun('Thursday', easyMi, servedGoal));
   }
 
   // ── Easy aerobic swim (default Mon) ─────────────────────────────────────────
+  // In recovery weeks: place at ~30% of normal yards (frequency preserved, volume cut).
   const easySwimSlot = grid.get(swimEasyDay);
-  if (!easySwimSlot?.isRest && hasTri && !isRecovery && !recoveryRebuildWeek1) {
-    const recSwimYd = Math.max(1200, Math.round(swimYards * 0.40));
+  if (!easySwimSlot?.isRest && hasTri && !recoveryRebuildWeek1) {
+    const yardsScale = isRecovery ? 0.30 : 0.40;
+    const recSwimYd = Math.max(1000, Math.round(swimYards * yardsScale));
     if (swimEasyDay !== swimQualityDay || !qualitySwimPlaced) {
       easySwimSlot!.sessions.push(easySwim(swimEasyDay, recSwimYd, servedGoal));
     }
   }
 
   // ── Mid-week easy run (default Friday; from Arc `preferred_days.easy_run`) ─
+  // In recovery weeks: shorter shake-out run (~25% of long-run mileage) to keep
+  // the running pattern without adding fatigue.
   const runEasySlot = grid.get(runEasyDay);
-  if (!runEasySlot?.isRest && !isRecovery && !['taper', 'recovery'].includes(phase)) {
-    const easyMi = recoveryRebuildWeek1
-      ? Math.min(30, Math.max(3, Math.round(longRunMiles * 0.35)))
-      : Math.max(3, Math.round(longRunMiles * 0.30));
-    runEasySlot!.sessions.push(easyRun(runEasyDay, easyMi, servedGoal));
+  if (!runEasySlot?.isRest && !['taper'].includes(phase)) {
+    if (isRecovery) {
+      const recMi = Math.max(2, Math.round(longRunMiles * 0.25));
+      runEasySlot!.sessions.push(easyRun(runEasyDay, recMi, servedGoal));
+    } else {
+      const easyMi = recoveryRebuildWeek1
+        ? Math.min(30, Math.max(3, Math.round(longRunMiles * 0.35)))
+        : Math.max(3, Math.round(longRunMiles * 0.30));
+      runEasySlot!.sessions.push(easyRun(runEasyDay, easyMi, servedGoal));
+    }
   }
 
   // ── STRENGTH ──────────────────────────────────────────────────────────────
@@ -729,19 +752,24 @@ export function buildWeek(
   // When the athlete has an explicit bike_easy_day preference, always place it if the slot
   // has ≤1 session (TSS gate is waived — the athlete asked for it). For unset/default days,
   // still require remaining TSS > 50 so we don't pad thin weeks with junk miles.
+  // Recovery weeks: place a short (~45 min) shake-out spin to preserve frequency.
   const hasExplicitBikeEasyPref = athleteState.bike_easy_day != null;
-  if (hasTri && !isRecovery && !recoveryRebuildWeek1 && !raceThisWeek) {
+  if (hasTri && !recoveryRebuildWeek1 && !raceThisWeek) {
     const midRideSlot = grid.get(bikeEasyDay);
     if (midRideSlot && !midRideSlot.isRest) {
       const slotFree = midRideSlot.sessions.length <= 1;
-      const budgetOk = hasExplicitBikeEasyPref || remaining > 50;
-      if (slotFree && budgetOk) {
-        const baseHours = remaining > 0 ? remaining * 0.50 / 55 : 1.0;
-        const midRideHr = Math.max(0.75, Math.min(2.5, baseHours));
-        if (baseHours > 2.5) {
-          console.warn('[week-builder] easy bike capped from', baseHours.toFixed(2), 'to 2.5');
+      if (isRecovery && slotFree) {
+        midRideSlot.sessions.push(easyBike(bikeEasyDay, 0.75, servedGoal));
+      } else if (!isRecovery) {
+        const budgetOk = hasExplicitBikeEasyPref || remaining > 50;
+        if (slotFree && budgetOk) {
+          const baseHours = remaining > 0 ? remaining * 0.50 / 55 : 1.0;
+          const midRideHr = Math.max(0.75, Math.min(2.5, baseHours));
+          if (baseHours > 2.5) {
+            console.warn('[week-builder] easy bike capped from', baseHours.toFixed(2), 'to 2.5');
+          }
+          midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
         }
-        midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
       }
     }
   }
