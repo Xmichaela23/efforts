@@ -366,6 +366,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   );
   const multipleEventGoals = activeEventGoals.length >= 2;
 
+  // When all active event goals share the same plan, the season plan is already built.
+  // Used to swap the banner from "build" → "active" and suppress per-card plan duplication.
+  const seasonPlan = useMemo(() => {
+    if (!multipleEventGoals) return null;
+    const linked = activeEventGoals.map(g => plansByGoalId.get(g.id)).filter(Boolean);
+    if (linked.length === 0) return null;
+    const uniqueIds = new Set(linked.map(p => p!.id));
+    return uniqueIds.size === 1 ? linked[0]! : null;
+  }, [multipleEventGoals, activeEventGoals, plansByGoalId]);
+
   const plansByGoalId = useMemo(() => {
     const map = new Map<string, (typeof currentPlans)[0]>();
     for (const p of currentPlans) {
@@ -1175,22 +1185,26 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               )}
             </div>
           ) : linkedPlan ? (
-            <div className="space-y-1.5">
-              {planReadyGoalId === goal.id && (
-                <p className="text-sm font-medium text-teal-300/95">Plan ready</p>
-              )}
-              <button
-                type="button"
-                className="flex w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] sm:inline-flex sm:w-auto sm:py-2"
-                onClick={() => onSelectPlan?.(linkedPlan.id)}
-              >
-                <span className="min-w-0">
-                  Plan: {linkedPlan.name}
-                  {linkedPlan.currentWeek != null && <span className="text-white/45"> · Week {linkedPlan.currentWeek}</span>}
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
-              </button>
-            </div>
+            // When part of a season plan (same plan linked to all event goals), the banner
+            // above already shows the plan link — suppress the per-card duplicate.
+            seasonPlan && linkedPlan.id === seasonPlan.id ? null : (
+              <div className="space-y-1.5">
+                {planReadyGoalId === goal.id && (
+                  <p className="text-sm font-medium text-teal-300/95">Plan ready</p>
+                )}
+                <button
+                  type="button"
+                  className="flex w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] sm:inline-flex sm:w-auto sm:py-2"
+                  onClick={() => onSelectPlan?.(linkedPlan.id)}
+                >
+                  <span className="min-w-0">
+                    Plan: {linkedPlan.name}
+                    {linkedPlan.currentWeek != null && <span className="text-white/45"> · Week {linkedPlan.currentWeek}</span>}
+                  </span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                </button>
+              </div>
+            )
           ) : (() => {
             const conflictPlan = goal.goal_type === 'event' ? findConflictPlan(goal) : null;
 
@@ -1582,29 +1596,48 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           <div className="space-y-3">
             {multipleEventGoals && (
               <div className="rounded-2xl border border-teal-500/30 bg-teal-950/35 p-4">
-                <p className="text-sm text-white/85 font-medium">One season, every race</p>
-                <p className="text-xs text-white/45 leading-relaxed mt-1.5">
-                  {activeEventGoals.length} event goals are on your season. We build a single multi-event plan (priorities A/B and race dates) — not a separate build per goal. Use Plan my season in chat for setup details, or build the schedule here.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void handleBuildSeasonPlan(null)}
-                  disabled={seasonBuilding}
-                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/40 bg-teal-900/30 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-900/45 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {seasonBuilding ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin opacity-90" />
-                      Building season…
-                    </>
-                  ) : (
-                    <>
-                      <CalendarRange className="h-5 w-5 opacity-90" />
-                      Build season plan
-                    </>
-                  )}
-                </button>
-                {seasonError && <p className="mt-2 text-xs text-red-400/80">{seasonError}</p>}
+                {seasonPlan ? (
+                  <>
+                    <p className="text-sm text-white/85 font-medium">Season plan active</p>
+                    <p className="text-xs text-white/45 leading-relaxed mt-1">
+                      One plan covers all {activeEventGoals.length} races (A/B priority).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => onSelectPlan?.(seasonPlan.id)}
+                      className="mt-3 w-full flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left text-sm text-white/75 hover:bg-white/[0.07] transition-all"
+                    >
+                      <span className="min-w-0 truncate">{seasonPlan.name}{seasonPlan.currentWeek != null && <span className="text-white/45"> · Week {seasonPlan.currentWeek}</span>}</span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-white/85 font-medium">One season, every race</p>
+                    <p className="text-xs text-white/45 leading-relaxed mt-1.5">
+                      {activeEventGoals.length} event goals. One schedule covers every race (A/B priority) — not a separate plan per goal.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void handleBuildSeasonPlan(null)}
+                      disabled={seasonBuilding}
+                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/40 bg-teal-900/30 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-900/45 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {seasonBuilding ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin opacity-90" />
+                          Building season…
+                        </>
+                      ) : (
+                        <>
+                          <CalendarRange className="h-5 w-5 opacity-90" />
+                          Build season plan
+                        </>
+                      )}
+                    </button>
+                    {seasonError && <p className="mt-2 text-xs text-red-400/80">{seasonError}</p>}
+                  </>
+                )}
               </div>
             )}
             {activeGoals.map(renderGoalCard)}
