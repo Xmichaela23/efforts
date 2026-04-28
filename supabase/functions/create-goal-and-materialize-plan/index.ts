@@ -591,11 +591,18 @@ function backfillTriTrainingPrefsDefenseInDepth(
   const trainingIntent = inferTrainingIntentFromPrefs(trainingPrefs);
   const strengthIntent = trainingPrefs.strength_intent === 'performance' ? 'performance' : 'support';
 
+  // Swim anchors: if the athlete already has explicit swim days, pass the first
+  // (easy) day as a masters_swim anchor so the optimizer preserves the day even
+  // when re-deriving the rest of preferred_days due to other conflicts.
+  // The optimizer only accepts ONE swim anchor; the quality day is preserved
+  // by the post-optimizer swim-days restoration below.
+  const swimEasyAnchorDay = swimDays?.[0];
   const inputs: WeekOptimizerInputs = {
     anchors: {
       ...(longRide ? { long_ride: longRide } : {}),
       ...(longRun ? { long_run: longRun } : {}),
       ...(qualityBike ? { quality_bike: qualityBike } : {}),
+      ...(swimEasyAnchorDay ? { masters_swim: { day: swimEasyAnchorDay as any, intensity: 'easy' } } : {}),
     },
     preferences: {
       swims_per_week: swimsPerWeek,
@@ -641,6 +648,14 @@ function backfillTriTrainingPrefsDefenseInDepth(
   // Derive a fresh, matrix-valid week.
   const optimal = deriveOptimalWeek(inputs);
   const merged: Record<string, unknown> = { ...optimal.preferred_days };
+
+  // Restore user-specified swim days: the optimizer only honors one swim anchor
+  // (masters_swim). If the athlete set explicit swim days (e.g. ["tuesday","friday"]),
+  // put them back so we don't clobber their calendar with algorithmic defaults.
+  if (swimDays && swimDays.length > 0) {
+    merged.swim = swimDays;
+  }
+
   trainingPrefs.preferred_days = merged;
   notes.push(`preferred_days→optimizer (${hasFullPreferred ? 'invalid input' : 'incomplete input'})`);
   if (optimal.trade_offs.length) {
@@ -877,9 +892,13 @@ async function buildCombinedPlan(
   );
   console.log('[buildCombinedPlan] freshCombinedPrefs after backfill:', JSON.stringify({
     bike_quality_day: freshCombinedPrefs.bike_quality_day,
+    bike_easy_day: freshCombinedPrefs.bike_easy_day,
     run_quality_day: freshCombinedPrefs.run_quality_day,
+    run_easy_day: freshCombinedPrefs.run_easy_day,
     long_ride_day: freshCombinedPrefs.long_ride_day,
     long_run_day: freshCombinedPrefs.long_run_day,
+    swim_easy_day: freshCombinedPrefs.swim_easy_day,
+    swim_quality_day: freshCombinedPrefs.swim_quality_day,
     strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
   }));
 
