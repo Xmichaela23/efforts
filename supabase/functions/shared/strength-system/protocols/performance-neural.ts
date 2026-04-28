@@ -156,27 +156,34 @@ function createBaseHypertrophyLower(
 }
 
 function createPerfRecoverySession(tier: 'barbell' | 'bodyweight'): IntentSession {
+  // Phase 4 rule: NO heavy spinal loading post-race (no back squats, no deadlifts,
+  // no RDLs). Movement-only — hip thrusts, step-ups, calf raises, face pulls.
+  // Mirrors the spec: "Recovery — movement only, no soreness, no heavy loading."
   const ex: StrengthExercise[] = tier === 'barbell'
     ? [
-        { name: 'Romanian Deadlift', sets: 2, reps: 8, weight: '~80% of usual', target_rir: 4, notes: 'Recovery — reduce load ~10%' },
-        { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Light–moderate', target_rir: 4 },
-        { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Light', target_rir: 4 },
-        { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light cable', target_rir: 4 },
+        { name: 'Hip Thrusts', sets: 2, reps: 8, weight: '55% 1RM', target_rir: 4, notes: 'No spinal loading — hip hinge only. Move well, not hard.' },
+        { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Light dumbbell', target_rir: 4, notes: 'Controlled — no fatigue chase' },
+        { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight or light', target_rir: 4 },
+        { name: 'Face Pulls', sets: 2, reps: 12, weight: 'Light cable', target_rir: 4, notes: 'Scapular health. Keep shoulders happy post-race.' },
+        { name: 'Band Pull-Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: 4 },
+        { name: 'Light DB Row', sets: 2, reps: 12, weight: '50% usual', target_rir: 4, notes: 'Light — not a training stimulus. Maintain tissue.' },
       ]
     : [
-        { name: 'Single-Leg RDL', sets: 2, reps: '8/leg', weight: 'Light', target_rir: 4 },
         { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: 4 },
         { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: 4 },
+        { name: 'Calf Raises', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: 4 },
+        { name: 'Band Pull-Aparts', sets: 2, reps: 15, weight: 'Light band', target_rir: 4 },
+        { name: 'Resistance Band Row', sets: 2, reps: 12, weight: 'Light band', target_rir: 4 },
       ];
   return {
     intent: 'FULLBODY_MAINTENANCE',
     priority: 'preferred',
-    name: 'Neural Speed — Recovery Week',
-    description: 'Deload: reduce load ~10%, same movement patterns. Maintain tissue tolerance without soreness.',
+    name: 'Recovery — Movement Only',
+    description: 'Post-race recovery session. No heavy spinal loading — no squats, no deadlifts. Hip thrusts, step-ups, face pulls only. Move, don\'t stress. Arrive at next training block fresh.',
     duration: 30,
     exercises: ex,
     repProfile: 'maintenance',
-    tags: ['strength', 'recovery', 'performance_neural', 'phase:recovery'],
+    tags: ['strength', 'recovery', 'performance_neural', 'phase:recovery', 'no_spinal_load'],
   };
 }
 
@@ -569,29 +576,31 @@ function createTaperSessions(
       tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`],
     });
   } else {
-    // Taper week (not race week): Light full-body maintenance
-    // This is effectively full-body (squat + bench + rows), so use FULLBODY_MAINTENANCE intent
-    const exercises: StrengthExercise[] = tier === 'barbell' 
+    // Phase 5 neural priming — 1×3 @ 75% explosive.
+    // Spec: trap_bar_deadlift + hip_thrust (lower), bench_press + face_pulls (upper).
+    // Goal: fire the nervous system, zero soreness, arrive at start line fresh.
+    const exercises: StrengthExercise[] = tier === 'barbell'
       ? [
-          { name: 'Back Squat', sets: 2, reps: 3, weight: '60% 1RM', target_rir: taperRIR },
-          { name: 'Bench Press', sets: 2, reps: 8, weight: '50% 1RM', target_rir: taperRIR },
-          { name: 'Barbell Rows', sets: 2, reps: 8, weight: '50% 1RM', target_rir: taperRIR }
+          { name: 'Trap Bar Deadlift', sets: 1, reps: 3, weight: '75% 1RM', target_rir: taperRIR, notes: 'Explosive — fast off floor, controlled descent. Arrive fresh.' },
+          { name: 'Hip Thrusts', sets: 1, reps: 3, weight: '75% 1RM', target_rir: taperRIR, notes: 'Explosive drive at top. No grinding.' },
+          { name: 'Bench Press', sets: 1, reps: 3, weight: '75% 1RM', target_rir: taperRIR, notes: 'Crisp and fast. No failure.' },
+          { name: 'Face Pulls', sets: 1, reps: 10, weight: 'Light cable', target_rir: taperRIR, notes: 'Shoulder health — not a training stimulus.' },
         ]
       : [
-          { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: taperRIR },
-          { name: 'Push-ups', sets: 2, reps: 12, weight: 'Bodyweight', target_rir: taperRIR },
-          { name: 'Inverted Rows', sets: 2, reps: 10, weight: 'Bodyweight', target_rir: taperRIR }
+          { name: 'Glute Bridges', sets: 1, reps: 5, weight: 'Bodyweight', target_rir: taperRIR, notes: 'Explosive hip extension.' },
+          { name: 'Push-ups (explosive)', sets: 1, reps: 5, weight: 'Bodyweight', target_rir: taperRIR, notes: 'Push away from floor fast.' },
+          { name: 'Band Pull-Aparts', sets: 1, reps: 10, weight: 'Light band', target_rir: taperRIR },
         ];
-        
+
     sessions.push({
       intent: 'FULLBODY_MAINTENANCE',
       priority: 'optional',
-      name: 'Taper: Light Maintenance (Optional)',
-      description: 'Taper week - Light work to maintain adaptations. 50-60% effort max. Skip if any fatigue.',
-      duration: 25,
+      name: 'Neural Priming — Light & Fast',
+      description: 'Taper neural priming. 1×3 @ 75% — explosive tempo, no soreness. Trap bar, hip thrusts, bench, face pulls. This is NOT a training session; it\'s a nervous system wake-up. Arrive at the start line fresh.',
+      duration: 20,
       exercises,
-      repProfile: 'maintenance',
-      tags: ['strength', 'full_body', 'phase:taper', 'optional', `tier:${tier}`],
+      repProfile: 'neural',
+      tags: ['strength', 'full_body', 'phase:taper', 'optional', 'neural_priming', `tier:${tier}`],
     });
   }
   
