@@ -258,6 +258,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [athleteMemory, setAthleteMemory] = useState<any>(null);
   const [prefillSource, setPrefillSource] = useState<{ fitness?: string; goal?: string; strength?: string }>({});
   const [planStartDate, setPlanStartDate] = useState('');
+  // Separate state for the Build / Build season actions — must not pollute the new-goal form.
+  const [buildStartDate, setBuildStartDate] = useState('');
 
   // Pre-fill fitness + goal + strength from athlete memory and recent snapshots
   useEffect(() => {
@@ -807,6 +809,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         mode: 'build_existing',
         existing_goal_id: String(goal.id),
         replace_plan_id: _conflictPlanId ? String(_conflictPlanId) : null,
+        ...(buildStartDate ? { plan_start_date: buildStartDate } : {}),
       });
       if (error || !data?.success) {
         const parsed = await parseFunctionError(error, data, 'Unable to build and materialize plan');
@@ -862,6 +865,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         existing_goal_id: String(primary.id),
         combine: true,
         replace_plan_id: replacePlanId ? String(replacePlanId) : null,
+        ...(buildStartDate ? { plan_start_date: buildStartDate } : {}),
       });
       if (error || !data?.success) {
         const parsed = await parseFunctionError(error, data, 'Unable to build season plan');
@@ -1254,24 +1258,38 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 );
               }
               return (
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  disabled={buildingGoalId === goal.id || seasonBuilding}
-                  onClick={() => handleBuildPlan(goal)}
-                >
-                  {buildingGoalId === goal.id ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin opacity-90" />
-                      Building…
-                    </>
-                  ) : (
-                    <>
-                      <CalendarRange className="h-5 w-5 opacity-90" />
-                      Build Plan
-                    </>
-                  )}
-                </button>
+                <div className="space-y-2">
+                  <label className="block">
+                    <span className="text-xs text-white/45 mb-1 block">Plan starts</span>
+                    <input
+                      type="date"
+                      value={buildStartDate}
+                      onChange={(e) => setBuildStartDate(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]"
+                    />
+                    {!buildStartDate && (
+                      <span className="text-[11px] text-white/30 mt-1 block">Defaults to this Monday.</span>
+                    )}
+                  </label>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/30 bg-teal-950/40 py-3 text-sm font-medium text-teal-100/90 hover:bg-teal-950/55 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={buildingGoalId === goal.id || seasonBuilding}
+                    onClick={() => handleBuildPlan(goal)}
+                  >
+                    {buildingGoalId === goal.id ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin opacity-90" />
+                        Building…
+                      </>
+                    ) : (
+                      <>
+                        <CalendarRange className="h-5 w-5 opacity-90" />
+                        Build Plan
+                      </>
+                    )}
+                  </button>
+                </div>
               );
             }
             return <p className="text-sm text-white/25">No plan linked</p>;
@@ -1617,6 +1635,18 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     <p className="text-xs text-white/45 leading-relaxed mt-1.5">
                       {activeEventGoals.length} event goals. One schedule covers every race (A/B priority) — not a separate plan per goal.
                     </p>
+                    <label className="block mt-3">
+                      <span className="text-xs text-white/45 mb-1 block">Plan starts</span>
+                      <input
+                        type="date"
+                        value={buildStartDate}
+                        onChange={(e) => setBuildStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-white/90 focus:outline-none focus:border-white/25 transition-colors [color-scheme:dark]"
+                      />
+                      {!buildStartDate && (
+                        <span className="text-[11px] text-white/30 mt-1 block">Defaults to this Monday — pick a date to override.</span>
+                      )}
+                    </label>
                     <button
                       type="button"
                       onClick={() => void handleBuildSeasonPlan(null)}
