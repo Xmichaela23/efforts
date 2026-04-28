@@ -61,7 +61,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
       : [perfBuildLower(tier, limiter, weekInPhase)];
   }
 
-  if (phaseName === 'race prep' || phaseName === 'race-specific') {
+  if (phaseName === 'race prep' || phaseName === 'race-specific' || phaseName === 'speed') {
     return freq >= 2
       ? [perfRaceLower(tier, limiter, weekInPhase), perfRaceUpper(tier, limiter)]
       : [perfRaceLower(tier, limiter, weekInPhase)];

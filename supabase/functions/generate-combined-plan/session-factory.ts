@@ -461,12 +461,23 @@ function resolveTriCombinedStrengthProtocol(options: {
   return triathlonProtocol;
 }
 
-// Maps combined-plan phase names to the StrengthPhase format
+// Maps combined-plan phase names to the StrengthPhase format expected by the
+// shared strength protocols. Mapping rationale:
+//   base          → 'Base'      (hypertrophy / structural foundation)
+//   build         → 'Build'     (strength building, 3×4-6 @ 75-82%)
+//   race_specific → 'Speed'     (peak neural with potentiation — box jumps, 3×2 @ 87-89%)
+//   taper         → 'Taper'     (createTaperSessions handles light maintenance)
+//   recovery      → 'Recovery'  (deload week — protocols use createPerfRecoverySession etc.)
+//
+// 'Race Prep' (minimal 2×2 activation) is a legacy fallback; nothing maps to it
+// from combined-plan anymore. Taper weeks correctly use createTaperSessions.
 function toStrengthPhase(phase: Phase): { name: string; start_week: number; end_week: number; weeks_in_phase: number } {
   const nameMap: Record<Phase, string> = {
-    base: 'Base', build: 'Build', race_specific: 'Race Prep', taper: 'Taper', recovery: 'Taper',
+    base: 'Base', build: 'Build', race_specific: 'Speed', taper: 'Taper', recovery: 'Recovery',
   };
-  return { name: nameMap[phase] ?? 'Base', start_week: 1, end_week: 4, weeks_in_phase: 4 };
+  const name = nameMap[phase] ?? 'Base';
+  console.log(`[strength] combined-plan phase=${phase} → strength phase name=${name}`);
+  return { name, start_week: 1, end_week: 4, weeks_in_phase: 4 };
 }
 
 // Converts a protocol IntentSession to a PlannedSession for the combined plan

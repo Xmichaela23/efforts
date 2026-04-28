@@ -210,13 +210,27 @@ function createLowerNeuralSession(
     } else if (phase.name === 'Base') {
       // 85-88% at 3 reps = RIR 2→1 (5-6RM doing 3). Genuine neural range.
       const step = Math.min(3, Math.max(0, wip - 1));
-      const load = 85 + step; // 85% → 86% → 87% → 88%
+      const load = 85 + step;
       exercises.push(
         { name: 'Back Squat', sets: 3, reps: 3, weight: `${load}% 1RM`, notes: '2-3 min rest between sets. Bar speed should be fast and controlled.' },
         { name: 'Trap Bar Deadlift', sets: 2, reps: 3, weight: `${load}% 1RM`, notes: '2-3 min rest. Reset each rep from the floor.' }
       );
       duration = 35;
       description = `Week ${displayWeek} Base - Heavy neural loading. 3x3 squat + 2x3 trap bar @ ${load}% 1RM, RIR ${load <= 86 ? 2 : 1}. These should feel genuinely heavy but never grinding.`;
+    } else if (phase.name === 'Build') {
+      // Build phase: real strength work bridging hypertrophy → peak neural.
+      // 4-5 reps at 78-84% — RIR 2 throughout. Adds mass + strength without the
+      // CNS demand of true neural triples. Progresses load week-over-week.
+      const step = Math.min(3, Math.max(0, wip - 1));
+      const load = 78 + step * 2; // 78 → 80 → 82 → 84
+      const reps = wip <= 2 ? 5 : 4;
+      exercises.push(
+        { name: 'Back Squat', sets: 3, reps, weight: `${load}% 1RM`, notes: '2 min rest. Control descent — drive up fast.' },
+        { name: 'Trap Bar Deadlift', sets: 3, reps, weight: `${load}% 1RM`, notes: '2 min rest. Reset each rep.' },
+        { name: 'Hip Thrusts', sets: 2, reps: 8, weight: '70% 1RM', notes: 'Pause 1s at top.' }
+      );
+      duration = 45;
+      description = `Week ${displayWeek} Build - Strength building. 3×${reps} @ ${load}% 1RM, RIR 2. Real strength work — bridge between hypertrophy and peak neural.`;
     } else if (phase.name === 'Speed') {
       // 87-89% at 2 reps = RIR 1-2 (~3-4RM doing 2). Peak neural stimulus.
       const step = Math.min(2, Math.max(0, wip - 1));
@@ -368,7 +382,7 @@ function createUpperStrengthSession(
       repProfile = 'maintenance';
     } else if (phase.name === 'Base') {
       const step = Math.min(3, Math.max(0, wip - 1));
-      const load = 72 + (step * 2); // 72% → 74% → 76% → 78%
+      const load = 72 + (step * 2);
       exercises.push(
         { name: 'Bench Press', sets: 3, reps: 6, weight: `${load}% 1RM` },
         { name: 'Barbell Rows', sets: 3, reps: 6, weight: `${load}% 1RM` },
@@ -377,6 +391,20 @@ function createUpperStrengthSession(
       );
       duration = 40;
       description = `Week ${displayWeek} Base - Upper body strength. 3x6 @ ${load}% 1RM, RIR 2. Push these — upper body doesn't interfere with running.`;
+      repProfile = 'strength';
+    } else if (phase.name === 'Build') {
+      // Build: heavier upper work, lower reps. Upper body doesn't interfere
+      // with running — push the load.
+      const step = Math.min(3, Math.max(0, wip - 1));
+      const load = 76 + step * 2; // 76 → 78 → 80 → 82
+      exercises.push(
+        { name: 'Bench Press', sets: 3, reps: 5, weight: `${load}% 1RM` },
+        { name: 'Barbell Rows', sets: 3, reps: 5, weight: `${load}% 1RM` },
+        { name: 'Pull-ups', sets: 3, reps: '5-7', weight: 'Add weight when bodyweight is easy' },
+        { name: 'Overhead Press', sets: 3, reps: 5, weight: `${Math.max(70, load - 5)}% 1RM` }
+      );
+      duration = 40;
+      description = `Week ${displayWeek} Build - Upper body strength. 3x5 @ ${load}% 1RM, RIR 2.`;
       repProfile = 'strength';
     } else if (phase.name === 'Speed') {
       const step = Math.min(2, Math.max(0, wip - 1));
@@ -580,22 +608,26 @@ function getTargetRIR(
   isNeural: boolean
 ): number {
   if (isRecovery) return 3;
-  
+
   if (isNeural) {
     switch (phase.name) {
       case 'Base': return 2;
+      case 'Build': return 2;
       case 'Speed': return 1;
       case 'Race Prep': return 3;
+      case 'Recovery': return 3;
       case 'Taper': return 4;
       default: return 2;
     }
   }
-  
+
   // Upper body — doesn't interfere with running, push it
   switch (phase.name) {
     case 'Base': return 2;
+    case 'Build': return 2;
     case 'Speed': return 1;
     case 'Race Prep': return 3;
+    case 'Recovery': return 3;
     case 'Taper': return 4;
     default: return 2;
   }
