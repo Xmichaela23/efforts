@@ -1,6 +1,12 @@
 // =============================================================================
 // _shared/week-optimizer.ts — pure week-derivation engine
 // =============================================================================
+// IMPORTANT: This file implements scheduling logic that is also implemented in
+// generate-combined-plan/week-builder.ts. The same-day matrix is shared via
+// schedule-session-constraints.ts but sequential rules and placement logic are
+// duplicated. Any rule change MUST be applied to both files.
+// See: supabase/functions/_shared/schedule-session-constraints.ts
+// =============================================================================
 // Given anchors (group-ride day, masters-swim day, long-day preferences) and
 // athlete preferences (swims/strength/training-days), produces a complete
 // `preferred_days` payload that:

@@ -97,17 +97,39 @@ export function tempoRun(day: string, miles: number, warmupMiles: number, goalId
 }
 
 export function intervalRun(day: string, reps: number, phase: Phase, goalId: string): PlannedSession {
-  const dist = phase === 'base' ? '1200m' : phase === 'build' ? '1000m' : '800m';
-  const pace = phase === 'base' ? '10km pace' : '5km pace';
-  const dur = 65;
+  // Periodized interval structure: short/fast in base (neuromuscular priming),
+  // progressing to longer/more-specific efforts approaching race day.
+  // base:          4-6×800m  @ 5km pace   — fast turnover, short contact time
+  // build:         4-6×1200m @ 10km pace  — lactate threshold stimulus
+  // race_specific: 3-4×1600m @ threshold  — race-specific pacing + mental rehearsal
+  // taper:         2-3×1000m @ race pace  — keep the snap, low accumulation
+  let dist: string;
+  let pace: string;
+  let restNote: string;
+  let zoneLabel: string;
+  let dur: number;
+
+  if (phase === 'taper') {
+    dist = '1000m'; pace = 'race pace'; restNote = '2 min walk/jog recovery'; zoneLabel = 'Z4 race pace'; dur = 45;
+    reps = Math.min(reps, 3);
+  } else if (phase === 'race_specific') {
+    dist = '1600m'; pace = 'threshold / tempo pace'; restNote = '2 min jog recovery'; zoneLabel = 'Z4 threshold'; dur = 70;
+    reps = Math.min(reps, 4);
+  } else if (phase === 'build') {
+    dist = '1200m'; pace = '10km pace'; restNote = '90 sec jog recovery'; zoneLabel = 'Z4–Z5'; dur = 65;
+  } else {
+    // base — short, fast, neuromuscular
+    dist = '800m'; pace = '5km pace'; restNote = '90 sec jog recovery'; zoneLabel = 'Z5'; dur = 55;
+  }
+
   return session(
     day, 'run',
     `Run Intervals — ${reps}×${dist}`,
-    `Warm up 10 min easy. ${reps}×${dist} at ${pace} with 90 sec jog recovery between. Cool down 10 min. Focus on consistent splits, not all-out.`,
+    `Warm up 10 min easy. ${reps}×${dist} at ${pace} with ${restNote} between. Cool down 10 min. Focus on consistent splits, not all-out.`,
     dur, 'HARD',
-    ['warmup_run_10min_easy', `interval_${reps}x${dist}_${phase === 'base' ? '10kpace' : '5kpace'}`, 'cooldown_run_10min_easy'],
+    ['warmup_run_10min_easy', `interval_${reps}x${dist}_${phase}`, 'cooldown_run_10min_easy'],
     ['quality', 'intervals', 'run'],
-    'Z4–Z5 intervals', goalId,
+    zoneLabel, goalId,
   );
 }
 

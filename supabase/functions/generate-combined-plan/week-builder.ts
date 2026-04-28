@@ -1,4 +1,9 @@
 // generate-combined-plan/week-builder.ts
+// IMPORTANT: This file implements scheduling logic that is also implemented in
+// _shared/week-optimizer.ts. The same-day matrix is shared via
+// schedule-session-constraints.ts but sequential rules and placement logic are
+// duplicated. Any rule change MUST be applied to both files.
+// See: supabase/functions/_shared/schedule-session-constraints.ts
 //
 // Implements §8 Week Construction Algorithm — all 7 steps.
 // This is the core of the engine. All hard/easy constraints, 80/20 enforcement,
@@ -22,7 +27,7 @@ import {
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
-import { arePlannedSessionsCompatible } from '../_shared/schedule-session-constraints.ts';
+import { arePlannedSessionsCompatible, plannedSessionToScheduleSlot } from '../_shared/schedule-session-constraints.ts';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -163,8 +168,12 @@ function validateWeekGridSameDayMatrix(grid: WeekGrid): SameDayValidationResult 
   return { valid: conflicts.length === 0, conflicts };
 }
 
-/** Prefer dropping strength on a clashing day (movable) before returning the grid. */
-function tryResolveSameDayMatrixConflicts(grid: WeekGrid): string[] {
+/**
+ * Prefer dropping strength on a clashing day (movable) before returning the grid.
+ * Exception: quality_run + lower_body_strength on the same day is allowed for
+ * performance + co-equal strength athletes (AM/PM consolidated hard day per EXPERIENCE_MODIFIER).
+ */
+function tryResolveSameDayMatrixConflicts(grid: WeekGrid, isPerformanceCoequal = false): string[] {
   const actions: string[] = [];
   for (let pass = 0; pass < 32; pass++) {
     if (validateWeekGridSameDayMatrix(grid).valid) break;
@@ -174,6 +183,19 @@ function tryResolveSameDayMatrixConflicts(grid: WeekGrid): string[] {
       for (let i = 0; i < list.length; i++) {
         for (let j = i + 1; j < list.length; j++) {
           if (arePlannedSessionsCompatible(list[i], list[j])) continue;
+          // Performance exception: quality_run AM + lower_body_strength PM is an allowed
+          // consolidated hard day for co-equal strength athletes (EXPERIENCE_MODIFIER rule).
+          if (isPerformanceCoequal) {
+            const kindI = plannedSessionToScheduleSlot(list[i]);
+            const kindJ = plannedSessionToScheduleSlot(list[j]);
+            const isQrLb =
+              (kindI === 'quality_run' && kindJ === 'lower_body_strength') ||
+              (kindI === 'lower_body_strength' && kindJ === 'quality_run');
+            if (isQrLb) {
+              console.log(`[week-builder] allowing quality_run + lower_body AM/PM on ${day} (performance co-equal exception)`);
+              continue;
+            }
+          }
           if (list[i].type === 'strength') {
             const [rm] = list.splice(i, 1);
             actions.push(`removed strength on ${day}: ${rm.name}`);
@@ -703,17 +725,24 @@ export function buildWeek(
   const currentTSS = gridSessions(grid).reduce((s, x) => s + x.tss, 0);
   const remaining  = weeklyTSSBudget - currentTSS;
 
-  // Add a mid-week easy bike if budget remains and plan is triathlon-focused.
-  // Never add secondary sessions in a race week — the race session owns the week.
-  if (remaining > 50 && hasTri && !isRecovery && !recoveryRebuildWeek1 && !raceThisWeek) {
+  // Add a mid-week easy bike for triathlon plans. Never in race weeks.
+  // When the athlete has an explicit bike_easy_day preference, always place it if the slot
+  // has ≤1 session (TSS gate is waived — the athlete asked for it). For unset/default days,
+  // still require remaining TSS > 50 so we don't pad thin weeks with junk miles.
+  const hasExplicitBikeEasyPref = athleteState.bike_easy_day != null;
+  if (hasTri && !isRecovery && !recoveryRebuildWeek1 && !raceThisWeek) {
     const midRideSlot = grid.get(bikeEasyDay);
-    if (midRideSlot && !midRideSlot.isRest && midRideSlot.sessions.length === 1) {
-      const calculatedHours = remaining * 0.50 / 55;
-      const midRideHr = Math.max(0.75, Math.min(2.5, calculatedHours));
-      if (calculatedHours > 2.5) {
-        console.warn('[week-builder] easy bike capped from', calculatedHours.toFixed(2), 'to 2.5');
+    if (midRideSlot && !midRideSlot.isRest) {
+      const slotFree = midRideSlot.sessions.length <= 1;
+      const budgetOk = hasExplicitBikeEasyPref || remaining > 50;
+      if (slotFree && budgetOk) {
+        const baseHours = remaining > 0 ? remaining * 0.50 / 55 : 1.0;
+        const midRideHr = Math.max(0.75, Math.min(2.5, baseHours));
+        if (baseHours > 2.5) {
+          console.warn('[week-builder] easy bike capped from', baseHours.toFixed(2), 'to 2.5');
+        }
+        midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
       }
-      midRideSlot.sessions.push(easyBike(bikeEasyDay, midRideHr, servedGoal));
     }
   }
 
@@ -751,10 +780,13 @@ export function buildWeek(
   enforce8020(grid, phase);
 
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
+  // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
+  // strength_intent === 'performance' is the co-equal flag (see AthleteState type + EXPERIENCE_MODIFIER_TEXT).
+  const isPerformanceCoequal = athleteState.strength_intent === 'performance';
   const sameDayPre = validateWeekGridSameDayMatrix(grid);
   if (!sameDayPre.valid) {
     console.warn('[week-builder] same-day schedule conflicts detected:', sameDayPre.conflicts);
-    const res = tryResolveSameDayMatrixConflicts(grid);
+    const res = tryResolveSameDayMatrixConflicts(grid, isPerformanceCoequal);
     if (res.length > 0) {
       console.warn('[week-builder] same-day auto-resolution (strength removal):', res);
     }

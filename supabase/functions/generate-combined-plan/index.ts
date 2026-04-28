@@ -73,6 +73,7 @@ Deno.serve(async (req: Request) => {
         long_ride_day: state.long_ride_day,
         long_run_day: state.long_run_day,
         strength_preferred_days: state.strength_preferred_days,
+        strength_intent: state.strength_intent,
         transition_mode: state.transition_mode,
         tri_approach: state.tri_approach,
       });

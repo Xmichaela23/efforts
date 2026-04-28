@@ -47,41 +47,137 @@ export const performanceNeuralProtocol: StrengthProtocol = {
 function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const { phase, weekInPhase, isRecovery, weekIndex, totalWeeks, strengthFrequency, userBaselines } = context;
   const sessions: IntentSession[] = [];
-  
-  // Determine tier from equipment
-  const tier: 'barbell' | 'bodyweight' = 
-    userBaselines.equipment === 'commercial_gym' 
-      ? 'barbell' 
-      : 'bodyweight';
-  
-  const isTaper = phase.name === 'Taper';
-  
-  if (isTaper) {
-    return createTaperSessions(tier, weekIndex, totalWeeks);
-  }
-  
-  // If bodyweight tier, downgrade LOWER_NEURAL → LOWER_MAINTENANCE
-  // (Can't do true neural loading without heavy weights)
-  const lowerIntent = tier === 'barbell' ? 'LOWER_NEURAL' : 'LOWER_MAINTENANCE';
-  
-  // Handle frequency: default to 2 if undefined, treat 1 as 2 (explicit)
-  // Guard against NaN from bad upstream parsing
+
+  const tier: 'barbell' | 'bodyweight' =
+    userBaselines.equipment === 'commercial_gym' ? 'barbell' : 'bodyweight';
+
+  const phaseName = String(phase?.name ?? '').toLowerCase();
   const freqRaw = strengthFrequency ?? 2;
   const freq = Number.isFinite(freqRaw) ? Math.max(2, freqRaw) : 2;
-  
-  // Always: LOWER (required) + UPPER_STRENGTH (required) + UPPER_MAINTENANCE (optional bonus).
-  // The optional session is always generated so it shows as a 3rd day athletes can take or skip.
-  // The overlay's placement policy assigns it to Friday.
+
+  if (phaseName === 'taper') {
+    return createTaperSessions(tier, weekIndex, totalWeeks);
+  }
+
+  if (isRecovery) {
+    return [createPerfRecoverySession(tier)];
+  }
+
+  // Base phase: structural hypertrophy foundation (3×8-10) before neural loading.
+  // Neural loading (85%+ 1RM) requires a hypertrophy base — jumping straight to heavy
+  // triples in week 1 skips adaptation and risks injury for endurance athletes.
+  if (phaseName === 'base') {
+    sessions.push(createBaseHypertrophyLower(tier, weekInPhase));
+    sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
+    if (freq >= 2) sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
+    return sessions;
+  }
+
+  // Build and beyond: neural loading (the purpose of this protocol).
+  const lowerIntent = tier === 'barbell' ? 'LOWER_NEURAL' : 'LOWER_MAINTENANCE';
   if (lowerIntent === 'LOWER_NEURAL') {
     sessions.push(createLowerNeuralSession(phase, weekInPhase, isRecovery, tier));
   } else {
     sessions.push(createLowerMaintenanceSession(phase, weekInPhase, isRecovery, tier));
   }
   sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
-  // Optional 3rd day — upper maintenance. Athletes doing 2x/week can skip this.
   sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
-  
+
   return sessions;
+}
+
+// ============================================================================
+// BASE HYPERTROPHY SESSION (new — fires before neural loading in base phase)
+// ============================================================================
+
+function createBaseHypertrophyLower(
+  tier: 'barbell' | 'bodyweight',
+  weekInPhase: number,
+): IntentSession {
+  const wip = Number.isFinite(weekInPhase) ? Math.max(1, weekInPhase) : 1;
+  // Progressive load: 65% → 68% → 70% → 72% over the base phase
+  const step = Math.min(3, wip - 1);
+  const load = 65 + step * 2;
+  const rir = wip <= 2 ? 3 : 2;
+  const sets = 3;
+  const reps = wip <= 2 ? 10 : 8;
+
+  const exercises: StrengthExercise[] = [];
+
+  if (tier === 'barbell') {
+    exercises.push(
+      {
+        name: 'Trap Bar Deadlift',
+        sets, reps,
+        weight: `${load}% 1RM`,
+        target_rir: rir,
+        notes: 'Hinge at hips — neutral spine, drive through floor',
+      },
+      {
+        name: 'Barbell Back Squat',
+        sets, reps,
+        weight: `${load - 3}% 1RM`,
+        target_rir: rir,
+        notes: 'Control the descent — 3s eccentric',
+      },
+      {
+        name: 'Hip Thrusts',
+        sets, reps: 12,
+        weight: 'Barbell (moderate)',
+        target_rir: rir,
+        notes: 'Full hip extension at top — pause 1s',
+      },
+      {
+        name: 'Single-Leg Calf Raises',
+        sets: 2, reps: '15/leg',
+        weight: 'Bodyweight or light dumbbell',
+        notes: 'Slow — 2s up, 2s down',
+      },
+    );
+  } else {
+    exercises.push(
+      { name: 'Single-Leg RDL', sets, reps: '10/leg', weight: 'Heaviest available', target_rir: rir, notes: '2s lowering, controlled' },
+      { name: 'Goblet Squat', sets, reps: 12, weight: 'Heaviest dumbbell', target_rir: rir },
+      { name: 'Hip Thrusts', sets, reps: 15, weight: 'Bodyweight or load hips', notes: 'Pause at top' },
+      { name: 'Single-Leg Calf Raises', sets: 2, reps: '15/leg', weight: 'Bodyweight' },
+    );
+  }
+
+  return {
+    intent: 'LOWER_HYPERTROPHY' as any,
+    priority: 'required',
+    name: 'Lower Body: Hypertrophy Base',
+    description: `Week ${wip} Base — Structural foundation. ${sets}×${reps} @ ${tier === 'barbell' ? `${load}% 1RM` : 'heavy DBs'}, RIR ${rir}. Build tissue tolerance before moving to neural loading in build phase.`,
+    duration: 40,
+    exercises,
+    repProfile: 'hypertrophy',
+    tags: ['strength', 'lower_body', `tier:${tier}`, 'phase:base', 'focus:hypertrophy'],
+  };
+}
+
+function createPerfRecoverySession(tier: 'barbell' | 'bodyweight'): IntentSession {
+  const ex: StrengthExercise[] = tier === 'barbell'
+    ? [
+        { name: 'Romanian Deadlift', sets: 2, reps: 8, weight: '~80% of usual', target_rir: 4, notes: 'Recovery — reduce load ~10%' },
+        { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Light–moderate', target_rir: 4 },
+        { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Light', target_rir: 4 },
+        { name: 'Face Pulls', sets: 2, reps: 15, weight: 'Light cable', target_rir: 4 },
+      ]
+    : [
+        { name: 'Single-Leg RDL', sets: 2, reps: '8/leg', weight: 'Light', target_rir: 4 },
+        { name: 'Glute Bridges', sets: 2, reps: 15, weight: 'Bodyweight', target_rir: 4 },
+        { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Bodyweight', target_rir: 4 },
+      ];
+  return {
+    intent: 'FULLBODY_MAINTENANCE',
+    priority: 'preferred',
+    name: 'Neural Speed — Recovery Week',
+    description: 'Deload: reduce load ~10%, same movement patterns. Maintain tissue tolerance without soreness.',
+    duration: 30,
+    exercises: ex,
+    repProfile: 'maintenance',
+    tags: ['strength', 'recovery', 'performance_neural', 'phase:recovery'],
+  };
 }
 
 // ============================================================================
