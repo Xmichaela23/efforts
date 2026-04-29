@@ -55,6 +55,11 @@ export interface AthleteState {
   strength_intent?: 'support' | 'performance';
   /** Preferred weekdays for strength (e.g. ["Monday","Wednesday"]) from preferred_days.strength. */
   strength_preferred_days?: string[];
+  /**
+   * When set (e.g. `co_equal_strength_provisional_1x` after optimizer recovery), caps
+   * how many strength sessions `buildWeek` places per week (applied after phase default).
+   */
+  strength_sessions_cap?: number;
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**

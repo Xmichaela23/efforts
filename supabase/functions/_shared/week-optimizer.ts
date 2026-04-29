@@ -959,6 +959,64 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   };
 }
 
+/** Conflicts that mean 2× co-equal strength could not be placed — see `deriveOptimalWeekWithCoEqualRecovery`. */
+export const CO_EQUAL_STRENGTH_CONFLICT_PREFIX = 'CO_EQUAL_STRENGTH';
+
+/**
+ * Arc-setup + materialize entry: if 2× **performance** strength cannot be placed, retry at **1×**
+ * so the athlete sees a workable week and a **non-vague** recovery line instead of a silent
+ * partial schedule or a dead-end conflict card alone.
+ */
+export function deriveOptimalWeekWithCoEqualRecovery(
+  inputs: WeekOptimizerInputs,
+): { week: OptimalWeek; used_co_equal_1x_fallback: boolean } {
+  const first = deriveOptimalWeek(inputs);
+  const wantsCoEq2x =
+    inputs.athlete.strength_intent === 'performance' &&
+    inputs.preferences.strength_frequency >= 2;
+  const coEqualFailed = first.conflicts.some((c) =>
+    c.startsWith(CO_EQUAL_STRENGTH_CONFLICT_PREFIX),
+  );
+  if (!wantsCoEq2x || !coEqualFailed) {
+    return { week: first, used_co_equal_1x_fallback: false };
+  }
+
+  const retry = deriveOptimalWeek({
+    ...inputs,
+    preferences: {
+      ...inputs.preferences,
+      strength_frequency: 1 as 0 | 1 | 2 | 3,
+    },
+  });
+
+  const recoveryLine =
+    'CO_EQUAL_STRENGTH (recovery): 2× co-equal strength could not fit these anchors — this output is a provisional 1× strength week. The athlete must choose: move a fixed day (long ride, group bike, run club, or swim block), or explicitly accept 1× strength until the schedule fits. Do not describe this as a vague “small adjustment”; name the constraint.';
+
+  if (retry.conflicts.length > 0) {
+    return {
+      week: {
+        ...first,
+        trade_offs: [
+          ...first.trade_offs,
+          ...retry.trade_offs,
+          `${recoveryLine} 1× retry still has CONFLICTS — needs coach-led anchor edits before save.`,
+        ],
+        conflicts: [...first.conflicts, ...retry.conflicts],
+      },
+      used_co_equal_1x_fallback: false,
+    };
+  }
+
+  return {
+    week: {
+      ...retry,
+      trade_offs: [...retry.trade_offs, recoveryLine],
+      conflicts: retry.conflicts,
+    },
+    used_co_equal_1x_fallback: true,
+  };
+}
+
 // ── Validator (reusable) ────────────────────────────────────────────────────
 
 /**

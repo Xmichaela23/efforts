@@ -664,6 +664,12 @@ export function buildWeek(
   let strFreq = phase === 'base' ? 2 : 1;
   if (recoveryRebuildWeek1) strFreq = 0;
 
+  const capRaw = athleteState.strength_sessions_cap;
+  if (capRaw != null && Number.isFinite(capRaw)) {
+    const cap = Math.max(0, Math.min(3, Math.round(Number(capRaw))));
+    strFreq = Math.min(strFreq, cap);
+  }
+
   if (strFreq >= 1) {
     // Identify brick days in the current grid to pass to the protocol placement
     const brickDaysInGrid = [...grid.values()]

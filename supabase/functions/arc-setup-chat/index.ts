@@ -16,7 +16,7 @@ import {
   upsertWebSearchResearchRow,
 } from '../_shared/race-research-cache.ts';
 import {
-  deriveOptimalWeek,
+  deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
   type WeekOptimizerInputs,
   type DayName,
@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
       const hasAnchors = Object.values(inputs.anchors ?? {}).some(v => v != null);
       const hasIntentSignal = !!trainingIntent || !!strengthIntent || strengthFrequency > 0 || swimArr.length > 0;
       if (hasAnchors || hasIntentSignal) {
-        const result = deriveOptimalWeek(inputs);
+        const { week: result } = deriveOptimalWeekWithCoEqualRecovery(inputs);
         const lines: string[] = [];
         const ALL_DAYS: DayName[] = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
         for (const day of ALL_DAYS) {

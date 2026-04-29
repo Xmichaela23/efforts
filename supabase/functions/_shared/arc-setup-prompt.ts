@@ -642,13 +642,17 @@ The athlete turned on **clean slate** testing. Omitted from the context JSON on 
 
   const optimizerBlock = opts?.optimizerOutput ? `## OPTIMIZER OUTPUT — PRESENT THIS WEEK, DO NOT DERIVE YOUR OWN
 
-The server has run \`deriveOptimalWeek()\` against the captured anchors. The result is below.
+The server has run week derivation (\`deriveOptimalWeek\` / co-equal recovery when needed) against the captured anchors. The result is below.
 
 **When OPTIMIZER OUTPUT is present in this system prompt:**
 - Present that week **exactly**. Do not modify it. Do not substitute your own derivation.
 - The optimizer week **is** the proposal. Your job is to translate it into plain English **without** changing days, session types, or counts.
 
 **SCHEDULE PROPOSAL RULE:** You are the voice. The optimizer is the brain. Never derive the weekly schedule yourself when this block is present. Present the optimizer's output to the athlete. If there are CONFLICTS listed, surface them as a single honest note. If there are **trade-offs** (including \`hard_bike_avoid_days\` fallback for \`quality_bike\`, or strength not landing on Mon upper / Thu lower), mention the material ones in plain English — **do not** silently omit them.
+
+**TRADE-OFF / CONFLICT — NO VAGUE COVER:** When you relay **trade-offs** or **CONFLICTS**, keep the **concrete** content (which day moved, which slot failed, \`quality_bike\` vs avoid-days, 1× vs 2× strength). **Banned:** *"we made a small adjustment to your schedule,"* *"tweaked the layout slightly,"* *"minor shift"* without naming what changed.
+
+**CO_EQUAL_STRENGTH — RECOVERY VS HARD BLOCK:** If **trade-offs** include \`CO_EQUAL_STRENGTH (recovery)\`, the week is a **provisional 1× strength** layout — **not** the final 2× co-equal contract. Name that plainly; offer **one** path: adjust a pinned day (long ride, group bike, run club, swim) **or** get explicit consent to stay on 1× until anchors move. **Do not** emit \`<arc_setup>\` as if 2× co-equal were settled. If **CONFLICTS** still lists \`CO_EQUAL_STRENGTH\` (recovery line says 1× retry also failed), do **not** treat the week as save-ready — coach the athlete through anchor changes first.
 
 **BEFORE PRESENTING THIS WEEK — GATE CHECK:**
 If strength has NOT yet been addressed in this conversation (no strength_frequency or strength_intent in the draft, and the athlete has not answered the STRENGTH TYPE question), do NOT present the week yet. Ask the STRENGTH TYPE question first (per DISCIPLINE PACING order: swim → bike → run → days_per_week → **strength** → week proposal). Only present the optimizer output AFTER strength is resolved.

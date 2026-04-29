@@ -19,7 +19,7 @@ import {
   readDaysPerWeekFromPrefs,
 } from '../_shared/combined-schedule-prefs.ts';
 import {
-  deriveOptimalWeek,
+  deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
   validatePreferredDays,
   type AnchorWithIntensity,
@@ -650,11 +650,12 @@ function backfillTriTrainingPrefsDefenseInDepth(
 
   if (validationErrors.length === 0) {
     // User-provided week is matrix-clean; nothing to do.
+    delete trainingPrefs.co_equal_strength_provisional_1x;
     return notes;
   }
 
-  // Derive a fresh, matrix-valid week.
-  const optimal = deriveOptimalWeek(inputs);
+  // Derive a fresh, matrix-valid week (with 1× co-equal recovery if 2× cannot be placed).
+  const { week: optimal, used_co_equal_1x_fallback } = deriveOptimalWeekWithCoEqualRecovery(inputs);
   const merged: Record<string, unknown> = { ...optimal.preferred_days };
 
   // Restore user-specified swim days: the optimizer only honors one swim anchor
@@ -665,6 +666,12 @@ function backfillTriTrainingPrefsDefenseInDepth(
   }
 
   trainingPrefs.preferred_days = merged;
+  if (used_co_equal_1x_fallback) {
+    trainingPrefs.co_equal_strength_provisional_1x = true;
+    notes.push('co_equal_strength_provisional_1x=true (optimizer 1× recovery week)');
+  } else {
+    delete trainingPrefs.co_equal_strength_provisional_1x;
+  }
   notes.push(`preferred_days→optimizer (${hasFullPreferred ? 'invalid input' : 'incomplete input'})`);
   if (optimal.trade_offs.length) {
     notes.push(`trade_offs: ${optimal.trade_offs.join(' | ')}`);
@@ -885,6 +892,7 @@ async function buildCombinedPlan(
   // flow into the athlete_state we send to generate-combined-plan.
   const backfilledPrimaryPrefs =
     (allEventGoals.find((g) => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+  const coEqualProvisional1x = Boolean(backfilledPrimaryPrefs?.co_equal_strength_provisional_1x);
   const freshCombinedPrefs = mergeCombinedSchedulePrefs(
     backfilledPrimaryPrefs as Record<string, unknown>,
     newGoal.training_prefs as Record<string, unknown>,
@@ -961,6 +969,7 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.strength_preferred_days?.length
         ? { strength_preferred_days: freshCombinedPrefs.strength_preferred_days }
         : {}),
+      ...(coEqualProvisional1x ? { strength_sessions_cap: 1 } : {}),
       ...(combinedTransition?.transition_mode ? { transition_mode: combinedTransition.transition_mode } : {}),
       ...(combinedTransition?.structural_load_hint
         ? { structural_load_hint: combinedTransition.structural_load_hint }
