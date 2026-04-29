@@ -49,20 +49,49 @@ function session(
 
 // ── Run sessions ──────────────────────────────────────────────────────────────
 
-export function longRun(day: string, miles: number, phase: Phase, goalId: string): PlannedSession {
+/** Race-specific long run: finish segment copy + zone line — marathon for IM/full; tri distances otherwise. */
+function longRunRaceSpecificPaceCopy(dist: TriRaceDistance | null | undefined): { finish: string; zoneLine: string } {
+  const d = String(dist ?? '').toLowerCase();
+  if (d === 'ironman' || d === 'full' || d === 'marathon') {
+    return { finish: 'marathon goal pace', zoneLine: 'Z2, last 30–40% at marathon pace' };
+  }
+  if (d === '70.3' || d === 'half' || d === 'half_marathon') {
+    return { finish: '70.3 / half-marathon race pace', zoneLine: 'Z2, last 30–40% at 70.3 run pace' };
+  }
+  if (d === 'olympic') {
+    return { finish: 'Olympic-distance race pace', zoneLine: 'Z2, last 30–40% at Olympic run pace' };
+  }
+  if (d === 'sprint') {
+    return { finish: 'sprint race pace', zoneLine: 'Z2, last 30–40% at sprint run pace' };
+  }
+  return { finish: 'race pace', zoneLine: 'Z2, last 30–40% at race pace' };
+}
+
+/**
+ * @param triRaceDistance When set (typical for combined tri plans), race-specific finish text matches distance
+ *                        (70.3/half vs marathon/IM). Standalone marathon plans omit or pass `"marathon"`.
+ */
+export function longRun(
+  day: string,
+  miles: number,
+  phase: Phase,
+  goalId: string,
+  triRaceDistance?: TriRaceDistance | null,
+): PlannedSession {
   const isRaceSpecific = phase === 'race_specific';
   const dur = Math.round(miles * 9.5); // ~9:30/mi easy pace average
+  const paceCopy = isRaceSpecific ? longRunRaceSpecificPaceCopy(triRaceDistance) : null;
   return session(
     day, 'run',
     `Long Run — ${miles} mi`,
     isRaceSpecific
-      ? `Race-prep long run. Miles 1–${Math.round(miles * 0.5)} easy Z2, final ${Math.round(miles * 0.5)} at marathon goal pace.`
+      ? `Race-prep long run. Miles 1–${Math.round(miles * 0.5)} easy Z2, final ${Math.round(miles * 0.5)} at ${paceCopy!.finish}.`
       : `Aerobic long run at conversational pace. Full Z2 effort — if you can\'t speak in sentences, slow down.`,
     dur,
     isRaceSpecific ? 'MODERATE' : 'EASY',
     [isRaceSpecific ? `longrun_${miles}mi_mp_finish` : `longrun_${miles}mi_easypace`],
     ['long_run', 'aerobic', isRaceSpecific ? 'race_specific' : 'base'],
-    isRaceSpecific ? 'Z2, last 30–40% at marathon pace' : 'Z2 throughout',
+    isRaceSpecific ? paceCopy!.zoneLine : 'Z2 throughout',
     goalId,
   );
 }
@@ -500,6 +529,9 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
     const m = s.name.match(/(\d+)\s*[×x]/);
     const tempoMi = m ? Math.max(2, Math.min(5, parseInt(m[1], 10) - 1)) : 3;
     next = tempoRun(day, tempoMi, 1.5, goalId);
+  } else if (s.type === 'run' && s.tags?.includes('vo2max')) {
+    // Same pattern as bike vo2 downgrade: replace with tempo-style work so MODERATE + description stay aligned.
+    next = tempoRun(day, 3, 1.5, goalId);
   } else if (s.type === 'swim' && (s.tags?.includes('threshold') || /threshold/i.test(s.name))) {
     const yd = parseYardsFromSessionName(s.name) ?? Math.max(1800, s.duration * 40);
     next = cssAerobicSwim(day, yd, goalId);

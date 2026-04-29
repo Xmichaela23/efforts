@@ -589,7 +589,8 @@ Deno.serve(async (req)=>{
         const tags = Array.isArray(p?.tags) ? p.tags : [];
         const isBrick = tags.some((t)=>String(t).toLowerCase() === 'brick');
         const t = String(p?.type || '').toLowerCase();
-        const isEndurance = t === 'run' || t === 'ride' || t === 'walk';
+        // Combined-plan bricks use type "bike"; legacy rows may use "ride" / "cycling".
+        const isEndurance = t === 'run' || t === 'ride' || t === 'walk' || t === 'bike' || t === 'cycling';
         if (isBrick && isEndurance) {
           const date = String(p?.date).slice(0, 10);
           if (!byDate[date]) byDate[date] = [];
@@ -597,17 +598,20 @@ Deno.serve(async (req)=>{
         }
       }
       Object.entries(byDate).forEach(([date, arr])=>{
-        // Stable order: created_at then id then type (bike first if available)
+        // Brick must display bike → run regardless of insert/update timestamps.
         const sorted = [
           ...arr
         ].sort((a, b)=>{
+          const ta = String(a.type || '').toLowerCase();
+          const tb = String(b.type || '').toLowerCase();
+          const bikeFirst = (x)=>x === 'ride' || x === 'bike' || x === 'cycling';
+          if (ta !== tb) {
+            if (bikeFirst(ta) && tb === 'run') return -1;
+            if (ta === 'run' && bikeFirst(tb)) return 1;
+          }
           const ca = String(a.created_at || '');
           const cb = String(b.created_at || '');
           if (ca !== cb) return ca.localeCompare(cb);
-          // Prefer bike before run when equal
-          const ta = String(a.type || '').toLowerCase();
-          const tb = String(b.type || '').toLowerCase();
-          if (ta !== tb) return ta === 'ride' ? -1 : 1;
           return String(a.id).localeCompare(String(b.id));
         });
         // Pair in twos

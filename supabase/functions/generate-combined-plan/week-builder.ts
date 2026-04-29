@@ -19,6 +19,7 @@ import {
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS,
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
+  type TriRaceDistance,
 } from './science.ts';
 import type { DayOfWeek } from './science.ts';
 import {
@@ -482,9 +483,15 @@ export function buildWeek(
   if (!lrSlot?.isRest && !raceThisWeek) {
     if (phase === 'race_specific' && hasRun) {
       const mpMiles = Math.max(4, Math.round(longRunMiles * 0.60));
-      lrSlot!.sessions.push(marathonPaceRun(longRunActualDay, mpMiles, servedGoal));
+      lrSlot!.sessions.push(
+        hasTri
+          ? racePaceRun(longRunActualDay, mpMiles, primaryGoal.distance as TriRaceDistance, servedGoal)
+          : marathonPaceRun(longRunActualDay, mpMiles, servedGoal),
+      );
     } else {
-      lrSlot!.sessions.push(longRun(longRunActualDay, longRunMiles, phase, servedGoal));
+      lrSlot!.sessions.push(
+        longRun(longRunActualDay, longRunMiles, phase, servedGoal, hasTri ? primaryGoal.distance : null),
+      );
     }
   }
 
