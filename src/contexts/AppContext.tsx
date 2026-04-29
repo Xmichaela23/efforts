@@ -5,6 +5,7 @@ import { loadPlansBundle } from '@/services/plans/BundleLoader';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 import { Capacitor } from '@capacitor/core';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
@@ -526,7 +527,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const startDateStr = plan.config?.user_selected_start_date || plan.config?.start_date;
       if (!startDateStr) return plan.current_week || 1;
       
-      const startDate = new Date(startDateStr + 'T00:00:00');
+      const startDate = parseLocalDate(String(startDateStr).slice(0, 10));
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Normalize to midnight
       

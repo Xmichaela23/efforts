@@ -29,6 +29,7 @@ import { runGoalPredictor } from '../_shared/goal-predictor/index.ts';
 import { getLatestAthleteMemory } from '../_shared/athlete-memory.ts';
 import { computeBlockResponse, type BlockResponseState } from '../_shared/response-model/index.ts';
 import { loadGoalContext } from '../_shared/goal-context.ts';
+import { parseLocalDate } from '../_shared/parse-local-date.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -143,14 +144,14 @@ Deno.serve(async (req) => {
     // Debug: Show this week's planned workouts
     const thisWeekStart = new Date();
     thisWeekStart.setDate(thisWeekStart.getDate() - 6);
-    const thisWeekPlanned = planned.filter(p => new Date(p.date) >= thisWeekStart);
+    const thisWeekPlanned = planned.filter(p => parseLocalDate(String(p.date).slice(0, 10)) >= thisWeekStart);
     console.log(`📊 This week planned (${thisWeekStart.toLocaleDateString('en-CA')} to today):`);
     thisWeekPlanned.forEach(p => {
       console.log(`   - ${p.date}: ${p.type} "${p.name}"`);
     });
     
     // Debug: Show this week's completed workouts
-    const thisWeekCompleted = completedWorkouts.filter(w => new Date(w.date) >= thisWeekStart);
+    const thisWeekCompleted = completedWorkouts.filter(w => parseLocalDate(String(w.date).slice(0, 10)) >= thisWeekStart);
     console.log(`📊 This week completed:`);
     thisWeekCompleted.forEach(w => {
       console.log(`   - ${w.date}: ${w.type} "${w.name}" (planned_id: ${w.planned_id || 'none'})`);
@@ -349,12 +350,12 @@ function attachCompletions(
     
     // If no exact match, try type + date proximity (for moved workouts)
     if (matches.length === 0) {
-      const plannedDate = new Date(plannedWorkout.date);
+      const plannedDate = parseLocalDate(String(plannedWorkout.date).slice(0, 10));
       const plannedType = plannedWorkout.type.toLowerCase();
       
       matches = completed.filter(workout => {
         const workoutType = workout.type.toLowerCase();
-        const workoutDate = new Date(workout.date);
+        const workoutDate = parseLocalDate(String(workout.date).slice(0, 10));
         const daysDiff = Math.abs((workoutDate.getTime() - plannedDate.getTime()) / (1000 * 60 * 60 * 24));
         
         // Match type and date within 7 days

@@ -5,6 +5,7 @@ import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts'
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
+import { formatLocalDate, mondayOfCalendarYmd, parseLocalDate } from '../_shared/parse-local-date.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1026,19 +1027,13 @@ function toDateOnly(val: any): string | null {
 }
 
 function isoWeekStartMonday(isoDate: string): string {
-  const d = new Date(isoDate);
-  // Force local midnight
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0=Sun..6=Sat
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return monday.toLocaleDateString('en-CA');
+  return mondayOfCalendarYmd(isoDate);
 }
 
 function isoDateAddDays(isoDate: string, days: number): string {
-  const d = new Date(isoDate);
+  const d = parseLocalDate(isoDate);
   d.setDate(d.getDate() + days);
-  return d.toLocaleDateString('en-CA');
+  return formatLocalDate(d);
 }
 
 async function inferPlanIdForDate(

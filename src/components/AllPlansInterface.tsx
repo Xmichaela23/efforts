@@ -16,6 +16,7 @@ import { getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBor
 // PlannedWorkoutView is deprecated; unified view replaces it
 import WorkoutSummaryView from './WorkoutSummaryView';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
+import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 // @ts-ignore
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 
@@ -526,11 +527,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       
       if (Array.isArray(w1) && w1.length > 0) {
         const anchor = w1[0] as any;
-        const startDate = new Date(anchor.date);
+        const startDate = parseLocalDate(String(anchor.date).slice(0, 10));
+        const anchorMid = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
         const today = new Date();
-        
-        // Calculate days difference
-        const diffTime = today.getTime() - startDate.getTime();
+        today.setHours(0, 0, 0, 0);
+        const diffTime = today.getTime() - anchorMid.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         
         // Calculate week number (1-based)
@@ -547,10 +548,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         .maybeSingle();
       
       if (planRow?.config?.user_selected_start_date) {
-        const startDate = new Date(planRow.config.user_selected_start_date);
+        const startDate = parseLocalDate(String(planRow.config.user_selected_start_date).slice(0, 10));
+        const anchorMid = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
         const today = new Date();
-        
-        const diffTime = today.getTime() - startDate.getTime();
+        today.setHours(0, 0, 0, 0);
+        const diffTime = today.getTime() - anchorMid.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
         
@@ -618,7 +620,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         const weekStartISO = (()=>{
           try {
             const w1 = (pd.weeks && pd.weeks[0] && pd.weeks[0].workouts && pd.weeks[0].workouts[0] && pd.weeks[0].workouts[0].date) || null;
-            const ref = new Date(w1 || new Date());
+            const ref = w1 ? parseLocalDate(String(w1).slice(0, 10)) : new Date();
             const js = ref.getDay(); const mon = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - ((js + 6)%7));
             const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + (wk-1)*7);
             const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
@@ -627,7 +629,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         })();
         const weekEndISO = (()=>{
           try {
-            const s = weekStartISO ? new Date(weekStartISO) : new Date();
+            const s = weekStartISO ? parseLocalDate(String(weekStartISO).slice(0, 10)) : new Date();
             const e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+6);
             const y=e.getFullYear(), m=String(e.getMonth()+1).padStart(2,'0'), dd=String(e.getDate()).padStart(2,'0');
             return `${y}-${m}-${dd}`;
@@ -1251,7 +1253,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           } catch { return undefined; }
         })();
         const weekEndISO = (()=>{
-          try { const s = weekStartISO ? new Date(weekStartISO) : new Date(); const e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+6); const y=e.getFullYear(), m=String(e.getMonth()+1).padStart(2,'0'), dd=String(e.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; } catch { return undefined; }
+          try { const s = weekStartISO ? parseLocalDate(String(weekStartISO).slice(0, 10)) : new Date(); const e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+6); const y=e.getFullYear(), m=String(e.getMonth()+1).padStart(2,'0'), dd=String(e.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; } catch { return undefined; }
         })();
         // Skip invoking here to avoid load storms
         const { data: rows } = await supabase
@@ -1393,14 +1395,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       
       if (pausedAt && selectedPlanDetail.config?.user_selected_start_date) {
         const pauseDurationDays = Math.floor((now.getTime() - pausedAt.getTime()) / (1000 * 60 * 60 * 24));
-        const originalStart = new Date(selectedPlanDetail.config.user_selected_start_date);
+        const originalStart = parseLocalDate(String(selectedPlanDetail.config.user_selected_start_date).slice(0, 10));
         const newStart = new Date(originalStart);
         newStart.setDate(newStart.getDate() + pauseDurationDays);
         
         // Update config with new start date
         updates.config = {
           ...selectedPlanDetail.config,
-          user_selected_start_date: newStart.toISOString().split('T')[0]
+          user_selected_start_date: formatLocalDate(newStart)
         };
       }
       

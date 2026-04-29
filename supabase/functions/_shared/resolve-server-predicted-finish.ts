@@ -10,6 +10,7 @@
  * Clients must not send predicted_finish_time_seconds; course-detail / course-strategy use this only.
  */
 import { computeRaceReadiness } from './race-readiness/index.ts';
+import { parseLocalDate } from './parse-local-date.ts';
 import { parseClientPredictedFinishSeconds } from './resolve-goal-target-time.ts';
 import { fmtFinishClock } from './course-strategy-helpers.ts';
 
@@ -260,7 +261,7 @@ export async function resolveServerPredictedFinishSeconds(
 
   let weeksOut = 0;
   try {
-    const race = new Date(String(goal.target_date).slice(0, 10));
+    const race = parseLocalDate(String(goal.target_date).slice(0, 10));
     if (!Number.isNaN(race.getTime())) {
       const now = new Date();
       weeksOut = Math.max(0, Math.round((race.getTime() - now.getTime()) / (7 * 24 * 60 * 60 * 1000)));

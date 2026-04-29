@@ -1,3 +1,5 @@
+import { mondayOfCalendarYmd, parseLocalDate } from '../../_shared/parse-local-date.ts';
+
 /**
  * Plan context: fetch plan/phase and week intent for a workout date.
  * Isolates Supabase/database access from analysis logic.
@@ -38,18 +40,10 @@ export async function fetchPlanContextForWorkout(
     const startDateStr = config.user_selected_start_date || config.start_date;
     if (!startDateStr) return null;
 
-    // Normalize start date to Monday
-    const mondayOf = (iso: string): string => {
-      const d = new Date(iso);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      return monday.toLocaleDateString('en-CA');
-    };
-
-    const startDateMonday = mondayOf(startDateStr);
-    const startDate = new Date(startDateMonday);
-    const viewedDate = new Date(workoutDate);
+    // Normalize start date to Monday (local calendar date)
+    const startDateMonday = mondayOfCalendarYmd(String(startDateStr).slice(0, 10));
+    const startDate = parseLocalDate(startDateMonday);
+    const viewedDate = parseLocalDate(String(workoutDate).slice(0, 10));
     startDate.setHours(0, 0, 0, 0);
     viewedDate.setHours(0, 0, 0, 0);
     const diffMs = viewedDate.getTime() - startDate.getTime();

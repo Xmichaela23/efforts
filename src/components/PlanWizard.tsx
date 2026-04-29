@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { getDisciplineGlowColor, getDisciplineTextClass, getDisciplineTextClassVariant, getDisciplineBorderClass, getDisciplineFocusRingClass, getDisciplineFocusBorderClass, getDisciplineSelectedButtonClasses, getDisciplineUnselectedButtonClasses, getDisciplineBgClassVariant, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { useToast } from '@/components/ui/use-toast';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { MobileHeader } from './MobileHeader';
 import {
   calculateEffortScoreResult,
@@ -2743,7 +2744,7 @@ export default function PlanWizard() {
                     );
                   })()}
                   <span className="px-3 py-1 rounded-full bg-white/10 text-white/80 border border-white/20">
-                    Starts {new Date(state.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    Starts {parseLocalDate(String(state.startDate).slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                 </div>
               </div>

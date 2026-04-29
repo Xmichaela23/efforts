@@ -1050,7 +1050,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   // For completed workouts, use the date field for date and timestamp for time
                   if (workout.workout_status === 'completed' && workout.date) {
                     // Use the date field for the date (this is already in the correct timezone)
-                    const dateStr = new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                    const dateStr = new Date(workout.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                     
                     // Use timestamp for time if available
                     if (workout.timestamp) {
@@ -1074,7 +1074,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   // Fallback to date only
                   const ds = String(workout.date || '').trim();
                   if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
-                    const d = new Date(ds + 'T00:00:00');
+                    const d = new Date(ds + 'T12:00:00');
                     if (!isNaN(d.getTime())) {
                       const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                       return <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{dateStr}</span>;

@@ -7,6 +7,8 @@
 
 import { AdherenceItem, PlanAdherence, PlannedWorkout, Goal } from './types.ts';
 
+import { parseLocalDate } from '../parse-local-date.ts';
+
 // =============================================================================
 // CONFIGURATION
 // =============================================================================
@@ -248,7 +250,7 @@ function groupByWeek(workouts: PlannedWorkout[], weeksBack: number): PlannedWork
     weekStart.setDate(weekStart.getDate() - 6);
     
     const weekWorkouts = workouts.filter(w => {
-      const workoutDate = new Date(w.date);
+      const workoutDate = parseLocalDate(String(w.date).slice(0, 10));
       return workoutDate >= weekStart && workoutDate <= weekEnd;
     });
     

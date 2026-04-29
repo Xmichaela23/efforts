@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import StrengthCompareTable from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
-import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 interface StrengthCompletedViewProps {
   workoutData: any;
@@ -35,7 +35,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   // Normalize dates to YYYY-MM-DD format for comparison using user's local timezone
   const normalizeDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     return date.toLocaleDateString('en-CA');
   };
 

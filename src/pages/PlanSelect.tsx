@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -1103,7 +1104,7 @@ export default function PlanSelect() {
       const chosenStart = (startDate && startDate.trim().length>0) ? startDate : (payload?.config?.user_selected_start_date || '');
       let currentWeek = 1;
       if (chosenStart) {
-        const startDateObj = new Date(chosenStart);
+        const startDateObj = parseLocalDate(String(chosenStart).slice(0, 10));
         const today = new Date();
         const weeksDiff = Math.floor((today.getTime() - startDateObj.getTime()) / (7 * 24 * 60 * 60 * 1000));
         currentWeek = Math.max(1, Math.min(payload.duration_weeks, weeksDiff + 1));

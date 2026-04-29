@@ -1,5 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+import { formatLocalDate, parseLocalDate } from '../_shared/parse-local-date.ts';
+
 type Confidence = number;
 
 interface RecomputeRequest {
@@ -35,11 +37,11 @@ const INJURY_KEYWORDS: Array<{ pattern: RegExp; flag: string }> = [
 ];
 
 function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return formatLocalDate(d);
 }
 
 function mondayOf(date: Date): Date {
-  const d = new Date(date);
+  const d = new Date(date.getTime());
   const day = d.getDay(); // 0=Sun..6=Sat
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
@@ -296,7 +298,7 @@ Deno.serve(async (req: Request) => {
       const disc = normalizeDiscipline(w.type);
       const mins = Number(w.moving_time ?? w.duration ?? 0);
       if (!Number.isFinite(mins) || mins <= 0) continue;
-      const wk = toISODate(mondayOf(new Date(w.date)));
+      const wk = toISODate(mondayOf(parseLocalDate(String(w.date).slice(0, 10))));
       if (disc === 'run') weeklyByDiscipline.run.set(wk, (weeklyByDiscipline.run.get(wk) || 0) + mins);
       if (disc === 'bike') weeklyByDiscipline.bike.set(wk, (weeklyByDiscipline.bike.get(wk) || 0) + mins);
       if (disc === 'swim') weeklyByDiscipline.swim.set(wk, (weeklyByDiscipline.swim.get(wk) || 0) + mins);
@@ -311,7 +313,7 @@ Deno.serve(async (req: Request) => {
     }
 
     for (const f of factRows) {
-      const wk = toISODate(mondayOf(new Date(f.date)));
+      const wk = toISODate(mondayOf(parseLocalDate(String(f.date).slice(0, 10))));
       const sf = (f as any).strength_facts as any;
       const totalSets = Number(sf?.total_sets ?? NaN);
       if (Number.isFinite(totalSets) && totalSets > 0) {

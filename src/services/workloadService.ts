@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { formatLocalDate, parseLocalDate } from '@/lib/dateUtils';
 
 interface WorkloadCalculationRequest {
   workout_id: string;
@@ -145,12 +146,13 @@ export async function getWorkloadStats(userId: string): Promise<{
 
   // Calculate weekly averages (simplified)
   const weeklyTotals = new Map<string, number>();
-  data?.forEach(workout => {
-    const date = new Date(workout.date);
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const weekKey = weekStart.toISOString().split('T')[0];
-    
+  data?.forEach((workout) => {
+    const date = parseLocalDate(String(workout.date).slice(0, 10));
+    const dow = date.getDay();
+    const daysFromMonday = (dow + 6) % 7;
+    const weekStart = new Date(date.getFullYear(), date.getMonth(), date.getDate() - daysFromMonday);
+    const weekKey = formatLocalDate(weekStart);
+
     weeklyTotals.set(weekKey, (weeklyTotals.get(weekKey) || 0) + (workout.workload_actual || 0));
   });
 

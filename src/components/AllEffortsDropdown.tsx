@@ -100,7 +100,7 @@ style={{borderRadius: '12px', padding: '8px', minWidth: '320px'}}
               {workout.name || `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}`}
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              {workout.date ? new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
+              {workout.date ? new Date(workout.date + 'T12:00:00').toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric'
               }) : 'No date'}

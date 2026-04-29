@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 
 type Props = {
@@ -99,8 +100,8 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           if (bDate === workoutDate && aDate !== workoutDate) return 1;
           
           // Otherwise sort by date proximity (closest first)
-          const aDiff = Math.abs(new Date(aDate).getTime() - new Date(workoutDate).getTime());
-          const bDiff = Math.abs(new Date(bDate).getTime() - new Date(workoutDate).getTime());
+          const aDiff = Math.abs(parseLocalDate(aDate).getTime() - parseLocalDate(workoutDate).getTime());
+          const bDiff = Math.abs(parseLocalDate(bDate).getTime() - parseLocalDate(workoutDate).getTime());
           return aDiff - bDiff;
         });
 

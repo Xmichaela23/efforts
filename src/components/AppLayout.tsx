@@ -27,6 +27,7 @@ import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
 import AthleticRecordPage from './AthleticRecordPage';
+import { parseLocalDate } from '@/lib/dateUtils';
 import Gear from './Gear';
 import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -408,7 +409,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           const hasRpe = workout.rpe != null || workoutMetadata.session_rpe != null;
 
           // Only show if: no RPE, not dismissed, and within last 7 days
-          const workoutDate = new Date(workout.date);
+          const workoutDate = parseLocalDate(String(workout.date).slice(0, 10));
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
           const isWithin7Days = workoutDate >= sevenDaysAgo;
 

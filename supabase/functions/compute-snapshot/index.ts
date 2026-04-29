@@ -15,17 +15,21 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  formatLocalDate,
+  mondayOfCalendarYmd,
+  mondayOfToday,
+  parseLocalDate,
+} from "../_shared/parse-local-date.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Get the Monday of the week containing `date`. */
-function weekMonday(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - ((day + 6) % 7));
-  return d.toISOString().slice(0, 10);
+function addCalendarDays(iso: string, delta: number): string {
+  const d = parseLocalDate(iso);
+  d.setDate(d.getDate() + delta);
+  return formatLocalDate(d);
 }
 
 function avg(arr: number[]): number | null {
@@ -248,7 +252,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const targetWeek = body.week_start ?? weekMonday(new Date());
+    const targetWeek = body.week_start ?? mondayOfToday();
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -258,13 +262,13 @@ serve(async (req: Request) => {
     // -----------------------------------------------------------------------
     // 1. Fetch 5 weeks of workout_facts (target week + 4 prior)
     // -----------------------------------------------------------------------
-    const fiveWeeksAgo = new Date(targetWeek);
+    const fiveWeeksAgo = parseLocalDate(targetWeek);
     fiveWeeksAgo.setDate(fiveWeeksAgo.getDate() - 28);
-    const rangeStart = fiveWeeksAgo.toISOString().slice(0, 10);
+    const rangeStart = formatLocalDate(fiveWeeksAgo);
 
-    const sundayOfTarget = new Date(targetWeek);
+    const sundayOfTarget = parseLocalDate(targetWeek);
     sundayOfTarget.setDate(sundayOfTarget.getDate() + 6);
-    const rangeEnd = sundayOfTarget.toISOString().slice(0, 10);
+    const rangeEnd = formatLocalDate(sundayOfTarget);
 
     const { data: allFacts, error: fErr } = await supabase
       .from("workout_facts")
@@ -303,9 +307,9 @@ serve(async (req: Request) => {
     // Split prior into individual weeks for chronic load
     const priorWeeks: FactRow[][] = [[], [], [], []];
     for (const f of priorFacts) {
-      const wk = weekMonday(new Date(f.date));
+      const wk = mondayOfCalendarYmd(String(f.date).slice(0, 10));
       const weeksBack = Math.floor(
-        (new Date(targetWeek).getTime() - new Date(wk).getTime()) / (7 * 24 * 60 * 60 * 1000),
+        (parseLocalDate(targetWeek).getTime() - parseLocalDate(wk).getTime()) / (7 * 24 * 60 * 60 * 1000),
       );
       if (weeksBack >= 1 && weeksBack <= 4) {
         priorWeeks[weeksBack - 1].push(f);
@@ -364,13 +368,14 @@ serve(async (req: Request) => {
     // Aerobic direction: run_easy_hr_trend < 0 means faster at same HR = improving
     // Strength direction: compare current top lifts vs prior top lifts
     const priorExercises = exercises.filter((e) => e.date < targetWeek);
+    const priorWeekMonday = addCalendarDays(targetWeek, -7);
     const priorTopLifts = buildTopLifts(
       priorExercises.filter((e) => {
-        const wk = weekMonday(new Date(e.date));
-        return wk === weekMonday(new Date(new Date(targetWeek).getTime() - 7 * 24 * 60 * 60 * 1000));
+        const wk = mondayOfCalendarYmd(String(e.date).slice(0, 10));
+        return wk === priorWeekMonday;
       }),
       priorExercises,
-      weekMonday(new Date(new Date(targetWeek).getTime() - 7 * 24 * 60 * 60 * 1000)),
+      priorWeekMonday,
     );
 
     let aerobicDirection: 'improving' | 'stable' | 'declining' | null = null;

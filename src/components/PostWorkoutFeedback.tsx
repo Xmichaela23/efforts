@@ -5,6 +5,7 @@ import { SPORT_COLORS } from '@/lib/context-utils';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
 import { useAppContext } from '@/contexts/AppContext';
+import { parseLocalDate } from '@/lib/dateUtils';
 import MapEffort from './MapEffort';
 import {
   Select,
@@ -314,7 +315,7 @@ export default function PostWorkoutFeedback({
   const formatDate = (dateString: string | null | undefined): string | null => {
     if (!dateString) return null;
     try {
-      const date = new Date(dateString);
+      const date = parseLocalDate(String(dateString).slice(0, 10));
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);

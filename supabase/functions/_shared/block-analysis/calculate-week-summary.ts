@@ -13,6 +13,8 @@ import {
   Workout 
 } from './types.ts';
 
+import { parseLocalDate } from '../parse-local-date.ts';
+
 // =============================================================================
 // KEY WORKOUT PATTERNS
 // =============================================================================
@@ -56,12 +58,12 @@ export function calculateWeekSummary(
   
   // Filter to this week
   const thisWeekPlanned = plannedWithCompletions.filter(p => {
-    const plannedDate = new Date(p.date);
+    const plannedDate = parseLocalDate(String(p.date).slice(0, 10));
     return plannedDate >= weekStart && plannedDate <= weekEnd;
   });
   
   const thisWeekCompleted = completedWorkouts.filter(w => {
-    const workoutDate = new Date(w.date);
+    const workoutDate = parseLocalDate(String(w.date).slice(0, 10));
     return workoutDate >= weekStart && workoutDate <= weekEnd;
   });
   
@@ -217,7 +219,7 @@ function detectWeekPatterns(
       weekStart.setDate(weekStart.getDate() - 6);
       
       const weekWorkouts = plannedWithCompletions.filter(p => {
-        const d = new Date(p.date);
+        const d = parseLocalDate(String(p.date).slice(0, 10));
         return d >= weekStart && d <= weekEnd && 
                normalizeDiscipline(p.type) === discipline;
       });

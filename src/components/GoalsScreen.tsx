@@ -8,6 +8,7 @@ import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/rac
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
+import { parseLocalDate } from '@/lib/dateUtils';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { useToast } from '@/components/ui/use-toast';
 // Local alias so existing call-sites inside this file don't need renaming
@@ -1960,7 +1961,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             // Determine whether dates make the priority obvious so we can simplify
             // the copy. If the new race is more than 8 weeks after the existing one
             // the user is probably asking to train sequentially, not competitively.
-            const existingDate = existingPrimary?.target_date ? new Date(existingPrimary.target_date) : null;
+            const existingDate = existingPrimary?.target_date ? parseLocalDate(String(existingPrimary.target_date).slice(0, 10)) : null;
             const newDate = eventDate ? new Date(eventDate) : null;
             const gapWeeks = existingDate && newDate
               ? Math.round((newDate.getTime() - existingDate.getTime()) / (7 * 24 * 60 * 60 * 1000))

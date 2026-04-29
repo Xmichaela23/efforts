@@ -4,6 +4,8 @@
 
 import type { AthleteIdentity, PlanPosition, LiftMax, PlannedSession } from './types.ts';
 
+import { parseLocalDate } from '../parse-local-date.ts';
+
 // ---------------------------------------------------------------------------
 // Identity: who the athlete is (goals, key numbers, preferences)
 // ---------------------------------------------------------------------------
@@ -24,7 +26,7 @@ export function buildIdentity(opts: {
     .filter((g: any) => g?.goal_type === 'event' && g?.target_date)
     .map((g: any) => {
       const weeksOut = Math.max(0, Math.round(
-        (new Date(g.target_date).getTime() - new Date(asOfDate).getTime()) / (7 * 24 * 3600 * 1000)
+        (parseLocalDate(String(g.target_date).slice(0, 10)).getTime() - parseLocalDate(String(asOfDate).slice(0, 10)).getTime()) / (7 * 24 * 3600 * 1000)
       ));
       return {
         name: String(g.name || ''),

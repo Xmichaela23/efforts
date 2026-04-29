@@ -14,6 +14,7 @@ import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-s
 import { buildWeek } from './week-builder.ts';
 import { validatePlan, failedChecks } from './validator.ts';
 import { scaledWeeklyTSS } from './science.ts';
+import { parseLocalDate } from '../_shared/parse-local-date.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +47,7 @@ Deno.serve(async (req: Request) => {
 
     // Default loading pattern
     const loadingPattern = athlete_state.loading_pattern ?? '3:1';
-    const startDate = start_date ? new Date(start_date) : new Date();
+    const startDate = start_date ? parseLocalDate(String(start_date).slice(0, 10)) : new Date();
 
     const state: AthleteState = {
       ...athlete_state,

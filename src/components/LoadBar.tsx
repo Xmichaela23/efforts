@@ -150,7 +150,7 @@ export default function LoadBar({ load, loadStatus, readinessState, weekIntent, 
                     </div>
                   )}
                   <span className={`text-[9px] tabular-nums leading-none ${isToday ? 'text-white/70' : 'text-white/40'}`}>
-                    {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
+                    {new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'narrow' })}
                   </span>
                 </div>
               );

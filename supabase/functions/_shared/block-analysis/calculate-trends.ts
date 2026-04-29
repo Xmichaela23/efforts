@@ -7,6 +7,8 @@
 
 import { TrendResult, PerformanceTrends, StrengthTrend, Workout, UserBaselines } from './types.ts';
 
+import { parseLocalDate } from '../parse-local-date.ts';
+
 // =============================================================================
 // CONFIGURATION
 // =============================================================================
@@ -62,9 +64,9 @@ function calculateBikeTrend(
   midpoint: Date,
   periodStart: Date
 ): TrendResult {
-  const currentPeriod = workouts.filter(w => new Date(w.date) >= midpoint);
+  const currentPeriod = workouts.filter(w => parseLocalDate(String(w.date).slice(0, 10)) >= midpoint);
   const previousPeriod = workouts.filter(w => 
-    new Date(w.date) >= periodStart && new Date(w.date) < midpoint
+    parseLocalDate(String(w.date).slice(0, 10)) >= periodStart && parseLocalDate(String(w.date).slice(0, 10)) < midpoint
   );
   
   // Check data availability
@@ -153,9 +155,9 @@ function calculateRunTrend(
   midpoint: Date,
   periodStart: Date
 ): TrendResult {
-  const currentPeriod = workouts.filter(w => new Date(w.date) >= midpoint);
+  const currentPeriod = workouts.filter(w => parseLocalDate(String(w.date).slice(0, 10)) >= midpoint);
   const previousPeriod = workouts.filter(w => 
-    new Date(w.date) >= periodStart && new Date(w.date) < midpoint
+    parseLocalDate(String(w.date).slice(0, 10)) >= periodStart && parseLocalDate(String(w.date).slice(0, 10)) < midpoint
   );
   
   // Check data availability

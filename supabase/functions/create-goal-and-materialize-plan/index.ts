@@ -58,6 +58,8 @@ interface CreateGoalRequest {
     training_prefs: Record<string, any>;
     notes?: string | null;
   };
+  /** When set, combined-plan + run/tri generators use this anchor instead of guessing. */
+  plan_start_date?: string | null;
 }
 
 class AppError extends Error {
@@ -326,12 +328,22 @@ function isMarathonDistance(distance: string | null | undefined): boolean {
   return String(distance || '').trim().toLowerCase() === 'marathon';
 }
 
+/** YYYY-MM-DD when valid; avoids UTC drift from Date.toISOString(). */
+function normalizeDateOnlyYmd(raw: unknown): string | null {
+  const t = String(raw ?? '').trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
+}
+
+/** Monday of the server's *local calendar* week — use local getters, not toISOString() (UTC). */
 function currentWeekMondayISO(): string {
   const d = new Date();
   const day = d.getDay(); // 0=Sun ... 6=Sat
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 }
 
 /**
@@ -745,6 +757,8 @@ async function buildCombinedPlan(
     transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
     structural_load_hint?: 'low' | 'normal';
   },
+  /** From goal flow (`plan_start_date`). When omitted, combined plan still used server's current Monday (legacy). */
+  explicit_plan_start_date?: string | null,
 ): Promise<{ plan_id: string } | null> {
 
   // Gather all active event goals (including the just-created one)
@@ -918,9 +932,8 @@ async function buildCombinedPlan(
     strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
   }));
 
-  // Anchor the combined plan to the current week's Monday so planWeek
-  // calculations in generate-combined-plan are stable regardless of time-of-day.
-  const combinedPlanStartDate = currentWeekMondayISO();
+  const combinedPlanStartDate =
+    normalizeDateOnlyYmd(explicit_plan_start_date) ?? currentWeekMondayISO();
 
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
@@ -1224,6 +1237,7 @@ Deno.serve(async (req: Request) => {
           postRaceRecovery.apply
             ? { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' }
             : undefined,
+          plan_start_date ?? null,
         );
         if (combinedResult) {
           createdPlanId = combinedResult.plan_id;
@@ -1568,6 +1582,7 @@ Deno.serve(async (req: Request) => {
         postRaceRecovery.apply
           ? { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' }
           : undefined,
+        plan_start_date ?? null,
       );
       if (combinedResult) {
         createdPlanId = combinedResult.plan_id;

@@ -25,6 +25,7 @@ import {
   type RawCourseSegmentRow,
 } from '../_shared/race-debrief.ts';
 import { runPostRaceFeedbackChain } from '../_shared/race-feedback.ts';
+import { parseLocalDate } from '../_shared/parse-local-date.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -378,7 +379,7 @@ Deno.serve(async (req) => {
               null;
             w.workout_analysis = null; // free immediately
             if (hrDrift != null && Number.isFinite(hrDrift)) {
-              const daysSince = Math.round((Date.now() - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24));
+              const daysSince = Math.round((Date.now() - parseLocalDate(String(w.date).slice(0, 10)).getTime()) / (1000 * 60 * 60 * 24));
               return {
                 date: w.date,
                 driftBpm: hrDrift,
