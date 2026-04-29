@@ -108,16 +108,17 @@ function effectiveHardMin(s: PlannedSession): number {
   return 0;
 }
 
-function enforce8020(grid: WeekGrid, phase: Phase): void {
+function enforce8020(grid: WeekGrid, phase: Phase): string[] {
+  const tradeOffs: string[] = [];
   const target   = PHASE_ZONE_DIST[phase];
   const sessions = gridSessions(grid);
   const totalMin = sessions.reduce((s, x) => s + x.duration, 0);
-  if (totalMin === 0) return;
+  if (totalMin === 0) return tradeOffs;
 
   let hardMin    = sessions.reduce((s, x) => s + effectiveHardMin(x), 0);
   const maxAllowed = totalMin * (1 - target.low); // e.g. 0.80 target → 20% of total
 
-  if (hardMin <= maxAllowed) return;
+  if (hardMin <= maxAllowed) return tradeOffs;
 
   // Downgrade in sport priority order (lowest systemic impact first).
   // Each non-protected HARD/MODERATE session is a candidate. We downgrade
@@ -136,12 +137,17 @@ function enforce8020(grid: WeekGrid, phase: Phase): void {
         if (s.type !== sport || s.intensity_class === 'EASY' || isProtected) continue;
 
         const before = effectiveHardMin(s);
+        const prior = { name: s.name, intensity_class: s.intensity_class, day: s.day };
         // Replace with a real easy session so name, tokens, and description match EASY.
         Object.assign(s, downgradedEasyAerobicFrom(s));
+        tradeOffs.push(
+          `80/20 adjustment: "${prior.name}" on ${prior.day} downgraded from ${prior.intensity_class} to EASY — weekly hard-minute ceiling reached. Reduce total load or protect this session by adjusting anchor days.`,
+        );
         hardMin -= before;
       }
     }
   }
+  return tradeOffs;
 }
 
 // ── Same-day matrix (9×9 + extensions) — post placement ---------------------------------
@@ -219,7 +225,13 @@ function tryResolveSameDayMatrixConflicts(grid: WeekGrid, isPerformanceCoequal =
 
 // ── TSS summary helpers ───────────────────────────────────────────────────────
 
-function computeWeekMetrics(sessions: PlannedSession[], weekNum: number, phase: Phase, isRecovery: boolean): GeneratedWeek {
+function computeWeekMetrics(
+  sessions: PlannedSession[],
+  weekNum: number,
+  phase: Phase,
+  isRecovery: boolean,
+  weekTradeOffs?: string[],
+): GeneratedWeek {
   const sport_raw_tss: Record<Sport, number> = { run: 0, bike: 0, swim: 0, strength: 0, race: 0 };
   let total_raw = 0, total_weighted = 0, z12min = 0, z3min = 0;
 
@@ -243,6 +255,7 @@ function computeWeekMetrics(sessions: PlannedSession[], weekNum: number, phase: 
     zone1_2_minutes: Math.round(z12min),
     zone3_plus_minutes: Math.round(z3min),
     eighty_twenty_ratio: totalMin > 0 ? z12min / totalMin : 1,
+    ...(weekTradeOffs && weekTradeOffs.length > 0 ? { week_trade_offs: weekTradeOffs } : {}),
   };
 }
 
@@ -845,7 +858,7 @@ export function buildWeek(
   enforceHardEasy(grid);
 
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
-  enforce8020(grid, phase);
+  const week8020TradeOffs = enforce8020(grid, phase);
 
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
@@ -867,7 +880,7 @@ export function buildWeek(
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 
   const allSessions = gridSessions(grid);
-  return computeWeekMetrics(allSessions, weekNum, phase, isRecovery);
+  return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, week8020TradeOffs);
 }
 
 // ── Ramp helper (duplicated locally to avoid circular import) ────────────────

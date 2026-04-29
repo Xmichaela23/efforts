@@ -173,6 +173,8 @@ export interface GeneratedWeek {
   zone1_2_minutes: number;
   zone3_plus_minutes: number;
   eighty_twenty_ratio: number; // fraction of time at Z1-2
+  /** Athlete/coach-facing notes when 80/20 enforcement replaced a session (see enforce8020). */
+  week_trade_offs?: string[];
 }
 
 // ── Output ───────────────────────────────────────────────────────────────────

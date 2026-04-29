@@ -191,6 +191,11 @@ Deno.serve(async (req: Request) => {
       validation,
       validation_failures: failures,
       week_start_dow: 'Monday',
+      week_trade_offs: Object.fromEntries(
+        generatedWeeks
+          .filter((w) => Array.isArray(w.week_trade_offs) && w.week_trade_offs.length > 0)
+          .map((w) => [String(w.weekNum), w.week_trade_offs as string[]]),
+      ),
     };
 
     // ── Write plan to DB ───────────────────────────────────────────────────
