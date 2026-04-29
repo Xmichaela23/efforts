@@ -178,64 +178,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     if (runEvent) setExpandedGoalId(runEvent.id);
   }, [expandRunEventForCourseNonce, goals]);
 
-  async function handleGoalsCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    const gid = pendingCourseGoalId;
-    setPendingCourseGoalId(null);
-    if (!file || !gid) return;
-    const goal = goals.find((g) => g.id === gid);
-    if (!goal) return;
-    const linked = plansByGoalId.get(gid);
-    const rr = coachWeek.data?.race_readiness;
-    const coachPred =
-      rr &&
-      String(goal.name) === String(rr.goal.name) &&
-      (goal.sport || '').toLowerCase() === 'run' &&
-      Number.isFinite(rr.predicted_finish_time_seconds) &&
-      rr.predicted_finish_time_seconds > 0
-        ? rr.predicted_finish_time_seconds
-        : null;
-    const paceTargetSec = resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
-    if (paceTargetSec == null && coachPred == null) {
-      window.alert(
-        'No pacing target yet: set a race target on this goal or plan, or open Goals/Home after coach loads so your finish projection is saved — then try again.',
-      );
-      return;
-    }
-    setCourseUploadBusy(gid);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('name', `${goal.name} course`);
-      fd.append('goal_id', gid);
-      const rd = goal.target_date != null ? String(goal.target_date).slice(0, 10) : '';
-      if (/^\d{4}-\d{2}-\d{2}$/.test(rd)) fd.append('race_date', rd);
-      const { data, error } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
-      if (error || !data?.course_id) {
-        window.alert(error?.message || 'Upload failed');
-        return;
-      }
-      const { error: stErr } = await invokeFunction('course-strategy', { course_id: data.course_id });
-      if (stErr) {
-        window.alert(stErr.message || 'Strategy generation failed');
-        return;
-      }
-      setCourseByGoal((prev) => ({
-        ...prev,
-        [gid]: {
-          id: data.course_id,
-          name: `${goal.name} course`,
-          strategy_updated_at: new Date().toISOString(),
-        },
-      }));
-      setStrategyModalCourseId(data.course_id);
-      setStrategyModalOpen(true);
-    } finally {
-      setCourseUploadBusy(null);
-    }
-  }
-
   // Clear stale error whenever the event form opens so a previous failed attempt
   // doesn't show error text before the user has done anything.
   useEffect(() => {
@@ -405,6 +347,64 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const uniqueIds = new Set(linked.map(p => p!.id));
     return uniqueIds.size === 1 ? linked[0]! : null;
   }, [multipleEventGoals, activeEventGoals, plansByGoalId]);
+
+  async function handleGoalsCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    const gid = pendingCourseGoalId;
+    setPendingCourseGoalId(null);
+    if (!file || !gid) return;
+    const goal = goals.find((g) => g.id === gid);
+    if (!goal) return;
+    const linked = plansByGoalId.get(gid);
+    const rr = coachWeek.data?.race_readiness;
+    const coachPred =
+      rr &&
+      String(goal.name) === String(rr.goal.name) &&
+      (goal.sport || '').toLowerCase() === 'run' &&
+      Number.isFinite(rr.predicted_finish_time_seconds) &&
+      rr.predicted_finish_time_seconds > 0
+        ? rr.predicted_finish_time_seconds
+        : null;
+    const paceTargetSec = resolveEventTargetTimeSeconds(goal, linked?.config as Record<string, unknown> | undefined);
+    if (paceTargetSec == null && coachPred == null) {
+      window.alert(
+        'No pacing target yet: set a race target on this goal or plan, or open Goals/Home after coach loads so your finish projection is saved — then try again.',
+      );
+      return;
+    }
+    setCourseUploadBusy(gid);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('name', `${goal.name} course`);
+      fd.append('goal_id', gid);
+      const rd = goal.target_date != null ? String(goal.target_date).slice(0, 10) : '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(rd)) fd.append('race_date', rd);
+      const { data, error } = await invokeFunctionFormData<{ course_id: string }>('course-upload', fd);
+      if (error || !data?.course_id) {
+        window.alert(error?.message || 'Upload failed');
+        return;
+      }
+      const { error: stErr } = await invokeFunction('course-strategy', { course_id: data.course_id });
+      if (stErr) {
+        window.alert(stErr.message || 'Strategy generation failed');
+        return;
+      }
+      setCourseByGoal((prev) => ({
+        ...prev,
+        [gid]: {
+          id: data.course_id,
+          name: `${goal.name} course`,
+          strategy_updated_at: new Date().toISOString(),
+        },
+      }));
+      setStrategyModalCourseId(data.course_id);
+      setStrategyModalOpen(true);
+    } finally {
+      setCourseUploadBusy(null);
+    }
+  }
 
   type BackfillStatus =
     | { kind: 'idle' }
