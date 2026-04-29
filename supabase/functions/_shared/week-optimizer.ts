@@ -80,8 +80,10 @@ export interface WeekOptimizerInputs {
     /** Optional explicit rest days (Sun-first day names). Server fills the rest. */
     rest_days?: DayName[];
     /**
-     * Weekdays where a standalone mid-week quality/hard bike must not land (e.g. athlete
-     * avoids hard efforts that day). Does not remove an explicit quality_bike anchor.
+     * Weekdays where the optimizer should not place **quality_bike** (the only mid-week
+     * HIGH bike slot in this module). `long_ride` is handled separately via anchors; there
+     * is no other SessionKind here for structured hard bike — bricks / race sims live in
+     * the week builder, not in `deriveOptimalWeek()`.
      */
     hard_bike_avoid_days?: DayName[];
   };
@@ -624,6 +626,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         if (upperDay) {
           place(days, upperDay, 'upper_body_strength');
           strengthDays.push(upperDay);
+          if (upperDay !== 'monday') {
+            trade_offs.push(
+              `strength: default Monday upper relocated to ${upperDay} (minimum spacing vs lower on ${consolidatedQrLowerDay}).`,
+            );
+          }
           placeThirdStrengthIfNeeded();
         } else {
           conflicts.push(
@@ -673,6 +680,15 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             trade_offs.push(
               `lower_body_strength stacked with quality_run on ${lowerDay} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
             );
+            if (upperDay !== 'monday' || lowerDay !== 'thursday') {
+              trade_offs.push(
+                `strength: default Mon upper / Thu lower not used — upper on ${upperDay}, lower on ${lowerDay} (stacked hard day / anchor layout).`,
+              );
+            }
+          } else if (upperDay !== 'monday' || lowerDay !== 'thursday') {
+            trade_offs.push(
+              `strength: default Mon upper / Thu lower relocated — upper on ${upperDay}, lower on ${lowerDay} (anchors or matrix).`,
+            );
           }
           placeThirdStrengthIfNeeded();
         } else {
@@ -694,6 +710,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       if (upperDay) {
         place(days, upperDay, 'upper_body_strength');
         strengthDays.push(upperDay);
+        if (upperDay !== 'monday') {
+          trade_offs.push(
+            `strength: default Monday upper relocated to ${upperDay} (support / 1×–2× template).`,
+          );
+        }
       } else {
         conflicts.push(
           'upper_body_strength: no matrix-clean weekday found — try reducing strength to 0× or removing a quality session.',
@@ -730,6 +751,18 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           if (stacking) {
             trade_offs.push(
               `lower_body_strength stacked with quality_run on ${lowerDay} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
+            );
+            if (upperDay && (upperDay !== 'monday' || lowerDay !== 'thursday')) {
+              trade_offs.push(
+                `strength: typical Mon upper / Thu lower pattern adjusted — upper on ${upperDay}, lower on ${lowerDay}.`,
+              );
+            }
+          } else if (
+            upperDay &&
+            (upperDay !== 'monday' || lowerDay !== 'thursday')
+          ) {
+            trade_offs.push(
+              `strength: typical Mon upper / Thu lower pattern adjusted — upper on ${upperDay}, lower on ${lowerDay} (schedule constraints).`,
             );
           }
         } else {
