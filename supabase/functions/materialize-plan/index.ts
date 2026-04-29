@@ -836,6 +836,23 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
+  // Tri race-pace block: run_race_pace_70_3_5mi, run_race_pace_ironman_8mi, etc.
+  if (/^run_race_pace_[a-z0-9_]+_[\d.]+mi$/.test(lower)) {
+    const m = lower.match(/^run_race_pace_([a-z0-9_]+)_([\d.]+)mi$/);
+    if (m) {
+      const key = m[1];
+      const miles = parseFloat(m[2]);
+      if (Number.isFinite(miles) && miles > 0) {
+        let paceWhich: 'fivek' | 'marathon' | 'threshold' = 'threshold';
+        if (key === 'ironman') paceWhich = 'marathon';
+        else if (key === 'sprint') paceWhich = 'fivek';
+        const pace = secPerMiFromBaseline(baselines, paceWhich) || secPerMiFromBaseline(baselines, 'easy') || undefined;
+        out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: pace });
+        return out;
+      }
+    }
+  }
+  
   // Marathon pace run DISTANCE based: run_mp_5mi or run_mp_26.2mi (supports decimals)
   if (/run_mp_[\d.]+mi/.test(lower)) {
     const m = lower.match(/run_mp_([\d.]+)mi/);
@@ -915,6 +932,27 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   
+  // VO2 run: run_vo2_5x3min_z5 — 5×3 min Z5, 90s float (main set ~22 min)
+  if (/^run_vo2_\d+x\d+min_z5$/.test(lower)) {
+    const m = lower.match(/^run_vo2_(\d+)x(\d+)min_z5$/);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const workMin = parseInt(m[2], 10);
+      const work_s = workMin * 60;
+      const rest_s = 90;
+      const fkp = secPerMiFromBaseline(baselines, 'fivek');
+      const vo2Pace = fkp != null ? Math.max(270, fkp - 12) : undefined;
+      const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      for (let i = 0; i < reps; i++) {
+        out.push({ id: uid(), kind: 'work', duration_s: work_s, pace_sec_per_mi: vo2Pace, label: 'Z5' });
+        if (i < reps - 1) {
+          out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, pace_sec_per_mi: easyPace, label: 'Float' });
+        }
+      }
+      return out;
+    }
+  }
+
   // Cruise intervals: cruise_4x1mi_threshold_r60s or cruise_3x1.5mi_threshold_r60s
   if (/cruise_\d+x[\d.]+mi_threshold/.test(lower)) {
     const m = lower.match(/cruise_(\d+)x([\d.]+)mi_threshold(?:_r(\d+)s)?/);
@@ -932,21 +970,45 @@ function expandRunToken(tok: string, baselines: Baselines): any[] {
       return out;
     }
   }
-  // Intervals: interval_5x800m_5kpace_r90s, interval_6x800m_5kpace_r120, interval_4x1mi_5kpace_R2min
+  // Intervals: interval_5x800m_5kpace_r90s, interval_6x800m_base (phase suffix from session-factory), etc.
   if (/interval_\d+x/.test(lower)) {
-    // Handle both _r and _R, optional s/min suffix
-    const m = lower.match(/interval_(\d+)x(\d+)(m|mi)_5kpace(?:_[rR](\d+)(s|min)?)?/);
+    const mLegacy = lower.match(/^interval_(\d+)x(\d+)(m|mi)_5kpace(?:_[rR](\d+)(s|min)?)?$/);
+    const mPhase = !mLegacy
+      ? lower.match(/^interval_(\d+)x(\d+)(m|mi)_(base|build|race_specific|taper)(?:_[rR](\d+)(s|min)?)?$/)
+      : null;
+    const m = mLegacy || mPhase;
     if (m) {
-      const reps = parseInt(m[1],10);
-      const val = parseInt(m[2],10);
+      const reps = parseInt(m[1], 10);
+      const val = parseInt(m[2], 10);
       const unit = m[3];
-      const dist_m = unit==='mi' ? Math.round(val*1609.34) : val;
-      // Parse rest: if m[4] exists, check if m[5] is 'min' (multiply by 60) or default to seconds
-      const rest_s = m[4] ? (m[5]==='min' ? parseInt(m[4],10)*60 : parseInt(m[4],10)) : 0;
-      const pace = secPerMiFromBaseline(baselines,'fivek') || undefined;
-      for (let i=0;i<reps;i+=1) {
-        out.push({ id: uid(), kind:'work', distance_m: dist_m, pace_sec_per_mi: pace });
-        if (rest_s>0 && i<reps-1) out.push({ id: uid(), kind:'recovery', duration_s: rest_s, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined });
+      const dist_m = unit === 'mi' ? Math.round(val * 1609.34) : val;
+      let rest_s = 0;
+      let paceWhich: 'fivek' | 'marathon' | 'threshold' = 'fivek';
+      if (mLegacy) {
+        const restNum = m[4];
+        rest_s = restNum ? (m[5] === 'min' ? parseInt(restNum, 10) * 60 : parseInt(restNum, 10)) : 0;
+        if (!rest_s) rest_s = 90;
+        paceWhich = 'fivek';
+      } else {
+        const phase = m[4];
+        const restNum = m[5];
+        rest_s = restNum ? (m[6] === 'min' ? parseInt(restNum, 10) * 60 : parseInt(restNum, 10)) : 0;
+        if (!rest_s) rest_s = phase === 'base' || phase === 'build' ? 90 : 120;
+        if (phase === 'base') paceWhich = 'fivek';
+        else if (phase === 'build' || phase === 'race_specific') paceWhich = 'threshold';
+        else paceWhich = 'marathon';
+      }
+      const pace = secPerMiFromBaseline(baselines, paceWhich) || undefined;
+      for (let i = 0; i < reps; i += 1) {
+        out.push({ id: uid(), kind: 'work', distance_m: dist_m, pace_sec_per_mi: pace });
+        if (rest_s > 0 && i < reps - 1) {
+          out.push({
+            id: uid(),
+            kind: 'recovery',
+            duration_s: rest_s,
+            pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined,
+          });
+        }
       }
       return out;
     }
@@ -1441,6 +1503,24 @@ function expandTokensForRow(
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });
+            console.log(`    🔄 Added recovery step: ${rest}s`);
+          }
+        }
+        continue;
+      }
+      // CSS-paced aerobic main set: swim_aerobic_css_15x100yd_r15 (label segment breaks naive aerobic regex)
+      m = s.match(/^swim_aerobic_css_(\d+)x(\d+)(yd|m)(?:_r(\d+))?$/);
+      if (m) {
+        const reps = parseInt(m[1], 10);
+        const dist = parseInt(m[2], 10);
+        const unit = m[3];
+        const rest = parseInt(m[4] || '0', 10);
+        const distM = unit === 'yd' ? ydToM(dist) : dist;
+        console.log(`  ✅ Matched CSS aerobic: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
+        for (let i = 0; i < reps; i++) {
+          steps.push({ id: uid(), kind: 'work', distance_m: distM, label: 'css' });
+          if (rest && i < reps - 1) {
+            steps.push({ id: uid(), kind: 'recovery', duration_s: rest });
             console.log(`    🔄 Added recovery step: ${rest}s`);
           }
         }

@@ -22,7 +22,7 @@ import {
 } from './science.ts';
 import type { DayOfWeek } from './science.ts';
 import {
-  longRun, easyRun, tempoRun, intervalRun, marathonPaceRun, racePaceRun,
+  longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
   longRide, thresholdBike, vo2Bike, sweetSpotBike, tempoBike, easyBike, bikeOpeners,
   thresholdSwim, cssAerobicSwim, easySwim,
   brick, triathlonStrength, runStrength,
@@ -593,9 +593,8 @@ export function buildWeek(
         runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
       }
     } else {
-      // race_peak progression: structured intervals every phase except RS (race-specific
-      // uses race-pace running). intervalRun() periodizes pace+distance internally:
-      //   base: 6×800m @ 5km    build: 6×1200m @ 10km    race_specific: 4×1600m @ threshold
+      // race_peak: base = short intervals; build = explicit VO2 (tri) or interval ladder (run-only);
+      // race_specific = race-pace run (tri) / MP (run).
       if (phase === 'race_specific') {
         const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
         runQualitySlot!.sessions.push(
@@ -603,6 +602,8 @@ export function buildWeek(
             ? racePaceRun(runQualityDay, mpMiles, primaryGoal.distance, servedGoal)
             : marathonPaceRun(runQualityDay, mpMiles, servedGoal),
         );
+      } else if (hasTri && phase === 'build') {
+        runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal));
       } else {
         runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
       }
