@@ -18,10 +18,11 @@ import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS,
+  expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
 } from './science.ts';
 import type { DayOfWeek } from './science.ts';
 import {
-  longRun, easyRun, tempoRun, intervalRun, marathonPaceRun,
+  longRun, easyRun, tempoRun, intervalRun, marathonPaceRun, racePaceRun,
   longRide, thresholdBike, vo2Bike, sweetSpotBike, tempoBike, easyBike, bikeOpeners,
   thresholdSwim, cssAerobicSwim, easySwim,
   brick, triathlonStrength, runStrength,
@@ -372,6 +373,12 @@ export function buildWeek(
     longRunMiles = Math.max(3, Math.min(longRunMiles, 5));
   }
 
+  if (hasTri && !raceThisWeek) {
+    const longRunFloor = longRunFloorMiles(primaryGoal.distance, phase);
+    longRunMiles = Math.max(longRunMiles, longRunFloor);
+    longRunMinutes = Math.round(longRunMiles * 9.5);
+  }
+
   // Long ride hours
   let longRideMinutes = isRecovery
     ? Math.min(75, Math.round(bikeTotalMin * 0.60))
@@ -384,7 +391,11 @@ export function buildWeek(
     longRideHours = Math.min(longRideHours, 1.0);
   }
   if (hasTri) {
-    longRideHours = Math.min(2.5, longRideHours);
+    const weeklyHours = athleteState.weekly_hours_available;
+    const raceBikeDuration = expectedBikeDurationHours(primaryGoal.distance);
+    const capFromBudgetAndRace = Math.min(raceBikeDuration * 1.1, weeklyHours * 0.45);
+    const longRideCapHours = Math.max(raceBikeDuration * 0.8, capFromBudgetAndRace);
+    longRideHours = Math.min(longRideCapHours, longRideHours);
   }
 
   if (recoveryRebuildWeek1 && !hasTri) {
@@ -419,8 +430,8 @@ export function buildWeek(
   const longRideSlot = grid.get(longRideDay);
   if (!longRideSlot?.isRest && hasTri && !raceThisWeek) {
     if (effectiveBricks >= 1 && phase !== 'base') {
-      const brickRunMin = Math.max(15, Math.round(longRunMiles * 0.20) * 10);
-      const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMin, effectiveBrickPhase, servedGoal);
+      const brickRunMi = brickRunTargetMiles(primaryGoal.distance, effectiveBrickPhase);
+      const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMi, effectiveBrickPhase, servedGoal);
       longRideSlot!.sessions.push(bkBike, bkRun);
     } else {
       longRideSlot!.sessions.push(longRide(longRideDay, longRideHours, servedGoal));
@@ -571,7 +582,11 @@ export function buildWeek(
       // base_first: Z3 tempo throughout — no intervals until Race-Specific.
       if (phase === 'race_specific') {
         const rpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
-        runQualitySlot!.sessions.push(marathonPaceRun(runQualityDay, rpMiles, servedGoal)); // race-pace comfort
+        runQualitySlot!.sessions.push(
+          hasTri
+            ? racePaceRun(runQualityDay, rpMiles, primaryGoal.distance, servedGoal)
+            : marathonPaceRun(runQualityDay, rpMiles, servedGoal),
+        );
       } else {
         // Build and Base: tempo (Z3) — builds muscular endurance safely
         const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
@@ -583,7 +598,11 @@ export function buildWeek(
       //   base: 6×800m @ 5km    build: 6×1200m @ 10km    race_specific: 4×1600m @ threshold
       if (phase === 'race_specific') {
         const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
-        runQualitySlot!.sessions.push(marathonPaceRun(runQualityDay, mpMiles, servedGoal));
+        runQualitySlot!.sessions.push(
+          hasTri
+            ? racePaceRun(runQualityDay, mpMiles, primaryGoal.distance, servedGoal)
+            : marathonPaceRun(runQualityDay, mpMiles, servedGoal),
+        );
       } else {
         runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
       }

@@ -5,8 +5,8 @@
 
 import type { GoalInput, PhaseBlock, Phase, EventRelationship, AthleteState, RaceAnchor } from './types.ts';
 import {
-  TAPER_WEEKS,
-  RECOVERY_DAYS_POST_RACE,
+  taperWeeks,
+  recoveryWeeksPostRace,
   blockWeekMultiplier,
   getBaseDistribution,
 } from './science.ts';
@@ -133,7 +133,7 @@ export function buildPhaseTimeline(
       // First race: own macrocycle ending week w1
       buildSingleEventBlocks(g1, 1, w1, blocks, athleteState);
       // Post-race: easy aerobic only
-      const recW = Math.max(1, Math.ceil((RECOVERY_DAYS_POST_RACE[g1.distance] ?? 7) / 7));
+      const recW = recoveryWeeksPostRace(g1.distance, g1.priority);
       const recStart = w1 + 1;
       const recEnd = w1 + recW;
       insertRecoveryBlock(recStart, recEnd, g1.id, blocks, athleteState);
@@ -155,7 +155,7 @@ export function buildPhaseTimeline(
     if (aGoals.length > 1) {
       // After first A-race: recovery + new cycle for the second
       const firstRaceWeek = planWeekForCalendarEvent(startDate, aGoals[0].event_date);
-      const recoveryWeeks = Math.ceil((RECOVERY_DAYS_POST_RACE[aGoals[0].distance] ?? 7) / 7);
+      const recoveryWeeks = recoveryWeeksPostRace(aGoals[0].distance, aGoals[0].priority);
       const secondStart = firstRaceWeek + recoveryWeeks + 1;
       const secondEnd   = planWeekForCalendarEvent(startDate, aGoals[1].event_date);
       if (secondStart <= secondEnd) {
@@ -175,7 +175,7 @@ export function buildPhaseTimeline(
     if (rel === 'overlapping') {
       // 8–16 week gap: full cycle to first, recovery, abbreviated build, taper to second
       buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
-      const recWeeks = Math.ceil((RECOVERY_DAYS_POST_RACE[aChrono[0].distance] ?? 7) / 7);
+      const recWeeks = recoveryWeeksPostRace(aChrono[0].distance, aChrono[0].priority);
       insertRecoveryBlock(firstEnd + 1, firstEnd + recWeeks, aChrono[0].id, blocks, athleteState);
       const buildStart = firstEnd + recWeeks + 1;
       buildAbbreviatedBlocks(aChrono[1], buildStart, secondEnd, blocks, athleteState);
@@ -186,7 +186,7 @@ export function buildPhaseTimeline(
       // Tight schedule: one macrocycle to the *later* race is wrong for the *earlier* race
       if (aChrono[0] && aChrono[1] && firstEnd < secondEnd) {
         buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
-        const recW = Math.max(1, Math.ceil((RECOVERY_DAYS_POST_RACE[aChrono[0].distance] ?? 7) / 7));
+        const recW = recoveryWeeksPostRace(aChrono[0].distance, aChrono[0].priority);
         const recStart = firstEnd + 1;
         const recEnd = firstEnd + recW;
         insertRecoveryBlock(recStart, recEnd, aChrono[0].id, blocks, athleteState);
@@ -215,7 +215,7 @@ function buildSingleEventBlocks(
   blocks: PhaseBlock[],
   as: AthleteState,
 ) {
-  const taperWks  = TAPER_WEEKS[goal.distance] ?? 2;
+  const taperWks  = taperWeeks(goal.distance, goal.priority);
   const approach  = as.tri_approach ?? 'race_peak';
   const dist      = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
 
@@ -286,7 +286,7 @@ function buildAbbreviatedBlocks(
   // Math.floor(totalWeeks * 0.45) would give 0 for a 2-week window (floors 0.9 → 0),
   // leaving week 19 as race_specific and firing VO2max 1 week before an A-race.
   // Correct behavior: if fewer weeks are available than the distance calls for, taper all of them.
-  const taperWks = Math.min(TAPER_WEEKS[goal.distance] ?? 2, totalWeeks);
+  const taperWks = Math.min(taperWeeks(goal.distance, goal.priority), totalWeeks);
   const taperStartWeek = endWeek - taperWks + 1;
   const preTaperEnd = taperStartWeek - 1;
   if (preTaperEnd < startWeek) {
@@ -310,8 +310,8 @@ function buildSharedPeakBlocks(
   startWeek: number, g1Week: number, g2Week: number,
   blocks: PhaseBlock[], as: AthleteState,
 ) {
-  const taper1 = TAPER_WEEKS[g1.distance] ?? 2;
-  const taper2 = TAPER_WEEKS[g2.distance] ?? 2;
+  const taper1 = taperWeeks(g1.distance, g1.priority);
+  const taper2 = taperWeeks(g2.distance, g2.priority);
   const dist1  = getBaseDistribution(g1.sport, g1.distance, as.limiter_sport as Sport | undefined);
 
   const rsStart = Math.max(startWeek, g1Week - taper1 - 4);

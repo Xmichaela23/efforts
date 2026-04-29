@@ -6,7 +6,7 @@
 
 import type { PlannedSession, Phase, Intensity, PlannedStrengthExercise } from './types.ts';
 import type { Sport } from './types.ts';
-import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK } from './science.ts';
+import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK, type TriRaceDistance } from './science.ts';
 import type { StrengthProtocol } from '../shared/strength-system/protocols/types.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
@@ -143,8 +143,78 @@ export function marathonPaceRun(day: string, mpMiles: number, goalId: string): P
     `1.5 mi warm-up, ${mpMiles} mi at marathon goal pace (Z3–Z4, controlled), 1.5 mi cool-down. This teaches your body to run marathon pace on accumulating fatigue.`,
     dur, 'MODERATE',
     ['warmup_run_15min_easy', `run_marathon_pace_${mpMiles}mi`, 'cooldown_run_10min_easy'],
-    ['race_specific', 'marathon_pace', 'run'],
+    ['race_specific', 'marathon_pace', 'run', 'quality'],
     'Z3 marathon pace', goalId,
+  );
+}
+
+/** Stable token segment for `run_race_pace_<key>_<miles>mi` (no ambiguous extra underscores). */
+function racePaceTokenKey(distance: TriRaceDistance): string {
+  const d = String(distance || '').toLowerCase();
+  if (d === '70.3') return '70_3';
+  if (d === 'half' || d === 'half_marathon') return 'half';
+  if (d === 'ironman' || d === 'full') return 'ironman';
+  if (d === 'olympic') return 'olympic';
+  if (d === 'sprint') return 'sprint';
+  const cleaned = d.replace(/\./g, '_').replace(/[^a-z0-9_]/g, '');
+  return cleaned || 'default';
+}
+
+/** Tri race-specific sustained run at distance-appropriate race effort (vs standalone marathon MP). */
+export function racePaceRun(
+  day: string,
+  miles: number,
+  distance: TriRaceDistance,
+  goalId: string,
+): PlannedSession {
+  const paceLabel = (() => {
+    switch (String(distance || '').toLowerCase()) {
+      case 'sprint':
+        return 'Olympic/Sprint race pace (Z4–Z5)';
+      case 'olympic':
+        return 'Olympic race pace (Z4)';
+      case '70.3':
+      case 'half':
+      case 'half_marathon':
+        return '70.3 / half-marathon run pace (Z3–Z4)';
+      case 'ironman':
+      case 'full':
+      case 'marathon':
+        return 'Ironman / marathon run pace (Z3)';
+      default:
+        return 'race pace (Z3–Z4)';
+    }
+  })();
+
+  const sessionLabel = (() => {
+    switch (String(distance || '').toLowerCase()) {
+      case 'sprint':
+      case 'olympic':
+        return 'Race Pace Run';
+      case '70.3':
+      case 'half':
+      case 'half_marathon':
+        return 'Half-Marathon Pace Run';
+      case 'ironman':
+      case 'full':
+      case 'marathon':
+        return 'Marathon Pace Run';
+      default:
+        return 'Race Pace Run';
+    }
+  })();
+
+  const token = `run_race_pace_${racePaceTokenKey(distance)}_${miles}mi`;
+  const dur = Math.round((miles + 3) * 9.0);
+
+  return session(
+    day, 'run',
+    `${sessionLabel} — ${miles} mi`,
+    `1.5 mi warm-up, ${miles} mi at ${paceLabel}, 1.5 mi cool-down. Trains your body to hold race effort on accumulating fatigue.`,
+    dur, 'MODERATE',
+    ['warmup_run_15min_easy', token, 'cooldown_run_10min_easy'],
+    ['race_specific', 'race_pace', 'run', 'quality'],
+    paceLabel, goalId,
   );
 }
 
@@ -310,21 +380,23 @@ export function easySwim(day: string, totalYards: number, goalId: string): Plann
 export function brick(
   day: string,
   bikeHours: number,
-  runMinutes: number,
+  runMiles: number,
   phase: Phase,
   goalId: string,
 ): [PlannedSession, PlannedSession] {
   const bikeMin = Math.round(bikeHours * 60);
   const isRS = phase === 'race_specific';
   const bikeIntensity: Intensity = isRS ? 'MODERATE' : 'EASY';
-  const runIntensity: Intensity  = isRS ? 'MODERATE' : 'EASY';
-  const runMiles = Math.max(2, Math.round(runMinutes / 10));
+  const runIntensity: Intensity = isRS ? 'MODERATE' : 'EASY';
+  const runMilesClamped = Math.max(1, runMiles);
+  const runMinutes = Math.max(15, Math.round(runMilesClamped * 10));
+  const miLabel = Math.round(runMilesClamped * 2) / 2;
 
   const bikeSession = session(
     day, 'bike',
     `Brick — Bike ${bikeHours.toFixed(1)} hr`,
     isRS
-      ? `Race-simulation bike at Zone 3 (70.3 race pace). Stay aero. Transition quickly into the run.`
+      ? `Race-simulation bike at Zone 3 (race pace). Stay aero. Transition quickly into the run.`
       : `Brick bike at Zone 2. Build leg feel for the transition. Maintain steady power throughout.`,
     bikeMin,
     bikeIntensity,
@@ -337,11 +409,11 @@ export function brick(
 
   const runSession = session(
     day, 'run',
-    `Brick — Run ${runMiles} mi off the bike`,
+    `Brick — Run ${miLabel} mi off the bike`,
     `Immediately after the bike. The first 5 min will feel strange — focus on turnover, not pace. ${isRS ? 'Target race pace last half.' : 'Easy Z2 throughout.'}`,
     runMinutes,
     runIntensity,
-    [`run_easy_${runMiles}mi`],
+    [`run_easy_${runMinutes}min`],
     ['brick', 'run', isRS ? 'race_specific' : 'build'],
     isRS ? 'Z2–Z3' : 'Z2',
     goalId,

@@ -4,7 +4,7 @@
 // Sources: Friel "Triathlete's Training Bible" 5e, Fitzgerald & Warden "80/20 Triathlon",
 // Seiler 2010, Hickson 1980, Couzens ramp rate tables.
 
-import type { Phase, Sport, Intensity } from './types.ts';
+import type { Phase, Sport, Intensity, Priority } from './types.ts';
 
 // ── §1.1  TSS impact multipliers ────────────────────────────────────────────
 // Normalize systemic recovery cost across sports.
@@ -106,6 +106,80 @@ export const TRI_SPORT_DIST: Record<string, Record<Sport, number>> = {
   ironman: { swim: 0.13, bike: 0.55, run: 0.26, strength: 0.06, race: 0 },
 };
 
+/** Wire-format tri distances + aliases; used for long-ride ceiling vs expected bike leg duration. */
+export type TriRaceDistance = 'sprint' | 'olympic' | '70.3' | 'ironman' | 'half' | 'full' | string;
+
+/** Conservative expected bike leg duration (hours) when no per-athlete projection is wired. */
+export function expectedBikeDurationHours(distance: TriRaceDistance): number {
+  switch (distance) {
+    case 'sprint': return 1.0;
+    case 'olympic': return 1.5;
+    case '70.3':
+    case 'half': return 3.0;
+    case 'ironman':
+    case 'full': return 6.0;
+    default: return 3.0;
+  }
+}
+
+/** Brick run length (mi) from race run distance and phase; distance-first for off-bike work. */
+export function brickRunTargetMiles(distance: TriRaceDistance, phase: string): number {
+  const raceRunMiles: Record<string, number> = {
+    sprint: 3.1,
+    olympic: 6.2,
+    '70.3': 13.1,
+    half: 13.1,
+    ironman: 26.2,
+    full: 26.2,
+    half_marathon: 13.1,
+    marathon: 26.2,
+  };
+  const raceRun = raceRunMiles[distance] ?? 13.1;
+
+  const p = String(phase || '').toLowerCase();
+  const multiplier = (() => {
+    switch (p) {
+      case 'base': return 0.20;
+      case 'build': return 0.30;
+      case 'peak':
+      case 'race_specific': return 0.42;
+      case 'taper': return 0.22;
+      default: return 0.20;
+    }
+  })();
+
+  const raw = raceRun * multiplier;
+  return Math.min(8, Math.max(1.5, Math.round(raw * 2) / 2));
+}
+
+/** Minimum long-run mileage by race distance and calendar phase (after TSS-derived miles). */
+export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): number {
+  const peakTarget: Record<string, number> = {
+    sprint: 4.0,
+    olympic: 7.0,
+    '70.3': 11.0,
+    half: 11.0,
+    ironman: 18.0,
+    full: 18.0,
+    half_marathon: 11.0,
+    marathon: 18.0,
+  };
+  const peak = peakTarget[distance] ?? 11.0;
+
+  const multiplier = (() => {
+    switch (phase) {
+      case 'base': return 0.50;
+      case 'build': return 0.75;
+      case 'race_specific': return 1.00;
+      case 'taper': return 0.55;
+      case 'recovery': return 0.40;
+      default: return 0.50;
+    }
+  })();
+
+  return Math.round(peak * multiplier * 2) / 2;
+}
+
 // For a run-only event, all non-strength budget goes to run.
 export const RUN_SPORT_DIST: Record<string, Record<Sport, number>> = {
   marathon:      { run: 0.82, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },
@@ -172,29 +246,112 @@ export const BRICKS_PER_WEEK: Record<Phase, number> = {
   recovery:      0,
 };
 
-// ── §6.1  Taper duration in weeks ───────────────────────────────────────────
-export const TAPER_WEEKS: Record<string, number> = {
-  sprint:        1,
-  olympic:       2,
-  '70.3':        3,
-  ironman:       3,
-  marathon:      3,
-  half_marathon: 1,
-  '10k':         1,
-  '5k':          1,
+// ── §6.1  Taper duration in weeks (distance × priority) ─────────────────────
+const TAPER_WEEKS_BY_PRIORITY: Record<Priority, Record<string, number>> = {
+  A: {
+    sprint: 1,
+    olympic: 1,
+    '70.3': 2,
+    half: 2,
+    ironman: 3,
+    full: 3,
+    marathon: 3,
+    half_marathon: 2,
+    '10k': 1,
+    '5k': 1,
+  },
+  B: {
+    sprint: 1,
+    olympic: 1,
+    '70.3': 1,
+    half: 1,
+    ironman: 2,
+    full: 2,
+    marathon: 2,
+    half_marathon: 1,
+    '10k': 1,
+    '5k': 1,
+  },
+  C: {
+    sprint: 1,
+    olympic: 1,
+    '70.3': 1,
+    half: 1,
+    ironman: 1,
+    full: 1,
+    marathon: 1,
+    half_marathon: 1,
+    '10k': 1,
+    '5k': 1,
+  },
 };
 
-// §6.4  Post-race mandatory recovery in days
-export const RECOVERY_DAYS_POST_RACE: Record<string, number> = {
-  sprint:        3,
-  olympic:       5,
-  '70.3':        14,
-  ironman:       14,
-  marathon:      10,
-  half_marathon: 4,
-  '10k':         3,
-  '5k':          2,
+/** Taper length in weeks: B/C races get shorter tapers than A; 70.3 A uses 2w (not 3). */
+export function taperWeeks(distance: string, priority: Priority | string): number {
+  const d0 = String(distance || '').toLowerCase();
+  const key = d0 === 'half_marathon' ? 'half' : d0;
+  const pri = String(priority || 'A').toUpperCase();
+  const tier = (pri === 'B' || pri === 'C' ? pri : 'A') as Priority;
+  const byDist = TAPER_WEEKS_BY_PRIORITY[tier] ?? TAPER_WEEKS_BY_PRIORITY.A;
+  if (typeof byDist[key] === 'number') return byDist[key];
+  return 2;
+}
+
+// §6.4  Post-race mandatory recovery in days (distance × priority of the race that just finished)
+const RECOVERY_DAYS_BY_PRIORITY: Record<Priority, Record<string, number>> = {
+  A: {
+    sprint: 5,
+    olympic: 7,
+    '70.3': 14,
+    half: 14,
+    ironman: 21,
+    full: 21,
+    marathon: 21,
+    half_marathon: 14,
+    '10k': 7,
+    '5k': 5,
+  },
+  B: {
+    sprint: 3,
+    olympic: 5,
+    '70.3': 7,
+    half: 7,
+    ironman: 14,
+    full: 14,
+    marathon: 14,
+    half_marathon: 7,
+    '10k': 5,
+    '5k': 3,
+  },
+  C: {
+    sprint: 3,
+    olympic: 4,
+    '70.3': 5,
+    half: 5,
+    ironman: 7,
+    full: 7,
+    marathon: 7,
+    half_marathon: 5,
+    '10k': 4,
+    '5k': 3,
+  },
 };
+
+/** Calendar days of easy-only / reduced load after a race; scales with priority (B/C shorter than A). */
+export function recoveryDaysPostRace(distance: string, priority: Priority | string): number {
+  const d0 = String(distance || '').toLowerCase();
+  const key = d0 === 'half_marathon' ? 'half' : d0;
+  const pri = String(priority || 'A').toUpperCase();
+  const tier = (pri === 'B' || pri === 'C' ? pri : 'A') as Priority;
+  const byDist = RECOVERY_DAYS_BY_PRIORITY[tier] ?? RECOVERY_DAYS_BY_PRIORITY.A;
+  if (typeof byDist[key] === 'number') return byDist[key];
+  return 7;
+}
+
+/** Whole weeks allocated to recovery block (min 1). */
+export function recoveryWeeksPostRace(distance: string, priority: Priority | string): number {
+  return Math.max(1, Math.ceil(recoveryDaysPostRace(distance, priority) / 7));
+}
 
 // ── §7.2  Mesocycle loading pattern ─────────────────────────────────────────
 // Returns the TSS multiplier for week-within-block (1-indexed).
