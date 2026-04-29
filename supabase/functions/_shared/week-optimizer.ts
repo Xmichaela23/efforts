@@ -79,6 +79,11 @@ export interface WeekOptimizerInputs {
     training_days: 4 | 5 | 6 | 7;
     /** Optional explicit rest days (Sun-first day names). Server fills the rest. */
     rest_days?: DayName[];
+    /**
+     * Weekdays where a standalone mid-week quality/hard bike must not land (e.g. athlete
+     * avoids hard efforts that day). Does not remove an explicit quality_bike anchor.
+     */
+    hard_bike_avoid_days?: DayName[];
   };
   athlete: {
     training_intent?: 'performance' | 'completion' | 'first_race' | 'comeback';
@@ -373,14 +378,27 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   let qualityBikeDay: DayName | undefined =
     qualityBikeAnchor && !conflicts.length ? qualityBikeAnchor.day : qualityBikeAnchor?.day;
   if (!qualityBikeDay) {
+    const avoidHardBike = new Set<DayName>(inputs.preferences.hard_bike_avoid_days ?? []);
     const candidates: DayName[] = ['tuesday', 'wednesday', 'thursday'];
-    for (const c of candidates) {
-      if (c === longRide || c === longRun) continue;
-      if (!canPlace(days, c, 'quality_bike')) continue;
-      if (!sequentialOk(days, c, 'quality_bike', inputs.athlete)) continue;
-      qualityBikeDay = c;
-      place(days, c, 'quality_bike');
-      break;
+    const tryPlaceQb = (respectAvoid: boolean): DayName | undefined => {
+      for (const c of candidates) {
+        if (c === longRide || c === longRun) continue;
+        if (respectAvoid && avoidHardBike.has(c)) continue;
+        if (!canPlace(days, c, 'quality_bike')) continue;
+        if (!sequentialOk(days, c, 'quality_bike', inputs.athlete)) continue;
+        place(days, c, 'quality_bike');
+        return c;
+      }
+      return undefined;
+    };
+    qualityBikeDay = tryPlaceQb(true);
+    if (!qualityBikeDay && avoidHardBike.size > 0) {
+      qualityBikeDay = tryPlaceQb(false);
+      if (qualityBikeDay) {
+        trade_offs.push(
+          `quality_bike: hard_bike_avoid_days ruled out all mid-week candidates — placed on ${qualityBikeDay} instead.`,
+        );
+      }
     }
   }
 

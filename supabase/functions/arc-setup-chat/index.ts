@@ -127,6 +127,12 @@ Deno.serve(async (req) => {
         : strengthArr.length > 0
           ? Math.min(3, strengthArr.length)
           : (strengthIntent === 'performance' ? 2 : strengthIntent === 'support' ? 2 : 0)) as 0 | 1 | 2 | 3;
+      const rawHardBikeAvoid = tp?.hard_bike_avoid_days ?? tp?.hardBikeAvoidDays;
+      const hardBikeAvoidDays: DayName[] = Array.isArray(rawHardBikeAvoid)
+        ? rawHardBikeAvoid
+            .map((x) => normalizeDayName(x))
+            .filter((d): d is DayName => d != null)
+        : [];
       const inputs: WeekOptimizerInputs = {
         anchors: {
           ...(toDay(pd.long_ride) ? { long_ride: toDay(pd.long_ride)! } : {}),
@@ -137,6 +143,7 @@ Deno.serve(async (req) => {
           swims_per_week: Math.min(3, swimArr.length) as 0 | 1 | 2 | 3,
           strength_frequency: strengthFrequency,
           training_days: Math.min(7, Math.max(4, daysPerWeek)) as 4 | 5 | 6 | 7,
+          ...(hardBikeAvoidDays.length ? { hard_bike_avoid_days: hardBikeAvoidDays } : {}),
         },
         athlete: {
           ...(trainingIntent ? { training_intent: trainingIntent } : {}),

@@ -587,6 +587,13 @@ function backfillTriTrainingPrefsDefenseInDepth(
     return n as 0 | 1 | 2 | 3;
   })();
   const restDaysIn = pdDays(trainingPrefs as Record<string, unknown>, 'rest_days', 'restDays');
+  const rawHardBikeAvoid =
+    trainingPrefs.hard_bike_avoid_days ?? trainingPrefs.hardBikeAvoidDays;
+  const hardBikeAvoidDays: DayName[] = Array.isArray(rawHardBikeAvoid)
+    ? rawHardBikeAvoid
+        .map((x) => normalizeDayName(x))
+        .filter((d): d is DayName => d != null)
+    : [];
 
   const trainingIntent = inferTrainingIntentFromPrefs(trainingPrefs);
   const strengthIntent = trainingPrefs.strength_intent === 'performance' ? 'performance' : 'support';
@@ -609,6 +616,7 @@ function backfillTriTrainingPrefsDefenseInDepth(
       strength_frequency: strengthFreq,
       training_days: trainingDays,
       ...(restDaysIn?.length ? { rest_days: restDaysIn } : {}),
+      ...(hardBikeAvoidDays.length ? { hard_bike_avoid_days: hardBikeAvoidDays } : {}),
     },
     athlete: {
       ...(trainingIntent ? { training_intent: trainingIntent } : {}),
