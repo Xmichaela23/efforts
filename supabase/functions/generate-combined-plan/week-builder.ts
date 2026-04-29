@@ -24,7 +24,8 @@ import {
 import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
-  longRide, thresholdBike, vo2Bike, sweetSpotBike, tempoBike, easyBike, bikeOpeners,
+  longRide, easyBike, bikeOpeners,
+  groupRideQualityBikeSession,
   thresholdSwim, cssAerobicSwim, easySwim,
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
@@ -572,26 +573,8 @@ export function buildWeek(
     const bq = bikeQualityDay;
     if (phase === 'taper') {
       bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
-    } else if (triApproach === 'base_first') {
-      if (phase === 'race_specific') {
-        bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 3, 12, servedGoal));
-      } else if (phase === 'build') {
-        const intervals = Math.max(2, Math.min(3, Math.floor(bikeTotalMin / 60)));
-        bikeQualitySlot!.sessions.push(tempoBike(bq, intervals, 20, servedGoal));
-      } else {
-        bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 2, 12, servedGoal));
-      }
     } else {
-      if (phase === 'race_specific') {
-        bikeQualitySlot!.sessions.push(
-          vo2Bike(bq, Math.max(4, Math.min(6, Math.round(bikeTotalMin / 40))), servedGoal),
-        );
-      } else if (phase === 'build') {
-        const intervals = Math.max(2, Math.min(4, Math.floor(bikeTotalMin / 60)));
-        bikeQualitySlot!.sessions.push(thresholdBike(bq, intervals, 20, servedGoal));
-      } else {
-        bikeQualitySlot!.sessions.push(sweetSpotBike(bq, 2, 15, servedGoal));
-      }
+      bikeQualitySlot!.sessions.push(groupRideQualityBikeSession(bq, phase, servedGoal));
     }
     // Athlete rides with a recurring group on this day → label the just-pushed
     // session so the calendar reads "Group Ride — Threshold" instead of generic.
@@ -906,6 +889,8 @@ export function buildWeek(
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
   const week8020TradeOffs = enforce8020(grid, phase);
 
+  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid));
+
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
   // strength_intent === 'performance' is the co-equal flag (see AthleteState type + EXPERIENCE_MODIFIER_TEXT).
@@ -926,7 +911,40 @@ export function buildWeek(
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 
   const allSessions = gridSessions(grid);
-  return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, week8020TradeOffs);
+  const mergedTradeOffs = [
+    ...week8020TradeOffs,
+    ...qrLbTradeOffStrings,
+  ];
+  return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs);
+}
+
+const CONCENTRATED_LOAD_DAY =
+  'Concentrated load day — your Wednesday group ride anchor required pairing the quality run and lower body session on Thursday. Run first, then lift. This is intentional.';
+
+/**
+ * Wednesday quality-bike anchors often shift quality_run to Thursday; pairing with lower-body
+ * strength uses the performance co-equal exception. Surface that for coach/UI (`week_trade_offs`).
+ */
+function collectQualityRunLowerBodyTradeOffs(
+  sessions: PlannedSession[],
+  _bikeQualityDayResolved: string,
+): string[] {
+  const byDay = new Map<string, PlannedSession[]>();
+  for (const s of sessions) {
+    const arr = byDay.get(s.day) ?? [];
+    arr.push(s);
+    byDay.set(s.day, arr);
+  }
+  for (const daySessions of byDay.values()) {
+    const hasQualityRun = daySessions.some(
+      (s) => s.type === 'run' && (s.tags?.includes('quality') ?? false),
+    );
+    const hasLowerBodyStrength = daySessions.some(
+      (s) => s.type === 'strength' && (s.tags?.includes('lower_body') ?? false),
+    );
+    if (hasQualityRun && hasLowerBodyStrength) return [CONCENTRATED_LOAD_DAY];
+  }
+  return [];
 }
 
 // ── Ramp helper (duplicated locally to avoid circular import) ────────────────

@@ -345,6 +345,20 @@ export function easyBike(day: string, hours: number, goalId: string): PlannedSes
   );
 }
 
+/**
+ * Mid-week quality bike anchor (e.g. group ride Wednesday). Same periodization intent as run `intervalRun`:
+ * base → sweet spot 2×15; build → FTP threshold 3×20; race_specific → VO2 6×5. Taper: `bikeOpeners` at call site.
+ */
+export function groupRideQualityBikeSession(day: string, phase: Phase, goalId: string): PlannedSession {
+  if (phase === 'race_specific') {
+    return vo2Bike(day, 6, goalId);
+  }
+  if (phase === 'build') {
+    return thresholdBike(day, 3, 20, goalId);
+  }
+  return sweetSpotBike(day, 2, 15, goalId);
+}
+
 export function bikeOpeners(day: string, goalId: string): PlannedSession {
   return session(
     day, 'bike',
