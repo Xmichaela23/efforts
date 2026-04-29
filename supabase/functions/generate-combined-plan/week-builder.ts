@@ -29,6 +29,27 @@ import {
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
 import { arePlannedSessionsCompatible, plannedSessionToScheduleSlot } from '../_shared/schedule-session-constraints.ts';
+import { blockForWeek } from './phase-structure.ts';
+
+/**
+ * Timeline rows are one week each (`pushBlockRange`: startWeek === endWeek). Using
+ * `weekNum - block.startWeek + 1` would always yield 1 — count consecutive weeks
+ * with the same phase / goal / recovery flag instead.
+ */
+function weekInPhaseForTimeline(phaseBlocks: PhaseBlock[], weekNum: number, block: PhaseBlock): number {
+  let n = 1;
+  for (let w = weekNum - 1; w >= 1; w--) {
+    const b = blockForWeek(phaseBlocks, w);
+    if (
+      b.phase === block.phase &&
+      b.primaryGoalId === block.primaryGoalId &&
+      b.isRecovery === block.isRecovery
+    ) {
+      n++;
+    } else break;
+  }
+  return n;
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -270,7 +291,7 @@ export function buildWeek(
   goals: GoalInput[],
   athleteState: AthleteState,
   athleteMemory?: AthleteMemory,
-  options?: { totalWeeks?: number; raceAnchors?: RaceAnchor[] },
+  options?: { totalWeeks?: number; raceAnchors?: RaceAnchor[]; phaseBlocks?: PhaseBlock[] },
 ): GeneratedWeek {
 
   const phase = block.phase;
@@ -723,8 +744,10 @@ export function buildWeek(
     // Blocked days: rest + brick + long ride + long run (actual calendar day)
     const blocked = new Set([...brickDaysInGrid, longRideDay, longRunActualDay, ...restDayNames]);
 
-    // weekInPhase: how many weeks into this phase are we?
-    const weekInPhase = Math.max(1, weekNum - block.startWeek + 1);
+    const weekInPhase = options?.phaseBlocks?.length
+      ? weekInPhaseForTimeline(options.phaseBlocks, weekNum, block)
+      : Math.max(1, weekNum - block.startWeek + 1);
+    const planTotalWeeks = Math.max(1, options?.totalWeeks ?? 52);
 
     const prefStrength = (athleteState.strength_preferred_days ?? [])
       .map((d) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase())
@@ -748,6 +771,8 @@ export function buildWeek(
           // quality run — matches the optimizer's Mon-upper / Thu-lower prescription.
           strSlot.sessions.push(triathlonStrength(strDay, phase, servedGoal, {
             weekInPhase,
+            weekIndex: weekNum,
+            totalWeeks: planTotalWeeks,
             isRecovery,
             limiterSport,
             sessionIndex: 1,
@@ -758,7 +783,13 @@ export function buildWeek(
             strengthIntent: athleteState.strength_intent,
           }));
         } else {
-          strSlot.sessions.push(runStrength(strDay, phase, servedGoal, { weekInPhase, isRecovery, equipmentType }));
+          strSlot.sessions.push(runStrength(strDay, phase, servedGoal, {
+            weekInPhase,
+            weekIndex: weekNum,
+            totalWeeks: planTotalWeeks,
+            isRecovery,
+            equipmentType,
+          }));
         }
       }
     }
@@ -780,6 +811,8 @@ export function buildWeek(
             // with quality run in the AM/PM performance exception.
             strSlot2.sessions.push(triathlonStrength(strDay2, phase, servedGoal, {
               weekInPhase,
+              weekIndex: weekNum,
+              totalWeeks: planTotalWeeks,
               isRecovery,
               limiterSport,
               sessionIndex: 0,
@@ -790,7 +823,13 @@ export function buildWeek(
               strengthIntent: athleteState.strength_intent,
             }));
           } else {
-            strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, { weekInPhase, isRecovery, equipmentType: equipmentType2 }));
+            strSlot2.sessions.push(runStrength(strDay2, phase, servedGoal, {
+              weekInPhase,
+              weekIndex: weekNum,
+              totalWeeks: planTotalWeeks,
+              isRecovery,
+              equipmentType: equipmentType2,
+            }));
           }
         }
       }

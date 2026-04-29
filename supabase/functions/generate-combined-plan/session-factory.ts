@@ -693,6 +693,10 @@ export function triathlonStrength(
   goalId: string,
   options?: {
     weekInPhase?: number;
+    /** 1-based calendar week in the plan — taper / race-week branching in protocols */
+    weekIndex?: number;
+    /** Full plan duration (same as generate-combined-plan total weeks) */
+    totalWeeks?: number;
     isRecovery?: boolean;
     limiterSport?: 'swim' | 'bike' | 'run';
     sessionIndex?: number; // 0 = lower/posterior, 1 = upper/swim
@@ -713,10 +717,10 @@ export function triathlonStrength(
   );
 
   const ctx: ProtocolContext = {
-    weekIndex: 1,
+    weekIndex: Math.max(1, options?.weekIndex ?? 1),
     weekInPhase: options?.weekInPhase ?? 1,
     phase: toStrengthPhase(phase),
-    totalWeeks: 20,
+    totalWeeks: Math.max(1, options?.totalWeeks ?? 20),
     isRecovery: options?.isRecovery ?? false,
     primarySchedule: {
       longSessionDays,
@@ -753,13 +757,19 @@ export function triathlonStrength(
   return intentToPlanned(chosen, day, phase, goalId);
 }
 
-export function runStrength(day: string, phase: Phase, goalId: string, options?: { weekInPhase?: number; isRecovery?: boolean; equipmentType?: 'home_gym' | 'commercial_gym' }): PlannedSession {
+export function runStrength(day: string, phase: Phase, goalId: string, options?: {
+  weekInPhase?: number;
+  weekIndex?: number;
+  totalWeeks?: number;
+  isRecovery?: boolean;
+  equipmentType?: 'home_gym' | 'commercial_gym';
+}): PlannedSession {
   const protocol = getProtocol('durability');
   const ctx: ProtocolContext = {
-    weekIndex: 1,
+    weekIndex: Math.max(1, options?.weekIndex ?? 1),
     weekInPhase: options?.weekInPhase ?? 1,
     phase: toStrengthPhase(phase),
-    totalWeeks: 20,
+    totalWeeks: Math.max(1, options?.totalWeeks ?? 20),
     isRecovery: options?.isRecovery ?? false,
     primarySchedule: { longSessionDays: ['Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
     userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },

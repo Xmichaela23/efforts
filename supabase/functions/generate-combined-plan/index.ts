@@ -90,6 +90,7 @@ Deno.serve(async (req: Request) => {
       const week = buildWeek(w, block, prevWeightedTSS, goals, state, athlete_memory, {
         totalWeeks,
         raceAnchors,
+        phaseBlocks: blocks,
       });
       generatedWeeks.push(week);
       prevWeightedTSS = week.total_weighted_tss;

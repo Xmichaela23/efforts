@@ -73,7 +73,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   // triples in week 1 skips adaptation and risks injury for endurance athletes.
   if (phaseName === 'base') {
     sessions.push(createBaseHypertrophyLower(tier, weekInPhase));
-    sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
+    sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier));
     if (freq >= 2) sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
     return sessions;
   }
@@ -85,7 +85,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   } else {
     sessions.push(createLowerMaintenanceSession(phase, weekInPhase, isRecovery, tier));
   }
-  sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier, weekIndex, totalWeeks));
+  sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier));
   sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
 
   return sessions;
@@ -369,8 +369,6 @@ function createUpperStrengthSession(
   weekInPhase: number,
   isRecovery: boolean,
   tier: 'barbell' | 'bodyweight',
-  absoluteWeek: number,
-  totalWeeks: number
 ): IntentSession {
   const exercises: StrengthExercise[] = [];
   let duration: number;
