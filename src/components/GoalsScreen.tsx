@@ -368,16 +368,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   );
   const multipleEventGoals = activeEventGoals.length >= 2;
 
-  // When all active event goals share the same plan, the season plan is already built.
-  // Used to swap the banner from "build" → "active" and suppress per-card plan duplication.
-  const seasonPlan = useMemo(() => {
-    if (!multipleEventGoals) return null;
-    const linked = activeEventGoals.map(g => plansByGoalId.get(g.id)).filter(Boolean);
-    if (linked.length === 0) return null;
-    const uniqueIds = new Set(linked.map(p => p!.id));
-    return uniqueIds.size === 1 ? linked[0]! : null;
-  }, [multipleEventGoals, activeEventGoals, plansByGoalId]);
-
+  // Must be declared before `seasonPlan` — that memo reads this map; `const` is TDZ until here.
   const plansByGoalId = useMemo(() => {
     const map = new Map<string, (typeof currentPlans)[0]>();
     for (const p of currentPlans) {
@@ -404,6 +395,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     }
     return map;
   }, [currentPlans, completedPlans]);
+
+  // When all active event goals share the same plan, the season plan is already built.
+  // Used to swap the banner from "build" → "active" and suppress per-card plan duplication.
+  const seasonPlan = useMemo(() => {
+    if (!multipleEventGoals) return null;
+    const linked = activeEventGoals.map(g => plansByGoalId.get(g.id)).filter(Boolean);
+    if (linked.length === 0) return null;
+    const uniqueIds = new Set(linked.map(p => p!.id));
+    return uniqueIds.size === 1 ? linked[0]! : null;
+  }, [multipleEventGoals, activeEventGoals, plansByGoalId]);
 
   type BackfillStatus =
     | { kind: 'idle' }
