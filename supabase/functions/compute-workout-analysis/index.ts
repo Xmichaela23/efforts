@@ -1641,6 +1641,22 @@ Deno.serve(async (req) => {
 
         if (hasUsableElevation(gapSamples) && gapSamples.length > 60) {
           const grades = computeSampleGrades(gapSamples);
+          const nonZeroGrades = grades.filter((g) => Math.abs(g) >= 0.3);
+          const meanGrade = nonZeroGrades.length
+            ? nonZeroGrades.reduce((a, b) => a + b, 0) / nonZeroGrades.length
+            : 0;
+          console.log('[GAP_DIAG]', JSON.stringify({
+            sampleCount: gapSamples.length,
+            meanGrade: +meanGrade.toFixed(2),
+            posCount: nonZeroGrades.filter((g) => g > 0).length,
+            negCount: nonZeroGrades.filter((g) => g < 0).length,
+            firstFewGrades: grades.slice(0, 10).map((g) => +g.toFixed(2)),
+            elevRange: [
+              +(Math.min(...gapSamples.map((s) => s.elevation_m ?? 0))).toFixed(1),
+              +(Math.max(...gapSamples.map((s) => s.elevation_m ?? 0))).toFixed(1),
+            ],
+            firstFewElev: gapSamples.slice(0, 10).map((s) => +(s.elevation_m ?? 0).toFixed(1)),
+          }));
           let gapSum = 0;
           let gapCount = 0;
           for (let i = 0; i < gapSamples.length; i++) {
