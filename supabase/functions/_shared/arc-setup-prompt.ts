@@ -606,6 +606,7 @@ export function buildArcSetupSystemPrompt(
   arc: ArcContext,
   opts?: ArcSetupPromptOptions,
 ): { staticPart: string; dynamicPart: string } {
+  const todayStr = new Date().toISOString().slice(0, 10);
   const cacheBlock = (opts?.raceCacheSection && opts.raceCacheSection.trim()) ? `${opts.raceCacheSection}\n\n` : '';
   const confirmedBlockRaw = opts?.freshSetup ? '' : buildConfirmedSoFarSection(opts?.draftArcSetup);
   const confirmedBlock = confirmedBlockRaw ? `${confirmedBlockRaw}\n\n` : '';
@@ -672,7 +673,10 @@ When presenting to the athlete: translate day-by-day into plain English (e.g. "M
 
   // ── Dynamic suffix: these two blocks change every turn as the draft evolves.
   // Kept separate so the large static prefix can be Anthropic-cached.
-  const dynamicPart = [optimizerBlock.trim(), confirmedBlock.trim()]
+  const todayBlock = `TODAY: ${todayStr}
+Use this date for all recency calculations.
+Do not estimate or infer the current date.`;
+  const dynamicPart = [todayBlock.trim(), optimizerBlock.trim(), confirmedBlock.trim()]
     .filter(Boolean)
     .join('\n\n');
 
