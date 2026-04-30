@@ -203,6 +203,14 @@ export interface CombinedSchedulePrefs {
   swim_quality_day?: number;
   /** Mid-week bike quality (threshold / tempo / SS). 0=Sun … 6=Sat */
   bike_quality_day?: number;
+  /** Route-estimated or user-confirmed group-ride anchor duration in hours. */
+  bike_quality_group_ride_hours?: number;
+  /** Route-estimated or user-confirmed group-ride anchor duration in minutes. */
+  bike_quality_group_ride_minutes?: number;
+  /** GPX/route-estimated group-ride anchor duration in hours. */
+  bike_quality_route_estimated_hours?: number;
+  /** GPX/route-estimated group-ride anchor duration in minutes. */
+  bike_quality_route_estimated_minutes?: number;
   /** Mid-week easy aerobic bike add-on. 0=Sun … 6=Sat */
   bike_easy_day?: number;
   rest_days?: number[];
@@ -217,6 +225,20 @@ export interface CombinedSchedulePrefs {
 export function mergeCombinedSchedulePrefs(
   ...sources: Array<Record<string, unknown> | null | undefined>
 ): CombinedSchedulePrefs {
+  const pickFinitePositive = (
+    src: Record<string, unknown>,
+    keys: string[],
+  ): number | undefined => {
+    for (const key of keys) {
+      const raw = src[key];
+      const num =
+        typeof raw === 'number'
+          ? raw
+          : (typeof raw === 'string' && raw.trim().length > 0 ? Number(raw) : NaN);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+    return undefined;
+  };
   const out: CombinedSchedulePrefs = {};
   for (const src of sources) {
     if (!src) continue;
@@ -234,6 +256,42 @@ export function mergeCombinedSchedulePrefs(
     const siRaw = src.strength_intent ?? src.strengthIntent;
     const si =
       siRaw === 'support' || siRaw === 'performance' ? (siRaw as StrengthIntentArc) : undefined;
+    const groupRideHours = pickFinitePositive(src, [
+      'bike_quality_group_ride_hours',
+      'bikeQualityGroupRideHours',
+      'group_ride_duration_hours',
+      'groupRideDurationHours',
+      'group_ride_estimated_hours',
+      'groupRideEstimatedHours',
+      'route_estimated_hours',
+      'routeEstimatedHours',
+    ]);
+    const groupRideMinutes = pickFinitePositive(src, [
+      'bike_quality_group_ride_minutes',
+      'bikeQualityGroupRideMinutes',
+      'group_ride_duration_minutes',
+      'groupRideDurationMinutes',
+      'group_ride_estimated_minutes',
+      'groupRideEstimatedMinutes',
+      'route_estimated_minutes',
+      'routeEstimatedMinutes',
+    ]);
+    const routeEstimatedHours = pickFinitePositive(src, [
+      'bike_quality_route_estimated_hours',
+      'bikeQualityRouteEstimatedHours',
+      'route_estimated_hours',
+      'routeEstimatedHours',
+      'group_ride_route_estimated_hours',
+      'groupRideRouteEstimatedHours',
+    ]);
+    const routeEstimatedMinutes = pickFinitePositive(src, [
+      'bike_quality_route_estimated_minutes',
+      'bikeQualityRouteEstimatedMinutes',
+      'route_estimated_minutes',
+      'routeEstimatedMinutes',
+      'group_ride_route_estimated_minutes',
+      'groupRideRouteEstimatedMinutes',
+    ]);
     const pdPatch = parsePreferredDaysPatch(src);
 
     if (lr !== undefined) out.long_run_day = lr;
@@ -251,6 +309,14 @@ export function mergeCombinedSchedulePrefs(
     if (pdPatch.run_easy_day !== undefined) out.run_easy_day = pdPatch.run_easy_day;
     if (pdPatch.bike_quality_day !== undefined) out.bike_quality_day = pdPatch.bike_quality_day;
     if (pdPatch.bike_easy_day !== undefined) out.bike_easy_day = pdPatch.bike_easy_day;
+    if (groupRideHours !== undefined) out.bike_quality_group_ride_hours = groupRideHours;
+    if (groupRideMinutes !== undefined) out.bike_quality_group_ride_minutes = groupRideMinutes;
+    if (routeEstimatedHours !== undefined) {
+      out.bike_quality_route_estimated_hours = routeEstimatedHours;
+    }
+    if (routeEstimatedMinutes !== undefined) {
+      out.bike_quality_route_estimated_minutes = routeEstimatedMinutes;
+    }
     if (pdPatch.strength_preferred_days?.length) {
       out.strength_preferred_days = pdPatch.strength_preferred_days;
     }

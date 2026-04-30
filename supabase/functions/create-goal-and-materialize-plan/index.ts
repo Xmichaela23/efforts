@@ -983,6 +983,21 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.bike_quality_day !== undefined
         ? { bike_quality_day: freshCombinedPrefs.bike_quality_day }
         : {}),
+      ...(freshCombinedPrefs.bike_quality_group_ride_hours !== undefined
+        ? { bike_quality_group_ride_hours: freshCombinedPrefs.bike_quality_group_ride_hours }
+        : {}),
+      ...(freshCombinedPrefs.bike_quality_group_ride_minutes !== undefined
+        ? { bike_quality_group_ride_minutes: freshCombinedPrefs.bike_quality_group_ride_minutes }
+        : {}),
+      ...(freshCombinedPrefs.bike_quality_route_estimated_hours !== undefined
+        ? { bike_quality_route_estimated_hours: freshCombinedPrefs.bike_quality_route_estimated_hours }
+        : {}),
+      ...(freshCombinedPrefs.bike_quality_route_estimated_minutes !== undefined
+        ? {
+            bike_quality_route_estimated_minutes:
+              freshCombinedPrefs.bike_quality_route_estimated_minutes,
+          }
+        : {}),
       ...(freshCombinedPrefs.bike_easy_day !== undefined
         ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
         : {}),

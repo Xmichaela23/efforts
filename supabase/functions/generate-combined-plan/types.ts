@@ -53,6 +53,10 @@ export interface AthleteState {
    * when `bike_quality_group_ride_hours` is not provided.
    */
   bike_quality_group_ride_minutes?: number;
+  /** Optional GPX/route-estimated group-ride duration (hours). */
+  bike_quality_route_estimated_hours?: number;
+  /** Optional GPX/route-estimated group-ride duration (minutes). */
+  bike_quality_route_estimated_minutes?: number;
   /**
    * Optional label appended to the mid-week quality bike when the athlete rides with a
    * recurring group ("Group Ride", "Hammer Ride"). Derived from training_prefs.notes.

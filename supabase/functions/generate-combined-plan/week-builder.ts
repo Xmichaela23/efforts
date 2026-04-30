@@ -607,7 +607,8 @@ export function buildWeek(
         const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
         runQualitySlot!.sessions.push(easyRun(runQualityDay, taperRunMi, servedGoal));
       } else if (triApproach === 'base_first') {
-        // base_first: Z3 tempo throughout — no intervals until Race-Specific.
+        // base_first: Base uses controlled interval progression; Build uses tempo;
+        // Race-specific uses race-pace specificity.
         if (phase === 'race_specific') {
           const rpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
           runQualitySlot!.sessions.push(
@@ -615,8 +616,10 @@ export function buildWeek(
               ? racePaceRun(runQualityDay, rpMiles, primaryGoal.distance, servedGoal)
               : marathonPaceRun(runQualityDay, rpMiles, servedGoal),
           );
+        } else if (phase === 'base') {
+          runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
         } else {
-          // Build and Base: tempo (Z3) — builds muscular endurance safely
+          // Build: tempo (Z3) — builds muscular endurance safely
           const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
           runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
         }
@@ -961,23 +964,37 @@ function weeklyTSSForRamp(currentCTL: number, targetWeeklyRamp: number): number 
 }
 
 function resolveGroupRideHours(
-  phase: Phase,
+  _phase: Phase,
   athleteState: AthleteState,
 ): number {
+  const routeEstimatedHours =
+    typeof athleteState.bike_quality_route_estimated_hours === 'number'
+      ? athleteState.bike_quality_route_estimated_hours
+      : null;
+  if (routeEstimatedHours && Number.isFinite(routeEstimatedHours) && routeEstimatedHours > 0) {
+    return Math.max(1.0, Math.min(4.0, routeEstimatedHours));
+  }
+  const routeEstimatedMinutes =
+    typeof athleteState.bike_quality_route_estimated_minutes === 'number'
+      ? athleteState.bike_quality_route_estimated_minutes
+      : null;
+  if (routeEstimatedMinutes && Number.isFinite(routeEstimatedMinutes) && routeEstimatedMinutes > 0) {
+    return Math.max(1.0, Math.min(4.0, routeEstimatedMinutes / 60));
+  }
   const explicitHours =
     typeof athleteState.bike_quality_group_ride_hours === 'number'
       ? athleteState.bike_quality_group_ride_hours
       : null;
   if (explicitHours && Number.isFinite(explicitHours) && explicitHours > 0) {
-    return Math.max(1.0, Math.min(4.0, explicitHours));
+    return Math.max(1.5, Math.min(4.0, explicitHours));
   }
   const explicitMinutes =
     typeof athleteState.bike_quality_group_ride_minutes === 'number'
       ? athleteState.bike_quality_group_ride_minutes
       : null;
   if (explicitMinutes && Number.isFinite(explicitMinutes) && explicitMinutes > 0) {
-    return Math.max(1.0, Math.min(4.0, explicitMinutes / 60));
+    return Math.max(1.5, Math.min(4.0, explicitMinutes / 60));
   }
-  // Defaults for anchored group rides when no route estimate is available.
-  return phase === 'base' ? 1.5 : 2.0;
+  // Defaults for anchored hard group rides when no route estimate is available.
+  return 1.5;
 }
