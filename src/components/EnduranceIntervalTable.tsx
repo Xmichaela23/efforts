@@ -159,8 +159,8 @@ export default function EnduranceIntervalTable({
     return null;
   }
 
-  // ── Awaiting recompute (linked plan / interval pipeline) ─────────────────
-  if (displayMode === 'awaiting_recompute') {
+  // ── Awaiting recompute (linked plan / interval pipeline only) ─────────────
+  if (displayMode === 'awaiting_recompute' && hasPlanned) {
     return (
       <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
         <p className="text-sm text-red-200">Session interval contract missing for this planned workout.</p>
@@ -318,7 +318,7 @@ export default function EnduranceIntervalTable({
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
                       <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
-                      {pct != null && !isGoalRace && (
+                      {pct != null && !isGoalRace && hasPlanned && (
                         <div className="flex items-center gap-1">
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
                           {cvIndicator}
