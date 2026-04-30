@@ -68,6 +68,57 @@ type PlanRow = {
   status?: string | null
 }
 
+/**
+ * Fresh-start cleanup when no active event goals remain.
+ * Clears planning artifacts that should not survive a season reset.
+ */
+async function cleanupPlanningArtifactsForFreshStart(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<{ notes: string[]; errors: string[] }> {
+  const notes: string[] = []
+  const errors: string[] = []
+
+  // 1) Remove uploaded race courses (segments/debug cascade from FK).
+  try {
+    const { error } = await supabase
+      .from('race_courses')
+      .delete()
+      .eq('user_id', userId)
+    if (error) errors.push(`race_courses: ${error.message}`)
+    else notes.push('race_courses_cleared')
+  } catch (e) {
+    errors.push(`race_courses: ${String(e)}`)
+  }
+
+  // 2) Clear athlete identity JSON so Arc setup starts from a blank identity.
+  // Keep performance metrics/baselines intact.
+  try {
+    const { error } = await supabase
+      .from('user_baselines')
+      .update({ athlete_identity: null, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+    if (error) errors.push(`user_baselines.athlete_identity: ${error.message}`)
+    else notes.push('athlete_identity_cleared')
+  } catch (e) {
+    errors.push(`user_baselines.athlete_identity: ${String(e)}`)
+  }
+
+  // 3) Clear accumulated athlete memory rules/notes so season guidance restarts cleanly.
+  try {
+    const { error } = await supabase
+      .from('athlete_memory')
+      .delete()
+      .eq('user_id', userId)
+    if (error) errors.push(`athlete_memory: ${error.message}`)
+    else notes.push('athlete_memory_cleared')
+  } catch (e) {
+    errors.push(`athlete_memory: ${String(e)}`)
+  }
+
+  return { notes, errors }
+}
+
 /** Combined plans store every served goal on `config.plan_contract_v1.goals_served`; standalone plans don't. */
 function goalsServedFromPlan(plan: PlanRow): string[] {
   const cfg = (plan.config ?? {}) as Record<string, unknown>
@@ -224,6 +275,7 @@ Deno.serve(async (req) => {
     //    that still has at least one other active event goal.
     let rebuiltPlanId: string | null = null
     let rebuildError: string | null = null
+    let freshStartCleanup: { notes: string[]; errors: string[] } | null = null
     let toastMessage = `${goalName} removed.`
 
     if (combinedSiblingGoalIds.size > 0) {
@@ -289,6 +341,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 7) If no active event goals remain at all, clear planning artifacts so the
+    // athlete can truly start fresh (courses + identity/planning memory).
+    const { count: activeEventGoalCount } = await supabase
+      .from('goals')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('goal_type', 'event')
+      .eq('status', 'active')
+
+    if ((activeEventGoalCount ?? 0) === 0) {
+      freshStartCleanup = await cleanupPlanningArtifactsForFreshStart(supabase, userId)
+      if ((freshStartCleanup.errors?.length ?? 0) === 0) {
+        toastMessage = `${goalName} removed. No active races remain — fresh start complete.`
+      } else {
+        toastMessage = `${goalName} removed. No active races remain — partial fresh-start cleanup; see logs.`
+      }
+    }
+
     return json({
       success: true,
       deleted_goal_id: goalId,
@@ -296,6 +366,7 @@ Deno.serve(async (req) => {
       plan_errors: planErrors.length ? planErrors : null,
       rebuilt_plan_id: rebuiltPlanId,
       rebuild_error: rebuildError,
+      fresh_start_cleanup: freshStartCleanup,
       message: toastMessage,
     })
   } catch (e) {
