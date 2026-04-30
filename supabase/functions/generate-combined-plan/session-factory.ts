@@ -315,6 +315,37 @@ export function sweetSpotBike(day: string, intervals: number, minEach: number, g
 }
 
 /**
+ * Anchor-driven group ride quality session.
+ * Use this when the athlete's quality-bike day is a recurring group ride anchor.
+ * We do not prescribe interval structure because effort is controlled by the group.
+ */
+export function groupRideSession(
+  day: string,
+  hours: number,
+  phase: Phase,
+  goalId: string,
+  label = 'Group Ride',
+): PlannedSession {
+  const min = Math.max(45, Math.round(hours * 60));
+  const phaseLine =
+    phase === 'base'
+      ? 'Keep overall effort aerobic — Z2 with climb surges.'
+      : 'This is your quality bike session — give the climbs real effort.';
+  return session(
+    day,
+    'bike',
+    label,
+    `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}`,
+    min,
+    'HARD',
+    [],
+    ['quality', 'group_ride', 'anchor'],
+    'Group-ride variable effort',
+    goalId,
+  );
+}
+
+/**
  * base_first approach — Z3 tempo blocks.
  * The "20% non-easy" bucket favours comfortably hard (Z3) over threshold (Z4).
  * Builds muscular endurance without the cortisol spike of FTP work.

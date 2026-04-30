@@ -25,7 +25,7 @@ import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
   longRide, easyBike, bikeOpeners,
-  groupRideQualityBikeSession,
+  groupRideQualityBikeSession, groupRideSession,
   thresholdSwim, cssAerobicSwim, easySwim,
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
@@ -575,14 +575,16 @@ export function buildWeek(
       if (phase === 'taper') {
         bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
       } else {
-        bikeQualitySlot!.sessions.push(groupRideQualityBikeSession(bq, phase, servedGoal));
-      }
-      const label = athleteState.bike_quality_label;
-      if (label && phase !== 'taper') {
-        const last = bikeQualitySlot!.sessions[bikeQualitySlot!.sessions.length - 1];
-        if (last && !/group ride|hammer ride/i.test(last.name)) {
-          last.name = `${label} — ${last.name}`;
-          last.tags = [...(last.tags ?? []), 'group_ride'];
+        const label = athleteState.bike_quality_label;
+        // Anchor-driven override: when quality-bike day is a recurring group ride,
+        // describe it honestly as a group ride (no structured interval prescription).
+        if (label) {
+          const groupRideHours = Math.max(1.0, Math.min(2.0, bikeTotalMin * 0.35 / 60));
+          bikeQualitySlot!.sessions.push(
+            groupRideSession(bq, groupRideHours, phase, servedGoal, label),
+          );
+        } else {
+          bikeQualitySlot!.sessions.push(groupRideQualityBikeSession(bq, phase, servedGoal));
         }
       }
     }

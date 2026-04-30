@@ -162,7 +162,11 @@ function derivePlannedCellLabel(w: any): string | null {
       }
       // Always include duration for bikes when available
       let label = '';
-      if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2${durStr ? ` ${durStr}` : ''}`.trim();
+      const isGroupRideAnchor =
+        has(/group_ride|group\s*ride/i) ||
+        tags.map(String).some((t: string) => t.toLowerCase() === 'group_ride' || t.toLowerCase() === 'anchor');
+      if (isGroupRideAnchor) label = 'Group Ride';
+      else if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_thr_/i)) label = `BK-THR${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_ss_/i)) label = `BK-SS${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/endurance|z2|long\s*ride/i)) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
