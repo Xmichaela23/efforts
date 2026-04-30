@@ -3938,6 +3938,51 @@ function buildSessionIntervalRows(
   const expectedWorkRows = getPlannedWorkSteps(plannedWorkout).length;
   const isStructuredIntervalSession = expectedWorkRows >= 2;
   if (!plannedSteps.length) {
+    // No linked plan: empty steps are normal — show session totals, not a "planned workout" recompute state.
+    if (!plannedWorkout) {
+      const overall = workout?.computed?.overall || {};
+      const distM = Number(overall?.distance_m ?? ((Number(workout?.distance) > 0) ? Number(workout.distance) * 1000 : 0));
+      const durS = Number(
+        overall?.duration_s_moving ??
+        ((Number(workout?.moving_time) > 0) ? Number(workout.moving_time) * 60 : 0)
+      );
+      const directPaceS = Number(overall?.avg_pace_s_per_mi ?? 0);
+      const derivedPaceS = (durS > 0 && distM > 0) ? (durS / (distM / 1609.34)) : 0;
+      const paceS = Number.isFinite(directPaceS) && directPaceS > 0 ? directPaceS : (Number.isFinite(derivedPaceS) && derivedPaceS > 0 ? derivedPaceS : 0);
+      const hr = Number(overall?.avg_hr ?? workout?.avg_heart_rate ?? workout?.metrics?.avg_heart_rate ?? 0);
+
+      if (durS > 0 || distM > 0 || paceS > 0) {
+        return {
+          rows: [{
+            row_id: 'overall',
+            planned_step_id: null,
+            planned_index: 0,
+            kind: 'overall',
+            planned_label: 'Overall session',
+            planned_pace_display: null,
+            adherence_pct: null,
+            executed: {
+              pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : null,
+              avg_pace_s_per_mi: Number.isFinite(paceS) && paceS > 0 ? Math.round(paceS) : null,
+              distance_m: Number.isFinite(distM) && distM > 0 ? Math.round(distM) : null,
+              duration_s: Number.isFinite(durS) && durS > 0 ? Math.round(durS) : null,
+              avg_hr: Number.isFinite(hr) && hr > 0 ? Math.round(hr) : null,
+            },
+          }],
+          mode: 'overall_only',
+          reason: 'unplanned_session',
+          expected_work_rows: 0,
+          measured_work_rows: 0,
+        };
+      }
+      return {
+        rows: [],
+        mode: 'overall_only',
+        reason: 'unplanned_no_totals',
+        expected_work_rows: 0,
+        measured_work_rows: 0,
+      };
+    }
     return {
       rows: [],
       mode: 'awaiting_recompute',

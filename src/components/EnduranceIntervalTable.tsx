@@ -139,7 +139,27 @@ export default function EnduranceIntervalTable({
     return <PoolSwimOverall sd={sd} useImperial={useImperial} />;
   }
 
-  // ── Awaiting recompute ───────────────────────────────────────────────────
+  const ct = sd.completed_totals;
+  const hasCompletedTotals =
+    !!ct &&
+    ((ct.duration_s ?? 0) > 0 || (ct.distance_m ?? 0) > 0 || (ct.avg_pace_s_per_mi ?? 0) > 0);
+
+  // Stale session_detail from before unplanned interval fix — never show "planned workout" for unlinked sessions.
+  if (displayMode === 'awaiting_recompute' && !hasPlanned) {
+    if (hasCompletedTotals && ct) {
+      return (
+        <CompletedTotalsSegmentTable
+          ct={ct}
+          isRide={isRide}
+          isSwim={isSwim}
+          useImperial={useImperial}
+        />
+      );
+    }
+    return null;
+  }
+
+  // ── Awaiting recompute (linked plan / interval pipeline) ─────────────────
   if (displayMode === 'awaiting_recompute') {
     return (
       <div className="px-3 py-3 rounded-lg border border-red-400/30 bg-red-900/10 mb-3">
@@ -160,40 +180,14 @@ export default function EnduranceIntervalTable({
 
   // ── Single overall row when no interval breakdown ────────────────────────
   if (allIntervals.length === 0 && displayMode === 'overall_only') {
-    const ct = sd.completed_totals;
-    if (!ct) return null;
-    const paceStr = fmtPaceSec(ct.avg_pace_s_per_mi ?? null);
-    const distStr = fmtDist(ct.distance_m ?? null, isSwim, useImperial);
-    const durStr = ct.duration_s ? fmtTime(ct.duration_s) : '—';
-    const hrStr = ct.avg_hr ? String(Math.round(ct.avg_hr)) : '—';
+    if (!hasCompletedTotals || !ct) return null;
     return (
-      <table className="w-full text-[13px] table-fixed">
-        <colgroup>
-          <col className="w-[36%]" />
-          <col className="w-[22%]" />
-          <col className="w-[16%]" />
-          <col className="w-[14%]" />
-          <col className="w-[12%]" />
-        </colgroup>
-        <thead>
-          <tr className="border-b border-white/10">
-            <th className="px-2 py-2 text-left font-medium text-gray-400">Segment</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-400">{isRide ? 'Watts' : 'Pace'}</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-400">Dist</th>
-            <th className="px-2 py-2 text-left font-medium text-gray-400">Time</th>
-            <th className="px-1 py-2 pr-2 text-right font-medium text-gray-400">BPM</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="border-b border-white/10">
-            <td className="px-2 py-1.5 font-medium">Overall</td>
-            <td className="px-2 py-1.5 font-medium">{isRide ? '—' : paceStr}</td>
-            <td className="px-2 py-1.5">{distStr}</td>
-            <td className="px-2 py-1.5 font-medium">{durStr}</td>
-            <td className="px-1 py-1.5 text-right">{hrStr !== '—' ? <><div className="font-medium">{hrStr}</div><div className="text-[10px] text-gray-400">bpm</div></> : '—'}</td>
-          </tr>
-        </tbody>
-      </table>
+      <CompletedTotalsSegmentTable
+        ct={ct}
+        isRide={isRide}
+        isSwim={isSwim}
+        useImperial={useImperial}
+      />
     );
   }
 
@@ -359,6 +353,56 @@ export default function EnduranceIntervalTable({
         </tbody>
       </table>
     </>
+  );
+}
+
+type CompletedTotals = NonNullable<
+  NonNullable<EnduranceIntervalTableProps['sessionDetail']>['completed_totals']
+>;
+
+function CompletedTotalsSegmentTable({
+  ct,
+  isRide,
+  isSwim,
+  useImperial,
+}: {
+  ct: CompletedTotals;
+  isRide: boolean;
+  isSwim: boolean;
+  useImperial: boolean;
+}) {
+  const paceStr = fmtPaceSec(ct.avg_pace_s_per_mi ?? null);
+  const distStr = fmtDist(ct.distance_m ?? null, isSwim, useImperial);
+  const durStr = ct.duration_s ? fmtTime(ct.duration_s) : '—';
+  const hrStr = ct.avg_hr ? String(Math.round(ct.avg_hr)) : '—';
+  return (
+    <table className="w-full text-[13px] table-fixed">
+      <colgroup>
+        <col className="w-[36%]" />
+        <col className="w-[22%]" />
+        <col className="w-[16%]" />
+        <col className="w-[14%]" />
+        <col className="w-[12%]" />
+      </colgroup>
+      <thead>
+        <tr className="border-b border-white/10">
+          <th className="px-2 py-2 text-left font-medium text-gray-400">Segment</th>
+          <th className="px-2 py-2 text-left font-medium text-gray-400">{isRide ? 'Watts' : 'Pace'}</th>
+          <th className="px-2 py-2 text-left font-medium text-gray-400">Dist</th>
+          <th className="px-2 py-2 text-left font-medium text-gray-400">Time</th>
+          <th className="px-1 py-2 pr-2 text-right font-medium text-gray-400">BPM</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="border-b border-white/10">
+          <td className="px-2 py-1.5 font-medium">Overall</td>
+          <td className="px-2 py-1.5 font-medium">{isRide ? '—' : paceStr}</td>
+          <td className="px-2 py-1.5">{distStr}</td>
+          <td className="px-2 py-1.5 font-medium">{durStr}</td>
+          <td className="px-1 py-1.5 text-right">{hrStr !== '—' ? <><div className="font-medium">{hrStr}</div><div className="text-[10px] text-gray-400">bpm</div></> : '—'}</td>
+        </tr>
+      </tbody>
+    </table>
   );
 }
 
