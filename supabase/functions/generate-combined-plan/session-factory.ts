@@ -571,9 +571,20 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
       next = tempoBike(day, 3, 12, goalId);
     }
   } else if (s.type === 'run' && s.tags?.includes('intervals')) {
-    const m = s.name.match(/(\d+)\s*[×x]/);
-    const tempoMi = m ? Math.max(2, Math.min(5, parseInt(m[1], 10) - 1)) : 3;
-    next = tempoRun(day, tempoMi, 1.5, goalId);
+    const m = s.name.match(/(\d+)\s*[×x]\s*(800m|1200m|1600m|1000m)/i);
+    const reps = m ? Math.max(2, parseInt(m[1], 10) - 2) : 4;
+    const dist = m?.[2] ?? '800m';
+    next = session(
+      day, 'run',
+      `Run Intervals — ${reps}×${dist}`,
+      `Warm up 10 min easy. ${reps}×${dist} at controlled quality pace with 90 sec jog recovery between. Cool down 10 min. Keep this crisp and smooth, not maximal.`,
+      Math.max(45, Math.round(s.duration * 0.85)),
+      'MODERATE',
+      ['warmup_run_10min_easy', `interval_${reps}x${dist}_moderate`, 'cooldown_run_10min_easy'],
+      ['quality', 'intervals', 'run'],
+      'Z4 controlled quality',
+      goalId,
+    );
   } else if (s.type === 'run' && s.tags?.includes('vo2max')) {
     // Same pattern as bike vo2 downgrade: replace with tempo-style work so MODERATE + description stay aligned.
     next = tempoRun(day, 3, 1.5, goalId);
