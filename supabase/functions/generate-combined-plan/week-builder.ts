@@ -579,7 +579,7 @@ export function buildWeek(
         // Anchor-driven override: when quality-bike day is a recurring group ride,
         // describe it honestly as a group ride (no structured interval prescription).
         if (label) {
-          const groupRideHours = Math.max(1.0, Math.min(2.0, bikeTotalMin * 0.35 / 60));
+          const groupRideHours = resolveGroupRideHours(phase, athleteState);
           bikeQualitySlot!.sessions.push(
             groupRideSession(bq, groupRideHours, phase, servedGoal, label),
           );
@@ -958,4 +958,26 @@ function weeklyTSSForRamp(currentCTL: number, targetWeeklyRamp: number): number 
   const alpha = 1 - Math.exp(-1 / 42);
   const dailyDelta = targetWeeklyRamp / 7;
   return Math.round((currentCTL + dailyDelta / alpha) * 7);
+}
+
+function resolveGroupRideHours(
+  phase: Phase,
+  athleteState: AthleteState,
+): number {
+  const explicitHours =
+    typeof athleteState.bike_quality_group_ride_hours === 'number'
+      ? athleteState.bike_quality_group_ride_hours
+      : null;
+  if (explicitHours && Number.isFinite(explicitHours) && explicitHours > 0) {
+    return Math.max(1.0, Math.min(4.0, explicitHours));
+  }
+  const explicitMinutes =
+    typeof athleteState.bike_quality_group_ride_minutes === 'number'
+      ? athleteState.bike_quality_group_ride_minutes
+      : null;
+  if (explicitMinutes && Number.isFinite(explicitMinutes) && explicitMinutes > 0) {
+    return Math.max(1.0, Math.min(4.0, explicitMinutes / 60));
+  }
+  // Defaults for anchored group rides when no route estimate is available.
+  return phase === 'base' ? 1.5 : 2.0;
 }

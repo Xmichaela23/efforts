@@ -616,6 +616,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       const tags = tagsArr.map((x:any)=> String(x).toLowerCase());
       const focus = (() => {
         if (t === 'ride') {
+          if (tags.includes('group_ride') || /group\s*ride/.test(rawDesc)) return 'Group Ride';
           if (tags.includes('long_ride')) return 'Long Ride';
           if (/vo2/.test(rawDesc)) return 'VO2';
           if (/threshold|thr_/.test(rawDesc)) return 'Threshold';
@@ -672,6 +673,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       
       const raw = String(workout.name || (workout as any).rendered_description || (workout as any).description || '').toLowerCase();
       const focus = (() => {
+        if (t === 'ride' && /group\s*ride/.test(raw)) return 'Group Ride';
         if (/interval/.test(raw)) return 'Intervals';
         if (/tempo/.test(raw)) return 'Tempo';
         if (/long\s*run|long\s*ride|long\s*\d+\s*min/.test(raw)) return 'Long';

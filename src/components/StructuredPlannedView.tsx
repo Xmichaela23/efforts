@@ -657,7 +657,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           <div className="text-xs text-gray-300 font-light tracking-normal mb-1">Total duration: {(() => { const m=Math.floor(totalSecsFromSteps/60); const s=totalSecsFromSteps%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
         )}
         <ul className="list-none space-y-1">
-          {(lines.length?lines:["No structured steps found."]).map((ln, i)=>{
+          {(lines.length
+            ? lines
+            : [(() => {
+                const tagSet = tags.map(String).map((t:string) => t.toLowerCase());
+                if (tagSet.includes('group_ride')) {
+                  return 'Unstructured session — ride with the group. No prescribed intervals.';
+                }
+                return 'No structured steps found.';
+              })()]).map((ln, i)=>{
             const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
             const isStrengthContext = (String((workout as any)?.workout_structure?.type||'').toLowerCase()==='strength_session') || (parentDisc === 'strength');
             const isPlannedRow = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';

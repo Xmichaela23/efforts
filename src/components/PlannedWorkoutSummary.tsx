@@ -33,6 +33,7 @@ function getTitle(workout: any): string {
   const tags = Array.isArray(workout.tags) ? (workout.tags as any[]).map((x: any) => String(x).toLowerCase()) : [];
   const lower = desc.toLowerCase();
   if (t === 'ride') {
+    if (tags.includes('group_ride') || /group\s*ride/.test(lower)) return 'Group Ride';
     if (tags.includes('long_ride')) return 'Ride — Long Ride';
     if (/vo2/.test(lower)) return 'Ride — VO2';
     if (/threshold|thr_/.test(lower)) return 'Ride — Threshold';

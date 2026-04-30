@@ -44,6 +44,16 @@ export interface AthleteState {
   /** Mid-week easy aerobic bike (second ride). Default: Wednesday. */
   bike_easy_day?: number;
   /**
+   * Optional group-ride anchor duration override (hours). When present, this
+   * takes precedence over phase defaults for anchored group-ride sessions.
+   */
+  bike_quality_group_ride_hours?: number;
+  /**
+   * Optional group-ride anchor duration override (minutes). Converted to hours
+   * when `bike_quality_group_ride_hours` is not provided.
+   */
+  bike_quality_group_ride_minutes?: number;
+  /**
    * Optional label appended to the mid-week quality bike when the athlete rides with a
    * recurring group ("Group Ride", "Hammer Ride"). Derived from training_prefs.notes.
    * When set, the session name surfaces it so the calendar matches the athlete's reality.
