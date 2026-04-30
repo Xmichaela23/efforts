@@ -174,21 +174,39 @@ export function parsePreferredDaysPatch(
     }).filter((s) => s.length > 0);
   }
   const qRun = parseSunFirstDayIndex(
-    o.quality_run ?? o.qualityRun ?? o.tempo_run ?? o.tempoRun ?? o.run_quality,
+    o.run_quality ?? o.quality_run ?? o.qualityRun ?? o.tempo_run ?? o.tempoRun,
   );
   const eRun = parseSunFirstDayIndex(
-    o.easy_run ?? o.easyRun ?? o.mid_week_easy_run ?? o.midWeekEasyRun ?? o.recovery_run,
+    o.run_easy ?? o.easy_run ?? o.easyRun ?? o.mid_week_easy_run ?? o.midWeekEasyRun ?? o.recovery_run,
   );
   if (qRun !== undefined) patch.run_quality_day = qRun;
   if (eRun !== undefined) patch.run_easy_day = eRun;
   const qBike = parseSunFirstDayIndex(
-    o.quality_bike ?? o.qualityBike ?? o.bike_quality ?? o.bikeQuality ?? o.mid_week_quality_bike,
+    o.bike_quality ?? o.quality_bike ?? o.qualityBike ?? o.bikeQuality ?? o.mid_week_quality_bike,
   );
   const eBike = parseSunFirstDayIndex(
-    o.easy_bike ?? o.easyBike ?? o.bike_easy ?? o.bikeEasy ?? o.mid_week_easy_bike,
+    o.bike_easy ?? o.easy_bike ?? o.easyBike ?? o.bikeEasy ?? o.mid_week_easy_bike,
   );
   if (qBike !== undefined) patch.bike_quality_day = qBike;
   if (eBike !== undefined) patch.bike_easy_day = eBike;
+  console.log('[combined-schedule-prefs] bike/run parse:', {
+    raw: {
+      run_quality: o.run_quality,
+      quality_run: o.quality_run,
+      run_easy: o.run_easy,
+      easy_run: o.easy_run,
+      bike_quality: o.bike_quality,
+      quality_bike: o.quality_bike,
+      bike_easy: o.bike_easy,
+      easy_bike: o.easy_bike,
+    },
+    parsed: {
+      run_quality_day: patch.run_quality_day,
+      run_easy_day: patch.run_easy_day,
+      bike_quality_day: patch.bike_quality_day,
+      bike_easy_day: patch.bike_easy_day,
+    },
+  });
   return patch;
 }
 

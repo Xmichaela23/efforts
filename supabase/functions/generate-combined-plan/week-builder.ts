@@ -83,6 +83,16 @@ function dayIntensity(slot: DaySlot): Intensity | null {
   return null;
 }
 
+function hasConsolidatedQualityRunWithLowerBody(slot: DaySlot): boolean {
+  const hasQualityRun = slot.sessions.some(
+    (s) => s.type === 'run' && (s.tags?.includes('quality') ?? false),
+  );
+  const hasLowerBodyStrength = slot.sessions.some(
+    (s) => s.type === 'strength' && (s.tags?.includes('lower_body') ?? false),
+  );
+  return hasQualityRun && hasLowerBodyStrength;
+}
+
 // Numerically index days so we can check adjacency
 function adjDay(day: string, delta: number): DayOfWeek {
   const idx = DAY_INDEX[day] ?? 0;
@@ -100,6 +110,10 @@ function enforceHardEasy(grid: WeekGrid): void {
     const prevIntensity = dayIntensity(grid.get(prev)!);
     const slot = grid.get(day)!;
     if (prevIntensity === 'HARD' && dayIntensity(slot) === 'HARD') {
+      // Performance consolidated hard day (quality_run + lower_body AM/PM) is an
+      // intentional exception used by the combined planner when anchored bikes
+      // compress quality placement. Preserve the planned run interval structure.
+      if (hasConsolidatedQualityRunWithLowerBody(slot)) continue;
       // Downgrade this day's HARD sessions to MODERATE
       for (const s of slot.sessions) {
         if (s.intensity_class === 'HARD') {
