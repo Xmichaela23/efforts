@@ -2603,6 +2603,8 @@ Deno.serve(async (req) => {
     // Full replacement — every field is computed fresh in this run.
     const updatePayload = {
       workout_analysis: {
+        /** workout-detail staleness: session_detail rebuild when GAP/narrative/analysis change */
+        recomputed_at: new Date().toISOString(),
         classified_type: classifiedTypeKey,
         granular_analysis: enhancedAnalysis,
         performance: performance,

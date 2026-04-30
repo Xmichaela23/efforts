@@ -210,6 +210,7 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         if (t) clearTimeout(t);
         t = setTimeout(() => {
           try {
+            forceSessionDetailRefreshRef.current = true;
             queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
           } catch {}
         }, 750);
