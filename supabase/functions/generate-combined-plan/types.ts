@@ -75,8 +75,14 @@ export interface AthleteState {
    * combined plan caps run/bike endurance and drops strength intensity.
    */
   transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
-  /** Explicit low structural load (e.g. post-marathon). Week 1 honors hard caps even if phase is "build". */
-  structural_load_hint?: 'low' | 'normal';
+  /**
+   * `low` = full post-race week-1 caps (marathon / IM / 70.3 / HM ≤14d).
+   * `moderate` = shorter race or HM 15–20d — easy week-1 volume, no empty-week pattern.
+   * `normal` = default.
+   */
+  structural_load_hint?: 'low' | 'moderate' | 'normal';
+  /** Echo of training_prefs days_per_week (4–7) for diagnostics; optional. */
+  days_per_week?: number;
   /**
    * 0.42–1.0 from Arc swim history (`swim_training_from_workouts`). Scales swim minutes/yards
    * before session placement so returning swimmers are not dropped into full 70.3 swim share.

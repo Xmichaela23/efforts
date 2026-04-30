@@ -97,38 +97,122 @@ export function recentLongRunMilesFromCompletedEvent(distance: string, sport: st
   return 16;
 }
 
+/** Drives combined/run transition: full = week-1 caps + recovery_rebuild; moderate = structural hint only. */
+export type PostRaceRecoverySeverity = 'full' | 'moderate';
+
+export type PostRaceRecoveryResult =
+  | { apply: false }
+  | {
+      apply: true;
+      severity: PostRaceRecoverySeverity;
+      event: CompletedEvent;
+      recentLongRunMilesHint: number;
+      reasoning: string;
+    };
+
 /**
- * A recent run or tri finish (from Arc `recent_completed_events`) should start the next
- * run/tri plan in `recovery_rebuild` with the race treated as the long-run peak.
+ * Classify a single completed event for post-race planning. Returns null if outside recovery windows.
+ *
+ * - **full** (≤21d): marathon, Ironman, 70.3/Half-Iron tri, ultras; **half marathon only ≤14d**
+ * - **moderate** (≤21d): half marathon 15–20d; sprint/olympic tri; 5K/10K; other run
+ */
+export function classifyPostRaceRecoveryTier(e: CompletedEvent): PostRaceRecoverySeverity | null {
+  if (e.days_ago >= 21) return null;
+  const d = (e.distance || '').toLowerCase();
+  const s = (e.sport || '').toLowerCase();
+  const n = (e.name || '').toLowerCase();
+  const hay = `${d} ${n}`;
+  const isTri = s.includes('tri');
+  const days = e.days_ago;
+
+  const fullTri =
+    hay.includes('ironman') ||
+    hay.includes('140.6') ||
+    hay.includes('70.3') ||
+    hay.includes('half iron') ||
+    hay.includes('half ironman');
+  if (isTri && fullTri) return 'full';
+
+  const moderateTri =
+    hay.includes('sprint') ||
+    hay.includes('olympic') ||
+    hay.includes('standard distance') ||
+    (!fullTri && isTri);
+
+  if (isTri) {
+    return moderateTri ? 'moderate' : null;
+  }
+
+  if (d.includes('marathon') && !d.includes('half') && !d.includes('70') && !hay.includes('half marathon')) {
+    return 'full';
+  }
+  if (hay.includes('ultra') || hay.includes('50k') || hay.includes('50 mi')) {
+    return 'full';
+  }
+
+  const isHalf =
+    d.includes('half') ||
+    d.includes('13.1') ||
+    d.includes('21k') ||
+    n.includes('half marathon');
+  if (isHalf) {
+    if (days < 14) return 'full';
+    return 'moderate';
+  }
+
+  if (hay.includes('10k') || hay.includes('10 k') || d === '10k') return 'moderate';
+  if (hay.includes('5k') || hay.includes('5 k') || d === '5k') return 'moderate';
+
+  if (s === 'run' || s === '') return 'moderate';
+  return null;
+}
+
+function pickStrongerPostRace(
+  a: { severity: PostRaceRecoverySeverity; event: CompletedEvent },
+  b: { severity: PostRaceRecoverySeverity; event: CompletedEvent },
+): { severity: PostRaceRecoverySeverity; event: CompletedEvent } {
+  if (a.severity === 'full' && b.severity === 'moderate') return a;
+  if (b.severity === 'full' && a.severity === 'moderate') return b;
+  return a.event.days_ago <= b.event.days_ago ? a : b;
+}
+
+/**
+ * A recent run or tri finish (from Arc `recent_completed_events`) may start the next plan
+ * in full post-race mode (marathon / IM / 70.3, HM ≤14d) or moderate structural load only (shorter races, HM 15–20d).
  */
 export function findPostRaceRecoveryContext(
   events: CompletedEvent[] | null | undefined,
   newGoalSport: string,
-):
-  | {
-      apply: true;
-      event: CompletedEvent;
-      recentLongRunMilesHint: number;
-      reasoning: string;
-    }
-  | { apply: false } {
+): PostRaceRecoveryResult {
   const goal = (newGoalSport || '').toLowerCase();
   if (!['run', 'tri', 'triathlon'].includes(goal)) return { apply: false };
   if (!events?.length) return { apply: false };
+
+  let best: { severity: PostRaceRecoverySeverity; event: CompletedEvent } | null = null;
   for (const e of events) {
-    if (e.days_ago >= 21) continue;
     const s = (e.sport || '').toLowerCase();
-    if (s === 'run' || s.includes('tri')) {
-      const hint = recentLongRunMilesFromCompletedEvent(e.distance, e.sport);
-      return {
-        apply: true,
-        event: e,
-        recentLongRunMilesHint: hint,
-        reasoning: `Recent race "${e.name}" (${e.days_ago}d ago) — starting in recovery rebuild from event peak.`,
-      };
-    }
+    if (s !== 'run' && !s.includes('tri')) continue;
+    const tier = classifyPostRaceRecoveryTier(e);
+    if (!tier) continue;
+    const cand = { severity: tier, event: e };
+    best = best ? pickStrongerPostRace(best, cand) : cand;
   }
-  return { apply: false };
+
+  if (!best) return { apply: false };
+
+  const hint = recentLongRunMilesFromCompletedEvent(best.event.distance, best.event.sport);
+  const reasoning =
+    best.severity === 'full'
+      ? `Recent "${best.event.name}" (${best.event.days_ago}d ago) — full post-race recovery from event peak.`
+      : `Recent "${best.event.name}" (${best.event.days_ago}d ago) — lighter transition (moderate structural load).`;
+
+  return {
+    apply: true,
+    severity: best.severity,
+    event: best.event,
+    recentLongRunMilesHint: hint,
+    reasoning,
+  };
 }
 
 /**

@@ -8,6 +8,7 @@ import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import {
   computeRunPlanningSignals,
   findPostRaceRecoveryContext,
+  type PostRaceRecoveryResult,
   swimVolumeMultiplierFromArcWorkouts,
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
@@ -735,6 +736,19 @@ function deriveBikeQualityLabel(goals: ReadonlyArray<{ training_prefs?: Record<s
   return null;
 }
 
+function combinedTransitionFromPostRace(
+  pr: PostRaceRecoveryResult,
+):
+  | { transition_mode: 'recovery_rebuild'; structural_load_hint: 'low' }
+  | { structural_load_hint: 'moderate' }
+  | undefined {
+  if (!pr.apply) return undefined;
+  if (pr.severity === 'full') {
+    return { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' };
+  }
+  return { structural_load_hint: 'moderate' };
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -755,7 +769,7 @@ async function buildCombinedPlan(
   /** Propagate Arc post-marathon / recent-race recovery into generate-combined-plan. */
   combinedTransition?: {
     transition_mode?: 'peak_bridge' | 'recovery_rebuild' | 'fresh_build' | 'fitness_maintenance';
-    structural_load_hint?: 'low' | 'normal';
+    structural_load_hint?: 'low' | 'moderate' | 'normal';
   },
   /** From goal flow (`plan_start_date`). When omitted, combined plan still used server's current Monday (legacy). */
   explicit_plan_start_date?: string | null,
@@ -987,6 +1001,7 @@ async function buildCombinedPlan(
       ...(combinedTransition?.structural_load_hint
         ? { structural_load_hint: combinedTransition.structural_load_hint }
         : {}),
+      ...(freshDpw != null ? { days_per_week: freshDpw } : {}),
     },
   });
 
@@ -1225,8 +1240,9 @@ Deno.serve(async (req: Request) => {
         apply: postRaceRecovery.apply,
         ...(postRaceRecovery.apply
           ? {
-              event: (postRaceRecovery as { event: { name: string; days_ago: number } }).event?.name,
-              days_ago: (postRaceRecovery as { event: { name: string; days_ago: number } }).event?.days_ago,
+              severity: postRaceRecovery.severity,
+              event: postRaceRecovery.event.name,
+              days_ago: postRaceRecovery.event.days_ago,
             }
           : {}),
       }));
@@ -1234,9 +1250,7 @@ Deno.serve(async (req: Request) => {
         const combinedResult = await buildCombinedPlan(
           supabase, functionsBaseUrl, serviceKey,
           user_id, createdGoalId, resolvedGoal!, fitness,
-          postRaceRecovery.apply
-            ? { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' }
-            : undefined,
+          combinedTransitionFromPostRace(postRaceRecovery),
           plan_start_date ?? null,
         );
         if (combinedResult) {
@@ -1316,7 +1330,9 @@ Deno.serve(async (req: Request) => {
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
         // Days already covered by a concurrent run plan — tri generator defers to those sessions
         ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),
-        ...(postRaceRecovery.apply ? { transition_mode: 'recovery_rebuild' as const } : {}),
+        ...(postRaceRecovery.apply && postRaceRecovery.severity === 'full'
+          ? { transition_mode: 'recovery_rebuild' as const }
+          : {}),
       };
 
       const triLearned = parseLearnedFitnessForSeed(triBaseline?.learned_fitness);
@@ -1419,7 +1435,7 @@ Deno.serve(async (req: Request) => {
     let weeks_since_peak_long_run = planningCtx.weeks_since_peak_long_run;
     const current_acwr = planningCtx.current_acwr;
     const volume_trend = planningCtx.volume_trend;
-    if (postRaceRecovery.apply) {
+    if (postRaceRecovery.apply && postRaceRecovery.severity === 'full') {
       trainingTransition = {
         mode: 'recovery_rebuild',
         reasoning: postRaceRecovery.reasoning,
@@ -1428,7 +1444,11 @@ Deno.serve(async (req: Request) => {
       weeks_since_peak_long_run = 0;
       const hint = postRaceRecovery.recentLongRunMilesHint;
       recent_long_run_miles = recent_long_run_miles != null ? Math.max(recent_long_run_miles, hint) : hint;
-      console.log(`[create-goal] post-race recovery from Arc: ${postRaceRecovery.event.name}, days_ago=${postRaceRecovery.event.days_ago}, longRunHint=${hint} mi`);
+      console.log(`[create-goal] post-race recovery (full) from Arc: ${postRaceRecovery.event.name}, days_ago=${postRaceRecovery.event.days_ago}, longRunHint=${hint} mi`);
+    } else if (postRaceRecovery.apply && postRaceRecovery.severity === 'moderate') {
+      console.log(
+        `[create-goal] post-race (moderate structural only): ${postRaceRecovery.event.name}, days_ago=${postRaceRecovery.event.days_ago}`,
+      );
     }
     if (recent_long_run_miles != null && weeks_since_peak_long_run != null) {
       console.log(`[AthleteState] Peak long run: ${recent_long_run_miles} mi, ${weeks_since_peak_long_run} weeks ago (planning context)`);
@@ -1579,9 +1599,7 @@ Deno.serve(async (req: Request) => {
       const combinedResult = await buildCombinedPlan(
         supabase, functionsBaseUrl, serviceKey,
         user_id, createdGoalId, resolvedGoal!, fitness,
-        postRaceRecovery.apply
-          ? { transition_mode: 'recovery_rebuild', structural_load_hint: 'low' }
-          : undefined,
+        combinedTransitionFromPostRace(postRaceRecovery),
         plan_start_date ?? null,
       );
       if (combinedResult) {
@@ -1675,7 +1693,7 @@ Deno.serve(async (req: Request) => {
       generateBody.structural_load_hint = strengthProto === 'neural_speed' ? 'heavy_lower' : 'moderate';
     }
     if (postRaceRecovery.apply) {
-      generateBody.structural_load_hint = 'low';
+      generateBody.structural_load_hint = postRaceRecovery.severity === 'full' ? 'low' : 'moderate';
     }
 
     const generated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-run-plan', generateBody);
