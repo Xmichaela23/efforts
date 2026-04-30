@@ -337,7 +337,7 @@ RULES:
 - NEVER describe the workout the athlete just did ("You ran 13 miles at 11:04 pace"). They were there.
 - NEVER reference prior workouts, strength sessions, yesterday's training, weekly load, muscular fatigue, or recovery needs.
 - Connect data across domains: if terrain was hilly AND pace was "slow", say the pace was appropriate for the terrain — don't report them as separate facts.
-- When grade-adjusted pace (GAP) is available, translate it: "Your 11:04 pace was a 10:32 effort on this terrain — the hills cost about 30s/mi."
+- When grade-adjusted pace (GAP) appears on the Pace line, the parenthetical terrain bias text after it is authoritative: do not contradict it using elevation gain alone. If bias says net downhill, grade assisted raw pace (GAP slower than raw pace in min/mi terms); if net uphill, grade resisted raw pace (GAP faster than raw). Example rewrite when bias is uphill: "Your 11:04 pace was about a 10:32 flat-equivalent effort — the climbs added demand." Do not invert this relationship.
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
 - When ROUTE data is present, reference it: "on your [route name]" or "on a route you've run N times". When FAMILIAR SEGMENTS data is present and segment_insight_eligible, mention how today's effort on that segment compared to previous runs.
 
@@ -390,14 +390,26 @@ function buildUserMessage(dp: any): string {
     sections.push(`\nWORKOUT DATE: ${w.date}`);
   }
 
-  // Workout
-  const gapNote = w.avg_gap ? `(effort-adjusted: ${w.avg_gap})` : '';
+  // Workout — GAP note must include terrain bias so the model does not invert vs raw pace.
+  const gapBias = w.gap_terrain_bias as 'downhill' | 'uphill' | 'flat' | null | undefined;
+  let gapNote = '';
+  if (w.avg_gap) {
+    if (gapBias === 'downhill') {
+      gapNote = `(effort-adjusted pace ${w.avg_gap} — net downhill bias, raw pace slightly assisted by grade)`;
+    } else if (gapBias === 'uphill') {
+      gapNote = `(effort-adjusted pace ${w.avg_gap} — net uphill bias, effort harder than raw pace suggests on flat)`;
+    } else if (gapBias === 'flat') {
+      gapNote = `(effort-adjusted pace ${w.avg_gap} — terrain roughly neutral vs flat-equivalent pace)`;
+    } else {
+      gapNote = `(effort-adjusted: ${w.avg_gap})`;
+    }
+  }
   const terrainNote = [w.terrain, w.elevation_gain ? `${w.elevation_gain} gain` : null].filter(Boolean).join(', ');
   sections.push([
     '\nWORKOUT:',
     `- Type: ${w.type || 'run'}${dp.plan?.workout_purpose ? ` (${dp.plan.workout_purpose})` : ''}`,
     w.distance && w.duration ? `- Distance: ${w.distance} in ${w.duration}` : null,
-    w.avg_pace ? `- Pace: ${w.avg_pace} ${gapNote}`.trim() : null,
+    w.avg_pace ? `- Pace: ${w.avg_pace}${gapNote ? ` ${gapNote}` : ''}`.trim() : null,
     w.avg_hr ? `- HR: ${w.avg_hr}${sig.hr_drift ? ` (drift: ${sig.hr_drift}${sig.drift_explanation ? `, explanation: ${sig.drift_explanation}` : ''}${sig.hr_drift_raw_absolute ? `, raw first→second half: ${sig.hr_drift_raw_absolute}` : ''}, typical: ${sig.hr_drift_typical || 'unknown'})` : ''}` : null,
     terrainNote ? `- Terrain: ${terrainNote}` : null,
     dp.conditions ? `- Weather: ${dp.conditions.temperature}, ${dp.conditions.humidity} humidity${dp.conditions.heat_stress_level !== 'none' ? ` (${dp.conditions.heat_stress_level} heat stress)` : ''}` : null,
@@ -520,6 +532,22 @@ function fmtDeltaSecPerMi(delta: number | null | undefined): string | null {
   return `${abs}s/mi ${dir}`;
 }
 
+/** Higher sec/mi = slower pace. GAP slower than raw ⇒ net downhill bias in this model. */
+function computeGapTerrainBias(
+  paceSecPerMi: number | null | undefined,
+  gapSecPerMi: number | null | undefined,
+  gapAdjusted: boolean,
+  tolSeconds = 5,
+): 'downhill' | 'uphill' | 'flat' | null {
+  if (!gapAdjusted) return null;
+  const p = coerceNumber(paceSecPerMi);
+  const g = coerceNumber(gapSecPerMi);
+  if (p == null || g == null || !(p > 0) || !(g > 0)) return null;
+  if (g > p + tolSeconds) return 'downhill';
+  if (g < p - tolSeconds) return 'uphill';
+  return 'flat';
+}
+
 function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
   const facts = packet?.facts as any;
   const derived = packet?.derived as any;
@@ -560,6 +588,11 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
     priority: f.priority,
   }));
 
+  const paceSecForBias = coerceNumber(facts?.avg_pace_sec_per_mi);
+  const gapSecForBias = coerceNumber(facts?.avg_gap_sec_per_mi);
+  const gapAdjustForBias = !!facts?.gap_adjusted;
+  const gap_terrain_bias = computeGapTerrainBias(paceSecForBias, gapSecForBias, gapAdjustForBias);
+
   return {
     version: 1,
     generated_at: packet.generated_at,
@@ -571,6 +604,7 @@ function toDisplayFormatV1(packet: FactPacketV1, flags: FlagV1[]) {
       duration: fmtMin(coerceNumber(facts?.total_duration_min)),
       avg_pace: secondsToPaceString(coerceNumber(facts?.avg_pace_sec_per_mi)),
       avg_gap: facts?.gap_adjusted ? secondsToPaceString(coerceNumber(facts?.avg_gap_sec_per_mi)) : null,
+      gap_terrain_bias,
       avg_hr: fmtBpm(coerceNumber(facts?.avg_hr)),
       max_hr: fmtBpm(coerceNumber(facts?.max_hr)),
       elevation_gain: (coerceNumber(facts?.elevation_gain_ft) != null) ? `${Math.round(Number(facts.elevation_gain_ft))} ft` : null,
