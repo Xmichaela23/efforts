@@ -732,6 +732,9 @@ function deriveBikeQualityLabel(goals: ReadonlyArray<{ training_prefs?: Record<s
     if (!notes) continue;
     if (/\bhammer\s+ride\b/.test(notes)) return 'Hammer Ride';
     if (/\bgroup\s+ride\b/.test(notes)) return 'Group Ride';
+    if (/\b(recurring|weekly)\s+(ride|bike)\b/.test(notes)) return 'Group Ride';
+    if (/\b(ride|bike)\s+anchor\b/.test(notes)) return 'Group Ride';
+    if (/\bmore\s+ponies\b/.test(notes)) return 'Group Ride';
   }
   return null;
 }
@@ -1001,9 +1004,19 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.bike_easy_day !== undefined
         ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
         : {}),
-      ...(deriveBikeQualityLabel(allEventGoals)
-        ? { bike_quality_label: deriveBikeQualityLabel(allEventGoals) as string }
-        : {}),
+      ...(() => {
+        const inferredLabel = deriveBikeQualityLabel(allEventGoals);
+        const hasRouteEstimate =
+          freshCombinedPrefs.bike_quality_route_estimated_hours !== undefined ||
+          freshCombinedPrefs.bike_quality_route_estimated_minutes !== undefined ||
+          freshCombinedPrefs.bike_quality_group_ride_hours !== undefined ||
+          freshCombinedPrefs.bike_quality_group_ride_minutes !== undefined;
+        if (inferredLabel) return { bike_quality_label: inferredLabel as string };
+        if (hasRouteEstimate && freshCombinedPrefs.bike_quality_day !== undefined) {
+          return { bike_quality_label: 'Group Ride' };
+        }
+        return {};
+      })(),
       strength_protocol: resolvedCombinedStrengthProtocol,
       ...(freshCombinedPrefs.strength_intent
         ? { strength_intent: freshCombinedPrefs.strength_intent }

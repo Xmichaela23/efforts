@@ -542,6 +542,13 @@ export function buildWeek(
       : DAYS_OF_WEEK.indexOf('Wednesday');
   let bikeEasyDay = DAYS_OF_WEEK[bikeEasyIdxBase] ?? 'Wednesday';
 
+  // If quality-bike day is explicitly pinned but easy-bike day is not, bias easy bike
+  // to the day before quality (e.g. Wed quality → Tue easy) to preserve the expected
+  // tri rhythm and avoid drifting to Thu when defaults collide.
+  if (athleteState.bike_quality_day != null && athleteState.bike_easy_day == null) {
+    bikeEasyDay = adjDay(bikeQualityDay, -1);
+  }
+
   const blockedForBikeQual = new Set<string>([longRideDay, longRunActualDay, ...restDayNames]);
   if (blockedForBikeQual.has(bikeQualityDay)) {
     for (let step = 1; step <= 6; step++) {
