@@ -43,6 +43,8 @@ export interface AthleteState {
   bike_quality_day?: number;
   /** Mid-week easy aerobic bike (second ride). Default: Wednesday. */
   bike_easy_day?: number;
+  /** Arc-level athlete intent; used to gate performance-only scheduling exceptions. */
+  training_intent?: 'completion' | 'performance' | 'first_race' | 'comeback';
   /**
    * Optional group-ride anchor duration override (hours). When present, this
    * takes precedence over phase defaults for anchored group-ride sessions.

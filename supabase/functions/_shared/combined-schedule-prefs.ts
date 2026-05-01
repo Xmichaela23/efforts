@@ -126,6 +126,7 @@ function pickStrengthProtocol(obj: Record<string, unknown> | null | undefined): 
 }
 
 export type StrengthIntentArc = 'support' | 'performance';
+export type TrainingIntentArc = 'completion' | 'performance' | 'first_race' | 'comeback';
 
 const TITLE_BY_SUN: Record<number, string> = {
   0: 'Sunday',
@@ -174,18 +175,18 @@ export function parsePreferredDaysPatch(
     }).filter((s) => s.length > 0);
   }
   const qRun = parseSunFirstDayIndex(
-    o.run_quality ?? o.quality_run ?? o.qualityRun ?? o.tempo_run ?? o.tempoRun,
+    o.quality_run ?? o.qualityRun ?? o.run_quality ?? o.tempo_run ?? o.tempoRun,
   );
   const eRun = parseSunFirstDayIndex(
-    o.run_easy ?? o.easy_run ?? o.easyRun ?? o.mid_week_easy_run ?? o.midWeekEasyRun ?? o.recovery_run,
+    o.easy_run ?? o.easyRun ?? o.run_easy ?? o.mid_week_easy_run ?? o.midWeekEasyRun ?? o.recovery_run,
   );
   if (qRun !== undefined) patch.run_quality_day = qRun;
   if (eRun !== undefined) patch.run_easy_day = eRun;
   const qBike = parseSunFirstDayIndex(
-    o.bike_quality ?? o.quality_bike ?? o.qualityBike ?? o.bikeQuality ?? o.mid_week_quality_bike,
+    o.quality_bike ?? o.qualityBike ?? o.bike_quality ?? o.bikeQuality ?? o.mid_week_quality_bike,
   );
   const eBike = parseSunFirstDayIndex(
-    o.bike_easy ?? o.easy_bike ?? o.easyBike ?? o.bikeEasy ?? o.mid_week_easy_bike,
+    o.easy_bike ?? o.easyBike ?? o.bike_easy ?? o.bikeEasy ?? o.mid_week_easy_bike,
   );
   if (qBike !== undefined) patch.bike_quality_day = qBike;
   if (eBike !== undefined) patch.bike_easy_day = eBike;
@@ -231,6 +232,8 @@ export interface CombinedSchedulePrefs {
   bike_quality_route_estimated_minutes?: number;
   /** Mid-week easy aerobic bike add-on. 0=Sun … 6=Sat */
   bike_easy_day?: number;
+  /** Arc-level intent used by scheduling exceptions and progression defaults. */
+  training_intent?: TrainingIntentArc;
   rest_days?: number[];
   strength_protocol?: string;
   /** From Arc: support = tri accessory loads; performance = compound / progressive overload. */
@@ -274,6 +277,11 @@ export function mergeCombinedSchedulePrefs(
     const siRaw = src.strength_intent ?? src.strengthIntent;
     const si =
       siRaw === 'support' || siRaw === 'performance' ? (siRaw as StrengthIntentArc) : undefined;
+    const tiRaw = src.training_intent ?? src.trainingIntent;
+    const ti =
+      tiRaw === 'completion' || tiRaw === 'performance' || tiRaw === 'first_race' || tiRaw === 'comeback'
+        ? (tiRaw as TrainingIntentArc)
+        : undefined;
     const groupRideHours = pickFinitePositive(src, [
       'bike_quality_group_ride_hours',
       'bikeQualityGroupRideHours',
@@ -319,6 +327,7 @@ export function mergeCombinedSchedulePrefs(
     if (rd !== undefined) out.rest_days = rd;
     if (sp !== undefined) out.strength_protocol = sp;
     if (si !== undefined) out.strength_intent = si;
+    if (ti !== undefined) out.training_intent = ti;
     if (pdPatch.long_run_day !== undefined) out.long_run_day = pdPatch.long_run_day;
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
     if (pdPatch.swim_easy_day !== undefined) out.swim_easy_day = pdPatch.swim_easy_day;

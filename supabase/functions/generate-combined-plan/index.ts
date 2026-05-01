@@ -81,6 +81,7 @@ Deno.serve(async (req: Request) => {
         strength_preferred_days: state.strength_preferred_days,
         strength_sessions_cap: state.strength_sessions_cap,
         strength_intent: state.strength_intent,
+        training_intent: state.training_intent,
         transition_mode: state.transition_mode,
         tri_approach: state.tri_approach,
       });
@@ -161,6 +162,7 @@ Deno.serve(async (req: Request) => {
       bike_easy_day: state.bike_easy_day ?? null,
       strength_protocol: state.strength_protocol ?? null,
       strength_intent: state.strength_intent ?? null,
+      training_intent: state.training_intent ?? null,
       strength_preferred_days: state.strength_preferred_days ?? null,
       strength_sessions_cap: state.strength_sessions_cap ?? null,
       rest_days: state.rest_days ?? [],

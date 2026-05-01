@@ -582,10 +582,10 @@ function backfillTriTrainingPrefsDefenseInDepth(
   // ── Pull existing slots as anchors / preferences for the optimizer ───────
   const longRide = pdDay(pd, 'long_ride', 'longRide');
   const longRun = pdDay(pd, 'long_run', 'longRun');
-  const qualityBike = pdDay(pd, 'bike_quality', 'quality_bike', 'qualityBike');
-  const qualityRunDay = pdDay(pd, 'run_quality', 'quality_run', 'qualityRun');
-  const easyBikeDay = pdDay(pd, 'bike_easy', 'easy_bike', 'easyBike');
-  const easyRunDay = pdDay(pd, 'run_easy', 'easy_run', 'easyRun');
+  const qualityBike = pdDay(pd, 'quality_bike', 'qualityBike', 'bike_quality');
+  const qualityRunDay = pdDay(pd, 'quality_run', 'qualityRun', 'run_quality');
+  const easyBikeDay = pdDay(pd, 'easy_bike', 'easyBike', 'bike_easy');
+  const easyRunDay = pdDay(pd, 'easy_run', 'easyRun', 'run_easy');
   const swimDays = pdDays(pd, 'swim');
   const strengthDaysIn = pdDays(pd, 'strength', 'strength_days');
 
@@ -1003,6 +1003,9 @@ async function buildCombinedPlan(
         : {}),
       ...(freshCombinedPrefs.bike_easy_day !== undefined
         ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
+        : {}),
+      ...(freshCombinedPrefs.training_intent !== undefined
+        ? { training_intent: freshCombinedPrefs.training_intent }
         : {}),
       ...(() => {
         const inferredLabel = deriveBikeQualityLabel(allEventGoals);

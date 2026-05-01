@@ -104,7 +104,7 @@ function adjDay(day: string, delta: number): DayOfWeek {
 // If a HARD session lands next to another HARD day, downgrade the later one's
 // intensity to MODERATE and update its tokens.
 
-function enforceHardEasy(grid: WeekGrid): void {
+function enforceHardEasy(grid: WeekGrid, allowConsolidatedHardException: boolean): void {
   for (const day of DAYS_OF_WEEK) {
     const prev = adjDay(day, -1);
     const prevIntensity = dayIntensity(grid.get(prev)!);
@@ -113,7 +113,7 @@ function enforceHardEasy(grid: WeekGrid): void {
       // Performance consolidated hard day (quality_run + lower_body AM/PM) is an
       // intentional exception used by the combined planner when anchored bikes
       // compress quality placement. Preserve the planned run interval structure.
-      if (hasConsolidatedQualityRunWithLowerBody(slot)) continue;
+      if (allowConsolidatedHardException && hasConsolidatedQualityRunWithLowerBody(slot)) continue;
       // Downgrade this day's HARD sessions to MODERATE
       for (const s of slot.sessions) {
         if (s.intensity_class === 'HARD') {
@@ -913,7 +913,9 @@ export function buildWeek(
   }
 
   // ── Step 4: Hard/Easy enforcement ────────────────────────────────────────
-  enforceHardEasy(grid);
+  const allowConsolidatedHardException =
+    athleteState.strength_intent === 'performance' && athleteState.training_intent === 'performance';
+  enforceHardEasy(grid, allowConsolidatedHardException);
 
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
   const week8020TradeOffs = enforce8020(grid, phase);
