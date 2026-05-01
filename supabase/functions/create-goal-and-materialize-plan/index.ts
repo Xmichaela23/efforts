@@ -730,8 +730,8 @@ function deriveBikeQualityLabel(goals: ReadonlyArray<{ training_prefs?: Record<s
   for (const g of goals) {
     const notes = String(g.training_prefs?.notes ?? '').toLowerCase();
     if (!notes) continue;
-    if (/\bhammer\s+ride\b/.test(notes)) return 'Hammer Ride';
     if (/\bgroup\s+ride\b/.test(notes)) return 'Group Ride';
+    if (/\bhammer\s+ride\b/.test(notes)) return 'Group Ride';
     if (/\b(recurring|weekly)\s+(ride|bike)\b/.test(notes)) return 'Group Ride';
     if (/\b(ride|bike)\s+anchor\b/.test(notes)) return 'Group Ride';
     if (/\bmore\s+ponies\b/.test(notes)) return 'Group Ride';
@@ -853,9 +853,12 @@ async function buildCombinedPlan(
     ?? primaryGoalPrefs?.tri_approach
     ?? (primaryGoalType === 'speed' ? 'race_peak' : 'base_first');
 
+  // mergeCombinedSchedulePrefs: later sources override earlier. The A-priority goal
+  // owns the weekly skeleton; the newly created goal must not overwrite its
+  // easy_bike / easy_run (and other preferred_days) with a duplicate B-goal payload.
   const combinedSchedulePrefs = mergeCombinedSchedulePrefs(
-    primaryGoalPrefs as Record<string, unknown>,
     newGoal.training_prefs as Record<string, unknown>,
+    primaryGoalPrefs as Record<string, unknown>,
   );
   const dpwCombined =
     readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
@@ -925,8 +928,8 @@ async function buildCombinedPlan(
     (allEventGoals.find((g) => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
   const coEqualProvisional1x = Boolean(backfilledPrimaryPrefs?.co_equal_strength_provisional_1x);
   const freshCombinedPrefs = mergeCombinedSchedulePrefs(
-    backfilledPrimaryPrefs as Record<string, unknown>,
     newGoal.training_prefs as Record<string, unknown>,
+    backfilledPrimaryPrefs as Record<string, unknown>,
   );
   const freshDpw =
     readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
