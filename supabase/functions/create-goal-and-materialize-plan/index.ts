@@ -19,6 +19,7 @@ import {
   mergeCombinedSchedulePrefs,
   readDaysPerWeekFromPrefs,
 } from '../_shared/combined-schedule-prefs.ts';
+import { fixTransposedEasyBikeRunAgainstSwimOrder } from '../_shared/tri-preferred-days-sanity.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -575,9 +576,20 @@ function backfillTriTrainingPrefsDefenseInDepth(
   }
 
   const pdRaw = trainingPrefs.preferred_days ?? trainingPrefs.preferredDays;
-  const pd = pdRaw && typeof pdRaw === 'object' && !Array.isArray(pdRaw)
+  let pd = pdRaw && typeof pdRaw === 'object' && !Array.isArray(pdRaw)
     ? (pdRaw as Record<string, unknown>)
     : null;
+
+  if (pd) {
+    const fixedPd = fixTransposedEasyBikeRunAgainstSwimOrder(pd);
+    const changed = JSON.stringify(fixedPd) !== JSON.stringify(pd);
+    if (changed) {
+      pd = fixedPd;
+      trainingPrefs.preferred_days = fixedPd;
+      delete trainingPrefs.preferredDays;
+      notes.push('preferred_days: corrected easy_bike/easy_run transpose vs swim[0]/swim[1]');
+    }
+  }
 
   // ── Pull existing slots as anchors / preferences for the optimizer ───────
   const longRide = pdDay(pd, 'long_ride', 'longRide');

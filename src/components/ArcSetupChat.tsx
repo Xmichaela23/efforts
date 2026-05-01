@@ -13,6 +13,7 @@ import type { GoalInsert } from '@/hooks/useGoals';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs';
 import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
+import { fixTransposedEasyBikeRunAgainstSwimOrder } from '@/lib/tri-preferred-days-sanity';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
@@ -181,6 +182,14 @@ function normalizeGoalInput(
         typeof g.training_prefs === 'object' && g.training_prefs !== null
           ? { ...(g.training_prefs as Record<string, unknown>) }
           : {};
+      const sportLowerForPd = (sport || '').toLowerCase();
+      if (goal_type === 'event' && (sportLowerForPd === 'triathlon' || sportLowerForPd === 'tri')) {
+        const pdR = tp.preferred_days ?? tp.preferredDays;
+        if (pdR && typeof pdR === 'object' && !Array.isArray(pdR)) {
+          tp.preferred_days = fixTransposedEasyBikeRunAgainstSwimOrder(pdR as Record<string, unknown>);
+          delete tp.preferredDays;
+        }
+      }
       const freq = coalesceStrengthFrequency(g, parent, tp);
       const focusRaw =
         typeof g.strength_focus === 'string'
