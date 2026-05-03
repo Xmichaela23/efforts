@@ -7,6 +7,7 @@ import {
   arcEventGoalsHaveRequiredTrainingPrefs,
   coachVisibleProseSeeksReply,
   parseArcSetupFromAssistant,
+  parsePlanStartDate,
   type ArcSetupPayload,
 } from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
@@ -556,10 +557,11 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
 
   const onConfirm = async () => {
     if (!pendingSetup) return;
+    const confirmPayload = pendingSetup.payload;
     setSending(true);
     setError(null);
     setSaveBanner(null);
-    const { ok, error: pe } = await persistArcSetup(pendingSetup.payload);
+    const { ok, error: pe } = await persistArcSetup(confirmPayload);
     if (!ok) {
       setSending(false);
       setError(pe || 'Save failed');
@@ -618,6 +620,8 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
 
     const replacePlanId = findOrphanActivePlanConflictId((planRows || []) as PlanRowLite[], primarySport);
 
+    const planStart = parsePlanStartDate(confirmPayload.plan_start_date);
+
     setSaveBanner('Building your training calendar…');
     const combine = eventGoals.length >= 2;
     const { data, error: fnErr } = await invokeFunction('create-goal-and-materialize-plan', {
@@ -626,6 +630,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       existing_goal_id: String(primaryId),
       combine,
       replace_plan_id: replacePlanId,
+      ...(planStart ? { plan_start_date: planStart } : {}),
     });
 
     setSending(false);

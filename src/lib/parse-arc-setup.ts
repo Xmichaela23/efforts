@@ -14,7 +14,17 @@ export type ArcSetupPayload = {
   /** Optional top-level; merged into each goal's training_prefs when saving */
   strength_frequency?: 0 | 1 | 2 | 3;
   strength_focus?: 'general' | 'power' | 'maintenance';
+  /**
+   * First calendar day of plan Week 1 (YYYY-MM-DD). Combined planner maps this to the Monday-based week.
+   * Required for tri season setup before Looks right.
+   */
+  plan_start_date?: string;
 };
+
+export function parsePlanStartDate(raw: unknown): string | null {
+  const t = String(raw ?? '').trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
+}
 
 function parseStrengthFrequency(raw: unknown): number | undefined {
   if (typeof raw === 'number' && [0, 1, 2, 3].includes(raw)) return raw;
@@ -55,7 +65,7 @@ export function coachVisibleProseSeeksReply(visible: string): boolean {
 /**
  * Triathlon event goals must have strength resolved (in: strength_intent + preferred_days.strength[];
  * out: strength_frequency 0), plus preferred_days (long ride/run, swim[], quality_run + easy_run,
- * quality_bike + easy_bike) and days_per_week before the confirm card appears.
+ * quality_bike + easy_bike), days_per_week, and top-level **plan_start_date** (YYYY-MM-DD) before Looks right.
  */
 export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload | null): boolean {
   if (!payload?.goals || !Array.isArray(payload.goals)) return false;
@@ -118,7 +128,7 @@ export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload 
     }
     if (!Number.isFinite(dpwNum) || dpwNum < 4 || dpwNum > 7) return false;
     return true;
-  });
+  }) && parsePlanStartDate(payload.plan_start_date) != null;
 }
 
 export function parseArcSetupFromAssistant(raw: string): {
