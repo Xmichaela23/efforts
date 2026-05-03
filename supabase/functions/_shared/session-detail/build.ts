@@ -440,7 +440,6 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     ?? fin(granular?.pacing_analysis?.pacing_variability?.coefficient_of_variation);
 
   const performanceNarrativeText = mergeArcPerformanceNarrative({
-    framing: arcPerformance?.framing ?? null,
     analysisNarrative: resolvedNarrative,
     isGoalRaceSession,
   });

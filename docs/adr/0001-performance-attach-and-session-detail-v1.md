@@ -80,8 +80,8 @@ This avoids: *“I executed the workout well but scored 72 because I did it Satu
 ### 8. Arc continuity on Performance (`arc_performance`)
 
 - Every `session_detail_v1` build in **`workout-detail`** loads **`getArcContext(workout_date)`** so Arc is temporal: goal stack / plan envelope / narrative mode reflect **what was true that day**, not the live dashboard only.
-- The contract includes optional **`arc_performance`**: **`narrative_mode`**, last-race deltas, **`runs_since_last_race`** (heuristic from completed runs), heuristic **`days_until_next_block_start`**, next goal refs, framing, plus plan-week snapshot when resolvable from `plans.created_at + duration_weeks`.
-- **`narrative_text`** merges Arc framing with analysis; **`analyze-running-workout`** fact-packet LLM consumes the same deterministic **`ArcNarrativeContextV1.mode`**.
+- The contract includes optional **`arc_performance`**: **`narrative_mode`**, last-race deltas, **`runs_since_last_race`** (heuristic from completed runs), heuristic **`days_until_next_block_start`**, next goal refs, **`coaching_context`** (internal routing / tooling; not merged into athlete copy), plus plan-week snapshot when resolvable from `plans.created_at + duration_weeks`.
+- **`narrative_text`** is **athlete coaching copy only** (analysis LLM paragraph). Temporal Arc primes **`analyze-running-workout`** via **`ArcNarrativeContextV1`** separately; Insights does not prefix internal plan-envelope notes to **`narrative_text`**.
 - Cached `session_detail_v1` without matching `arc_performance.version` is **stale** so historical sessions refresh into correct temporal snapshots.
 
 ---

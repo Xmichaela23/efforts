@@ -644,10 +644,7 @@ async function runSessionDetailPipelineAndPersist(
             weatherWindMph: wd?.windSpeed ?? wd?.wind_speed ?? null,
           });
           if (raceNarrative) {
-            const fr = sessionDetailV1?.arc_performance?.framing;
-            sessionDetailV1.narrative_text = fr
-              ? `${String(fr)} ${raceNarrative}`.trim()
-              : raceNarrative;
+            sessionDetailV1.narrative_text = raceNarrative;
             console.log('[race-narrative] narrative set, length:', sessionDetailV1.narrative_text.length);
           }
         } else {

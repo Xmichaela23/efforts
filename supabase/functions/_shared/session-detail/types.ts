@@ -104,8 +104,8 @@ export type SessionDetailV1 = {
   observations: string[];
   narrative_text: string | null;
   /**
-   * Compact Arc snapshot from `getArcContext` (workout date). Same source as Coach;
-   * Performance narrative is prefixed with `framing` when present.
+   * Compact Arc snapshot from `getArcContext` (workout date). Insights `narrative_text` is
+   * athlete coaching copy only; `coaching_context` is tooling/LLM routing (not prefixed to narrative).
    */
   arc_performance?: ArcPerformanceBridgeV1 | null;
   /** LLM race debrief (goal race only); additive alongside adherence rows. */

@@ -2,9 +2,9 @@
  * Compact Arc snapshot for Performance (`session_detail_v1`) — sourced from temporal `getArcContext`.
  */
 import type { ArcContext, Goal } from '../arc-context.ts';
-import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
+import { sanitizeUserFacingPhaseLabel, type ArcNarrativeContextV1, type ArcNarrativeMode } from '../arc-narrative-state.ts';
 
-export const ARC_PERFORMANCE_BRIDGE_VERSION = 6;
+export const ARC_PERFORMANCE_BRIDGE_VERSION = 7;
 
 export type ArcPerformancePrimaryGoalV1 = {
   id: string;
@@ -30,8 +30,11 @@ export type ArcPerformanceBridgeV1 = {
     | { name: string; distance: string | null; date: string }
     | null;
   next_goal: ArcPerformancePrimaryGoalV1 | null;
-  /** One or two sentences (Markdown light), aligned to `narrative_mode`. */
-  framing: string | null;
+  /**
+   * Coach-side / tooling context derived from temporal Arc — plan envelope, linkage hints, internal mode labels.
+   * Not appended to athlete `narrative_text`; prompts use `ArcNarrativeContextV1` from `analyze-running-workout`.
+   */
+  coaching_context: string | null;
   primary_goal: ArcPerformancePrimaryGoalV1 | null;
   active_plan: {
     plan_id: string;
@@ -80,7 +83,7 @@ function primaryFromNarrative(
   };
 }
 
-function buildFraming(params: {
+function buildCoachContext(params: {
   focusYmd: string;
   nc: ArcNarrativeContextV1 | null;
   primary: ArcPerformancePrimaryGoalV1 | null;
@@ -141,7 +144,7 @@ function buildFraming(params: {
 
   if (!hasLinkedPlannedSession) {
     parts.push(
-      'This workout is **not linked** to a plan session card — interpret via Arc mode + physiology, not a missing prescription.',
+      'SESSION NOTE: Planned-workout row not linked — base insights on Arc narrative mode + logged physiology only; do not narrate a missing prescription card.',
     );
   }
 
@@ -155,21 +158,16 @@ function buildFraming(params: {
 }
 
 /**
- * Single Performance narrative: Arc framing first, then analysis copy (when present).
- * Goal-race sessions keep analysis narrative null here; race debrief is overlaid later in workout-detail.
+ * Athlete-facing Performance Insights body — coaching read only (`workout_analysis` LLM paragraph).
+ * Temporal Arc primes the model separately (`arc_narrative_context`), not prepended here.
  */
 export function mergeArcPerformanceNarrative(params: {
-  framing: string | null;
   analysisNarrative: string | null;
   isGoalRaceSession: boolean;
 }): string | null {
   if (params.isGoalRaceSession) return params.analysisNarrative;
-  const f = (params.framing || '').trim();
   const b = (params.analysisNarrative || '').trim();
-  if (!f && !b) return null;
-  if (!b) return f || null;
-  if (!f) return b;
-  return `${f} ${b}`.trim();
+  return b || null;
 }
 
 export function buildArcPerformanceBridge(
@@ -207,7 +205,7 @@ export function buildArcPerformanceBridge(
       ? {
           plan_id: ap.plan_id,
           week_number: ap.week_number ?? null,
-          phase: ap.phase ?? null,
+          phase: sanitizeUserFacingPhaseLabel(ap.phase) ?? null,
           discipline: ap.discipline ?? null,
         }
       : null;
@@ -220,7 +218,7 @@ export function buildArcPerformanceBridge(
       }
     : null;
 
-  const framing = buildFraming({
+  const coaching_context = buildCoachContext({
     focusYmd: focus_date,
     nc,
     primary,
@@ -238,7 +236,7 @@ export function buildArcPerformanceBridge(
     days_until_next_block_start: nc?.days_until_next_block_start ?? null,
     last_race,
     next_goal: primary,
-    framing,
+    coaching_context,
     primary_goal: primary,
     active_plan,
   };
