@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import StrengthCompareTable from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
 import { parseLocalDate } from '@/lib/dateUtils';
+import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
 
 interface StrengthCompletedViewProps {
   workoutData: any;
