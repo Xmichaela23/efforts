@@ -934,9 +934,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             onAssociated={async(pid)=>{ 
               setAssocOpen(false);
               try {
-                window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                window.dispatchEvent(new CustomEvent('week:invalidate'));
+                invalidateWorkoutScreens();
               } catch (e) {
                 console.warn('[UnifiedWorkoutView] AssociatePlannedDialog invalidate dispatch failed:', e);
               }
@@ -1101,9 +1099,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             await deletePlannedWorkout(workoutId);
                             
                             // Trigger invalidation to refresh calendar
-                            window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                            window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                            window.dispatchEvent(new CustomEvent('week:invalidate'));
+                            invalidateWorkoutScreens();
                             
                             // Close the workout view
                             onClose();
@@ -1204,9 +1200,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                                 setAssocOpen(false);
                                 // Just dispatch invalidation - AppLayout and useEffects will handle the rest
                                 try {
-                                  window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                                  window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                                  window.dispatchEvent(new CustomEvent('week:invalidate'));
+                                  invalidateWorkoutScreens();
                                 } catch (e) {
                                   console.warn('[UnifiedWorkoutView] completed-tab associate invalidate dispatch failed:', e);
                                 }
@@ -1328,9 +1322,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               console.log('[Reschedule] Update result:', result);
               
               // Trigger all invalidation events
-              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-              window.dispatchEvent(new CustomEvent('planned:invalidate'));
-              window.dispatchEvent(new CustomEvent('week:invalidate'));
+              invalidateWorkoutScreens();
               
               setShowReschedulePopup(false);
               setReschedulePending(null);
@@ -1417,27 +1409,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   day_number: null
                 });
 
-                // Trigger invalidation
-                window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                window.dispatchEvent(new CustomEvent('week:invalidate'));
+                invalidateWorkoutScreens();
 
-                // Close popup and workout view
                 setShowReschedulePopup(false);
                 setReschedulePending(null);
                 setRescheduleValidation(null);
                 setTimeout(() => onClose(), 100);
               } else if (option.action === 'skip') {
-                // Skip the workout - mark as skipped or delete
                 if (confirm(`Skip "${reschedulePending.workoutName}"? This will remove it from your plan.`)) {
                   await deletePlannedWorkout(reschedulePending.workoutId);
 
-                  // Trigger invalidation
-                  window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                  window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                  window.dispatchEvent(new CustomEvent('week:invalidate'));
+                  invalidateWorkoutScreens();
 
-                  // Close popup and workout view
                   setShowReschedulePopup(false);
                   setReschedulePending(null);
                   setRescheduleValidation(null);
