@@ -15,6 +15,7 @@ import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs
 import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
 import { fixTransposedEasyBikeRunAgainstSwimOrder } from '@/lib/tri-preferred-days-sanity';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
+import { findOrphanActivePlanConflictId, type PlanRowLite } from '@/lib/plan-goal-conflict';
 
 type ChatMessage = { role: 'assistant' | 'user'; content: string };
 
@@ -575,7 +576,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
 
     const { data: evRows, error: evErr } = await supabase
       .from('goals')
-      .select('id, priority, target_date')
+      .select('id, priority, target_date, sport')
       .eq('user_id', userId)
       .eq('goal_type', 'event')
       .eq('status', 'active');
@@ -587,7 +588,12 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       return;
     }
 
-    const eventGoals = (evRows || []) as { id: string; priority: string; target_date: string | null }[];
+    const eventGoals = (evRows || []) as {
+      id: string;
+      priority: string;
+      target_date: string | null;
+      sport: string | null;
+    }[];
     const primaryId = pickPrimaryEventGoalId(eventGoals);
 
     if (!primaryId) {
@@ -596,6 +602,22 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       return;
     }
 
+    const primarySport = eventGoals.find((g) => g.id === primaryId)?.sport ?? null;
+    const { data: planRows, error: planErr } = await supabase
+      .from('plans')
+      .select('id, goal_id, status, config, plan_type')
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    if (planErr) {
+      setSending(false);
+      setError(planErr.message);
+      navigate('/goals', { replace: true, state: { fromArcSetup: true } });
+      return;
+    }
+
+    const replacePlanId = findOrphanActivePlanConflictId((planRows || []) as PlanRowLite[], primarySport);
+
     setSaveBanner('Building your training calendar…');
     const combine = eventGoals.length >= 2;
     const { data, error: fnErr } = await invokeFunction('create-goal-and-materialize-plan', {
@@ -603,7 +625,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
       mode: 'build_existing',
       existing_goal_id: String(primaryId),
       combine,
-      replace_plan_id: null,
+      replace_plan_id: replacePlanId,
     });
 
     setSending(false);

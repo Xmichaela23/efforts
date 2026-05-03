@@ -9,6 +9,7 @@ import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import { parseLocalDate } from '@/lib/dateUtils';
+import { findOrphanActivePlanConflictId } from '@/lib/plan-goal-conflict';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { useToast } from '@/components/ui/use-toast';
 // Local alias so existing call-sites inside this file don't need renaming
@@ -75,18 +76,6 @@ function parseElapsedRaceTimeInput(input: string): number | null {
   // Race cards accept H:MM for marathon-style results such as "4:44".
   if (parts[0] <= 12 && parts[1] < 60) return parts[0] * 3600 + parts[1] * 60;
   return parts[0] * 60 + parts[1];
-}
-
-function inferSportFromPlanConfig(config: any, planType?: string): string {
-  if (config?.sport) return String(config.sport).toLowerCase();
-  const dist = String(config?.distance || '').toLowerCase();
-  if (['5k', '10k', 'half', 'marathon'].includes(dist)) return 'run';
-  const pt = String(planType || '').toLowerCase();
-  if (pt.includes('run')) return 'run';
-  if (pt.includes('ride') || pt.includes('bike') || pt.includes('cycling')) return 'ride';
-  if (pt.includes('swim')) return 'swim';
-  if (pt.includes('tri')) return 'triathlon';
-  return '';
 }
 
 const GoalsScreen: React.FC<GoalsScreenProps> = ({
@@ -822,11 +811,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   }
 
   function findConflictPlan(goal: Goal) {
-    const sport = String(goal.sport ?? '').toLowerCase();
-    if (!sport) return null;
-    return currentPlans.find(p =>
-      !p.goal_id && p.status === 'active' && inferSportFromPlanConfig(p.config || {}, p.plan_type) === sport
-    ) ?? null;
+    const id = findOrphanActivePlanConflictId(currentPlans, goal.sport);
+    return id ? currentPlans.find((p) => p.id === id) ?? null : null;
   }
 
   function handleBuildPlan(goal: Goal) {
