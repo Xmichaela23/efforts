@@ -302,8 +302,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const fromISO = `${y(monday)}-${m(monday)}-${d0(monday)}`;
         const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+6);
         const toISO = `${y(sunday)}-${m(sunday)}-${d0(sunday)}`;
-        try { await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO } }); } catch {}
-      } catch {}
+        try {
+          await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO } });
+        } catch {
+          /* Intentional: week warm is best-effort; first real fetch still runs on demand */
+        }
+      } catch {
+        /* Intentional: outer guard — never fail the provider on warm-cache path */
+      }
     })();
   }, [plansAuthReady]);
 
@@ -497,7 +503,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (b && (b.units === 'metric' || b.units === 'imperial')) {
           setUseImperial(b.units !== 'metric');
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[AppContext] initial unit preference load failed:', e);
+      }
     })();
   }, []);
 
@@ -514,7 +522,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .from('user_baselines')
               .upsert({ user_id: userId, units }, { onConflict: 'user_id' });
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[AppContext] persist unit toggle failed:', e);
+        }
       })();
       return next;
     });
@@ -617,7 +627,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const act = await supabase.functions.invoke('activate-plan', {
           body: { plan_id: String((data as any)?.id || (insertPayload as any)?.id), start_date: startDate }
         });
-        try { console.log('[activate-plan] request start_date:', startDate, 'response:', (act as any)?.data); } catch {}
+        try {
+          console.log('[activate-plan] request start_date:', startDate, 'response:', (act as any)?.data);
+        } catch {
+          /* Intentional: console can be patched/broken in some embeds */
+        }
 
         // Warm unified caches for week 1
         try {
@@ -634,9 +648,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const wk1End = `${y(sunday)}-${m(sunday)}-${d0(sunday)}`;
           supabase.functions.invoke('sweep-week', { body: { week_start: wk1Start } }).catch(()=>{});
           supabase.functions.invoke('get-week', { body: { from: wk1Start, to: wk1End } }).catch(()=>{});
-        } catch {}
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+        } catch {
+          /* Intentional: week-1 warm/sweep is best-effort after activate */
+        }
+        try {
+          window.dispatchEvent(new CustomEvent('planned:invalidate'));
+          window.dispatchEvent(new CustomEvent('week:invalidate'));
+        } catch {
+          /* CustomEvent should not throw */
+        }
       } catch (mErr) {
         console.error('Activation error:', mErr);
         throw mErr;
@@ -655,8 +675,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { error } = await supabase.functions.invoke('delete-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
       await loadPlans();
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
     } catch (error) {
       console.error('Error in deletePlan:', error);
       throw error;
@@ -671,8 +695,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error as any;
       if (!data?.success) throw new Error(data?.error || 'Failed to end plan');
       await loadPlans();
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
       return data;
     } catch (error) {
       console.error('Error in endPlan:', error);
@@ -689,8 +717,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error as any;
       if (!data?.success) throw new Error(data?.error || 'Failed to resume plan');
       await loadPlans();
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
       return data;
     } catch (error) {
       console.error('Error in resumePlan:', error);
@@ -715,8 +747,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
       return data;
     } catch (error) {
       console.error('Error in pausePlan:', error);
@@ -737,7 +773,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
     } catch (error) {
       console.error('Error in updatePlan:', error);
       throw error;
@@ -818,7 +858,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const batch = updates.splice(0, 200);
       await supabase.from('planned_workouts').upsert(batch, { onConflict: 'id' });
     }
-    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    try {
+      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+    } catch {
+      /* CustomEvent should not throw */
+    }
     return { repaired };
   };
 

@@ -143,7 +143,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         // Do NOT override selectedDate here.
         // selectedDate represents the performed/logged day; planned.date is the scheduled day (used for linkage/prefill).
         setShowStrengthLogger(true);
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] open:strengthLogger handler failed:', e);
+      }
     };
     window.addEventListener('open:strengthLogger', handler as any);
     return () => window.removeEventListener('open:strengthLogger', handler as any);
@@ -162,7 +164,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         const raw: any[] = (() => {
           const val: any = (planned as any)?.mobility_exercises;
           if (Array.isArray(val)) return val as any[];
-          if (typeof val === 'string') { try { const p = JSON.parse(val); if (Array.isArray(p)) return p as any[]; } catch {} }
+          if (typeof val === 'string') { try { const p = JSON.parse(val); if (Array.isArray(p)) return p as any[]; } catch { /* mobility_exercises not valid JSON */ } }
           return [] as any[];
         })();
         const parsed = raw.flatMap((m: any) => {
@@ -242,9 +244,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         setLoggerScheduledWorkout(plannedForStrength);
         // Do NOT override selectedDate; keep performed/logged day stable.
         setShowStrengthLogger(true);
-      } catch {}
-    };
-    window.addEventListener('open:mobilityLogger', handler as any);
+      } catch (e) {
+        console.warn('[AppLayout] open:mobilityLogger handler failed:', e);
+      }
     return () => window.removeEventListener('open:mobilityLogger', handler as any);
   }, []);
 
@@ -258,7 +260,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         setLoggerScheduledWorkout(planned);
         // Do NOT override selectedDate; keep performed/logged day stable.
         setShowPilatesYogaLogger(true);
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] open:pilatesYogaLogger handler failed:', e);
+      }
     };
     window.addEventListener('open:pilatesYogaLogger', handler as any);
     return () => window.removeEventListener('open:pilatesYogaLogger', handler as any);
@@ -279,7 +283,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       isEndurance(selectedWorkout)
     ) {
       providerFetchedRef.current = true;
-      try { loadProviderData(); } catch {}
+      try {
+        loadProviderData();
+      } catch (e) {
+        console.warn('[AppLayout] loadProviderData (disabled path) failed:', e);
+      }
     }
   }, [activeTab, loadProviderData, selectedWorkout]);
 
@@ -334,8 +342,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           existingRpe: workout.existing_rpe || null,
         });
       }
-    } catch {}
-    finally {
+    } catch (e) {
+      console.warn('[AppLayout] checkForFeedbackNeeded failed:', e);
+    } finally {
       checkingFeedbackRef.current = false;
     }
   };
@@ -437,7 +446,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               existingRpe: workout.rpe || null,
             });
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] checkSpecificWorkout feedback path failed:', e);
+        }
       };
 
       checkSpecificWorkout();
@@ -547,7 +558,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       if (state.focusWeek) setFocusWeek(state.focusWeek);
       if (state.showCompleted) setShowCompletedPlans(true);
       // Clear state to avoid re-opening on back/refresh
-      try { navigate(location.pathname, { replace: true, state: {} }); } catch {}
+      try {
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch (e) {
+        console.warn('[AppLayout] clear location state after openPlans failed:', e);
+      }
     }
   }, [location]);
 
@@ -614,7 +629,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           if (data) {
             setSelectedWorkout(data);
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] refresh selected completed workout failed:', e);
+        }
       } else {
         // Refresh from planned_workouts table
         try {
@@ -626,7 +643,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           if (data) {
             setSelectedWorkout(data);
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] refresh selected planned workout failed:', e);
+        }
       }
     };
 
@@ -658,7 +677,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       if (refreshedWorkout) {
         setSelectedWorkout(refreshedWorkout);
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[AppLayout] handleUpdateWorkout refresh failed:', e);
+    }
   };
 
   const handleOpenPlanBuilder = () => {
@@ -718,7 +739,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         if (date) {
           setSelectedDate(date);
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] week:navigate handler failed:', e);
+      }
     };
     window.addEventListener('week:navigate', handler as any);
     return () => window.removeEventListener('week:navigate', handler as any);
@@ -741,7 +764,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (location.pathname === '/profile/athletic-record') {
       try {
         navigate('/', { replace: true });
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] navigate away from /profile/athletic-record failed:', e);
+      }
     }
   };
 
@@ -761,7 +786,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowAthleticRecord(true);
     try {
       navigate('/profile/athletic-record', { replace: true });
-    } catch {}
+    } catch (e) {
+      console.warn('[AppLayout] navigate to athletic record failed:', e);
+    }
   };
 
   // Gear handler - clear other views first
@@ -781,7 +808,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (location.pathname === '/profile/athletic-record') {
       try {
         navigate('/', { replace: true });
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] navigate away from /profile/athletic-record failed:', e);
+      }
     }
   };
 
@@ -807,7 +836,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (location.pathname === '/profile/athletic-record') {
       try {
         navigate('/', { replace: true });
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] navigate away from /profile/athletic-record failed:', e);
+      }
     }
   };
 
@@ -831,7 +862,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           if (!error && data?.attached) {
             // Realtime subscription will automatically refresh via database triggers
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] auto-attach after import failed:', e);
+        }
 
         // Calculate workload for completed workout
         try {
@@ -848,7 +881,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               }
             }
           });
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] calculate-workload after import failed:', e);
+        }
         
         if ((workout.type === 'run' || workout.type === 'ride') && savedWorkout.id) {
           setFeedbackWorkout({
@@ -860,8 +895,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         try {
           window.dispatchEvent(new CustomEvent('workouts:invalidate'));
           window.dispatchEvent(new CustomEvent('week:invalidate'));
-        } catch {}
-      } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] import invalidate dispatch failed:', e);
+        }
+      } catch (e) {
+        console.warn('[AppLayout] save-imported-workout pipeline failed:', e);
+      }
     });
     setShowImportPage(false);
   };
@@ -905,7 +944,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (location.pathname === '/goals' || location.pathname === '/profile/athletic-record') {
       try {
         navigate('/', { replace: true });
-      } catch {}
+      } catch (e) {
+        console.warn('[AppLayout] navigate to dashboard from deep link failed:', e);
+      }
     }
 
     // If we were viewing a workout (not from builder), reset date to today and sync calendar
@@ -977,7 +1018,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             const { data } = await supabase.from('workouts').select('*').eq('id', String((workout as any).id)).maybeSingle();
             return data as any ?? workout;
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] handleEditEffort hydrate workout row failed:', e);
+        }
         return workout;
       })());
       setSelectedWorkout(row);
@@ -1260,7 +1303,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       for (const workout of planWorkouts) {
         try {
           await deleteWorkout(workout.id);
-        } catch {}
+        } catch (e) {
+          console.warn('[AppLayout] bulk delete plan legacy workout failed:', workout.id, e);
+        }
       }
 
       await deletePlan(planId);
@@ -1294,13 +1339,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         await Promise.resolve(loadProviderData());
       }
       // Invalidate planned range caches and notify weekly to bust week cache
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('nav:pullrefresh')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+        window.dispatchEvent(new CustomEvent('nav:pullrefresh'));
+      } catch (e) {
+        console.warn('[AppLayout] pull-refresh invalidate dispatch failed:', e);
+      }
       // Light UI refresh: re-navigate to current route to trigger hooks where needed
       navigate(location.pathname, { replace: true });
-    } catch {
-      // Fallback: full reload
-      try { window.location.reload(); } catch {}
+    } catch (e) {
+      console.warn('[AppLayout] handleGlobalRefresh failed, falling back to reload:', e);
+      try {
+        window.location.reload();
+      } catch {
+        /* last resort; ignore */
+      }
     }
   };
 
@@ -1666,7 +1719,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 await supabase.functions.invoke('dismiss-feedback', {
                   body: { workout_id: feedbackWorkout.id }
                 });
-              } catch {}
+              } catch (e) {
+                console.warn('[AppLayout] dismiss-feedback (close) failed:', e);
+              }
             }
             setFeedbackWorkout(null);
           }}
@@ -1677,7 +1732,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 await supabase.functions.invoke('dismiss-feedback', {
                   body: { workout_id: feedbackWorkout.id }
                 });
-              } catch {}
+              } catch (e) {
+                console.warn('[AppLayout] dismiss-feedback (skip) failed:', e);
+              }
             }
             setFeedbackWorkout(null);
           }}
@@ -1692,7 +1749,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             try {
               window.dispatchEvent(new CustomEvent('workout:invalidate'));
               window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-            } catch {}
+            } catch (e) {
+              console.warn('[AppLayout] feedback onSave invalidate dispatch failed:', e);
+            }
             // Only check for next workout if no workout is selected (don't interfere with workout-specific checks)
             if (!selectedWorkout) {
               setTimeout(() => checkForFeedbackNeeded(), 1000);

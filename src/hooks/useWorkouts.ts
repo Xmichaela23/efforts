@@ -491,7 +491,9 @@ export const useWorkouts = () => {
             });
           }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[useWorkouts] Garmin provider fallback fetch/map failed:', e);
+      }
 
       // Step 2b: Fetch Strava activities saved by webhook/importer (if connected)
       let stravaWorkouts: any[] = [];
@@ -597,9 +599,11 @@ export const useWorkouts = () => {
             };
           });
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[useWorkouts] Strava provider fallback fetch failed:', e);
+      }
 
-      // Step 3: Merge all sources and remove duplicates (keep simple for now)
+      // Step 3: Merge all sources
       // Do not merge raw Strava provider rows to avoid duplicates.
       // Strava activities are now normalized into the workouts table.
       const allWorkouts = [ ...(manualWorkouts || []) ];
@@ -690,7 +694,9 @@ export const useWorkouts = () => {
                     weightMode: exercise.weightMode || 'same' as const
                   }));
                 }
-              } catch {}
+              } catch {
+                /* strength_exercises JSON invalid — skip field */
+              }
             }
             
             // Remove description-based fallback and noisy console; rely on server-computed or explicit strength_exercises only
@@ -802,7 +808,8 @@ export const useWorkouts = () => {
 
       // Quiet logs
       setWorkouts(mapped);
-    } catch {
+    } catch (e) {
+      console.warn('[useWorkouts] fetchWorkouts failed:', e);
       setWorkouts([]);
     } finally {
       setLoading(false);
@@ -819,10 +826,18 @@ export const useWorkouts = () => {
       const body = pid ? { workout_id: wid, planned_id: pid } : { workout_id: wid };
       try {
         await supabase.functions.invoke('auto-attach-planned', { body });
-      } catch {}
-      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-    } catch {}
+      } catch (e) {
+        console.warn('[useWorkouts] auto-attach-planned failed:', e);
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+        window.dispatchEvent(new CustomEvent('week:invalidate'));
+      } catch (e) {
+        console.warn('[useWorkouts] auto-attach invalidate dispatch failed:', e);
+      }
+    } catch (e) {
+      console.warn('[useWorkouts] autoAttachPlannedSession failed:', e);
+    }
   };
 
   // 🔄 Initialize auth state and listen for changes
@@ -882,8 +897,14 @@ export const useWorkouts = () => {
     (async () => {
       try {
         await backfillRecentAttachments(14);
-        try { window.localStorage.setItem(KEY, String(Date.now())); } catch {}
-      } catch {}
+        try {
+          window.localStorage.setItem(KEY, String(Date.now()));
+        } catch {
+          /* private mode / quota — backfill still ran */
+        }
+      } catch (e) {
+        console.warn('[useWorkouts] auto-attach backfill failed:', e);
+      }
     })();
   }, [authReady]);
 
@@ -910,7 +931,9 @@ export const useWorkouts = () => {
           body: { userId: userId, accessToken, refreshToken, importType: 'recent' }
         });
         if (!cancelled) await fetchWorkouts();
-      } catch {}
+      } catch (e) {
+        console.warn('[useWorkouts] Strava import-strava-history backfill failed:', e);
+      }
     })();
     return () => { cancelled = true; };
   }, [authReady]);
@@ -934,8 +957,11 @@ export const useWorkouts = () => {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${userId}` }, () => {
           // Listen for INSERT, UPDATE, DELETE - server handles all changes via realtime
           fetchWorkouts();
-          // Dispatch invalidation event so components can refresh (e.g., UnifiedWorkoutView, AppLayout)
-          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+          try {
+            window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+          } catch (e) {
+            console.warn('[useWorkouts] realtime workouts:invalidate dispatch failed:', e);
+          }
         })
         .subscribe();
     })();
@@ -983,10 +1009,16 @@ export const useWorkouts = () => {
       try {
         await autoAttachPlannedSession({ ...(r as any) } as Workout);
         processed += 1;
-      } catch {}
+      } catch (e) {
+        console.warn('[useWorkouts] backfill auto-attach row failed:', (r as any)?.id, e);
+      }
     }
     await fetchWorkouts();
-    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    try {
+      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+    } catch {
+      /* CustomEvent should not throw */
+    }
     return { processed };
   };
 
@@ -1226,31 +1258,47 @@ export const useWorkouts = () => {
         if ((newWorkout.workout_status === 'completed') && newWorkout.date && newWorkout.type) {
           autoAttachPlannedSession(newWorkout).catch(() => {});
         }
-      } catch {}
+      } catch {
+        /* unexpected sync throw from auto-attach guard only */
+      }
 
       // Generate context for completed workouts using routing service (fire-and-forget background processing)
       try {
         if (newWorkout.workout_status === 'completed') {
           analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type).catch(() => {});
         }
-      } catch {}
+      } catch {
+        /* unexpected sync throw from analyze guard only */
+      }
 
       // Compute analysis (fire-and-forget) so computed.overall is available to unified/Today
       try {
         (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: data.id } } as any)
           .then(() => {
-            try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+            try {
+              window.dispatchEvent(new CustomEvent('week:invalidate'));
+            } catch {
+              /* CustomEvent should not throw */
+            }
             // Run adherence/pace analysis for completed running workouts (pace column + summary)
             const typeLower = String(data.type || '').toLowerCase();
             const isRun = typeLower === 'run' || typeLower === 'running';
             if (isRun && (data.workout_status === 'completed' || newWorkout.workout_status === 'completed')) {
               (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: data.id } } as any)
-                .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+                .then(() => {
+                  try {
+                    window.dispatchEvent(new CustomEvent('week:invalidate'));
+                  } catch {
+                    /* CustomEvent should not throw */
+                  }
+                })
                 .catch(() => {});
             }
           })
           .catch(() => {});
-      } catch {}
+      } catch {
+        /* sync guard around compute-workout-analysis invoke */
+      }
       
       // Calculate workload for completed workouts (fire-and-forget)
       try {
@@ -1258,13 +1306,17 @@ export const useWorkouts = () => {
           (supabase.functions.invoke as any)?.('calculate-workload', { body: { workout_id: data.id } } as any)
             .catch(() => {});
         }
-      } catch {}
+      } catch {
+        /* sync guard around calculate-workload invoke */
+      }
 
       // Compute deterministic facts (fire-and-forget)
       try {
         (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: data.id } } as any)
           .catch(() => {});
-      } catch {}
+      } catch {
+        /* sync guard around compute-facts invoke */
+      }
 
       // Invalidate coach cache so State tab revalidates after new workout
       void supabase.from('coach_cache')
@@ -1278,7 +1330,9 @@ export const useWorkouts = () => {
           try {
             (supabase.functions.invoke as any)?.('recompute-athlete-memory', { body: { user_id: newWorkout.user_id } } as any)
               .catch(() => {});
-          } catch {}
+          } catch {
+            /* sync guard around recompute-athlete-memory invoke */
+          }
         }, 3000);
       }
       
@@ -1508,22 +1562,36 @@ export const useWorkouts = () => {
       try {
         (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: id } } as any)
           .then(() => {
-            try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+            try {
+              window.dispatchEvent(new CustomEvent('week:invalidate'));
+            } catch {
+              /* CustomEvent should not throw */
+            }
             // Run adherence/pace/HR-drift analysis for any completed run so Readiness can show a verdict
             if (isCompletedRun) {
               (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: id } } as any)
-                .then(() => { try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {} })
+                .then(() => {
+                  try {
+                    window.dispatchEvent(new CustomEvent('week:invalidate'));
+                  } catch {
+                    /* CustomEvent should not throw */
+                  }
+                })
                 .catch(() => {});
             }
           })
           .catch(() => {});
-      } catch {}
+      } catch {
+        /* sync guard around compute-workout-analysis invoke */
+      }
 
       // Recompute deterministic facts on update (fire-and-forget)
       try {
         (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: id } } as any)
           .catch(() => {});
-      } catch {}
+      } catch {
+        /* sync guard around compute-facts invoke */
+      }
 
       // Invalidate coach cache so State tab revalidates after workout edit
       void supabase.from('coach_cache')
@@ -1536,7 +1604,9 @@ export const useWorkouts = () => {
           try {
             (supabase.functions.invoke as any)?.('recompute-athlete-memory', { body: { user_id: data.user_id } } as any)
               .catch(() => {});
-          } catch {}
+          } catch {
+            /* sync guard around recompute-athlete-memory invoke */
+          }
         }, 3000);
       }
 
@@ -1611,7 +1681,9 @@ export const useWorkouts = () => {
                     canonical = `${y}-${m}-${d}`;
                   }
                 }
-              } catch {}
+              } catch {
+                /* canonical date resolution failed for row — still revert status below */
+              }
 
               // Revert status and date (if we found a canonical date)
               const updates: any = { workout_status: 'planned' };
@@ -1629,9 +1701,15 @@ export const useWorkouts = () => {
               .in('workout_status', ['completed','in_progress']);
           }
 
-          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+          try {
+            window.dispatchEvent(new CustomEvent('planned:invalidate'));
+          } catch {
+            /* CustomEvent should not throw */
+          }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[useWorkouts] deleteWorkout planned-row repair failed:', e);
+      }
     } catch (err) {
       throw err;
     }
@@ -1670,7 +1748,9 @@ export const useWorkouts = () => {
       if (!updateError) {
         fetchWorkouts();
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[useWorkouts] fixExistingWorkoutDate failed:', e);
+    }
   };
 
   // 🔧 TEMPORARY: Call this function once to fix the existing workout

@@ -841,7 +841,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         throw new Error(parsed.message);
       }
 
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      } catch {
+        /* CustomEvent should not throw */
+      }
       onPlanBuilt?.();
       await refreshGoals();
       setPlanReadyGoalId(goal.id);
@@ -958,8 +962,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       duration: 6000,
     });
     if (result.ok) {
-      try { await refreshPlans?.(); } catch {}
-      try { await refreshGoals(); } catch {}
+      try {
+        await refreshPlans?.();
+      } catch (e) {
+        console.warn('[GoalsScreen] refreshPlans after delete failed:', e);
+      }
+      try {
+        await refreshGoals();
+      } catch (e) {
+        console.warn('[GoalsScreen] refreshGoals after delete failed:', e);
+      }
     }
   }
 
@@ -1169,9 +1181,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                         window.alert(msg || 'Could not save elapsed result from the race workout.');
                         return;
                       }
-                      try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch {}
-                      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                      try {
+                        window.dispatchEvent(new CustomEvent('goals:invalidate'));
+                        window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                        window.dispatchEvent(new CustomEvent('week:invalidate'));
+                      } catch {
+                        /* CustomEvent should not throw */
+                      }
                       refreshGoals();
                       return;
                     }
@@ -1204,8 +1220,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       window.alert('Could not save elapsed result. Please try again.');
                       return;
                     }
-                    try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch {}
-                    try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                    try {
+                      window.dispatchEvent(new CustomEvent('goals:invalidate'));
+                      window.dispatchEvent(new CustomEvent('week:invalidate'));
+                    } catch {
+                      /* CustomEvent should not throw */
+                    }
                     refreshGoals();
                   }}
                 >
