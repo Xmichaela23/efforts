@@ -16,6 +16,24 @@ export type ArcSetupPayload = {
   strength_focus?: 'general' | 'power' | 'maintenance';
 };
 
+function parseStrengthFrequency(raw: unknown): number | undefined {
+  if (typeof raw === 'number' && [0, 1, 2, 3].includes(raw)) return raw;
+  if (typeof raw === 'string' && /^[0123]$/.test(raw.trim())) return parseInt(raw.trim(), 10);
+  return undefined;
+}
+
+/** Goal order: explicit goal > training_prefs > payload top-level (matches `normalizeGoalInput`). */
+function triGoalEffectiveStrengthFrequency(g: Record<string, unknown>, payload: ArcSetupPayload): number | undefined {
+  const fromGoal = parseStrengthFrequency(g.strength_frequency);
+  if (fromGoal !== undefined) return fromGoal;
+  const tp = g.training_prefs;
+  if (tp && typeof tp === 'object' && !Array.isArray(tp)) {
+    const tpf = parseStrengthFrequency((tp as Record<string, unknown>).strength_frequency);
+    if (tpf !== undefined) return tpf;
+  }
+  return parseStrengthFrequency(payload.strength_frequency);
+}
+
 function innerJsonToParse(inner: string): string {
   let s = inner.trim();
   if (s.startsWith('```')) {
@@ -35,9 +53,9 @@ export function coachVisibleProseSeeksReply(visible: string): boolean {
 }
 
 /**
- * Triathlon event goals must have strength_intent + preferred_days (long ride/run, strength[], swim[],
- * quality_run + easy_run for weekly run rhythm)
- * before the confirm card appears — matches Arc coach instructions.
+ * Triathlon event goals must have strength resolved (in: strength_intent + preferred_days.strength[];
+ * out: strength_frequency 0), plus preferred_days (long ride/run, swim[], quality_run + easy_run,
+ * quality_bike + easy_bike) and days_per_week before the confirm card appears.
  */
 export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload | null): boolean {
   if (!payload?.goals || !Array.isArray(payload.goals)) return false;
@@ -52,15 +70,21 @@ export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload 
     const tp = g.training_prefs;
     if (!tp || typeof tp !== 'object' || Array.isArray(tp)) return false;
     const prefs = tp as Record<string, unknown>;
-    const si = prefs.strength_intent ?? prefs.strengthIntent;
-    if (si !== 'support' && si !== 'performance') return false;
+    const strengthFreq = triGoalEffectiveStrengthFrequency(g, payload);
+    const noStrength = strengthFreq === 0;
+    if (!noStrength) {
+      const si = prefs.strength_intent ?? prefs.strengthIntent;
+      if (si !== 'support' && si !== 'performance') return false;
+    }
     const pd = prefs.preferred_days ?? prefs.preferredDays;
     if (!pd || typeof pd !== 'object' || Array.isArray(pd)) return false;
     const pdo = pd as Record<string, unknown>;
     if (pdo.long_ride == null && pdo.longRide == null) return false;
     if (pdo.long_run == null && pdo.longRun == null) return false;
-    const st = pdo.strength;
-    if (!Array.isArray(st) || st.length === 0) return false;
+    if (!noStrength) {
+      const st = pdo.strength;
+      if (!Array.isArray(st) || st.length === 0) return false;
+    }
     const sw = pdo.swim;
     if (!Array.isArray(sw) || sw.length === 0) return false;
     const qRun =
