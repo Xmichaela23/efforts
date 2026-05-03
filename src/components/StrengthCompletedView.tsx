@@ -128,22 +128,33 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   // Determine which exercises array to use - supports both strength and mobility
   const getCompletedExercises = () => {
-    // If we have a saved completed workout for the day, prefer it (check both fields)
-    const dayStrength = parseExercises((completedForDay as any)?.strength_exercises);
-    if (dayStrength.length > 0) return dayStrength;
-    
-    const dayMobility = parseExercises((completedForDay as any)?.mobility_exercises);
-    if (dayMobility.length > 0) return dayMobility;
-    
-    const workoutStrength = parseExercises((workoutData as any).strength_exercises);
-    if (workoutStrength.length > 0) return workoutStrength;
-    
-    const workoutMobility = parseExercises((workoutData as any).mobility_exercises);
-    if (workoutMobility.length > 0) return workoutMobility;
-    
-    const completed = parseExercises((workoutData as any).completed_exercises);
-    if (completed.length > 0) return completed;
-    
+    // Prefer the opened workout row (merged hydration from parent) so Details matches Performance
+    // and we never show another same-day session's lifts from context.
+    const fromViewed = (): any[] => {
+      const ws = parseExercises((workoutData as any).strength_exercises);
+      if (ws.length > 0) return ws;
+      const wm = parseExercises((workoutData as any).mobility_exercises);
+      if (wm.length > 0) return wm;
+      const ce = parseExercises((workoutData as any).completed_exercises);
+      if (ce.length > 0) return ce;
+      return [];
+    };
+
+    const viewed = fromViewed();
+    if (viewed.length > 0) return viewed;
+
+    const wid = String((workoutData as any)?.id || '');
+    if (
+      completedForDay &&
+      wid &&
+      String((completedForDay as any)?.id) === wid
+    ) {
+      const dayStrength = parseExercises((completedForDay as any)?.strength_exercises);
+      if (dayStrength.length > 0) return dayStrength;
+      const dayMobility = parseExercises((completedForDay as any)?.mobility_exercises);
+      if (dayMobility.length > 0) return dayMobility;
+    }
+
     return [];
   };
 
