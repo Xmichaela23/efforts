@@ -10,6 +10,16 @@
 
 import { callLLM } from './llm.ts';
 
+/** Removes common LLM echoes of coach-only instructions before the athlete sees debrief prose. */
+export function stripRaceDebriefMetaArtifacts(text: string): string {
+  let s = String(text || '');
+  s = s.replace(/\s*[—–-]\s*one clause,?\s*move on\s*[—–-]?\s*/gi, ' ');
+  s = s.replace(/\s*[,;]\s*one clause,?\s*move on\b\.?/gi, '. ');
+  s = s.replace(/\bone clause,?\s*move on\b/gi, '');
+  s = s.replace(/\bstage direction[s]?\b[^\n.]*/gi, '');
+  return s.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim();
+}
+
 const RACE_DEBRIEF_SYSTEM_PROMPT = `You are a running coach debriefing an athlete after a race.
 
 The athlete already has pace, HR, and splits on screen. Do not recite the split table or dwell on numbers they can read themselves. Your job is interpretation: what the pattern means, and what drove the result.
@@ -20,7 +30,10 @@ NARRATIVE STRUCTURE — follow this order exactly:
 3) Remaining sentences (about three): explain what drove the result using terrain, heart rate, weather, and (when present) the pre-race COURSE STRATEGY ZONES. Name specific miles only when they explain a mechanism—not because a mile was slow or an outlier.
 
 OUTLIER MILES:
-- If a mile is roughly two or more minutes slower than neighboring miles and grade does not explain it, you may flag a likely non-running stop in ONE short clause (bathroom, shoe, crowded aid, etc.), then move on. Do not make that mile the thesis of the paragraph. Do not assign a minute-by-minute forensic or accuse the athlete; they know what happened.
+- If a mile is clearly slower than surrounding running pace and grade does not explain it, you may mention a likely brief aid stop or similar in plain language (e.g. "Mile 18 looks like a short stop"). Keep that aside to a short phrase; do not make it the paragraph thesis. Never quote or paraphrase internal coaching instructions.
+
+ANTI-LEAK (critical):
+- The athlete reads only athlete-facing prose. Forbidden in output: meta lines like "one clause", "move on", "keep it brief", "do not dwell", bullet labels from this prompt, or any stage direction meant for you. Write as if emailing the athlete directly.
 
 TARGET FRAMING:
 - The only time benchmark for "how you did vs the plan" is PROJECTED FINISH TIME (a single number derived from the course model). Ignore any other stored target times even if they appeared elsewhere in tooling. If PROJECTED FINISH TIME is unavailable, the debrief is purely about execution quality — say nothing about missing projections; analyze the run on its own terms using zones, terrain, HR, and weather.
@@ -47,6 +60,7 @@ HEART RATE — DO NOT ROMANTICIZE DRIFT:
 VOICE:
 - Direct, human, like a coach talking to one person. No report tone.
 - No idioms, no slogans, no "real talk," no filler praise, no motivational clichés.
+- Never paste wording from CONTEXT lines such as "POSSIBLE NON-RUNNING SLOW MILES"; translate into natural speech only.
 
 OUTPUT FORMAT — follow exactly:
 Write four labeled sections. Each section label is on its own line in brackets, followed by 1–3 sentences of plain prose. No bullets, no sub-headers inside sections. A blank line between sections.
@@ -366,26 +380,61 @@ PER-MILE DATA (reference as needed; do not read aloud row by row):
 ${i.splits.map((s) =>
   `Mile ${s.mile}: ${fmtPace(s.paceSeconds)} | ${s.avgHR} bpm | ${s.grade > 0 ? '+' : ''}${s.grade}%`,
 ).join('\n')}
-${suspectStopHint ? `\nPOSSIBLE NON-RUNNING SLOW MILES (one clause max if mentioned): ${suspectStopHint}` : ''}
+${suspectStopHint ? `\nSUSPECT NON-RUNNING SLOW SEGMENTS (for your judgment only — summarize naturally if relevant; never echo this label): ${suspectStopHint}` : ''}
 `.trim();
 }
 
-/** Miles where pace is far slower than neighbors and grade is mild — optional one-clause flag in narrative. */
-function formatSuspectStopMiles(splits: RaceDebriefInputs['splits']): string | null {
-  if (splits.length < 4) return null;
+/** Per-mile pace (sec/mi) + grade (%). Used by debrief + marathon deterministic digest. */
+export type SuspectStopSplitInput = {
+  mile: number;
+  paceSeconds: number;
+  grade: number;
+};
+
+/**
+ * Miles that look like aid/bathroom/etc. slowdowns versus surrounding running pace.
+ * Kept permissive on grade so real stops on rolling courses are not silently dropped.
+ */
+export function collectSuspectStopMiles(splits: SuspectStopSplitInput[]): number[] {
+  if (splits.length < 4) return [];
   const sorted = [...splits].sort((a, b) => a.mile - b.mile);
-  const out: string[] = [];
+  const flagged = new Set<number>();
+  /** ~1.5+ min slower than local running context */
+  const THRESH_VS_AVG = 90;
+  const THRESH_VS_FAST_NEIGHBOR = 80;
+  const THRESH_VS_LOCAL_MEDIAN = 95;
+  const MAX_GRADE_ABS = 2.6;
+
   for (let i = 1; i < sorted.length - 1; i++) {
     const prev = sorted[i - 1];
     const cur = sorted[i];
     const next = sorted[i + 1];
+    if (Math.abs(cur.grade) > MAX_GRADE_ABS) continue;
     const neighAvg = (prev.paceSeconds + next.paceSeconds) / 2;
-    if (cur.paceSeconds - neighAvg < 110) continue; // not ~2+ min slower than neighbors
-    if (Math.abs(cur.grade) > 1.2) continue; // grade might explain it
-    out.push(`mile ${cur.mile}`);
-    if (out.length >= 2) break;
+    const fastNeighbor = Math.min(prev.paceSeconds, next.paceSeconds);
+    if (cur.paceSeconds - neighAvg >= THRESH_VS_AVG || cur.paceSeconds - fastNeighbor >= THRESH_VS_FAST_NEIGHBOR) {
+      flagged.add(cur.mile);
+    }
   }
-  return out.length ? out.join(', ') : null;
+
+  for (let i = 2; i < sorted.length - 2; i++) {
+    const cur = sorted[i];
+    if (Math.abs(cur.grade) > MAX_GRADE_ABS) continue;
+    const peers = [sorted[i - 2], sorted[i - 1], sorted[i + 1], sorted[i + 2]].map((s) => s.paceSeconds).sort(
+      (a, b) => a - b,
+    );
+    const median = (peers[1] + peers[2]) / 2;
+    if (cur.paceSeconds - median >= THRESH_VS_LOCAL_MEDIAN) flagged.add(cur.mile);
+  }
+
+  return [...flagged].sort((a, b) => a - b).slice(0, 8);
+}
+
+function formatSuspectStopMiles(splits: RaceDebriefInputs['splits']): string | null {
+  const miles = collectSuspectStopMiles(
+    splits.map((s) => ({ mile: s.mile, paceSeconds: s.paceSeconds, grade: s.grade })),
+  );
+  return miles.length ? miles.map((m) => `mile ${m}`).join(', ') : null;
 }
 
 export async function generateRaceDebrief(
@@ -393,14 +442,15 @@ export async function generateRaceDebrief(
 ): Promise<string | null> {
   try {
     const facts = buildFactString(inputs);
-    const narrative = await callLLM({
+    const narrativeRaw = await callLLM({
       system: RACE_DEBRIEF_SYSTEM_PROMPT,
       user: facts,
       maxTokens: 900,
       temperature: 0.2,
       model: 'sonnet',
     });
-    return narrative ? narrative.trim() : null;
+    const narrative = narrativeRaw ? stripRaceDebriefMetaArtifacts(narrativeRaw.trim()) : null;
+    return narrative;
   } catch (err) {
     console.error('[race-debrief] LLM call failed:', err);
     return null;

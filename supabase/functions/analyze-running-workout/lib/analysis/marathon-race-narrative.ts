@@ -4,6 +4,7 @@
  */
 
 import type { GoalRaceCompletionMatch } from '../../../_shared/goal-race-completion.ts';
+import { collectSuspectStopMiles } from '../../../_shared/race-debrief.ts';
 
 type MileSplit = {
   mile: number;
@@ -165,21 +166,24 @@ function buildHrInsight(args: {
     if (heatBpm != null && heatBpm > 3 && tempContext) {
       parts.push(
         `HR mile 1 ~${m1Hr} → final miles ~${mLastHr} bpm (+${totalDrift} bpm). ` +
-        `${tempContext} across the race: ~${heatBpm} bpm from heat load, ~${effortDrift} bpm from effort accumulation.`
+          `${tempContext} across the race: ~${heatBpm} bpm from heat load, ~${effortDrift} bpm from effort accumulation.`,
       );
     } else {
       parts.push(`HR mile 1 ~${m1Hr} → final miles ~${mLastHr} bpm (+${totalDrift} bpm).`);
     }
+
+    const alreadyHeatPartitioned = heatBpm != null && heatBpm > 3 && tempContext;
 
     if (totalDrift <= 15 && durationMinutes != null && durationMinutes > 200) {
       parts.push(`Minimal drift for a marathon — efficient cardiac response at this pace and temperature.`);
     } else if (totalDrift <= 25) {
       parts.push(`Normal decoupling arc for 26.2. No late-race spike.`);
     } else if (totalDrift <= 35) {
-      const heatNote = heatBpm != null && heatBpm > 5 ? ` ~${heatBpm} bpm of that is heat.` : '';
+      const heatEcho =
+        !alreadyHeatPartitioned && heatBpm != null && heatBpm > 5 ? ` ~${heatBpm} bpm from heat.` : '';
       parts.push(
-        `Higher drift (+${totalDrift} bpm).${heatNote} ` +
-          `A gradual rise in HR across the race is typical; a sharp jump in the final miles usually means fueling, hydration, or pacing limit rather than steady drift—check the per-mile curve.`,
+        `Higher drift (+${totalDrift} bpm).${heatEcho} ` +
+          `A gradual rise across the race is typical; a sharp jump in the final miles usually means fueling, hydration, or a pacing ceiling—check the per-mile curve.`,
       );
     } else {
       parts.push(`Significant drift (+${totalDrift} bpm) — review the per-mile HR curve for where it accelerated.`);
@@ -343,7 +347,19 @@ export function buildMarathonGoalRaceAdherenceSummary(args: {
     weatherWindMph: wp?.windSpeed ?? null,
   });
 
-  const pacingInsight = buildPacingInsight(sorted, goalPaceSec);
+  let pacingInsight = buildPacingInsight(sorted, goalPaceSec);
+  const suspectStopMiles = collectSuspectStopMiles(
+    sorted.map((s) => ({
+      mile: s.mile,
+      paceSeconds: s.pace_s_per_mi,
+      grade: s.grade_percent ?? 0,
+    })),
+  );
+  if (suspectStopMiles.length) {
+    pacingInsight +=
+      (pacingInsight.trim() ? ' ' : '') +
+      `Likely non-running slow segments (aid/stop): ${suspectStopMiles.map((m) => `${m}`).join(', ')}.`;
+  }
 
   const hrInsight = buildHrInsight({
     sorted,
