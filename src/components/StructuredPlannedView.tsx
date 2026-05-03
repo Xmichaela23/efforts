@@ -660,7 +660,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           {(lines.length
             ? lines
             : [(() => {
-                const tagSet = tags.map(String).map((t:string) => t.toLowerCase());
+                const tagSet: string[] = Array.isArray((workout as any)?.tags)
+                  ? (workout as any).tags.map((t: any) => String(t).toLowerCase())
+                  : [];
                 if (tagSet.includes('group_ride')) {
                   return 'Unstructured session — ride with the group. No prescribed intervals.';
                 }
