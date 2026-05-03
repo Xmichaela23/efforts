@@ -7,6 +7,9 @@ interface StrengthCompletedViewProps {
   workoutData: any;
   plannedWorkout?: any; // Optional planned workout data for comparison
   session_detail_v1?: {
+    /** Response-time only — from workout-detail; never persisted. */
+    stale?: boolean;
+    stale_reason?: 'recomputing' | 'attach_pending' | 'analysis_missing';
     strength_weight_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
     strength_volume_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
   } | null;
@@ -203,27 +206,18 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   }, [completedExercises]);
 
   const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
+  const sessionDetailStale = session_detail_v1?.stale === true;
 
-  // Deviation prompt: prefer server (session_detail_v1). Volume deviation takes precedence over weight.
+  // Deviation prompt: server session_detail_v1 only — no client heuristic (see workout-detail stale flags).
   const deviationPrompt = useMemo(() => {
     const sd = session_detail_v1;
+    if (sd?.stale === true) return { show: false, message: '' };
     const vol = sd?.strength_volume_deviation;
     const wt = sd?.strength_weight_deviation;
     if (vol?.show_prompt) return { show: true, message: vol.message };
     if (wt?.show_prompt) return { show: true, message: wt.message };
-    if (sd != null) return { show: false, message: '' }; // Server said no prompt
-    // Fallback: client-side (when session_detail_v1 not yet available) — weight only
-    if (isMobility || !plannedWorkout) return { show: false, message: '' };
-    const plannedExs = (plannedWorkout as any).strength_exercises || [];
-    for (const compEx of completedExercises) {
-      const plannedEx = plannedExs.find((p: any) => String(p?.name || '').toLowerCase() === String(compEx?.name || '').toLowerCase());
-      if (!plannedEx?.weight || plannedEx.weight <= 0) continue;
-      const plannedW = Number(plannedEx.weight) || 0;
-      const bestActual = Math.max(0, ...(compEx.sets || []).map((s: any) => Number(s?.weight) || 0));
-      if (bestActual > plannedW * 1.05) return { show: true, message: 'You went heavier than planned — intentional?' };
-    }
     return { show: false, message: '' };
-  }, [isMobility, plannedWorkout, completedExercises, session_detail_v1]);
+  }, [session_detail_v1]);
 
   const currentMeta = (workoutData as any)?.workout_metadata;
   const deviationIntentional = typeof currentMeta?.weight_deviation_intentional === 'boolean' ? currentMeta.weight_deviation_intentional : null;
@@ -243,6 +237,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
       {/* Summary line - volume/workload only (title shown in parent) */}
       <div className="space-y-2">
+        {sessionDetailStale && (
+          <div className="rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2 text-xs text-white/70">
+            Analysis updating…
+          </div>
+        )}
         <div className="flex items-center justify-between text-sm text-white/60">
           <div className="flex items-center gap-4">
             {!isMobility && workoutStats.actual.volume > 0 && (
@@ -259,7 +258,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           )}
         </div>
 
-        {/* Deviation prompt — server-computed (session_detail_v1) or client fallback. Volume or weight. */}
+        {/* Deviation prompt — server session_detail_v1 only (volume before weight). */}
         {deviationPrompt.show && (
           <div className="mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
             <div className="text-xs text-amber-200/90 mb-2">{deviationPrompt.message}</div>
