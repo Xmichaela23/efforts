@@ -90,12 +90,10 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       const normalized = JSON.parse(optsKey || '{}');
       const userId = getStoredUserId();
       if (!userId) throw new Error('Session expired - please log in again');
-      const accessToken = (() => {
-        try {
-          const raw = localStorage.getItem('sb-yyriamwvtvzlkumqrvpm-auth-token');
-          return raw ? (JSON.parse(raw) as any)?.access_token ?? '' : '';
-        } catch { return ''; }
-      })();
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) console.warn('[useWorkoutDetail] getSession (workout scope):', sessionErr.message);
+      const accessToken = sessionData.session?.access_token ?? '';
+      if (!accessToken) throw new Error('Session expired - please log in again');
 
       const { data, error } = await supabase.functions.invoke('workout-detail', {
         body: { id, ...normalized, scope: 'workout' },
@@ -170,12 +168,10 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     queryFn: async () => {
       const userId = getStoredUserId();
       if (!userId) throw new Error('Session expired - please log in again');
-      const accessToken = (() => {
-        try {
-          const raw = localStorage.getItem('sb-yyriamwvtvzlkumqrvpm-auth-token');
-          return raw ? (JSON.parse(raw) as any)?.access_token ?? '' : '';
-        } catch { return ''; }
-      })();
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) console.warn('[useWorkoutDetail] getSession (session_detail scope):', sessionErr.message);
+      const accessToken = sessionData.session?.access_token ?? '';
+      if (!accessToken) throw new Error('Session expired - please log in again');
 
       const forceRefresh = forceSessionDetailRefreshRef.current;
       forceSessionDetailRefreshRef.current = false;
