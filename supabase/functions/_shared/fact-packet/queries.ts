@@ -7,6 +7,11 @@ import type {
   TrainingLoadV1,
 } from './types.ts';
 import { classifyTerrain, coerceNumber, isoDateAddDays, isoWeekStartMonday } from './utils.ts';
+import {
+  resolveMovingDurationMinutes,
+  resolveOverallDistanceMi,
+  resolveOverallPaceSecPerMi,
+} from './pace-resolution.ts';
 
 type SupabaseLike = any;
 
@@ -45,38 +50,17 @@ function getComputedOverall(row: any): any {
   try { return typeof c === 'string' ? JSON.parse(c) : c; } catch { return c; }
 }
 
-function getOverallPaceSecPerMi(row: any): number | null {
-  const overall = getComputedOverall(row)?.overall;
-  const v = coerceNumber(overall?.avg_pace_s_per_mi ?? overall?.avg_pace_sec_per_mi);
-  return v != null && v > 0 ? v : null;
+function getOverallDistanceMi(row: any): number | null {
+  const mi = resolveOverallDistanceMi(row);
+  return mi > 0 ? mi : null;
 }
 
 function getOverallDurationMin(row: any): number | null {
-  const overall = getComputedOverall(row)?.overall;
-  const distMi = getOverallDistanceMi(row);
-  const durS = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
-  if (durS != null && durS > 0) {
-    let min = durS / 60;
-    // Guardrail: implausibly large (e.g. 1800 min) suggests unit error; treat as seconds→minutes.
-    if (min > 600 && distMi != null && distMi > 0 && distMi < 50) {
-      const corrected = min / 60;
-      if (corrected > 0 && corrected < 600) return corrected;
-    }
-    return min;
-  }
-  const mvMin = coerceNumber(row?.moving_time);
-  if (mvMin != null && mvMin > 0) {
-    // Guardrail: some legacy rows accidentally store seconds in moving_time.
-    // If it's implausibly large in minutes (> 16h), treat it as seconds.
-    if (mvMin > 1000) return mvMin / 60;
-    return mvMin;
-  }
-  const durMin = coerceNumber(row?.duration);
-  if (durMin != null && durMin > 0) {
-    if (durMin > 1000) return durMin / 60;
-    return durMin;
-  }
-  return null;
+  return resolveMovingDurationMinutes(row);
+}
+
+function getOverallPaceSecPerMi(row: any): number | null {
+  return resolveOverallPaceSecPerMi(row);
 }
 
 function getOverallAvgHr(row: any): number | null {
@@ -91,14 +75,6 @@ function getOverallMaxHr(row: any): number | null {
   return v != null && v > 0 ? Math.round(v) : null;
 }
 
-function getOverallDistanceMi(row: any): number | null {
-  const overall = getComputedOverall(row)?.overall;
-  const m = coerceNumber(overall?.distance_m);
-  if (m != null && m > 0) return m / 1609.34;
-  const km = coerceNumber(row?.distance);
-  if (km != null && km > 0) return km * 0.621371;
-  return null;
-}
 
 function getHrDriftBpmFromAnalysis(row: any): number | null {
   const wa = row?.workout_analysis;
@@ -343,7 +319,11 @@ export async function getSimilarWorkoutComparisons(
           pace_sec_per_mi: Math.round(pace),
           avg_hr: hr != null ? Math.round(hr) : null,
         };
-      });
+      })
+      .filter((tp) =>
+        typeof tp.pace_sec_per_mi === 'number' && Number.isFinite(tp.pace_sec_per_mi)
+        && tp.pace_sec_per_mi >= 240 && tp.pace_sec_per_mi <= 3600
+      );
 
     if (sample_size < 3) {
       return {

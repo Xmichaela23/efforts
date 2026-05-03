@@ -1915,7 +1915,7 @@ Deno.serve(async (req) => {
           cur > 0 &&
           inferred != null &&
           inferred > 0 &&
-          (cur / inferred >= 10 || inferred / cur >= 10)
+          (cur / inferred >= 3 || inferred / cur >= 3)
         ) {
           const distM = Number(overall?.distance_m) || (Number((workoutForFact as any)?.distance) || 0) * 1000;
           const miles = distM > 0 ? distM / 1609.34 : 0;
@@ -1986,7 +1986,12 @@ Deno.serve(async (req) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout.user_id) {
         const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
         arc_narrative_for_summary = arc.arc_narrative_context ?? null;
-        console.log(`[analyze-running-workout] arc_narrative mode=${arc_narrative_for_summary?.mode ?? 'n/a'}`);
+        const lr = arc_narrative_for_summary?.last_goal_race;
+        console.log(
+          `[analyze-running-workout] arc_narrative workout=${workout_id} date=${wdSlice} mode=${arc_narrative_for_summary?.mode ?? 'n/a'} ` +
+            `days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'} ` +
+            `last_race=${lr ? `${lr.name}@${lr.target_date}` : 'none'} next=${arc_narrative_for_summary?.next_primary_goal?.name ?? 'none'}`,
+        );
       }
     } catch (arcSummErr) {
       console.warn('[analyze-running-workout] arc_narrative_for_summary skipped:', arcSummErr);

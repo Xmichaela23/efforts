@@ -504,6 +504,17 @@ async function runSessionDetailPipelineAndPersist(
 
     const hasLinkedPlannedSession = !!(String(row?.planned_id || match?.planned_id || '').trim());
     const arcPerformance = buildArcPerformanceBridge(arcCtx, asOfDate, hasLinkedPlannedSession);
+    try {
+      const nc = arcCtx?.arc_narrative_context;
+      console.log(
+        `[workout-detail] arc_narrative workout=${id} as_of=${asOfDate} mode=${nc?.mode ?? 'n/a'} ` +
+          `days_since_last_race=${nc?.days_since_last_goal_race ?? 'n/a'} ` +
+          `last_race=${nc?.last_goal_race ? `${nc.last_goal_race.name}@${nc.last_goal_race.target_date}` : 'none'} ` +
+          `next_goal=${nc?.next_primary_goal?.name ?? 'none'}`,
+      );
+    } catch {
+      /* non-fatal logging */
+    }
 
     sessionDetailV1 = buildSessionDetailV1({
       workoutId: id,

@@ -17,6 +17,11 @@ import { getComparableTypeKeys, getNotableAchievements, getPaceTrend, getSimilar
 import { assessStimulus } from './stimulus.ts';
 import { identifyPerformanceLimiter } from './limiter.ts';
 import { generateFlagsV1 } from './flags.ts';
+import {
+  resolveMovingDurationMinutes,
+  resolveOverallDistanceMi,
+  resolveOverallPaceSecPerMi,
+} from './pace-resolution.ts';
 
 type SupabaseLike = any;
 
@@ -257,52 +262,9 @@ export async function buildWorkoutFactPacketV1(args: {
 
   const computed = parseJson(workout?.computed) || {};
   const overall = computed?.overall || {};
-  const overallDistMi = (() => {
-    const m =
-      coerceNumber(overall?.distance_m) ??
-      coerceNumber(overall?.distance_meters) ??
-      coerceNumber(overall?.distanceMeters);
-    if (m != null && m > 0) return m / 1609.34;
-    const kmOverall = coerceNumber(overall?.distance_km ?? overall?.distanceKm);
-    if (kmOverall != null && kmOverall > 0) return kmOverall * 0.621371;
-    const km = coerceNumber(workout?.distance);
-    return km != null && km > 0 ? km * 0.621371 : 0;
-  })();
-
-  const overallDurMin = (() => {
-    const s = coerceNumber(overall?.duration_s_moving ?? overall?.duration_s_elapsed);
-    if (s != null && s > 0) {
-      const min = s / 60;
-      // Guardrail: implausibly large (e.g. 1800 min = 30h) suggests seconds were passed as minutes.
-      // 30 min = 1800 sec; if we erroneously got 1800 "minutes", treat as seconds and convert.
-      if (min > 600 && overallDistMi > 0 && overallDistMi < 50) {
-        const corrected = min / 60;
-        if (corrected > 0 && corrected < 600) return corrected;
-      }
-      return min;
-    }
-    // DB convention: moving_time/duration in minutes. Some legacy rows store seconds.
-    // Heuristic (matches cycling-v1/build): values >= 1000 are almost certainly seconds.
-    const toMin = (v: number) => (v < 1000 ? v : v / 60);
-    const mv = coerceNumber(workout?.moving_time);
-    if (mv != null && mv > 0) return toMin(mv);
-    const d = coerceNumber(workout?.duration);
-    return d != null && d > 0 ? toMin(d) : 0;
-  })();
-
-  const overallPace = (() => {
-    const stored = coerceNumber(overall?.avg_pace_s_per_mi);
-    // Fallback: when stored pace is implausible (e.g. 60x off from duration bug), derive from duration + distance.
-    if (overallDistMi > 0 && overallDurMin > 0 && overallDurMin < 600) {
-      const derived = (overallDurMin * 60) / overallDistMi;
-      if (derived > 0 && derived < 7200) {
-        if (stored == null || stored <= 0) return Math.round(derived);
-        const ratio = stored / derived;
-        if (ratio >= 10 || ratio <= 0.1) return Math.round(derived);
-      }
-    }
-    return stored;
-  })();
+  const overallDistMi = resolveOverallDistanceMi(workout);
+  const overallDurMin = resolveMovingDurationMinutes(workout) ?? 0;
+  const overallPace = resolveOverallPaceSecPerMi(workout);
 
   const hrFromComputedAvg = coerceNumber(overall?.avg_hr);
   const hrFromComputedMax = coerceNumber(overall?.max_hr);

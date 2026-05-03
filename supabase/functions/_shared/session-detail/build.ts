@@ -531,13 +531,18 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         if (!Array.isArray(pts) || pts.length < 3) return null;
         const fmtPace = (s: number) => { const m = Math.floor(s / 60); const sec = Math.round(s % 60); return `${m}:${String(sec).padStart(2, '0')}/mi`; };
         const sorted = [...pts].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
-        const points = sorted.map((p: any) => ({
+        const rawPoints = sorted.map((p: any) => ({
           date: String(p.date),
           value: Number(p.pace_sec_per_mi),
           avg_hr: p.avg_hr != null ? Number(p.avg_hr) : null,
           is_current: !!p.is_current,
           label: fmtPace(Number(p.pace_sec_per_mi)),
         }));
+        // Drop corrupt pace scalars (bad duration_s_moving / avg_pace) so one point cannot skew the sparkline.
+        const points = rawPoints.filter(
+          (p) => Number.isFinite(p.value) && p.value >= 240 && p.value <= 3600,
+        );
+        if (points.length < 3) return null;
         const mid = Math.ceil(points.length / 2);
         const avgArr = (arr: typeof points) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
         const firstHalfAvg = avgArr(points.slice(0, mid));
