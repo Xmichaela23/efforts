@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
+import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
@@ -249,50 +250,37 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     [sessionDetailV1, workoutAnalysisForSessionMerge],
   );
 
-  // Auto-materialize planned row if Summary is opened and computed steps are missing
   useEffect(() => {
-    if (!linkedPlanned) return;
-    const ensureMaterialized = async () => {
+    const pid = linkedPlanned?.id;
+    if (!pid) return;
+    let cancelled = false;
+    (async () => {
       try {
-        const hasSteps = Array.isArray((linkedPlanned as any)?.computed?.steps) && (linkedPlanned as any).computed.steps.length>0;
-        if (hasSteps) {
-          // Enforce stable IDs if missing and recompute once
-          try {
-            const steps: any[] = (linkedPlanned as any).computed.steps;
-            const needsIds = steps.some((st:any)=> !st?.id);
-            if (needsIds) {
-              const withIds = steps.map((st:any)=> ({ id: st?.id || (typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`), ...st }));
-              await supabase.from('planned_workouts').update({ computed: { ...(linkedPlanned as any).computed, steps: withIds } } as any).eq('id', String((linkedPlanned as any).id));
-              const { data } = await supabase.from('planned_workouts').select('*').eq('id', String((linkedPlanned as any).id)).maybeSingle();
-              if (data) setLinkedPlanned(data);
-              // Enhanced analysis will be triggered when user opens Summary tab
-            }
-          } catch (e) {
-            console.warn('[UnifiedWorkoutView] step id backfill failed:', e);
-          }
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) console.warn('[UnifiedWorkoutView] ensure-planned-ready getSession:', sessionErr.message);
+        const token = sessionData.session?.access_token ?? '';
+        if (!token) return;
+        const { data, error } = await supabase.functions.invoke('ensure-planned-ready', {
+          body: { planned_workout_id: String(pid) },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled) return;
+        if (error) {
+          console.warn('[UnifiedWorkoutView] ensure-planned-ready:', error);
           return;
         }
-        // Server materialization: if steps missing, materialize on server
-        try {
-          const pid = String((linkedPlanned as any)?.id || '');
-          if (pid) {
-            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
-            const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
-            if (refreshed && Array.isArray((refreshed as any)?.computed?.steps) && (refreshed as any).computed.steps.length>0) {
-              setLinkedPlanned(refreshed);
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('[UnifiedWorkoutView] Server materialization failed:', err);
+        if (Array.isArray((data as { actions_taken?: unknown })?.actions_taken) &&
+          (data as { actions_taken: unknown[] }).actions_taken.length > 0) {
+          invalidateWorkoutScreens();
         }
       } catch (e) {
-        console.warn('[UnifiedWorkoutView] ensureMaterialized failed:', e);
+        if (!cancelled) console.warn('[UnifiedWorkoutView] ensure-planned-ready invoke failed:', e);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    // When switching to Summary tab, try a materialize pass
-    if (activeTab === 'summary') ensureMaterialized();
-  }, [linkedPlanned, activeTab]);
+  }, [linkedPlanned?.id]);
 
   // Auto-trigger server compute AND analysis on Summary open
   useEffect(() => {
@@ -350,72 +338,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       }
     })();
   }, [activeTab, linkedPlanned?.id, (workout as any)?.planned_id]);
-
-  // Race fixer: after planned hydration, if executed intervals exist but lack planned_step_id mapping, re-run compute once
-  useEffect(() => {
-    (async () => {
-      try {
-        if (activeTab !== 'summary') return;
-        if (!isCompleted) return;
-        const wid = String((workout as any)?.id || '');
-        if (!wid) return;
-        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { /* malformed computed */ return false; }})();
-        if (!hasPlannedSteps) return; // wait until planned steps are present
-
-        // Load latest intervals
-        let intervals: any[] = [];
-        try {
-          const local = (workout as any)?.computed;
-          if (local && Array.isArray(local?.intervals)) intervals = local.intervals;
-        } catch { /* computed.intervals unreadable */ }
-        if (!intervals || !intervals.length) {
-          const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
-          const cmp = (data as any)?.computed;
-          if (cmp && Array.isArray(cmp?.intervals)) intervals = cmp.intervals;
-        }
-        if (!intervals || !intervals.length) return; // nothing to recompute yet
-
-        const missingMapping = intervals.every((it:any)=> !it?.planned_step_id);
-        if (!missingMapping) return;
-
-        // Avoid repeated re-compute loops per workout id
-        if (recomputeGuardRef.current.has(wid)) return;
-        recomputeGuardRef.current.add(wid);
-
-        // Enhanced analysis will be triggered when user opens Summary tab
-      } catch (e) {
-        console.warn('[UnifiedWorkoutView] race fixer (planned_step_id) effect failed:', e);
-      }
-    })();
-  }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
-
-  // Ensure server snapshot exists: if planned steps exist but computed.planned_steps_light is missing, trigger compute once
-  useEffect(() => {
-    (async () => {
-      try {
-        if (activeTab !== 'summary') return;
-        if (!isCompleted) return;
-        const wid = String((workout as any)?.id || '');
-        if (!wid) return;
-        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { /* malformed computed */ return false; }})();
-        if (!hasPlannedSteps) return;
-        // Check current computed snapshot
-        let plannedLight: any[] = [];
-        try {
-          const local = (workout as any)?.computed;
-          if (local && Array.isArray(local?.planned_steps_light)) plannedLight = local.planned_steps_light;
-        } catch { /* computed.planned_steps_light unreadable */ }
-        if (!plannedLight || !plannedLight.length) {
-          // Avoid double invoke using same guard
-          if (recomputeGuardRef.current.has(`snap-${wid}`)) return;
-          recomputeGuardRef.current.add(`snap-${wid}`);
-          // Enhanced analysis will be triggered when user opens Summary tab
-        }
-      } catch (e) {
-        console.warn('[UnifiedWorkoutView] planned_steps_light snapshot effect failed:', e);
-      }
-    })();
-  }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {

@@ -17,7 +17,7 @@ function readStepsPreset(src: unknown): string[] | undefined {
 
 /**
  * Planned-workout link state for UnifiedWorkoutView: synced `planned_id`, linked row fetch,
- * and Planned-tab hydration. (Summary-tab materialize / race fixer / planned_steps_light stay in the view until #2.)
+ * and Planned-tab hydration. Summary-tab readiness is handled server-side via `ensure-planned-ready`.
  *
  * `unifiedWorkout` must match the parent’s derived row — `updatedWorkoutData || unifiedWorkout` drives
  * `currentPlannedId` sync; for non-completed sessions that differs from `workout`.
