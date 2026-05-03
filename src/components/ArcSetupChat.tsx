@@ -523,8 +523,8 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     }
     setPendingSetup(null);
     setSaveBanner(null);
-    // Step 1 (arc) done — athlete builds plans per goal on the Goals screen (explicit Build Plan, no auto-build).
-    navigate('/goals', { state: { fromArcSetup: true } });
+    // Open Goals as the next step (replace: avoids back-stack through an empty-looking hop after Arc).
+    navigate('/goals', { replace: true, state: { fromArcSetup: true } });
   };
 
   const onClarify = () => {

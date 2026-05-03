@@ -132,18 +132,22 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [courseUploadBusy, setCourseUploadBusy] = useState<string | null>(null);
   const [pendingCourseGoalId, setPendingCourseGoalId] = useState<string | null>(null);
   const goalsCourseFileRef = useRef<HTMLInputElement>(null);
+  /** After Arc "Looks right" save: show one clear next step so Goals doesn’t feel like a dead end. */
+  const [showArcSetupNextStep, setShowArcSetupNextStep] = useState(false);
 
-  // Clear `fromArcSetup` navigation state so back/forward does not re-apply; goals list is the control center.
+  // Hydrate follow-up UI from `/goals` navigation state, then strip it so refresh/back doesn’t re-show.
   useEffect(() => {
     const st = location.state as { fromArcSetup?: boolean } | null;
     if (st?.fromArcSetup) {
+      setShowArcSetupNextStep(true);
+      void refreshGoals();
       try {
         navigate(location.pathname, { replace: true, state: {} });
       } catch {
         void 0;
       }
     }
-  }, [location.state, location.pathname, navigate]);
+  }, [location.state, location.pathname, navigate, refreshGoals]);
 
   useEffect(() => {
     const uid = readStoredUserId();
@@ -348,6 +352,20 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const uniqueIds = new Set(linked.map(p => p!.id));
     return uniqueIds.size === 1 ? linked[0]! : null;
   }, [multipleEventGoals, activeEventGoals, plansByGoalId]);
+
+  /** A-race / soonest event — same ordering as `handleBuildSeasonPlan` primary. */
+  const primaryActiveEventGoal = useMemo(() => {
+    const sorted = [...activeEventGoals].sort((a, b) => {
+      const pr = (p: string) => (p === 'A' ? 0 : p === 'B' ? 1 : p === 'C' ? 2 : 3);
+      const c = pr(a.priority) - pr(b.priority);
+      if (c !== 0) return c;
+      const da = a.target_date ? new Date(a.target_date + 'T12:00:00').getTime() : 0;
+      const db = b.target_date ? new Date(b.target_date + 'T12:00:00').getTime() : 0;
+      if (da !== db) return da - db;
+      return a.id.localeCompare(b.id);
+    });
+    return sorted[0] ?? null;
+  }, [activeEventGoals]);
 
   async function handleGoalsCourseFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1412,6 +1430,61 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   // ===================== SUB-SCREENS =====================
 
+  const arcSetupFollowUp =
+    showArcSetupNextStep && !loading
+      ? multipleEventGoals && seasonPlan
+        ? {
+            subtitle: 'Your unified schedule is ready.',
+            label: 'View training plan',
+            disabled: false as const,
+            onClick: () => {
+              onSelectPlan?.(seasonPlan.id);
+              setShowArcSetupNextStep(false);
+            },
+          }
+        : multipleEventGoals
+          ? {
+              subtitle:
+                'Build one calendar for every race. You can set the start date in the section below if you want a specific week-one Monday.',
+              label: seasonBuilding ? 'Building…' : 'Build season plan',
+              disabled: seasonBuilding,
+              onClick: () => {
+                void handleBuildSeasonPlan(null);
+                setShowArcSetupNextStep(false);
+              },
+            }
+          : primaryActiveEventGoal
+            ? plansByGoalId.get(primaryActiveEventGoal.id)
+              ? {
+                  subtitle: `Open the plan for ${primaryActiveEventGoal.name}.`,
+                  label: 'View training plan',
+                  disabled: false as const,
+                  onClick: () => {
+                    const p = plansByGoalId.get(primaryActiveEventGoal.id)!;
+                    onSelectPlan?.(p.id);
+                    setShowArcSetupNextStep(false);
+                  },
+                }
+              : {
+                  subtitle: `Create your schedule for ${primaryActiveEventGoal.name}.`,
+                  label: buildingGoalId === primaryActiveEventGoal.id ? 'Building…' : 'Build training plan',
+                  disabled: Boolean(buildingGoalId === primaryActiveEventGoal.id || seasonBuilding),
+                  onClick: () => {
+                    handleBuildPlan(primaryActiveEventGoal);
+                    setShowArcSetupNextStep(false);
+                  },
+                }
+            : {
+                subtitle: 'Add a race or event to generate a training calendar.',
+                label: 'Add goal',
+                disabled: false as const,
+                onClick: () => {
+                  setShowAddGoal(true);
+                  setShowArcSetupNextStep(false);
+                },
+              }
+      : null;
+
   if (showEventForm) return renderEventForm();
   if (showCapacityForm) return renderCapacityForm();
   if (showMaintenanceForm) return renderMaintenanceForm();
@@ -1600,6 +1673,37 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {showArcSetupNextStep && (
+          <div className="rounded-2xl border border-teal-500/40 bg-teal-950/45 p-4 mb-4 shrink-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-teal-100/95 leading-snug">What’s next</p>
+              <button
+                type="button"
+                onClick={() => setShowArcSetupNextStep(false)}
+                className="rounded-lg p-1 text-white/40 hover:text-white/70 hover:bg-white/10 shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {loading ? (
+              <p className="text-xs text-white/45 mt-2">Syncing goals from your season setup…</p>
+            ) : arcSetupFollowUp ? (
+              <>
+                <p className="text-xs text-white/55 mt-2 leading-relaxed">{arcSetupFollowUp.subtitle}</p>
+                <button
+                  type="button"
+                  disabled={arcSetupFollowUp.disabled}
+                  onClick={arcSetupFollowUp.onClick}
+                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-teal-500/35 bg-teal-500/15 py-3 text-sm font-medium text-teal-100/95 hover:bg-teal-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {arcSetupFollowUp.disabled ? <Loader2 className="h-4 w-4 animate-spin opacity-90" /> : <Calendar className="h-4 w-4 opacity-90" />}
+                  {arcSetupFollowUp.label}
+                </button>
+              </>
+            ) : null}
+          </div>
+        )}
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
