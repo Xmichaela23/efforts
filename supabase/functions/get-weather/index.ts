@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 /** Bump when weather merge/cache semantics change so persisted workout rows refetch */
-const WEATHER_SCHEMA_VERSION = 3;
+const WEATHER_SCHEMA_VERSION = 4;
 
 interface WeatherData {
   /** Representative temp for the session: avg over [start, end] when duration provided, else start-hour slot. */
@@ -212,6 +212,31 @@ function parseOpenMeteoUtcHourMs(iso: string): number {
   return Date.parse(s);
 }
 
+/** Open-Meteo archive with timezone=UTC returns sunrise/sunset without offset; treat as UTC instant for clients. */
+function normalizeOpenMeteoUtcInstant(iso: string): string {
+  const s = String(iso || '').trim();
+  if (!s) return s;
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) return s;
+  return `${s}Z`;
+}
+
+function pickDailySunriseSunset(
+  daily: { time?: string[]; sunrise?: (string | null)[]; sunset?: (string | null)[] } | undefined,
+  utcDay: string,
+): { sunrise?: string; sunset?: string } {
+  if (!daily?.time?.length || !daily.sunrise?.length || !daily.sunset?.length) return {};
+  const dayPrefix = utcDay.slice(0, 10);
+  let idx = daily.time.findIndex((t) => String(t).slice(0, 10) === dayPrefix);
+  if (idx < 0) idx = 0;
+  const sr = daily.sunrise[idx];
+  const ss = daily.sunset[idx];
+  if (typeof sr !== 'string' || typeof ss !== 'string' || !sr || !ss) return {};
+  return {
+    sunrise: normalizeOpenMeteoUtcInstant(sr),
+    sunset: normalizeOpenMeteoUtcInstant(ss),
+  };
+}
+
 function nearestHourlyIndex(hourlyTime: string[], workoutMs: number): number {
   if (!hourlyTime?.length) return 0;
   let best = 0;
@@ -251,7 +276,7 @@ async function fetchWeatherData(
 
     // Open-Meteo archive API - free, no key required
     // Use timezone=UTC so all times are in UTC (consistent with our timestamp)
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${rangeStart}&end_date=${rangeEnd}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${rangeStart}&end_date=${rangeEnd}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
     
     const resp = await fetch(url);
     if (!resp.ok) {
@@ -260,6 +285,7 @@ async function fetchWeatherData(
     }
     
     const data = await resp.json();
+    const { sunrise: srDaily, sunset: ssDaily } = pickDailySunriseSunset(data.daily, dateStr);
     const hourly = data.hourly;
     
     if (!hourly || !hourly.time || !hourly.temperature_2m) {
@@ -349,8 +375,8 @@ async function fetchWeatherData(
       windSpeed: Math.round(windSpeed ?? 0),
       windDirection: Math.round(windDir ?? 0),
       precipitation: precip ?? 0,
-      sunrise: undefined, // Could add with separate API call if needed
-      sunset: undefined,
+      sunrise: srDaily,
+      sunset: ssDaily,
       daily_high: dailyHigh,
       daily_low: dailyLow,
       timestamp: timestamp,

@@ -25,6 +25,9 @@ export type SessionWeatherForDisplay = {
   precipitation?: number;
   daily_high?: number;
   daily_low?: number;
+  /** ISO instant (UTC); from Open-Meteo daily when present */
+  sunrise?: string;
+  sunset?: string;
   timestamp?: string;
 };
 
@@ -84,6 +87,8 @@ export function parseWorkoutWeatherDataForDisplay(raw: unknown): SessionWeatherF
     precipitation: num(w.precipitation),
     daily_high: num(w.daily_high),
     daily_low: num(w.daily_low),
+    ...(typeof w.sunrise === 'string' && w.sunrise ? { sunrise: w.sunrise } : {}),
+    ...(typeof w.sunset === 'string' && w.sunset ? { sunset: w.sunset } : {}),
     timestamp: typeof w.timestamp === 'string' ? w.timestamp : undefined,
   };
 }
