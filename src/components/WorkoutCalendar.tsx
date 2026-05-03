@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
@@ -13,6 +14,7 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import LoadBar from '@/components/LoadBar';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
+import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -483,7 +485,29 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
+  const queryClient = useQueryClient();
+  const weekStaleMs = (import.meta.env?.DEV ? 5 : 60) * 60 * 1000;
   const { items: unifiedItems, weeklyStats, trainingPlanContext, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
+
+  // Warm previous/next week in React Query so swipe/navigation hits cache (matches useWeekUnified staleTime)
+  useEffect(() => {
+    const uid = getStoredUserId();
+    if (!uid || !fromISO || !toISO) return;
+    const prefetch = (from: string, to: string) => {
+      void queryClient.prefetchQuery({
+        queryKey: ['weekUnified', 'me', uid, from, to],
+        queryFn: () => fetchWeekUnified(from, to),
+        staleTime: weekStaleMs,
+      });
+    };
+    const prevMon = addDays(weekStart, -7);
+    const prevSun = addDays(weekStart, -1);
+    prefetch(toDateOnlyString(prevMon), toDateOnlyString(prevSun));
+    const nextMon = addDays(weekStart, 7);
+    const nextSun = addDays(weekStart, 13);
+    prefetch(toDateOnlyString(nextMon), toDateOnlyString(nextSun));
+  }, [queryClient, fromISO, toISO, weekStaleMs]);
+
   // Adapt unified items → planned + workouts shapes expected below
   // Use mapper - SINGLE SOURCE OF TRUTH
   const unifiedPlanned = unifiedItems

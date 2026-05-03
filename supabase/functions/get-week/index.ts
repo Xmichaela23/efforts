@@ -140,9 +140,9 @@ Deno.serve(async (req)=>{
     // On-demand materialization (scoped strictly to [fromISO, toISO])
     try {
       // Load user's active plans with an explicit start date and non-empty sessions
-      console.log('[get-week] Looking for active plans for user:', userId, 'date range:', fromISO, 'to', toISO);
+      if (debug) console.log('[get-week] Looking for active plans for user:', userId, 'date range:', fromISO, 'to', toISO);
       const { data: plans, error: plansErr } = await supabase.from('plans').select('id,user_id,status,config,duration_weeks,sessions_by_week').eq('user_id', userId).eq('status', 'active');
-      console.log('[get-week] Found plans:', plans?.length || 0, 'Error:', plansErr?.message || 'none');
+      if (debug) console.log('[get-week] Found plans:', plans?.length || 0, 'Error:', plansErr?.message || 'none');
       if (!plansErr && Array.isArray(plans) && plans.length) {
         if (debug) debugNotes.push({
           where: 'plans',
@@ -190,12 +190,12 @@ Deno.serve(async (req)=>{
               durWeeks
             });
             // For each date in range, see if plan covers it and ensure a row per authored session
-            console.log('[get-week] Processing plan:', plan.id, 'dates:', dates.length, 'startIso:', startIso);
+            if (debug) console.log('[get-week] Processing plan:', plan.id, 'dates:', dates.length, 'startIso:', startIso);
             for (const iso of dates){
               const wk = weekNumberFor(iso, startIso);
-              console.log('[get-week] Date:', iso, 'week:', wk, 'durWeeks:', durWeeks);
+              if (debug) console.log('[get-week] Date:', iso, 'week:', wk, 'durWeeks:', durWeeks);
               if (!(wk >= 1 && (durWeeks ? wk <= durWeeks : true))) {
-                console.log('[get-week] Skipping date', iso, '- out of bounds');
+                if (debug) console.log('[get-week] Skipping date', iso, '- out of bounds');
                 if (debug && debugNotes.length < 50) debugNotes.push({
                   where: 'skip_range',
                   iso,
@@ -205,10 +205,10 @@ Deno.serve(async (req)=>{
                 continue;
               }
               const dayName = String(dayNameFromISO(iso));
-              console.log('[get-week] Date:', iso, 'day:', dayName, 'looking for week', wk, 'in sessions_by_week');
+              if (debug) console.log('[get-week] Date:', iso, 'day:', dayName, 'looking for week', wk, 'in sessions_by_week');
               // Be tolerant of structure: array preferred; object -> flatten values; single -> box
               let weekArrRaw = sessionsByWeek?.[String(wk)];
-              console.log('[get-week] weekArrRaw for week', wk, ':', weekArrRaw ? 'EXISTS' : 'NULL', 'type:', Array.isArray(weekArrRaw) ? 'array' : typeof weekArrRaw);
+              if (debug) console.log('[get-week] weekArrRaw for week', wk, ':', weekArrRaw ? 'EXISTS' : 'NULL', 'type:', Array.isArray(weekArrRaw) ? 'array' : typeof weekArrRaw);
               let weekArr = [];
               if (Array.isArray(weekArrRaw)) weekArr = weekArrRaw;
               else if (weekArrRaw && typeof weekArrRaw === 'object') {
@@ -221,9 +221,9 @@ Deno.serve(async (req)=>{
                   weekArrRaw
                 ];
               }
-              console.log('[get-week] weekArr.length:', weekArr.length);
+              if (debug) console.log('[get-week] weekArr.length:', weekArr.length);
               if (!weekArr.length) {
-                console.log('[get-week] Skipping - no sessions in weekArr');
+                if (debug) console.log('[get-week] Skipping - no sessions in weekArr');
                 continue;
               }
               // Find all sessions authored for this day
@@ -234,13 +234,13 @@ Deno.serve(async (req)=>{
                 const targetDay = normalizeDayName(dayName);
                 return sessionDay === targetDay;
               });
-              console.log('[get-week] daySessions for', dayName, ':', daySessions.length, 'found');
+              if (debug) console.log('[get-week] daySessions for', dayName, ':', daySessions.length, 'found');
               if (!daySessions.length) continue;
               for (const s of daySessions){
                 // Normalize type (include mobility). If unknown, skip instead of defaulting to run.
                 // Check type field first (strength sessions have type: 'strength'), then discipline as fallback
                 const raw = String((s?.type && s.type.trim()) || (s?.discipline && s.discipline.trim()) || '').toLowerCase();
-                console.log('[get-week] Session type check:', { raw, type: s?.type, discipline: s?.discipline, name: s?.name });
+                if (debug) console.log('[get-week] Session type check:', { raw, type: s?.type, discipline: s?.discipline, name: s?.name });
                 let normType = null;
                 const hasMob = Array.isArray(s?.mobility_exercises) && s.mobility_exercises.length > 0;
                 if (hasMob) normType = 'mobility';
@@ -254,7 +254,7 @@ Deno.serve(async (req)=>{
                 else if (raw === 'pilates_yoga' || raw === 'pilates' || raw === 'yoga') normType = 'pilates_yoga';
                 // Skip unknown/blank types entirely to avoid phantom RN rows
                 if (!normType) {
-                  console.log('[get-week] Skipping session - unknown type:', { raw, type: s?.type, discipline: s?.discipline, name: s?.name, day: s?.day });
+                  if (debug) console.log('[get-week] Skipping session - unknown type:', { raw, type: s?.type, discipline: s?.discipline, name: s?.name, day: s?.day });
                   if (debug && debugNotes.length < 50) debugNotes.push({
                     where: 'skip_unknown_type',
                     iso,
@@ -264,9 +264,9 @@ Deno.serve(async (req)=>{
                   continue;
                 }
                 const key = `${String(plan.id)}|${iso}|${normType}`;
-                console.log('[get-week] Checking key:', key, 'exists:', existsKey.has(key));
+                if (debug) console.log('[get-week] Checking key:', key, 'exists:', existsKey.has(key));
                 if (existsKey.has(key)) {
-                  console.log('[get-week] Skipping - workout already exists');
+                  if (debug) console.log('[get-week] Skipping - workout already exists');
                   continue;
                 }
                 // Build minimal row preserving authored fields
@@ -296,14 +296,14 @@ Deno.serve(async (req)=>{
                 if (tags) insertRow.tags = tags;
                 if (exportHints) insertRow.export_hints = exportHints;
                 if (description) insertRow.description = description;
-                console.log('[get-week] Attempting insert for:', key);
+                if (debug) console.log('[get-week] Attempting insert for:', key);
                 try {
                   const { error: insertErr } = await supabase.from('planned_workouts').insert(insertRow);
                   // Ignore duplicate key errors (code 23505) - these are expected with concurrent requests
                   if (insertErr && insertErr.code !== '23505') {
                     console.error('[get-week] Insert FAILED for:', key, 'error:', insertErr);
                   } else {
-                    console.log('[get-week] Insert successful for:', key);
+                    if (debug) console.log('[get-week] Insert successful for:', key);
                     existsKey.add(key);
                     if (debug && debugNotes.length < 50) debugNotes.push({
                       where: 'insert',
@@ -331,8 +331,7 @@ Deno.serve(async (req)=>{
           if (ids.length) {
             const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
             const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-            // Wait for all materializations to complete
-            await Promise.all(ids.map(async (id)=>{
+            const runMaterialize = async (id)=>{
               try {
                 await fetch(fnUrl, {
                   method: 'POST',
@@ -346,10 +345,20 @@ Deno.serve(async (req)=>{
                   })
                 });
               } catch  {}
-            }));
+            };
+            // Cap awaited materializations so calendar week loads return quickly; rest continues in background
+            const MAX_SYNC_MATERIALIZE = 8;
+            const syncIds = ids.slice(0, MAX_SYNC_MATERIALIZE);
+            const asyncIds = ids.slice(MAX_SYNC_MATERIALIZE);
+            await Promise.all(syncIds.map(runMaterialize));
+            if (asyncIds.length) {
+              void Promise.all(asyncIds.map(runMaterialize));
+            }
             if (debug) debugNotes.push({
               where: 'materialize',
-              count: ids.length
+              count: ids.length,
+              sync: syncIds.length,
+              deferred: asyncIds.length
             });
           }
         } catch  {}
@@ -647,7 +656,7 @@ Deno.serve(async (req)=>{
         if (!p) p = plannedByKey.get(`${date}|${type}`) || null;
         if (p) {
           plannedSourceRow = p;
-          console.log('get-week: Processing planned workout:', {
+          if (debug) console.log('get-week: Processing planned workout:', {
             id: p.id,
             date: p.date,
             type: p.type,
@@ -726,16 +735,16 @@ Deno.serve(async (req)=>{
             skip_reason: p.skip_reason ?? null,
             skip_note: p.skip_note ?? null
           };
-          // Debug: Log the processed planned data
-          console.log('get-week: Processed planned data:', {
-            id: planned.id,
-            steps: planned.steps?.map((s)=>({
-                paceTarget: s.paceTarget,
-                pace_range: s.pace_range
-              }))
-          });
-          // Debug: Log the full planned object structure
-          console.log('get-week: Full planned object:', JSON.stringify(planned, null, 2));
+          if (debug) {
+            console.log('get-week: Processed planned data:', {
+              id: planned.id,
+              steps: planned.steps?.map((s)=>({
+                  paceTarget: s.paceTarget,
+                  pace_range: s.pace_range
+                }))
+            });
+            console.log('get-week: Full planned object:', JSON.stringify(planned, null, 2));
+          }
         }
       }
       // executed snapshot from columns that exist
@@ -831,8 +840,7 @@ Deno.serve(async (req)=>{
           const exLen = Array.isArray(executed?.strength_exercises) ? executed.strength_exercises.length : 0;
           const seRaw = w?.strength_exercises;
           const seLen = Array.isArray(seRaw) ? seRaw.length : typeof seRaw === 'string' ? 'str' : 0;
-          // eslint-disable-next-line no-console
-          console.log('[get-week:strength]', {
+          if (debug) console.log('[get-week:strength]', {
             id: String(w.id),
             date,
             seLen,
@@ -1337,7 +1345,7 @@ Deno.serve(async (req)=>{
             weeksToRace
           };
           
-          console.log('[get-week] Final trainingPlanContext:', {
+          if (debug) console.log('[get-week] Final trainingPlanContext:', {
             currentWeek: trainingPlanContext.currentWeek,
             focus: trainingPlanContext.focus,
             notes: trainingPlanContext.notes,
@@ -1372,7 +1380,7 @@ Deno.serve(async (req)=>{
         }
       }
 
-      console.log(`[get-week] Workload totals: planned=${workloadPlanned}, completed=${workloadCompleted}`);
+      if (debug) console.log(`[get-week] Workload totals: planned=${workloadPlanned}, completed=${workloadCompleted}`);
     } catch (error) {
       console.error('Failed to calculate workload totals:', error);
     }

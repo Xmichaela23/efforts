@@ -8,8 +8,9 @@
  * - Just renders what the server returns
  */
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getStoredUserId, supabase } from '@/lib/supabase';
+import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
 
 export type UnifiedItem = {
   id: string;
@@ -30,7 +31,7 @@ export function useWeekUnified(fromISO: string, toISO: string) {
       queryClient.invalidateQueries({ queryKey: ['weekUnified'] });
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [queryClient]);
 
   const queryKeyBase = ['weekUnified', 'me', userId, fromISO, toISO] as const;
   const enabled = !!userId;
@@ -40,16 +41,13 @@ export function useWeekUnified(fromISO: string, toISO: string) {
     enabled,
     queryFn: async () => {
       if (!userId) return { items: [] } as any;
-      const { data, error } = await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO } });
-      if (error) throw error as any;
-      const items: UnifiedItem[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
-      return { 
-        items,
-        weekly_stats: (data as any)?.weekly_stats || { planned: 0, completed: 0 },
-        training_plan_context: (data as any)?.training_plan_context || null,
-      };
+      return fetchWeekUnified(fromISO, toISO) as Promise<{
+        items: UnifiedItem[];
+        weekly_stats: Record<string, unknown>;
+        training_plan_context: unknown | null;
+      }>;
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
     retry: false,
     staleTime: (import.meta.env?.DEV ? 5 : 60) * 60 * 1000,
     gcTime: 6 * 60 * 60 * 1000,
@@ -71,9 +69,11 @@ export function useWeekUnified(fromISO: string, toISO: string) {
   const items: UnifiedItem[] = (query.data as any)?.items || [];
   const weeklyStats = (query.data as any)?.weekly_stats || { planned: 0, completed: 0 };
   const trainingPlanContext = (query.data as any)?.training_plan_context || null;
-  // v5: disabled queries stay `pending` with `fetchStatus: idle`, so `isPending` alone would spin forever.
-  // Only show loading while a real fetch is in flight and we have no snapshot yet (keeps refetch from blanking UI).
-  const loading = enabled && query.isFetching && query.data === undefined;
+  // Show loading while fetching when there is no real data yet, or when showing previous week's placeholder (wrong dates for the requested range).
+  const loading =
+    enabled &&
+    query.isFetching &&
+    (query.isPlaceholderData || query.data === undefined);
   return { items, weeklyStats, trainingPlanContext, loading, error: (query.error as any)?.message || null };
 }
 
