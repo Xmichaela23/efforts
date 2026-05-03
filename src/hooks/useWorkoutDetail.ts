@@ -22,6 +22,7 @@ export function extractSessionDetailV1FromWorkout(w: unknown): Record<string, un
     try {
       wa = JSON.parse(wa);
     } catch {
+      /* Intentional silence: corrupt workout_analysis string → no embedded session_detail */
       return null;
     }
   }
@@ -61,7 +62,8 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
       const sensorData = (w as any)?.sensor_data;
       const hasSensors = Array.isArray(sensorData) && sensorData.length > 0;
       return hasGps || hasSensors ? w : null;
-    } catch {
+    } catch (e) {
+      console.warn('[useWorkoutDetail] contextPreview unexpected:', e);
       return null;
     }
   }, [id, workouts]);
@@ -136,7 +138,9 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         } else {
           merged = remote;
         }
-      } catch {
+      } catch (e) {
+        /* Intentional fallback: merge is best-effort; edge workout payload is still valid */
+        console.warn('[useWorkoutDetail] merge with context workout failed, using remote only:', e);
         merged = remote;
       }
 
@@ -208,9 +212,13 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
           try {
             forceSessionDetailRefreshRef.current = true;
             queryClient.invalidateQueries({ queryKey: ['workout-detail'] });
-          } catch {}
+          } catch (e) {
+            console.warn('[useWorkoutDetail] deferred invalidateQueries:', e);
+          }
         }, 750);
-      } catch {}
+      } catch (e) {
+        console.warn('[useWorkoutDetail] workout-detail:invalidate handler:', e);
+      }
     };
     window.addEventListener('workout-detail:invalidate', detailHandler);
     return () => {
