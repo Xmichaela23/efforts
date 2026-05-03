@@ -181,10 +181,13 @@ function buildHrInsight(args: {
     } else if (totalDrift <= 35) {
       const heatEcho =
         !alreadyHeatPartitioned && heatBpm != null && heatBpm > 5 ? ` ~${heatBpm} bpm from heat.` : '';
-      parts.push(
-        `Higher drift (+${totalDrift} bpm).${heatEcho} ` +
-          `A gradual rise across the race is typical; a sharp jump in the final miles usually means fueling, hydration, or a pacing ceiling—check the per-mile curve.`,
-      );
+      const interpret =
+        `A gradual rise across the race is typical; a sharp jump in the final miles usually means fueling, hydration, or a pacing ceiling—check the per-mile curve.`;
+      if (alreadyHeatPartitioned) {
+        parts.push(interpret);
+      } else {
+        parts.push(`Higher drift (+${totalDrift} bpm).${heatEcho} ${interpret}`);
+      }
     } else {
       parts.push(`Significant drift (+${totalDrift} bpm) — review the per-mile HR curve for where it accelerated.`);
     }
