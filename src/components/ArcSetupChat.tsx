@@ -686,7 +686,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
               What does your season look like?
             </h2>
             <p className="mt-2.5 text-[17px] leading-relaxed text-white/60">
-              Races, goals, and limits—this flow shapes your arc. Type below to start.
+              Add a race or races—we can find most events and add the date. Your arc builds around your goals from there.
             </p>
           </div>
         )}
