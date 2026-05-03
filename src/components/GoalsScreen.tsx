@@ -132,22 +132,39 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [courseUploadBusy, setCourseUploadBusy] = useState<string | null>(null);
   const [pendingCourseGoalId, setPendingCourseGoalId] = useState<string | null>(null);
   const goalsCourseFileRef = useRef<HTMLInputElement>(null);
-  /** After Arc "Looks right" save: show one clear next step so Goals doesn’t feel like a dead end. */
+  /** After Arc "Looks right" when plan wasn’t built in Arc (identity-only or no events): show next step on Goals. */
   const [showArcSetupNextStep, setShowArcSetupNextStep] = useState(false);
+  /** After Arc built the calendar: compact success on Goals. */
+  const [arcPlanReady, setArcPlanReady] = useState<{ planId: string | null } | null>(null);
 
-  // Hydrate follow-up UI from `/goals` navigation state, then strip it so refresh/back doesn’t re-show.
+  // Hydrate follow-up UI from `/goals` navigation state, then strip it so refresh/back doesn’t re-apply.
   useEffect(() => {
-    const st = location.state as { fromArcSetup?: boolean } | null;
-    if (st?.fromArcSetup) {
-      setShowArcSetupNextStep(true);
+    const st = location.state as {
+      fromArcSetup?: boolean;
+      seasonPlanJustBuilt?: boolean;
+      builtPlanId?: string | null;
+      needPaceCalibration?: boolean;
+    } | null;
+    if (!st || Object.keys(st).length === 0) return;
+
+    if (st.needPaceCalibration) setShowCalibration(true);
+
+    if (st.seasonPlanJustBuilt) {
+      void refreshPlans?.();
       void refreshGoals();
-      try {
-        navigate(location.pathname, { replace: true, state: {} });
-      } catch {
-        void 0;
-      }
+      setArcPlanReady({ planId: st.builtPlanId ?? null });
+      setShowArcSetupNextStep(false);
+    } else if (st.fromArcSetup) {
+      void refreshGoals();
+      setShowArcSetupNextStep(true);
     }
-  }, [location.state, location.pathname, navigate, refreshGoals]);
+
+    try {
+      navigate(location.pathname, { replace: true, state: {} });
+    } catch {
+      void 0;
+    }
+  }, [location.state, location.pathname, navigate, refreshGoals, refreshPlans]);
 
   useEffect(() => {
     const uid = readStoredUserId();
@@ -1673,6 +1690,37 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {arcPlanReady && (
+          <div className="rounded-2xl border border-emerald-500/35 bg-emerald-950/40 p-4 mb-4 shrink-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-emerald-100/95 leading-snug">Season plan ready</p>
+              <button
+                type="button"
+                onClick={() => setArcPlanReady(null)}
+                className="rounded-lg p-1 text-white/40 hover:text-white/70 hover:bg-white/10 shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-white/55 mt-2 leading-relaxed">
+              Your training calendar is saved. You can open it here or from Home.
+            </p>
+            {arcPlanReady.planId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectPlan?.(arcPlanReady.planId!);
+                  setArcPlanReady(null);
+                }}
+                className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/35 bg-emerald-500/15 py-3 text-sm font-medium text-emerald-100/95 hover:bg-emerald-500/25 transition-all"
+              >
+                <Calendar className="h-4 w-4 opacity-90" />
+                View training calendar
+              </button>
+            ) : null}
+          </div>
+        )}
         {showArcSetupNextStep && (
           <div className="rounded-2xl border border-teal-500/40 bg-teal-950/45 p-4 mb-4 shrink-0">
             <div className="flex items-start justify-between gap-2">

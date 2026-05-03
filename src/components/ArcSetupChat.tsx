@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import {
   arcEventGoalsHaveRequiredTrainingPrefs,
   coachVisibleProseSeeksReply,
@@ -270,6 +270,48 @@ function payloadHasDatedEventGoal(payload: ArcSetupPayload | null | undefined): 
   });
 }
 
+function pickPrimaryEventGoalId(goals: { id: string; priority: string; target_date: string | null }[]): string | null {
+  if (goals.length === 0) return null;
+  const sorted = [...goals].sort((a, b) => {
+    const pr = (p: string) => (p === 'A' ? 0 : p === 'B' ? 1 : p === 'C' ? 2 : 3);
+    const c = pr(String(a.priority)) - pr(String(b.priority));
+    if (c !== 0) return c;
+    const da = a.target_date ? new Date(a.target_date + 'T12:00:00').getTime() : 0;
+    const db = b.target_date ? new Date(b.target_date + 'T12:00:00').getTime() : 0;
+    if (da !== db) return da - db;
+    return a.id.localeCompare(b.id);
+  });
+  return sorted[0]?.id ?? null;
+}
+
+async function parseArcInvokeError(
+  error: unknown,
+  data: unknown,
+  fallback: string,
+): Promise<{ message: string; code?: string }> {
+  if (data && typeof data === 'object') {
+    const msg = (data as { error?: string }).error;
+    const code = (data as { error_code?: string }).error_code;
+    if (typeof msg === 'string' && msg.trim()) return { message: msg, code };
+  }
+  try {
+    const ctx = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+    if (ctx?.json) {
+      const payload = (await ctx.json()) as { error?: string; error_code?: string };
+      if (typeof payload?.error === 'string' && payload.error.trim()) {
+        return { message: payload.error, code: payload.error_code };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  const msg =
+    error && typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: string }).message)
+      : '';
+  return { message: msg || fallback };
+}
+
 async function persistArcSetup(
   payload: ArcSetupPayload,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -515,16 +557,86 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     if (!pendingSetup) return;
     setSending(true);
     setError(null);
+    setSaveBanner(null);
     const { ok, error: pe } = await persistArcSetup(pendingSetup.payload);
-    setSending(false);
     if (!ok) {
+      setSending(false);
       setError(pe || 'Save failed');
       return;
     }
     setPendingSetup(null);
+
+    const userId = getStoredUserId();
+    if (!userId) {
+      setSending(false);
+      navigate('/goals', { replace: true, state: { fromArcSetup: true } });
+      return;
+    }
+
+    const { data: evRows, error: evErr } = await supabase
+      .from('goals')
+      .select('id, priority, target_date')
+      .eq('user_id', userId)
+      .eq('goal_type', 'event')
+      .eq('status', 'active');
+
+    if (evErr) {
+      setSending(false);
+      setError(evErr.message);
+      navigate('/goals', { replace: true, state: { fromArcSetup: true } });
+      return;
+    }
+
+    const eventGoals = (evRows || []) as { id: string; priority: string; target_date: string | null }[];
+    const primaryId = pickPrimaryEventGoalId(eventGoals);
+
+    if (!primaryId) {
+      setSending(false);
+      navigate('/goals', { replace: true, state: { fromArcSetup: true } });
+      return;
+    }
+
+    setSaveBanner('Building your training calendar…');
+    const combine = eventGoals.length >= 2;
+    const { data, error: fnErr } = await invokeFunction('create-goal-and-materialize-plan', {
+      user_id: userId,
+      mode: 'build_existing',
+      existing_goal_id: String(primaryId),
+      combine,
+      replace_plan_id: null,
+    });
+
+    setSending(false);
     setSaveBanner(null);
-    // Open Goals as the next step (replace: avoids back-stack through an empty-looking hop after Arc).
-    navigate('/goals', { replace: true, state: { fromArcSetup: true } });
+
+    if (fnErr || !data || (data as { success?: boolean }).success !== true) {
+      const parsed = await parseArcInvokeError(fnErr, data, 'Unable to build training plan');
+      if (parsed.code === 'missing_pace_benchmark') {
+        navigate('/goals', { replace: true, state: { fromArcSetup: true, needPaceCalibration: true } });
+        return;
+      }
+      setError(parsed.message);
+      return;
+    }
+
+    const planId = (data as { plan_id?: string | null }).plan_id ?? null;
+
+    try {
+      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+      window.dispatchEvent(new CustomEvent('goals:invalidate'));
+      window.dispatchEvent(new CustomEvent('plans:refresh'));
+    } catch {
+      void 0;
+    }
+
+    navigate('/goals', {
+      replace: true,
+      state: {
+        fromArcSetup: true,
+        seasonPlanJustBuilt: true,
+        builtPlanId: planId,
+      },
+    });
   };
 
   const onClarify = () => {
