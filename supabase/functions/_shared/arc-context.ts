@@ -4,6 +4,12 @@
 
 import { resolvePlanWeekIndex } from './plan-week.ts';
 import {
+  buildArcNarrativeContextV1,
+  goalIsUpcomingStackAsOf,
+  pickLastCompletedGoalRaceBefore,
+  type ArcNarrativeContextV1,
+} from './arc-narrative-state.ts';
+import {
   resolveFinishFromWorkouts,
   ymdFromWorkoutDate,
   type WorkoutFinishRow,
@@ -192,6 +198,9 @@ export interface ArcContext {
 
   user_id: string;
   built_at: string;
+
+  /** Deterministic narrative mode + deltas from `focusDateISO`; not "today unless coincident". */
+  arc_narrative_context: ArcNarrativeContextV1 | null;
 }
 
 /**
@@ -213,6 +222,7 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
     active_plan: null,
     recent_completed_events: [],
     five_k_nudge: null,
+    arc_narrative_context: null,
   };
 }
 
@@ -495,6 +505,55 @@ function buildActivePlanSummary(
   };
 }
 
+function arcAddDaysYmd(ymd: string, days: number): string {
+  const d = new Date(ymd.slice(0, 10) + 'T12:00:00.000Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function planCreatedAtToYmd(isoLike: string): string | null {
+  const s = String(isoLike || '').trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return s.slice(0, 10);
+}
+
+/** Plan row covering `focusYmd` via [created_at, created_at+duration_weeks*7); else latest started ≤ focus. */
+function resolveTemporalPlanRow(planRows: Record<string, unknown>[], focusYmd: string): Record<string, unknown> | null {
+  if (!Array.isArray(planRows) || planRows.length === 0) return null;
+  const asc = [...planRows].sort((a, b) =>
+    String(a.created_at || '').localeCompare(String(b.created_at || '')),
+  );
+  const focus = focusYmd.slice(0, 10);
+  const activeByDate = asc.filter((row) => {
+    const sd = planCreatedAtToYmd(String(row.created_at || ''));
+    return sd != null && sd <= focus;
+  });
+  for (const row of activeByDate.slice().reverse()) {
+    const start = planCreatedAtToYmd(String(row.created_at || ''));
+    if (!start) continue;
+    const cfg = row.config && typeof row.config === 'object' && !Array.isArray(row.config)
+      ? (row.config as Record<string, unknown>)
+      : {};
+    const durRaw = row.duration_weeks ?? cfg.duration_weeks;
+    const durW = Number(durRaw);
+    const weeks = Number.isFinite(durW) && durW > 0 ? durW : 52;
+    const endExclusive = arcAddDaysYmd(start, weeks * 7);
+    if (focus >= start && focus < endExclusive) return row;
+  }
+  let best: Record<string, unknown> | null = null;
+  let bestStart: string | null = null;
+  for (const row of activeByDate) {
+    const sd = planCreatedAtToYmd(String(row.created_at || ''));
+    if (!sd) continue;
+    if (!bestStart || sd > bestStart) {
+      best = row;
+      bestStart = sd;
+    }
+  }
+  return best;
+}
+
 const EIGHT_WEEKS_DAYS = 56;
 
 async function buildRecentCompletedEvents(
@@ -623,22 +682,22 @@ export async function getArcContext(
     supabase
       .from('goals')
       .select(
-        'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs',
+        'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at',
       )
       .eq('user_id', userId)
-      .eq('status', 'active')
-      .order('target_date', { ascending: true, nullsFirst: false }),
+      .neq('status', 'cancelled')
+      .limit(260),
     supabase
       .from('plans')
       .select('id, name, config, current_week, duration_weeks, plan_type, status, created_at')
       .eq('user_id', userId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1),
+      .lte('created_at', `${focusYmd}T23:59:59.999Z`)
+      .order('created_at', { ascending: true }),
     supabase
       .from('athlete_snapshot')
       .select('*')
       .eq('user_id', userId)
+      .lte('week_start', focusYmd)
       .order('week_start', { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -697,9 +756,27 @@ export async function getArcContext(
   const units = baseline?.units != null && typeof baseline.units === 'string' ? (baseline.units as string) : null;
   const dismissed_suggestions = parseJsonObject(baseline?.dismissed_suggestions);
 
-  const active_goals: Goal[] = (Array.isArray(goalsRes?.data) ? goalsRes.data : []).map((r: Record<string, unknown>) =>
-    toGoalRow(r)
+  const rawGoalRowsAll: Record<string, unknown>[] = Array.isArray(goalsRes?.data)
+    ? (goalsRes.data as Record<string, unknown>[])
+    : [];
+  const upcomingStackRows = rawGoalRowsAll.filter((r) =>
+    goalIsUpcomingStackAsOf(
+      {
+        status: String(r.status || ''),
+        target_date: r.target_date != null ? String(r.target_date) : null,
+        created_at: r.created_at != null ? String(r.created_at) : null,
+      },
+      focusYmd,
+    ),
   );
+
+  upcomingStackRows.sort((a, b) => {
+    const da = String(a.target_date || '9999-12-31');
+    const db = String(b.target_date || '9999-12-31');
+    return da.localeCompare(db);
+  });
+
+  const active_goals: Goal[] = upcomingStackRows.map((r) => toGoalRow(r));
 
   const emptyBundle = (): ActiveGoalCourseBundle => ({
     swim: null,
@@ -748,17 +825,22 @@ export async function getArcContext(
   }
 
   let active_plan: ActivePlanSummary | null = null;
-  const planRow = Array.isArray(plansRes?.data) && plansRes.data[0] ? plansRes.data[0] : null;
-  if (planRow) {
+  const plansRowsAscending = Array.isArray(plansRes?.data)
+    ? (plansRes.data as Record<string, unknown>[])
+    : [];
+  const temporalPlanRow = resolveTemporalPlanRow(plansRowsAscending, focusYmd);
+  let hasTemporalPlanAsOf = false;
+  if (temporalPlanRow) {
+    hasTemporalPlanAsOf = true;
     active_plan = buildActivePlanSummary(
       {
-        id: planRow.id,
-        config: planRow.config,
-        current_week: planRow.current_week,
-        duration_weeks: planRow.duration_weeks,
-        plan_type: planRow.plan_type
+        id: temporalPlanRow.id as string,
+        config: temporalPlanRow.config,
+        current_week: temporalPlanRow.current_week,
+        duration_weeks: temporalPlanRow.duration_weeks,
+        plan_type: temporalPlanRow.plan_type,
       },
-      focusDateISO
+      focusDateISO,
     );
   }
 
@@ -821,6 +903,47 @@ export async function getArcContext(
     console.log('[getArcContext] performance_numbers swim (swimPace100 or swim_pace_100_yd):', sp['swimPace100'] ?? sp['swim_pace_100_yd']);
   }
 
+  const goalRowsForPrimary = upcomingStackRows.map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? 'Untitled'),
+    goal_type: String(r.goal_type ?? 'event'),
+    target_date: r.target_date != null ? String(r.target_date).slice(0, 10) : null,
+    sport: r.sport != null ? String(r.sport) : null,
+    distance: r.distance != null ? String(r.distance) : null,
+    priority: String(r.priority ?? 'A'),
+    status: String(r.status ?? 'active'),
+    created_at: r.created_at != null ? String(r.created_at) : null,
+  }));
+
+  let runsSinceLastRaceCount: number | null = null;
+  const lrForRuns = pickLastCompletedGoalRaceBefore(rawGoalRowsAll, focusYmd);
+  if (lrForRuns) {
+    try {
+      const wc = await supabase
+        .from('workouts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('workout_status', 'completed')
+        .in('type', ['run', 'running'])
+        .gt('date', lrForRuns.target_date)
+        .lte('date', focusYmd);
+      const c = (wc as { count?: number | null })?.count;
+      runsSinceLastRaceCount =
+        typeof c === 'number' && Number.isFinite(c) ? c : null;
+    } catch (_e) {
+      runsSinceLastRaceCount = null;
+    }
+  }
+
+  const arc_narrative_context: ArcNarrativeContextV1 = buildArcNarrativeContextV1({
+    focusYmd,
+    goalRowsForPrimary,
+    completedGoalRowsForLastRace: rawGoalRowsAll,
+    activePlanPhase: active_plan?.phase ?? null,
+    hasActiveTemporalPlan: hasTemporalPlanAsOf,
+    runsSinceLastRace: runsSinceLastRaceCount,
+  });
+
   const run_pace_for_coach = buildRunPaceForCoach(learned_fitness);
 
   return {
@@ -843,6 +966,7 @@ export async function getArcContext(
     gear,
     run_pace_for_coach,
     user_id: userId,
-    built_at
+    built_at,
+    arc_narrative_context,
   };
 }

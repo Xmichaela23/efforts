@@ -1,6 +1,8 @@
 import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
 import { callLLM } from '../llm.ts';
+import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
+import { arcModeSystemAddon, arcNarrativeFactBlock } from '../arc-narrative-ai-appendix.ts';
 
 function normalizeParagraph(text: string): string {
   return String(text || '')
@@ -20,8 +22,8 @@ function extractNumericTokens(text: string): string[] {
   return Array.from(out);
 }
 
-function validateNoNewNumbers(summary: string, displayPacket: any): { ok: boolean; bad: string[] } {
-  const displayStr = JSON.stringify(displayPacket, null, 2);
+function validateNoNewNumbers(summary: string, displayPacket: any, extraAllowedJson?: string | null): { ok: boolean; bad: string[] } {
+  const displayStr = JSON.stringify(displayPacket, null, 2) + (extraAllowedJson ? '\n' + String(extraAllowedJson) : '');
   const tokens = extractNumericTokens(summary);
   const bad: string[] = [];
   for (const t of tokens) {
@@ -782,6 +784,7 @@ export async function generateAISummaryV1(
   flags: FlagV1[],
   _coachingContext?: string | null,
   _opts?: GenerateAISummaryV1Options | null,
+  arcNarrative?: ArcNarrativeContextV1 | null,
 ): Promise<string | null> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     console.warn('[ai-summary] ANTHROPIC_API_KEY not set — skipping narrative generation');
@@ -790,13 +793,18 @@ export async function generateAISummaryV1(
 
   const displayPacket = toDisplayFormatV1(factPacket, flags);
 
-  const userMessage = buildUserMessage(displayPacket);
-  const systemPrompt = COACHING_SYSTEM_PROMPT;
+  const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
+  const userMessage =
+    `${arcFacts ? `\nTEMPORAL ARC CONTEXT (do not contradict; paraphrase for athlete):\n${arcFacts}\n` : ''}` +
+    buildUserMessage(displayPacket);
+  const systemPrompt = `${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}`;
+  const numericAllowAnchors =
+    arcNarrative ? JSON.stringify(arcNarrative) : '';
 
   try {
     const s1 = await callLLMParagraph(systemPrompt, userMessage, 0.2);
     if (!s1) { console.warn('[ai-summary] attempt 1 returned empty'); return null; }
-    const v1 = validateNoNewNumbers(s1, displayPacket);
+    const v1 = validateNoNewNumbers(s1, displayPacket, numericAllowAnchors);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
     const len1 = validateAdaptiveLength(s1, displayPacket);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
@@ -814,7 +822,7 @@ export async function generateAISummaryV1(
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
     if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
-    const v2 = validateNoNewNumbers(s2, displayPacket);
+    const v2 = validateNoNewNumbers(s2, displayPacket, numericAllowAnchors);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);
     const len2 = validateAdaptiveLength(s2, displayPacket);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);

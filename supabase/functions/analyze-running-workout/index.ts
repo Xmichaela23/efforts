@@ -26,6 +26,8 @@ import {
 } from '../_shared/race-debrief.ts';
 import { runPostRaceFeedbackChain } from '../_shared/race-feedback.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
+import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 
 // =============================================================================
 // ANALYZE-RUNNING-WORKOUT - RUNNING ANALYSIS EDGE FUNCTION
@@ -1976,6 +1978,21 @@ Deno.serve(async (req) => {
     }
 
     // =========================================================================
+    // Arc narrative mode (workout date slice, not "now")
+    // =========================================================================
+    let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
+    try {
+      const wdSlice = String(workout.date || '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout.user_id) {
+        const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
+        arc_narrative_for_summary = arc.arc_narrative_context ?? null;
+        console.log(`[analyze-running-workout] arc_narrative mode=${arc_narrative_for_summary?.mode ?? 'n/a'}`);
+      }
+    } catch (arcSummErr) {
+      console.warn('[analyze-running-workout] arc_narrative_for_summary skipped:', arcSummErr);
+    }
+
+    // =========================================================================
     // AI coaching paragraph (v1)
     // Fact packet + flags + holistic training context (deterministic layer).
     // =========================================================================
@@ -1983,7 +2000,7 @@ Deno.serve(async (req) => {
     let ai_summary_generated_at: string | null = null;
     try {
       if (fact_packet_v1 && flags_v1) {
-        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1);
+        ai_summary = await generateAISummaryV1(fact_packet_v1, flags_v1, null, null, arc_narrative_for_summary);
         if (ai_summary) ai_summary_generated_at = new Date().toISOString();
       }
     } catch (e) {

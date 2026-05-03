@@ -36,7 +36,11 @@ Deno.serve(async (req) => {
       typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : new Date().toISOString().slice(0, 10);
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const arc: ArcContext = await getArcContext(supabase, userId, focusDateISO);
+    const arc: ArcContext = await getArcContext(
+      supabase,
+      userId,
+      `${focusDateISO.slice(0, 10)}T12:00:00.000Z`,
+    );
     return new Response(JSON.stringify({ arc }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
