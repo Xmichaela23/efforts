@@ -454,12 +454,20 @@ export function buildWeek(
   }
 
   if (recoveryRebuildWeek1 && !hasTri) {
-    // Post-marathon week 1 (run plans only): cap leg load. Tri plans let the TSS budget
-    // govern session length — week 1 is already light in base phase.
+    // Post-marathon week 1 (run-primary): aggressive leg caps.
     longRunMinutes = Math.min(longRunMinutes, 30);
     longRideMinutes = Math.min(longRideMinutes, 60);
     longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(longRunMinutes / 10)));
     longRideHours = Math.min(1, Math.max(0.5, longRideMinutes / 60));
+  }
+
+  if (recoveryRebuildWeek1 && hasTri && !raceThisWeek) {
+    // Post-marathon week 1 (combined tri): softer caps than run-primary — respect leg stress
+    // without stripping swim/bike touch frequency.
+    longRunMinutes = Math.min(longRunMinutes, 50);
+    longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(longRunMinutes / 9.5)));
+    longRideMinutes = Math.min(longRideMinutes, 90);
+    longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
   }
 
   // Swim yards (average ~2.0 yd/sec net = 120 yd/min; with rest ~80 yd/min effective)

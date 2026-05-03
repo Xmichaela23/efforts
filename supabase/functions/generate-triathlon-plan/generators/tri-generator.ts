@@ -68,7 +68,14 @@ const LONG_RUN_PROGRESSION: Record<TriDistance, Record<string, number[]>> = {
   },
 };
 
-// Long ride progressions (hours)
+// Full post-race transition week 1 — standalone tri parity with combined `recoveryRebuildWeek1`.
+const RECOVERY_REBUILD_W1_LONG_RUN_CAP_MIN = 50;
+const RECOVERY_REBUILD_W1_LONG_RIDE_CAP_HR = 1.5;
+
+// ============================================================================
+// LONG RIDE PROGRESSIONS (hours)
+// ============================================================================
+
 const LONG_RIDE_PROGRESSION: Record<TriDistance, Record<string, number[]>> = {
   sprint: {
     beginner:     [0.75, 1.0, 1.25, 1.0, 1.25, 1.5, 1.5, 1.0, 1.5, 1.75, 1.75, 1.25],
@@ -217,6 +224,11 @@ export class TriathlonGenerator {
     return ps.recovery_weeks.includes(week);
   }
 
+  /** Recent marathon / full post-race tier → `transition_mode: recovery_rebuild` from materialize. */
+  protected isRecoveryRebuildWeek1(week: number): boolean {
+    return week === 1 && this.params.transition_mode === 'recovery_rebuild';
+  }
+
   // ============================================================================
   // WEEK GENERATION
   // ============================================================================
@@ -228,11 +240,19 @@ export class TriathlonGenerator {
     isRecovery: boolean,
   ): TriSession[] {
     const vol = TRI_VOLUME[this.params.distance]?.[this.params.fitness]!;
+    const recoveryRebuildW1 = this.isRecoveryRebuildWeek1(week);
 
     // Scale long run from progression table (seeded by recent fitness if provided)
-    const longRunMi = this.getLongRun(week, phase, isRecovery);
+    let longRunMi = this.getLongRun(week, phase, isRecovery);
     // Scale long ride from progression table
-    const longRideHr = this.getLongRide(week, phase, isRecovery);
+    let longRideHr = this.getLongRide(week, phase, isRecovery);
+
+    if (recoveryRebuildW1) {
+      const maxMi = Math.max(2, Math.round(RECOVERY_REBUILD_W1_LONG_RUN_CAP_MIN / this.easyPaceMinPerMile()));
+      longRunMi = Math.min(longRunMi, maxMi);
+      longRideHr = Math.min(longRideHr, RECOVERY_REBUILD_W1_LONG_RIDE_CAP_HR);
+      longRideHr = Math.max(0, Math.round(longRideHr * 4) / 4);
+    }
 
     // Volume multiplier
     const vm = isRecovery ? 0.65 : phase.volume_multiplier;
@@ -249,7 +269,7 @@ export class TriathlonGenerator {
     const weekSwimYd  = Math.round(this.lerp(startSwimYd, peakSwimYd, week, this.params.duration_weeks) * vm);
 
     const isTaper      = phase.name === 'Taper';
-    const bricksThisWeek = isRecovery || isTaper ? 0 : phase.bricks_per_week;
+    const bricksThisWeek = recoveryRebuildW1 || isRecovery || isTaper ? 0 : phase.bricks_per_week;
     const weekInPhase  = Math.max(1, week - (phase.start_week ?? 1) + 1);
 
     const sessions: TriSession[] = [];
@@ -279,7 +299,9 @@ export class TriathlonGenerator {
     }
 
     // ── Tuesday: Bike Quality ────────────────────────────────────────────────
-    if (!isTaper || isRecovery) {
+    if (recoveryRebuildW1) {
+      sessions.push(this.recoveryRebuildEasyBikeSession('Tuesday'));
+    } else if (!isTaper || isRecovery) {
       sessions.push(this.bikeQualitySession(phase, isRecovery, 'Tuesday'));
     } else {
       sessions.push(this.bikeOpenersSession('Tuesday'));
@@ -289,10 +311,16 @@ export class TriathlonGenerator {
     // If run plan already has a Wednesday run (e.g. tempo), skip the tri run quality
     // session — the run plan's hard effort counts toward triathlon run fitness.
     const runQualMi = this.runQualityMiles(phase, isRecovery, week);
+    const swimWeekForQuality = recoveryRebuildW1 ? Math.round(weekSwimYd * 0.55) : weekSwimYd;
     if (!existingRunDays.has('Wednesday')) {
-      sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
+      if (recoveryRebuildW1) {
+        const easyMi = Math.max(3, Math.round(longRunMi * 0.25));
+        sessions.push(this.easyRunSession(easyMi, 'Wednesday'));
+      } else {
+        sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
+      }
     }
-    sessions.push(this.swimQualitySession(weekSwimYd, phase, isRecovery, 'Wednesday'));
+    sessions.push(this.swimQualitySession(swimWeekForQuality, phase, isRecovery, 'Wednesday'));
 
     // ── Thursday: Second Brick (Race-Specific) or Endurance Ride ─────────────
     if (bricksThisWeek >= 2) {
@@ -305,20 +333,26 @@ export class TriathlonGenerator {
     }
 
     // ── Monday: Easy Recovery Swim ───────────────────────────────────────────
-    const recSwimYd = Math.max(1500, Math.round(weekSwimYd * 0.35));
+    const recSwimYd = recoveryRebuildW1
+      ? Math.max(1000, Math.round(weekSwimYd * 0.28))
+      : Math.max(1500, Math.round(weekSwimYd * 0.35));
     sessions.push(this.easySwimSession(recSwimYd, 'Monday'));
 
     // ── Friday: Easy Run ─────────────────────────────────────────────────────
     // Skip if run plan already has a Friday run — no point doubling up easy miles.
     if (supportRunMi >= 3 && !isTaper && !existingRunDays.has('Friday')) {
-      const easyRunMi = Math.max(3, Math.round(supportRunMi * 0.6));
+      let easyRunMi = Math.max(3, Math.round(supportRunMi * 0.6));
+      if (recoveryRebuildW1) {
+        const capMi = Math.max(3, Math.round(30 / this.easyPaceMinPerMile()));
+        easyRunMi = Math.min(easyRunMi, capMi);
+      }
       sessions.push(this.easyRunSession(easyRunMi, 'Friday'));
     }
 
     // ── Strength (optional, protocol-driven) ─────────────────────────────────
     // Strength goes on the lightest aerobic days. The triathlon protocol selects
     // phase-appropriate exercises and respects brick-day placement guardrails.
-    if ((this.params.strength_frequency ?? 0) > 0 && !isRecovery) {
+    if ((this.params.strength_frequency ?? 0) > 0 && !isRecovery && !recoveryRebuildW1) {
       // Compute weekInPhase: how many weeks into the current phase is this week?
       const phaseStartWeek = ps.phases.find(p => p.name === phase.name)?.start_week ?? 1;
       const wipForStrength = Math.max(1, week - phaseStartWeek + 1);
@@ -536,6 +570,20 @@ export class TriathlonGenerator {
       description: `${Math.round(hours * 60)} min steady aerobic ride at 65–75% FTP.`,
       duration: mins,
       steps_preset: [`bike_endurance_${mins}min_Z2`],
+      tags: ['aerobic_ride'],
+    };
+  }
+
+  /** Week 1 after full post-race context — easy spin only (mirrors combined `recoveryRebuildWeek1` bike slot). */
+  protected recoveryRebuildEasyBikeSession(day: string): TriSession {
+    return {
+      day,
+      type: 'bike',
+      name: 'Easy Ride',
+      description:
+        '50 min easy aerobic ride, Zone 2. Legs are rebuilding after recent racing — keep power and duration conservative.',
+      duration: 50,
+      steps_preset: ['bike_endurance_50min_Z2'],
       tags: ['aerobic_ride'],
     };
   }
