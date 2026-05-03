@@ -673,8 +673,9 @@ export async function getArcContext(
 
   const start90Ymd = addDaysYmd(focusYmd, -90);
 
+  // Omit `completed_at` until universally migrated — selecting a missing column empty-errors the query and silently starves Arc.
   const goalsArcRowSelect =
-    'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at, completed_at';
+    'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at';
 
   const [
     baselinesRes,
@@ -778,6 +779,10 @@ export async function getArcContext(
   const effort_paces = parseJsonObject(baseline?.effort_paces);
   const units = baseline?.units != null && typeof baseline.units === 'string' ? (baseline.units as string) : null;
   const dismissed_suggestions = parseJsonObject(baseline?.dismissed_suggestions);
+
+  if (goalsRes?.error) console.warn('[getArcContext] goals (main)', goalsRes.error.message);
+  if (pastEventGoalsBeforeFocusRes?.error)
+    console.warn('[getArcContext] goals (past_events)', pastEventGoalsBeforeFocusRes.error.message);
 
   const rawGoalsMain = Array.isArray(goalsRes?.data) ? (goalsRes.data as Record<string, unknown>[]) : [];
   const rawGoalsPastEvents = Array.isArray(pastEventGoalsBeforeFocusRes?.data)

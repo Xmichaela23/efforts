@@ -228,17 +228,19 @@ export function selectArcNarrativeMode(params: {
     daysUntilNextGoalRace != null && Number.isFinite(daysUntilNextGoalRace) ? daysUntilNextGoalRace : null;
 
   const pri = String(nextGoalPriority || 'A').toUpperCase();
-  /** Imminent A-priority race wins over post-race windows (taper + debrief can overlap on calendar). */
-  if (dRace != null && dRace >= 0 && dRace <= 14 && pri === 'A') {
-    return 'taper_read';
-  }
 
+  /** Post–goal-race horizons first: athlete truth is “coming back from X” until that window closes. */
   if (dSince != null && dSince >= 0 && dSince <= 7) {
     return 'race_debrief';
   }
 
   if (dSince != null && dSince >= 8 && dSince <= 21) {
     return 'recovery_read';
+  }
+
+  /** Near-term A race (no recent finish in debrief/recovery window above). */
+  if (dRace != null && dRace >= 0 && dRace <= 14 && pri === 'A') {
+    return 'taper_read';
   }
 
   if (hasActiveTemporalPlan) {

@@ -45,7 +45,8 @@ REQUIRED FRAMING OPEN — the narrative's FIRST or SECOND sentence MUST include 
 ${ng ? `- Their next stacked target "${ng.name}" is still ahead; heuristic block/start spacing suggests ~${blockIn} days before structured build density — treat this outing as bridging/re-entry pace.` : '- Next primary race target is unspecified in Arc.'}
 
 YOU MUST SURFACE (pick what data supports — skip only if unavailable):
-- Pace-normalized / terrain-aware HR drift and whether it hints at aerobic economy vs pace creep.
+- Pace-normalized / terrain-aware HR drift and whether it hints at aerobic economy vs pace creep. If drift_explanation is pace_driven, describe HR tracking the faster/slower halves without using the literal word \"drift\".
+- Temperature / humidity / heat-stress lines when WORKOUT Weather is present — connect briefly to restraint on easy days in that comeback window when relevant (no invented dehydration narrative).
 - Steady conversational effort vs HR for easy work (recovery absorption read).
 - Consistency vs recent similar runs ONLY when COMPARED TO SIMILAR WORKOUTS appears in facts.
 

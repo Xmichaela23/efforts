@@ -77,7 +77,7 @@ Deno.test('taper_read near next A race when recovery branch does not win', () =>
   assertEquals(mode, 'taper_read');
 });
 
-Deno.test('taper_read beats race_debrief when both horizons overlap calendar', () => {
+Deno.test('race_debrief overrides taper_read when freshly post-goal despite imminent A race', () => {
   const mode = selectArcNarrativeMode({
     focusYmd: '2026-04-21',
     daysSinceLastGoalRace: 2,
@@ -87,7 +87,20 @@ Deno.test('taper_read beats race_debrief when both horizons overlap calendar', (
     phaseBucket: 'taper',
     hasActiveTemporalPlan: true,
   });
-  assertEquals(mode, 'taper_read');
+  assertEquals(mode, 'race_debrief');
+});
+
+Deno.test('recovery_read overrides taper_read when comeback window overlaps near-term A race', () => {
+  const mode = selectArcNarrativeMode({
+    focusYmd: '2026-04-29',
+    daysSinceLastGoalRace: 10,
+    daysUntilNextBlockStart: null,
+    daysUntilNextGoalRace: 11,
+    nextGoalPriority: 'A',
+    phaseBucket: 'taper',
+    hasActiveTemporalPlan: true,
+  });
+  assertEquals(mode, 'recovery_read');
 });
 
 Deno.test('pickLastGoalRace picks past dated event goals even while status active', () => {

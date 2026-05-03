@@ -1,7 +1,7 @@
 import type { FactPacketV1, FlagV1 } from './types.ts';
 import { coerceNumber, secondsToPaceString } from './utils.ts';
 import { callLLM } from '../llm.ts';
-import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
+import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
 import { arcModeSystemAddon, arcNarrativeFactBlock } from '../arc-narrative-ai-appendix.ts';
 
 function normalizeParagraph(text: string): string {
@@ -103,20 +103,34 @@ function getTopFlags(displayPacket: any): Array<{ type: string; message: string;
     .map((f: any) => ({ type: String(f.type || ''), message: String(f.message || ''), priority: Number(f.priority || 99) }));
 }
 
-function validateAdaptiveLength(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+function validateAdaptiveLength(
+  summary: string,
+  displayPacket: any,
+  arcMode?: ArcNarrativeMode | null,
+): { ok: boolean; why: string | null } {
+  const temporalRich =
+    arcMode === 'recovery_read' || arcMode === 'race_debrief' || arcMode === 'taper_read';
   const top = getTopFlags(displayPacket);
   const hasConcern = top.some((f) => f.type === 'concern' && f.priority <= 2);
   const sentences = countSentences(summary);
   const clauses = countClauses(summary);
   const words = countWords(summary);
+  /** Post-race / taper prose needs room for mandated Arc opening + physiology + conditions. */
+  const wBump = temporalRich ? 22 : 0;
+  const cBump = temporalRich ? 2 : 0;
+  const maxWordsLo = 50 + wBump;
+  const maxWordsHi = 65 + wBump;
+  const maxClausesLo = 4 + cBump;
+  const maxClausesHi = 5 + cBump;
+
   if (!hasConcern) {
     if (sentences > 3) return { ok: false, why: `too many sentences (${sentences}) for low-signal workout` };
-    if (clauses > 4) return { ok: false, why: `too many clauses (${clauses}) for low-signal workout` };
-    if (words > 50) return { ok: false, why: `too many words (${words}) for low-signal workout` };
+    if (clauses > maxClausesLo) return { ok: false, why: `too many clauses (${clauses}) for low-signal workout` };
+    if (words > maxWordsLo) return { ok: false, why: `too many words (${words}) for low-signal workout` };
   }
   if (sentences > 3) return { ok: false, why: `too many sentences (${sentences})` };
-  if (clauses > 5) return { ok: false, why: `too many clauses (${clauses})` };
-  if (words > 65) return { ok: false, why: `too many words (${words})` };
+  if (clauses > maxClausesHi) return { ok: false, why: `too many clauses (${clauses})` };
+  if (words > maxWordsHi) return { ok: false, why: `too many words (${words})` };
   return { ok: true, why: null };
 }
 
@@ -864,7 +878,7 @@ export async function generateAISummaryV1(
     if (!s1) { console.warn('[ai-summary] attempt 1 returned empty'); return null; }
     const v1 = validateNoNewNumbers(s1, displayPacket, numericAllowAnchors);
     const z1 = validateNoZoneTimeClaims(s1, displayPacket);
-    const len1 = validateAdaptiveLength(s1, displayPacket);
+    const len1 = validateAdaptiveLength(s1, displayPacket, arcNarrative?.mode);
     const td1 = validateTerrainExplainsDrift(s1, displayPacket);
     const g1 = validateNoGenericFiller(s1);
     const hr1 = validateNoHrWithoutData(s1, displayPacket);
@@ -883,7 +897,7 @@ export async function generateAISummaryV1(
     if (!s2) { console.warn('[ai-summary] attempt 2 returned empty'); return null; }
     const v2 = validateNoNewNumbers(s2, displayPacket, numericAllowAnchors);
     const z2 = validateNoZoneTimeClaims(s2, displayPacket);
-    const len2 = validateAdaptiveLength(s2, displayPacket);
+    const len2 = validateAdaptiveLength(s2, displayPacket, arcNarrative?.mode);
     const td2 = validateTerrainExplainsDrift(s2, displayPacket);
     const g2 = validateNoGenericFiller(s2);
     const hr2 = validateNoHrWithoutData(s2, displayPacket);
