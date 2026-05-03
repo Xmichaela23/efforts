@@ -212,6 +212,22 @@ function validateNoPaceDeltaFormat(summary: string): { ok: boolean; why: string 
   return { ok: true, why: null };
 }
 
+function validateNoRpeClaimsWithoutAthleteReport(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
+  const rpeLogged = displayPacket?.workout?.athlete_reported?.rpe;
+  const hasRpe =
+    rpeLogged != null && typeof rpeLogged !== 'boolean' && Number.isFinite(Number(rpeLogged));
+  if (hasRpe) return { ok: true, why: null };
+  const s = String(summary || '');
+  const sl = s.toLowerCase();
+  if (/\brpe\b/i.test(sl)) {
+    return { ok: false, why: 'Do not cite RPE unless athlete_reported.rpe is present in the fact packet' };
+  }
+  if (/\b\d{1,2}(?:\.\d)?\s+out\s+of\s+10\b/i.test(s)) {
+    return { ok: false, why: 'Do not invent effort scores (out of 10) unless athlete_reported.rpe is logged' };
+  }
+  return { ok: true, why: null };
+}
+
 function validateNoHrWithoutData(summary: string, displayPacket: any): { ok: boolean; why: string | null } {
   const hasHr = !!(displayPacket?.workout?.avg_hr || displayPacket?.workout?.max_hr);
   if (hasHr) return { ok: true, why: null };
@@ -812,12 +828,13 @@ export async function generateAISummaryV1(
     const hr1 = validateNoHrWithoutData(s1, displayPacket);
     const pd1 = validateNoPaceDeltaFormat(s1);
     const ac1 = validateNoAthleteContradiction(s1, displayPacket);
-    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok) return s1;
-    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why }));
+    const rp1 = validateNoRpeClaimsWithoutAthleteReport(s1, displayPacket);
+    if (v1.ok && z1.ok && len1.ok && td1.ok && g1.ok && hr1.ok && pd1.ok && ac1.ok && rp1.ok) return s1;
+    console.warn('[ai-summary] attempt 1 rejected:', JSON.stringify({ num: v1.ok, bad: v1.bad, zone: z1.why, len: len1.why, td: td1.why, filler: g1.why, hr: hr1.why, pd: pd1.why, ac: ac1.why, rp: rp1.why }));
 
     const corrections = [
       v1.bad.length ? 'Bad numeric tokens: ' + v1.bad.join(', ') : null,
-      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why,
+      z1.why, len1.why, td1.why, g1.why, hr1.why, pd1.why, ac1.why, rp1.why,
     ].filter(Boolean);
     const corrective = userMessage + '\n\nYou violated constraints:\n' + corrections.map(c => '- ' + c).join('\n') + '\nRewrite and fix.';
     const s2 = await callLLMParagraph(systemPrompt, corrective, 0);
@@ -830,9 +847,10 @@ export async function generateAISummaryV1(
     const hr2 = validateNoHrWithoutData(s2, displayPacket);
     const pd2 = validateNoPaceDeltaFormat(s2);
     const ac2 = validateNoAthleteContradiction(s2, displayPacket);
-    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok) return s2;
-    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why }));
-    if (!hr2.ok || !ac2.ok) return null;
+    const rp2 = validateNoRpeClaimsWithoutAthleteReport(s2, displayPacket);
+    if (v2.ok && z2.ok && len2.ok && td2.ok && g2.ok && hr2.ok && pd2.ok && ac2.ok && rp2.ok) return s2;
+    console.warn('[ai-summary] attempt 2 also rejected:', JSON.stringify({ num: v2.ok, zone: z2.why, len: len2.why, td: td2.why, filler: g2.why, hr: hr2.why, pd: pd2.why, ac: ac2.why, rp: rp2.why }));
+    if (!hr2.ok || !ac2.ok || !rp2.ok) return null;
     return s2;
   } catch (e) {
     console.warn('[fact-packet] ai_summary generation failed:', e);

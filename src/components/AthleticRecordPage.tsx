@@ -185,6 +185,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
           .from('goals')
           .update({
             status: 'completed',
+            completed_at: new Date().toISOString(),
             current_value: seconds,
             training_prefs: {
               ...currentPrefs,
@@ -204,6 +205,11 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         return;
       }
       if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
+      const date10 =
+        typeof manual.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(manual.date.slice(0, 10))
+          ? manual.date.slice(0, 10)
+          : null;
+      const racedAt = date10 ? `${date10}T12:00:00.000Z` : new Date().toISOString();
       const { error } = await supabase.from('goals').insert({
         user_id: uid,
         name: manual.name.trim(),
@@ -212,6 +218,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
         distance: manual.distance,
         sport: 'run',
         status: 'completed',
+        completed_at: racedAt,
         current_value: seconds,
         training_prefs: { manual_athletic_record: true, time_source: 'manual_elapsed' },
       } as any);

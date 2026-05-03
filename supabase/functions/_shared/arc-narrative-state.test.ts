@@ -5,8 +5,15 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   calendarDaysBetween,
   pickTemporalPrimaryGoal,
+  pickLastCompletedGoalRaceBefore,
   selectArcNarrativeMode,
+  sanitizeUserFacingPhaseLabel,
 } from './arc-narrative-state.ts';
+
+Deno.test('sanitizeUserFacingPhaseLabel removes (generated) suffix', () => {
+  assertEquals(sanitizeUserFacingPhaseLabel('taper (generated)'), 'taper');
+  assertEquals(sanitizeUserFacingPhaseLabel('Peak (Generated)'), 'Peak');
+});
 
 Deno.test('calendarDaysBetween end-exclusive semantics', () => {
   assertEquals(calendarDaysBetween('2026-04-02', '2026-04-19'), 17);
@@ -44,11 +51,11 @@ Deno.test('temporal primary — upcoming marathon beats later tri goal on histor
   assertEquals(marathon?.id, 'm');
 });
 
-Deno.test('recovery_read when recent race + structured block horizon ahead', () => {
+Deno.test('recovery_read shortly after goal race — no structured-block gate', () => {
   const mode = selectArcNarrativeMode({
     focusYmd: '2026-05-03',
     daysSinceLastGoalRace: 14,
-    daysUntilNextBlockStart: 10,
+    daysUntilNextBlockStart: null,
     daysUntilNextGoalRace: 120,
     nextGoalPriority: 'A',
     phaseBucket: 'unspecified',
@@ -68,4 +75,34 @@ Deno.test('taper_read near next A race when recovery branch does not win', () =>
     hasActiveTemporalPlan: true,
   });
   assertEquals(mode, 'taper_read');
+});
+
+Deno.test('taper_read beats race_debrief when both horizons overlap calendar', () => {
+  const mode = selectArcNarrativeMode({
+    focusYmd: '2026-04-21',
+    daysSinceLastGoalRace: 2,
+    daysUntilNextBlockStart: 100,
+    daysUntilNextGoalRace: 12,
+    nextGoalPriority: 'A',
+    phaseBucket: 'taper',
+    hasActiveTemporalPlan: true,
+  });
+  assertEquals(mode, 'taper_read');
+});
+
+Deno.test('pickLastGoalRace picks past dated event goals even while status active', () => {
+  const lr = pickLastCompletedGoalRaceBefore(
+    [
+      {
+        name: 'Ojai',
+        distance: 'marathon',
+        target_date: '2026-04-19',
+        status: 'active',
+        goal_type: 'event',
+      },
+    ],
+    '2026-04-29',
+  );
+  assertEquals(lr?.target_date, '2026-04-19');
+  assertEquals(lr?.name, 'Ojai');
 });

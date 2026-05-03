@@ -4,7 +4,7 @@
 import type { ArcContext, Goal } from '../arc-context.ts';
 import type { ArcNarrativeContextV1, ArcNarrativeMode } from '../arc-narrative-state.ts';
 
-export const ARC_PERFORMANCE_BRIDGE_VERSION = 5;
+export const ARC_PERFORMANCE_BRIDGE_VERSION = 6;
 
 export type ArcPerformancePrimaryGoalV1 = {
   id: string;

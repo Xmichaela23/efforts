@@ -23,6 +23,8 @@ export interface Goal {
   projection?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  /** When the goal was marked completed (event goals); optional until column backfilled client-side read */
+  completed_at?: string | null;
 }
 
 export type GoalInsert = Omit<Goal, 'id' | 'user_id' | 'created_at' | 'updated_at'>;

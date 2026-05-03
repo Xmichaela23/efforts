@@ -479,6 +479,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       .from('goals')
       .update({
         status: 'completed',
+        completed_at: new Date().toISOString(),
         current_value: bestSec,
         training_prefs: {
           ...currentPrefs,
@@ -1166,6 +1167,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                         : {};
                     const updated = await updateGoal(goal.id, {
                       status: 'completed',
+                      completed_at: new Date().toISOString(),
                       current_value: seconds,
                       training_prefs: {
                         ...currentPrefs,

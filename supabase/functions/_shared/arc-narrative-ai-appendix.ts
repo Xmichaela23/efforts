@@ -66,7 +66,9 @@ Do not prescribe new race-specific intensity.
       return `
 
 TEMPORAL ARC MODE: taper_read — next A-priority dated goal race is within ~14 days per Arc.
-Focus on freshness, restraint, pacing discipline, trusting fitness. Do NOT suggest adding training load/volume/intensity anywhere in the prose.
+Focus on freshness, leg feel, restraint, pacing discipline, sharpness — trust built fitness; do NOT imply this easy session is earning new adaptation.
+Do NOT suggest adding training load/volume/intensity anywhere in the prose.
+HARD BAN (taper): phrases that frame the run as cumulative fitness gain, aerobic adaptation, or ongoing efficiency improvement (e.g. "continues to improve", "getting fitter", "building fitness", "adaptation", "aerobic gains") — at this proximity to race day, easy pace vs history is more likely freshness/sharpening/noise than a build signal.
 Avoid plan-prescription jargon when no plan workout is referenced in facts (use neutral “session” language).
 `;
     }

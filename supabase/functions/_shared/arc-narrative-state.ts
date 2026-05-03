@@ -29,6 +29,14 @@ export type ArcNarrativeLastRace = {
 /** Normalized bucket for plan.phase string ( substring match ). */
 export type ArcPlanPhaseBucket = 'peak' | 'base' | 'build' | 'taper' | 'recovery' | 'unspecified';
 
+/** Strip planner-internal markers from phase labels shown to athletes (e.g. "(generated)"). */
+export function sanitizeUserFacingPhaseLabel(phaseRaw: string | null | undefined): string | null {
+  let s = String(phaseRaw ?? '').trim();
+  if (!s) return null;
+  s = s.replace(/\s*\([^)]*\bgenerated\b[^)]*\)/gi, '').trim();
+  return s || null;
+}
+
 export type ArcNarrativeContextV1 = {
   version: 1;
   focus_date: string;
@@ -134,7 +142,11 @@ export function pickTemporalPrimaryGoal(
   };
 }
 
-/** Most recent completed event goal strictly before focusYmd (temporal cursor). */
+/**
+ * Most recent **event** goal whose race day is strictly before `focusYmd`.
+ * Includes goals still `active`/`paused` with a past `target_date` so Arc stays honest when
+ * `status` flips to `completed` late (e.g. recovery runs before the DB marked the race done).
+ */
 export function pickLastCompletedGoalRaceBefore(
   rows: Array<{
     name: unknown;
@@ -142,12 +154,13 @@ export function pickLastCompletedGoalRaceBefore(
     target_date: unknown;
     status: unknown;
     goal_type: unknown;
+    completed_at?: unknown;
   }>,
   focusYmd: string,
 ): ArcNarrativeLastRace | null {
   const focus = focusYmd.slice(0, 10);
   const candidates = rows
-    .filter((r) => String(r.status || '').toLowerCase() === 'completed')
+    .filter((r) => String(r.status || '').toLowerCase() !== 'cancelled')
     .filter((r) => String(r.goal_type || '').toLowerCase() === 'event')
     .map((r) => ({
       name: String(r.name || 'Race'),
@@ -202,31 +215,30 @@ export function selectArcNarrativeMode(params: {
 }): ArcNarrativeMode {
   const {
     daysSinceLastGoalRace,
-    daysUntilNextBlockStart,
+    daysUntilNextBlockStart: _unusedBlockHorizon,
     daysUntilNextGoalRace,
     nextGoalPriority,
     phaseBucket,
     hasActiveTemporalPlan,
   } = params;
+  void _unusedBlockHorizon;
 
   const dSince = daysSinceLastGoalRace;
-  const dBlock =
-    daysUntilNextBlockStart != null && Number.isFinite(daysUntilNextBlockStart)
-      ? daysUntilNextBlockStart
-      : null;
   const dRace =
     daysUntilNextGoalRace != null && Number.isFinite(daysUntilNextGoalRace) ? daysUntilNextGoalRace : null;
 
-  if (dSince != null && dSince >= 0 && dSince <= 21 && dBlock != null && dBlock > 0) {
-    return 'recovery_read';
+  const pri = String(nextGoalPriority || 'A').toUpperCase();
+  /** Imminent A-priority race wins over post-race windows (taper + debrief can overlap on calendar). */
+  if (dRace != null && dRace >= 0 && dRace <= 14 && pri === 'A') {
+    return 'taper_read';
   }
+
   if (dSince != null && dSince >= 0 && dSince <= 7) {
     return 'race_debrief';
   }
 
-  const pri = String(nextGoalPriority || 'A').toUpperCase();
-  if (dRace != null && dRace >= 0 && dRace <= 14 && pri === 'A') {
-    return 'taper_read';
+  if (dSince != null && dSince >= 8 && dSince <= 21) {
+    return 'recovery_read';
   }
 
   if (hasActiveTemporalPlan) {

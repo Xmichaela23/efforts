@@ -5,6 +5,7 @@
 import { resolvePlanWeekIndex } from './plan-week.ts';
 import {
   buildArcNarrativeContextV1,
+  sanitizeUserFacingPhaseLabel,
   goalIsUpcomingStackAsOf,
   pickLastCompletedGoalRaceBefore,
   type ArcNarrativeContextV1,
@@ -487,7 +488,7 @@ function buildActivePlanSummary(
   if (contract?.version === 1 && Array.isArray(contract.phase_by_week) && weekIndex != null) {
     const i = weekIndex - 1;
     if (i >= 0 && i < contract.phase_by_week.length) {
-      phase = contract.phase_by_week[i] ?? null;
+      phase = sanitizeUserFacingPhaseLabel(contract.phase_by_week[i] ?? null);
     }
   }
 
@@ -682,7 +683,7 @@ export async function getArcContext(
     supabase
       .from('goals')
       .select(
-        'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at',
+        'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at, completed_at',
       )
       .eq('user_id', userId)
       .neq('status', 'cancelled')

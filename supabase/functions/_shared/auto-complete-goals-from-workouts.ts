@@ -74,7 +74,11 @@ export async function autoCompleteGoalsFromWorkouts(
       const { found, finishSeconds } = resolveFinishFromWorkouts(g.sport, dayW);
       if (!found) continue;
 
-      const payload: Record<string, unknown> = { status: 'completed', updated_at: new Date().toISOString() };
+      const payload: Record<string, unknown> = {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
       if (g.target_time == null && finishSeconds != null) {
         payload.target_time = finishSeconds;
       }

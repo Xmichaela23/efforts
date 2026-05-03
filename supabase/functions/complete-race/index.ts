@@ -205,6 +205,7 @@ Deno.serve(async (req) => {
       .from('goals')
       .update({
         status: 'completed',
+        completed_at: new Date().toISOString(),
         current_value: actualSeconds,
         training_prefs: nextPrefs,
         updated_at: new Date().toISOString(),
