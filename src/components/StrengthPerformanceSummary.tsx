@@ -106,7 +106,23 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         return { name: ex.name, setsArray };
       }
     }
-    return { name: ex.name, setsArray: Array.isArray(ex.sets) ? ex.sets : [] };
+    if (Array.isArray(ex.sets) && ex.sets.length > 0) {
+      return { name: ex.name, setsArray: ex.sets };
+    }
+    // Legacy compact shape: sets = set count, reps & weight on exercise (same as workout-detail fallback)
+    if (typeof ex.sets === 'number' && ex.sets > 0) {
+      const reps = Number(ex.reps ?? 0) || 0;
+      const weight = Number(ex.weight ?? 0) || 0;
+      if (reps > 0 || weight > 0) {
+        const setsArray = Array.from({ length: ex.sets }, () => ({
+          reps,
+          weight,
+          completed: true as boolean,
+        }));
+        return { name: ex.name, setsArray };
+      }
+    }
+    return { name: ex.name, setsArray: [] };
   });
 
   const planId = (planned as any)?.training_plan_id 

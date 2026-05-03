@@ -144,6 +144,25 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
           } else if (baseSdLen > 0) {
             merged.sensor_data = baseSd;
           }
+          // strength/mobility: avoid remote null/empty overwriting list/cache rows that still have logged sets
+          const remoteSe = (remote as any)?.strength_exercises;
+          const baseSe = (base as any)?.strength_exercises;
+          const remoteSeLen = Array.isArray(remoteSe) ? remoteSe.length : 0;
+          const baseSeLen = Array.isArray(baseSe) ? baseSe.length : 0;
+          if (remoteSeLen > 0) {
+            merged.strength_exercises = remoteSe;
+          } else if (baseSeLen > 0) {
+            merged.strength_exercises = baseSe;
+          }
+          const remoteMe = (remote as any)?.mobility_exercises;
+          const baseMe = (base as any)?.mobility_exercises;
+          const remoteMeLen = Array.isArray(remoteMe) ? remoteMe.length : 0;
+          const baseMeLen = Array.isArray(baseMe) ? baseMe.length : 0;
+          if (remoteMeLen > 0) {
+            merged.mobility_exercises = remoteMe;
+          } else if (baseMeLen > 0) {
+            merged.mobility_exercises = baseMe;
+          }
         } else {
           merged = remote;
         }
