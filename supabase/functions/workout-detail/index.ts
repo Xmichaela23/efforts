@@ -59,6 +59,19 @@ function parseAnalysisFromWorkoutRow(row: any): Record<string, unknown> {
   return {};
 }
 
+/** Skip weekly readiness + plan-context fetches for strength/mobility unless goal race (race-readiness path needs plan context). */
+function isStrengthLikePerfSession(row: any): boolean {
+  const t = String(row?.type ?? row?.refined_type ?? '').toLowerCase();
+  return (
+    t.includes('strength') ||
+    t === 'weight_training' ||
+    t === 'weights' ||
+    t.includes('mobility') ||
+    t.includes('pilates') ||
+    t.includes('yoga')
+  );
+}
+
 function msFromTimestampField(v: unknown): number | null {
   if (v == null) return null;
   if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -312,19 +325,38 @@ async function runSessionDetailPipelineAndPersist(
     const weekEndDate = addDaysISO(weekStartDate, 6);
     const asOfDate = workoutDate;
 
+    const waEarlyRaw = (detail as any).workout_analysis;
+    let wa: any =
+      typeof waEarlyRaw === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(waEarlyRaw);
+            } catch {
+              return {};
+            }
+          })()
+        : waEarlyRaw && typeof waEarlyRaw === 'object'
+          ? waEarlyRaw
+          : {};
+    if (!wa || typeof wa !== 'object') wa = {};
+
+    const strengthPerfFastPath = isStrengthLikePerfSession(row) && wa?.is_goal_race !== true;
+
     let readinessSnapshot: ReadinessSnapshotV1 | null = null;
     let readinessUnavailable = false;
-    const readinessP = buildReadiness(supabase, userId, new Date(workoutDate))
-      .then((r) => {
-        readinessSnapshot = r;
-      })
-      .catch((reErr: unknown) => {
-        readinessUnavailable = true;
-        console.warn(
-          '[session_detail_v1] readiness unavailable, using legacy load context:',
-          reErr instanceof Error ? reErr.message : reErr,
-        );
-      });
+    const readinessP = strengthPerfFastPath
+      ? Promise.resolve()
+      : buildReadiness(supabase, userId, new Date(workoutDate))
+          .then((r) => {
+            readinessSnapshot = r;
+          })
+          .catch((reErr: unknown) => {
+            readinessUnavailable = true;
+            console.warn(
+              '[session_detail_v1] readiness unavailable, using legacy load context:',
+              reErr instanceof Error ? reErr.message : reErr,
+            );
+          });
 
     const [plannedRes, weekWorkoutsRes, , arcCtx] = await Promise.all([
       supabase
@@ -406,7 +438,6 @@ async function runSessionDetailPipelineAndPersist(
     const sessionObs = bodyResponse.session_signals.find((o) => o.workout_id === id);
     const observations = sessionObs?.observations ?? [];
 
-    const wa = (detail as any).workout_analysis || {};
     // Goal races use structured technical_insights — suppress ai_summary so it doesn't render as a wall of text
     const narrativeText = wa?.is_goal_race === true
       ? null
@@ -510,47 +541,49 @@ async function runSessionDetailPipelineAndPersist(
     } : null;
 
     let planCtxForSession: PlanContext | null = null;
-    try {
-      let tpId =
-        plannedRowRaw?.training_plan_id ??
-        attachPlannedRaw?.training_plan_id ??
-        null;
-      const hasPlanLink = !!(match?.planned_id || effectivePlannedId);
-      if (!tpId && userId && hasPlanLink) {
-        const activePid = await fetchActivePlanId(supabase, userId);
-        if (activePid) {
-          tpId = activePid;
-          console.warn(
-            '[session_detail_v1] plan context: resolved plans.id from active plan (planned row missing training_plan_id)',
-          );
+    if (!strengthPerfFastPath) {
+      try {
+        let tpId =
+          plannedRowRaw?.training_plan_id ??
+          attachPlannedRaw?.training_plan_id ??
+          null;
+        const hasPlanLink = !!(match?.planned_id || effectivePlannedId);
+        if (!tpId && userId && hasPlanLink) {
+          const activePid = await fetchActivePlanId(supabase, userId);
+          if (activePid) {
+            tpId = activePid;
+            console.warn(
+              '[session_detail_v1] plan context: resolved plans.id from active plan (planned row missing training_plan_id)',
+            );
+          }
         }
-      }
-      if (userId && tpId && workoutDate) {
-        planCtxForSession = await fetchPlanContextForWorkout(
-          supabase,
-          userId,
-          String(tpId),
-          workoutDate,
-        );
-        if (!planCtxForSession) {
-          planCtxForSession = await fetchPlanRaceMetaForWorkout(
+        if (userId && tpId && workoutDate) {
+          planCtxForSession = await fetchPlanContextForWorkout(
             supabase,
             userId,
             String(tpId),
             workoutDate,
           );
-          if (planCtxForSession) {
-            console.warn(
-              '[session_detail_v1] plan context: race-meta fallback (full week context unavailable)',
+          if (!planCtxForSession) {
+            planCtxForSession = await fetchPlanRaceMetaForWorkout(
+              supabase,
+              userId,
+              String(tpId),
+              workoutDate,
             );
+            if (planCtxForSession) {
+              console.warn(
+                '[session_detail_v1] plan context: race-meta fallback (full week context unavailable)',
+              );
+            }
           }
         }
+      } catch (durErr: unknown) {
+        console.warn(
+          '[session_detail_v1] plan context fetch failed:',
+          durErr instanceof Error ? durErr.message : durErr,
+        );
       }
-    } catch (durErr: unknown) {
-      console.warn(
-        '[session_detail_v1] plan context fetch failed:',
-        durErr instanceof Error ? durErr.message : durErr,
-      );
     }
 
     const hasLinkedPlannedSession = !!(String(row?.planned_id || match?.planned_id || '').trim());
