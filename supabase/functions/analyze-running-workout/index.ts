@@ -1992,6 +1992,25 @@ Deno.serve(async (req) => {
             `days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'} ` +
             `last_race=${lr ? `${lr.name}@${lr.target_date}` : 'none'} next=${arc_narrative_for_summary?.next_primary_goal?.name ?? 'none'}`,
         );
+        console.log(`arc_narrative_context.mode=${arc_narrative_for_summary?.mode ?? 'MISSING'} <- before generateAISummaryV1`);
+        console.log(
+          JSON.stringify({
+            tag: 'arc_narrative_context_before_llm',
+            workout_id,
+            focus_ymd: wdSlice,
+            mode: arc_narrative_for_summary?.mode ?? null,
+            days_since_last_goal_race: arc_narrative_for_summary?.days_since_last_goal_race ?? null,
+            last_goal_race: lr ? { name: lr.name, date: lr.target_date } : null,
+            next_primary_goal: arc_narrative_for_summary?.next_primary_goal
+              ? {
+                  name: arc_narrative_for_summary.next_primary_goal.name,
+                  target_date: arc_narrative_for_summary.next_primary_goal.target_date,
+                  priority: arc_narrative_for_summary.next_primary_goal.priority,
+                }
+              : null,
+            plan_phase_bucket: arc_narrative_for_summary?.plan_phase_normalized ?? null,
+          }),
+        );
       }
     } catch (arcSummErr) {
       console.warn('[analyze-running-workout] arc_narrative_for_summary skipped:', arcSummErr);

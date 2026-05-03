@@ -673,7 +673,20 @@ export async function getArcContext(
 
   const start90Ymd = addDaysYmd(focusYmd, -90);
 
-  const [baselinesRes, goalsRes, plansRes, snapshotRes, memoryRes, gearRes, recentCompletedGoalsRes, swimWorkoutsRes] =
+  const goalsArcRowSelect =
+    'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at, completed_at';
+
+  const [
+    baselinesRes,
+    goalsRes,
+    pastEventGoalsBeforeFocusRes,
+    plansRes,
+    snapshotRes,
+    memoryRes,
+    gearRes,
+    recentCompletedGoalsRes,
+    swimWorkoutsRes,
+  ] =
     await Promise.all([
     supabase
       .from('user_baselines')
@@ -682,12 +695,21 @@ export async function getArcContext(
       .maybeSingle(),
     supabase
       .from('goals')
-      .select(
-        'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at, completed_at',
-      )
+      .select(goalsArcRowSelect)
       .eq('user_id', userId)
       .neq('status', 'cancelled')
+      .order('updated_at', { ascending: false })
       .limit(260),
+    supabase
+      .from('goals')
+      .select(goalsArcRowSelect)
+      .eq('user_id', userId)
+      .neq('status', 'cancelled')
+      .eq('goal_type', 'event')
+      .not('target_date', 'is', null)
+      .lt('target_date', focusYmd)
+      .order('target_date', { ascending: false })
+      .limit(48),
     supabase
       .from('plans')
       .select('id, name, config, current_week, duration_weeks, plan_type, status, created_at')
@@ -757,9 +779,20 @@ export async function getArcContext(
   const units = baseline?.units != null && typeof baseline.units === 'string' ? (baseline.units as string) : null;
   const dismissed_suggestions = parseJsonObject(baseline?.dismissed_suggestions);
 
-  const rawGoalRowsAll: Record<string, unknown>[] = Array.isArray(goalsRes?.data)
-    ? (goalsRes.data as Record<string, unknown>[])
+  const rawGoalsMain = Array.isArray(goalsRes?.data) ? (goalsRes.data as Record<string, unknown>[]) : [];
+  const rawGoalsPastEvents = Array.isArray(pastEventGoalsBeforeFocusRes?.data)
+    ? (pastEventGoalsBeforeFocusRes.data as Record<string, unknown>[])
     : [];
+
+  /** Merge deterministic past-event slice so `pickLastCompletedGoalRaceBefore` survives capricious `.limit()` on unordered pools. */
+  const byGoalIdMerged = new Map<string, Record<string, unknown>>();
+  for (const r of rawGoalsMain) {
+    if (r?.id != null) byGoalIdMerged.set(String(r.id), r);
+  }
+  for (const r of rawGoalsPastEvents) {
+    if (r?.id != null) byGoalIdMerged.set(String(r.id), r);
+  }
+  const rawGoalRowsAll: Record<string, unknown>[] = [...byGoalIdMerged.values()];
   const upcomingStackRows = rawGoalRowsAll.filter((r) =>
     goalIsUpcomingStackAsOf(
       {
