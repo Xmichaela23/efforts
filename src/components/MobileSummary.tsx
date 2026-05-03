@@ -49,83 +49,50 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
     const workoutId = String(sd?.workout_id || (completed as any)?.id || '');
     if (!workoutId) return;
 
-    const formatInvokeError = async (err: unknown, step: string): Promise<string> => {
-      const base = (err as { message?: string })?.message
-        || (typeof err === 'object' && err !== null ? JSON.stringify(err).slice(0, 200) : String(err));
-      const ctx = (err as { context?: { json?: () => Promise<unknown> } })?.context;
-      if (ctx && typeof ctx.json === 'function') {
-        try {
-          const body = (await ctx.json()) as { error?: string } | string | null;
-          if (body && typeof body === 'object' && typeof (body as { error?: string }).error === 'string') {
-            return `${step}: ${(body as { error: string }).error}`;
-          }
-          if (body != null && typeof body === 'object') {
-            return `${step}: ${JSON.stringify(body).slice(0, 400)}`;
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-      return `${step}: ${base}`;
-    };
-
     try {
       setRecomputing(true);
       setRecomputeError(null);
 
-      const fnName = (() => {
-        const t = String(type || '').toLowerCase();
-        if (t === 'run' || t === 'running') return 'analyze-running-workout';
-        if (t === 'ride' || t === 'cycling' || t === 'bike') return 'analyze-cycling-workout';
-        if (t === 'strength' || t === 'strength_training') return 'analyze-strength-workout';
-        if (t === 'swim' || t === 'swimming') return 'analyze-swim-workout';
-        return 'analyze-running-workout';
-      })();
-
-      // Step 1: Recompute computed.overall (duration, pace, distance) so downstream analysis uses fresh values
-      console.log('[recompute] Step 1: compute-workout-analysis for', workoutId);
-      const computeRes = await supabase.functions.invoke('compute-workout-analysis', {
-        body: { workout_id: workoutId },
-      });
-      if (computeRes.error) {
-        console.warn('[recompute] compute-workout-analysis error:', computeRes.error);
-        throw await formatInvokeError(computeRes.error, 'compute-workout-analysis');
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) console.warn('[MobileSummary] recompute getSession:', sessionErr);
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not signed in');
       }
-      console.log('[recompute] compute-workout-analysis ok');
 
-      // Step 1b: session_load + facts (readiness / LOAD context); omitted before caused empty session_load after recompute
-      console.log('[recompute] Step 1b: compute-facts for', workoutId);
-      const factsRes = await supabase.functions.invoke('compute-facts', {
+      const res = await supabase.functions.invoke('recompute-workout', {
         body: { workout_id: workoutId },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (factsRes.error) {
-        console.warn('[recompute] compute-facts error:', factsRes.error);
-        throw await formatInvokeError(factsRes.error, 'compute-facts');
-      }
-      console.log('[recompute] compute-facts ok');
 
-      // Step 2: Run the discipline-specific analysis (builds fact packet, narrative, etc.)
-      console.log('[recompute] Step 2:', fnName, 'for', workoutId);
-      const analyzeRes = await supabase.functions.invoke(fnName, {
-        body: { workout_id: workoutId },
-      });
-      if (analyzeRes.error) {
-        console.error('[recompute]', fnName, 'error:', analyzeRes.error);
-        throw await formatInvokeError(analyzeRes.error, fnName);
+      if (res.error) {
+        throw new Error(res.error.message);
       }
-      console.log('[recompute]', fnName, 'ok, data:', typeof analyzeRes.data === 'object' ? JSON.stringify(analyzeRes.data).slice(0, 200) : analyzeRes.data);
 
+      const result = res.data as {
+        ok: boolean;
+        stale: boolean;
+        steps: string[];
+        error?: string;
+        code?: string;
+      };
+
+      if (result.ok) {
+        try {
+          window.dispatchEvent(new CustomEvent('workout-detail:invalidate'));
+          window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+        } catch (e) {
+          console.warn('[MobileSummary] recompute: invalidate dispatch failed:', e);
+        }
+        if (result.stale) {
+          console.warn('[MobileSummary] recompute partial success, steps:', result.steps);
+        }
+      } else {
+        throw new Error(result.error ?? 'Recompute failed');
+      }
     } catch (e: unknown) {
       setRecomputeError(typeof e === 'string' ? e : (e as Error)?.message || String(e));
     } finally {
-      // Always invalidate so session_detail re-fetches even if recompute partially failed
-      try {
-        window.dispatchEvent(new CustomEvent('workout-detail:invalidate'));
-        window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-      } catch (e) {
-        /* CustomEvent dispatch should not throw in browsers; log if something odd happens */
-        console.warn('[MobileSummary] recompute finally: invalidate dispatch failed:', e);
-      }
       setRecomputing(false);
     }
   };
