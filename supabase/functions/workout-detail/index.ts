@@ -114,6 +114,55 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analys
   return false;
 }
 
+/** Strip response-only keys; they must never appear in persisted workout_analysis.session_detail_v1. */
+function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  if (!sd || typeof sd !== 'object') return (sd ?? {}) as Record<string, unknown>;
+  const { stale: _s, stale_reason: _r, ...rest } = sd as Record<string, unknown>;
+  return rest as Record<string, unknown>;
+}
+
+type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
+
+/**
+ * Inject `stale` / `stale_reason` only on the HTTP response payload.
+ * If you see these keys in a DB row, strip them — that is a bug.
+ */
+function enrichSessionDetailForResponse(
+  rowSd: any,
+  sessionDetailV1: any | null,
+  arcContextLoadFailed: boolean,
+): any {
+  if (!sessionDetailV1 || typeof sessionDetailV1 !== 'object') {
+    return { stale: true, stale_reason: 'analysis_missing' };
+  }
+  const base = stripResponseOnlySessionDetailFields(sessionDetailV1 as Record<string, unknown>) as any;
+  const rowPlanned = rowSd?.planned_id != null && String(rowSd.planned_id).trim() !== '' ? String(rowSd.planned_id) : '';
+  const sdPlanned = base?.plan_context?.planned_id != null && String(base.plan_context.planned_id).trim() !== ''
+    ? String(base.plan_context.planned_id)
+    : '';
+
+  let stale = false;
+  let stale_reason: SessionDetailStaleReason | undefined;
+
+  if (rowPlanned && sdPlanned !== rowPlanned) {
+    stale = true;
+    stale_reason = 'attach_pending';
+  } else if (rowPlanned && !sdPlanned) {
+    stale = true;
+    stale_reason = 'attach_pending';
+  }
+
+  if (!stale && arcContextLoadFailed) {
+    stale = true;
+    stale_reason = 'recomputing';
+  }
+
+  if (stale) {
+    return { ...base, stale, stale_reason };
+  }
+  return { ...base, stale: false };
+}
+
 function processingCompleteFromWorkoutRow(row: any): boolean {
   let comp = row?.computed;
   if (typeof comp === 'string') {
@@ -249,11 +298,12 @@ async function runSessionDetailPipelineAndPersist(
   id: string,
   row: any,
   detail: any,
-): Promise<{ sessionDetailV1: any | null; snapshot_latency_ms: number | null }> {
+): Promise<{ sessionDetailV1: any | null; snapshot_latency_ms: number | null; arcContextLoadFailed: boolean }> {
   let sessionDetailV1: any = null;
   let snapshot_latency_ms: number | null = null;
+  let arcContextLoadFailed = false;
   if (!userId || String(row?.workout_status || '').toLowerCase() !== 'completed') {
-    return { sessionDetailV1: null, snapshot_latency_ms: null };
+    return { sessionDetailV1: null, snapshot_latency_ms: null, arcContextLoadFailed: false };
   }
   const t0 = performance.now();
   try {
@@ -291,6 +341,7 @@ async function runSessionDetailPipelineAndPersist(
         .lte('date', weekEndDate),
       readinessP,
       getArcContext(supabase, userId, asOfDate).catch((arcErr: unknown) => {
+        arcContextLoadFailed = true;
         console.warn(
           '[session_detail_v1] getArcContext failed:',
           arcErr instanceof Error ? arcErr.message : arcErr,
@@ -709,16 +760,17 @@ async function runSessionDetailPipelineAndPersist(
 
   if (sessionDetailV1) {
     try {
+      const forPersist = stripResponseOnlySessionDetailFields(sessionDetailV1 as Record<string, unknown>);
       await supabase.rpc('merge_session_detail_v1_into_workout_analysis', {
         p_workout_id: id,
-        p_session_detail_v1: sessionDetailV1,
+        p_session_detail_v1: forPersist,
       });
     } catch (persistErr: any) {
       console.warn('[workout-detail] session_detail_v1 persist failed (non-fatal):', persistErr?.message || persistErr);
     }
   }
 
-  return { sessionDetailV1, snapshot_latency_ms };
+  return { sessionDetailV1, snapshot_latency_ms, arcContextLoadFailed };
 }
 
 const corsHeaders: Record<string, string> = {
@@ -977,8 +1029,13 @@ Deno.serve(async (req) => {
         console.log('[workout-detail] session_detail fast path: serving persisted session_detail_v1');
         const pcFast = processingCompleteFromWorkoutRow(rowSd);
         const cachedAt = analysisSd.session_detail_updated_at ?? analysisSd.updated_at;
+        const sdForResponse =
+          sd && typeof sd === 'object'
+            ? stripResponseOnlySessionDetailFields({ ...sd } as Record<string, unknown>)
+            : sd;
+        const enriched = enrichSessionDetailForResponse(rowSd, sdForResponse, false);
         const outFast: Record<string, unknown> = {
-          session_detail_v1: sd,
+          session_detail_v1: enriched,
           processing_complete: pcFast,
           _cache_hit: true,
           _cached_at: cachedAt != null ? String(cachedAt) : null,
@@ -998,7 +1055,7 @@ Deno.serve(async (req) => {
       }
 
       const { detail: dSd, processingComplete: pcSd } = buildDetailCoreForSession(rowSd);
-      const { sessionDetailV1: sdV1, snapshot_latency_ms: latMs } = await runSessionDetailPipelineAndPersist(
+      const { sessionDetailV1: sdV1, snapshot_latency_ms: latMs, arcContextLoadFailed } = await runSessionDetailPipelineAndPersist(
         supabase,
         userId,
         id,
@@ -1006,7 +1063,7 @@ Deno.serve(async (req) => {
         dSd,
       );
       const out: Record<string, unknown> = { processing_complete: pcSd, _cache_hit: false };
-      if (sdV1) out.session_detail_v1 = sdV1;
+      out.session_detail_v1 = enrichSessionDetailForResponse(rowSd, sdV1, arcContextLoadFailed);
       if (latMs != null && latMs >= SNAPSHOT_LATENCY_WARN_MS) out.snapshot_latency_ms = latMs;
       const headersOut: Record<string, string> = {
         ...corsHeaders,
@@ -1247,7 +1304,7 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { sessionDetailV1, snapshot_latency_ms } = await runSessionDetailPipelineAndPersist(
+    const { sessionDetailV1: rawSd, snapshot_latency_ms, arcContextLoadFailed } = await runSessionDetailPipelineAndPersist(
       supabase,
       userId || '',
       id,
@@ -1259,7 +1316,9 @@ Deno.serve(async (req) => {
       workout: detail,
       processing_complete: processingComplete,
     };
-    if (sessionDetailV1) responsePayload.session_detail_v1 = sessionDetailV1;
+    if (rawSd) {
+      responsePayload.session_detail_v1 = enrichSessionDetailForResponse(row, rawSd, arcContextLoadFailed);
+    }
     if (snapshot_latency_ms != null && snapshot_latency_ms >= SNAPSHOT_LATENCY_WARN_MS) {
       responsePayload.snapshot_latency_ms = snapshot_latency_ms;
     }
