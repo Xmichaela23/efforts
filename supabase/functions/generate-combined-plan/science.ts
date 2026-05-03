@@ -171,7 +171,8 @@ export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): numb
       case 'base': return 0.50;
       case 'build': return 0.75;
       case 'race_specific': return 1.00;
-      case 'taper': return 0.55;
+      // Taper long-run floor: keep pre–A-race Sunday run conservative (e.g. 70.3 ≈ 5 mi, not 6+).
+      case 'taper': return 0.45;
       case 'recovery': return 0.40;
       default: return 0.50;
     }

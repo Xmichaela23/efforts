@@ -428,6 +428,12 @@ export function buildWeek(
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 
+  // Final week before A-race (taper): cap Sunday long-run miles so volume drops with neurologic freshness.
+  if (phase === 'taper' && hasTri && !raceThisWeek) {
+    longRunMiles = Math.min(longRunMiles, 5);
+    longRunMinutes = Math.round(longRunMiles * 9.5);
+  }
+
   // Long ride hours
   let longRideMinutes = isRecovery
     ? Math.min(75, Math.round(bikeTotalMin * 0.60))

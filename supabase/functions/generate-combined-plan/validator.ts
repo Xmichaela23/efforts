@@ -13,26 +13,40 @@ import {
 } from './science.ts';
 
 // ── Check 1: No consecutive HARD days ────────────────────────────────────────
-// §4.3 — Any two adjacent days both classified HARD is a violation.
-function checkNoConsecutiveHardDays(weeks: GeneratedWeek[]): boolean {
-  for (const week of weeks) {
-    // Build a day→intensity map for this week
-    const dayIntensity = new Map<string, 'HARD' | 'MODERATE' | 'EASY' | null>();
-    for (const day of DAYS_OF_WEEK) dayIntensity.set(day, null);
+// §4.3 — Any two adjacent *calendar* days both classified HARD is a violation.
+//
+// `DAYS_OF_WEEK` is Mon→Sun within one training week. True adjacency is (Mon,Tue)…(Sat,Sun)
+// within the week, plus Sun→Mon *across* week boundaries (this week's Sunday → next week's
+// Monday). Do NOT wrap Sunday→Monday inside the same week — that falsely flags six-day-separated
+// bookends as "consecutive" and caused spurious failures on every multi-week plan.
+const INT_RANK: Record<string, number> = { HARD: 3, MODERATE: 2, EASY: 1 };
 
-    for (const s of week.sessions) {
-      const prev = dayIntensity.get(s.day);
-      if (prev === null || (s.intensity_class === 'HARD' && prev !== 'HARD')) {
-        dayIntensity.set(s.day, s.intensity_class);
-      } else if (s.intensity_class === 'HARD') {
-        dayIntensity.set(s.day, 'HARD');
+function dayMaxIntensity(week: GeneratedWeek): Map<string, 'HARD' | 'MODERATE' | 'EASY' | null> {
+  const m = new Map<string, 'HARD' | 'MODERATE' | 'EASY' | null>();
+  for (const day of DAYS_OF_WEEK) m.set(day, null);
+  for (const s of week.sessions) {
+    const prev = m.get(s.day);
+    const cur = s.intensity_class;
+    const cr = INT_RANK[cur] ?? 0;
+    const pr = prev != null ? INT_RANK[prev] ?? 0 : -1;
+    if (prev === null || cr > pr) m.set(s.day, cur);
+  }
+  return m;
+}
+
+function checkNoConsecutiveHardDays(weeks: GeneratedWeek[]): boolean {
+  const maps = weeks.map(dayMaxIntensity);
+  for (let wi = 0; wi < maps.length; wi++) {
+    const dayIntensity = maps[wi];
+    for (let i = 0; i < 6; i++) {
+      const today = DAYS_OF_WEEK[i];
+      const tomorrow = DAYS_OF_WEEK[i + 1];
+      if (dayIntensity.get(today) === 'HARD' && dayIntensity.get(tomorrow) === 'HARD') {
+        return false;
       }
     }
-
-    for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
-      const today = DAYS_OF_WEEK[i];
-      const tomorrow = DAYS_OF_WEEK[(i + 1) % 7];
-      if (dayIntensity.get(today) === 'HARD' && dayIntensity.get(tomorrow) === 'HARD') {
+    if (wi < maps.length - 1) {
+      if (dayIntensity.get('Sunday') === 'HARD' && maps[wi + 1].get('Monday') === 'HARD') {
         return false;
       }
     }

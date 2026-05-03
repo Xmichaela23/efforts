@@ -1595,6 +1595,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }, 0);
   };
 
+  /** Same-day ordering for markdown export: swim → bike → run → strength so bricks read bike→run. */
+  const markdownExportSessionOrder = (a: any, b: any): number => {
+    const rank = (w: any): number => {
+      const t = String(w?.type || w?.discipline || '').toLowerCase();
+      const n = String(w?.name || '').toLowerCase();
+      if (t === 'swim' || /\bswim\b/.test(n)) return 0;
+      if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
+        return 1;
+      }
+      if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
+      if (t === 'strength') return 3;
+      return 4;
+    };
+    const d = rank(a) - rank(b);
+    if (d !== 0) return d;
+    return String(a?.name || '').localeCompare(String(b?.name || ''));
+  };
+
   // Export selected plan to Markdown (all weeks)
   const exportPlanToMarkdown = (plan: any) => {
     if (!plan) return;
@@ -1634,7 +1652,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     const weeks: any[] = (plan.weeks || []).slice().sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0));
     const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     for (const wk of weeks) {
-      lines.push(`## Week ${wk.weekNumber}${wk.title ? `: ${wk.title}` : ''}`);
+      const rawTitle = wk.title != null ? String(wk.title).trim() : '';
+      const titleRedundant = rawTitle === `Week ${wk.weekNumber}`;
+      lines.push(`## Week ${wk.weekNumber}${rawTitle && !titleRedundant ? `: ${rawTitle}` : ''}`);
       if (wk.focus) lines.push(`> ${wk.focus}`);
       const groups: Record<string, any[]> = {};
       (wk.workouts || []).forEach((w: any) => {
@@ -1644,7 +1664,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
       for (const d of orderedDays) {
         lines.push(`### ${d}`);
-        for (const w of groups[d]) {
+        for (const w of (groups[d] as any[]).slice().sort(markdownExportSessionOrder)) {
           const meta: string[] = [];
           // Handle intensity - only include if it's a valid string
           if (w.intensity && typeof w.intensity === 'string' && w.intensity.length > 0) {
