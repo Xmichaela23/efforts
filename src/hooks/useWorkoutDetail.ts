@@ -32,6 +32,15 @@ export function extractSessionDetailV1FromWorkout(w: unknown): Record<string, un
   return sd as Record<string, unknown>;
 }
 
+/** Never surface edge response-only flags from persisted JSON (or merged row). */
+function stripEphemeralSessionDetailFields(
+  sd: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!sd || typeof sd !== 'object') return sd;
+  const { stale: _st, stale_reason: _sr, ...rest } = sd;
+  return rest as Record<string, unknown>;
+}
+
 export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
   const queryClient = useQueryClient();
   const { workouts } = useAppContext();
@@ -144,7 +153,8 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
         merged = remote;
       }
 
-      const emb = extractSessionDetailV1FromWorkout(merged);
+      const embRaw = extractSessionDetailV1FromWorkout(merged);
+      const emb = embRaw ? stripEphemeralSessionDetailFields(embRaw) : null;
       if (emb && id) {
         // Only seed if cache is empty — never overwrite existing data (even stale/invalidated),
         // or the session query won't re-run after a recompute invalidation.
@@ -234,16 +244,22 @@ export function useWorkoutDetail(id?: string, opts?: WorkoutDetailOptions) {
     return preview ? { ...preview } : null;
   }, [id, contextPreview, workoutQuery.data]);
 
-  const embeddedSessionDetail = useMemo(
-    () => extractSessionDetailV1FromWorkout(stableWorkout),
-    [stableWorkout],
-  );
+  const embeddedSessionDetail = useMemo(() => {
+    const raw = extractSessionDetailV1FromWorkout(stableWorkout);
+    return stripEphemeralSessionDetailFields(raw);
+  }, [stableWorkout]);
 
   const sessionDetailV1 = useMemo(() => {
+    // Performance tab runs scope=session_detail (edge may attach response-only `stale`).
+    // Details tab does not refetch — reusing cached edge payload would wrongly show
+    // “Analysis updating…” from a prior Performance visit.
+    if (!fetchSessionDetail) {
+      return embeddedSessionDetail;
+    }
     const fromEdge = (sessionQuery.data as { session_detail_v1?: unknown })?.session_detail_v1;
     if (fromEdge != null && typeof fromEdge === 'object') return fromEdge as Record<string, unknown>;
     return embeddedSessionDetail;
-  }, [sessionQuery.data, embeddedSessionDetail]);
+  }, [fetchSessionDetail, sessionQuery.data, embeddedSessionDetail]);
 
   const haveSessionForUi = sessionDetailV1 != null;
   // v5: disabled queries are still `isPending` with fetchStatus `idle` — do not OR `isPending` for loading UX.

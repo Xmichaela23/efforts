@@ -489,7 +489,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     observations,
     narrative_text: performanceNarrativeText,
-    arc_performance: arcPerformance ?? null,
+    arc_performance: arcPerformance,
     race_debrief_text: raceDebriefText,
     race:
       (sessionState as any).race && typeof (sessionState as any).race === 'object'

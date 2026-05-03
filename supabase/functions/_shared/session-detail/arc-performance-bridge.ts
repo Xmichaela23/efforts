@@ -174,10 +174,28 @@ export function buildArcPerformanceBridge(
   arc: ArcContext | null | undefined,
   focusYmd: string,
   hasLinkedPlannedSession: boolean,
-): ArcPerformanceBridgeV1 | null {
-  if (!arc) return null;
+): ArcPerformanceBridgeV1 {
   const built_at = new Date().toISOString();
   const focus_date = focusYmd.slice(0, 10);
+
+  if (!arc) {
+    return {
+      version: ARC_PERFORMANCE_BRIDGE_VERSION,
+      built_at,
+      focus_date,
+      narrative_mode: null,
+      days_since_last_goal_race: null,
+      runs_since_last_race: null,
+      days_until_next_block_start: null,
+      last_race: null,
+      next_goal: null,
+      coaching_context: hasLinkedPlannedSession
+        ? null
+        : 'Arc snapshot unavailable for this date — session logged without temporal plan framing.',
+      primary_goal: null,
+      active_plan: null,
+    };
+  }
   const nc = arc.arc_narrative_context ?? null;
 
   const pgFromNc = primaryFromNarrative(nc, focus_date);
