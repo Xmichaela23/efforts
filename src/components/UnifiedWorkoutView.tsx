@@ -172,7 +172,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           }
           console.log('🔍 [REFRESH DEBUG] Final parsed.workout_analysis:', parsed.workout_analysis ? 'present' : 'missing');
           console.log('🔍 [REFRESH DEBUG] Final parsed.workout_analysis?.performance:', parsed.workout_analysis?.performance);
-          setUpdatedWorkoutData(parsed);
+          // Refresh SELECT omits heavy JSONB (strength_exercises, etc.) — merge so Performance/Details keep logged sets
+          setUpdatedWorkoutData((prev) => ({ ...(workout || {}), ...(prev || {}), ...parsed }));
         }
       } catch (error) {
         console.error('❌ Error refreshing workout data:', error);
@@ -1144,7 +1145,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 )}
                 <MobileSummary
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)}
-                  completed={isCompleted ? (updatedWorkoutData || hydratedCompleted || workout) : null}
+                  completed={isCompleted ? completedData : null}
                   session_detail_v1={sessionDetailV1Merged}
                   sessionDetailLoading={!!sessionDetailLoading}
                 />
