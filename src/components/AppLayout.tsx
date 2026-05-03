@@ -247,6 +247,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       } catch (e) {
         console.warn('[AppLayout] open:mobilityLogger handler failed:', e);
       }
+    };
+    window.addEventListener('open:mobilityLogger', handler as any);
     return () => window.removeEventListener('open:mobilityLogger', handler as any);
   }, []);
 
