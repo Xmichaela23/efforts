@@ -16,6 +16,7 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
+import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
 import { mapUnifiedItemToPlanned } from '@/utils/workout-mappers';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -108,14 +109,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // plannedWorkouts context removed; rely on server unified data/routes
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
-  const [currentPlannedId, setCurrentPlannedId] = useState<string | null>((workout as any)?.planned_id || null);
-  const hasLink = Boolean(currentPlannedId);
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'summary' : 'planned'));
   const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
-  const [linkedPlanned, setLinkedPlanned] = useState<any | null>(null);
-  const [hydratedPlanned, setHydratedPlanned] = useState<any | null>(null);
   const [updatedWorkoutData, setUpdatedWorkoutData] = useState<any | null>(null);
   const recomputeGuardRef = useRef<Set<string>>(new Set());
   // Suppress auto re-link fallback briefly after an explicit Unattach
@@ -211,14 +208,20 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     return workout;
   })();
 
-  // Fetch current planned_id from database to ensure we have the latest state
-  // Use planned_id from unified API data or updatedWorkoutData (refreshed after auto-attach)
-  useEffect(() => {
-    // Prefer updatedWorkoutData (refreshed from DB) over workout prop (may be stale)
-    const sourceWorkout = updatedWorkoutData || unifiedWorkout;
-    const plannedId = (sourceWorkout as any)?.planned_id || null;
-    setCurrentPlannedId(plannedId);
-  }, [(unifiedWorkout as any)?.planned_id, updatedWorkoutData?.planned_id]);
+  const {
+    linkedPlanned,
+    setLinkedPlanned,
+    hydratedPlanned,
+    setHydratedPlanned,
+    currentPlannedId,
+    isLinked,
+  } = usePlannedWorkoutLink({
+    workout,
+    isCompleted,
+    activeTab,
+    updatedWorkoutData,
+    unifiedWorkout,
+  });
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
   const wid = String((workout as any)?.id || '');
@@ -245,42 +248,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     () => mergeSessionDetailRaceReadiness(sessionDetailV1, workoutAnalysisForSessionMerge),
     [sessionDetailV1, workoutAnalysisForSessionMerge],
   );
-
-  // Resolve linked planned row for completed workouts
-  useEffect(() => {
-    (async () => {
-      if (!isCompleted) { 
-        setLinkedPlanned(null); 
-        return; 
-      }
-
-      // Use updatedWorkoutData if available (refreshed after auto-attach), otherwise workout prop
-      const sourceWorkout = updatedWorkoutData || workout;
-      
-      // 1) If workout has planned_id, fetch it directly from the database (single source of truth)
-      const pid = (sourceWorkout as any)?.planned_id as string | undefined || currentPlannedId;
-      if (pid) {
-        try {
-          const { data: plannedRow } = await supabase
-            .from('planned_workouts')
-            .select('*')
-            .eq('id', pid)
-            .maybeSingle();
-          if (plannedRow) {
-            setLinkedPlanned(plannedRow);
-            return;
-          }
-        } catch (e) {
-          console.warn('[UnifiedWorkoutView] fetch linked planned_workout failed:', e);
-        }
-        // If fetch failed but we have planned_id, keep current state
-        return;
-      }
-
-      // 2) No planned_id - clear linked state
-      setLinkedPlanned(null);
-    })();
-  }, [isCompleted, workout?.id, (workout as any)?.planned_id, updatedWorkoutData?.planned_id, currentPlannedId]);
 
   // Auto-materialize planned row if Summary is opened and computed steps are missing
   useEffect(() => {
@@ -475,100 +442,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       }
     })();
   }, [activeTab, isCompleted, (workout as any)?.id, (workout as any)?.planned_id, linkedPlanned?.id, hydratedPlanned?.id]);
-
-  // Helper to parse steps_preset that may be stored as JSON string
-  const readStepsPreset = (src: any): string[] | undefined => {
-    try {
-      if (Array.isArray(src)) return src as string[];
-      if (src && typeof src === 'object') return src as string[];
-      if (typeof src === 'string' && src.trim().length) {
-        const parsed = JSON.parse(src);
-        return Array.isArray(parsed) ? (parsed as string[]) : undefined;
-      }
-    } catch {
-      /* steps_preset not valid JSON — ignore */
-    }
-    return undefined;
-  };
-
-  // Hydrate planned rows (expand tokens → resolve targets → persist computed + duration) before rendering Planned tab
-  useEffect(() => {
-    (async () => {
-      try {
-        if (activeTab !== 'planned') return;
-        const plannedRow = isCompleted ? (linkedPlanned || null) : (workout?.workout_status === 'planned' ? workout : null);
-        if (!plannedRow || !plannedRow.id) { setHydratedPlanned(null); return; }
-
-        // If already hydrated (v3 with steps and total), use it
-        const hasV3 = (() => {
-          try { return Array.isArray(plannedRow?.computed?.steps) && plannedRow.computed.steps.length>0 && Number(plannedRow?.computed?.total_duration_seconds) > 0; } catch { /* malformed plannedRow.computed */ return false; }
-        })();
-        let stepsPreset = readStepsPreset((plannedRow as any).steps_preset);
-        // Fetch latest row (in case caller provided a minimal object)
-        let row = plannedRow;
-        try {
-          const { data } = await supabase.from('planned_workouts').select('*').eq('id', String(plannedRow.id)).maybeSingle();
-          if (data) { row = data; stepsPreset = readStepsPreset((data as any).steps_preset) ?? stepsPreset; }
-        } catch (e) {
-          console.warn('[UnifiedWorkoutView] planned tab: refresh planned_workout row failed:', e);
-        }
-
-        const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { /* malformed row.computed */ return false; }})();
-        const isStrength = String((row as any)?.type || '').toLowerCase() === 'strength';
-        
-        // Strength workouts: use server-side materialization for correct grouped structure
-        if (isStrength && !rowHasV3) {
-          try {
-            const pid = String(row.id);
-            await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
-            const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
-            if (refreshed) {
-              setHydratedPlanned(refreshed);
-              // Delay invalidate event to ensure state update completes first
-              setTimeout(() => {
-                try {
-                  window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                } catch (e) {
-                  console.warn('[UnifiedWorkoutView] planned:invalidate dispatch failed:', e);
-                }
-              }, 100);
-              return;
-            }
-          } catch (e) {
-            console.warn('[UnifiedWorkoutView] strength materialize on planned tab failed:', e);
-          }
-        }
-        
-        // Server materialization: if steps missing, materialize on server
-        if (!rowHasV3) {
-          try {
-            const pid = String((row as any)?.id || '');
-            if (pid) {
-              await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
-              const { data: refreshed } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
-              if (refreshed) {
-                setHydratedPlanned(refreshed);
-                setTimeout(() => {
-                  try {
-                    window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                  } catch (e) {
-                    console.warn('[UnifiedWorkoutView] planned:invalidate dispatch failed:', e);
-                  }
-                }, 100);
-                return;
-              }
-            }
-          } catch (err) {
-            console.warn('[UnifiedWorkoutView] Server materialization failed:', err);
-          }
-        }
-        setHydratedPlanned(row);
-      } catch (e) {
-        console.warn('[UnifiedWorkoutView] planned tab hydrate effect failed:', e);
-        setHydratedPlanned(null);
-      }
-    })();
-  }, [activeTab, workout?.id, linkedPlanned?.id]);
 
   const getWorkoutType = () => {
     // Trust explicit stored type first (prevents misclassification when provider field is missing/ambiguous)
@@ -822,10 +695,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // ✅ REMOVED: All client-side analysis code
   // Client is now UI-only - all analysis comes from server (workout_analysis.performance)
-  // Use updatedWorkoutData if available (refreshed after auto-attach), otherwise fall back to workout prop
-  const sourceWorkout = updatedWorkoutData || workout;
-  const isLinked = Boolean((sourceWorkout as any)?.planned_id) || Boolean(currentPlannedId) || Boolean(linkedPlanned?.id);
-  
+  // `isLinked` + `currentPlannedId` come from `usePlannedWorkoutLink`
+
   // Workout type styling for visual continuity with loggers
   const workoutType = String(workout?.type || '').toLowerCase();
   const isMobility = workoutType === 'mobility';
