@@ -342,18 +342,59 @@ function validateTerrainExplainsDrift(summary: string, displayPacket: any): { ok
   return { ok: true, why: null };
 }
 
+/**
+ * Prepended before base prompt so Arc temporal modes win over broad "session-only" bans.
+ * Base prompt forbids vague "recovery needs" / guessed weekly fatigue; it must not silence
+ * deterministic LAST_GOAL_RACE comeback framing from getArcContext(workout_date).
+ */
+function arcTemporalSystemPrefix(nc: ArcNarrativeContextV1 | null | undefined): string {
+  if (!nc) return '';
+  switch (nc.mode) {
+    case 'recovery_read': {
+      const lr = nc.last_goal_race;
+      if (!lr?.name) return '';
+      const ds = nc.days_since_last_goal_race ?? '?';
+      return (
+        `=== TEMPORAL ARC — OVERRIDES CONFLICTING SESSION-ONLY LANGUAGE BELOW ===
+NARRATIVE_MODE=recovery_read. The athlete raced **${lr.name}** on **${lr.target_date}**; WORKOUT DATE is about **${ds}** days after that event.
+Your **first or second sentence MUST** name that race (short paraphrase OK) and acknowledge this **comeback / re-entry window** using the day count when given.
+This is required Arc framing and is NOT optional. It does not violate "session-scoped" truth: these lines are facts in TEMPORAL ARC CONTEXT for this workout date — not invented weekly load or guessed fatigue.
+IGNORE any instruction below that forbids "recovery" phrasing when it would block this Arc-mandated comeback frame; that ban targets speculative cumulative recovery needs, not LAST_GOAL_RACE.
+===\n\n`
+      );
+    }
+    case 'race_debrief': {
+      const lr = nc.last_goal_race;
+      if (!lr?.name) return '';
+      return (
+        `=== TEMPORAL ARC — OVERRIDES CONFLICTING SESSION-ONLY LANGUAGE BELOW ===
+NARRATIVE_MODE=race_debrief within days of **${lr.name}** (${lr.target_date}). Anchor to guarded return-to-running, not build-phase fitness gains.
+===\n\n`
+      );
+    }
+    case 'taper_read':
+      return (
+        `=== TEMPORAL ARC — OVERRIDES CONFLICTING SESSION-ONLY LANGUAGE BELOW ===
+NARRATIVE_MODE=taper_read: an A-priority race is imminent (see ARC FACT block). Lead with freshness/sharpness; forbid adaptation-gain praise per appendix.
+===\n\n`
+      );
+    default:
+      return '';
+  }
+}
+
 const COACHING_SYSTEM_PROMPT = `You are an experienced endurance coach reviewing a completed workout. Your athlete can already see their pace, HR, distance, and duration — do not restate those numbers unless you're connecting them to an insight.
 
 Write 1-2 sentences (3 maximum if there is a genuine concern). This narrative covers THIS session only.
 
-STRICTLY SESSION-SCOPED — you will NOT receive training load, fatigue, weekly volume, or prior-session data. Do not reference, infer, or speculate about: training load, weekly volume, cumulative fatigue, prior workouts, recovery needs, or "this week's" anything. If none of that data is in the message, it doesn't exist for this narrative.
+STRICTLY SESSION-SCOPED for execution facts — you will NOT invent training load, weekly volume, or cumulative-fatigue guesses. Unless TEMPORAL ARC CONTEXT in the USER message declares a narrative mode that explicitly allows comeback/taper framing, do NOT reference prior workouts by date, speculative "recovery needs", or this week's aggregate load. When TEMPORAL ARC CONTEXT includes NARRATIVE_MODE=recovery_read with LAST_GOAL_RACE facts, acknowledging that comeback window is REQUIRED and is not speculative.
 
 RULES:
 - THE CORE TEST: Before writing any sentence, ask "Could the athlete figure this out by looking at the pace/HR/distance numbers and adherence chips above?" If yes, cut it. Only say things the athlete cannot see for themselves.
 - NEVER start with a restatement of distance/time/pace. The athlete already sees those.
 - NEVER restate execution percentages, pace adherence, or duration adherence — these are displayed as chips above the narrative.
 - NEVER describe the workout the athlete just did ("You ran 13 miles at 11:04 pace"). They were there.
-- NEVER reference prior workouts, strength sessions, yesterday's training, weekly load, muscular fatigue, or recovery needs.
+- NEVER reference unrelated prior workouts by date, strength sessions, yesterday's training, guessed weekly load, muscular fatigue, or invented "recovery needs" (unless REQUIRED by TEMPORAL ARC recovery_read comeback framing — see preamble when present).
 - Connect data across domains: if terrain was hilly AND pace was "slow", say the pace was appropriate for the terrain — don't report them as separate facts.
 - When grade-adjusted pace (GAP) appears on the Pace line, the parenthetical terrain bias text after it is authoritative: do not contradict it using elevation gain alone. Large "elevation gain" on rolling routes can coexist with net downhill bias in aggregate GAP — gain sums climbs but does not replace time-weighted grade. If bias says net downhill, grade assisted raw pace (GAP slower than raw pace in min/mi terms); if net uphill, grade resisted raw pace (GAP faster than raw). Example rewrite when bias is uphill: "Your 11:04 pace was about a 10:32 flat-equivalent effort — the climbs added demand." Do not invert this relationship.
 - When similar workout comparisons exist, lead with the trend: "You're X faster/slower than your last N similar efforts" is more valuable than any single-workout metric.
@@ -813,7 +854,8 @@ export async function generateAISummaryV1(
   const userMessage =
     `${arcFacts ? `\nTEMPORAL ARC CONTEXT (do not contradict; paraphrase for athlete):\n${arcFacts}\n` : ''}` +
     buildUserMessage(displayPacket);
-  const systemPrompt = `${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}`;
+  const systemPrompt =
+    `${arcTemporalSystemPrefix(arcNarrative)}${COACHING_SYSTEM_PROMPT}${arcModeSystemAddon(arcNarrative)}`;
   const numericAllowAnchors =
     arcNarrative ? JSON.stringify(arcNarrative) : '';
 

@@ -40,7 +40,7 @@ The athlete-completed-this-workout facts below are still immutable; temporal lin
 
 JOB: Answer "how is the athlete doing while coming back?", not prescription compliance.
 
-REQUIRED FRAMING OPEN (paraphrase, do not bolt numbers you were not given):
+REQUIRED FRAMING OPEN — the narrative's FIRST or SECOND sentence MUST include this comeback frame (paraphrase; do not omit the race identification or ~${dSince} day window unless data is "?"):
 - They finished "${lr?.name ?? 'their last goal race'}" (${lr?.distance ?? ''}) about ${dSince} days before this WORKOUT DATE; this logged run sits in that comeback window (~run #${runN} runs since that race finish, heuristic count from Arc).
 ${ng ? `- Their next stacked target "${ng.name}" is still ahead; heuristic block/start spacing suggests ~${blockIn} days before structured build density — treat this outing as bridging/re-entry pace.` : '- Next primary race target is unspecified in Arc.'}
 
