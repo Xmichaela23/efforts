@@ -119,8 +119,13 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       setRecomputeError(typeof e === 'string' ? e : (e as Error)?.message || String(e));
     } finally {
       // Always invalidate so session_detail re-fetches even if recompute partially failed
-      try { window.dispatchEvent(new CustomEvent('workout-detail:invalidate')); } catch {}
-      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('workout-detail:invalidate'));
+        window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+      } catch (e) {
+        /* CustomEvent dispatch should not throw in browsers; log if something odd happens */
+        console.warn('[MobileSummary] recompute finally: invalidate dispatch failed:', e);
+      }
       setRecomputing(false);
     }
   };

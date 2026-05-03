@@ -270,7 +270,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             setLinkedPlanned(plannedRow);
             return;
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[UnifiedWorkoutView] fetch linked planned_workout failed:', e);
+        }
         // If fetch failed but we have planned_id, keep current state
         return;
       }
@@ -298,7 +300,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               if (data) setLinkedPlanned(data);
               // Enhanced analysis will be triggered when user opens Summary tab
             }
-          } catch {}
+          } catch (e) {
+            console.warn('[UnifiedWorkoutView] step id backfill failed:', e);
+          }
           return;
         }
         // Server materialization: if steps missing, materialize on server
@@ -315,7 +319,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         } catch (err) {
           console.warn('[UnifiedWorkoutView] Server materialization failed:', err);
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[UnifiedWorkoutView] ensureMaterialized failed:', e);
+      }
     };
     // When switching to Summary tab, try a materialize pass
     if (activeTab === 'summary') ensureMaterialized();
@@ -372,7 +378,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         }
         
         setHydratedPlanned(row as any);
-      } catch {}
+      } catch (e) {
+        console.warn('[UnifiedWorkoutView] summary tab planned row hydrate failed:', e);
+      }
     })();
   }, [activeTab, linkedPlanned?.id, (workout as any)?.planned_id]);
 
@@ -384,7 +392,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!isCompleted) return;
         const wid = String((workout as any)?.id || '');
         if (!wid) return;
-        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { return false; }})();
+        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { /* malformed computed */ return false; }})();
         if (!hasPlannedSteps) return; // wait until planned steps are present
 
         // Load latest intervals
@@ -392,7 +400,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         try {
           const local = (workout as any)?.computed;
           if (local && Array.isArray(local?.intervals)) intervals = local.intervals;
-        } catch {}
+        } catch { /* computed.intervals unreadable */ }
         if (!intervals || !intervals.length) {
           const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
           const cmp = (data as any)?.computed;
@@ -408,7 +416,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         recomputeGuardRef.current.add(wid);
 
         // Enhanced analysis will be triggered when user opens Summary tab
-      } catch {}
+      } catch (e) {
+        console.warn('[UnifiedWorkoutView] race fixer (planned_step_id) effect failed:', e);
+      }
     })();
   }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
 
@@ -420,21 +430,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         if (!isCompleted) return;
         const wid = String((workout as any)?.id || '');
         if (!wid) return;
-        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { return false; }})();
+        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { /* malformed computed */ return false; }})();
         if (!hasPlannedSteps) return;
         // Check current computed snapshot
         let plannedLight: any[] = [];
         try {
           const local = (workout as any)?.computed;
           if (local && Array.isArray(local?.planned_steps_light)) plannedLight = local.planned_steps_light;
-        } catch {}
+        } catch { /* computed.planned_steps_light unreadable */ }
         if (!plannedLight || !plannedLight.length) {
           // Avoid double invoke using same guard
           if (recomputeGuardRef.current.has(`snap-${wid}`)) return;
           recomputeGuardRef.current.add(`snap-${wid}`);
           // Enhanced analysis will be triggered when user opens Summary tab
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[UnifiedWorkoutView] planned_steps_light snapshot effect failed:', e);
+      }
     })();
   }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
 
@@ -458,7 +470,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         recomputeGuardRef.current.add(key);
 
         // Enhanced analysis will be triggered when user opens Summary tab
-      } catch {}
+      } catch (e) {
+        console.warn('[UnifiedWorkoutView] summary-strict coordination effect failed:', e);
+      }
     })();
   }, [activeTab, isCompleted, (workout as any)?.id, (workout as any)?.planned_id, linkedPlanned?.id, hydratedPlanned?.id]);
 
@@ -471,7 +485,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         const parsed = JSON.parse(src);
         return Array.isArray(parsed) ? (parsed as string[]) : undefined;
       }
-    } catch {}
+    } catch {
+      /* steps_preset not valid JSON — ignore */
+    }
     return undefined;
   };
 
@@ -485,7 +501,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         // If already hydrated (v3 with steps and total), use it
         const hasV3 = (() => {
-          try { return Array.isArray(plannedRow?.computed?.steps) && plannedRow.computed.steps.length>0 && Number(plannedRow?.computed?.total_duration_seconds) > 0; } catch { return false; }
+          try { return Array.isArray(plannedRow?.computed?.steps) && plannedRow.computed.steps.length>0 && Number(plannedRow?.computed?.total_duration_seconds) > 0; } catch { /* malformed plannedRow.computed */ return false; }
         })();
         let stepsPreset = readStepsPreset((plannedRow as any).steps_preset);
         // Fetch latest row (in case caller provided a minimal object)
@@ -493,9 +509,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         try {
           const { data } = await supabase.from('planned_workouts').select('*').eq('id', String(plannedRow.id)).maybeSingle();
           if (data) { row = data; stepsPreset = readStepsPreset((data as any).steps_preset) ?? stepsPreset; }
-        } catch {}
+        } catch (e) {
+          console.warn('[UnifiedWorkoutView] planned tab: refresh planned_workout row failed:', e);
+        }
 
-        const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { return false; }})();
+        const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { /* malformed row.computed */ return false; }})();
         const isStrength = String((row as any)?.type || '').toLowerCase() === 'strength';
         
         // Strength workouts: use server-side materialization for correct grouped structure
@@ -508,11 +526,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               setHydratedPlanned(refreshed);
               // Delay invalidate event to ensure state update completes first
               setTimeout(() => {
-                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                try {
+                  window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                } catch (e) {
+                  console.warn('[UnifiedWorkoutView] planned:invalidate dispatch failed:', e);
+                }
               }, 100);
               return;
             }
-          } catch {}
+          } catch (e) {
+            console.warn('[UnifiedWorkoutView] strength materialize on planned tab failed:', e);
+          }
         }
         
         // Server materialization: if steps missing, materialize on server
@@ -525,7 +549,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               if (refreshed) {
                 setHydratedPlanned(refreshed);
                 setTimeout(() => {
-                  try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                  try {
+                    window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                  } catch (e) {
+                    console.warn('[UnifiedWorkoutView] planned:invalidate dispatch failed:', e);
+                  }
                 }, 100);
                 return;
               }
@@ -535,7 +563,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           }
         }
         setHydratedPlanned(row);
-      } catch { setHydratedPlanned(null); }
+      } catch (e) {
+        console.warn('[UnifiedWorkoutView] planned tab hydrate effect failed:', e);
+        setHydratedPlanned(null);
+      }
     })();
   }, [activeTab, workout?.id, linkedPlanned?.id]);
 
@@ -951,14 +982,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     suppressRelinkUntil.current = Date.now() + 15000;
                     try {
                       await supabase.functions.invoke('detach-planned', { body: { workout_id: wid, planned_id: pid } as any });
-                    } catch {}
+                    } catch (e) {
+                      console.warn('[UnifiedWorkoutView] detach-planned failed:', e);
+                    }
                     setCurrentPlannedId(null);
                     setLinkedPlanned(null);
                     setHydratedPlanned(null);
-                    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                    try {
+                      window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                      window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                    } catch (e) {
+                      console.warn('[UnifiedWorkoutView] unattach invalidate dispatch failed:', e);
+                    }
                     setActiveTab('completed');
-                  } catch {}
+                  } catch (e) {
+                    console.warn('[UnifiedWorkoutView] unattach handler failed:', e);
+                  }
                 }}
                 className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 font-light tracking-wide hover:bg-white/[0.12] hover:text-white hover:border-white/35 transition-all duration-300 text-sm"
                 style={{
@@ -981,7 +1020,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
               if (typeof di === 'string') return JSON.parse(di);
               return di;
-            } catch { return null; }
+            } catch { /* device_info string not JSON — omit device line */ return null; }
           })();
           const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
           const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
@@ -1087,7 +1126,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     const long = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
                     return long[dn - 1];
                   }
-                } catch {}
+                } catch (e) {
+                  console.warn('[UnifiedWorkoutView] header date formatting failed:', e);
+                }
                 return 'Planned';
               })()}
             </p>
@@ -1099,9 +1140,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             onClose={()=>setAssocOpen(false)}
             onAssociated={async(pid)=>{ 
               setAssocOpen(false);
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-              try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+              try {
+                window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                window.dispatchEvent(new CustomEvent('week:invalidate'));
+              } catch (e) {
+                console.warn('[UnifiedWorkoutView] AssociatePlannedDialog invalidate dispatch failed:', e);
+              }
             }}
           />
         )}
@@ -1181,7 +1226,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       } else if (type==='pilates_yoga') {
                         window.dispatchEvent(new CustomEvent('open:pilatesYogaLogger', { detail: { planned: basePlanned } }));
                       }
-                    } catch {}
+                    } catch (e) {
+                      console.warn('[UnifiedWorkoutView] open logger from planned tab failed:', e);
+                    }
                   };
                   return (
                     <div className="mt-4">
@@ -1295,9 +1342,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       onWorkoutSaved={(saved)=>{
                         setEditingInline(false);
                         setActiveTab('summary');
-                        try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
-                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                        try {
+                          (workout as any).id = (saved as any)?.id || (workout as any).id;
+                          window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                        } catch (e) {
+                          console.warn('[UnifiedWorkoutView] onWorkoutSaved post-save hooks failed:', e);
+                        }
                       }}
                       targetDate={(workout as any)?.date}
                     />
@@ -1320,7 +1370,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   try {
                     if (!confirm('Delete this workout?')) return;
                     onDelete?.(String((workout as any).id));
-                  } catch {}
+                  } catch (e) {
+                    console.warn('[UnifiedWorkoutView] delete workout confirmation/handler failed:', e);
+                  }
                 }}
               >Delete</Button>
             )}
@@ -1358,9 +1410,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                               onAssociated={async(pid)=>{ 
                                 setAssocOpen(false);
                                 // Just dispatch invalidation - AppLayout and useEffects will handle the rest
-                                try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                                try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                                try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+                                try {
+                                  window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                                  window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+                                  window.dispatchEvent(new CustomEvent('week:invalidate'));
+                                } catch (e) {
+                                  console.warn('[UnifiedWorkoutView] completed-tab associate invalidate dispatch failed:', e);
+                                }
                               }}
                             />
                           )}

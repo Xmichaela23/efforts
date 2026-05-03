@@ -116,7 +116,9 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch {}
+    } catch {
+      /* Intentional: bad JSON or non-array → treat as no exercises */
+    }
     return [];
   };
 
