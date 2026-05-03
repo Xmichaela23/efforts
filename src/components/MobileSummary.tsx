@@ -99,24 +99,26 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
 
   // No interactive hydration path; assume data present during development
 
-  // Strength and Mobility use dedicated component
+  // Strength and Mobility — show plan vs completed immediately; session_detail enriches RIR/adherence (may be slow).
   if (type === 'strength' || type === 'mobility') {
-    if (sessionDetailLoading && !sd) {
-      return (
-        <div className="flex justify-center py-8" aria-busy="true" aria-label="Loading performance data">
-          <Loader2 className="h-6 w-6 animate-spin text-white/40" />
-        </div>
-      );
-    }
-    return <StrengthPerformanceSummary
-      planned={planned}
-      completed={completed}
-      type={type as 'strength' | 'mobility'}
-      sessionDetail={sd}
-      onRecompute={recomputeAnalysis}
-      recomputing={recomputing}
-      recomputeError={recomputeError}
-    />;
+    return (
+      <div className="w-full space-y-2">
+        {sessionDetailLoading && !sd && (
+          <div className="text-xs text-white/50 px-0.5" aria-live="polite">
+            Loading performance analysis…
+          </div>
+        )}
+        <StrengthPerformanceSummary
+          planned={planned}
+          completed={completed}
+          type={type as 'strength' | 'mobility'}
+          sessionDetail={sd}
+          onRecompute={recomputeAnalysis}
+          recomputing={recomputing}
+          recomputeError={recomputeError}
+        />
+      </div>
+    );
   }
 
   // Endurance (run/ride/swim) — all data comes from sd (session_detail_v1)
