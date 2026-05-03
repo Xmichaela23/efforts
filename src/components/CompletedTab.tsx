@@ -392,13 +392,23 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
         // Mark as triggered immediately to prevent duplicate triggers
         processingTriggeredRef.current.add(workoutId);
         
-        // Trigger processing once (fire-and-forget)
-        supabase.functions.invoke('compute-workout-analysis', {
-          body: { workout_id: workoutId }
-        }).catch(err => {
-          console.warn('Failed to trigger processing:', err);
-          // Remove from set on error so it can retry
-          processingTriggeredRef.current.delete(workoutId);
+        // Trigger full compute pipeline once (fire-and-forget)
+        void supabase.auth.getSession().then(({ data: { session }, error: sessionErr }) => {
+          if (sessionErr) console.warn('[CompletedTab] recompute getSession:', sessionErr);
+          const token = session?.access_token;
+          if (!token) {
+            processingTriggeredRef.current.delete(workoutId);
+            return;
+          }
+          supabase.functions
+            .invoke('recompute-workout', {
+              body: { workout_id: workoutId },
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            .catch((err) => {
+              console.warn('Failed to trigger recompute-workout:', err);
+              processingTriggeredRef.current.delete(workoutId);
+            });
         });
       }
       })();

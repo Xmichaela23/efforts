@@ -107,6 +107,7 @@ Deno.serve(async (req) => {
   }
   steps.push('analyze');
 
+  console.log('[recompute-workout] steps completed:', steps);
   return json({ ok: true, stale: false, steps });
 });
 

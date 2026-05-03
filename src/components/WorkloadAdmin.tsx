@@ -256,44 +256,63 @@ export default function WorkloadAdmin() {
       return;
     }
     setFixWorkoutLoading(true);
+    const wid = fixWorkoutId.trim();
     try {
-      setResults({ message: 'Step 1/3: Running compute-workout-analysis...' });
-      
-      // Step 1: Recompute intervals
-      const { data: computeData, error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
-        body: { workout_id: fixWorkoutId.trim() }
-      });
-      
-      if (computeError) {
-        throw new Error(`Compute failed: ${computeError.message}`);
-      }
-      
-      setResults({ message: 'Step 1.5/3: Running compute-facts (session_load)...' });
-      const { error: factsError } = await supabase.functions.invoke('compute-facts', {
-        body: { workout_id: fixWorkoutId.trim() },
-      });
-      if (factsError) console.warn('compute-facts:', factsError);
-
-      setResults({ message: 'Step 2/3: Running analyze-running-workout...' });
-      
-      // Step 2: Re-analyze (with optional weather refresh)
-      const { data: analyzeData, error: analyzeError } = await supabase.functions.invoke('analyze-running-workout', {
-        body: { 
-          workout_id: fixWorkoutId.trim(),
-          force_weather_refresh: forceWeatherRefresh
+      if (!forceWeatherRefresh) {
+        setResults({ message: 'Running recompute-workout (compute → facts → analyze)...' });
+        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) console.warn('[WorkloadAdmin] recompute getSession:', sessionErr);
+        const token = session?.access_token;
+        if (!token) {
+          throw new Error('Not signed in');
         }
-      });
-      
-      if (analyzeError) {
-        throw new Error(`Analyze failed: ${analyzeError.message}`);
+        const res = await supabase.functions.invoke('recompute-workout', {
+          body: { workout_id: wid },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.error) {
+          throw new Error(res.error.message);
+        }
+        const result = res.data as { ok?: boolean; stale?: boolean; steps?: string[]; error?: string };
+        if (!result?.ok) {
+          throw new Error(result?.error ?? 'Recompute failed');
+        }
+        setResults({
+          success: true,
+          message: `✅ Workout fixed! Refresh the workout page.${result.stale ? ' (partial / stale)' : ''}`,
+          recompute: result,
+        });
+      } else {
+        setResults({ message: 'Step 1/3: Running compute-workout-analysis...' });
+        const { data: computeData, error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
+          body: { workout_id: wid },
+        });
+        if (computeError) {
+          throw new Error(`Compute failed: ${computeError.message}`);
+        }
+        setResults({ message: 'Step 1.5/3: Running compute-facts (session_load)...' });
+        const { error: factsError } = await supabase.functions.invoke('compute-facts', {
+          body: { workout_id: wid },
+        });
+        if (factsError) console.warn('compute-facts:', factsError);
+
+        setResults({ message: 'Step 2/3: Running analyze-running-workout (force weather)...' });
+        const { data: analyzeData, error: analyzeError } = await supabase.functions.invoke('analyze-running-workout', {
+          body: {
+            workout_id: wid,
+            force_weather_refresh: true,
+          },
+        });
+        if (analyzeError) {
+          throw new Error(`Analyze failed: ${analyzeError.message}`);
+        }
+        setResults({
+          success: true,
+          message: '✅ Workout fixed! Refresh the workout page.',
+          compute: computeData,
+          analyze: analyzeData,
+        });
       }
-      
-      setResults({
-        success: true,
-        message: '✅ Workout fixed! Refresh the workout page.',
-        compute: computeData,
-        analyze: analyzeData
-      });
     } catch (e: any) {
       console.error('Fix workout failed:', e);
       setResults({ error: e?.message || String(e) });
@@ -460,10 +479,18 @@ export default function WorkloadAdmin() {
 
       const results: Array<{ id: string; status: string; error?: string }> = [];
 
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) console.warn('[WorkloadAdmin] process workouts getSession:', sessionErr);
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not signed in');
+      }
+
       for (const workoutId of workoutIds) {
         try {
-          const { error } = await supabase.functions.invoke('compute-workout-analysis', {
-            body: { workout_id: workoutId }
+          const { error } = await supabase.functions.invoke('recompute-workout', {
+            body: { workout_id: workoutId },
+            headers: { Authorization: `Bearer ${accessToken}` },
           });
 
           if (error) {

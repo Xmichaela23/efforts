@@ -1,7 +1,29 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase, getStoredUserId } from "@/lib/supabase";
-import { analyzeWorkoutWithRetry } from "../services/workoutAnalysisService";
 import { safeParseJSONB } from "@/utils/jsonb";
+
+/** Fire-and-forget full pipeline for completed workouts (see `recompute-workout` edge). */
+function fireRecomputeWorkout(workoutId: string) {
+  void supabase.auth.getSession().then(({ data: { session }, error: sessionErr }) => {
+    if (sessionErr) console.warn("[useWorkouts] recompute getSession:", sessionErr);
+    const token = session?.access_token;
+    if (!token) return;
+    supabase.functions
+      .invoke("recompute-workout", {
+        body: { workout_id: workoutId },
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(({ error: invErr }) => {
+        if (invErr) console.warn("[useWorkouts] recompute-workout:", invErr);
+        try {
+          window.dispatchEvent(new CustomEvent("week:invalidate"));
+        } catch {
+          /* CustomEvent should not throw */
+        }
+      })
+      .catch((e) => console.warn("[useWorkouts] recompute-workout invoke:", e));
+  });
+}
 
 // [Keep all your existing interfaces exactly as they are]
 export interface RunInterval {
@@ -1262,40 +1284,21 @@ export const useWorkouts = () => {
         /* unexpected sync throw from auto-attach guard only */
       }
 
-      // Generate context for completed workouts using routing service (fire-and-forget background processing)
+      // Completed: compute → facts → analyze-* (`recompute-workout`)
       try {
-        if (newWorkout.workout_status === 'completed') {
-          analyzeWorkoutWithRetry(newWorkout.id, newWorkout.type).catch(() => {});
+        if (newWorkout.workout_status === "completed") {
+          fireRecomputeWorkout(newWorkout.id);
         }
       } catch {
-        /* unexpected sync throw from analyze guard only */
+        /* unexpected sync throw from recompute guard only */
       }
 
-      // Compute analysis (fire-and-forget) so computed.overall is available to unified/Today
+      // Non-completed: cheap compute + facts only (no discipline analyze)
       try {
-        (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: data.id } } as any)
-          .then(() => {
-            try {
-              window.dispatchEvent(new CustomEvent('week:invalidate'));
-            } catch {
-              /* CustomEvent should not throw */
-            }
-            // Run adherence/pace analysis for completed running workouts (pace column + summary)
-            const typeLower = String(data.type || '').toLowerCase();
-            const isRun = typeLower === 'run' || typeLower === 'running';
-            if (isRun && (data.workout_status === 'completed' || newWorkout.workout_status === 'completed')) {
-              (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: data.id } } as any)
-                .then(() => {
-                  try {
-                    window.dispatchEvent(new CustomEvent('week:invalidate'));
-                  } catch {
-                    /* CustomEvent should not throw */
-                  }
-                })
-                .catch(() => {});
-            }
-          })
-          .catch(() => {});
+        if (newWorkout.workout_status !== "completed") {
+          (supabase.functions.invoke as any)?.("compute-workout-analysis", { body: { workout_id: data.id } } as any)
+            .catch(() => {});
+        }
       } catch {
         /* sync guard around compute-workout-analysis invoke */
       }
@@ -1310,10 +1313,12 @@ export const useWorkouts = () => {
         /* sync guard around calculate-workload invoke */
       }
 
-      // Compute deterministic facts (fire-and-forget)
+      // Deterministic facts for non-completed only (completed path uses recompute-workout)
       try {
-        (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: data.id } } as any)
-          .catch(() => {});
+        if (newWorkout.workout_status !== "completed") {
+          (supabase.functions.invoke as any)?.("compute-facts", { body: { workout_id: data.id } } as any)
+            .catch(() => {});
+        }
       } catch {
         /* sync guard around compute-facts invoke */
       }
@@ -1556,39 +1561,30 @@ export const useWorkouts = () => {
 
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
 
-      // Compute summary (fire-and-forget) to refresh metrics post-update
-      const isRun = (t: string) => { const l = String(t || '').toLowerCase(); return l === 'run' || l === 'running'; };
-      const isCompletedRun = isRun(data.type) && data.workout_status === 'completed';
+      const isCompletedUpdate = data.workout_status === "completed";
       try {
-        (supabase.functions.invoke as any)?.('compute-workout-analysis', { body: { workout_id: id } } as any)
-          .then(() => {
-            try {
-              window.dispatchEvent(new CustomEvent('week:invalidate'));
-            } catch {
-              /* CustomEvent should not throw */
-            }
-            // Run adherence/pace/HR-drift analysis for any completed run so Readiness can show a verdict
-            if (isCompletedRun) {
-              (supabase.functions.invoke as any)?.('analyze-running-workout', { body: { workout_id: id } } as any)
-                .then(() => {
-                  try {
-                    window.dispatchEvent(new CustomEvent('week:invalidate'));
-                  } catch {
-                    /* CustomEvent should not throw */
-                  }
-                })
-                .catch(() => {});
-            }
-          })
-          .catch(() => {});
+        if (isCompletedUpdate) {
+          fireRecomputeWorkout(id);
+        } else {
+          (supabase.functions.invoke as any)?.("compute-workout-analysis", { body: { workout_id: id } } as any)
+            .then(() => {
+              try {
+                window.dispatchEvent(new CustomEvent("week:invalidate"));
+              } catch {
+                /* CustomEvent should not throw */
+              }
+            })
+            .catch(() => {});
+        }
       } catch {
-        /* sync guard around compute-workout-analysis invoke */
+        /* sync guard around compute / recompute invoke */
       }
 
-      // Recompute deterministic facts on update (fire-and-forget)
       try {
-        (supabase.functions.invoke as any)?.('compute-facts', { body: { workout_id: id } } as any)
-          .catch(() => {});
+        if (!isCompletedUpdate) {
+          (supabase.functions.invoke as any)?.("compute-facts", { body: { workout_id: id } } as any)
+            .catch(() => {});
+        }
       } catch {
         /* sync guard around compute-facts invoke */
       }
