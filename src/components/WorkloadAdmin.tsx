@@ -283,6 +283,7 @@ export default function WorkloadAdmin() {
           recompute: result,
         });
       } else {
+        // manual chain: force_weather_refresh requires direct invocation, not recompute-workout
         setResults({ message: 'Step 1/3: Running compute-workout-analysis...' });
         const { data: computeData, error: computeError } = await supabase.functions.invoke('compute-workout-analysis', {
           body: { workout_id: wid },

@@ -391,16 +391,15 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
       if (!alreadyTriggered) {
         // Mark as triggered immediately to prevent duplicate triggers
         processingTriggeredRef.current.add(workoutId);
-        
-        // Trigger full compute pipeline once (fire-and-forget)
-        void supabase.auth.getSession().then(({ data: { session }, error: sessionErr }) => {
-          if (sessionErr) console.warn('[CompletedTab] recompute getSession:', sessionErr);
-          const token = session?.access_token;
-          if (!token) {
-            processingTriggeredRef.current.delete(workoutId);
-            return;
-          }
-          supabase.functions
+
+        // JWT via getSession() (same as MobileSummary / useWorkouts); do not await long recompute.
+        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) console.warn('[CompletedTab] recompute getSession:', sessionErr);
+        const token = session?.access_token;
+        if (!token) {
+          processingTriggeredRef.current.delete(workoutId);
+        } else {
+          void supabase.functions
             .invoke('recompute-workout', {
               body: { workout_id: workoutId },
               headers: { Authorization: `Bearer ${token}` },
@@ -409,7 +408,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
               console.warn('Failed to trigger recompute-workout:', err);
               processingTriggeredRef.current.delete(workoutId);
             });
-        });
+        }
       }
       })();
     }
