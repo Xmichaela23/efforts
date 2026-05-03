@@ -77,6 +77,13 @@ This avoids: *“I executed the workout well but scored 72 because I did it Satu
 - Resolution order on the server: (1) `goals.race_readiness_projection` when present, (2) **`coach_cache.payload.race_readiness`** when `goal_context.primary_event.id` matches the course’s `goal_id` (same payload State SWR uses), (3) **stated plan / goal race target** from `resolveGoalTargetTimeSeconds`, (4) baseline-only VDOT only if no plan target exists.
 - The **client does not pass** `predicted_finish_time_seconds` into course APIs; it only renders server payloads.
 
+### 8. Arc continuity on Performance (`arc_performance`)
+
+- Every `session_detail_v1` build in **`workout-detail`** loads **`getArcContext`** for the workout date (same entry as Coach / planning).
+- The contract includes optional **`arc_performance`**: a compact snapshot (primary goal horizon, active plan week/phase, and whether a plan session card is linked).
+- **`narrative_text`** is the **single merged paragraph** for non–goal-race sessions: Arc **framing** (athlete truth) is prepended to the analysis narrative. Goal races still use the race debrief narrative, optionally prefixed with the same framing when present.
+- Cached `session_detail_v1` without `arc_performance` or with `arc_performance.version` below the current bridge version is treated as **stale** so clients pick up Arc-grounded copy after one refresh.
+
 ---
 
 ## Consequences

@@ -13,6 +13,7 @@ import type {
   ProtectedSessionRiskV1,
   WeekLoadStatusV1,
 } from "../readiness-types.ts";
+import type { ArcPerformanceBridgeV1 } from "./arc-performance-bridge.ts";
 
 export type MuscularSummaryEntryV1 = {
   target: string;
@@ -102,6 +103,11 @@ export type SessionDetailV1 = {
 
   observations: string[];
   narrative_text: string | null;
+  /**
+   * Compact Arc snapshot from `getArcContext` (workout date). Same source as Coach;
+   * Performance narrative is prefixed with `framing` when present.
+   */
+  arc_performance?: ArcPerformanceBridgeV1 | null;
   /** LLM race debrief (goal race only); additive alongside adherence rows. */
   race_debrief_text: string | null;
 

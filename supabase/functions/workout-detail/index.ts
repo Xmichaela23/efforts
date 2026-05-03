@@ -20,6 +20,10 @@ import { generateRaceNarrative } from '../_shared/race-narrative.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
 import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
+import {
+  buildArcPerformanceBridge,
+  ARC_PERFORMANCE_BRIDGE_VERSION,
+} from '../_shared/session-detail/arc-performance-bridge.ts';
 
 type DetailOptions = {
   include_gps?: boolean;
@@ -82,6 +86,10 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null }, analys
     const cv = Number(fc?.copy_version);
     if (!Number.isFinite(cv) || cv < FORWARD_CONTEXT_COPY_VERSION) return true;
   }
+
+  const ap = (sessionDetail as any)?.arc_performance;
+  const apv = Number(ap?.version);
+  if (!Number.isFinite(apv) || apv < ARC_PERFORMANCE_BRIDGE_VERSION) return true;
 
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
@@ -268,7 +276,7 @@ async function runSessionDetailPipelineAndPersist(
         );
       });
 
-    const [plannedRes, weekWorkoutsRes] = await Promise.all([
+    const [plannedRes, weekWorkoutsRes, , arcCtx] = await Promise.all([
       supabase
         .from('planned_workouts')
         .select('id,date,type,name,description,rendered_description,total_duration_seconds,workload_planned,computed,strength_exercises,swim_unit,baselines_template,baselines,training_plan_id')
@@ -282,6 +290,13 @@ async function runSessionDetailPipelineAndPersist(
         .gte('date', weekStartDate)
         .lte('date', weekEndDate),
       readinessP,
+      getArcContext(supabase, userId, asOfDate).catch((arcErr: unknown) => {
+        console.warn(
+          '[session_detail_v1] getArcContext failed:',
+          arcErr instanceof Error ? arcErr.message : arcErr,
+        );
+        return null;
+      }),
     ]);
 
     const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
@@ -487,6 +502,9 @@ async function runSessionDetailPipelineAndPersist(
       );
     }
 
+    const hasLinkedPlannedSession = !!(String(row?.planned_id || match?.planned_id || '').trim());
+    const arcPerformance = buildArcPerformanceBridge(arcCtx, asOfDate, hasLinkedPlannedSession);
+
     sessionDetailV1 = buildSessionDetailV1({
       workoutId: id,
       workoutDate,
@@ -507,6 +525,7 @@ async function runSessionDetailPipelineAndPersist(
       nextSession,
       readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
       readinessUnavailable,
+      arcPerformance,
     });
 
     if (sessionDetailV1?.race?.is_goal_race) {
@@ -625,8 +644,11 @@ async function runSessionDetailPipelineAndPersist(
             weatherWindMph: wd?.windSpeed ?? wd?.wind_speed ?? null,
           });
           if (raceNarrative) {
-            sessionDetailV1.narrative_text = raceNarrative;
-            console.log('[race-narrative] narrative set, length:', raceNarrative.length);
+            const fr = sessionDetailV1?.arc_performance?.framing;
+            sessionDetailV1.narrative_text = fr
+              ? `${String(fr)} ${raceNarrative}`.trim()
+              : raceNarrative;
+            console.log('[race-narrative] narrative set, length:', sessionDetailV1.narrative_text.length);
           }
         } else {
           console.log('[race-narrative] skipped — insufficient data (splits:', mileSplits?.length, 'actualSec:', actualSec, ')');

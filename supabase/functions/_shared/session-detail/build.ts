@@ -3,6 +3,8 @@
 // =============================================================================
 
 import type { SessionDetailV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
+import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
+import { mergeArcPerformanceNarrative } from './arc-performance-bridge.ts';
 import type { LedgerDay, ActualSession, PlannedSession, SessionMatch } from '../athlete-snapshot/types.ts';
 import type { ReadinessSnapshotV1 } from '../readiness-types.ts';
 import { packageSessionDetailReadiness } from './readiness-load-context.ts';
@@ -86,6 +88,8 @@ export type SessionDetailInput = {
   readinessSnapshot?: ReadinessSnapshotV1 | null;
   /** True when buildReadiness threw — keep legacy load context. */
   readinessUnavailable?: boolean;
+  /** From `getArcContext` + `buildArcPerformanceBridge` in workout-detail. */
+  arcPerformance?: ArcPerformanceBridgeV1 | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -109,6 +113,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     nextSession,
     readinessSnapshot,
     readinessUnavailable,
+    arcPerformance,
   } = input;
 
   const type = normType(workoutType) as SessionDetailV1['type'];
@@ -434,6 +439,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const pacingCV = fin((wa as any)?.analysis?.pacing_analysis?.pacing_variability?.coefficient_of_variation)
     ?? fin(granular?.pacing_analysis?.pacing_variability?.coefficient_of_variation);
 
+  const performanceNarrativeText = mergeArcPerformanceNarrative({
+    framing: arcPerformance?.framing ?? null,
+    analysisNarrative: resolvedNarrative,
+    isGoalRaceSession,
+  });
+
   return {
     version: 1,
     generated_at: new Date().toISOString(),
@@ -478,7 +489,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     },
 
     observations,
-    narrative_text: resolvedNarrative,
+    narrative_text: performanceNarrativeText,
+    arc_performance: arcPerformance ?? null,
     race_debrief_text: raceDebriefText,
     race:
       (sessionState as any).race && typeof (sessionState as any).race === 'object'
