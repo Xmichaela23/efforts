@@ -22,6 +22,7 @@ import { skipReasonLabel } from '@/lib/skip-session-reasons';
 import { useNavigate } from 'react-router-dom';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { buildArcLine, arcLineNeedsGoalsSetup, type ArcForHomeLine } from '@/lib/build-arc-line';
+import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 
 // Component for expandable workout cards with fixed height
 const WorkoutCardExpandable: React.FC<{
@@ -477,9 +478,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         setSelectedPlannedWorkout(null);
         
         // Refresh the view - the RPE popup will appear via realtime subscription
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        invalidateWorkoutScreens();
       } else {
         // For non-run/ride workouts, just update planned_workouts status
         const { error } = await supabase

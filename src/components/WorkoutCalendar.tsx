@@ -12,6 +12,7 @@ import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import LoadBar from '@/components/LoadBar';
+import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -418,9 +419,7 @@ export default function WorkoutCalendar({
       });
 
       // Invalidate to refresh calendar
-      window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-      window.dispatchEvent(new CustomEvent('planned:invalidate'));
-      window.dispatchEvent(new CustomEvent('week:invalidate'));
+      invalidateWorkoutScreens();
 
       setShowValidationPopup(false);
       setReschedulePending(null);
