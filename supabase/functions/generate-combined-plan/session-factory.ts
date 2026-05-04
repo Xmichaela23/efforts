@@ -15,7 +15,7 @@ import { simplePlacementPolicy } from '../shared/strength-system/placement/simpl
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
-import '../_shared/swim-program-templates.ts';
+import type { SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -38,12 +38,28 @@ function optionalSwimDrillBlock(
   drillSlotSalt: number,
   phase: string | undefined,
   sessionKind: SwimDrillSessionKind,
+  techniqueDrillEmphasis?: boolean,
 ): { mainBudgetYd: number; drillTokens: string[] } {
   let mainBudgetYd = totalYards - wuYd - cdYd;
   if (planWeek == null || mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
     return { mainBudgetYd, drillTokens: [] };
   }
   const salt = drillSlotSalt + SWIM_DRILL_KIND_SALT[sessionKind];
+
+  if (techniqueDrillEmphasis && sessionKind === 'easy') {
+    const want = pickSwimDrillTokens(planWeek, salt, 3, phase);
+    let budget = mainBudgetYd;
+    const chosen: string[] = [];
+    for (const tok of want) {
+      const dy = swimDrillYardsFromToken(tok);
+      if (dy > 0 && budget - dy >= SWIM_DRILL_MAIN_FLOOR_YD) {
+        chosen.push(tok);
+        budget -= dy;
+      }
+    }
+    if (chosen.length) return { mainBudgetYd: budget, drillTokens: chosen };
+  }
+
   const tok = pickSwimDrillTokens(planWeek, salt, 1, phase)[0]!;
   const dy = swimDrillYardsFromToken(tok);
   if (dy <= 0 || mainBudgetYd - dy < SWIM_DRILL_MAIN_FLOOR_YD) {
@@ -463,6 +479,7 @@ export function thresholdSwim(
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
     totalYards, wu, cd, planWeek, drillSlotSalt, phase, 'threshold',
+    undefined,
   );
   const threshReps = Math.max(4, Math.round((main * 0.55) / 100));
   const aeroReps   = Math.max(3, Math.round((main * 0.45) / 150));
@@ -493,22 +510,32 @@ export function cssAerobicSwim(
   planWeek?: number,
   drillSlotSalt: number = 0,
   phase?: string,
+  options?: { raceSupport?: boolean },
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
     totalYards, wu, cd, planWeek, drillSlotSalt, phase, 'css_aerobic',
+    undefined,
   );
+  const raceSupport = options?.raceSupport ?? false;
   const reps = Math.max(5, Math.round(main / 100));
-  const dur  = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
+  const dur = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
   const drillNote = drillTokens.length ? ' Technique drills after the warm-up.' : '';
   const tags: string[] = ['quality', 'css_aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
+  if (raceSupport) tags.push('race_specific_swim');
+  const name = raceSupport
+    ? `Race-Specific Aerobic Swim — ${totalYards} yd`
+    : `CSS Aerobic Swim — ${totalYards} yd`;
+  const mainSet = raceSupport
+    ? `${reps}×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare.`
+    : `${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits.`;
   return session(
     day, 'swim',
-    `CSS Aerobic Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd.${drillNote} ${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits. Cool down ${cd} yd.`,
+    name,
+    `Warm up ${wu} yd.${drillNote} ${mainSet} Cool down ${cd} yd.`,
     dur, 'MODERATE',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
     tags,
@@ -523,27 +550,58 @@ export function easySwim(
   planWeek?: number,
   drillSlotSalt: number = 0,
   phase?: string,
+  techniqueDrillEmphasis = false,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdEasy(totalYards);
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: mainYards, drillTokens } = optionalSwimDrillBlock(
     totalYards, wu, cd, planWeek, drillSlotSalt, phase, 'easy',
+    techniqueDrillEmphasis,
   );
   const reps = Math.max(4, Math.round(mainYards / 150));
   const dur = Math.round(totalYards / 35); // ~35 yd/min for easy
   const drillNote = drillTokens.length ? ' Drills after the warm-up for stroke feel.' : '';
   const tags: string[] = ['easy', 'aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
+  if (techniqueDrillEmphasis) tags.push('technique_swim');
+  const title = techniqueDrillEmphasis
+    ? `Technique Aerobic Swim — ${totalYards} yd`
+    : `Easy Swim — ${totalYards} yd`;
   return session(
     day, 'swim',
-    `Easy Swim — ${totalYards} yd`,
+    title,
     `Warm up ${wu} yd easy.${drillNote} ${reps}×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down ${cd} yd.`,
     dur, 'EASY',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
     tags,
     'Z2', goalId,
   );
+}
+
+/** Maps program template rows to concrete swim sessions (combined-plan week-builder). */
+export function swimSessionFromTemplate(
+  template: SwimSlotTemplate,
+  yards: number,
+  day: string,
+  planWeek: number,
+  phase: string,
+  goalId: string,
+  drillSlotSalt: number,
+): PlannedSession {
+  switch (template.session_type) {
+    case 'threshold':
+      return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase);
+    case 'css_aerobic':
+      return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase);
+    case 'technique_aerobic':
+      return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true);
+    case 'race_specific_aerobic':
+      return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, { raceSupport: true });
+    case 'easy':
+    default:
+      return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false);
+  }
 }
 
 /** Open water skills practice — ocean/lake chop, sighting, wetsuit comfort (tri-specific). */

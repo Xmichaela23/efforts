@@ -15,9 +15,13 @@ import type {
   PlannedSession, GeneratedWeek, Phase, PhaseBlock, GoalInput,
   AthleteState, AthleteMemory, RaceAnchor,
 } from './types.ts';
-/** Step 4: `getSwimSlotTemplates` / `getRecoverySwimTemplate` — keep module on the graph (same pattern as `../_shared/schedule-session-constraints.ts`). */
-import '../_shared/swim-program-templates.ts';
 import type { Sport, Intensity } from './types.ts';
+import {
+  getSwimSlotTemplates,
+  getRecoverySwimTemplate,
+  normalizeSwimProgramDistance,
+  type SwimSlotTemplate,
+} from '../_shared/swim-program-templates.ts';
 import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
@@ -30,7 +34,8 @@ import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
   longRide, easyBike, bikeOpeners,
   groupRideQualityBikeSession, groupRideSession,
-  thresholdSwim, cssAerobicSwim, easySwim, openWaterPracticeSwim,
+  swimSessionFromTemplate,
+  openWaterPracticeSwim,
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
@@ -429,19 +434,14 @@ export function buildWeek(
 
   const runBudget  = weeklyTSSBudget * runPct;
   const bikeBudget = weeklyTSSBudget * bikePct;
-  const swimBudget = weeklyTSSBudget * swimPct;
 
   // Convert TSS budgets to session durations using average intensity
   // Run: mix of easy (~55 TSS/hr) and hard (~85 TSS/hr) → use 65 avg
   const runTotalMin  = Math.max(60, Math.round((runBudget / 65) * 60));
   // Bike: mix of easy + quality → use 62 avg
   const bikeTotalMin = Math.max(60, Math.round((bikeBudget / 62) * 60));
-  // Swim: use 42 avg; scale down when Arc shows few recent swims (athlete_state.swim_volume_multiplier).
+  /** Downscales template `target_yards` when Arc shows limited recent swim exposure. */
   const swimMult = Math.min(1, Math.max(0.35, athleteState.swim_volume_multiplier ?? 1));
-  const swimTotalMin = Math.max(
-    25,
-    Math.round(Math.max(30, Math.round((swimBudget / 42) * 60)) * swimMult),
-  );
 
   // Derive long run miles from typical 9:30/mi easy pace
   let longRunMinutes = isRecovery
@@ -517,12 +517,6 @@ export function buildWeek(
     longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(longRunMinutes / 9.5)));
     longRideMinutes = Math.min(longRideMinutes, 90);
     longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
-  }
-
-  // Swim yards (average ~2.0 yd/sec net = 120 yd/min; with rest ~80 yd/min effective)
-  let swimYards = Math.max(1200, Math.round(swimTotalMin * 80 / (hasTri ? 1 : 2)));
-  if (swimMult < 0.92 && weekNum <= 8) {
-    swimYards = Math.min(swimYards, Math.round(2400 + (weekNum - 1) * 80));
   }
 
   // ── BRICK / LONG RIDE ─────────────────────────────────────────────────────
@@ -698,6 +692,27 @@ export function buildWeek(
     swimThirdDay = resolveSwimThirdDay();
   }
 
+  const swimDistance = normalizeSwimProgramDistance(primaryGoal.distance);
+  const swimSingleRecovery = hasTri && (isRecovery || recoveryRebuildWeek1);
+  let swimTemplates: SwimSlotTemplate[] = !hasTri
+    ? []
+    : swimSingleRecovery
+      ? [getRecoverySwimTemplate()]
+      : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock);
+  if (hasTri && swimPct === 0 && !swimSingleRecovery && swimTemplates.length > 0) {
+    swimTemplates = swimTemplates.map((t) => ({
+      session_type: 'easy',
+      drill_emphasis: false,
+      target_yards: Math.max(800, Math.round(t.target_yards * 0.35)),
+      notes: 'Maintenance aerobic swim — run-primary emphasis, swim kept short.',
+    }));
+  }
+  const scaledTemplateYards = (t: SwimSlotTemplate): number => {
+    const raw = t.target_yards * swimMult;
+    const easyLike = t.session_type === 'easy' || t.session_type === 'technique_aerobic';
+    return Math.max(easyLike ? 800 : 1000, Math.round(raw));
+  };
+
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =
     athleteState.bike_quality_day != null
@@ -823,31 +838,22 @@ export function buildWeek(
     }
   }
 
-  // ── Quality swim day (default Thu; §6.2 — retain swim volume in taper) ───
-  // Marathon-primary blocks (swimPct ≈ 0): maintenance easy swim only.
+  // ── Tri swims (program templates × swim_volume_multiplier) ────────────────
   let qualitySwimPlaced = false;
   const qualitySwimSlot = grid.get(swimQualityDay);
-  if (!qualitySwimSlot?.isRest) {
-    if (hasTri) {
-      if (recoveryRebuildWeek1) {
-        const easyYd = Math.min(2800, Math.max(1500, Math.round(swimYards * 0.32)));
-        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, easyYd, servedGoal, weekNum, 0, phase));
-        qualitySwimPlaced = true;
-      } else if (isRecovery) {
-        // Recovery: easy aerobic swim at reduced volume — preserve feel + frequency.
-        const recYd = Math.max(1200, Math.round(swimYards * 0.40));
-        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, recYd, servedGoal, weekNum, 1, phase));
-        qualitySwimPlaced = true;
-      } else {
-        const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
-        const maintYd = Math.max(1200, Math.round(swimYards * 0.40));
-        const qualitySwim = triApproach === 'base_first'
-          ? cssAerobicSwim(swimQualityDay, tSwimYd, servedGoal, weekNum, 2, phase)
-          : thresholdSwim(swimQualityDay, tSwimYd, servedGoal, weekNum, 2, phase);
-        qualitySwimSlot!.sessions.push(
-          phase === 'taper' || swimPct === 0
-            ? easySwim(swimQualityDay, maintYd, servedGoal, weekNum, 3, phase)
-            : qualitySwim,
+  if (hasTri && swimTemplates.length > 0) {
+    const t0 = swimTemplates[0]!;
+    const y0 = scaledTemplateYards(t0);
+    if (!qualitySwimSlot?.isRest) {
+      qualitySwimSlot!.sessions.push(
+        swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0),
+      );
+      qualitySwimPlaced = true;
+    } else {
+      const fallSlot = grid.get(swimEasyDay);
+      if (!fallSlot?.isRest) {
+        fallSlot!.sessions.push(
+          swimSessionFromTemplate(t0, y0, swimEasyDay, weekNum, phase, servedGoal, 4),
         );
         qualitySwimPlaced = true;
       }
@@ -863,35 +869,37 @@ export function buildWeek(
     thursdayRunSlot!.sessions.push(easyRun('Thursday', easyMi, servedGoal));
   }
 
-  // ── Easy aerobic swim (default Mon) ─────────────────────────────────────────
-  // In recovery weeks: place at ~30% of normal yards (frequency preserved, volume cut).
+  // ── Second swim slot (easy / technique / race-specific aerobic from template) ─
   const easySwimSlot = grid.get(swimEasyDay);
-  if (!easySwimSlot?.isRest && hasTri) {
-    const yardsScale = recoveryRebuildWeek1 || isRecovery ? 0.30 : 0.40;
-    const recSwimYd = Math.max(1000, Math.round(swimYards * yardsScale));
+  if (!easySwimSlot?.isRest && hasTri && swimTemplates.length >= 2) {
+    const t1 = swimTemplates[1]!;
+    const y1 = scaledTemplateYards(t1);
     if (swimEasyDay !== swimQualityDay || !qualitySwimPlaced) {
       const useOpenWater =
+        t1.session_type === 'easy' &&
         hasTri &&
         !isRecovery &&
         !recoveryRebuildWeek1 &&
         (phase === 'race_specific' || (phase === 'taper' && !raceThisWeek)) &&
         weekInBlock % 2 === 0;
-      const owMin = Math.max(32, Math.min(50, Math.round(recSwimYd / 42)));
+      const owMin = Math.max(32, Math.min(50, Math.round(y1 / 42)));
       easySwimSlot!.sessions.push(
         useOpenWater
           ? openWaterPracticeSwim(swimEasyDay, owMin, servedGoal)
-          : easySwim(swimEasyDay, recSwimYd, servedGoal, weekNum, 4, phase),
+          : swimSessionFromTemplate(t1, y1, swimEasyDay, weekNum, phase, servedGoal, 4),
       );
     }
   }
 
-  // ── Third swim (focus intent only; easy aerobic — volume rebalance in Step 4) ──
-  if (swimThirdDay && hasTri && !recoveryRebuildWeek1) {
+  // ── Third swim (focus program template slot 2) ─────────────────────────────
+  if (swimThirdDay && hasTri && !recoveryRebuildWeek1 && swimTemplates.length >= 3) {
     const thirdSwimSlot = grid.get(swimThirdDay);
     if (!thirdSwimSlot?.isRest) {
-      const yardsScaleThird = isRecovery ? 0.28 : 0.30;
-      const thirdYd = Math.max(1000, Math.round(swimYards * yardsScaleThird));
-      thirdSwimSlot!.sessions.push(easySwim(swimThirdDay, thirdYd, servedGoal, weekNum, 5, phase));
+      const t2 = swimTemplates[2]!;
+      const y2 = scaledTemplateYards(t2);
+      thirdSwimSlot!.sessions.push(
+        swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5),
+      );
     }
   }
 
