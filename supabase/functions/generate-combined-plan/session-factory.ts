@@ -10,7 +10,7 @@ import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK, type TriRaceDistance } f
 import type { StrengthProtocol } from '../shared/strength-system/protocols/types.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
-import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
+import { getProtocol, resolveProtocolIdForCombinedTriPlan } from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
@@ -688,23 +688,16 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
 //   - Brick-day awareness (caller passes brickDays; protocol placement avoids them)
 //   - Taper sensitivity (taper phase → neural priming only)
 
-/** Tri combined plans: non-tri protocols (neural_speed, …) override; else performance → triathlon_performance, support → triathlon. */
+/** Tri combined: never run foundation-durability / neural_speed as literal protocols when intent is co-equal. */
 function resolveTriCombinedStrengthProtocol(options: {
   strengthProtocolId?: string;
   strengthIntent?: 'support' | 'performance';
 }): StrengthProtocol {
-  const raw = options.strengthProtocolId?.trim() ?? '';
-  if (raw && raw !== 'triathlon' && raw !== 'triathlon_performance') {
-    try {
-      return getProtocol(raw);
-    } catch {
-      /* fall through */
-    }
-  }
-  if (raw === 'triathlon_performance') return triathlonPerformanceProtocol;
-  if (raw === 'triathlon') return triathlonProtocol;
-  if (options.strengthIntent === 'performance') return triathlonPerformanceProtocol;
-  return triathlonProtocol;
+  const id = resolveProtocolIdForCombinedTriPlan(
+    options.strengthProtocolId,
+    options.strengthIntent,
+  );
+  return id === 'triathlon_performance' ? triathlonPerformanceProtocol : triathlonProtocol;
 }
 
 // Maps combined-plan phase names to the StrengthPhase format expected by the

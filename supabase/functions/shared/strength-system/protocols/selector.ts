@@ -81,6 +81,39 @@ export function isValidProtocol(protocolId: string): boolean {
 }
 
 /**
+ * Run / marathon wizard strength protocol IDs. Combined **tri** plans must not use
+ * these as literal engines when `strength_intent` is performance (co-equal), or
+ * they mis-label: athlete gets foundation-durability sessions instead of
+ * `triathlon_performance`.
+ */
+export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
+  'neural_speed',
+  'durability',
+  'upper_aesthetics',
+  'minimum_dose',
+  'upper_priority_hybrid',
+  'foundation_durability',
+  'performance_neural',
+]);
+
+/**
+ * Resolve stored `training_prefs.strength_protocol` + `strength_intent` to the
+ * tri implementation used by combined-plan `triathlonStrength`.
+ */
+export function resolveProtocolIdForCombinedTriPlan(
+  rawProtocol: string | undefined,
+  strengthIntent: string | undefined,
+): 'triathlon' | 'triathlon_performance' {
+  const p = String(rawProtocol ?? '').trim();
+  const intent = String(strengthIntent ?? '').trim().toLowerCase();
+  if (p === 'triathlon_performance') return 'triathlon_performance';
+  if (p === 'triathlon') return 'triathlon';
+  if (intent === 'performance') return 'triathlon_performance';
+  if (p && RUN_CENTRIC_STRENGTH_PROTOCOL_IDS.has(p)) return 'triathlon';
+  return 'triathlon';
+}
+
+/**
  * Get protocol by ID
  * 
  * @throws Error if protocolId is provided but not found (no silent fallback)

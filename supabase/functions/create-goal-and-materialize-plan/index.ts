@@ -33,6 +33,7 @@ import {
   hasBarbellCapability,
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
+import { resolveProtocolIdForCombinedTriPlan } from '../shared/strength-system/protocols/selector.ts';
 import {
   calculateEffortScore,
   estimateVdotFromBasePace,
@@ -708,28 +709,14 @@ function backfillTriTrainingPrefsDefenseInDepth(
 }
 
 /**
- * For combined tri plans: keep explicit non-tri strength protocols (neural_speed, …);
- * otherwise map `strength_intent` → triathlon vs triathlon_performance.
+ * For combined tri plans: always map to triathlon or triathlon_performance.
+ * Run-centric wizard ids (durability, neural_speed, …) + performance intent → performance tri track.
  */
 function resolveCombinedTriStrengthProtocol(
   rawProtocol: string | undefined,
   strengthIntent: string | undefined,
 ): string {
-  const p = String(rawProtocol ?? '').trim();
-  const nonTri = new Set([
-    'neural_speed',
-    'durability',
-    'upper_aesthetics',
-    'minimum_dose',
-    'upper_priority_hybrid',
-    'foundation_durability',
-    'performance_neural',
-  ]);
-  if (p && nonTri.has(p)) return p;
-  if (p === 'triathlon_performance') return 'triathlon_performance';
-  if (p === 'triathlon') return 'triathlon';
-  if (strengthIntent === 'performance') return 'triathlon_performance';
-  return 'triathlon';
+  return resolveProtocolIdForCombinedTriPlan(rawProtocol, strengthIntent);
 }
 
 /**

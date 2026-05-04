@@ -204,7 +204,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [eventTrainingGoal, setEventTrainingGoal] = useState<'complete' | 'speed' | ''>('');
   const [overrideFitness, setOverrideFitness] = useState(false);
   const [overrideGoal, setOverrideGoal] = useState(false);
-  const [eventStrength, setEventStrength] = useState<'none' | 'neural_speed' | 'durability' | 'upper_aesthetics'>('none');
+  const [eventStrength, setEventStrength] = useState<
+    'none' | 'neural_speed' | 'durability' | 'upper_aesthetics' | 'triathlon' | 'triathlon_performance'
+  >('none');
   const [eventStrengthFreq, setEventStrengthFreq] = useState<2 | 3>(2);
   const [overrideStrength, setOverrideStrength] = useState(false);
   const [currentSnapshots, setCurrentSnapshots] = useState<any[]>([]);
@@ -253,13 +255,23 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
     // === Strength protocol ===
     if (eventStrength === 'none') {
+      const isTriSport = String(eventSport ?? '').toLowerCase() === 'triathlon';
       // Existing active plan takes priority
       const existingPlan = currentPlans.find(p => p.status === 'active' && p.config?.strength_protocol);
       if (existingPlan?.config?.strength_protocol) {
-        setEventStrength(existingPlan.config.strength_protocol);
+        const sp = String(existingPlan.config.strength_protocol);
+        if (isTriSport) {
+          if (sp === 'triathlon_performance' || sp === 'neural_speed' || sp === 'upper_aesthetics') {
+            setEventStrength('triathlon_performance');
+          } else if (sp !== 'none') {
+            setEventStrength('triathlon');
+          }
+        } else {
+          setEventStrength(sp as 'neural_speed' | 'durability' | 'upper_aesthetics');
+        }
         setEventStrengthFreq(existingPlan.config.strength_frequency || 2);
         sources.strength = 'Matched to your active plan';
-      } else {
+      } else if (!isTriSport) {
         // Check athlete memory for strength 1RM signals
         const strengthRules = athleteMemory?.derived_rules?.strength ?? {};
         const anchorKeys = [
@@ -282,11 +294,24 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             : `${activeLifts.length} lifts tracked`;
           sources.strength = weeksLabel;
         }
+      } else {
+        // Triathlon: suggest support track unless memory shows heavy barbell history
+        const strengthRules = athleteMemory?.derived_rules?.strength ?? {};
+        const hasHeavyLifts = ['squat_1rm_est', 'deadlift_1rm_est', 'trap_bar_deadlift_1rm_est']
+          .some(k => Number(strengthRules[k]?.value ?? 0) > 100);
+        const strengthWeeks = currentSnapshots.filter(s => Number(s.strength_volume_total ?? 0) > 0).length;
+        if (hasHeavyLifts || strengthWeeks >= 2) {
+          setEventStrength('triathlon_performance');
+          sources.strength = hasHeavyLifts ? 'From barbell baselines in your profile' : 'From recent lifting volume';
+        } else {
+          setEventStrength('triathlon');
+          sources.strength = 'Default tri strength — change if you want a heavier progression';
+        }
       }
     }
 
     setPrefillSource(sources);
-  }, [showEventForm, currentBaselines, currentSnapshot, currentSnapshots, athleteMemory]);
+  }, [showEventForm, currentBaselines, currentSnapshot, currentSnapshots, athleteMemory, eventSport]);
   const [capCategory, setCapCategory] = useState('Speed');
   const [capMetric, setCapMetric] = useState('');
   const [capTarget, setCapTarget] = useState('');
@@ -1018,6 +1043,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       if (eventStrength !== 'none') {
         trainingPrefs.strength_protocol = String(eventStrength);
         trainingPrefs.strength_frequency = Number(eventStrengthFreq);
+      }
+      if (String(eventSport).toLowerCase() === 'triathlon' && eventStrength !== 'none') {
+        trainingPrefs.strength_intent = eventStrength === 'triathlon_performance' ? 'performance' : 'support';
       }
 
       const payload: Record<string, unknown> = {
@@ -1982,7 +2010,28 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             <p className="text-xs text-white/30 -mt-1">Plan start defaults to this Monday — set a date above to control when training begins.</p>
           )}
           <label className="block"><span className="text-sm text-white/50 mb-1.5 block">Sport</span>
-            <select value={eventSport} onChange={e => { setEventSport(e.target.value); setEventDistance(''); }} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors appearance-none">
+            <select value={eventSport} onChange={e => {
+              const v = e.target.value;
+              setEventSport(v);
+              setEventDistance('');
+              if (v === 'triathlon') {
+                setEventStrength((s) =>
+                  s === 'neural_speed' || s === 'upper_aesthetics'
+                    ? 'triathlon_performance'
+                    : s === 'durability'
+                      ? 'triathlon'
+                      : s,
+                );
+              } else {
+                setEventStrength((s) =>
+                  s === 'triathlon_performance'
+                    ? 'neural_speed'
+                    : s === 'triathlon'
+                      ? 'durability'
+                      : s,
+                );
+              }
+            }} className="w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-white/90 focus:outline-none focus:border-white/25 transition-colors appearance-none">
               <option value="run">Run</option><option value="ride">Ride</option><option value="swim">Swim</option><option value="triathlon">Triathlon</option><option value="other">Other</option>
             </select>
           </label>
@@ -2058,12 +2107,25 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               <div>
                 <span className="text-sm text-white/50 mb-1.5 block">Strength work</span>
                 {(() => {
-                  const strengthLabels: Record<string, [string, string]> = {
+                  const isTriSport = String(eventSport ?? '').toLowerCase() === 'triathlon';
+                  const strengthLabelsRun: Record<string, [string, string]> = {
                     none: ['No strength', 'Running only'],
                     neural_speed: ['Get faster', 'Heavy lifts for power and running economy'],
                     durability: ['Stay healthy', 'Injury prevention with progressive strength'],
                     upper_aesthetics: ['Build upper body', 'Hypertrophy up top, functional legs'],
                   };
+                  const strengthLabelsTri: Record<string, [string, string]> = {
+                    none: ['No structured lifts', 'Swim, bike, and run only'],
+                    triathlon: [
+                      'Support triathlon strength',
+                      'Periodized for three sports: hinges, single-leg durability, swim-shoulder care — backs up performance without a powerlifting focus.',
+                    ],
+                    triathlon_performance: [
+                      'Performance strength (co-equal)',
+                      'Heavier compounds and planned progressions for economy and power — same track as treating the gym as a real season goal alongside tri.',
+                    ],
+                  };
+                  const strengthLabels = isTriSport ? strengthLabelsTri : strengthLabelsRun;
                   const hasExisting = eventStrength !== 'none';
                   const freqLabel = `${eventStrengthFreq}x/week`;
 
@@ -2080,13 +2142,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                     </div>
                   );
 
+                  const triOptions = ['none', 'triathlon', 'triathlon_performance'] as const;
+                  const runOptions = ['none', 'neural_speed', 'durability', 'upper_aesthetics'] as const;
+                  const options = isTriSport ? triOptions : runOptions;
+
                   return (
                     <div className="space-y-3">
                       <div className="flex flex-col gap-2">
-                        {(['none', 'neural_speed', 'durability', 'upper_aesthetics'] as const).map(val => (
+                        {options.map(val => (
                           <button key={val} onClick={() => { setEventStrength(val); if (val !== 'none') setOverrideStrength(false); }} className={`w-full rounded-xl px-4 py-3 text-left transition-all border ${eventStrength === val ? 'border-white/25 bg-white/[0.12]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.06]'}`}>
-                            <span className={`text-sm font-medium ${eventStrength === val ? 'text-white/90' : 'text-white/50'}`}>{strengthLabels[val][0]}</span>
-                            <span className={`block text-xs mt-0.5 ${eventStrength === val ? 'text-white/50' : 'text-white/25'}`}>{strengthLabels[val][1]}</span>
+                            <span className={`text-sm font-medium ${eventStrength === val ? 'text-white/90' : 'text-white/50'}`}>{strengthLabels[val]?.[0]}</span>
+                            <span className={`block text-xs mt-0.5 ${eventStrength === val ? 'text-white/50' : 'text-white/25'}`}>{strengthLabels[val]?.[1]}</span>
                           </button>
                         ))}
                       </div>
