@@ -81,7 +81,8 @@ const corsHeaders: Record<string, string> = {
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
 /** v28: Wire coach to ArcContext + add Arc-aware overall_training_read + weekly_state_v1.empty_state. */
 /** v29: Add last_completed_race.projected_seconds (course-model projection at race time). */
-const COACH_PAYLOAD_VERSION = 29;
+/** v30: Weekly coach swim_intent posture + longitudinal prompt shaping for tri goals. */
+const COACH_PAYLOAD_VERSION = 30;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -288,6 +289,42 @@ function pickPrimaryPlan(plans: ActivePlanLite[]): ActivePlanLite | null {
     .filter(p => p.config?.race_date)
     .sort((a, b) => new Date(a.config.race_date).getTime() - new Date(b.config.race_date).getTime());
   return (withRace[0] ?? plans[0]) as ActivePlanLite;
+}
+
+function isTriGoalLite(g: GoalLite | null | undefined): boolean {
+  if (!g) return false;
+  const s = String(g.sport || '').toLowerCase();
+  return s === 'triathlon' || s === 'tri' || s.includes('triathlon');
+}
+
+/** Plan-linked tri goal if it matches active plan; else A-priority tri primary_event; else first active tri goal. */
+function activeTriGoalForSwimIntent(ctx: GoalContext, activePlanGoalId: string | null | undefined): GoalLite | null {
+  const triGoals = ctx.goals.filter(isTriGoalLite);
+  if (!triGoals.length) return null;
+  const gid = activePlanGoalId && String(activePlanGoalId).trim() ? String(activePlanGoalId).trim() : null;
+  if (gid) {
+    const linked = triGoals.find((g) => g.id === gid);
+    if (linked) return linked;
+  }
+  if (ctx.primary_event && isTriGoalLite(ctx.primary_event)) return ctx.primary_event;
+  return triGoals[0] ?? null;
+}
+
+/** `swim_intent` from the active tri goal's `training_prefs`; null when no tri goal (skip swim-specific coach framing). */
+function deriveTriSwimIntentForCoach(ctx: GoalContext, activePlanGoalId: string | null | undefined): 'focus' | 'race' | null {
+  const g = activeTriGoalForSwimIntent(ctx, activePlanGoalId);
+  if (!g) return null;
+  const tp = g.training_prefs;
+  if (!tp || typeof tp !== 'object') return 'race';
+  const raw = (tp as Record<string, unknown>).swim_intent ?? (tp as Record<string, unknown>).swimIntent;
+  if (raw === 'focus') return 'focus';
+  return 'race';
+}
+
+function swimPostureFactLine(intent: 'focus' | 'race'): string {
+  return intent === 'focus'
+    ? 'SWIM_POSTURE: swim_intent is "focus" — treat swim as a primary vector with bike and run; name swim explicitly (pace feel, drills, aerobic quality, CSS/threshold context) when SESSION lines include swims.'
+    : 'SWIM_POSTURE: swim_intent is "race" (default) — swims maintain feel and sharpness; foreground bike and run trends unless a swim issue is clearly concerning.';
 }
 
 function inferMethodologyId(planConfig: any): MethodologyId {
@@ -900,6 +937,7 @@ Deno.serve(async (req) => {
     const planConfig = activePlan?.config || null;
 
     const goalContext = await loadGoalContext(supabaseService, userId, asOfDate, allActivePlans.map(p => p.id));
+    const triSwimIntent = deriveTriSwimIntentForCoach(goalContext, activePlan?.goal_id ?? null);
     const methodologyId: MethodologyId = inferMethodologyId(planConfig);
     const weekStartDow: WeekStartDow = resolveWeekStartDow(planConfig);
 
@@ -2899,6 +2937,12 @@ Deno.serve(async (req) => {
         return false;
       })();
 
+      try {
+        longitudinalSignalsResult = await computeLongitudinalSignals(supabase, userId, asOfDate, 6);
+      } catch (longErr: any) {
+        console.warn('[coach] longitudinal signals failed (non-fatal):', longErr?.message || longErr);
+      }
+
       if (anthropicKey) {
         try {
           // Build session interpretations from persisted session_detail_v1 (chronological).
@@ -2941,12 +2985,6 @@ Deno.serve(async (req) => {
             .sort((a, b) => (a as any).__sort.localeCompare((b as any).__sort));
           const sessionInterpretations: SessionInterpretationForPrompt[] = completedWorkouts.map(({ __sort, has_interpretation, ...rest }) => rest);
 
-          try {
-            longitudinalSignalsResult = await computeLongitudinalSignals(supabase, userId, asOfDate, 6);
-          } catch (longErr: any) {
-            console.warn('[coach] longitudinal signals failed (non-fatal):', longErr?.message || longErr);
-          }
-
           // Adaptation trajectory: multi-week lookback from normWorkouts (28d)
           let adaptationBlock: string | null = null;
           try {
@@ -2988,9 +3026,8 @@ Deno.serve(async (req) => {
             console.warn('[coach] adaptation assessment failed (non-fatal):', adaptErr?.message || adaptErr);
           }
 
-          // Longitudinal signals are computed for the API response (Block view) but NOT
-          // fed to the weekly LLM — the weekly narrative should be about this week only.
-          // Adaptation trajectory IS fed — it's about how the body is handling the current block.
+          // Longitudinal patterns (same DB result as weekly_state) are appended after adaptation
+          // trajectory for the weekly LLM, with swim_intent-aware ordering/filtering for tri goals.
 
           // Early artifact detection — needed before generateCoaching so the LLM prompt
           // can suppress spike language when run sessions hit planned duration/distance.
@@ -3023,9 +3060,17 @@ Deno.serve(async (req) => {
             }
           }
 
+          const longitudinalPatternsText =
+            longitudinalSignalsResult?.signals?.length
+              ? longitudinalSignalsToPrompt(longitudinalSignalsResult, { swimIntent: triSwimIntent })
+              : '';
+          const coachingLongitudinalBlock = [adaptationBlock, longitudinalPatternsText.trim() || null]
+            .filter((x): x is string => Boolean(x && String(x).trim()))
+            .join('\n\n') || null;
+
           coaching = await generateCoaching(partialSnapshot, anthropicKey, {
             sessionInterpretations,
-            longitudinalBlock: adaptationBlock,
+            longitudinalBlock: coachingLongitudinalBlock,
             suppressRunLoadSpike: earlyRunAdherenceArtifact && !hasRealLoadConcerns,
           });
         } catch (llmErr: any) {
@@ -3780,6 +3825,13 @@ Deno.serve(async (req) => {
             );
           }
         } catch { /* non-fatal */ }
+
+        const longLegacyBlock =
+          longitudinalSignalsResult?.signals?.length
+            ? longitudinalSignalsToPrompt(longitudinalSignalsResult, { swimIntent: triSwimIntent })
+            : '';
+        if (longLegacyBlock.trim()) narrativeFacts.push(longLegacyBlock);
+        else if (triSwimIntent != null) narrativeFacts.push(swimPostureFactLine(triSwimIntent));
 
         const todayDay = (() => {
           try { return new Date(asOfDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', ...(userTz ? { timeZone: userTz } : {}) }); }

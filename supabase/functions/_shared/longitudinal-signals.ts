@@ -606,15 +606,69 @@ function fmtPacePerMi(secPerMi: number): string {
   return `${m}:${String(s).padStart(2, '0')}/mi`;
 }
 
-/** Format signals as a text block for the weekly coach LLM prompt. */
-export function longitudinalSignalsToPrompt(signals: LongitudinalSignals): string {
+function severityRank(s: LongitudinalSignal['severity']): number {
+  const sev: Record<string, number> = { concern: 0, warning: 1, info: 2 };
+  return sev[s] ?? 2;
+}
+
+function sortSignalsBySeverity(sigs: LongitudinalSignal[]): LongitudinalSignal[] {
+  return [...sigs].sort((a, b) => severityRank(a.severity) - severityRank(b.severity));
+}
+
+/** Heuristic for coach ordering / filtering — no change to detection. */
+export function isSwimRelatedLongitudinalSignal(s: LongitudinalSignal): boolean {
+  const blob = `${s.id} ${s.headline} ${s.detail} ${s.evidence}`.toLowerCase();
+  return (
+    /\bswim\b/.test(blob) ||
+    /\bpool\b/.test(blob) ||
+    /\bcss\b/.test(blob) ||
+    /\bopen water\b/.test(blob) ||
+    /\b100\s*(m|yd)\b/.test(blob)
+  );
+}
+
+export type LongitudinalCoachSwimIntent = 'focus' | 'race';
+
+/**
+ * Format multi-week pattern signals for the weekly coach LLM.
+ * When `swimIntent` is set (tri goal context), adjusts ordering and which swim lines appear.
+ */
+export function longitudinalSignalsToPrompt(
+  signals: LongitudinalSignals,
+  opts?: { swimIntent?: LongitudinalCoachSwimIntent | null },
+): string {
   if (!signals.signals.length) return '';
+
+  const swimIntent = opts?.swimIntent;
+
+  let ordered: LongitudinalSignal[];
+  if (swimIntent === 'race') {
+    ordered = signals.signals.filter((s) => !isSwimRelatedLongitudinalSignal(s) || s.severity === 'concern');
+  } else if (swimIntent === 'focus') {
+    const swim = signals.signals.filter(isSwimRelatedLongitudinalSignal);
+    const rest = signals.signals.filter((s) => !isSwimRelatedLongitudinalSignal(s));
+    ordered = [...sortSignalsBySeverity(swim), ...sortSignalsBySeverity(rest)];
+  } else {
+    ordered = [...signals.signals];
+  }
+
+  if (!ordered.length) return '';
 
   const lines = [
     `=== LONGITUDINAL PATTERNS (${signals.window_weeks}-week window) ===`,
   ];
 
-  for (const s of signals.signals) {
+  if (swimIntent === 'focus') {
+    lines.push(
+      'SWIM_POSTURE (swim_intent focus): Swim is a primary training vector this block — treat it alongside bike power trends and run aerobic efficiency. Name swim explicitly when it matters this week (pace feel, drill quality, steady aerobic execution, threshold/CSS work when session lines support it). Any swim-related pattern listed below comes before other disciplines by design; still prioritize a non-swim [CONCERN] in the headline if it is clearly more urgent.',
+    );
+  } else if (swimIntent === 'race') {
+    lines.push(
+      'SWIM_POSTURE (swim_intent race): Swim sessions are in to keep feel and sharpness; foreground bike power trends and run aerobic efficiency in synthesis. Only emphasize swim-related items below when they are tagged [CONCERN].',
+    );
+  }
+
+  for (const s of ordered) {
     const tag = s.severity === 'concern' ? '[CONCERN]' : s.severity === 'warning' ? '[WATCH]' : '[NOTE]';
     lines.push(`${tag} ${s.headline}`);
     lines.push(`  ${s.detail}`);
