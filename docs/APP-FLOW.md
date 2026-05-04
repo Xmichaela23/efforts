@@ -89,6 +89,8 @@ When **`weekly_state_v1.plan.has_active_plan`**, **`useCoachWeekContext`** calls
 
 Merged from **`adapt-plan`** today: **`strength_relayout`** (prepended if missing), **`end_easy_pace`** and **`end_ftp`** (appended; types **`endurance_pace_update`** / **`endurance_ftp_update`**). Server fields **`id`** / **`description`** map to card **`code`** / **`details`**. Endurance rows only appear when learnings vs manual baselines and Arc gates allow (e.g. meaningful delta, not suppressed for load/taper); no row is a valid outcome.
 
+**Got it → persistence:** Endurance accepts update **`performance_numbers`** directly (**easyPace**, **FTP**). Strength accepts write **`plan_adjustments`** scaling factors, not stored 1RMs. **Baseline drift card** is a separate accept path for lift numbers.
+
 **Swim:** **`adapt-plan`** does not yet emit swim baseline suggestions — additive later.
 
 ---
@@ -120,3 +122,4 @@ Everything else in recent sprints is either **done** or an explicit **known trad
 - **2026-05-03** — Initial check-in from chat audit: architecture snapshot, Arc usage, `get-week` gap, follow-up table.
 - **2026-05-04** — Arc grounding table: `adapt-plan` (suggest) now loads `getArcContext`; `get-week` remains the main server gap.
 - **2026-05-05** — State tab: `useCoachWeekContext` merges `adapt-plan` endurance suggestions (`end_easy_pace`, `end_ftp`) into plan adaptation card; swim still out of scope on `adapt-plan`; doc section for plan adaptation flow.
+- **2026-05-06** — Plan adaptation: document endurance vs strength persistence (`performance_numbers` vs `plan_adjustments`) and baseline drift card.
