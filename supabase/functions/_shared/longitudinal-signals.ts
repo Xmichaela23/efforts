@@ -230,8 +230,22 @@ function detectE1rmTrends(facts: WorkoutFactRow[], out: LongitudinalSignal[]): v
   }
 }
 
+/** Calendar days from scheduled plan date to as-of (YYYY-MM-DD), noon-normalized. */
+function calendarDaysFromPlanToAsOf(planDate: string, asOfDate: string): number {
+  const t0 = new Date(`${planDate}T12:00:00`).getTime();
+  const t1 = new Date(`${asOfDate}T12:00:00`).getTime();
+  return Math.round((t1 - t0) / 86400000);
+}
+
+/**
+ * Past adherence: explicit skips vs missed (incomplete, no link, after grace).
+ * Do not count incomplete sessions as "missed" until MISSED_GRACE calendar days after scheduled date —
+ * allows late logging and device sync.
+ */
 function detectSessionSkipPatterns(planned: PlannedRow[], facts: WorkoutFactRow[], asOfDate: string, out: LongitudinalSignal[]): void {
   if (planned.length < 5) return;
+
+  const MISSED_GRACE_CALENDAR_DAYS = 2;
 
   // Build set of planned IDs that have a matching workout_facts row (completed but not linked)
   const completedByFact = new Set<string>();
@@ -239,33 +253,53 @@ function detectSessionSkipPatterns(planned: PlannedRow[], facts: WorkoutFactRow[
     if (f.planned_workout_id) completedByFact.add(f.planned_workout_id);
   }
 
-  const byDiscipline = new Map<string, { total: number; skipped: number }>();
+  const byDiscipline = new Map<string, { total: number; confirmedSkips: number; missed: number }>();
   for (const p of planned) {
     // Only count strictly past dates — today's workouts may not be done yet
     if (p.date >= asOfDate) continue;
 
     const type = normDiscipline(p.type);
-    if (!byDiscipline.has(type)) byDiscipline.set(type, { total: 0, skipped: 0 });
+    if (!byDiscipline.has(type)) byDiscipline.set(type, { total: 0, confirmedSkips: 0, missed: 0 });
     const entry = byDiscipline.get(type)!;
-    entry.total++;
 
     const status = String(p.workout_status || '').toLowerCase();
     const linkedOrFactMatched = !!p.completed_workout_id || completedByFact.has(p.id);
-    if (status === 'completed' || linkedOrFactMatched) continue;
-    entry.skipped++;
+    if (status === 'completed' || linkedOrFactMatched) {
+      entry.total++;
+      continue;
+    }
+
+    if (status === 'skipped') {
+      entry.total++;
+      entry.confirmedSkips++;
+      continue;
+    }
+
+    // planned / in_progress / unknown — not completed; wait grace before "missed"
+    if (calendarDaysFromPlanToAsOf(p.date, asOfDate) < MISSED_GRACE_CALENDAR_DAYS) {
+      continue;
+    }
+
+    entry.total++;
+    entry.missed++;
   }
 
-  for (const [type, { total, skipped }] of byDiscipline) {
+  for (const [type, { total, confirmedSkips, missed }] of byDiscipline) {
     if (total < 3) continue;
-    const skipRate = skipped / total;
-    if (skipRate >= 0.4 && skipped >= 3) {
+    const adherenceGaps = confirmedSkips + missed;
+    const gapRate = adherenceGaps / total;
+    if (gapRate >= 0.4 && adherenceGaps >= 3) {
+      const skipPart =
+        confirmedSkips > 0 ? `${confirmedSkips} confirmed skip${confirmedSkips === 1 ? '' : 's'}` : '';
+      const missPart = missed > 0 ? `${missed} missed (not completed after sync grace)` : '';
+      const breakdown = [missPart, skipPart].filter(Boolean).join('; ');
       out.push({
         id: `skip_pattern_${type}`,
         category: 'adherence',
-        severity: skipRate >= 0.6 ? 'concern' : 'warning',
+        severity: gapRate >= 0.6 ? 'concern' : 'warning',
         headline: `${type} session consistency trending low`,
-        detail: `Completed ${total - skipped} of ${total} planned ${type} sessions over the last few weeks. ${type === 'swim' ? 'Aerobic base balance' : type === 'strength' ? 'Strength maintenance' : 'Training progression'} benefits from regularity.`,
-        evidence: `${skipped}/${total} ${type} sessions skipped over the window`,
+        detail: `Completed ${total - adherenceGaps} of ${total} planned ${type} sessions over the last few weeks (${breakdown}). ${type === 'swim' ? 'Aerobic base balance' : type === 'strength' ? 'Strength maintenance' : 'Training progression'} benefits from regularity.`,
+        evidence: `${adherenceGaps}/${total} ${type} gaps (${missed} post-grace missed, ${confirmedSkips} skipped)`,
       });
     }
   }

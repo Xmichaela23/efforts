@@ -31,6 +31,7 @@ export const triathlonPerformanceProtocol: StrengthProtocol = {
 
 function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const { phase, weekInPhase, isRecovery, strengthFrequency } = context;
+  const planWeekLabel = Math.max(1, Number.isFinite(context.weekIndex) ? context.weekIndex : weekInPhase);
   const tier: EquipmentTier =
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
@@ -51,23 +52,23 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
   if (phaseName === 'base') {
     return freq >= 2
-      ? [perfBaseLower(tier, limiter, weekInPhase), perfBaseUpper(tier, limiter, weekInPhase)]
-      : [perfBaseLower(tier, limiter, weekInPhase)];
+      ? [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel), perfBaseUpper(tier, limiter, weekInPhase, planWeekLabel)]
+      : [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel)];
   }
 
   if (phaseName === 'build') {
     return freq >= 2
-      ? [perfBuildLower(tier, limiter, weekInPhase), perfBuildUpper(tier, limiter, weekInPhase)]
-      : [perfBuildLower(tier, limiter, weekInPhase)];
+      ? [perfBuildLower(tier, limiter, weekInPhase, planWeekLabel), perfBuildUpper(tier, limiter, weekInPhase, planWeekLabel)]
+      : [perfBuildLower(tier, limiter, weekInPhase, planWeekLabel)];
   }
 
   if (phaseName === 'race prep' || phaseName === 'race-specific' || phaseName === 'speed') {
     return freq >= 2
-      ? [perfRaceLower(tier, limiter, weekInPhase), perfRaceUpper(tier, limiter)]
-      : [perfRaceLower(tier, limiter, weekInPhase)];
+      ? [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel), perfRaceUpper(tier, limiter)]
+      : [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel)];
   }
 
-  return [perfBaseLower(tier, limiter, weekInPhase)];
+  return [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel)];
 }
 
 // ── Recovery (deload week): −volume, keep patterns ────────────────────────
@@ -108,7 +109,7 @@ function createPerfRecoverySession(tier: EquipmentTier): IntentSession {
 
 // ── Base: hypertrophy (weeks 1–8 in a typical macrocycle) ───────────────────
 
-function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number): IntentSession {
+function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 3;
   const rir = 3;
@@ -187,7 +188,7 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Performance — Base Hypertrophy (Lower)',
-    description: `Base Week ${wip} — Hypertrophy lower body (≈65% 1RM, RIR ${rir}). Build tissue for later strength and power blocks.`,
+    description: `Base Week ${planWeekLabel} — Hypertrophy lower body (≈65% 1RM, RIR ${rir}). Build tissue for later strength and power blocks.`,
     duration: tier === 'commercial_gym' ? 55 : 50,
     exercises: ex,
     repProfile: 'hypertrophy',
@@ -195,7 +196,7 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
   };
 }
 
-function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number): IntentSession {
+function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 3;
   const rir = 3;
@@ -276,7 +277,7 @@ function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     intent: 'UPPER_POSTURE',
     priority: 'required',
     name: 'Tri Performance — Base Hypertrophy (Upper)',
-    description: `Base Week ${wip} — Upper hypertrophy for swim pull, posture, and shoulder health (RIR ${rir}).`,
+    description: `Base Week ${planWeekLabel} — Upper hypertrophy for swim pull, posture, and shoulder health (RIR ${rir}).`,
     duration: 45,
     exercises: ex,
     repProfile: 'hypertrophy',
@@ -286,7 +287,7 @@ function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
 
 // ── Build: strength (≈78–82% 1RM) ──────────────────────────────────────────
 
-function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number): IntentSession {
+function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 4;
   const rir = 2;
@@ -357,7 +358,7 @@ function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Performance — Strength Build (Lower)',
-    description: `Build Week ${wip} — Heavy compounds (~78–80% 1RM), RIR ${rir}. Convert hypertrophy to usable strength.`,
+    description: `Build Week ${planWeekLabel} — Heavy compounds (~78–80% 1RM), RIR ${rir}. Convert hypertrophy to usable strength.`,
     duration: 55,
     exercises: ex,
     repProfile: 'strength',
@@ -365,7 +366,7 @@ function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
   };
 }
 
-function perfBuildUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number): IntentSession {
+function perfBuildUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 4;
   const rir = 2;
@@ -439,7 +440,7 @@ function perfBuildUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
     intent: 'UPPER_POSTURE',
     priority: 'required',
     name: 'Tri Performance — Strength Build (Upper)',
-    description: `Build Week ${wip} — Heavy pull + press (RIR ${rir}).`,
+    description: `Build Week ${planWeekLabel} — Heavy pull + press (RIR ${rir}).`,
     duration: 45,
     exercises: ex,
     repProfile: 'strength',
@@ -449,7 +450,7 @@ function perfBuildUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
 
 // ── Race-specific: power / neural ───────────────────────────────────────────
 
-function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number): IntentSession {
+function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const rir = 1;
   const ex: StrengthExercise[] = [];
@@ -512,7 +513,7 @@ function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Performance — Neural Power (Lower)',
-    description: `Race-prep Week ${wip} — Low reps, high intent (~85–87% on bar). Express strength as power; minimal fatigue.`,
+    description: `Race-prep Week ${planWeekLabel} — Low reps, high intent (~85–87% on bar). Express strength as power; minimal fatigue.`,
     duration: 50,
     exercises: ex,
     repProfile: 'strength',

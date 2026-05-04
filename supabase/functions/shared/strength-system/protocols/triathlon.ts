@@ -56,6 +56,8 @@ export const triathlonProtocol: StrengthProtocol = {
 
 function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const { phase, weekInPhase, isRecovery, strengthFrequency } = context;
+  /** User-facing week count across phase boundaries (avoids "Week 1" resetting each block). */
+  const planWeekLabel = Math.max(1, Number.isFinite(context.weekIndex) ? context.weekIndex : weekInPhase);
   const tier: EquipmentTier =
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
@@ -82,19 +84,19 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   if (phaseName === 'base') {
     return freq >= 2
       ? [
-        createBasePosteriorChain(tier, limiter, weekInPhase, strengthIntent),
-        createBaseUpperSwim(tier, limiter, weekInPhase, strengthIntent),
+        createBasePosteriorChain(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
+        createBaseUpperSwim(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
       ]
-      : [createBasePosteriorChain(tier, limiter, weekInPhase, strengthIntent)];
+      : [createBasePosteriorChain(tier, limiter, weekInPhase, planWeekLabel, strengthIntent)];
   }
 
   if (phaseName === 'build') {
     return freq >= 2
       ? [
-        createBuildExplosiveLower(tier, limiter, weekInPhase, strengthIntent),
-        createBuildSwimPower(tier, limiter, weekInPhase),
+        createBuildExplosiveLower(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
+        createBuildSwimPower(tier, limiter, weekInPhase, planWeekLabel),
       ]
-      : [createBuildExplosiveLower(tier, limiter, weekInPhase, strengthIntent)];
+      : [createBuildExplosiveLower(tier, limiter, weekInPhase, planWeekLabel, strengthIntent)];
   }
 
   // race_specific — maintenance only, single session
@@ -109,6 +111,7 @@ function createBasePosteriorChain(
   tier: EquipmentTier,
   limiter: LimiterSport,
   weekInPhase: number,
+  planWeekLabel: number,
   strengthIntent?: 'support' | 'performance',
 ): IntentSession {
   const wip   = Math.max(1, weekInPhase);
@@ -188,10 +191,10 @@ function createBasePosteriorChain(
   exercises.push({ name: 'Copenhagen Plank', sets: 2, reps: early ? '20s/side' : '30s/side', weight: 'Bodyweight' });
 
   const description = limiter === 'bike'
-    ? `Base Week ${weekInPhase} — Posterior chain priority for cycling power. Trap bar / RDL + hip thrusts dominate. Thoracic mobility work included.`
+    ? `Base Week ${planWeekLabel} — Posterior chain priority for cycling power. Trap bar / RDL + hip thrusts dominate. Thoracic mobility work included.`
     : limiter === 'swim'
-    ? `Base Week ${weekInPhase} — Foundation lower body. Single-leg stability is the run floor; upper session covers swim shoulder work.`
-    : `Base Week ${weekInPhase} — Foundational posterior chain and run durability. Target RIR ${rir}.`;
+    ? `Base Week ${planWeekLabel} — Foundation lower body. Single-leg stability is the run floor; upper session covers swim shoulder work.`
+    : `Base Week ${planWeekLabel} — Foundational posterior chain and run durability. Target RIR ${rir}.`;
 
   return {
     intent: 'LOWER_DURABILITY',
@@ -209,6 +212,7 @@ function createBaseUpperSwim(
   tier: EquipmentTier,
   limiter: LimiterSport,
   weekInPhase: number,
+  planWeekLabel: number,
   strengthIntent?: 'support' | 'performance',
 ): IntentSession {
   const wip   = Math.max(1, weekInPhase);
@@ -305,8 +309,8 @@ function createBaseUpperSwim(
   });
 
   const description = limiter === 'swim'
-    ? `Base Week ${weekInPhase} — Swim priority: scapular stability, lat power, and rotator cuff health. High-elbow catch strength built here.`
-    : `Base Week ${weekInPhase} — Upper pulling and scapular stability. Supports all three disciplines' postural demands.`;
+    ? `Base Week ${planWeekLabel} — Swim priority: scapular stability, lat power, and rotator cuff health. High-elbow catch strength built here.`
+    : `Base Week ${planWeekLabel} — Upper pulling and scapular stability. Supports all three disciplines' postural demands.`;
 
   return {
     intent: 'UPPER_POSTURE',
@@ -328,6 +332,7 @@ function createBuildExplosiveLower(
   tier: EquipmentTier,
   limiter: LimiterSport,
   weekInPhase: number,
+  planWeekLabel: number,
   strengthIntent?: 'support' | 'performance',
 ): IntentSession {
   const sets = 4;
@@ -401,7 +406,7 @@ function createBuildExplosiveLower(
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Strength — Build Explosive Lower',
-    description: `Build Week ${weekInPhase} — Neural drive and explosive power. Box jumps + explosive step-ups + fast hip thrusts. ` +
+    description: `Build Week ${planWeekLabel} — Neural drive and explosive power. Box jumps + explosive step-ups + fast hip thrusts. ` +
       `Strength is now about rate of force development, not volume. RIR ${rir}.`,
     duration: 50,
     exercises,
@@ -413,7 +418,8 @@ function createBuildExplosiveLower(
 function createBuildSwimPower(
   tier: EquipmentTier,
   limiter: LimiterSport,
-  weekInPhase: number,
+  _weekInPhase: number,
+  planWeekLabel: number,
 ): IntentSession {
   const sets = 4;
 
@@ -484,7 +490,7 @@ function createBuildSwimPower(
     intent: 'UPPER_POSTURE',
     priority: 'required',
     name: 'Tri Strength — Build Swim Power',
-    description: `Build Week ${weekInPhase} — Explosive lat and scap power for swim catch. ` +
+    description: `Build Week ${planWeekLabel} — Explosive lat and scap power for swim catch. ` +
       `Fast-concentric pulls + rotational core. ${limiter === 'swim' ? 'Rotator cuff under load included (swim limiter).' : ''}`,
     duration: 45,
     exercises,
