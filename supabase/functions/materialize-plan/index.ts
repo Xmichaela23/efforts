@@ -184,7 +184,74 @@ async function loadStrengthIntentForPlan(
   return null;
 }
 
-/** Performance intent: small weekly progression; recovery week (every 4th) −10% on compounds. */
+/** True for lifts that use the steeper compound performance progression (+5 lb / 2-wk step, deload week 4n). */
+function isPerformanceCompoundExercise(n: string): boolean {
+  return (
+    (n.includes('squat') && !n.includes('goblet') && !n.includes('jump')) ||
+    n.includes('deadlift') ||
+    n.includes('rdl') ||
+    n.includes('bench') ||
+    (n.includes('press') && !n.includes('leg')) ||
+    n.includes('barbell row') ||
+    n.includes('barbell rows') ||
+    n.includes('hip thrust')
+  );
+}
+
+/**
+ * Accessories that resolve via getAccessoryRatio / isolation work — shallower curve than compounds.
+ * Must not overlap isPerformanceCompoundExercise.
+ */
+function isPerformanceAccessoryProgressionExercise(n: string): boolean {
+  if (isPerformanceCompoundExercise(n)) return false;
+  if (
+    n.includes('cable row') ||
+    n.includes('cable_row') ||
+    n.includes('seated cable')
+  ) return true;
+  if (n.includes('pulldown') || n.includes('pull-down') || n.includes('lat pull')) return true;
+  if (n.includes('face pull') || n.includes('face_pull')) return true;
+  if (n.includes('inverted row') || n.includes('inverted_row')) return true;
+  if (n.includes('chest supported') || n.includes('chest_supported')) return true;
+  if (/\bt[- ]?bar\b/.test(n)) return true;
+  if (n.includes('reverse fly') || n.includes('rear delt')) return true;
+  if (n.includes('lateral raise') || n.includes('front raise')) return true;
+  if (n.includes('cable fly') || n.includes('cable_fly')) return true;
+  if ((n.includes('dumbbell') || n.includes('db ')) && (n.includes('fly') || n.includes('flye'))) return true;
+  if (n.includes('dumbbell row') || n.includes('dumbbell rows')) return true;
+  if (/(^|\s)db\s+row|\b1[- ]?arm\s+dumbbell\s+row\b/.test(n)) return true;
+  if (n.includes('dumbbell') && n.includes('row') && !n.includes('barbell')) return true;
+  if (n.includes('tricep') && n.includes('extension')) return true;
+  if (n.includes('leg press') || n.includes('leg_press')) return true;
+  if (n.includes('leg extension') || n.includes('leg_extension')) return true;
+  if (n.includes('leg curl') || n.includes('leg_curl')) return true;
+  if (n.includes('calf raise')) return true;
+  if (n.includes('goblet squat')) return true;
+  if (n.includes('bulgarian')) return true;
+  if (n.includes('step-up') || n.includes('step up')) return true;
+  if (n.includes('lunge') && !n.includes('jump')) return true;
+  if (n.includes('pallof')) return true;
+  if (n.includes('wood chop')) return true;
+  return false;
+}
+
+/** +2.5 lb per plan week from baseline prescription; same deload as compounds (week 4n → ×0.9). */
+function adjustPerformanceAccessoryLoadLb(
+  weightLb: number,
+  weekNum: number | null | undefined,
+): number {
+  if (!Number.isFinite(weightLb) || weightLb <= 0) return weightLb;
+  const w = Number(weekNum);
+  let x = weightLb;
+  if (Number.isFinite(w) && w >= 1 && w % 4 === 0) {
+    x *= 0.9;
+  } else if (Number.isFinite(w) && w >= 1) {
+    x += (w - 1) * 2.5;
+  }
+  return Math.max(2.5, Math.round(x / 2.5) * 2.5);
+}
+
+/** Performance intent: compound progression (+5 lb / 2-wk); accessory progression (+2.5 lb / wk); week 4n deload for both. */
 function adjustPerformanceWorkingLoadLb(
   weightLb: number | undefined,
   exerciseName: string,
@@ -193,25 +260,20 @@ function adjustPerformanceWorkingLoadLb(
 ): number | undefined {
   if (weightLb == null || !Number.isFinite(weightLb) || strengthIntent !== 'performance') return weightLb;
   const n = String(exerciseName || '').toLowerCase();
-  const compound =
-    (n.includes('squat') && !n.includes('goblet') && !n.includes('jump')) ||
-    n.includes('deadlift') ||
-    n.includes('rdl') ||
-    n.includes('bench') ||
-    (n.includes('press') && !n.includes('leg')) ||
-    n.includes('barbell row') ||
-    n.includes('barbell rows') ||
-    n.includes('hip thrust');
-  if (!compound) return weightLb;
-
-  const w = Number(weekNum);
-  let x = weightLb;
-  if (Number.isFinite(w) && w >= 1 && w % 4 === 0) {
-    x *= 0.9;
-  } else if (Number.isFinite(w) && w >= 1) {
-    x += Math.floor((w - 1) / 2) * 5;
+  if (isPerformanceCompoundExercise(n)) {
+    const w = Number(weekNum);
+    let x = weightLb;
+    if (Number.isFinite(w) && w >= 1 && w % 4 === 0) {
+      x *= 0.9;
+    } else if (Number.isFinite(w) && w >= 1) {
+      x += Math.floor((w - 1) / 2) * 5;
+    }
+    return Math.max(5, Math.round(x / 5) * 5);
   }
-  return Math.max(5, Math.round(x / 5) * 5);
+  if (isPerformanceAccessoryProgressionExercise(n)) {
+    return adjustPerformanceAccessoryLoadLb(weightLb, weekNum);
+  }
+  return weightLb;
 }
 
 type Baselines = { 
