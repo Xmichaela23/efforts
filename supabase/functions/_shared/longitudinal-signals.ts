@@ -1,7 +1,7 @@
 /**
  * Longitudinal signals — multi-week pattern detection for the weekly coach.
  *
- * Queries workout_facts + planned_workouts over a configurable window and
+ * Queries workout_facts, planned_workouts, athlete_snapshot over a window and
  * produces structured signals the weekly LLM can reference.
  */
 
@@ -40,6 +40,14 @@ type PlannedRow = {
   name: string | null;
   workout_status: string | null;
   completed_workout_id: string | null;
+  strength_exercises: any;
+};
+
+type AthleteSnapshotRow = {
+  week_start: string;
+  run_easy_hr_trend: number | null;
+  strength_volume_trend: number | null;
+  ride_efficiency_factor: number | null;
 };
 
 export async function computeLongitudinalSignals(
@@ -53,7 +61,7 @@ export async function computeLongitudinalSignals(
   cutoff.setDate(cutoff.getDate() - windowWeeks * 7);
   const cutoffIso = cutoff.toISOString().slice(0, 10);
 
-  const [factsRes, plannedRes] = await Promise.all([
+  const [factsRes, plannedRes, snapshotRes] = await Promise.all([
     supabase
       .from('workout_facts')
       .select('date, discipline, duration_minutes, workload, session_rpe, run_facts, strength_facts, ride_facts, plan_id, planned_workout_id')
@@ -63,26 +71,42 @@ export async function computeLongitudinalSignals(
       .order('date', { ascending: true }),
     supabase
       .from('planned_workouts')
-      .select('id, date, type, name, workout_status, completed_workout_id')
+      .select('id, date, type, name, workout_status, completed_workout_id, strength_exercises')
       .eq('user_id', userId)
       .gte('date', cutoffIso)
       .lte('date', asOfDate)
       .order('date', { ascending: true }),
+    supabase
+      .from('athlete_snapshot')
+      .select('week_start, run_easy_hr_trend, strength_volume_trend, ride_efficiency_factor')
+      .eq('user_id', userId)
+      .gte('week_start', cutoffIso)
+      .lte('week_start', asOfDate)
+      .order('week_start', { ascending: false })
+      .limit(2),
   ]);
 
   const facts: WorkoutFactRow[] = Array.isArray(factsRes?.data) ? factsRes.data : [];
   const planned: PlannedRow[] = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
+  const snapRows: AthleteSnapshotRow[] = Array.isArray(snapshotRes?.data) ? snapshotRes.data : [];
+  const latestSnapshot = snapRows[0] ?? null;
+  const priorSnapshot = snapRows[1] ?? null;
 
-  if (facts.length < 3) {
-    return { generated_at: new Date().toISOString(), window_weeks: windowWeeks, signals };
+  detectSnapshotChronicSignals(latestSnapshot, priorSnapshot, signals);
+
+  if (facts.length >= 3) {
+    detectThresholdPacePlateau(facts, signals);
+    detectE1rmTrends(facts, signals);
+    detectEasyPaceDrift(facts, signals);
+    detectRidePhysiologyTrends(facts, planned, signals);
   }
 
-  detectEasyHrTrend(facts, signals);
-  detectThresholdPacePlateau(facts, signals);
-  detectE1rmTrends(facts, signals);
   detectSessionSkipPatterns(planned, facts, asOfDate, signals);
-  detectStrengthVolumeTrend(facts, signals);
-  detectEasyPaceDrift(facts, signals);
+
+  const plannedById = new Map(planned.map((p) => [p.id, p]));
+  if (facts.length >= 3) {
+    detectStrengthRirGap(facts, plannedById, signals);
+  }
 
   signals.sort((a, b) => {
     const sev = { concern: 0, warning: 1, info: 2 };
@@ -92,45 +116,87 @@ export async function computeLongitudinalSignals(
   return {
     generated_at: new Date().toISOString(),
     window_weeks: windowWeeks,
-    signals: signals.slice(0, 5),
+    signals,
   };
 }
 
-function detectEasyHrTrend(facts: WorkoutFactRow[], out: LongitudinalSignal[]): void {
-  const easyRuns = facts.filter((f) => {
-    if (f.discipline !== 'run') return false;
-    const rf = f.run_facts;
-    if (!rf?.hr_avg || !rf?.distance_m) return false;
-    const paceKm = rf.pace_avg_s_per_km;
-    return paceKm == null || paceKm > 330;
-  });
-  if (easyRuns.length < 4) return;
+/**
+ * Chronic direction from compute-snapshot: run_easy_hr_trend / strength_volume_trend
+ * are pct-change vs trailing chronic; ride week-over-week uses two snapshot rows
+ * (ride_efficiency_factor has no dedicated trend column on snapshot).
+ */
+function detectSnapshotChronicSignals(
+  latest: AthleteSnapshotRow | null,
+  prior: AthleteSnapshotRow | null,
+  out: LongitudinalSignal[],
+): void {
+  if (!latest) return;
 
-  const mid = Math.ceil(easyRuns.length / 2);
-  const firstHalf = easyRuns.slice(0, mid).map((f) => f.run_facts.hr_avg);
-  const secondHalf = easyRuns.slice(mid).map((f) => f.run_facts.hr_avg);
-  const avgFirst = firstHalf.reduce((a: number, b: number) => a + b, 0) / firstHalf.length;
-  const avgSecond = secondHalf.reduce((a: number, b: number) => a + b, 0) / secondHalf.length;
-  const delta = Math.round(avgSecond - avgFirst);
+  const tRun = latest.run_easy_hr_trend;
+  if (tRun != null && !Number.isNaN(tRun)) {
+    if (tRun > 2) {
+      out.push({
+        id: 'snapshot_run_easy_pace_trend',
+        category: 'is_it_working',
+        severity: 'warning',
+        headline: `Easy aerobic efficiency slipping (pace-at-HR ${tRun > 0 ? '+' : ''}${Math.round(tRun * 10) / 10}% vs chronic)`,
+        detail:
+          `Athlete snapshot shows easy-run pace at target HR trending slower versus your recent baseline. Often fatigue, lost fitness, or easy days drifting harder.`,
+        evidence: `athlete_snapshot week ${latest.week_start} run_easy_hr_trend=${tRun}`,
+      });
+    } else if (tRun < -2) {
+      out.push({
+        id: 'snapshot_run_easy_pace_improving',
+        category: 'is_it_working',
+        severity: 'info',
+        headline: `Easy aerobic efficiency improving (${Math.round(tRun * 10) / 10}% vs chronic)`,
+        detail: `Athlete snapshot shows you're moving faster at easy HR versus recent baseline — a good endurance adaptation signal.`,
+        evidence: `athlete_snapshot week ${latest.week_start} run_easy_hr_trend=${tRun}`,
+      });
+    }
+  }
 
-  if (delta >= 5) {
-    out.push({
-      id: 'easy_hr_trending_up',
-      category: 'is_it_working',
-      severity: 'warning',
-      headline: `Easy run HR trending up ${delta} bpm`,
-      detail: `Average easy-run HR has risen from ~${Math.round(avgFirst)} to ~${Math.round(avgSecond)} bpm over ${easyRuns.length} runs. This can indicate accumulated fatigue or insufficient recovery.`,
-      evidence: `${easyRuns.length} easy runs, first-half avg ${Math.round(avgFirst)} bpm, second-half avg ${Math.round(avgSecond)} bpm`,
-    });
-  } else if (delta <= -5) {
-    out.push({
-      id: 'easy_hr_improving',
-      category: 'is_it_working',
-      severity: 'info',
-      headline: `Easy run HR improving by ${Math.abs(delta)} bpm`,
-      detail: `Average easy-run HR has dropped from ~${Math.round(avgFirst)} to ~${Math.round(avgSecond)} bpm — aerobic fitness is building.`,
-      evidence: `${easyRuns.length} easy runs, first-half avg ${Math.round(avgFirst)} bpm, second-half avg ${Math.round(avgSecond)} bpm`,
-    });
+  const tStr = latest.strength_volume_trend;
+  if (tStr != null && !Number.isNaN(tStr)) {
+    if (tStr < -12) {
+      out.push({
+        id: 'snapshot_strength_volume_down',
+        category: 'adherence',
+        severity: tStr < -22 ? 'concern' : 'warning',
+        headline: `Strength volume well below recent baseline (${Math.round(tStr * 10) / 10}% vs chronic)`,
+        detail: `Athlete snapshot shows weekly strength volume down versus your trailing average. Confirm if intentional (deload, travel) or consistency slipped.`,
+        evidence: `athlete_snapshot week ${latest.week_start} strength_volume_trend=${tStr}`,
+      });
+    } else if (tStr > 8) {
+      out.push({
+        id: 'snapshot_strength_volume_up',
+        category: 'is_it_working',
+        severity: 'info',
+        headline: `Strength volume above recent baseline (+${Math.round(tStr * 10) / 10}% vs chronic)`,
+        detail: `Athlete snapshot shows more strength work than your recent rolling average — okay if recovery supports it.`,
+        evidence: `athlete_snapshot week ${latest.week_start} strength_volume_trend=${tStr}`,
+      });
+    }
+  }
+
+  const curEf = latest.ride_efficiency_factor;
+  const prevEf = prior?.ride_efficiency_factor;
+  if (
+    typeof curEf === 'number' && !Number.isNaN(curEf) &&
+    typeof prevEf === 'number' && !Number.isNaN(prevEf) &&
+    prevEf > 0
+  ) {
+    const pct = ((curEf - prevEf) / prevEf) * 100;
+    if (pct <= -5) {
+      out.push({
+        id: 'snapshot_ride_efficiency_wow_down',
+        category: 'is_it_working',
+        severity: pct <= -10 ? 'warning' : 'info',
+        headline: `Cycling efficiency (NP/HR) down week-over-week in snapshot`,
+        detail: `Athlete snapshot: ride efficiency factor ${prevEf.toFixed(2)} → ${curEf.toFixed(2)} (${Math.round(pct * 10) / 10}%). Weekly cycling efficiency slipped versus the prior snapshot week. Pair with readiness and easy-day execution — not necessarily a single bad ride.`,
+        evidence: `athlete_snapshot ${prior!.week_start} EF ${prevEf} → ${latest.week_start} ${curEf}`,
+      });
+    }
   }
 }
 
@@ -305,39 +371,6 @@ function detectSessionSkipPatterns(planned: PlannedRow[], facts: WorkoutFactRow[
   }
 }
 
-function detectStrengthVolumeTrend(facts: WorkoutFactRow[], out: LongitudinalSignal[]): void {
-  const strengthSessions = facts.filter((f) => f.discipline === 'strength' && f.strength_facts?.total_volume_lbs > 0);
-  if (strengthSessions.length < 4) return;
-
-  const weekVolumes = new Map<string, number>();
-  for (const s of strengthSessions) {
-    const weekKey = getWeekKey(s.date);
-    weekVolumes.set(weekKey, (weekVolumes.get(weekKey) ?? 0) + (s.strength_facts.total_volume_lbs || 0));
-  }
-
-  const weeks = Array.from(weekVolumes.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  if (weeks.length < 3) return;
-
-  let declining = 0;
-  for (let i = 1; i < weeks.length; i++) {
-    if (weeks[i][1] < weeks[i - 1][1] * 0.9) declining++;
-  }
-
-  if (declining >= Math.ceil(weeks.length * 0.6) && weeks.length >= 3) {
-    const firstVol = Math.round(weeks[0][1]);
-    const lastVol = Math.round(weeks[weeks.length - 1][1]);
-    const dropPct = Math.round(((firstVol - lastVol) / firstVol) * 100);
-    out.push({
-      id: 'strength_volume_declining',
-      category: 'adherence',
-      severity: dropPct >= 30 ? 'concern' : 'warning',
-      headline: `Strength volume down ${dropPct}% over ${weeks.length} weeks`,
-      detail: `Weekly strength volume has been declining (${firstVol.toLocaleString()} lbs → ${lastVol.toLocaleString()} lbs). Is this intentional (taper, deload) or are you cutting sets short?`,
-      evidence: `${weeks.length} weeks tracked, ${declining} weeks with >10% drop from prior`,
-    });
-  }
-}
-
 function detectEasyPaceDrift(facts: WorkoutFactRow[], out: LongitudinalSignal[]): void {
   const easyRuns = facts.filter((f) => {
     if (f.discipline !== 'run') return false;
@@ -366,6 +399,198 @@ function detectEasyPaceDrift(facts: WorkoutFactRow[], out: LongitudinalSignal[])
   }
 }
 
+function isEasyRideSession(f: WorkoutFactRow, plannedById: Map<string, PlannedRow>): boolean {
+  if (f.discipline !== 'ride') return false;
+  const rf = f.ride_facts;
+  if (!rf) return false;
+  if (typeof rf.intensity_factor === 'number' && !Number.isNaN(rf.intensity_factor) && rf.intensity_factor <= 0.68) {
+    return true;
+  }
+  if (f.planned_workout_id) {
+    const p = plannedById.get(f.planned_workout_id);
+    if (p) {
+      const blob = `${p.name || ''} ${p.type || ''}`.toLowerCase();
+      if (/\b(easy|recovery|z2|zone\s*2|endurance|aerobic|base)\b/.test(blob)) return true;
+    }
+  }
+  return false;
+}
+
+function detectRidePhysiologyTrends(
+  facts: WorkoutFactRow[],
+  planned: PlannedRow[],
+  out: LongitudinalSignal[],
+): void {
+  const plannedById = new Map(planned.map((p) => [p.id, p]));
+
+  const ridesChrono = facts.filter((f) => f.discipline === 'ride' && f.ride_facts);
+  if (ridesChrono.length < 2) return;
+
+  const withDrift = ridesChrono.filter((f) => typeof f.ride_facts?.hr_drift_pct === 'number' && !Number.isNaN(f.ride_facts.hr_drift_pct));
+  if (withDrift.length >= 4) {
+    const mid = Math.ceil(withDrift.length / 2);
+    const first = withDrift.slice(0, mid).map((f) => f.ride_facts.hr_drift_pct as number);
+    const second = withDrift.slice(mid).map((f) => f.ride_facts.hr_drift_pct as number);
+    const avgFirst = first.reduce((a, b) => a + b, 0) / first.length;
+    const avgSecond = second.reduce((a, b) => a + b, 0) / second.length;
+    const delta = Math.round((avgSecond - avgFirst) * 10) / 10;
+    if (delta >= 3) {
+      out.push({
+        id: 'ride_hr_drift_trending_up',
+        category: 'is_it_working',
+        severity: delta >= 6 ? 'warning' : 'info',
+        headline: `Bike HR drift trending higher across rides (+${delta}% pts late vs early window)`,
+        detail:
+          `Average within-ride HR drift % (late vs early in each session) is higher in more recent rides than earlier in the window. Often heat, fatigue, or easy pace/power creeping up — worth watching recovery and easy-day discipline.`,
+        evidence: `${withDrift.length} rides with hr_drift_pct, early-window avg ${avgFirst} vs recent ${avgSecond}`,
+      });
+    }
+  }
+
+  const withEf = ridesChrono.filter((f) =>
+    typeof f.ride_facts?.efficiency_factor === 'number' && !Number.isNaN(f.ride_facts.efficiency_factor) && f.ride_facts.efficiency_factor > 0
+  );
+  if (withEf.length >= 4) {
+    const mid = Math.ceil(withEf.length / 2);
+    const first = withEf.slice(0, mid).map((f) => f.ride_facts.efficiency_factor as number);
+    const second = withEf.slice(mid).map((f) => f.ride_facts.efficiency_factor as number);
+    const avgFirst = first.reduce((a, b) => a + b, 0) / first.length;
+    const avgSecond = second.reduce((a, b) => a + b, 0) / second.length;
+    const pct = avgFirst > 0 ? ((avgSecond - avgFirst) / avgFirst) * 100 : 0;
+    if (pct <= -5) {
+      out.push({
+        id: 'ride_efficiency_factor_trending_down',
+        category: 'is_it_working',
+        severity: pct <= -9 ? 'warning' : 'info',
+        headline: `Cycling efficiency (NP vs HR) trending down (~${Math.round(Math.abs(pct) * 10) / 10}% vs early window)`,
+        detail:
+          `Power relative to average HR has slipped in recent rides versus earlier ones. Can reflect fatigue, detraining, or more variable pacing — contextualize with sleep and load.`,
+        evidence: `${withEf.length} rides, efficiency_factor early ${avgFirst.toFixed(2)} vs recent ${avgSecond.toFixed(2)}`,
+      });
+    }
+  }
+
+  const easyRides = ridesChrono.filter((f) => isEasyRideSession(f, plannedById));
+  const easyWithIf = easyRides.filter((f) =>
+    typeof f.ride_facts?.intensity_factor === 'number' && !Number.isNaN(f.ride_facts.intensity_factor)
+  );
+  if (easyWithIf.length >= 5) {
+    const mid = Math.ceil(easyWithIf.length / 2);
+    const first = easyWithIf.slice(0, mid).map((f) => f.ride_facts.intensity_factor as number);
+    const second = easyWithIf.slice(mid).map((f) => f.ride_facts.intensity_factor as number);
+    const avgFirst = first.reduce((a, b) => a + b, 0) / first.length;
+    const avgSecond = second.reduce((a, b) => a + b, 0) / second.length;
+    const deltaIf = Math.round((avgSecond - avgFirst) * 100) / 100;
+    if (deltaIf >= 0.08) {
+      out.push({
+        id: 'ride_easy_intensity_factor_up',
+        category: 'adherence',
+        severity: deltaIf >= 0.14 ? 'warning' : 'info',
+        headline: `Easy rides — intensity factor creeping up (IF +${deltaIf.toFixed(2)})`,
+        detail:
+          `On sessions flagged as easy (low IF and/or easy/recovery plan copy), normalized power vs FTP has drifted higher in recent rides. Easy days may be drifting toward moderate — watch fatigue.`,
+        evidence: `${easyWithIf.length} easy rides, IF ~${avgFirst.toFixed(2)} → ~${avgSecond.toFixed(2)}`,
+      });
+    }
+  }
+}
+
+function parseStrengthExercisesArray(raw: unknown): any[] {
+  if (raw == null) return [];
+  let v: any = raw;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(v)) return [];
+  return v;
+}
+
+function prescribedRirFromExercise(ex: any): number | null {
+  if (typeof ex?.target_rir === 'number' && !Number.isNaN(ex.target_rir)) return ex.target_rir;
+  if (typeof ex?.rir === 'number' && !Number.isNaN(ex.rir)) return ex.rir;
+  return null;
+}
+
+function normLiftKey(s: string): string {
+  return String(s || '').trim().toLowerCase().replace(/_/g, ' ');
+}
+
+function buildPrescribedRirByName(strengthExercises: any): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const ex of parseStrengthExercisesArray(strengthExercises)) {
+    const name = normLiftKey(String(ex?.name || ''));
+    if (!name) continue;
+    const r = prescribedRirFromExercise(ex);
+    if (r != null) m.set(name, r);
+  }
+  return m;
+}
+
+function detectStrengthRirGap(
+  facts: WorkoutFactRow[],
+  plannedById: Map<string, PlannedRow>,
+  out: LongitudinalSignal[],
+): void {
+  let below = 0;
+  let above = 0;
+  let compared = 0;
+  const belowLifts: string[] = [];
+  const aboveLifts: string[] = [];
+
+  for (const f of facts) {
+    if (f.discipline !== 'strength' || !f.planned_workout_id || !f.strength_facts?.exercises) continue;
+    const pw = plannedById.get(f.planned_workout_id);
+    if (!pw) continue;
+    const rx = buildPrescribedRirByName(pw.strength_exercises);
+    if (rx.size === 0) continue;
+
+    const exArr = Array.isArray(f.strength_facts.exercises) ? f.strength_facts.exercises : [];
+    for (const ex of exArr) {
+      const canonK = normLiftKey(String(ex.canonical || ''));
+      const nameK = normLiftKey(String(ex.name || ''));
+      const prescribed = (canonK ? rx.get(canonK) : undefined) ?? (nameK ? rx.get(nameK) : undefined);
+      if (prescribed == null) continue;
+      const ar = ex.avg_rir;
+      if (typeof ar !== 'number' || Number.isNaN(ar)) continue;
+      compared++;
+      if (ar < prescribed - 0.9) {
+        below++;
+        if (belowLifts.length < 4) belowLifts.push(String(ex.name || ex.canonical || canonK || nameK));
+      } else if (ar > prescribed + 1.4) {
+        above++;
+        if (aboveLifts.length < 4) aboveLifts.push(String(ex.name || ex.canonical || canonK || nameK));
+      }
+    }
+  }
+
+  if (compared >= 2 && below >= 2) {
+    out.push({
+      id: 'strength_rir_below_prescription',
+      category: 'is_it_working',
+      severity: 'warning',
+      headline: `Strength: avg RIR below prescribed on multiple lifts`,
+      detail:
+        `Logged reps-in-reserve are lower than plan targets for several exercises — you're training closer to failure than prescribed. Watch joint stress and recovery; consider dialing load or volume if fatigue stacks.`,
+      evidence: `${below}/${compared} lift-comparisons low vs prescribed (${belowLifts.join(', ')})`,
+    });
+  }
+  if (compared >= 3 && above >= 3) {
+    out.push({
+      id: 'strength_rir_above_prescription',
+      category: 'is_it_working',
+      severity: 'info',
+      headline: `Strength: leaving more in the tank than prescribed`,
+      detail:
+        `Avg RIR is higher than targets on multiple lifts — you may be undershooting intensity if the goal was near-prescription effort.`,
+      evidence: `${above}/${compared} lift-comparisons high vs prescribed (${aboveLifts.join(', ')})`,
+    });
+  }
+}
+
 function normDiscipline(t: string): string {
   const s = String(t || '').toLowerCase();
   if (s.startsWith('run') || s === 'running') return 'run';
@@ -373,14 +598,6 @@ function normDiscipline(t: string): string {
   if (s.startsWith('swim')) return 'swim';
   if (s.startsWith('strength') || s === 'weight_training') return 'strength';
   return s || 'other';
-}
-
-function getWeekKey(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return monday.toISOString().slice(0, 10);
 }
 
 function fmtPacePerMi(secPerMi: number): string {

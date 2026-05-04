@@ -15,6 +15,7 @@ import {
   ymdFromWorkoutDate,
   type WorkoutFinishRow,
 } from './goal-finish-from-workouts.ts';
+import { computeLongitudinalSignals, type LongitudinalSignals } from './longitudinal-signals.ts';
 
 /** JSON payload from `user_baselines.athlete_identity` */
 export type AthleteIdentity = Record<string, unknown>;
@@ -202,6 +203,12 @@ export interface ArcContext {
 
   /** Deterministic narrative mode + deltas from `focusDateISO`; not "today unless coincident". */
   arc_narrative_context: ArcNarrativeContextV1 | null;
+
+  /**
+   * Multi-week pattern detectors (`computeLongitudinalSignals`), as of Arc focus day (`focusYmd`).
+   * Full sorted list; consumers choose severity / caps. Null if computation failed.
+   */
+  longitudinal_signals: LongitudinalSignals | null;
 }
 
 /**
@@ -224,6 +231,7 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
     recent_completed_events: [],
     five_k_nudge: null,
     arc_narrative_context: null,
+    longitudinal_signals: null,
   };
 }
 
@@ -673,6 +681,11 @@ export async function getArcContext(
 
   const start90Ymd = addDaysYmd(focusYmd, -90);
 
+  const longitudinalSignalsPromise = computeLongitudinalSignals(supabase, userId, focusYmd, 6).catch((err) => {
+    console.warn('[getArcContext] longitudinal_signals', err instanceof Error ? err.message : String(err));
+    return null;
+  });
+
   // Omit `completed_at` until universally migrated — selecting a missing column empty-errors the query and silently starves Arc.
   const goalsArcRowSelect =
     'id, name, goal_type, target_date, sport, distance, priority, status, target_metric, target_value, current_value, projection, training_prefs, created_at';
@@ -687,6 +700,7 @@ export async function getArcContext(
     gearRes,
     recentCompletedGoalsRes,
     swimWorkoutsRes,
+    longitudinalSignals,
   ] =
     await Promise.all([
     supabase
@@ -756,6 +770,7 @@ export async function getArcContext(
       .in('type', ['swim', 'swimming'])
       .gte('date', start90Ymd)
       .lte('date', focusYmd),
+    longitudinalSignalsPromise,
   ]);
 
   const baseline = baselinesRes?.data as Record<string, unknown> | null;
@@ -1008,5 +1023,6 @@ export async function getArcContext(
     user_id: userId,
     built_at,
     arc_narrative_context,
+    longitudinal_signals: longitudinalSignals,
   };
 }

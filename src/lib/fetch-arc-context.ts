@@ -1,10 +1,11 @@
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import type { ArcFiveKLearnedDivergence, CompletedEvent } from '@/lib/arc-types';
+import type { ArcFiveKLearnedDivergence, CompletedEvent, LongitudinalSignalsPayload } from '@/lib/arc-types';
 
 /** Server `ArcContext` — client only needs a subset for UI; `five_k_nudge` is stable. */
 export type ArcContextPayload = {
   five_k_nudge: ArcFiveKLearnedDivergence | null;
   recent_completed_events?: CompletedEvent[];
+  longitudinal_signals?: LongitudinalSignalsPayload | null;
   [k: string]: unknown;
 };
 
