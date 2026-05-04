@@ -85,6 +85,12 @@ export function isValidProtocol(protocolId: string): boolean {
  * these as literal engines when `strength_intent` is performance (co-equal), or
  * they mis-label: athlete gets foundation-durability sessions instead of
  * `triathlon_performance`.
+ *
+ * **Contract:** Any new **run-centric** canonical or legacy `strength_protocol` id
+ * that should map through `resolveProtocolIdForCombinedTriPlan` (i.e. “this came from
+ * the run wizard, not tri tracks”) **must** be added here. Omitting one silently
+ * sends combined tri down the wrong branch again. Keep the client copy in
+ * `src/lib/tri-combined-strength-nudge.ts` aligned for stale-plan UX.
  */
 export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
   'neural_speed',

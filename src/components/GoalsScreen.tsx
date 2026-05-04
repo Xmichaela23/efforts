@@ -10,6 +10,11 @@ import { useAppContext } from '@/contexts/AppContext';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { findOrphanActivePlanConflictId } from '@/lib/plan-goal-conflict';
+import {
+  dismissTriStrengthRebuildNudge,
+  isTriStrengthRebuildNudgeDismissed,
+  shouldNudgeTriCombinedStrengthRebuild,
+} from '@/lib/tri-combined-strength-nudge';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { useToast } from '@/components/ui/use-toast';
 // Local alias so existing call-sites inside this file don't need renaming
@@ -112,6 +117,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [calFiveKPace, setCalFiveKPace] = useState('');
   const [calSaving, setCalSaving] = useState(false);
   const [goalFlowError, setGoalFlowError] = useState<string | null>(null);
+  const [triStrengthRebuildNudgeDismissed, setTriStrengthRebuildNudgeDismissed] = useState(
+    () => typeof globalThis !== 'undefined' && isTriStrengthRebuildNudgeDismissed(),
+  );
 
   const [courseByGoal, setCourseByGoal] = useState<
     Record<string, { id: string; name: string; strategy_updated_at: string | null }>
@@ -339,6 +347,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   }, []);
 
   const activeGoals = useMemo(() => goals.filter(g => g.status === 'active'), [goals]);
+  const staleTriStrengthCombinedPlan = useMemo(() => {
+    if (triStrengthRebuildNudgeDismissed) return null;
+    return (
+      currentPlans.find(
+        (p) =>
+          String(p.status || '').toLowerCase() === 'active' &&
+          shouldNudgeTriCombinedStrengthRebuild(p, activeGoals),
+      ) ?? null
+    );
+  }, [currentPlans, activeGoals, triStrengthRebuildNudgeDismissed]);
   const inactiveGoals = useMemo(() => goals.filter(g => g.status !== 'active'), [goals]);
   const activeEventGoals = useMemo(
     () => activeGoals.filter(g => g.goal_type === 'event'),
@@ -1724,6 +1742,27 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {staleTriStrengthCombinedPlan && (
+          <div className="rounded-2xl border border-amber-500/35 bg-amber-950/30 p-4 mb-4 shrink-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-amber-100/95 leading-snug">Plan strength may be out of date</p>
+              <button
+                type="button"
+                onClick={() => {
+                  dismissTriStrengthRebuildNudge();
+                  setTriStrengthRebuildNudgeDismissed(true);
+                }}
+                className="rounded-lg p-1 text-white/40 hover:text-white/70 hover:bg-white/10 shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-white/55 mt-2 leading-relaxed">
+              Combined tri strength routing was updated. Rebuild your season plan so sessions match your strength choice (especially co-equal / performance).
+            </p>
+          </div>
+        )}
         {arcPlanReady && (
           <div className="rounded-2xl border border-emerald-500/35 bg-emerald-950/40 p-4 mb-4 shrink-0">
             <div className="flex items-start justify-between gap-2">
