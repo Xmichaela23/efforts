@@ -4,7 +4,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Calendar, Clock, Dumbbell, Activity } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Activity, X } from 'lucide-react';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
@@ -21,8 +21,37 @@ import SkipSessionReasonPanel from '@/components/planned/SkipSessionReasonPanel'
 import { skipReasonLabel } from '@/lib/skip-session-reasons';
 import { useNavigate } from 'react-router-dom';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
+import type { ArcContextPayload } from '@/lib/fetch-arc-context';
 import { buildArcLine, arcLineNeedsGoalsSetup, type ArcForHomeLine } from '@/lib/build-arc-line';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
+import { shouldShowNudge } from '@/lib/nudge-policy';
+
+const NUDGE_DISMISS_KEY_PREFIX = 'efforts.nudge.dismissed.';
+
+function isNudgeSnoozedInStorage(nudgeKind: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = window.localStorage.getItem(`${NUDGE_DISMISS_KEY_PREFIX}${nudgeKind}`);
+    if (!raw) return false;
+    const dismissedYmd = raw.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dismissedYmd)) return false;
+    const dismissedMs = new Date(`${dismissedYmd}T12:00:00`).getTime();
+    if (!Number.isFinite(dismissedMs)) return false;
+    const ageDays = (Date.now() - dismissedMs) / 86400000;
+    return ageDays < 7;
+  } catch {
+    return false;
+  }
+}
+
+function snoozeNudgeInStorage(nudgeKind: string): void {
+  try {
+    const ymd = new Date().toISOString().slice(0, 10);
+    window.localStorage.setItem(`${NUDGE_DISMISS_KEY_PREFIX}${nudgeKind}`, ymd);
+  } catch {
+    void 0;
+  }
+}
 
 // Component for expandable workout cards with fixed height
 const WorkoutCardExpandable: React.FC<{
@@ -115,8 +144,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const navigate = useNavigate();
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
-  const [homeArc, setHomeArc] = useState<ArcForHomeLine | null>(null);
+  const [homeArc, setHomeArc] = useState<ArcContextPayload | null>(null);
   const [homeArcReady, setHomeArcReady] = useState(false);
+  const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -140,7 +170,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       try {
         const a = await fetchArcContext();
         if (!cancelled) {
-          setHomeArc((a as ArcForHomeLine) ?? null);
+          setHomeArc(a);
           setHomeArcReady(true);
         }
       } catch {
@@ -156,10 +186,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, []);
 
   const arcLineText = useMemo(
-    () => (homeArcReady ? buildArcLine(homeArc) : ''),
+    () => (homeArcReady ? buildArcLine(homeArc as ArcForHomeLine) : ''),
     [homeArcReady, homeArc]
   );
-  const arcNeedsGoals = useMemo(() => arcLineNeedsGoalsSetup(homeArc), [homeArc]);
+  const arcNeedsGoals = useMemo(() => arcLineNeedsGoalsSetup(homeArc as ArcForHomeLine), [homeArc]);
+
+  const nudgeDecision = useMemo(() => {
+    if (!homeArcReady) return shouldShowNudge(null);
+    return shouldShowNudge(homeArc?.longitudinal_signals ?? null);
+  }, [homeArcReady, homeArc, homeArc?.longitudinal_signals]);
+
+  const showNudgeBanner = useMemo(() => {
+    if (!nudgeDecision.show || !nudgeDecision.nudge_kind || !nudgeDecision.headline) return false;
+    if (isNudgeSnoozedInStorage(nudgeDecision.nudge_kind)) return false;
+    return true;
+  }, [nudgeDecision, nudgeDismissNonce]);
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
   const today = new Date().toLocaleDateString('en-CA');
@@ -1408,6 +1449,46 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 {arcLineText}
               </p>
             )}
+          </div>
+        ) : null}
+
+        {showNudgeBanner && nudgeDecision.headline && nudgeDecision.nudge_kind ? (
+          <div className="flex-shrink-0 px-2 pt-1 pb-2">
+            <div
+              className="rounded-xl border border-teal-500/30 bg-gradient-to-b from-teal-950/45 via-zinc-950/55 to-zinc-950/90 px-3 py-3 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+              role="region"
+              aria-label="Training note from coach"
+            >
+              <div className="flex items-start gap-2">
+                <p className="m-0 flex-1 min-w-0 text-[0.78rem] leading-snug text-white/90 font-medium pr-1">
+                  {nudgeDecision.headline}
+                </p>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md p-1 text-white/45 hover:text-white/80 hover:bg-white/[0.06] border-none bg-transparent cursor-pointer"
+                  aria-label="Dismiss training note"
+                  onClick={() => {
+                    snoozeNudgeInStorage(nudgeDecision.nudge_kind!);
+                    setNudgeDismissNonce((n) => n + 1);
+                  }}
+                >
+                  <X className="w-4 h-4" strokeWidth={2} />
+                </button>
+              </div>
+              <div className="mt-2.5 flex gap-2">
+                <button
+                  type="button"
+                  className="text-sm font-medium px-3 py-2 rounded-lg bg-teal-500/25 text-teal-100 border border-teal-500/40 hover:bg-teal-500/35 cursor-pointer"
+                  onClick={() => {
+                    navigate('/arc-setup', {
+                      state: { arcNudgeSeed: nudgeDecision.headline },
+                    });
+                  }}
+                >
+                  Review with Arc
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
