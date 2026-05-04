@@ -811,11 +811,21 @@ export function buildWeek(
 
   // ── STRENGTH ──────────────────────────────────────────────────────────────
   // Strength frequency by phase:
-  //   base: 2× (full hypertrophy programming)
-  //   build / race_specific: 1× (one focused neural/strength session — concurrent training cap)
-  //   taper / recovery: 1× (1×3 neural priming for taper, light movement-only for post-race recovery)
+  //   base: 2× (upper + lower template slots)
+  //   build / race_specific: 1× default (concurrent training cap); 2× when
+  //     strength_intent === 'performance' (co-equal tri / heavy barbell track)
+  //   taper / recovery: 1×
   // recoveryRebuildWeek1 (post-marathon week 1) suppresses strength entirely — handled below.
-  let strFreq = phase === 'base' ? 2 : 1;
+  const performanceStrength =
+    String(athleteState.strength_intent ?? '').trim().toLowerCase() === 'performance';
+  let strFreq: number;
+  if (phase === 'base') {
+    strFreq = 2;
+  } else if (phase === 'build' || phase === 'race_specific') {
+    strFreq = performanceStrength ? 2 : 1;
+  } else {
+    strFreq = 1;
+  }
   if (recoveryRebuildWeek1) strFreq = 0;
 
   const capRaw = athleteState.strength_sessions_cap;
@@ -894,7 +904,7 @@ export function buildWeek(
       }
     }
 
-    // Slot 2 (base phase only): second non-blocked day
+    // Slot 2: second non-blocked day when strFreq is 2 (base, or build/RS + performance intent)
     if (strFreq >= 2 && strDay) {
       let candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(
         d => !blocked.has(d) && d !== strDay && (!hasTri || d !== runQualityDay),
