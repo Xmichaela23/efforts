@@ -25,12 +25,13 @@ function optionalSwimDrillBlock(
   cdYd: number,
   planWeek: number | undefined,
   drillSlotSalt: number,
+  phase?: string,
 ): { mainBudgetYd: number; drillTokens: string[] } {
   let mainBudgetYd = totalYards - wuYd - cdYd;
   if (planWeek == null || mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
     return { mainBudgetYd, drillTokens: [] };
   }
-  const tok = pickSwimDrillTokens(planWeek, drillSlotSalt, 1)[0]!;
+  const tok = pickSwimDrillTokens(planWeek, drillSlotSalt, 1, phase)[0]!;
   const dy = swimDrillYardsFromToken(tok);
   if (dy <= 0 || mainBudgetYd - dy < SWIM_DRILL_MAIN_FLOOR_YD) {
     return { mainBudgetYd, drillTokens: [] };
@@ -430,11 +431,12 @@ export function thresholdSwim(
   goalId: string,
   planWeek?: number,
   drillSlotSalt: number = 0,
+  phase?: string,
 ): PlannedSession {
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
-    totalYards, wu, cd, planWeek, drillSlotSalt,
+    totalYards, wu, cd, planWeek, drillSlotSalt, phase,
   );
   const threshReps = Math.max(4, Math.round((main * 0.55) / 100));
   const aeroReps   = Math.max(3, Math.round((main * 0.45) / 150));
@@ -464,11 +466,12 @@ export function cssAerobicSwim(
   goalId: string,
   planWeek?: number,
   drillSlotSalt: number = 0,
+  phase?: string,
 ): PlannedSession {
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
-    totalYards, wu, cd, planWeek, drillSlotSalt,
+    totalYards, wu, cd, planWeek, drillSlotSalt, phase,
   );
   const reps = Math.max(5, Math.round(main / 100));
   const dur  = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
@@ -492,11 +495,12 @@ export function easySwim(
   goalId: string,
   planWeek?: number,
   drillSlotSalt: number = 0,
+  phase?: string,
 ): PlannedSession {
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: mainYards, drillTokens } = optionalSwimDrillBlock(
-    totalYards, wu, cd, planWeek, drillSlotSalt,
+    totalYards, wu, cd, planWeek, drillSlotSalt, phase,
   );
   const reps = Math.max(4, Math.round(mainYards / 150));
   const dur = Math.round(totalYards / 35); // ~35 yd/min for easy

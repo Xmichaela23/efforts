@@ -765,7 +765,7 @@ export class TriathlonGenerator {
         };
       }
       // Build: continuous + drill combo — volume + technique (token from shared drill library)
-      const drillTok = pickSwimDrillTokens(planWeek, 3, 1)[0]!;
+      const drillTok = pickSwimDrillTokens(planWeek, 3, 1, phase.name)[0]!;
       const drillYd = swimDrillYardsFromToken(drillTok);
       const contAdj = Math.max(400, yd - 500 - drillYd);
       return {

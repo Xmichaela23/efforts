@@ -49,16 +49,59 @@ export function swimDrillYardsFromToken(token: string): number {
   return 0;
 }
 
+export type SwimDrillPhase = 'base' | 'build' | 'peak' | 'taper';
+
+/** Normalize combined-plan phases, tri `TriPhase.name`, and contract `peak` → drill phase buckets. */
+export function resolveSwimDrillPhase(phaseName: string): SwimDrillPhase {
+  const p = String(phaseName).toLowerCase().replace(/-/g, '_');
+  if (p === 'base') return 'base';
+  if (p === 'build') return 'build';
+  if (p === 'race_specific' || p === 'peak') return 'peak';
+  if (p === 'taper' || p === 'recovery') return 'taper';
+  return 'build';
+}
+
+/** Phase-specific drill pools (existing `swim_drills_*` tokens only; no pull/paddles). */
+const SWIM_DRILL_POOLS: Record<SwimDrillPhase, readonly string[]> = {
+  base: [
+    'swim_drills_4x50yd_catchup',
+    'swim_drills_4x50yd_fingertipdrag',
+    'swim_drills_4x50yd_fist',
+    'swim_drills_4x50yd_kick',
+    'swim_drills_2x50yd_catchup',
+    'swim_drills_2x50yd_fingertipdrag',
+  ],
+  build: [
+    'swim_drills_4x50yd_catchup',
+    'swim_drills_4x50yd_fist',
+    'swim_drills_2x50yd_fingertipdrag',
+    'swim_drills_2x50yd_catchup',
+  ],
+  peak: ['swim_drills_2x50yd_catchup', 'swim_drills_2x50yd_fingertipdrag'],
+  taper: ['swim_drills_2x50yd_catchup'],
+};
+
 /**
  * Deterministic drill selection for plan weeks (no randomness in edge).
  * @param planWeek 1-based week index from buildWeek
  * @param slotSalt separates easy vs quality vs other swims the same week
+ * @param phase when set, uses phase-specific pool; when omitted, legacy `SWIM_DRILL_TOKEN_POOL` + index formula (no regression)
  */
-export function pickSwimDrillTokens(planWeek: number, slotSalt: number, count: number): string[] {
-  const pool = SWIM_DRILL_TOKEN_POOL;
+export function pickSwimDrillTokens(
+  planWeek: number,
+  slotSalt: number,
+  count: number,
+  phase?: string,
+): string[] {
+  const usePhase = phase != null && String(phase).length > 0;
+  const pool: readonly string[] = usePhase
+    ? SWIM_DRILL_POOLS[resolveSwimDrillPhase(phase!)]
+    : SWIM_DRILL_TOKEN_POOL;
   if (count <= 0 || pool.length === 0) return [];
   const n = pool.length;
-  const start = ((planWeek - 1) * 13 + slotSalt * 7) % n;
+  const start = usePhase
+    ? (planWeek * 3 + slotSalt) % n
+    : ((planWeek - 1) * 13 + slotSalt * 7) % n;
   const out: string[] = [];
   for (let i = 0; i < count; i++) out.push(pool[(start + i) % n]!);
   return out;

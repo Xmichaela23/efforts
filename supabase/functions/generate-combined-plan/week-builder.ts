@@ -739,21 +739,23 @@ export function buildWeek(
     if (hasTri) {
       if (recoveryRebuildWeek1) {
         const easyYd = Math.min(2800, Math.max(1500, Math.round(swimYards * 0.32)));
-        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, easyYd, servedGoal, weekNum, 0));
+        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, easyYd, servedGoal, weekNum, 0, phase));
         qualitySwimPlaced = true;
       } else if (isRecovery) {
         // Recovery: easy aerobic swim at reduced volume — preserve feel + frequency.
         const recYd = Math.max(1200, Math.round(swimYards * 0.40));
-        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, recYd, servedGoal, weekNum, 1));
+        qualitySwimSlot!.sessions.push(easySwim(swimQualityDay, recYd, servedGoal, weekNum, 1, phase));
         qualitySwimPlaced = true;
       } else {
         const tSwimYd = Math.max(1800, Math.round(swimYards * 0.55));
         const maintYd = Math.max(1200, Math.round(swimYards * 0.40));
         const qualitySwim = triApproach === 'base_first'
-          ? cssAerobicSwim(swimQualityDay, tSwimYd, servedGoal, weekNum, 2)
-          : thresholdSwim(swimQualityDay, tSwimYd, servedGoal, weekNum, 2);
+          ? cssAerobicSwim(swimQualityDay, tSwimYd, servedGoal, weekNum, 2, phase)
+          : thresholdSwim(swimQualityDay, tSwimYd, servedGoal, weekNum, 2, phase);
         qualitySwimSlot!.sessions.push(
-          phase === 'taper' || swimPct === 0 ? easySwim(swimQualityDay, maintYd, servedGoal, weekNum, 3) : qualitySwim,
+          phase === 'taper' || swimPct === 0
+            ? easySwim(swimQualityDay, maintYd, servedGoal, weekNum, 3, phase)
+            : qualitySwim,
         );
         qualitySwimPlaced = true;
       }
@@ -786,7 +788,7 @@ export function buildWeek(
       easySwimSlot!.sessions.push(
         useOpenWater
           ? openWaterPracticeSwim(swimEasyDay, owMin, servedGoal)
-          : easySwim(swimEasyDay, recSwimYd, servedGoal, weekNum, 4),
+          : easySwim(swimEasyDay, recSwimYd, servedGoal, weekNum, 4, phase),
       );
     }
   }
