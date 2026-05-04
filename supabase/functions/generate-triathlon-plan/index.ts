@@ -41,7 +41,11 @@ Deno.serve(async (req: Request) => {
     const validation = validateRequest(request);
     if (!validation.valid) {
       console.error('[TriPlanGen] Validation failed:', validation.errors);
-      return json({ success: false, error: 'Invalid request', validation_errors: validation.errors }, 400);
+      const detail = validation.errors.join('; ');
+      return json(
+        { success: false, error: detail || 'Invalid request', validation_errors: validation.errors },
+        400,
+      );
     }
     if (validation.warnings?.length) {
       console.warn('[TriPlanGen] Warnings:', validation.warnings);
@@ -292,7 +296,9 @@ function buildPreview(plan: any, phaseStructure: any, distance: TriDistance): Tr
 
 function calculateStartDate(durationWeeks: number, raceDate?: string): string {
   if (raceDate) {
-    const race = new Date(raceDate + 'T12:00:00');
+    const ymd = String(raceDate).trim().slice(0, 10);
+    const anchor = /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd}T12:00:00` : String(raceDate).trim();
+    const race = new Date(anchor);
     const dow  = race.getDay();
     race.setDate(race.getDate() + (dow === 0 ? -6 : 1 - dow)); // Monday of race week
     race.setDate(race.getDate() - (durationWeeks - 1) * 7);

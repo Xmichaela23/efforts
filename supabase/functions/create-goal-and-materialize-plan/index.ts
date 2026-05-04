@@ -1216,15 +1216,29 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const sport = String(resolvedGoal?.sport || '').toLowerCase();
+    if (!resolvedGoal) {
+      throw new AppError('missing_goal', 'Goal required to build a plan.');
+    }
+    if (resolvedGoal.target_date == null || String(resolvedGoal.target_date).trim() === '') {
+      throw new AppError('missing_race_date', 'A race date is required to build a plan.');
+    }
+    const raceYmd = normalizeDateOnlyYmd(resolvedGoal.target_date);
+    if (!raceYmd) {
+      throw new AppError('invalid_race_date', 'Race date must be a valid calendar day (YYYY-MM-DD).');
+    }
+    // Postgres `date` is usually YYYY-MM-DD, but clients may send ISO datetimes — normalize so
+    // weeksUntilRace / downstream generators never see `...ZT12:00:00` (Invalid Date → NaN weeks).
+    resolvedGoal = { ...resolvedGoal, target_date: raceYmd };
+
+    const sport = String(resolvedGoal.sport || '').toLowerCase();
     const isTri = sport === 'triathlon' || sport === 'tri';
 
     if (!['run', 'triathlon', 'tri'].includes(sport)) {
       throw new AppError('unsupported_sport', `Auto-build is not yet supported for "${sport}" goals. Supported: run, triathlon.`);
     }
 
-    const fitness = String(resolvedGoal?.training_prefs?.fitness || 'intermediate').toLowerCase();
-    const tPrefs = resolvedGoal?.training_prefs as { training_intent?: unknown; goal_type?: unknown } | undefined;
+    const fitness = String(resolvedGoal.training_prefs?.fitness || 'intermediate').toLowerCase();
+    const tPrefs = resolvedGoal.training_prefs as { training_intent?: unknown; goal_type?: unknown } | undefined;
     const goalType = (() => {
       if (tPrefs && tPrefs.training_intent != null && String(tPrefs.training_intent).trim()) {
         return trainingIntentToPrefsGoalType(
@@ -1242,7 +1256,7 @@ Deno.serve(async (req: Request) => {
         throw new AppError('missing_distance', 'Select a triathlon distance (Sprint, Olympic, 70.3, Ironman) to build a plan.');
       }
       const triFloorWeeks = TRI_MIN_WEEKS[triDistanceApi]?.[fitness] ?? 8;
-      const weeksOutTri   = weeksUntilRace(new Date(), new Date(String(resolvedGoal?.target_date || '') + 'T12:00:00'));
+      const weeksOutTri = weeksUntilRace(new Date(), new Date(`${resolvedGoal.target_date}T12:00:00`));
       if (weeksOutTri < 1)  throw new AppError('race_date_in_past', 'Race date must be in the future.');
       if (weeksOutTri < triFloorWeeks) {
         throw new AppError('race_too_close',
@@ -1447,7 +1461,7 @@ Deno.serve(async (req: Request) => {
     const distanceApi = distanceToApiValue(resolvedGoal?.distance || null);
     if (!distanceApi) throw new AppError('missing_distance', 'Select a race distance to build a plan.');
     const floorWeeks = MIN_WEEKS[distanceApi]?.[fitness] ?? 4;
-    const weeksOut = weeksUntilRace(new Date(), new Date(String(resolvedGoal?.target_date || '') + 'T12:00:00'));
+    const weeksOut = weeksUntilRace(new Date(), new Date(`${resolvedGoal.target_date}T12:00:00`));
     if (weeksOut < 1) {
       throw new AppError('race_date_in_past', 'Race date must be in the future.');
     }
@@ -1523,7 +1537,11 @@ Deno.serve(async (req: Request) => {
           existingGoal.target_date &&
           resolvedGoal?.target_date
         ) {
-          spacingWeeks = Math.abs(weeksBetween(new Date(existingGoal.target_date), new Date(resolvedGoal.target_date)));
+          const exY = normalizeDateOnlyYmd(existingGoal.target_date);
+          const curY = normalizeDateOnlyYmd(resolvedGoal.target_date);
+          if (exY && curY) {
+            spacingWeeks = Math.abs(weeksBetween(new Date(`${exY}T12:00:00`), new Date(`${curY}T12:00:00`)));
+          }
       }
       }
 
