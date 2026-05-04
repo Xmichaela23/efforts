@@ -40,6 +40,9 @@ import {
   type StrengthProtocolProfile,
   type PhaseRule,
 } from '../_shared/strength-profiles.ts';
+import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
+import { isAcwrFatiguedSignal, type AcwrWeekIntent } from '../_shared/acwr-state.ts';
+import type { ArcPlanPhaseBucket } from '../_shared/arc-narrative-state.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -161,6 +164,15 @@ Deno.serve(async (req) => {
     // SUGGEST: Generate adaptation suggestions
     // =========================================================================
 
+    const focusDateISO = today;
+    let arc: ArcContext | null = null;
+    try {
+      arc = await getArcContext(supabase, user_id, focusDateISO);
+    } catch (e) {
+      console.warn('[adapt-plan] Arc context load failed (non-fatal):', e);
+    }
+    const suggestionGates = buildAdaptSuggestionGates(arc);
+
     // 1. Get active plan (full row for strength relayout preview — matches auto-adapt payload)
     const { data: plans } = await supabase
       .from('plans')
@@ -276,7 +288,7 @@ Deno.serve(async (req) => {
         const currentWorkingWeight = roundTo5(baseline1rm * 0.75);
         const suggestedWeight = roundTo5(recentAvg1rm * 0.75);
 
-        if (suggestedWeight > currentWorkingWeight) {
+        if (suggestedWeight > currentWorkingWeight && suggestionGates.allowLoadIncrease) {
           suggestions.push({
             id: `str_prog_${liftName.replace(/\s/g, '_').toLowerCase()}`,
             type: 'strength_progression',
@@ -302,6 +314,8 @@ Deno.serve(async (req) => {
         const baseline1rm = Number(perf[liftName] || earlierAvg1rm);
         const currentWorkingWeight = roundTo5(baseline1rm * 0.75);
         const suggestedWeight = roundTo5(currentWorkingWeight * 0.9);
+
+        if (!suggestionGates.allowBackingOff) continue;
 
         suggestions.push({
           id: `str_deload_${liftName.replace(/\s/g, '_').toLowerCase()}`,
@@ -344,17 +358,23 @@ Deno.serve(async (req) => {
                 return `${m}:${String(s).padStart(2, '0')}`;
               };
 
-              suggestions.push({
-                id: 'end_easy_pace',
-                type: 'endurance_pace_update',
-                title: 'Update easy run pace',
-                description: `Your actual easy pace has ${learnedSecPerMi < manualSecPerMi ? 'improved' : 'slowed'}. Updating will better calibrate your workouts.`,
-                current_value: manualSecPerMi,
-                suggested_value: learnedSecPerMi,
-                unit: '/mi',
-                confidence: confNum >= 0.9 ? 'high' : 'medium',
-                reason: `Learned ${fmtPace(learnedSecPerMi)}/mi from recent runs vs manual ${fmtPace(manualSecPerMi)}/mi`,
-              });
+              const paceHarder = learnedSecPerMi < manualSecPerMi;
+              const blocked =
+                (paceHarder && !suggestionGates.allowLoadIncrease) ||
+                (!paceHarder && !suggestionGates.allowBackingOff);
+              if (!blocked) {
+                suggestions.push({
+                  id: 'end_easy_pace',
+                  type: 'endurance_pace_update',
+                  title: 'Update easy run pace',
+                  description: `Your actual easy pace has ${learnedSecPerMi < manualSecPerMi ? 'improved' : 'slowed'}. Updating will better calibrate your workouts.`,
+                  current_value: manualSecPerMi,
+                  suggested_value: learnedSecPerMi,
+                  unit: '/mi',
+                  confidence: confNum >= 0.9 ? 'high' : 'medium',
+                  reason: `Learned ${fmtPace(learnedSecPerMi)}/mi from recent runs vs manual ${fmtPace(manualSecPerMi)}/mi`,
+                });
+              }
             }
           }
         }
@@ -369,17 +389,23 @@ Deno.serve(async (req) => {
       if (confNum >= 0.65 && Number.isFinite(manualFtp) && manualFtp > 0 && Number.isFinite(learnedVal)) {
         const deltaPct = Math.abs(learnedVal - manualFtp) / manualFtp;
         if (deltaPct >= 0.05) {
-          suggestions.push({
-            id: 'end_ftp',
-            type: 'endurance_pace_update',
-            title: 'Update cycling FTP',
-            description: `Your estimated FTP has ${learnedVal > manualFtp ? 'increased' : 'decreased'}. Power targets will be more accurate.`,
-            current_value: Math.round(manualFtp),
-            suggested_value: Math.round(learnedVal),
-            unit: 'W',
-            confidence: confNum >= 0.9 ? 'high' : 'medium',
-            reason: `Learned ${Math.round(learnedVal)}W from recent rides vs manual ${Math.round(manualFtp)}W`,
-          });
+          const ftpHarder = learnedVal > manualFtp;
+          const blocked =
+            (ftpHarder && !suggestionGates.allowLoadIncrease) ||
+            (!ftpHarder && !suggestionGates.allowBackingOff);
+          if (!blocked) {
+            suggestions.push({
+              id: 'end_ftp',
+              type: 'endurance_pace_update',
+              title: 'Update cycling FTP',
+              description: `Your estimated FTP has ${learnedVal > manualFtp ? 'increased' : 'decreased'}. Power targets will be more accurate.`,
+              current_value: Math.round(manualFtp),
+              suggested_value: Math.round(learnedVal),
+              unit: 'W',
+              confidence: confNum >= 0.9 ? 'high' : 'medium',
+              reason: `Learned ${Math.round(learnedVal)}W from recent rides vs manual ${Math.round(manualFtp)}W`,
+            });
+          }
         }
       }
     }
@@ -420,6 +446,73 @@ Deno.serve(async (req) => {
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/** Map Arc plan phase → ACWR week-intent (build/peak/taper share methodology thresholds). */
+function mapPlanPhaseToAcwrWeekIntent(phase: ArcPlanPhaseBucket | null | undefined): AcwrWeekIntent {
+  switch (phase) {
+    case 'build':
+      return 'build';
+    case 'taper':
+      return 'taper';
+    case 'recovery':
+      return 'recovery';
+    case 'peak':
+      return 'peak';
+    case 'base':
+      return 'baseline';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * Arc-grounded gates for suggest (non-destructive). When `arc` is null, both flags stay permissive.
+ * Uses `latest_snapshot` (acwr, adherence) and `arc_narrative_context` (phase/mode).
+ */
+function buildAdaptSuggestionGates(arc: ArcContext | null): {
+  allowLoadIncrease: boolean;
+  allowBackingOff: boolean;
+} {
+  if (!arc) {
+    return { allowLoadIncrease: true, allowBackingOff: true };
+  }
+
+  const snap = arc.latest_snapshot as Record<string, unknown> | null | undefined;
+  const nc = arc.arc_narrative_context;
+
+  const acwrNum = snap && snap.acwr != null ? Number(snap.acwr) : NaN;
+  const acwr = Number.isFinite(acwrNum) ? acwrNum : null;
+
+  const weekIntent = mapPlanPhaseToAcwrWeekIntent(nc?.plan_phase_normalized);
+
+  const narrativeBlocksIncrease =
+    !!nc &&
+    (nc.plan_phase_normalized === 'taper' ||
+      nc.plan_phase_normalized === 'recovery' ||
+      nc.mode === 'taper_read' ||
+      nc.mode === 'recovery_read');
+
+  const acwrFatigued = isAcwrFatiguedSignal(acwr, false, weekIntent);
+
+  const adherenceRaw = snap && snap.adherence_pct != null ? Number(snap.adherence_pct) : NaN;
+  const completingWell = !Number.isFinite(adherenceRaw) || adherenceRaw >= 0.8;
+
+  let allowLoadIncrease = true;
+  if (narrativeBlocksIncrease) allowLoadIncrease = false;
+  else if (acwrFatigued) allowLoadIncrease = false;
+  else if (!completingWell) allowLoadIncrease = false;
+
+  const inBuildPhase =
+    !!nc &&
+    (nc.plan_phase_normalized === 'build' ||
+      nc.plan_phase_normalized === 'base' ||
+      nc.mode === 'build_read');
+
+  let allowBackingOff = true;
+  if (inBuildPhase && !acwrFatigued) allowBackingOff = false;
+
+  return { allowLoadIncrease, allowBackingOff };
+}
 
 function groupByLift(logs: any[]): Record<string, Array<{ estimated_1rm: number; avg_rir: number | null; workout_date: string }>> {
   const groups: Record<string, Array<{ estimated_1rm: number; avg_rir: number | null; workout_date: string }>> = {};
