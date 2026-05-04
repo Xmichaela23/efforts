@@ -337,6 +337,9 @@ export function buildWeek(
     !!prevWeekBlock && (prevWeekBlock.phase === 'recovery' || prevWeekBlock.isRecovery);
   /** Any tri race falls in the next plan week — avoid Sunday race-pace long run stacking. */
   const triRaceNextPlanWeek = raceAnchors.some((a) => a.planWeek === weekNum + 1);
+  /** Weeks until the nearest upcoming anchored race (0 = race this week). Large post-race or if none ahead. */
+  const weeksToRaceDeltas = raceAnchors.map((a) => a.planWeek - weekNum).filter((w) => w >= 0);
+  const weeksToRace = weeksToRaceDeltas.length === 0 ? 999 : Math.min(...weeksToRaceDeltas);
 
   const primaryGoal = goals.find(g => g.id === block.primaryGoalId) ?? goals[0];
   const hasTri = goals.some(g => ['triathlon', 'tri'].includes(g.sport?.toLowerCase()));
@@ -563,11 +566,12 @@ export function buildWeek(
     ? adjDay(longRunDay, -1)  // shift to Friday if Saturday has brick
     : longRunDay;
   const lrSlot = grid.get(longRunActualDay);
-  /** Hard Sunday long-run block (structured race-pace segment) — off in recovery, loading-pattern deload, or week before any tri race. */
+  /** Hard Sunday long-run block (structured race-pace segment) — off in recovery, loading-pattern deload, week before any tri race, or final 3 weeks before A-race (Z2 long only; triRaceNextPlanWeek-style gate). */
   const useStructuredRacePaceLong =
     phase === 'race_specific' &&
     !isRecovery &&
-    !triRaceNextPlanWeek;
+    !triRaceNextPlanWeek &&
+    weeksToRace > 3;
   /** When RS calendar phase but we want Z2 aerobic copy only (deload / pre-race week / recovery). */
   const longRunSessionPhase: Phase =
     phase === 'race_specific' && !useStructuredRacePaceLong ? 'build' : phase;
