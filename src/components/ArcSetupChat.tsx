@@ -75,6 +75,10 @@ const SWIM_LOAD_PROTECT_BIKE_USER_MESSAGE =
 
 const SWIM_LOAD_SPLIT_USER_MESSAGE = 'Split it evenly between bike and run.';
 
+/** Shared styles for Plan my season fork CTAs (always visible; ⓘ panel is details-only). */
+const ARC_SETUP_FORK_PRIMARY_BTN =
+  'min-h-[48px] text-[15px] sm:text-base font-semibold px-4 py-3 rounded-xl border disabled:opacity-50 flex-1 min-w-0 transition-colors';
+
 /** Last explicit swim-intent choice in the thread (button text or same opening line). */
 function priorThreadSwimIntentResolution(prior: ChatMessage[]): 'focus' | 'race' | null {
   let resolved: 'focus' | 'race' | null = null;
@@ -830,12 +834,12 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
                     aria-label={
                       disc === 'strength_fork'
-                        ? 'Support tri vs build strength in the gym'
+                        ? 'More detail: what each strength choice saves on your plan'
                         : disc === 'swim_fork'
-                          ? 'Swim focus vs swim to race'
+                          ? 'More detail: what Swim focus vs Swim to race changes'
                           : disc === 'swim_load_source'
-                            ? 'Where to fund extra swim load'
-                            : 'What performance and completion training intent mean'
+                            ? 'More detail: how extra swim load is funded'
+                            : 'More detail: performance vs completion training intent'
                     }
                     aria-expanded={intentInfoOpenIdx === i}
                     onClick={() => setIntentInfoOpenIdx((v) => (v === i ? null : i))}
@@ -844,12 +848,108 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                   </button>
                 )}
               </div>
+
+              {disc === 'strength_fork' && (
+                <div
+                  className="mt-3 flex flex-col sm:flex-row gap-2.5"
+                  role="group"
+                  aria-label="Strength intent"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(STRENGTH_SUPPORT_USER_MESSAGE)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Strength supports tri
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(STRENGTH_BUILD_USER_MESSAGE)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Build strength
+                  </button>
+                </div>
+              )}
+
+              {disc === 'swim_fork' && (
+                <div
+                  className="mt-3 flex flex-col sm:flex-row gap-2.5"
+                  role="group"
+                  aria-label="Swim sessions this block"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(SWIM_FOCUS_USER_MESSAGE)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Swim focus
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(SWIM_TO_RACE_USER_MESSAGE)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Swim to race
+                  </button>
+                </div>
+              )}
+
+              {disc === 'training_intent' && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(COMPLETION_INTENT_USER_MESSAGE)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full sm:w-auto sm:min-w-[12rem] bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Change intent
+                  </button>
+                </div>
+              )}
+
+              {disc === 'swim_load_source' && (
+                <div className="mt-3 space-y-2" role="group" aria-label="Where to fund extra swim load">
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(SWIM_LOAD_PROTECT_RUN_USER_MESSAGE)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-teal-500/30 text-teal-50 border-teal-400/50 hover:bg-teal-500/40`}
+                  >
+                    Protect my run
+                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(SWIM_LOAD_PROTECT_BIKE_USER_MESSAGE)}
+                      className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                    >
+                      Protect my bike
+                    </button>
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(SWIM_LOAD_SPLIT_USER_MESSAGE)}
+                      className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                    >
+                      Split it
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {disc === 'strength_fork' && intentInfoOpenIdx === i && (
                 <div
-                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[14px] sm:text-[15px] leading-relaxed text-white/75 space-y-3"
                   role="region"
-                  aria-label="Strength on the plan"
+                  aria-label="Strength choice details"
                 >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Details</p>
                   <p>
                     <span className="text-white/90 font-medium">Strength supports tri</span> — gym work in service of
                     endurance: one or two sessions per week by phase (more in base, leaner toward the race), accessory and
@@ -862,32 +962,15 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     and race-specific, compound-forward with real load progression. Endurance still matters, but the gym is a
                     real training goal, not only backup work. Saves <span className="text-white/85">performance</span> intent.
                   </p>
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendUserMessage(STRENGTH_SUPPORT_USER_MESSAGE)}
-                      className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
-                    >
-                      Strength supports tri
-                    </button>
-                    <button
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendUserMessage(STRENGTH_BUILD_USER_MESSAGE)}
-                      className="text-sm font-medium px-3 py-2 rounded-lg bg-teal-500/15 text-teal-100/95 border border-teal-500/35 hover:bg-teal-500/25 disabled:opacity-50 flex-1 min-w-0"
-                    >
-                      Build strength
-                    </button>
-                  </div>
                 </div>
               )}
               {disc === 'training_intent' && intentInfoOpenIdx === i && (
                 <div
-                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[14px] sm:text-[15px] leading-relaxed text-white/75 space-y-3"
                   role="region"
-                  aria-label="Training intent options"
+                  aria-label="Training intent details"
                 >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Details</p>
                   <p>
                     <span className="text-white/90 font-medium">Performance</span> — chasing a faster time. Higher
                     quality load, time targets, more intensity.
@@ -896,22 +979,15 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     <span className="text-white/90 font-medium">Completion</span> — strong healthy finish. Durability
                     focus, conservative load, finish well.
                   </p>
-                  <button
-                    type="button"
-                    disabled={sending}
-                    onClick={() => void sendUserMessage(COMPLETION_INTENT_USER_MESSAGE)}
-                    className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 w-full sm:w-auto"
-                  >
-                    Change intent
-                  </button>
                 </div>
               )}
               {disc === 'swim_fork' && intentInfoOpenIdx === i && (
                 <div
-                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[14px] sm:text-[15px] leading-relaxed text-white/75 space-y-3"
                   role="region"
-                  aria-label="Swim focus options"
+                  aria-label="Swim choice details"
                 >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Details</p>
                   <p>
                     <span className="text-white/90 font-medium">Swim focus</span> — 3 sessions per week — one threshold
                     main set, one technique session with drill emphasis, one quality aerobic. Volume builds from ~6,000
@@ -922,64 +998,19 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     set to stay sharp, one aerobic session with race-specific work. ~4,000–5,000 yards weekly. Swim
                     supports the block without competing with bike and run load.
                   </p>
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendUserMessage(SWIM_FOCUS_USER_MESSAGE)}
-                      className="text-sm font-medium px-3 py-2 rounded-lg bg-teal-500/15 text-teal-100/95 border border-teal-500/35 hover:bg-teal-500/25 disabled:opacity-50 flex-1 min-w-0"
-                    >
-                      Swim focus
-                    </button>
-                    <button
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendUserMessage(SWIM_TO_RACE_USER_MESSAGE)}
-                      className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
-                    >
-                      Swim to race
-                    </button>
-                  </div>
                 </div>
               )}
               {disc === 'swim_load_source' && intentInfoOpenIdx === i && (
                 <div
-                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[14px] sm:text-[15px] leading-relaxed text-white/75 space-y-3"
                   role="region"
-                  aria-label="Swim load funding options"
+                  aria-label="Swim load funding details"
                 >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Details</p>
                   <p>
                     A third weekly swim pulls load from bike and/or run. Pick what you want to protect most — the model
                     saves this as <span className="text-white/90">swim_load_source</span> on your tri goal.
                   </p>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      disabled={sending}
-                      onClick={() => void sendUserMessage(SWIM_LOAD_PROTECT_RUN_USER_MESSAGE)}
-                      className="text-sm font-medium px-3 py-2.5 rounded-lg bg-teal-500/40 text-teal-50 border border-teal-500/60 hover:bg-teal-500/50 disabled:opacity-50 w-full text-left"
-                    >
-                      Protect my run
-                    </button>
-                    <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={sending}
-                        onClick={() => void sendUserMessage(SWIM_LOAD_PROTECT_BIKE_USER_MESSAGE)}
-                        className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
-                      >
-                        Protect my bike
-                      </button>
-                      <button
-                        type="button"
-                        disabled={sending}
-                        onClick={() => void sendUserMessage(SWIM_LOAD_SPLIT_USER_MESSAGE)}
-                        className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
-                      >
-                        Split it
-                      </button>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
