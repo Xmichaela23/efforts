@@ -50,6 +50,18 @@ function optionalSwimDrillBlock(
   return { mainBudgetYd: mainBudgetYd - dy, drillTokens: [tok] };
 }
 
+/** Snap total swim volume to pool-friendly yards after TSS/duration math, before interval/token assembly. */
+function snapSwimSessionTotalYdEasy(totalYards: number): number {
+  if (!Number.isFinite(totalYards) || totalYards <= 0) return totalYards;
+  return Math.round(totalYards / 50) * 50;
+}
+
+/** CSS / threshold-style sessions built around 100 yd reps — snap total to nearest 100 yd. */
+function snapSwimSessionTotalYdInterval100(totalYards: number): number {
+  if (!Number.isFinite(totalYards) || totalYards <= 0) return totalYards;
+  return Math.round(totalYards / 100) * 100;
+}
+
 function session(
   day: string,
   type: Sport,
@@ -444,6 +456,7 @@ export function thresholdSwim(
   drillSlotSalt: number = 0,
   phase?: string,
 ): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
@@ -479,6 +492,7 @@ export function cssAerobicSwim(
   drillSlotSalt: number = 0,
   phase?: string,
 ): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
@@ -508,6 +522,7 @@ export function easySwim(
   drillSlotSalt: number = 0,
   phase?: string,
 ): PlannedSession {
+  totalYards = snapSwimSessionTotalYdEasy(totalYards);
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: mainYards, drillTokens } = optionalSwimDrillBlock(

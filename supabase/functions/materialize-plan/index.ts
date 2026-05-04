@@ -1467,6 +1467,30 @@ function expandTokensForRow(
       // Allow optional suffix after unit (e.g., _easy)
       m = s.match(/swim_(warmup|cooldown)_(\d+)(yd|m)(?:_[a-z0-9_]+)?/);
       if (m) { pushWUCD(parseInt(m[2],10), m[3], m[1]==='warmup'); continue; }
+      // Open water practice: duration from row; continuous steady effort, optional short time warmup, no interval rests
+      if (s === 'swim_open_water_practice') {
+        const totalMin = Number(row?.duration);
+        const totalSec =
+          Number.isFinite(totalMin) && totalMin > 0 ? Math.round(totalMin * 60) : 40 * 60;
+        const warmupSec = Math.min(5 * 60, Math.floor(totalSec * 0.15));
+        const owLabel =
+          'open water steady — sight every 6–8 strokes, pick a landmark; bilateral breathing into chop or sun glare';
+        if (warmupSec >= 120) {
+          steps.push({ id: uid(), kind: 'warmup', duration_s: warmupSec });
+          steps.push({
+            id: uid(),
+            kind: 'work',
+            duration_s: Math.max(60, totalSec - warmupSec),
+            label: owLabel,
+          });
+        } else {
+          steps.push({ id: uid(), kind: 'work', duration_s: totalSec, label: owLabel });
+        }
+        console.log(
+          `  ✅ Matched open water practice: total=${totalSec}s warmup=${warmupSec >= 120 ? warmupSec : 0}s`,
+        );
+        continue;
+      }
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
