@@ -61,6 +61,12 @@ const STRENGTH_SUPPORT_USER_MESSAGE =
 const STRENGTH_COEQUAL_USER_MESSAGE =
   'I want to push strength as a co-equal goal this season, not just maintenance. Set strength_intent to "performance" on my tri goal(s) and treat lifting as a real focus alongside the three sports.';
 
+const SWIM_FOCUS_USER_MESSAGE =
+  'Swim focus — two sessions a week, quality main set plus an easier aerobic session. Treat swim as a priority this block.';
+
+const SWIM_TO_RACE_USER_MESSAGE =
+  'Swim to race — two sessions, one quality set to stay sharp and one easy session. Swim supports the block without adding load.';
+
 function looksLikeStrengthIntentFork(visible: string): boolean {
   const t = visible.trim();
   if (!t) return false;
@@ -94,11 +100,39 @@ function looksLikeStrengthIntentStateConfirm(visible: string): boolean {
   );
 }
 
-type AssistantMessageDisclosure = 'strength_fork' | 'training_intent';
+/** Swim pillar: app offers Swim focus vs Swim to race buttons — match assistant lines that pose that fork. */
+function looksLikeSwimFork(visible: string): boolean {
+  const t = visible.trim();
+  if (!t) return false;
+  if (
+    looksLikeStrengthIntentFork(visible) ||
+    looksLikeStrengthIntentStateConfirm(visible) ||
+    looksLikePerformanceIntentConfirmation(visible)
+  ) {
+    return false;
+  }
+  const lower = t.toLowerCase();
+  const swimCtx =
+    /\bsw(?:im|imming)\b/i.test(t) || /\bpool\b/i.test(lower) || /\bopen water\b/i.test(lower);
+  if (!swimCtx) return false;
+
+  const namesBoth = /swim focus/i.test(t) && /swim to race/i.test(t);
+  const namesOne = /swim focus|swim to race/i.test(t);
+  const blockAndSwim = /\bswim this block\b/i.test(lower) || /\bthis block\b/.test(lower) && /\bsw(?:im|imming)\b/i.test(t);
+  const prioritizeSwim =
+    /\bprioritize\b/i.test(t) && /\bsw(?:im|imming)\b/i.test(t);
+  const treatSwimPriority =
+    /\btreat swim\b/i.test(lower) && /\b(priority|priorities|this block)\b/i.test(lower);
+
+  return namesBoth || namesOne || blockAndSwim || prioritizeSwim || treatSwimPriority;
+}
+
+type AssistantMessageDisclosure = 'strength_fork' | 'training_intent' | 'swim_fork';
 
 function assistantMessageDisclosure(visible: string): AssistantMessageDisclosure | null {
   if (looksLikeStrengthIntentFork(visible) || looksLikeStrengthIntentStateConfirm(visible)) return 'strength_fork';
   if (looksLikePerformanceIntentConfirmation(visible)) return 'training_intent';
+  if (looksLikeSwimFork(visible)) return 'swim_fork';
   return null;
 }
 
@@ -719,7 +753,9 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                     aria-label={
                       disc === 'strength_fork'
                         ? 'What support vs co-equal strength means'
-                        : 'What performance and completion training intent mean'
+                        : disc === 'swim_fork'
+                          ? 'Swim focus vs swim to race'
+                          : 'What performance and completion training intent mean'
                     }
                     aria-expanded={intentInfoOpenIdx === i}
                     onClick={() => setIntentInfoOpenIdx((v) => (v === i ? null : i))}
@@ -784,6 +820,40 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                   >
                     Change intent
                   </button>
+                </div>
+              )}
+              {disc === 'swim_fork' && intentInfoOpenIdx === i && (
+                <div
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  role="region"
+                  aria-label="Swim focus options"
+                >
+                  <p>
+                    <span className="text-white/90 font-medium">Swim focus</span> — two sessions a week: quality main set
+                    plus an easier aerobic. Swim is a priority this block; coach feedback leans in.
+                  </p>
+                  <p>
+                    <span className="text-white/90 font-medium">Swim to race</span> — same two sessions: one quality to
+                    stay sharp, one easy for feel. Swim supports the week without pushing extra load.
+                  </p>
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(SWIM_FOCUS_USER_MESSAGE)}
+                      className="text-sm font-medium px-3 py-2 rounded-lg bg-teal-500/15 text-teal-100/95 border border-teal-500/35 hover:bg-teal-500/25 disabled:opacity-50 flex-1 min-w-0"
+                    >
+                      Swim focus
+                    </button>
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(SWIM_TO_RACE_USER_MESSAGE)}
+                      className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
+                    >
+                      Swim to race
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
