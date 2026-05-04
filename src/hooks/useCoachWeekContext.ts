@@ -507,6 +507,7 @@ export function useCoachWeekContext(date?: string) {
       }
 
       // Merge strength relayout from adapt-plan suggest (same payload auto-adapt would persist).
+      // adapt-plan uses id + description; coach card expects code + details (same mapping as relayout).
       const adapt = adaptResult.data as {
         suggestions?: Array<{ id?: string; type?: string; title?: string; description?: string }>;
       } | null;
@@ -526,6 +527,34 @@ export function useCoachWeekContext(date?: string) {
               },
               ...base,
             ];
+            wsv.coach = coach;
+            merged = {
+              ...merged,
+              weekly_state_v1: wsv,
+              plan_adaptation_suggestions: coach.plan_adaptation_suggestions,
+            };
+          }
+        }
+
+        const enduranceSuggestions = adapt.suggestions.filter(
+          (s) => s.type === 'endurance_pace_update' || s.type === 'endurance_ftp_update',
+        );
+        if (enduranceSuggestions.length) {
+          const wsv = { ...(merged.weekly_state_v1 as CoachWeekContextV1['weekly_state_v1']) };
+          const coach = { narrative: null, ...(wsv.coach || {}) };
+          const base = [...(coach.plan_adaptation_suggestions ?? [])];
+          const extras: Array<{ code: string; title: string; details: string }> = [];
+          for (const s of enduranceSuggestions) {
+            const code = s.id;
+            if (!code || base.some(x => x.code === code) || extras.some(x => x.code === code)) continue;
+            extras.push({
+              code,
+              title: s.title ?? '',
+              details: s.description ?? '',
+            });
+          }
+          if (extras.length) {
+            coach.plan_adaptation_suggestions = [...base, ...extras];
             wsv.coach = coach;
             merged = {
               ...merged,
