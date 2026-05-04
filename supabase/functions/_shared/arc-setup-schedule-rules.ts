@@ -32,7 +32,7 @@ ${FATIGUE_LINES}
 (Conceptual: **brick** = **HIGH**; treat like long-day stress when checking spacing.)
 
 ### SAME-DAY PAIRING — matrix (authoritative)
-Two session **kinds** may appear on the same **calendar day** only if the cell is **✓** (row ∩ column). **✗** = forbidden. **Long** sessions (**long_ride**, **long_run**) are never paired with anything else the same day except **brick** long+short as defined in the engine, not in this 9×9.
+Two session **kinds** may appear on the same **calendar day** only if the cell is **✓** (row ∩ column). **✗** = forbidden. **Long** sessions (**long_ride**, **long_run**) are never paired with anything else the same day except **brick** long+short as defined in the engine, not in this matrix (now 10×10 including **quality_swim**).
 
 ${formatSameDayMatrixMarkdown()}
 

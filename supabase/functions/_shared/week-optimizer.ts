@@ -207,18 +207,24 @@ function canPlaceWithModifier(
   athlete: WeekOptimizerInputs['athlete'],
 ): boolean {
   if (canPlace(days, day, kind)) return true;
-  const isPerf = athlete.training_intent === 'performance';
-  const isCoEq = athlete.strength_intent === 'performance';
   const existing = days[day];
   if (!existing || existing.length !== 1) return false;
   const there = existing[0].kind;
+
+  const allowQrQs =
+    athlete.training_intent === 'performance' || athlete.strength_intent === 'performance';
+  if (areScheduleSlotsCompatible(there, kind, { allowQualityRunQualitySwimSameDay: allowQrQs })) {
+    return true;
+  }
+
+  const isPerf = athlete.training_intent === 'performance';
+  const isCoEq = athlete.strength_intent === 'performance';
 
   // Performance + co-equal strength: quality_run + lower_body_strength → consolidated hard day (AM run / PM lift).
   if (isPerf && isCoEq) {
     if (kind === 'lower_body_strength' && there === 'quality_run') return true;
     if (kind === 'quality_run' && there === 'lower_body_strength') return true;
   }
-  // (quality_swim + quality_run is already matrix-true via easy_swim row; no override needed.)
   return false;
 }
 

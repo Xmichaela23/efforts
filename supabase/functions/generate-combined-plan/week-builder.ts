@@ -32,7 +32,11 @@ import {
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
-import { arePlannedSessionsCompatible, plannedSessionToScheduleSlot } from '../_shared/schedule-session-constraints.ts';
+import {
+  arePlannedSessionsCompatible,
+  plannedSessionToScheduleSlot,
+  type SameDayCompatContext,
+} from '../_shared/schedule-session-constraints.ts';
 import { blockForWeek } from './phase-structure.ts';
 
 /**
@@ -189,7 +193,7 @@ function enforce8020(grid: WeekGrid, phase: Phase): string[] {
   return tradeOffs;
 }
 
-// ── Same-day matrix (9×9 + extensions) — post placement ---------------------------------
+// ── Same-day matrix (10×10 + race_event) — post placement ---------------------------------
 // One source of truth: `_shared/schedule-session-constraints.ts` (used by AL prompts + engine).
 
 interface SameDayValidationResult {
@@ -197,13 +201,16 @@ interface SameDayValidationResult {
   conflicts: string[];
 }
 
-function validateWeekGridSameDayMatrix(grid: WeekGrid): SameDayValidationResult {
+function validateWeekGridSameDayMatrix(
+  grid: WeekGrid,
+  ctx?: SameDayCompatContext,
+): SameDayValidationResult {
   const conflicts: string[] = [];
   for (const [day, slot] of grid) {
     const sessions = slot.sessions;
     for (let i = 0; i < sessions.length; i++) {
       for (let j = i + 1; j < sessions.length; j++) {
-        if (!arePlannedSessionsCompatible(sessions[i], sessions[j])) {
+        if (!arePlannedSessionsCompatible(sessions[i], sessions[j], ctx)) {
           conflicts.push(
             `${day}: "${sessions[i].name}" [${sessions[i].type}] + "${sessions[j].name}" [${sessions[j].type}]`,
           );
@@ -219,16 +226,20 @@ function validateWeekGridSameDayMatrix(grid: WeekGrid): SameDayValidationResult 
  * Exception: quality_run + lower_body_strength on the same day is allowed for
  * performance + co-equal strength athletes (AM/PM consolidated hard day per EXPERIENCE_MODIFIER).
  */
-function tryResolveSameDayMatrixConflicts(grid: WeekGrid, isPerformanceCoequal = false): string[] {
+function tryResolveSameDayMatrixConflicts(
+  grid: WeekGrid,
+  isPerformanceCoequal = false,
+  ctx?: SameDayCompatContext,
+): string[] {
   const actions: string[] = [];
   for (let pass = 0; pass < 32; pass++) {
-    if (validateWeekGridSameDayMatrix(grid).valid) break;
+    if (validateWeekGridSameDayMatrix(grid, ctx).valid) break;
     let removed = false;
     outer: for (const [day, slot] of grid) {
       const list = slot.sessions;
       for (let i = 0; i < list.length; i++) {
         for (let j = i + 1; j < list.length; j++) {
-          if (arePlannedSessionsCompatible(list[i], list[j])) continue;
+          if (arePlannedSessionsCompatible(list[i], list[j], ctx)) continue;
           // Performance exception: quality_run AM + lower_body_strength PM is an allowed
           // consolidated hard day for co-equal strength athletes (EXPERIENCE_MODIFIER rule).
           if (isPerformanceCoequal) {
@@ -1019,15 +1030,20 @@ export function buildWeek(
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
   // strength_intent === 'performance' is the co-equal flag (see AthleteState type + EXPERIENCE_MODIFIER_TEXT).
-  const isPerformanceCoequal = false;
-  const sameDayPre = validateWeekGridSameDayMatrix(grid);
+  const isPerformanceCoequal = performanceStrength;
+  const sameDayCompatCtx: SameDayCompatContext = {
+    allowQualityRunQualitySwimSameDay:
+      String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
+      performanceStrength,
+  };
+  const sameDayPre = validateWeekGridSameDayMatrix(grid, sameDayCompatCtx);
   if (!sameDayPre.valid) {
     console.warn('[week-builder] same-day schedule conflicts detected:', sameDayPre.conflicts);
-    const res = tryResolveSameDayMatrixConflicts(grid, isPerformanceCoequal);
+    const res = tryResolveSameDayMatrixConflicts(grid, isPerformanceCoequal, sameDayCompatCtx);
     if (res.length > 0) {
       console.warn('[week-builder] same-day auto-resolution (strength removal):', res);
     }
-    const sameDayPost = validateWeekGridSameDayMatrix(grid);
+    const sameDayPost = validateWeekGridSameDayMatrix(grid, sameDayCompatCtx);
     if (!sameDayPost.valid) {
       console.warn('[week-builder] same-day schedule conflicts after resolution:', sameDayPost.conflicts);
     }

@@ -17,15 +17,15 @@ export const SESSION_FATIGUE = {
   easy_swim: 'LOW' as const,
 } as const;
 
-/** Includes brick + quality_swim (not rows in the 9×9 same-day matrix). */
+/** Includes brick + `quality_swim` (both have fatigue tiers; `quality_swim` is a full matrix row). */
 export type SessionFatigueId = keyof typeof SESSION_FATIGUE;
 
-/** All keys used in the same-day matrix (9 session roles). */
-/** Nine roles in the same-day matrix (quality_swim is gated by text rules + experience). */
+/** Matrix session roles (10×10): `quality_swim` is its own row — not aliased to `easy_swim`. */
 export const SESSION_KINDS = [
   'easy_bike',
   'easy_run',
   'easy_swim',
+  'quality_swim',
   'quality_bike',
   'quality_run',
   'long_ride',
@@ -38,20 +38,21 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
 
 /**
  * true = may share the same calendar day (strict / completion default).
- * Symmetric. Source: product 9×9 matrix (Apr 2026); `easy_run` does not pair with
- * `lower_body_strength` or `upper_body_strength` (screenshot).
- * ✓/✗ encoded as 1/0 rows [easy_bike, easy_run, easy_swim, quality_bike, quality_run, long_ride, long_run, lower_body, upper_body]
+ * Symmetric. Source: product matrix (Apr 2026); extended with dedicated `quality_swim` row
+ * so `quality_run` × `quality_swim` is ✗ by default (was wrongly ✓ via `easy_swim` alias).
+ * ✓/✗ rows: [easy_bike, easy_run, easy_swim, quality_swim, quality_bike, quality_run, long_ride, long_run, lower_body, upper_body]
  */
 const ROWS: Record<MatrixSessionKind, number[]> = {
-  easy_bike:            [1, 1, 1, 0, 1, 0, 0, 1, 1],
-  easy_run:             [1, 1, 1, 1, 0, 0, 0, 0, 0],
-  easy_swim:            [1, 1, 1, 1, 1, 0, 0, 1, 1],
-  quality_bike:         [0, 1, 1, 0, 0, 0, 0, 0, 1],
-  quality_run:          [1, 0, 1, 0, 0, 0, 0, 0, 1],
-  long_ride:            [0, 0, 0, 0, 0, 1, 0, 0, 0],
-  long_run:             [0, 0, 0, 0, 0, 0, 1, 0, 0],
-  lower_body_strength:  [1, 0, 1, 0, 0, 0, 0, 0, 1],
-  upper_body_strength:  [1, 0, 1, 1, 1, 0, 0, 1, 1],
+  easy_bike:            [1, 1, 1, 1, 0, 1, 0, 0, 1, 1],
+  easy_run:             [1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+  easy_swim:            [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
+  quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
+  quality_bike:         [0, 1, 1, 1, 0, 0, 0, 0, 0, 1],
+  quality_run:          [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+  long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  lower_body_strength:  [1, 0, 1, 1, 0, 0, 0, 0, 0, 1],
+  upper_body_strength:  [1, 0, 1, 1, 1, 1, 0, 0, 1, 1],
 };
 
 function buildSameDayMatrix(): Record<MatrixSessionKind, Record<MatrixSessionKind, boolean>> {
@@ -75,25 +76,45 @@ export function areSameDayCompatible(a: MatrixSessionKind, b: MatrixSessionKind)
   return !!SAME_DAY_COMPATIBLE[a]?.[b];
 }
 
-/** Same-day roles including swim quality (not a 9×9 row; uses easy_swim column where needed). */
-export type ScheduleSlotKind = MatrixSessionKind | 'quality_swim' | 'race_event';
+/** Same-day roles: full matrix kinds plus synthetic race slot for pairwise checks. */
+export type ScheduleSlotKind = MatrixSessionKind | 'race_event';
 
 /**
- * Map a 9×9 or quality_swim kind to the matrix row used for pairwise checks.
- * `quality_swim` uses the same pairings as `easy_swim` vs the nine matrix kinds.
+ * Map non-matrix slots to a matrix row for lookup. `race_event` uses `easy_run` pairings
+ * (race day clears the calendar — bracketed as compatible elsewhere).
  */
 function matrixRowForSlot(k: ScheduleSlotKind): MatrixSessionKind {
-  return k === 'quality_swim' ? 'easy_swim' : k === 'race_event' ? 'easy_run' : k;
+  return k === 'race_event' ? 'easy_run' : k;
 }
 
-/** Pairwise same-day check for engine + arc (includes quality_swim and race). */
-export function areScheduleSlotsCompatible(a: ScheduleSlotKind, b: ScheduleSlotKind): boolean {
+/**
+ * Optional overrides for the strict matrix (server-only; defaults maintain completion-safe rules).
+ * `allowQualityRunQualitySwimSameDay`: training_intent or strength_intent performance — AM/PM split per EXPERIENCE_MODIFIER.
+ */
+export type SameDayCompatContext = {
+  allowQualityRunQualitySwimSameDay?: boolean;
+};
+
+/** Pairwise same-day check for engine + arc (includes `quality_swim` row + race). */
+export function areScheduleSlotsCompatible(
+  a: ScheduleSlotKind,
+  b: ScheduleSlotKind,
+  ctx?: SameDayCompatContext,
+): boolean {
   if (a === 'race_event' || b === 'race_event') return true;
   if (a === b) return true;
 
   const ma = matrixRowForSlot(a);
   const mb = matrixRowForSlot(b);
-  return !!SAME_DAY_COMPATIBLE[ma]?.[mb];
+  if (!!SAME_DAY_COMPATIBLE[ma]?.[mb]) return true;
+
+  if (
+    ctx?.allowQualityRunQualitySwimSameDay &&
+    ((ma === 'quality_swim' && mb === 'quality_run') || (ma === 'quality_run' && mb === 'quality_swim'))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export type PlannedSessionLike = {
@@ -157,7 +178,11 @@ export function plannedSessionToScheduleSlot(s: PlannedSessionLike): ScheduleSlo
  * Brick legs (both tagged) always pass. Involving a brick and a third session uses normal rules
  * (brick is not a matrix row — brick+brick only whitelisted here).
  */
-export function arePlannedSessionsCompatible(s1: PlannedSessionLike, s2: PlannedSessionLike): boolean {
+export function arePlannedSessionsCompatible(
+  s1: PlannedSessionLike,
+  s2: PlannedSessionLike,
+  ctx?: SameDayCompatContext,
+): boolean {
   const t1 = Array.isArray(s1.tags) ? s1.tags : [];
   const t2 = Array.isArray(s2.tags) ? s2.tags : [];
   if (t1.includes('brick') && t2.includes('brick')) return true;
@@ -167,10 +192,10 @@ export function arePlannedSessionsCompatible(s1: PlannedSessionLike, s2: Planned
   if ((t1.includes('brick') || t2.includes('brick')) && t1.includes('brick') !== t2.includes('brick')) {
     return true;
   }
-  return areScheduleSlotsCompatible(a, b);
+  return areScheduleSlotsCompatible(a, b, ctx);
 }
 
-/** Markdown table for system prompts (9×9). */
+/** Markdown table for system prompts (10×10 matrix). */
 export function formatSameDayMatrixMarkdown(): string {
   const header =
     '|  | ' +
