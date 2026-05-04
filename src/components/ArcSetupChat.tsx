@@ -56,10 +56,10 @@ const COMPLETION_INTENT_USER_MESSAGE =
 
 /** Coach presented an either/or (support vs co-equal) — labels match arc-setup prompt + disclosure buttons. */
 const STRENGTH_SUPPORT_USER_MESSAGE =
-  'Strength supports tri — two gym sessions a week, modest intensity and durability-focused work so lifting backs up swim, bike, and run without competing for recovery. Set strength_intent to "support" on my tri goal(s).';
+  'Strength supports tri — one or two gym sessions per week depending on phase: two in base, one in build and race-specific, with modest loads and durability-focused work so lifting backs up swim, bike, and run. Set strength_intent to "support" on my tri goal(s).';
 
 const STRENGTH_COEQUAL_USER_MESSAGE =
-  'Strength as co-equal — two gym sessions a week with real compound work and progressive loading; lifting is a parallel goal, not just maintenance. Set strength_intent to "performance" on my tri goal(s).';
+  'Strength as co-equal — two gym sessions per week through base, build, and race-specific with real compound work and progressive loading; lifting is a parallel goal, not just maintenance. Set strength_intent to "performance" on my tri goal(s).';
 
 const SWIM_FOCUS_USER_MESSAGE =
   'Swim focus — two sessions a week, quality main set plus an easier aerobic session. Treat swim as a priority this block.';
@@ -774,16 +774,15 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                   aria-label="Strength on the plan"
                 >
                   <p>
-                    <span className="text-white/90 font-medium">Strength supports tri</span> — default{' '}
-                    <span className="text-white/85">2×/week</span> gym, durability-biased patterns and conservative loads
-                    so swim, bike, and run quality stays center stage. Saves <span className="text-white/85">support</span>{' '}
-                    intent.
+                    <span className="text-white/90 font-medium">Strength supports tri</span> — one or two sessions per week
+                    depending on phase — more in base, leaner as race approaches. Accessory and durability focus; conservative
+                    loads so swim, bike, and run stay primary. Saves <span className="text-white/85">support</span> intent.
                   </p>
                   <p>
-                    <span className="text-white/90 font-medium">Strength as co-equal</span> — same default{' '}
-                    <span className="text-white/85">2×/week</span> slot count, but compound lifts at real working weights and
-                    progressive loading; gym is a first-class goal alongside the three sports. Saves{' '}
-                    <span className="text-white/85">performance</span> intent (co-equal contract).
+                    <span className="text-white/90 font-medium">Strength as co-equal</span> — two sessions per week through
+                    base, build, and race-specific phases. Compound-forward with real load progression; gym is a first-class
+                    goal alongside the three sports. Saves <span className="text-white/85">performance</span> intent
+                    (co-equal contract).
                   </p>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
