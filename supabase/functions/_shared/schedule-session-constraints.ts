@@ -90,6 +90,12 @@ function matrixRowForSlot(k: ScheduleSlotKind): MatrixSessionKind {
 /**
  * Optional overrides for the strict matrix (server-only; defaults maintain completion-safe rules).
  * `allowQualityRunQualitySwimSameDay`: training_intent or strength_intent performance — AM/PM split per EXPERIENCE_MODIFIER.
+ *
+ * **Bar for new flags:** (1) Must reflect an explicit product / EXPERIENCE_MODIFIER rule, not ad hoc convenience.
+ * (2) Default path stays strict-matrix / completion-safe; opt-in only via persisted athlete intent (or equivalent).
+ * (3) Implement as “after matrix says no” — document the pairing and keep symmetric with the rule text.
+ * (4) Thread the same ctx through `week-builder` grid validation and `week-optimizer` `canPlaceWithModifier`.
+ * (5) Prefer structural fixes (e.g. day bump before placement) when that fully solves the case without eroding the matrix.
  */
 export type SameDayCompatContext = {
   allowQualityRunQualitySwimSameDay?: boolean;

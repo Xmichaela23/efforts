@@ -621,6 +621,25 @@ export function buildWeek(
     runEasyDay = adjDay(runEasyDay, 1);
   }
 
+  /** Same gate as `SameDayCompatContext.allowQualityRunQualitySwimSameDay` — keep in sync. */
+  const allowQualityRunSwimSameDay =
+    String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
+    String(athleteState.strength_intent ?? '').toLowerCase() === 'performance';
+
+  // Completion / support: never place quality swim on the same calendar day as quality run
+  // unless performance escape hatch — matrix would reject and tryResolve cannot relocate swim/run.
+  if (!allowQualityRunSwimSameDay && swimQualityDay === runQualityDay) {
+    const swimBumpBlocked = new Set<string>([...qualitySwimBlocked, runQualityDay, swimEasyDay]);
+    const startIdx = Math.max(0, DAYS_OF_WEEK.indexOf(swimQualityDay));
+    for (let s = 0; s < 7; s++) {
+      const d = DAYS_OF_WEEK[(startIdx + s) % 7]!;
+      if (!swimBumpBlocked.has(d) && d !== runQualityDay) {
+        swimQualityDay = d;
+        break;
+      }
+    }
+  }
+
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =
     athleteState.bike_quality_day != null
@@ -1032,9 +1051,7 @@ export function buildWeek(
   // strength_intent === 'performance' is the co-equal flag (see AthleteState type + EXPERIENCE_MODIFIER_TEXT).
   const isPerformanceCoequal = performanceStrength;
   const sameDayCompatCtx: SameDayCompatContext = {
-    allowQualityRunQualitySwimSameDay:
-      String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
-      performanceStrength,
+    allowQualityRunQualitySwimSameDay: allowQualityRunSwimSameDay,
   };
   const sameDayPre = validateWeekGridSameDayMatrix(grid, sameDayCompatCtx);
   if (!sameDayPre.valid) {
