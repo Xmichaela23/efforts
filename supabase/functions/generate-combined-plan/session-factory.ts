@@ -14,6 +14,8 @@ import { getProtocol, resolveProtocolIdForCombinedTriPlan } from '../shared/stre
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
+/** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
+import '../_shared/swim-program-templates.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

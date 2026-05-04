@@ -15,6 +15,8 @@ import type {
   PlannedSession, GeneratedWeek, Phase, PhaseBlock, GoalInput,
   AthleteState, AthleteMemory, RaceAnchor,
 } from './types.ts';
+/** Step 4: `getSwimSlotTemplates` / `getRecoverySwimTemplate` — keep module on the graph (same pattern as `../_shared/schedule-session-constraints.ts`). */
+import '../_shared/swim-program-templates.ts';
 import type { Sport, Intensity } from './types.ts';
 import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
