@@ -54,12 +54,12 @@ function looksLikePerformanceIntentConfirmation(visible: string): boolean {
 const COMPLETION_INTENT_USER_MESSAGE =
   "I'd like completion intent instead: a strong, healthy finish with durability and conservative load — not chasing a faster time. Please set training intent to completion for this A-race.";
 
-/** Coach presented an either/or (support vs co-equal) — labels match arc-setup prompt + disclosure buttons. */
+/** Coach presented an either/or — labels match arc-setup prompt + disclosure buttons. */
 const STRENGTH_SUPPORT_USER_MESSAGE =
   'Strength supports tri — one or two gym sessions per week depending on phase: two in base, one in build and race-specific, with modest loads and durability-focused work so lifting backs up swim, bike, and run. Set strength_intent to "support" on my tri goal(s).';
 
-const STRENGTH_COEQUAL_USER_MESSAGE =
-  'Strength as co-equal — two gym sessions per week through base, build, and race-specific with real compound work and progressive loading; lifting is a parallel goal, not just maintenance. Set strength_intent to "performance" on my tri goal(s).';
+const STRENGTH_BUILD_USER_MESSAGE =
+  'Build strength — two gym sessions per week through base, build, and race-specific with real compound work and progressive loading. I want to actually get stronger, not only do gym work that props up swim, bike, and run. Set strength_intent to "performance" on my tri goal(s).';
 
 const SWIM_FOCUS_USER_MESSAGE =
   'Swim focus — two sessions a week, quality main set plus an easier aerobic session. Treat swim as a priority this block.';
@@ -76,14 +76,15 @@ function looksLikeStrengthIntentFork(visible: string): boolean {
     /support the tri or a real|or a real co-?equal|which —\s*support|which—\s*support|or co-equal alongside/i.test(t) ||
     (/support/i.test(t) && /(co-?equal|co-equal|pushing it|powerlifting|separate)/i.test(t)) ||
     (/(twice|2×|2x|a week)/i.test(t) && /(co-?equal|or are you)/i.test(t)) ||
-    (/\bstrength supports tri\b/i.test(t) && /\b(co-?equal|parallel goal|real goal)\b/i.test(t)) ||
+    (/\bstrength supports tri\b/i.test(t) && /\b(build strength|co-?equal|parallel goal|real goal)\b/i.test(t)) ||
+    (/\bbuild strength\b/i.test(t) && /\b(supports tri|support tri|backs up|endurance)\b/i.test(t)) ||
     (/backs? up swim,\s*bike,\s*and run/i.test(t) && /(co-?equal|real goal|parallel)/i.test(t)) ||
     (/back(?:s|ing) up swim/i.test(t) && /\b(co-?equal|parallel goal|real goal)\b/i.test(t));
   if (!hasEitherOr) return false;
   return /[?？]/.test(t) || /season\s*\?/i.test(t);
 }
 
-/** State → confirm (good) strength-type line: co-equal vs support phrasing, not day-picking. */
+/** State → confirm (good) strength-type line: build-strength vs support-tri phrasing, not day-picking. */
 function looksLikeStrengthIntentStateConfirm(visible: string): boolean {
   if (looksLikePerformanceIntentConfirmation(visible)) return false;
   const t = visible.trim();
@@ -97,7 +98,7 @@ function looksLikeStrengthIntentStateConfirm(visible: string): boolean {
     return false;
   }
   return (
-    /strength as a co-?equal|co-equal goal alongside|co-equal goal this season|push strength as a co-?equal/i.test(t) ||
+    /strength as a co-?equal|co-equal goal alongside|co-equal goal this season|push strength as a co-?equal|build(?:ing)? strength (?:as |for )a real|real goal.*lift/i.test(t) ||
     /strength is there to support|not a separate powerlifting|support the tri — not|support the tri, not|support the tri —|auxiliary to the tri|just maintenance\. right/i.test(t) ||
     (/^strength\b/i.test(t) && /co-?equal|support the tri|powerlifting|maintenance(?!$)/i.test(t))
   );
@@ -755,7 +756,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
                     aria-label={
                       disc === 'strength_fork'
-                        ? 'Strength supports tri vs co-equal'
+                        ? 'Support tri vs build strength in the gym'
                         : disc === 'swim_fork'
                           ? 'Swim focus vs swim to race'
                           : 'What performance and completion training intent mean'
@@ -774,15 +775,16 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                   aria-label="Strength on the plan"
                 >
                   <p>
-                    <span className="text-white/90 font-medium">Strength supports tri</span> — one or two sessions per week
-                    depending on phase — more in base, leaner as race approaches. Accessory and durability focus; conservative
-                    loads so swim, bike, and run stay primary. Saves <span className="text-white/85">support</span> intent.
+                    <span className="text-white/90 font-medium">Strength supports tri</span> — gym work in service of
+                    endurance: one or two sessions per week by phase (more in base, leaner toward the race), accessory and
+                    durability bias, lighter loads. Not a strength-build track. Saves <span className="text-white/85">support</span>{' '}
+                    intent.
                   </p>
                   <p>
-                    <span className="text-white/90 font-medium">Strength as co-equal</span> — two sessions per week through
-                    base, build, and race-specific phases. Compound-forward with real load progression; gym is a first-class
-                    goal alongside the three sports. Saves <span className="text-white/85">performance</span> intent
-                    (co-equal contract).
+                    <span className="text-white/90 font-medium">Build strength</span> — you are choosing to{' '}
+                    <span className="text-white/90">get stronger on purpose</span>: two sessions per week through base, build,
+                    and race-specific, compound-forward with real load progression. Endurance still matters, but the gym is a
+                    real training goal, not only backup work. Saves <span className="text-white/85">performance</span> intent.
                   </p>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
@@ -796,10 +798,10 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
                     <button
                       type="button"
                       disabled={sending}
-                      onClick={() => void sendUserMessage(STRENGTH_COEQUAL_USER_MESSAGE)}
+                      onClick={() => void sendUserMessage(STRENGTH_BUILD_USER_MESSAGE)}
                       className="text-sm font-medium px-3 py-2 rounded-lg bg-teal-500/15 text-teal-100/95 border border-teal-500/35 hover:bg-teal-500/25 disabled:opacity-50 flex-1 min-w-0"
                     >
-                      Strength as co-equal
+                      Build strength
                     </button>
                   </div>
                 </div>
