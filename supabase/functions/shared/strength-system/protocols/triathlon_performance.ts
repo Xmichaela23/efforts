@@ -150,20 +150,12 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
   }
 
   ex.push({
-    name: 'Hip Thrusts',
-    sets: 3,
-    reps: 12,
-    weight: tier === 'commercial_gym' ? 'Barbell (moderate)' : 'Backpack / DB on hips',
+    name: 'Nordic Hamstring Curl',
+    sets: 2,
+    reps: 5,
+    weight: 'Assisted — band or partner',
     target_rir: rir,
-    notes: 'Glute drive — run economy',
-  });
-
-  ex.push({
-    name: 'Step-ups',
-    sets: 3,
-    reps: '10/leg',
-    weight: tier === 'commercial_gym' ? 'DBs light–moderate' : 'Bodyweight + backpack',
-    target_rir: rir,
+    notes: 'Hamstring resilience — low volume, high intent',
   });
 
   if (limiter === 'run' || limiter === 'bike') {
@@ -188,8 +180,8 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Performance — Base Hypertrophy (Lower)',
-    description: `Base Week ${planWeekLabel} — Hypertrophy lower body (≈65% 1RM, RIR ${rir}). Build tissue for later strength and power blocks.`,
-    duration: tier === 'commercial_gym' ? 55 : 50,
+    description: `Base Week ${planWeekLabel} — Two primary lower compounds (≈65% 1RM, RIR ${rir}) plus Nordic curls 2×5 for hamstring resilience; accessories stay light.`,
+    duration: tier === 'commercial_gym' ? 50 : 48,
     exercises: ex,
     repProfile: 'hypertrophy',
     tags: ['strength', 'lower_body', 'triathlon_performance', 'phase:base', `limiter:${limiter}`],
@@ -288,22 +280,21 @@ function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
 // ── Build: strength (≈78–82% 1RM) ──────────────────────────────────────────
 
 function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
-  const wip = Math.max(1, weekInPhase);
-  const sets = 4;
+  const mainSets = 3;
   const rir = 2;
   const ex: StrengthExercise[] = [];
 
   if (tier === 'commercial_gym') {
     ex.push({
       name: 'Conventional Deadlift',
-      sets,
+      sets: mainSets,
       reps: '4-6',
       weight: '80% 1RM',
       target_rir: rir,
     });
     ex.push({
       name: 'Barbell Back Squat',
-      sets,
+      sets: mainSets,
       reps: '4-6',
       weight: '78% 1RM',
       target_rir: rir,
@@ -311,36 +302,19 @@ function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
   } else {
     ex.push({
       name: 'Single-Leg RDL',
-      sets: 3,
+      sets: mainSets,
       reps: '8/leg',
       weight: 'Heavy — RIR 2',
       target_rir: rir,
     });
     ex.push({
       name: 'Goblet Squat',
-      sets: 4,
+      sets: mainSets,
       reps: 8,
       weight: 'Heavy',
       target_rir: rir,
     });
   }
-
-  ex.push({
-    name: 'Bulgarian Split Squat',
-    sets: 3,
-    reps: '8/leg',
-    weight: tier === 'commercial_gym' ? 'DBs challenging' : 'Backpack',
-    target_rir: rir,
-    notes: 'Single-leg stability — injury prevention',
-  });
-
-  ex.push({
-    name: 'Nordic Hamstring Curl',
-    sets: 2,
-    reps: '4-6',
-    weight: 'Assisted — band or partner',
-    notes: 'Eccentric emphasis — hamstring health for running',
-  });
 
   if (limiter === 'run' || limiter === 'bike') {
     ex.push({
@@ -358,8 +332,8 @@ function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Performance — Strength Build (Lower)',
-    description: `Build Week ${planWeekLabel} — Heavy compounds (~78–80% 1RM), RIR ${rir}. Convert hypertrophy to usable strength.`,
-    duration: 55,
+    description: `Build Week ${planWeekLabel} — Two heavy compounds only (3 working sets each, ~78–80% 1RM), RIR ${rir}. Hamstring Nordics live in base; build stays squat + hinge volume-capped.`,
+    duration: 48,
     exercises: ex,
     repProfile: 'strength',
     tags: ['strength', 'lower_body', 'triathlon_performance', 'phase:build', `limiter:${limiter}`],

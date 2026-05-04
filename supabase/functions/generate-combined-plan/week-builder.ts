@@ -4,7 +4,9 @@
 // schedule-session-constraints.ts but sequential rules and placement logic are
 // duplicated. Any rule change MUST be applied to both files.
 // Strength: `week-builder` no longer places lower-body strength on `run_quality_day` for tri;
-// consider aligning `_shared/week-optimizer.ts` co-equal stacking if product re-enables same-day hard stacks.
+// Heavy lower (tri slot 2) also avoids the two calendar days before `longRunActualDay` and before
+// any brick day (48h floor vs long-run / brick leg stress). Mirrors `_shared/week-optimizer.ts`
+// `sequentialOk` for `lower_body_strength`. Co-equal stacking: see schedule-session-constraints.
 // See: supabase/functions/_shared/schedule-session-constraints.ts
 //
 // Implements §8 Week Construction Algorithm — all 7 steps.
@@ -110,6 +112,19 @@ function hasConsolidatedQualityRunWithLowerBody(slot: DaySlot): boolean {
 function adjDay(day: string, delta: number): DayOfWeek {
   const idx = DAY_INDEX[day] ?? 0;
   return DAYS_OF_WEEK[(idx + delta + 7) % 7];
+}
+
+/** Lower-body barbell day cannot fall in the 48h window before long run or brick (discrete: next two calendar days). */
+function heavyLowerBlockedWithin48hOfLongRunOrBrick(
+  day: string,
+  longRunDay: string,
+  brickDays: ReadonlySet<string>,
+): boolean {
+  const d1 = adjDay(day, 1);
+  const d2 = adjDay(day, 2);
+  if (longRunDay === d1 || longRunDay === d2) return true;
+  if (brickDays.has(d1) || brickDays.has(d2)) return true;
+  return false;
 }
 
 // ── Step 4: Global Hard/Easy Enforcement ─────────────────────────────────────
@@ -967,6 +982,7 @@ export function buildWeek(
     const brickDaysInGrid = [...grid.values()]
       .filter(s => s.sessions.some(w => w.tags?.includes('brick')))
       .map(s => s.day);
+    const brickDaysSet = new Set(brickDaysInGrid);
 
     // Identify HARD endurance days (for AMPK/mTOR 6-h interference warning)
     const hardEnduranceDaysInGrid = [...grid.values()]
@@ -1034,14 +1050,38 @@ export function buildWeek(
 
     // Slot 2: second non-blocked day when strFreq is 2 (base, or build/RS + performance intent)
     if (strFreq >= 2 && strDay) {
-      let candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(
-        d => !blocked.has(d) && d !== strDay && (!hasTri || d !== runQualityDay),
-      );
+      const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
+      const baseLowerDay = (d: string) =>
+        !blocked.has(d) && d !== strDay && (!hasTri || d !== runQualityDay);
+      const passesHeavyLowerGuard = (d: string) =>
+        !heavyLowerBlockedWithin48hOfLongRunOrBrick(d, longRunActualDay, brickDaysSet);
+
+      let pool2 = weekdayOrder.filter((d) => baseLowerDay(d) && passesHeavyLowerGuard(d));
       if (prefSet.size > 0) {
-        const preferred2 = candidates2.filter(d => prefSet.has(d));
-        if (preferred2.length > 0) candidates2 = preferred2;
+        const preferred2 = pool2.filter((d) => prefSet.has(d));
+        if (preferred2.length > 0) pool2 = preferred2;
       }
-      const strDay2 = candidates2[0];
+      if (pool2.length === 0) {
+        pool2 = weekdayOrder.filter((d) => baseLowerDay(d) && passesHeavyLowerGuard(d));
+        if (pool2.length > 0) {
+          console.warn(
+            '[week-builder] lower-body strength: no preferred weekday satisfies 48h vs long run/brick; using next available.',
+          );
+        }
+      }
+      if (pool2.length === 0) {
+        pool2 = weekdayOrder.filter((d) => baseLowerDay(d));
+        if (prefSet.size > 0) {
+          const preferredRelaxed = pool2.filter((d) => prefSet.has(d));
+          if (preferredRelaxed.length > 0) pool2 = preferredRelaxed;
+        }
+        if (pool2.length > 0) {
+          console.warn(
+            '[week-builder] lower-body strength: 48h vs long run/brick not satisfiable Mon–Fri with current anchors; placed without guard.',
+          );
+        }
+      }
+      const strDay2 = pool2[0];
       if (strDay2) {
         const strSlot2 = grid.get(strDay2);
         if (strSlot2) {

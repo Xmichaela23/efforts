@@ -304,12 +304,14 @@ function sequentialOk(
     if (twoBackKinds.includes('lower_body_strength')) return false;
   }
 
-  // 48h gap BEFORE sovereign days: lower_body_strength the day before long_ride
-  // or long_run leaves only 24h for leg recovery — block it.
-  // (Upper body is unaffected; legs are not the limiter for upper work.)
+  // 48h gap BEFORE sovereign days: lower_body_strength cannot fall in the two calendar
+  // days before long_ride or long_run (same discrete rule as generate-combined-plan week-builder
+  // vs long run + brick tags).
   if (kind === 'lower_body_strength') {
-    const nextKinds = (days[dayAfter(day)] ?? []).map((s) => s.kind);
-    if (nextKinds.includes('long_ride') || nextKinds.includes('long_run')) return false;
+    for (const delta of [1, 2] as const) {
+      const slots = days[nDaysAfter(day, delta)] ?? [];
+      if (slots.some((s) => s.kind === 'long_ride' || s.kind === 'long_run')) return false;
+    }
   }
 
   return true;

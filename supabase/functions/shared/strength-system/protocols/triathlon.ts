@@ -327,6 +327,14 @@ function createBaseUpperSwim(
 // ============================================================================
 // BUILD PHASE — explosive / neural drive (4×4–6)
 // ============================================================================
+//
+// Placement (combined tri weeks): `generate-combined-plan/week-builder` picks the
+// lower-body weekday Mon–Fri away from brick / long ride / long run on the same day,
+// and enforces a discrete 48h-style buffer (no lower session on days whose next two
+// calendar days host the actual long run or a brick). Explosive prescriptions assume
+// that slot — pair only with easy aerobic same-day when the planner stacks sessions.
+//
+// ============================================================================
 
 function createBuildExplosiveLower(
   tier: EquipmentTier,
