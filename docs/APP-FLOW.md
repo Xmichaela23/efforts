@@ -72,9 +72,16 @@ Daily use is mostly **`AppLayout`**, not standalone routes.
 
 **Arc-shaped server payloads (not necessarily the same HTTP call as `get-arc-context`):**
 
-- **`StateTab`** via **`useCoachWeekContext`** (`weekly_state_v1`, goals, race readiness, etc.) — should stay aligned with Arc **if** the coach edge is Arc-grounded internally.
+- **`StateTab`** via **`useCoachWeekContext`** (`weekly_state_v1`, goals, race readiness, etc.) — stays aligned with Arc because **`coach`** loads **`getArcContext`** on the primary path.
 
----
+### Arc grounding (server — `getArcContext`)
+
+| Function | Loads `getArcContext` on primary path |
+|----------|----------------------------------------|
+| `coach` | ✅ |
+| `workout-detail` | ✅ (non-blocking `.catch → null`) |
+| `adapt-plan` | ✅ (`action: suggest`; non-blocking try/catch; QA override `ADAPT_PLAN_FORCE_ARC_NULL`) |
+| `get-week` | ❌ |
 
 ## Honest gap: single narrative vs cache alignment
 
@@ -100,3 +107,4 @@ Everything else in recent sprints is either **done** or an explicit **known trad
 ## Changelog (manual)
 
 - **2026-05-03** — Initial check-in from chat audit: architecture snapshot, Arc usage, `get-week` gap, follow-up table.
+- **2026-05-04** — Arc grounding table: `adapt-plan` (suggest) now loads `getArcContext`; `get-week` remains the main server gap.

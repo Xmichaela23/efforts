@@ -25,7 +25,7 @@ export type StrengthIntent =
 
 export type IntentPriority = 'required' | 'preferred' | 'optional';
 export type SessionCost = 'low' | 'medium' | 'high';
-export type RepProfile = 'strength' | 'hypertrophy' | 'maintenance';
+export type RepProfile = 'strength' | 'hypertrophy' | 'maintenance' | 'neural';
 
 export interface IntentMetadata {
   // Classification

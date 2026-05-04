@@ -244,6 +244,7 @@ export interface PlacementPolicy {
       protocol?: string;
       strengthFrequency?: number;
       noDoubles?: boolean;
+      injuryHotspots?: string[];
     }
   ): PlacedSession[];
 }

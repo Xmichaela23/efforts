@@ -171,6 +171,10 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.warn('[adapt-plan] Arc context load failed (non-fatal):', e);
     }
+    // QA / regression: set ADAPT_PLAN_FORCE_ARC_NULL=true to verify suggest path with degraded gates.
+    if (Deno.env.get('ADAPT_PLAN_FORCE_ARC_NULL') === 'true') {
+      arc = null;
+    }
     const suggestionGates = buildAdaptSuggestionGates(arc);
 
     // 1. Get active plan (full row for strength relayout preview — matches auto-adapt payload)
@@ -186,7 +190,7 @@ Deno.serve(async (req) => {
       ? await loadPlanningMemoryForRelayout(supabase, user_id)
       : undefined;
 
-    const relayoutAnalysis = activePlan
+    const relayoutAnalysis: StrengthRelayoutAnalysis = activePlan
       ? analyzeStrengthRelayoutForCurrentWeek(activePlan as StrengthRelayoutPlanRow)
       : { ok: false };
 
@@ -479,6 +483,12 @@ function buildAdaptSuggestionGates(arc: ArcContext | null): {
 
   const snap = arc.latest_snapshot as Record<string, unknown> | null | undefined;
   const nc = arc.arc_narrative_context;
+
+  if (snap && (snap.adherence_pct === null || snap.adherence_pct === undefined)) {
+    console.warn(
+      '[adapt-plan] latest_snapshot has no adherence_pct; adherence gate for progression is skipped for this request',
+    );
+  }
 
   const acwrNum = snap && snap.acwr != null ? Number(snap.acwr) : NaN;
   const acwr = Number.isFinite(acwrNum) ? acwrNum : null;
@@ -1011,14 +1021,18 @@ async function autoAdaptAllActiveUsers(
       errors: [error.message],
     };
   }
-  const distinct = [...new Set((rows || []).map((r: { user_id: string }) => r.user_id).filter(Boolean))];
+  const planRows = (rows ?? []) as { user_id: string | null }[];
+  const narrowedUserIds = planRows
+    .map((r) => (r.user_id != null ? String(r.user_id) : ''))
+    .filter((id): id is string => id.length > 0);
+  const distinct: string[] = [...new Set(narrowedUserIds)];
   const batchTruncated = distinct.length > maxUsers;
   if (batchTruncated) {
     console.warn(
       `[adapt-plan] auto_batch: ${distinct.length} distinct users with active plans; processing only first ${maxUsers}. Set ADAPT_PLAN_BATCH_MAX_USERS or run additional batches.`,
     );
   }
-  const ids = distinct.slice(0, maxUsers);
+  const ids: string[] = distinct.slice(0, maxUsers);
   let usersWithApplied = 0;
   const errors: string[] = [];
   for (const uid of ids) {

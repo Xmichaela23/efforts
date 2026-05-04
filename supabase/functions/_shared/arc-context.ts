@@ -955,7 +955,8 @@ export async function getArcContext(
   }));
 
   let runsSinceLastRaceCount: number | null = null;
-  const lrForRuns = pickLastCompletedGoalRaceBefore(rawGoalRowsAll, focusYmd);
+  const completedGoalRowsForNarrative = rawGoalRowsAll as Parameters<typeof pickLastCompletedGoalRaceBefore>[0];
+  const lrForRuns = pickLastCompletedGoalRaceBefore(completedGoalRowsForNarrative, focusYmd);
   if (lrForRuns) {
     try {
       const wc = await supabase
@@ -977,7 +978,7 @@ export async function getArcContext(
   const arc_narrative_context: ArcNarrativeContextV1 = buildArcNarrativeContextV1({
     focusYmd,
     goalRowsForPrimary,
-    completedGoalRowsForLastRace: rawGoalRowsAll,
+    completedGoalRowsForLastRace: completedGoalRowsForNarrative,
     activePlanPhase: active_plan?.phase ?? null,
     hasActiveTemporalPlan: hasTemporalPlanAsOf,
     runsSinceLastRace: runsSinceLastRaceCount,

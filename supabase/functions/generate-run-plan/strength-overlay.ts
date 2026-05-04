@@ -511,7 +511,7 @@ export function extractPrimarySchedule(plan: TrainingPlan): ProtocolContext['pri
 export function extractPrimaryScheduleForWeekSessions(
   weekSessions: Session[],
 ): ProtocolContext['primarySchedule'] {
-  return extractPrimarySchedule({ sessions_by_week: { '0': weekSessions } } as TrainingPlan);
+  return extractPrimarySchedule({ sessions_by_week: { '0': weekSessions } } as unknown as TrainingPlan);
 }
 
 export function primaryScheduleSignature(sched: ProtocolContext['primarySchedule']): string {
