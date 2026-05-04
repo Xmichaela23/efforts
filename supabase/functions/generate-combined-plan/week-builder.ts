@@ -541,6 +541,15 @@ export function buildWeek(
     weekInBlock % 2 === 1;
 
   const longRideSlot = grid.get(longRideDay);
+  /** True when Saturday (long ride day) schedules a bike+run brick — matches inner `useBrick` predicate. */
+  const useBrickThisWeek =
+    hasTri &&
+    !raceThisWeek &&
+    !longRideSlot?.isRest &&
+    effectiveBricks >= 1 &&
+    phase !== 'base' &&
+    !preferStandaloneBikeEndurance;
+
   if (!longRideSlot?.isRest && hasTri && !raceThisWeek) {
     let rideHoursForSat = longRideHours;
     if (preferStandaloneBikeEndurance) {
@@ -727,6 +736,10 @@ export function buildWeek(
       } else if (phase === 'taper') {
         const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
         runQualitySlot!.sessions.push(easyRun(runQualityDay, taperRunMi, servedGoal));
+      } else if (hasTri && weeksToRace <= 3 && useBrickThisWeek) {
+        // Late-race brick week: brick carries race-sim; mid-week run = threshold maintenance only.
+        const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
+        runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
       } else if (triApproach === 'base_first') {
         // base_first: Base uses controlled interval progression; Build uses tempo;
         // Race-specific uses race-pace specificity.
