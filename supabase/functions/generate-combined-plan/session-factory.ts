@@ -19,19 +19,30 @@ import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../src/lib/p
 
 const SWIM_DRILL_MAIN_FLOOR_YD = 350;
 
+/** Separates `pickSwimDrillTokens` rotation so easy / CSS / threshold swims don’t always collide. */
+type SwimDrillSessionKind = 'easy' | 'css_aerobic' | 'threshold';
+
+const SWIM_DRILL_KIND_SALT: Record<SwimDrillSessionKind, number> = {
+  easy: 0,
+  css_aerobic: 5,
+  threshold: 11,
+};
+
 function optionalSwimDrillBlock(
   totalYards: number,
   wuYd: number,
   cdYd: number,
   planWeek: number | undefined,
   drillSlotSalt: number,
-  phase?: string,
+  phase: string | undefined,
+  sessionKind: SwimDrillSessionKind,
 ): { mainBudgetYd: number; drillTokens: string[] } {
   let mainBudgetYd = totalYards - wuYd - cdYd;
   if (planWeek == null || mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
     return { mainBudgetYd, drillTokens: [] };
   }
-  const tok = pickSwimDrillTokens(planWeek, drillSlotSalt, 1, phase)[0]!;
+  const salt = drillSlotSalt + SWIM_DRILL_KIND_SALT[sessionKind];
+  const tok = pickSwimDrillTokens(planWeek, salt, 1, phase)[0]!;
   const dy = swimDrillYardsFromToken(tok);
   if (dy <= 0 || mainBudgetYd - dy < SWIM_DRILL_MAIN_FLOOR_YD) {
     return { mainBudgetYd, drillTokens: [] };
@@ -436,7 +447,7 @@ export function thresholdSwim(
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
-    totalYards, wu, cd, planWeek, drillSlotSalt, phase,
+    totalYards, wu, cd, planWeek, drillSlotSalt, phase, 'threshold',
   );
   const threshReps = Math.max(4, Math.round((main * 0.55) / 100));
   const aeroReps   = Math.max(3, Math.round((main * 0.45) / 150));
@@ -471,7 +482,7 @@ export function cssAerobicSwim(
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
-    totalYards, wu, cd, planWeek, drillSlotSalt, phase,
+    totalYards, wu, cd, planWeek, drillSlotSalt, phase, 'css_aerobic',
   );
   const reps = Math.max(5, Math.round(main / 100));
   const dur  = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
@@ -500,7 +511,7 @@ export function easySwim(
   const wu = 300;
   const cd = 200;
   const { mainBudgetYd: mainYards, drillTokens } = optionalSwimDrillBlock(
-    totalYards, wu, cd, planWeek, drillSlotSalt, phase,
+    totalYards, wu, cd, planWeek, drillSlotSalt, phase, 'easy',
   );
   const reps = Math.max(4, Math.round(mainYards / 150));
   const dur = Math.round(totalYards / 35); // ~35 yd/min for easy
