@@ -355,6 +355,9 @@ export function buildWeek(
     longRideDay: athleteState.long_ride_day,
     longRunDay: athleteState.long_run_day,
     strengthPreferredDays: athleteState.strength_preferred_days,
+    swim_easy_day: athleteState.swim_easy_day,
+    swim_quality_day: athleteState.swim_quality_day,
+    swim_third_day: athleteState.swim_third_day,
     swim_intent: athleteState.swim_intent,
     transition_mode: athleteState.transition_mode,
     structural_load_hint: athleteState.structural_load_hint,
@@ -654,6 +657,45 @@ export function buildWeek(
     }
   }
 
+  // Third swim (`preferred_days.swim[2]` → swim_third_day): only when swim_intent === 'focus'.
+  const swimIntentFocus = String(athleteState.swim_intent ?? '').toLowerCase() === 'focus';
+  let swimThirdDay: string | null = null;
+  if (swimIntentFocus && hasTri) {
+    const thirdHardBlocked = new Set<string>([
+      longRideDay,
+      longRunActualDay,
+      ...restDayNames,
+      swimEasyDay,
+      swimQualityDay,
+    ]);
+    const resolveSwimThirdDay = (): string | null => {
+      const bumpFrom = (dayName: string): string | null => {
+        if (!thirdHardBlocked.has(dayName)) return dayName;
+        const startIdx = Math.max(0, DAYS_OF_WEEK.indexOf(dayName));
+        for (let step = 1; step <= 6; step++) {
+          const cand = DAYS_OF_WEEK[(startIdx + step) % 7]!;
+          if (!thirdHardBlocked.has(cand)) return cand;
+        }
+        return null;
+      };
+      if (athleteState.swim_third_day != null) {
+        const idx = (athleteState.swim_third_day + 6) % 7;
+        const preferred = DAYS_OF_WEEK[idx];
+        if (preferred) {
+          const resolved = bumpFrom(preferred);
+          if (resolved) return resolved;
+        }
+      }
+      const startIdx = DAYS_OF_WEEK.indexOf('Wednesday');
+      for (let s = 0; s < 7; s++) {
+        const d = DAYS_OF_WEEK[(startIdx + s) % 7]!;
+        if (!thirdHardBlocked.has(d)) return d;
+      }
+      return null;
+    };
+    swimThirdDay = resolveSwimThirdDay();
+  }
+
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =
     athleteState.bike_quality_day != null
@@ -838,6 +880,16 @@ export function buildWeek(
           ? openWaterPracticeSwim(swimEasyDay, owMin, servedGoal)
           : easySwim(swimEasyDay, recSwimYd, servedGoal, weekNum, 4, phase),
       );
+    }
+  }
+
+  // ── Third swim (focus intent only; easy aerobic — volume rebalance in Step 4) ──
+  if (swimThirdDay && hasTri && !recoveryRebuildWeek1) {
+    const thirdSwimSlot = grid.get(swimThirdDay);
+    if (!thirdSwimSlot?.isRest) {
+      const yardsScaleThird = isRecovery ? 0.28 : 0.30;
+      const thirdYd = Math.max(1000, Math.round(swimYards * yardsScaleThird));
+      thirdSwimSlot!.sessions.push(easySwim(swimThirdDay, thirdYd, servedGoal, weekNum, 5, phase));
     }
   }
 

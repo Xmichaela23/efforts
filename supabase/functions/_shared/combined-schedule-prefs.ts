@@ -161,12 +161,15 @@ export function parsePreferredDaysPatch(
   if (Array.isArray(swimRaw) && swimRaw.length >= 1) {
     const e = parseSunFirstDayIndex(swimRaw[0]);
     const q = parseSunFirstDayIndex(swimRaw[1] ?? swimRaw[0]);
+    const t = swimRaw.length >= 3 ? parseSunFirstDayIndex(swimRaw[2]) : undefined;
     if (e !== undefined) patch.swim_easy_day = e;
     if (q !== undefined) patch.swim_quality_day = q;
+    if (t !== undefined) patch.swim_third_day = t;
     console.log('[combined-schedule-prefs] swim parse:', {
       raw: swimRaw,
       swim_easy_day: patch.swim_easy_day,
       swim_quality_day: patch.swim_quality_day,
+      swim_third_day: patch.swim_third_day,
     });
   }
   const strRaw = o.strength ?? o.strength_days;
@@ -222,6 +225,8 @@ export interface CombinedSchedulePrefs {
   run_easy_day?: number;
   swim_easy_day?: number;
   swim_quality_day?: number;
+  /** From `preferred_days.swim[2]`; third slot when `swim_intent === 'focus'`. */
+  swim_third_day?: number;
   /** Mid-week bike quality (threshold / tempo / SS). 0=Sun … 6=Sat */
   bike_quality_day?: number;
   /** Route-estimated or user-confirmed group-ride anchor duration in hours. */
@@ -276,6 +281,7 @@ export function mergeCombinedSchedulePrefs(
       'quality_swim_day',
       'swim_main_day',
     ]);
+    const st = pickDay(src, ['swim_third_day', 'swimThirdDay', 'third_swim_day', 'swimThird']);
     const rd = pickRestDays(src);
     const sp = pickStrengthProtocol(src);
     const siRaw = src.strength_intent ?? src.strengthIntent;
@@ -331,6 +337,7 @@ export function mergeCombinedSchedulePrefs(
     if (lrd !== undefined) out.long_ride_day = lrd;
     if (se !== undefined) out.swim_easy_day = se;
     if (sq !== undefined) out.swim_quality_day = sq;
+    if (st !== undefined) out.swim_third_day = st;
     if (rd !== undefined) out.rest_days = rd;
     if (sp !== undefined) out.strength_protocol = sp;
     if (si !== undefined) out.strength_intent = si;
@@ -340,6 +347,7 @@ export function mergeCombinedSchedulePrefs(
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
     if (pdPatch.swim_easy_day !== undefined) out.swim_easy_day = pdPatch.swim_easy_day;
     if (pdPatch.swim_quality_day !== undefined) out.swim_quality_day = pdPatch.swim_quality_day;
+    if (pdPatch.swim_third_day !== undefined) out.swim_third_day = pdPatch.swim_third_day;
     if (pdPatch.run_quality_day !== undefined) out.run_quality_day = pdPatch.run_quality_day;
     if (pdPatch.run_easy_day !== undefined) out.run_easy_day = pdPatch.run_easy_day;
     if (pdPatch.bike_quality_day !== undefined) out.bike_quality_day = pdPatch.bike_quality_day;

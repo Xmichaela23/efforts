@@ -948,6 +948,7 @@ async function buildCombinedPlan(
     long_run_day: freshCombinedPrefs.long_run_day,
     swim_easy_day: freshCombinedPrefs.swim_easy_day,
     swim_quality_day: freshCombinedPrefs.swim_quality_day,
+    swim_third_day: freshCombinedPrefs.swim_third_day,
     strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
   }));
 
@@ -978,6 +979,9 @@ async function buildCombinedPlan(
         : {}),
       ...(freshCombinedPrefs.swim_quality_day !== undefined
         ? { swim_quality_day: freshCombinedPrefs.swim_quality_day }
+        : {}),
+      ...(freshCombinedPrefs.swim_third_day !== undefined
+        ? { swim_third_day: freshCombinedPrefs.swim_third_day }
         : {}),
       ...(freshCombinedPrefs.run_quality_day !== undefined
         ? { run_quality_day: freshCombinedPrefs.run_quality_day }

@@ -35,6 +35,8 @@ export interface AthleteState {
   swim_easy_day?: number;
   /** Quality/CSS/threshold swim day. Default: Thursday. */
   swim_quality_day?: number;
+  /** Third swim from Arc `preferred_days.swim[2]`; week-builder places only when `swim_intent === 'focus'`. */
+  swim_third_day?: number;
   /** Mid-week run quality (tempo / threshold / intervals). Default: Wednesday. */
   run_quality_day?: number;
   /** Mid-week easy aerobic run. Default: Friday. */

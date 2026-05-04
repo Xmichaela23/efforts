@@ -113,7 +113,7 @@ export interface PreferredDaysOut {
   long_run?: DayName;
   quality_run?: DayName;
   easy_run?: DayName;
-  /** Ordered [easy_day, quality_day]. Single element → that day is both. */
+  /** Ordered `[easy_day, quality_day]`; optional third index for focus swim program maps to `swim_third_day`. */
   swim?: DayName[];
   /** Chronological list of strength weekdays (1–3). */
   strength?: DayName[];
