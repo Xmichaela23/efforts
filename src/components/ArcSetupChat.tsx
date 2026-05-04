@@ -67,6 +67,26 @@ const SWIM_FOCUS_USER_MESSAGE =
 const SWIM_TO_RACE_USER_MESSAGE =
   'Swim to race — 2 sessions a week, one quality and one aerobic. Keep the swim sharp without adding load to the bike and run.';
 
+const SWIM_LOAD_PROTECT_RUN_USER_MESSAGE =
+  'Protect my run — take the extra swim load from bike volume.';
+
+const SWIM_LOAD_PROTECT_BIKE_USER_MESSAGE =
+  'Protect my bike — take the extra swim load from run volume.';
+
+const SWIM_LOAD_SPLIT_USER_MESSAGE = 'Split it evenly between bike and run.';
+
+/** Last explicit swim-intent choice in the thread (button text or same opening line). */
+function priorThreadSwimIntentResolution(prior: ChatMessage[]): 'focus' | 'race' | null {
+  let resolved: 'focus' | 'race' | null = null;
+  for (const m of prior) {
+    if (m.role !== 'user') continue;
+    const c = m.content.trim();
+    if (/^Swim focus —/i.test(c) || c === SWIM_FOCUS_USER_MESSAGE) resolved = 'focus';
+    if (/^Swim to race —/i.test(c) || c === SWIM_TO_RACE_USER_MESSAGE) resolved = 'race';
+  }
+  return resolved;
+}
+
 function looksLikeStrengthIntentFork(visible: string): boolean {
   const t = visible.trim();
   if (!t) return false;
@@ -131,11 +151,52 @@ function looksLikeSwimFork(visible: string): boolean {
   return namesBoth || namesOne || blockAndSwim || prioritizeSwim || treatSwimPriority;
 }
 
-type AssistantMessageDisclosure = 'strength_fork' | 'training_intent' | 'swim_fork';
+/**
+ * Assistant is asking where extra swim (focus / third swim) load should be funded from.
+ * Only meaningful after the athlete already chose Swim focus — see priorThreadSwimIntentResolution.
+ */
+function looksLikeSwimLoadSourceFork(visible: string): boolean {
+  const t = visible.trim();
+  if (!t) return false;
+  if (
+    looksLikeStrengthIntentFork(visible) ||
+    looksLikeStrengthIntentStateConfirm(visible) ||
+    looksLikePerformanceIntentConfirmation(visible) ||
+    looksLikeSwimFork(visible)
+  ) {
+    return false;
+  }
+  const lower = t.toLowerCase();
+  if (/\bstrength\b/i.test(t)) return false;
+  if (/recovery week|rest day/i.test(lower)) return false;
 
-function assistantMessageDisclosure(visible: string): AssistantMessageDisclosure | null {
+  const hasCue =
+    /protect your run/i.test(lower) ||
+    /protect your bike/i.test(lower) ||
+    /where should the extra swim load come from/i.test(lower) ||
+    /where do you want to protect/i.test(lower) ||
+    /who pays for the third swim/i.test(lower) ||
+    /\btrim from bike\b/i.test(lower) ||
+    /\btrim from run\b/i.test(lower) ||
+    /trim run slightly/i.test(lower) ||
+    /trim bike/i.test(lower) ||
+    /keep your bike volume/i.test(lower) ||
+    /keep run and trim bike/i.test(lower) ||
+    /split it evenly/i.test(lower) ||
+    (/third swim/i.test(lower) &&
+      /(protect|trim|pull from|where|split|evenly|extra swim|load from)/i.test(lower));
+
+  return hasCue;
+}
+
+type AssistantMessageDisclosure = 'strength_fork' | 'training_intent' | 'swim_fork' | 'swim_load_source';
+
+function assistantMessageDisclosure(visible: string, priorMessages: ChatMessage[]): AssistantMessageDisclosure | null {
   if (looksLikeStrengthIntentFork(visible) || looksLikeStrengthIntentStateConfirm(visible)) return 'strength_fork';
   if (looksLikePerformanceIntentConfirmation(visible)) return 'training_intent';
+  if (priorThreadSwimIntentResolution(priorMessages) === 'focus' && looksLikeSwimLoadSourceFork(visible)) {
+    return 'swim_load_source';
+  }
   if (looksLikeSwimFork(visible)) return 'swim_fork';
   return null;
 }
@@ -758,7 +819,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
               </div>
             );
           }
-          const disc = assistantMessageDisclosure(m.content);
+          const disc = assistantMessageDisclosure(m.content, messages.slice(0, i));
           return (
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
@@ -772,7 +833,9 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                         ? 'Support tri vs build strength in the gym'
                         : disc === 'swim_fork'
                           ? 'Swim focus vs swim to race'
-                          : 'What performance and completion training intent mean'
+                          : disc === 'swim_load_source'
+                            ? 'Where to fund extra swim load'
+                            : 'What performance and completion training intent mean'
                     }
                     aria-expanded={intentInfoOpenIdx === i}
                     onClick={() => setIntentInfoOpenIdx((v) => (v === i ? null : i))}
@@ -876,6 +939,46 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     >
                       Swim to race
                     </button>
+                  </div>
+                </div>
+              )}
+              {disc === 'swim_load_source' && intentInfoOpenIdx === i && (
+                <div
+                  className="mt-2.5 p-3 rounded-xl border border-white/10 bg-zinc-900/85 text-[15px] leading-relaxed text-white/80 space-y-3"
+                  role="region"
+                  aria-label="Swim load funding options"
+                >
+                  <p>
+                    A third weekly swim pulls load from bike and/or run. Pick what you want to protect most — the model
+                    saves this as <span className="text-white/90">swim_load_source</span> on your tri goal.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void sendUserMessage(SWIM_LOAD_PROTECT_RUN_USER_MESSAGE)}
+                      className="text-sm font-medium px-3 py-2.5 rounded-lg bg-teal-500/40 text-teal-50 border border-teal-500/60 hover:bg-teal-500/50 disabled:opacity-50 w-full text-left"
+                    >
+                      Protect my run
+                    </button>
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={sending}
+                        onClick={() => void sendUserMessage(SWIM_LOAD_PROTECT_BIKE_USER_MESSAGE)}
+                        className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
+                      >
+                        Protect my bike
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sending}
+                        onClick={() => void sendUserMessage(SWIM_LOAD_SPLIT_USER_MESSAGE)}
+                        className="text-sm font-medium px-3 py-2 rounded-lg bg-white/[0.08] text-teal-100/95 border border-white/15 hover:bg-white/12 disabled:opacity-50 flex-1 min-w-0"
+                      >
+                        Split it
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
