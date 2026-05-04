@@ -117,6 +117,11 @@ Deno.serve(async (req) => {
       const daysPerWeek = typeof tp?.days_per_week === 'number' ? tp.days_per_week : 5;
       const trainingIntent = tp?.training_intent as WeekOptimizerInputs['athlete']['training_intent'] | undefined;
       const strengthIntent = tp?.strength_intent as WeekOptimizerInputs['athlete']['strength_intent'] | undefined;
+      const swimIntentRaw = tp?.swim_intent ?? tp?.swimIntent;
+      const swimIntent =
+        swimIntentRaw === 'focus' || swimIntentRaw === 'race'
+          ? (swimIntentRaw as WeekOptimizerInputs['athlete']['swim_intent'])
+          : undefined;
       const strengthFreqRaw =
         (typeof tp?.strength_frequency === 'number' ? tp!.strength_frequency : undefined) ??
         (typeof (draft as Record<string, unknown> | undefined)?.strength_frequency === 'number'
@@ -148,6 +153,7 @@ Deno.serve(async (req) => {
         athlete: {
           ...(trainingIntent ? { training_intent: trainingIntent } : {}),
           ...(strengthIntent ? { strength_intent: strengthIntent } : {}),
+          ...(swimIntent ? { swim_intent: swimIntent } : {}),
         },
       };
       // Fire when we have at least one anchor OR enough preference signal

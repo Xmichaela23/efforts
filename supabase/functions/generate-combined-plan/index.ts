@@ -81,6 +81,7 @@ Deno.serve(async (req: Request) => {
         strength_preferred_days: state.strength_preferred_days,
         strength_sessions_cap: state.strength_sessions_cap,
         strength_intent: state.strength_intent,
+        swim_intent: state.swim_intent,
         training_intent: state.training_intent,
         transition_mode: state.transition_mode,
         tri_approach: state.tri_approach,

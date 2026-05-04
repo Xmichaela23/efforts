@@ -90,6 +90,8 @@ export interface WeekOptimizerInputs {
   athlete: {
     training_intent?: 'performance' | 'completion' | 'first_race' | 'comeback';
     strength_intent?: 'performance' | 'support';
+    /** Tri swim program (prefs); week-builder / templates use in Step 2+. */
+    swim_intent?: 'focus' | 'race';
     /** Affects swim quality timing default: weeks 1–6 → easy-only swims unless masters anchor; 7+ → quality enabled. */
     weeks_into_plan?: number;
   };

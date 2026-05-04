@@ -69,6 +69,8 @@ export interface AthleteState {
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */
   strength_intent?: 'support' | 'performance';
+  /** Tri swim program from goal training_prefs: focus vs race-support (placement/volume in later steps). */
+  swim_intent?: 'focus' | 'race';
   /** Preferred weekdays for strength (e.g. ["Monday","Wednesday"]) from preferred_days.strength. */
   strength_preferred_days?: string[];
   /**

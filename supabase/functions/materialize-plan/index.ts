@@ -93,6 +93,8 @@ function mergeAnchor1RmLb(
 
 type StrengthIntentMat = 'support' | 'performance' | null;
 
+type SwimIntentMat = 'focus' | 'race' | null;
+
 /** Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower). */
 function resolveStrengthPercentForLift(
   exerciseName: string,
@@ -180,6 +182,64 @@ async function loadStrengthIntentForPlan(
     }
   } catch (e) {
     console.warn('[materialize-plan] loadStrengthIntentForPlan:', e);
+  }
+  return null;
+}
+
+function swimIntentFromPrefs(prefs: Record<string, unknown> | null): SwimIntentMat {
+  if (!prefs) return null;
+  const raw = prefs.swim_intent ?? prefs.swimIntent;
+  if (raw === 'focus' || raw === 'race') return raw;
+  return null;
+}
+
+async function loadSwimIntentForPlan(
+  trainingPlanId: string | null | undefined,
+  supabase: ReturnType<typeof createClient>,
+): Promise<SwimIntentMat> {
+  if (!trainingPlanId) return null;
+  try {
+    const { data: planRow } = await supabase
+      .from('plans')
+      .select('goal_id, user_id, config')
+      .eq('id', trainingPlanId)
+      .maybeSingle();
+    const cfg = planRow?.config as Record<string, unknown> | null | undefined;
+    const contract = cfg?.plan_contract_v1 as Record<string, unknown> | undefined;
+    const fromContract = contract?.swim_intent ?? cfg?.swim_intent;
+    if (fromContract === 'focus' || fromContract === 'race') return fromContract;
+
+    const uid = planRow?.user_id as string | undefined;
+    const gid = planRow?.goal_id as string | undefined;
+
+    if (gid) {
+      const { data: gRow } = await supabase
+        .from('goals')
+        .select('training_prefs, sport, priority')
+        .eq('id', gid)
+        .maybeSingle();
+      const sw = swimIntentFromPrefs(parseTrainingPrefs(gRow?.training_prefs));
+      if (sw) return sw;
+    }
+
+    if (uid) {
+      const { data: triGoals } = await supabase
+        .from('goals')
+        .select('id, training_prefs, sport, priority')
+        .eq('user_id', uid)
+        .eq('goal_type', 'event')
+        .eq('status', 'active');
+      const tri = (triGoals || []).filter((g) =>
+        ['triathlon', 'tri'].includes(String(g.sport ?? '').toLowerCase()),
+      );
+      const a = tri.find((g) => g.priority === 'A') ?? tri[0];
+      if (a) {
+        const sw = swimIntentFromPrefs(parseTrainingPrefs(a.training_prefs));
+        if (sw) return sw;
+      }
+    }
+  } catch (e) {
+    console.warn('[materialize-plan] loadSwimIntentForPlan:', e);
   }
   return null;
 }
@@ -2230,6 +2290,10 @@ Deno.serve(async (req) => {
     }
 
     const strengthIntent = await loadStrengthIntentForPlan(rows[0]?.training_plan_id, supabase);
+    const swimIntentMat = await loadSwimIntentForPlan(rows[0]?.training_plan_id, supabase);
+    if (swimIntentMat) {
+      console.log('[materialize-plan] swim_intent:', swimIntentMat);
+    }
 
     let count = 0;
     for (const row of rows) {

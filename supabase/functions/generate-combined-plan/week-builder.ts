@@ -355,6 +355,7 @@ export function buildWeek(
     longRideDay: athleteState.long_ride_day,
     longRunDay: athleteState.long_run_day,
     strengthPreferredDays: athleteState.strength_preferred_days,
+    swim_intent: athleteState.swim_intent,
     transition_mode: athleteState.transition_mode,
     structural_load_hint: athleteState.structural_load_hint,
     triApproach,

@@ -126,6 +126,8 @@ function pickStrengthProtocol(obj: Record<string, unknown> | null | undefined): 
 }
 
 export type StrengthIntentArc = 'support' | 'performance';
+/** Tri swim program: 3×/wk focus path vs 2×/wk race-support path (week-builder uses in Step 2+). */
+export type SwimIntentArc = 'focus' | 'race';
 export type TrainingIntentArc = 'completion' | 'performance' | 'first_race' | 'comeback';
 
 const TITLE_BY_SUN: Record<number, string> = {
@@ -238,6 +240,8 @@ export interface CombinedSchedulePrefs {
   strength_protocol?: string;
   /** From Arc: support = tri accessory loads; performance = compound / progressive overload. */
   strength_intent?: StrengthIntentArc;
+  /** Tri swim: focus = higher-volume program; race = maintenance / execute leg (engine Step 2+). */
+  swim_intent?: SwimIntentArc;
   /** Weekday titles e.g. Monday — strength sessions prefer these days when set. */
   strength_preferred_days?: string[];
 }
@@ -277,6 +281,9 @@ export function mergeCombinedSchedulePrefs(
     const siRaw = src.strength_intent ?? src.strengthIntent;
     const si =
       siRaw === 'support' || siRaw === 'performance' ? (siRaw as StrengthIntentArc) : undefined;
+    const swimIRaw = src.swim_intent ?? src.swimIntent;
+    const swimI =
+      swimIRaw === 'focus' || swimIRaw === 'race' ? (swimIRaw as SwimIntentArc) : undefined;
     const tiRaw = src.training_intent ?? src.trainingIntent;
     const ti =
       tiRaw === 'completion' || tiRaw === 'performance' || tiRaw === 'first_race' || tiRaw === 'comeback'
@@ -327,6 +334,7 @@ export function mergeCombinedSchedulePrefs(
     if (rd !== undefined) out.rest_days = rd;
     if (sp !== undefined) out.strength_protocol = sp;
     if (si !== undefined) out.strength_intent = si;
+    if (swimI !== undefined) out.swim_intent = swimI;
     if (ti !== undefined) out.training_intent = ti;
     if (pdPatch.long_run_day !== undefined) out.long_run_day = pdPatch.long_run_day;
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
