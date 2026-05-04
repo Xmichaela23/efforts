@@ -38,7 +38,7 @@ Daily use is mostly **`AppLayout`**, not standalone routes.
 **Bottom nav:**
 
 - **Home** — `TodaysEffort` + `WorkoutCalendar` (+ overlays: selected workout, strength logger, import, etc.).
-- **State** — **`ContextTabs`** → **`StateTab`**, fed by **`useCoachWeekContext`** (coach / weekly state).
+- **State** — **`ContextTabs`** → **`StateTab`**, fed by **`useCoachWeekContext`** (coach / weekly state; plan adaptation cards also merge **`adapt-plan`** `suggest` when an active plan exists — see [Plan adaptation cards](#plan-adaptation-cards-state)).
 - **Goals** — goals stack UI; plan/goals invalidation events as needed.
 
 **Deep workout UI:**
@@ -80,8 +80,18 @@ Daily use is mostly **`AppLayout`**, not standalone routes.
 |----------|----------------------------------------|
 | `coach` | ✅ |
 | `workout-detail` | ✅ (non-blocking `.catch → null`) |
-| `adapt-plan` | ✅ (`action: suggest`; non-blocking try/catch; QA override `ADAPT_PLAN_FORCE_ARC_NULL`) |
+| `adapt-plan` | ✅ (`action: suggest`; non-blocking try/catch; QA override `ADAPT_PLAN_FORCE_ARC_NULL`; Arc-gated progression/deload on suggest) |
 | `get-week` | ❌ |
+
+### Plan adaptation cards (State)
+
+When **`weekly_state_v1.plan.has_active_plan`**, **`useCoachWeekContext`** calls **`adapt-plan`** with **`action: suggest`** after **`coach`**, then merges selected suggestions into **`weekly_state_v1.coach.plan_adaptation_suggestions`** for **`PlanAdaptationCard`** (**Got it** / **Dismiss** → **`adapt-plan`** **`accept`** where wired, plus dismissal cooldown in **`coach`**).
+
+Merged from **`adapt-plan`** today: **`strength_relayout`** (prepended if missing), **`end_easy_pace`** and **`end_ftp`** (appended; types **`endurance_pace_update`** / **`endurance_ftp_update`**). Server fields **`id`** / **`description`** map to card **`code`** / **`details`**. Endurance rows only appear when learnings vs manual baselines and Arc gates allow (e.g. meaningful delta, not suppressed for load/taper); no row is a valid outcome.
+
+**Swim:** **`adapt-plan`** does not yet emit swim baseline suggestions — additive later.
+
+---
 
 ## Honest gap: single narrative vs cache alignment
 
@@ -99,6 +109,7 @@ That is an acceptable tradeoff until you narrow the gap; the **next frontier** f
 | **`get-week` + narrow Arc fields** | Ground calendar/week responses in Arc where useful without bloating payload; original plan #6, parked until designed. |
 | **`mergeSessionDetailRaceReadiness` removal** | Wait until **`stale`** / session_detail contract is trusted in prod; then remove client-side merge of race readiness into `session_detail_v1`. |
 | **`WorkoutSummary` legacy fork** | Retire or converge with Unified / Mobile summary paths — avoid two competing “summary” stories. |
+| **`adapt-plan` swim / CSS suggestions** | Not in suggest payload today; run + bike endurance baselines only. |
 
 Everything else in recent sprints is either **done** or an explicit **known tradeoff** (e.g. partial invalidation vs full `invalidateWorkoutScreens()`).
 
@@ -108,3 +119,4 @@ Everything else in recent sprints is either **done** or an explicit **known trad
 
 - **2026-05-03** — Initial check-in from chat audit: architecture snapshot, Arc usage, `get-week` gap, follow-up table.
 - **2026-05-04** — Arc grounding table: `adapt-plan` (suggest) now loads `getArcContext`; `get-week` remains the main server gap.
+- **2026-05-05** — State tab: `useCoachWeekContext` merges `adapt-plan` endurance suggestions (`end_easy_pace`, `end_ftp`) into plan adaptation card; swim still out of scope on `adapt-plan`; doc section for plan adaptation flow.
