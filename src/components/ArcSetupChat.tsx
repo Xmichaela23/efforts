@@ -456,6 +456,8 @@ async function persistArcSetup(
 
 type ArcSetupChatProps = {
   focusDate?: string;
+  /** If set (e.g. home nudge), sent as the first user message once when the thread is empty */
+  seedUserMessage?: string;
   /** @deprecated server builds prompt; kept for compatibility */
   onSystemPromptSupplement?: (s: string, arc: unknown) => void;
 };
@@ -465,7 +467,7 @@ type ArcSetupChatProps = {
  * No extra loading state — searches add latency only.
  * Optional `<arc_setup>` confirmation card.
  */
-export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
+export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -481,6 +483,7 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
   const [intentInfoOpenIdx, setIntentInfoOpenIdx] = useState<number | null>(null);
   /** Latest `<arc_setup>` payload from the model (sticky until replaced) — echoed to server to reduce re-asks / drift */
   const lastDraftArcSetupRef = useRef<ArcSetupPayload | null>(null);
+  const arcNudgeSeedAppliedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -592,6 +595,16 @@ export default function ArcSetupChat({ focusDate }: ArcSetupChatProps) {
     setDraft('');
     await sendUserMessage(t);
   };
+
+  useEffect(() => {
+    const s = seedUserMessage?.trim();
+    if (!s) return;
+    if (arcNudgeSeedAppliedRef.current) return;
+    if (messages.length > 0) return;
+    arcNudgeSeedAppliedRef.current = true;
+    void sendUserMessage(s);
+    // sendUserMessage intentionally omitted: stable enough for one-shot seed; avoids effect churn
+  }, [seedUserMessage, messages.length]);
 
   const onConfirm = async () => {
     if (!pendingSetup) return;
