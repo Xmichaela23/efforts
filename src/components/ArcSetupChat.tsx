@@ -62,10 +62,10 @@ const STRENGTH_BUILD_USER_MESSAGE =
   'Build strength — two gym sessions per week through base, build, and race-specific with real compound work and progressive loading. I want to actually get stronger, not only do gym work that props up swim, bike, and run. Set strength_intent to "performance" on my tri goal(s).';
 
 const SWIM_FOCUS_USER_MESSAGE =
-  'Swim focus — two sessions a week, quality main set plus an easier aerobic session. Treat swim as a priority this block.';
+  'Swim focus — 3 sessions a week, building volume and treating swim as a real priority this block.';
 
 const SWIM_TO_RACE_USER_MESSAGE =
-  'Swim to race — two sessions, one quality set to stay sharp and one easy session. Swim supports the block without adding load.';
+  'Swim to race — 2 sessions a week, one quality and one aerobic. Keep the swim sharp without adding load to the bike and run.';
 
 function looksLikeStrengthIntentFork(visible: string): boolean {
   const t = visible.trim();
@@ -850,12 +850,14 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                   aria-label="Swim focus options"
                 >
                   <p>
-                    <span className="text-white/90 font-medium">Swim focus</span> — two sessions a week: quality main set
-                    plus an easier aerobic. Swim is a priority this block; coach feedback leans in.
+                    <span className="text-white/90 font-medium">Swim focus</span> — 3 sessions per week — one threshold
+                    main set, one technique session with drill emphasis, one quality aerobic. Volume builds from ~6,000
+                    to ~8,000 yards through the block. Treat swim as a development priority.
                   </p>
                   <p>
-                    <span className="text-white/90 font-medium">Swim to race</span> — same two sessions: one quality to
-                    stay sharp, one easy for feel. Swim supports the week without pushing extra load.
+                    <span className="text-white/90 font-medium">Swim to race</span> — 2 sessions per week — one threshold
+                    set to stay sharp, one aerobic session with race-specific work. ~4,000–5,000 yards weekly. Swim
+                    supports the block without competing with bike and run load.
                   </p>
                   <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                     <button
