@@ -191,11 +191,27 @@ export const RUN_SPORT_DIST: Record<string, Record<Sport, number>> = {
 
 // Blended distribution for multi-sport weeks (tri + run event concurrent).
 // The tri distribution IS the combined plan distribution since it already
-// includes run. Limiter shift applied on top.
+// includes run. Limiter shift and swim_intent shift applied on top.
+//
+// swim_intent focus shift (tri only): swim +0.06, funded from bike/run per swim_load_source:
+//   split        → bike -0.04, run -0.02  (default 2:1 ratio)
+//   protect_run  → bike -0.06, run unchanged
+//   protect_bike → run -0.06,  bike unchanged
+const SWIM_FOCUS_SHIFTS: Record<
+  'split' | 'protect_run' | 'protect_bike',
+  Partial<Record<'swim' | 'bike' | 'run', number>>
+> = {
+  split:        { swim: +0.06, bike: -0.04, run: -0.02 },
+  protect_run:  { swim: +0.06, bike: -0.06, run:  0    },
+  protect_bike: { swim: +0.06, bike:  0,    run: -0.06 },
+};
+
 export function getBaseDistribution(
   primaryGoalSport: string,
   primaryDistance: string,
   limiterSport?: Sport,
+  swimIntent?: 'focus' | 'race' | null,
+  swimLoadSource?: 'split' | 'protect_run' | 'protect_bike' | null,
 ): Record<Sport, number> {
   let dist: Record<Sport, number>;
 
@@ -206,7 +222,17 @@ export function getBaseDistribution(
     dist = { ...(RUN_SPORT_DIST[primaryDistance] ?? RUN_SPORT_DIST['marathon']) };
   }
 
-  // §2.1 limiter shift: increase limiter sport by 7%, reduce others proportionally
+  // §swim_intent focus shift (tri only): fund the third swim slot from bike/run budget.
+  if (isTri && swimIntent === 'focus') {
+    const source = swimLoadSource ?? 'split';
+    const shift = SWIM_FOCUS_SHIFTS[source] ?? SWIM_FOCUS_SHIFTS.split;
+    for (const [sport, delta] of Object.entries(shift) as [Sport, number][]) {
+      dist[sport] = Math.max(0, (dist[sport] ?? 0) + delta);
+    }
+  }
+
+  // §2.1 limiter shift: increase limiter sport by 7%, reduce others proportionally.
+  // Applied after swim_intent shift so both compose correctly.
   if (limiterSport && limiterSport in dist) {
     const shift = 0.07;
     const current = dist[limiterSport] ?? 0;

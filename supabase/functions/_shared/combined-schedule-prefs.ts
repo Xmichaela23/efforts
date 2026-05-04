@@ -247,6 +247,11 @@ export interface CombinedSchedulePrefs {
   strength_intent?: StrengthIntentArc;
   /** Tri swim: focus = higher-volume program; race = maintenance / execute leg (engine Step 2+). */
   swim_intent?: SwimIntentArc;
+  /**
+   * Where the swim-focus TSS increase is funded from (only meaningful when swim_intent === 'focus').
+   * split = 2:1 bike/run reduction; protect_run = all from bike; protect_bike = all from run.
+   */
+  swim_load_source?: 'split' | 'protect_run' | 'protect_bike';
   /** Weekday titles e.g. Monday — strength sessions prefer these days when set. */
   strength_preferred_days?: string[];
 }
@@ -290,6 +295,11 @@ export function mergeCombinedSchedulePrefs(
     const swimIRaw = src.swim_intent ?? src.swimIntent;
     const swimI =
       swimIRaw === 'focus' || swimIRaw === 'race' ? (swimIRaw as SwimIntentArc) : undefined;
+    const swimLSRaw = src.swim_load_source ?? src.swimLoadSource;
+    const swimLS: CombinedSchedulePrefs['swim_load_source'] =
+      swimLSRaw === 'split' || swimLSRaw === 'protect_run' || swimLSRaw === 'protect_bike'
+        ? swimLSRaw
+        : undefined;
     const tiRaw = src.training_intent ?? src.trainingIntent;
     const ti =
       tiRaw === 'completion' || tiRaw === 'performance' || tiRaw === 'first_race' || tiRaw === 'comeback'
@@ -342,6 +352,7 @@ export function mergeCombinedSchedulePrefs(
     if (sp !== undefined) out.strength_protocol = sp;
     if (si !== undefined) out.strength_intent = si;
     if (swimI !== undefined) out.swim_intent = swimI;
+    if (swimLS !== undefined) out.swim_load_source = swimLS;
     if (ti !== undefined) out.training_intent = ti;
     if (pdPatch.long_run_day !== undefined) out.long_run_day = pdPatch.long_run_day;
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;

@@ -217,7 +217,7 @@ function buildSingleEventBlocks(
 ) {
   const taperWks  = taperWeeks(goal.distance, goal.priority);
   const approach  = as.tri_approach ?? 'race_peak';
-  const dist      = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
+  const dist      = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined, as.swim_intent, as.swim_load_source);
 
   // Phase ratio constants — mirror the standalone triathlon generator's approach logic.
   // base_first: 15% RS (finish-line durability) — more time in base, shorter sharpening.
@@ -250,6 +250,22 @@ function buildSingleEventBlocks(
   pushBlockRange(blocks, 'taper', taperStart, startWeek + totalWeeks - 1, goal, dist, as);
 }
 
+// Base recovery distribution. Focus shifts match the SWIM_FOCUS_SHIFTS table so
+// focus athletes preserve proportional budget in recovery weeks too.
+const RECOVERY_DIST_BASE         = { run: 0.40, bike: 0.30, swim: 0.20, strength: 0.10 } as const;
+const RECOVERY_DIST_FOCUS_SPLIT  = { run: 0.38, bike: 0.26, swim: 0.26, strength: 0.10 } as const; // bike -4%, run -2%
+const RECOVERY_DIST_FOCUS_PROT_R = { run: 0.40, bike: 0.24, swim: 0.26, strength: 0.10 } as const; // bike -6%, run unchanged
+const RECOVERY_DIST_FOCUS_PROT_B = { run: 0.34, bike: 0.30, swim: 0.26, strength: 0.10 } as const; // run -6%, bike unchanged
+
+function recoveryDistribution(as: AthleteState): Record<string, number> {
+  if (as.swim_intent !== 'focus') return { ...RECOVERY_DIST_BASE };
+  switch (as.swim_load_source) {
+    case 'protect_run':  return { ...RECOVERY_DIST_FOCUS_PROT_R };
+    case 'protect_bike': return { ...RECOVERY_DIST_FOCUS_PROT_B };
+    default:             return { ...RECOVERY_DIST_FOCUS_SPLIT };
+  }
+}
+
 function insertRecoveryBlock(
   startWeek: number,
   endWeek: number,
@@ -258,6 +274,7 @@ function insertRecoveryBlock(
   as: AthleteState,
 ) {
   if (startWeek > endWeek) return;
+  const sportDistribution = recoveryDistribution(as);
   for (let w = startWeek; w <= endWeek; w++) {
     blocks.push({
       phase: 'recovery',
@@ -266,7 +283,7 @@ function insertRecoveryBlock(
       primaryGoalId: goalId,
       isRecovery: true,
       tssMultiplier: 0.5,
-      sportDistribution: { run: 0.40, bike: 0.30, swim: 0.20, strength: 0.10 },
+      sportDistribution,
     });
   }
 }
@@ -281,7 +298,7 @@ function buildAbbreviatedBlocks(
   // Post–B-race A-race segment: no heavy `build` (threshold/VO2 peaks). Base + race-specific + taper only.
   const totalWeeks = endWeek - startWeek + 1;
   if (totalWeeks < 1) return;
-  const dist = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined);
+  const dist = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined, as.swim_intent, as.swim_load_source);
   // Use as many taper weeks as the distance requires, up to the full available window.
   // Math.floor(totalWeeks * 0.45) would give 0 for a 2-week window (floors 0.9 → 0),
   // leaving week 19 as race_specific and firing VO2max 1 week before an A-race.
@@ -312,7 +329,7 @@ function buildSharedPeakBlocks(
 ) {
   const taper1 = taperWeeks(g1.distance, g1.priority);
   const taper2 = taperWeeks(g2.distance, g2.priority);
-  const dist1  = getBaseDistribution(g1.sport, g1.distance, as.limiter_sport as Sport | undefined);
+  const dist1  = getBaseDistribution(g1.sport, g1.distance, as.limiter_sport as Sport | undefined, as.swim_intent, as.swim_load_source);
 
   const rsStart = Math.max(startWeek, g1Week - taper1 - 4);
   if (startWeek < rsStart) pushBlockRange(blocks, 'base',  startWeek, rsStart - 1, g1, dist1, as);
@@ -320,7 +337,7 @@ function buildSharedPeakBlocks(
   pushBlockRange(blocks, 'race_specific', g1Week - taper1, g1Week - taper1 - 1 + taper1, g1, dist1, as);
   pushBlockRange(blocks, 'taper',         g1Week - taper1, g1Week - 1, g1, dist1, as);
   insertRecoveryBlock(g1Week + 1, g1Week + 1, g1.id, blocks, as); // 1-week recovery
-  const dist2 = getBaseDistribution(g2.sport, g2.distance, as.limiter_sport as Sport | undefined);
+  const dist2 = getBaseDistribution(g2.sport, g2.distance, as.limiter_sport as Sport | undefined, as.swim_intent, as.swim_load_source);
   pushBlockRange(blocks, 'build', g1Week + 2, g2Week - taper2 - 1, g2, dist2, as);
   pushBlockRange(blocks, 'taper', g2Week - taper2, g2Week - 1, g2, dist2, as);
 }
@@ -398,7 +415,7 @@ function fillGaps(blocks: PhaseBlock[], totalWeeks: number, primaryGoal: GoalInp
   for (const b of blocks) {
     for (let w = b.startWeek; w <= b.endWeek; w++) covered.add(w);
   }
-  const dist = getBaseDistribution(primaryGoal.sport, primaryGoal.distance, as.limiter_sport as Sport | undefined);
+  const dist = getBaseDistribution(primaryGoal.sport, primaryGoal.distance, as.limiter_sport as Sport | undefined, as.swim_intent, as.swim_load_source);
   for (let w = 1; w <= totalWeeks; w++) {
     if (!covered.has(w)) {
       blocks.push({ phase: 'base', startWeek: w, endWeek: w, primaryGoalId: primaryGoal.id, isRecovery: false, tssMultiplier: 1.0, sportDistribution: dist });

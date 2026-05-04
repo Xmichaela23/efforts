@@ -427,13 +427,15 @@ export function buildWeek(
 
   // ── Determine run distance and bike hours from TSS budget distribution ──
   const dist = block.sportDistribution;
-  const runPct   = dist.run      ?? 0.25;
-  const bikePct  = dist.bike     ?? 0.45;
-  const swimPct  = dist.swim     ?? 0.18;
-  const strPct   = dist.strength ?? 0.06;
+  const runPct  = dist.run      ?? 0.25;
+  const bikePct = dist.bike     ?? 0.45;
+  const swimPct = dist.swim     ?? 0.18;
+  // strPct reserved for future strength TSS accounting — not yet wired into session sizing.
 
   const runBudget  = weeklyTSSBudget * runPct;
   const bikeBudget = weeklyTSSBudget * bikePct;
+  // Swim TSS budget — used as a soft ceiling on template yards (55 TSS/hr estimate).
+  const swimBudget = weeklyTSSBudget * swimPct;
 
   // Convert TSS budgets to session durations using average intensity
   // Run: mix of easy (~55 TSS/hr) and hard (~85 TSS/hr) → use 65 avg
@@ -707,10 +709,26 @@ export function buildWeek(
       notes: 'Maintenance aerobic swim — run-primary emphasis, swim kept short.',
     }));
   }
-  const scaledTemplateYards = (t: SwimSlotTemplate): number => {
-    const raw = t.target_yards * swimMult;
+  // Apply swimMult then enforce swimBudget as a soft ceiling across all slots.
+  // 55 TSS/hr ÷ (1 yd/min ≈ 60 yd/hr at easy pace) → ~0.917 TSS/100yd, but we
+  // model it in time: swimBudget (TSS) → minutes at 55 TSS/hr → yards at 30 yd/min.
+  // Soft ceiling: if total raw yards exceed budget-implied yards, scale all slots
+  // down proportionally. Minimums (easyLike 800 yd, quality 1000 yd) are still applied.
+  const SWIM_TSS_PER_HR = 55;
+  const SWIM_YDS_PER_MIN = 30; // ~1650 yd/hr, mid-range for tri training
+  const swimBudgetMinutes = (swimBudget / SWIM_TSS_PER_HR) * 60;
+  const swimBudgetYards   = swimBudgetMinutes * SWIM_YDS_PER_MIN;
+
+  const rawSlotYards = swimTemplates.map((t) => Math.round(t.target_yards * swimMult));
+  const totalRawYards = rawSlotYards.reduce((s, y) => s + y, 0);
+  const budgetScale = totalRawYards > 0 && totalRawYards > swimBudgetYards
+    ? swimBudgetYards / totalRawYards
+    : 1;
+
+  const scaledTemplateYards = (t: SwimSlotTemplate, slotIdx: number): number => {
+    const budgetCapped = rawSlotYards[slotIdx]! * budgetScale;
     const easyLike = t.session_type === 'easy' || t.session_type === 'technique_aerobic';
-    return Math.max(easyLike ? 800 : 1000, Math.round(raw));
+    return Math.max(easyLike ? 800 : 1000, Math.round(budgetCapped));
   };
 
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
@@ -843,7 +861,7 @@ export function buildWeek(
   const qualitySwimSlot = grid.get(swimQualityDay);
   if (hasTri && swimTemplates.length > 0) {
     const t0 = swimTemplates[0]!;
-    const y0 = scaledTemplateYards(t0);
+    const y0 = scaledTemplateYards(t0, 0);
     if (!qualitySwimSlot?.isRest) {
       qualitySwimSlot!.sessions.push(
         swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0),
@@ -873,7 +891,7 @@ export function buildWeek(
   const easySwimSlot = grid.get(swimEasyDay);
   if (!easySwimSlot?.isRest && hasTri && swimTemplates.length >= 2) {
     const t1 = swimTemplates[1]!;
-    const y1 = scaledTemplateYards(t1);
+    const y1 = scaledTemplateYards(t1, 1);
     if (swimEasyDay !== swimQualityDay || !qualitySwimPlaced) {
       const useOpenWater =
         t1.session_type === 'easy' &&
@@ -896,7 +914,7 @@ export function buildWeek(
     const thirdSwimSlot = grid.get(swimThirdDay);
     if (!thirdSwimSlot?.isRest) {
       const t2 = swimTemplates[2]!;
-      const y2 = scaledTemplateYards(t2);
+      const y2 = scaledTemplateYards(t2, 2);
       thirdSwimSlot!.sessions.push(
         swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5),
       );

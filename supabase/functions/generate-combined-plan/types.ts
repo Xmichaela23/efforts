@@ -73,6 +73,14 @@ export interface AthleteState {
   strength_intent?: 'support' | 'performance';
   /** Tri swim program from goal training_prefs: focus vs race-support (placement/volume in later steps). */
   swim_intent?: 'focus' | 'race';
+  /**
+   * Where the swim-focus load increase is funded from.
+   * Only meaningful when `swim_intent === 'focus'`.
+   * - `split`        — default 2:1 ratio (bike -4%, run -2%)
+   * - `protect_run`  — all reduction from bike (bike -6%, run unchanged)
+   * - `protect_bike` — all reduction from run (run -6%, bike unchanged)
+   */
+  swim_load_source?: 'split' | 'protect_run' | 'protect_bike';
   /** Preferred weekdays for strength (e.g. ["Monday","Wednesday"]) from preferred_days.strength. */
   strength_preferred_days?: string[];
   /**

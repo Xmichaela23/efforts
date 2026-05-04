@@ -1031,6 +1031,7 @@ async function buildCombinedPlan(
         ? { strength_intent: freshCombinedPrefs.strength_intent }
         : {}),
       ...(freshCombinedPrefs.swim_intent ? { swim_intent: freshCombinedPrefs.swim_intent } : {}),
+      ...(freshCombinedPrefs.swim_load_source ? { swim_load_source: freshCombinedPrefs.swim_load_source } : {}),
       ...(freshCombinedPrefs.strength_preferred_days?.length
         ? { strength_preferred_days: freshCombinedPrefs.strength_preferred_days }
         : {}),
