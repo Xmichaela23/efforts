@@ -59,6 +59,12 @@ Daily use is mostly **`AppLayout`**, not standalone routes.
 | Weekly coach / load / race framing | **`coach`** (+ cache) | `useCoachWeekContext` |
 | Plans lifecycle | plan edges + bundle loaders | `AppContext`, plan/goal screens |
 
+### Plan generation — swim drills
+
+Combined plans (**`generate-combined-plan`** → **`session-factory`**) and standalone tri plans (**`generate-triathlon-plan`** → **`tri-generator`**) both pick inserted drill tokens through **`src/lib/plan-tokens/swim-drill-tokens.ts`**: **`resolveSwimDrillPhase`** maps phase labels (e.g. combined `race_specific` and tri `Race-Specific` / contract `peak`) into shared **base / build / peak / taper** pools so methodology is consistent — early plan emphasizes technique and water feel, mid-plan shorter drills, near-race minimal reminders, taper nearly none — not a single random pool rotation.
+
+**Equipment:** Current phase pools use only **`swim_drills_*`** bodyweight drills (catch-up, fingertip drag, fist, kick, etc.); they do **not** expand to pull-buoy or paddle main sets in **`materialize-plan`**. When adding pull-buoy or paddle drill tokens later, **gate** them on the athlete’s swim equipment (e.g. **`user_baselines.equipment`** / Arc equipment snapshot) before those tokens are eligible for any pool, so prescription never assumes gear the athlete does not have.
+
 **Performance contract:** Endurance Performance leans on **`session_detail_v1`**. Strength/mobility Performance uses **`StrengthPerformanceSummary`** / **`StrengthCompareTable`** from completed row fields (notably `strength_exercises`), merged carefully with `useWorkoutDetail` and refresh paths.
 
 ---
@@ -123,3 +129,4 @@ Everything else in recent sprints is either **done** or an explicit **known trad
 - **2026-05-04** — Arc grounding table: `adapt-plan` (suggest) now loads `getArcContext`; `get-week` remains the main server gap.
 - **2026-05-05** — State tab: `useCoachWeekContext` merges `adapt-plan` endurance suggestions (`end_easy_pace`, `end_ftp`) into plan adaptation card; swim still out of scope on `adapt-plan`; doc section for plan adaptation flow.
 - **2026-05-06** — Plan adaptation: document endurance vs strength persistence (`performance_numbers` vs `plan_adjustments`) and baseline drift card.
+- **2026-05-07** — Plan generation: phase-aware swim drill selection (`swim-drill-tokens.ts`), equipment-safe pools; note future gating for pull buoy / paddles on baselines / Arc equipment.
