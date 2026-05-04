@@ -139,17 +139,14 @@ export function vo2Run(day: string, goalId: string): PlannedSession {
 }
 
 export function intervalRun(day: string, reps: number, phase: Phase, goalId: string): PlannedSession {
-  // Periodized interval structure: short/fast in base (neuromuscular priming),
-  // progressing to longer/more-specific efforts approaching race day.
-  // base:          4-6×800m  @ 5km pace   — fast turnover, short contact time
-  // build:         4-6×1200m @ 10km pace  — lactate threshold stimulus
-  // race_specific: 3-4×1600m @ threshold  — race-specific pacing + mental rehearsal
-  // taper:         2-3×1000m @ race pace  — keep the snap, low accumulation
+  // Periodized interval structure: base = tempo-biased (polarized-friendly); build = threshold-leaning;
+  // race_specific = threshold / longer reps; taper = short race-pace touches.
   let dist: string;
   let pace: string;
   let restNote: string;
   let zoneLabel: string;
   let dur: number;
+  let intensity: Intensity = 'HARD';
 
   if (phase === 'taper') {
     dist = '1000m'; pace = 'race pace'; restNote = '2 min walk/jog recovery'; zoneLabel = 'Z4 race pace'; dur = 45;
@@ -160,15 +157,16 @@ export function intervalRun(day: string, reps: number, phase: Phase, goalId: str
   } else if (phase === 'build') {
     dist = '1200m'; pace = '10km pace'; restNote = '90 sec jog recovery'; zoneLabel = 'Z4–Z5'; dur = 65;
   } else {
-    // base — short, fast, neuromuscular
-    dist = '800m'; pace = '5km pace'; restNote = '90 sec jog recovery'; zoneLabel = 'Z5'; dur = 55;
+    // base — aerobic power / 10K-tempo bias (avoid labeling VO2 "base" polarized work)
+    dist = '1000m'; pace = '10K / tempo pace'; restNote = '90 sec jog recovery'; zoneLabel = 'Z3–Z4'; dur = 58;
+    intensity = 'MODERATE';
   }
 
   return session(
     day, 'run',
     `Run Intervals — ${reps}×${dist}`,
     `Warm up 10 min easy. ${reps}×${dist} at ${pace} with ${restNote} between. Cool down 10 min. Focus on consistent splits, not all-out.`,
-    dur, 'HARD',
+    dur, intensity,
     ['warmup_run_10min_easy', `interval_${reps}x${dist}_${phase}`, 'cooldown_run_10min_easy'],
     ['quality', 'intervals', 'run'],
     zoneLabel, goalId,
@@ -458,6 +456,20 @@ export function easySwim(day: string, totalYards: number, goalId: string): Plann
     [`swim_warmup_${wu}yd_easy`, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
     ['easy', 'aerobic', 'swim'],
     'Z2', goalId,
+  );
+}
+
+/** Open water skills practice — ocean/lake chop, sighting, wetsuit comfort (tri-specific). */
+export function openWaterPracticeSwim(day: string, durationMin: number, goalId: string): PlannedSession {
+  const m = Math.max(28, Math.min(55, durationMin));
+  return session(
+    day, 'swim',
+    'Open Water Practice',
+    `Open water session (~${m} min). Use conditions similar to your race where possible: wetsuit if legal, sight every 6–8 strokes, practice bilateral breathing into chop or sun glare. Steady aerobic effort — not an anaerobic sprint.`,
+    m, 'MODERATE',
+    ['swim_open_water_practice'],
+    ['open_water', 'aerobic_swim', 'swim', 'tri_specific'],
+    'Z2–Z3 OW sighting', goalId,
   );
 }
 

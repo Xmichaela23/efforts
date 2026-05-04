@@ -3,6 +3,8 @@
 // _shared/week-optimizer.ts. The same-day matrix is shared via
 // schedule-session-constraints.ts but sequential rules and placement logic are
 // duplicated. Any rule change MUST be applied to both files.
+// Strength: `week-builder` no longer places lower-body strength on `run_quality_day` for tri;
+// consider aligning `_shared/week-optimizer.ts` co-equal stacking if product re-enables same-day hard stacks.
 // See: supabase/functions/_shared/schedule-session-constraints.ts
 //
 // Implements §8 Week Construction Algorithm — all 7 steps.
@@ -26,7 +28,7 @@ import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
   longRide, easyBike, bikeOpeners,
   groupRideQualityBikeSession, groupRideSession,
-  thresholdSwim, cssAerobicSwim, easySwim,
+  thresholdSwim, cssAerobicSwim, easySwim, openWaterPracticeSwim,
   brick, triathlonStrength, runStrength,
   downgradedEasyAerobicFrom, downgradedHardToModerateFrom,
 } from './session-factory.ts';
@@ -314,10 +316,19 @@ export function buildWeek(
   const isRecovery = block.isRecovery;
   const raceAnchors = options?.raceAnchors ?? [];
   const raceThisWeek = raceAnchors.find((a) => a.planWeek === weekNum);
+  const weekInBlock = Math.max(1, weekNum - block.startWeek + 1);
+  const prevWeekBlock =
+    weekNum >= 2 && options?.phaseBlocks?.length
+      ? blockForWeek(options.phaseBlocks, weekNum - 1)
+      : null;
+  /** First week back after a calendar recovery block or a 3:1 / 2:1 deload week — ease run/bike stress. */
+  const returnFromRecoveryDeload =
+    !!prevWeekBlock && (prevWeekBlock.phase === 'recovery' || prevWeekBlock.isRecovery);
+  /** Any tri race falls in the next plan week — avoid Sunday race-pace long run stacking. */
+  const triRaceNextPlanWeek = raceAnchors.some((a) => a.planWeek === weekNum + 1);
 
   const primaryGoal = goals.find(g => g.id === block.primaryGoalId) ?? goals[0];
   const hasTri = goals.some(g => ['triathlon', 'tri'].includes(g.sport?.toLowerCase()));
-  const hasRun = goals.some(g => g.sport?.toLowerCase() === 'run');
   const triApproach = athleteState.tri_approach ?? 'race_peak';
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
 
@@ -382,7 +393,10 @@ export function buildWeek(
     : DAYS_OF_WEEK.indexOf('Saturday');
   const longRideDay = DAYS_OF_WEEK[longRideDayIdx] ?? 'Saturday';
 
-  const bricksThisWeek = recoveryRebuildWeek1 ? 0 : BRICKS_PER_WEEK[phase];
+  // Loading-pattern recovery weeks keep the mesocycle phase (build / RS) but must not inherit
+  // brick frequency from that phase — otherwise “recovery” weeks become the hardest weekends.
+  const bricksThisWeek =
+    recoveryRebuildWeek1 || isRecovery ? 0 : BRICKS_PER_WEEK[phase];
   // Race week: no brick stress; all load is the event itself
   const effectiveBricks = raceThisWeek ? 0 : bricksThisWeek;
 
@@ -422,9 +436,19 @@ export function buildWeek(
     longRunMiles = Math.max(3, Math.min(longRunMiles, 5));
   }
 
-  if (hasTri && !raceThisWeek) {
+  if (hasTri && !raceThisWeek && !isRecovery) {
     const longRunFloor = longRunFloorMiles(primaryGoal.distance, phase);
     longRunMiles = Math.max(longRunMiles, longRunFloor);
+    longRunMinutes = Math.round(longRunMiles * 9.5);
+  }
+
+  if (isRecovery && hasTri && !raceThisWeek) {
+    longRunMiles = Math.min(longRunMiles, 8);
+    longRunMinutes = Math.round(longRunMiles * 9.5);
+  }
+
+  if (returnFromRecoveryDeload && hasTri && !raceThisWeek) {
+    longRunMiles = Math.min(longRunMiles, 9);
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 
@@ -451,6 +475,11 @@ export function buildWeek(
     const capFromBudgetAndRace = Math.min(raceBikeDuration * 1.1, weeklyHours * 0.45);
     const longRideCapHours = Math.max(raceBikeDuration * 0.8, capFromBudgetAndRace);
     longRideHours = Math.min(longRideCapHours, longRideHours);
+  }
+
+  if (returnFromRecoveryDeload && hasTri && !raceThisWeek) {
+    longRideHours = Math.max(1, Math.round(longRideHours * 0.85 * 4) / 4);
+    longRideMinutes = Math.round(longRideHours * 60);
   }
 
   if (recoveryRebuildWeek1 && !hasTri) {
@@ -490,14 +519,29 @@ export function buildWeek(
   ) ? 'build'   // Z2 run leg (brick fn uses build → easy Z2 run)
     : phase;
 
+  const preferStandaloneBikeEndurance =
+    phase === 'build' &&
+    hasTri &&
+    !isRecovery &&
+    !returnFromRecoveryDeload &&
+    weekInBlock % 2 === 1;
+
   const longRideSlot = grid.get(longRideDay);
   if (!longRideSlot?.isRest && hasTri && !raceThisWeek) {
-    if (effectiveBricks >= 1 && phase !== 'base') {
-      const brickRunMi = brickRunTargetMiles(primaryGoal.distance, effectiveBrickPhase);
-      const [bkBike, bkRun] = brick(longRideDay, longRideHours, brickRunMi, effectiveBrickPhase, servedGoal);
+    let rideHoursForSat = longRideHours;
+    if (preferStandaloneBikeEndurance) {
+      rideHoursForSat = Math.max(rideHoursForSat, Math.min(3.5, athleteState.weekly_hours_available * 0.38));
+    }
+    const brickPhaseForSession =
+      returnFromRecoveryDeload && phase === 'race_specific' ? 'build' : effectiveBrickPhase;
+    const useBrick =
+      effectiveBricks >= 1 && phase !== 'base' && !preferStandaloneBikeEndurance;
+    if (useBrick) {
+      const brickRunMi = brickRunTargetMiles(primaryGoal.distance, brickPhaseForSession);
+      const [bkBike, bkRun] = brick(longRideDay, rideHoursForSat, brickRunMi, brickPhaseForSession, servedGoal);
       longRideSlot!.sessions.push(bkBike, bkRun);
     } else {
-      longRideSlot!.sessions.push(longRide(longRideDay, longRideHours, servedGoal));
+      longRideSlot!.sessions.push(longRide(longRideDay, rideHoursForSat, servedGoal));
     }
   }
 
@@ -508,8 +552,16 @@ export function buildWeek(
     ? adjDay(longRunDay, -1)  // shift to Friday if Saturday has brick
     : longRunDay;
   const lrSlot = grid.get(longRunActualDay);
+  /** Hard Sunday long-run block (structured race-pace segment) — off in recovery, loading-pattern deload, or week before any tri race. */
+  const useStructuredRacePaceLong =
+    phase === 'race_specific' &&
+    !isRecovery &&
+    !triRaceNextPlanWeek;
+  /** When RS calendar phase but we want Z2 aerobic copy only (deload / pre-race week / recovery). */
+  const longRunSessionPhase: Phase =
+    phase === 'race_specific' && !useStructuredRacePaceLong ? 'build' : phase;
   if (!lrSlot?.isRest && !raceThisWeek) {
-    if (phase === 'race_specific' && hasRun) {
+    if (useStructuredRacePaceLong) {
       const mpMiles = Math.max(4, Math.round(longRunMiles * 0.60));
       lrSlot!.sessions.push(
         hasTri
@@ -518,7 +570,7 @@ export function buildWeek(
       );
     } else {
       lrSlot!.sessions.push(
-        longRun(longRunActualDay, longRunMiles, phase, servedGoal, hasTri ? primaryGoal.distance : null),
+        longRun(longRunActualDay, longRunMiles, longRunSessionPhase, servedGoal, hasTri ? primaryGoal.distance : null),
       );
     }
   }
@@ -652,7 +704,8 @@ export function buildWeek(
               : marathonPaceRun(runQualityDay, rpMiles, servedGoal),
           );
         } else if (phase === 'base') {
-          runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
+          const progressedBaseReps = Math.min(8, 4 + Math.floor((weekInBlock - 1) / 2));
+          runQualitySlot!.sessions.push(intervalRun(runQualityDay, progressedBaseReps, phase, servedGoal));
         } else {
           // Build: tempo (Z3) — builds muscular endurance safely
           const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
@@ -671,7 +724,8 @@ export function buildWeek(
         } else if (hasTri && phase === 'build') {
           runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal));
         } else {
-          runQualitySlot!.sessions.push(intervalRun(runQualityDay, 6, phase, servedGoal));
+          const progressedBaseReps = Math.min(8, 4 + Math.floor((weekInBlock - 1) / 2));
+          runQualitySlot!.sessions.push(intervalRun(runQualityDay, progressedBaseReps, phase, servedGoal));
         }
       }
     }
@@ -722,7 +776,18 @@ export function buildWeek(
     const yardsScale = recoveryRebuildWeek1 || isRecovery ? 0.30 : 0.40;
     const recSwimYd = Math.max(1000, Math.round(swimYards * yardsScale));
     if (swimEasyDay !== swimQualityDay || !qualitySwimPlaced) {
-      easySwimSlot!.sessions.push(easySwim(swimEasyDay, recSwimYd, servedGoal));
+      const useOpenWater =
+        hasTri &&
+        !isRecovery &&
+        !recoveryRebuildWeek1 &&
+        (phase === 'race_specific' || (phase === 'taper' && !raceThisWeek)) &&
+        weekInBlock % 2 === 0;
+      const owMin = Math.max(32, Math.min(50, Math.round(recSwimYd / 42)));
+      easySwimSlot!.sessions.push(
+        useOpenWater
+          ? openWaterPracticeSwim(swimEasyDay, owMin, servedGoal)
+          : easySwim(swimEasyDay, recSwimYd, servedGoal),
+      );
     }
   }
 
@@ -829,7 +894,9 @@ export function buildWeek(
 
     // Slot 2 (base phase only): second non-blocked day
     if (strFreq >= 2 && strDay) {
-      let candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d) && d !== strDay);
+      let candidates2 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(
+        d => !blocked.has(d) && d !== strDay && (!hasTri || d !== runQualityDay),
+      );
       if (prefSet.size > 0) {
         const preferred2 = candidates2.filter(d => prefSet.has(d));
         if (preferred2.length > 0) candidates2 = preferred2;
@@ -927,8 +994,9 @@ export function buildWeek(
   }
 
   // ── Step 4: Hard/Easy enforcement ────────────────────────────────────────
-  const allowConsolidatedHardException =
-    athleteState.strength_intent === 'performance' && athleteState.training_intent === 'performance';
+  // Consolidated hard day (quality run + lower body same day) removed — splits stress across days
+  // and reduces injury risk (hard intervals + heavy lower-body same PM is a poor default).
+  const allowConsolidatedHardException = false;
   enforceHardEasy(grid, allowConsolidatedHardException);
 
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
@@ -939,7 +1007,7 @@ export function buildWeek(
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
   // strength_intent === 'performance' is the co-equal flag (see AthleteState type + EXPERIENCE_MODIFIER_TEXT).
-  const isPerformanceCoequal = athleteState.strength_intent === 'performance';
+  const isPerformanceCoequal = false;
   const sameDayPre = validateWeekGridSameDayMatrix(grid);
   if (!sameDayPre.valid) {
     console.warn('[week-builder] same-day schedule conflicts detected:', sameDayPre.conflicts);
