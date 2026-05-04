@@ -13,8 +13,30 @@ import { triathlonPerformanceProtocol } from '../shared/strength-system/protocol
 import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
+import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const SWIM_DRILL_MAIN_FLOOR_YD = 350;
+
+function optionalSwimDrillBlock(
+  totalYards: number,
+  wuYd: number,
+  cdYd: number,
+  planWeek: number | undefined,
+  drillSlotSalt: number,
+): { mainBudgetYd: number; drillTokens: string[] } {
+  let mainBudgetYd = totalYards - wuYd - cdYd;
+  if (planWeek == null || mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
+    return { mainBudgetYd, drillTokens: [] };
+  }
+  const tok = pickSwimDrillTokens(planWeek, drillSlotSalt, 1)[0]!;
+  const dy = swimDrillYardsFromToken(tok);
+  if (dy <= 0 || mainBudgetYd - dy < SWIM_DRILL_MAIN_FLOOR_YD) {
+    return { mainBudgetYd, drillTokens: [] };
+  }
+  return { mainBudgetYd: mainBudgetYd - dy, drillTokens: [tok] };
+}
 
 function session(
   day: string,
@@ -402,20 +424,31 @@ export function bikeOpeners(day: string, goalId: string): PlannedSession {
 
 // ── Swim sessions ─────────────────────────────────────────────────────────────
 
-export function thresholdSwim(day: string, totalYards: number, goalId: string): PlannedSession {
+export function thresholdSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+): PlannedSession {
   const wu = 300;
   const cd = 200;
-  const main = totalYards - wu - cd;
+  const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
+    totalYards, wu, cd, planWeek, drillSlotSalt,
+  );
   const threshReps = Math.max(4, Math.round((main * 0.55) / 100));
   const aeroReps   = Math.max(3, Math.round((main * 0.45) / 150));
   const dur = Math.round(totalYards / 40); // ~40 yd/min including rest
+  const drillNote = drillTokens.length ? ' Technique drills before the main set.' : '';
+  const tags: string[] = ['quality', 'threshold', 'swim'];
+  if (drillTokens.length) tags.push('swim_drills');
   return session(
     day, 'swim',
     `Swim Threshold — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.`,
+    `Warm up ${wu} yd easy.${drillNote} ${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.`,
     dur, 'HARD',
-    [`swim_warmup_${wu}yd_easy`, `swim_threshold_${threshReps}x100yd_r15`, `swim_aerobic_${aeroReps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
-    ['quality', 'threshold', 'swim'],
+    [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_threshold_${threshReps}x100yd_r15`, `swim_aerobic_${aeroReps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
+    tags,
     'Z4 threshold swim', goalId,
   );
 }
@@ -425,36 +458,58 @@ export function thresholdSwim(day: string, totalYards: number, goalId: string): 
  * Not maximal CSS threshold — just sustainable race pace.
  * Develops comfort at finish-line speed without lactate stress.
  */
-export function cssAerobicSwim(day: string, totalYards: number, goalId: string): PlannedSession {
+export function cssAerobicSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+): PlannedSession {
   const wu = 300;
   const cd = 200;
-  const main = totalYards - wu - cd;
+  const { mainBudgetYd: main, drillTokens } = optionalSwimDrillBlock(
+    totalYards, wu, cd, planWeek, drillSlotSalt,
+  );
   const reps = Math.max(5, Math.round(main / 100));
   const dur  = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
+  const drillNote = drillTokens.length ? ' Technique drills after the warm-up.' : '';
+  const tags: string[] = ['quality', 'css_aerobic', 'swim'];
+  if (drillTokens.length) tags.push('swim_drills');
   return session(
     day, 'swim',
     `CSS Aerobic Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd. ${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits. Cool down ${cd} yd.`,
+    `Warm up ${wu} yd.${drillNote} ${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits. Cool down ${cd} yd.`,
     dur, 'MODERATE',
-    [`swim_warmup_${wu}yd_easy`, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
-    ['quality', 'css_aerobic', 'swim'],
+    [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
+    tags,
     'Z3 CSS aerobic', goalId,
   );
 }
 
-export function easySwim(day: string, totalYards: number, goalId: string): PlannedSession {
+export function easySwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+): PlannedSession {
   const wu = 300;
   const cd = 200;
-  const mainYards = totalYards - wu - cd;
+  const { mainBudgetYd: mainYards, drillTokens } = optionalSwimDrillBlock(
+    totalYards, wu, cd, planWeek, drillSlotSalt,
+  );
   const reps = Math.max(4, Math.round(mainYards / 150));
   const dur = Math.round(totalYards / 35); // ~35 yd/min for easy
+  const drillNote = drillTokens.length ? ' Drills after the warm-up for stroke feel.' : '';
+  const tags: string[] = ['easy', 'aerobic', 'swim'];
+  if (drillTokens.length) tags.push('swim_drills');
   return session(
     day, 'swim',
     `Easy Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${reps}×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down ${cd} yd.`,
+    `Warm up ${wu} yd easy.${drillNote} ${reps}×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down ${cd} yd.`,
     dur, 'EASY',
-    [`swim_warmup_${wu}yd_easy`, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
-    ['easy', 'aerobic', 'swim'],
+    [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
+    tags,
     'Z2', goalId,
   );
 }

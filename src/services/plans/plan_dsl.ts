@@ -1,6 +1,8 @@
 // plan_dsl.ts — tiny DSL → steps_preset expander
 // Usage: expandSession({discipline:"swim", main:"drills(catchup,singlearm); pull2x100; kick2x100"}, defaults)
 
+import { SWIM_DRILL_ALIAS } from '@/lib/plan-tokens/swim-drill-tokens';
+
 export type Discipline = "run" | "bike" | "swim" | "strength";
 
 export type Defaults = {
@@ -19,18 +21,6 @@ export type SessionDSL = {
   override_wu?: string;
   override_cd?: string;
   tags?: string[];
-};
-
-const SWIM_DRILL_ALIAS: Record<string, string> = {
-  catchup: "swim_drills_4x50yd_catchup",
-  singlearm: "swim_drills_4x50yd_singlearm",
-  fist: "swim_drills_4x50yd_fist",
-  scull: "swim_drills_4x50yd_scull",
-  scullfront: "swim_drills_2x100yd_scullfront",
-  fingertipdrag: "swim_drills_4x50yd_fingertipdrag",
-  "616": "swim_drills_4x50yd_616",
-  zipper: "swim_drills_4x50yd_zipper",
-  doggypaddle: "swim_drills_4x50yd_doggypaddle",
 };
 
 function swimBlock(token: string): string[] {

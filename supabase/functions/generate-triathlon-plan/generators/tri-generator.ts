@@ -19,6 +19,8 @@ import {
   type TrainingIntent,
 } from '../types.ts';
 
+import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../../src/lib/plan-tokens/swim-drill-tokens.ts';
+
 import { triathlonProtocol } from '../../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../../shared/strength-system/protocols/triathlon_performance.ts';
 import type { ProtocolContext } from '../../shared/strength-system/protocols/types.ts';
@@ -320,7 +322,7 @@ export class TriathlonGenerator {
         sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
       }
     }
-    sessions.push(this.swimQualitySession(swimWeekForQuality, phase, isRecovery, 'Wednesday'));
+    sessions.push(this.swimQualitySession(swimWeekForQuality, phase, isRecovery, 'Wednesday', week));
 
     // ── Thursday: Second Brick (Race-Specific) or Endurance Ride ─────────────
     if (bricksThisWeek >= 2) {
@@ -732,7 +734,7 @@ export class TriathlonGenerator {
     ];
   }
 
-  protected swimQualitySession(weekYards: number, phase: TriPhase, isRecovery: boolean, day: string): TriSession {
+  protected swimQualitySession(weekYards: number, phase: TriPhase, isRecovery: boolean, day: string, planWeek: number): TriSession {
     // Main swim session is ~40% of weekly yardage
     const yd       = Math.max(1500, Math.round(weekYards * 0.40 / 50) * 50);
     const approach = this.params.approach;
@@ -762,13 +764,15 @@ export class TriathlonGenerator {
           tags: ['css_aerobic', 'swim_intervals', 'race_specific'],
         };
       }
-      // Build: continuous + drill combo — volume + technique
-      const contYd = Math.max(600, yd - 700);
+      // Build: continuous + drill combo — volume + technique (token from shared drill library)
+      const drillTok = pickSwimDrillTokens(planWeek, 3, 1)[0]!;
+      const drillYd = swimDrillYardsFromToken(drillTok);
+      const contAdj = Math.max(400, yd - 500 - drillYd);
       return {
         day, type: 'swim', name: 'Continuous Swim + Drills',
-        description: `${yd} yards. Warm-up 300, ${contYd} yards continuous aerobic (build effort in final 200), 4×100 drill work, cool-down 200. Endurance and stroke refinement.`,
+        description: `${yd} yards. Warm-up 300, ${contAdj} yards continuous aerobic (build effort in final 200), technique drills (${drillYd} yd), cool-down 200. Endurance and stroke refinement.`,
         duration: Math.round(yd / 47),
-        steps_preset: ['swim_warmup_300yd_easy', `swim_continuous_${Math.floor(contYd/100)}x100yd_aerobic`, 'swim_drills_4x100yd', 'swim_cooldown_200yd'],
+        steps_preset: ['swim_warmup_300yd_easy', `swim_continuous_${Math.floor(contAdj / 100)}x100yd_aerobic`, drillTok, 'swim_cooldown_200yd'],
         tags: ['aerobic_swim', 'swim_drills', 'endurance'],
       };
     }
