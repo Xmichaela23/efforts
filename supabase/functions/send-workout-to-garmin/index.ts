@@ -315,6 +315,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const isSwimSport = sport === 'LAP_SWIMMING'
   const poolUnitPref: 'yd' | 'm' | null = isSwimSport ? ((): any => {
     const v = (workout as any)?.pool_unit
+    const workoutUnits = String((workout as any)?.units || '').toLowerCase()
+    // Imperial plan overrides a stale 'm' pool_unit — activate-plan may have set 'm'
+    // incorrectly for imperial plans before this fix; honor workout.units as source of truth.
+    if (workoutUnits === 'imperial') return 'yd'
     if (!v) return null
     const t = String(v).toLowerCase()
     if (t === 'yd' || t === 'y') return 'yd'

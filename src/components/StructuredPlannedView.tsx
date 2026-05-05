@@ -103,12 +103,17 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     
     if (v3.length) {
       const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-      // Decide display unit for swim even if pool_unit is missing: fall back to tokens (…yd)
+      // Decide display unit for swim.
+      // Priority 1: explicit pool_unit on the row ('yd' or 'm').
+      // Priority 2: workout.units === 'imperial' (set by activate-plan for every row).
+      // Priority 3: token content — if steps_preset tokens contain 'yd', assume yards.
+      // Default: meters (metric users, or unknown).
       const tokensArr: string[] = Array.isArray((workout as any)?.steps_preset) ? ((workout as any).steps_preset as string[]).map(String) : [];
       const tokensJoined = tokensArr.join(' ').toLowerCase();
       const tokensPreferYd = /\byd\b/.test(tokensJoined);
       const isSwimType = String((workout as any)?.type||'').toLowerCase()==='swim';
-      const displayYards = isSwimType && (poolUnit==='yd' || tokensPreferYd);
+      const planUnitsRaw = String((workout as any)?.units||'').toLowerCase();
+      const displayYards = isSwimType && (poolUnit==='yd' || planUnitsRaw==='imperial' || tokensPreferYd);
       const fmtDist = (m:number)=>{
         const x = Math.max(1, Math.round(Number(m)||0));
         // For swims: use pool_unit preference (yd or m)

@@ -442,14 +442,17 @@ Deno.serve(async (req) => {
           // Ensure a stable display name for mobility when not authored
           if (!baseRow.name || String(baseRow.name).trim()==='') baseRow.name = 'Mobility'
         }
-        // Persist authored swim unit on each swim row so rendering/materialization honors yards vs meters
+        // Persist authored swim unit on each swim row so rendering/materialization honors yards vs meters.
+        // Token-based pool-length hints may refine the length, but only override the unit when the
+        // plan-level swimUnit is already metric — never flip an imperial plan to meters.
         if (mapped === 'swim') {
-          // If tokens explicitly indicate 50 m pool, prefer that length
           const joined = stepsTokens.join(' ').toLowerCase();
           let poolLen = defaultPoolLenM;
           let unit: 'yd'|'m' = swimUnit;
-          if (/\b50m\b/.test(joined)) { unit = 'm'; poolLen = 50.0; }
-          if (/\b25m\b/.test(joined)) { unit = 'm'; poolLen = 25.0; }
+          if (swimUnit !== 'yd') {
+            if (/\b50m\b/.test(joined)) { unit = 'm'; poolLen = 50.0; }
+            if (/\b25m\b/.test(joined)) { unit = 'm'; poolLen = 25.0; }
+          }
           if (/\b25\s*yd\b/.test(joined)) { unit = 'yd'; poolLen = 22.86; }
           baseRow.pool_unit = unit;
           baseRow.pool_length_m = poolLen;
