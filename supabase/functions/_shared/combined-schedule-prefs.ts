@@ -254,6 +254,12 @@ export interface CombinedSchedulePrefs {
   swim_load_source?: 'split' | 'protect_run' | 'protect_bike';
   /** Weekday titles e.g. Monday — strength sessions prefer these days when set. */
   strength_preferred_days?: string[];
+  /**
+   * Athlete-recorded choices from the conflict resolution UI, keyed by `conflict_id`.
+   * Passed straight through to `generate-combined-plan` `athlete_state` so week-builder
+   * can honour them on regeneration.
+   */
+  conflict_preferences?: Record<string, string>;
 }
 
 /** Later sources override earlier ones. */
@@ -373,6 +379,13 @@ export function mergeCombinedSchedulePrefs(
     }
     if (pdPatch.strength_preferred_days?.length) {
       out.strength_preferred_days = pdPatch.strength_preferred_days;
+    }
+    const cpRaw = src.conflict_preferences ?? src.conflictPreferences;
+    if (cpRaw && typeof cpRaw === 'object' && !Array.isArray(cpRaw)) {
+      out.conflict_preferences = {
+        ...(out.conflict_preferences ?? {}),
+        ...(cpRaw as Record<string, string>),
+      };
     }
   }
   return out;

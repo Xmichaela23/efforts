@@ -15,6 +15,7 @@ import { buildWeek } from './week-builder.ts';
 import { validatePlan, failedChecks } from './validator.ts';
 import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
+import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +39,7 @@ Deno.serve(async (req: Request) => {
   try {
     const body: CombinedPlanRequest = await req.json();
     const { user_id, goals, athlete_state, athlete_memory, start_date } = body;
+    const preview = body.preview === true;
 
     // ── Input validation ────────────────────────────────────────────────────
     if (!user_id)                         return json({ error: 'user_id required' }, 400);
@@ -211,12 +213,6 @@ Deno.serve(async (req: Request) => {
       ),
     };
 
-    // ── Write plan to DB ───────────────────────────────────────────────────
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
-
     const planName = totalWeeks <= 10
       ? `${allGoalNames} — ${totalWeeks}-Week Combined Plan`
       : `${allGoalNames} — Multi-Sport Plan`;
@@ -226,6 +222,65 @@ Deno.serve(async (req: Request) => {
     , generatedWeeks[0]);
 
     const avgTSS = Math.round(generatedWeeks.reduce((s, w) => s + w.total_raw_tss, 0) / totalWeeks);
+
+    const plan_config = {
+      ...plan_contract_v1,
+      sport: 'multi_sport',
+      race_date: primaryGoal.event_date,
+      race_name: primaryGoal.event_name,
+      units: 'imperial',
+      swim_unit: 'yd',
+      user_selected_start_date: start_date ?? new Date().toISOString().slice(0, 10),
+    };
+
+    const previewSummary = {
+      name: planName,
+      total_weeks: totalWeeks,
+      peak_weekly_tss: peakWeek.total_raw_tss,
+      avg_weekly_tss: avgTSS,
+      loading_pattern: loadingPattern,
+      goals: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
+      phase_summary: plan_contract_v1.phases,
+    };
+
+    if (preview) {
+      // Run the resolver server-side so the client gets labelled options ready for the UI.
+      const conflict_resolutions: Record<string, unknown[]> = {};
+      for (const w of generatedWeeks) {
+        const events = w.conflict_events ?? [];
+        if (events.length === 0) continue;
+        const ctx: WeekConflictContext = {
+          isRecovery: w.isRecovery,
+          isTaper: (w.phase as string) === 'taper',
+          isRaceWeek: raceAnchors.some((a) => a.planWeek === w.weekNum),
+          weeksToRace: (() => {
+            const deltas = raceAnchors.map((a) => a.planWeek - w.weekNum).filter((d) => d >= 0);
+            return deltas.length === 0 ? 999 : Math.min(...deltas);
+          })(),
+        };
+        conflict_resolutions[String(w.weekNum)] = resolveWeekConflicts(events, ctx);
+      }
+
+      return json({
+        success: true,
+        preview_mode: true,
+        plan_id: null,
+        total_weeks: totalWeeks,
+        validation,
+        validation_failures: failures,
+        sessions_by_week,
+        plan_contract_v1,
+        plan_config,
+        conflict_resolutions,
+        preview: previewSummary,
+      });
+    }
+
+    // ── Write plan to DB ───────────────────────────────────────────────────
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
     const { data: plan, error: planErr } = await supabase
       .from('plans')
@@ -237,15 +292,7 @@ Deno.serve(async (req: Request) => {
         status: 'active',
         duration_weeks: totalWeeks,
         sessions_by_week,
-        config: {
-          ...plan_contract_v1,
-          sport: 'multi_sport',
-          race_date: primaryGoal.event_date,
-          race_name: primaryGoal.event_name,
-          units: 'imperial',
-          swim_unit: 'yd',
-          user_selected_start_date: start_date ?? new Date().toISOString().slice(0, 10),
-        },
+        config: plan_config,
       })
       .select('id')
       .single();
@@ -261,15 +308,7 @@ Deno.serve(async (req: Request) => {
       total_weeks: totalWeeks,
       validation,
       validation_failures: failures,
-      preview: {
-        name: planName,
-        total_weeks: totalWeeks,
-        peak_weekly_tss: peakWeek.total_raw_tss,
-        avg_weekly_tss: avgTSS,
-        loading_pattern: loadingPattern,
-        goals: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
-        phase_summary: plan_contract_v1.phases,
-      },
+      preview: previewSummary,
     });
 
   } catch (e) {

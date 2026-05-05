@@ -939,6 +939,10 @@ export function triathlonStrength(
     limiterSport?: 'swim' | 'bike' | 'run';
     sessionIndex?: number; // 0 = lower/posterior, 1 = upper/swim
     equipmentType?: 'home_gym' | 'commercial_gym';
+    /** Explicit cable machine access. Barbell home gyms are upgraded to commercial_gym tier but may still lack cable. */
+    hasCable?: boolean;
+    /** True only when athlete has a GHD, Nordic bench, or fixed floor anchor. Required before prescribing Nordic Hamstring Curls. */
+    hasGhd?: boolean;
     /** Calendar long sessions — drives strength placement (default Sat/Sun). */
     longRideDayName?: string;
     longRunDayName?: string;
@@ -965,7 +969,11 @@ export function triathlonStrength(
       qualitySessionDays: ['Tuesday', 'Thursday'],
       easySessionDays,
     },
-    userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },
+    userBaselines: {
+      equipment: options?.equipmentType ?? 'commercial_gym',
+      hasCable: options?.hasCable ?? (options?.equipmentType !== 'home_gym'),
+      hasGHD: options?.hasGhd ?? false,
+    },
     strengthFrequency: 2,
     constraints: {},
     triathlonContext: {

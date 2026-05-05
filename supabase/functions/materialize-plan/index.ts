@@ -1613,35 +1613,27 @@ function expandTokensForRow(
         );
         continue;
       }
+      // Infer Garmin equipmentType from drill name when no explicit suffix is present.
+      // Covers swim_drills_* tokens where equipment is encoded in the drill name itself.
+      const inferEquipFromDrillName = (name: string): string | null => {
+        if (/snorkel/.test(name)) return 'snorkel';
+        if (/\bkick\b/.test(name)) return 'board';
+        if (/scull/.test(name)) return 'buoy';
+        return null;
+      };
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
-        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(name);
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
-        continue;
-      }
-      // Drill (name first): swim_drill_catchup_4x50yd_r15 (optional equipment)
-      m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
-      if (m) {
-        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
-        console.log(`  ✅ Matched drill (name first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
-        const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { 
-          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); 
-          // Only add rest BETWEEN reps, not after the last rep
-          if(rest && i < reps - 1) {
-            steps.push({ id: uid(), kind:'recovery', duration_s: rest });
-            console.log(`    🔄 Added recovery step: ${rest}s`);
-          }
-        }
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
       // Use negative lookahead to prevent drill name from consuming _r\d+ pattern
       m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+?)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/);
       if (m) {
-        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(name);
         console.log(`  ✅ Matched drill (count first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { 

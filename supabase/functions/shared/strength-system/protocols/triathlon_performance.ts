@@ -34,16 +34,19 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const planWeekLabel = Math.max(1, Number.isFinite(context.weekIndex) ? context.weekIndex : weekInPhase);
   const tier: EquipmentTier =
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
+  // hasCable / hasGHD are explicit when threaded from Arc equipment list; fall back to safe defaults.
+  const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
+  const hasGHD: boolean = context.userBaselines.hasGHD ?? false;
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
   const freq = strengthFrequency ?? 2;
   const phaseName = String(phase?.name ?? '').toLowerCase();
 
   if (isRecovery) {
-    return [createPerfRecoverySession(tier)];
+    return [createPerfRecoverySession(tier, hasCable)];
   }
 
   if (phaseName === 'taper') {
-    return [perfTaperSession(tier)];
+    return [perfTaperSession(tier, hasCable)];
   }
 
   if (phaseName === 'recovery') {
@@ -52,19 +55,19 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
   if (phaseName === 'base') {
     return freq >= 2
-      ? [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel), perfBaseUpper(tier, limiter, weekInPhase, planWeekLabel)]
-      : [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel)];
+      ? [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel, hasGHD), perfBaseUpper(tier, hasCable, limiter, weekInPhase, planWeekLabel)]
+      : [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel, hasGHD)];
   }
 
   if (phaseName === 'build') {
     return freq >= 2
-      ? [perfBuildLower(tier, limiter, weekInPhase, planWeekLabel), perfBuildUpper(tier, limiter, weekInPhase, planWeekLabel)]
+      ? [perfBuildLower(tier, limiter, weekInPhase, planWeekLabel), perfBuildUpper(tier, hasCable, limiter, weekInPhase, planWeekLabel)]
       : [perfBuildLower(tier, limiter, weekInPhase, planWeekLabel)];
   }
 
   if (phaseName === 'race prep' || phaseName === 'race-specific' || phaseName === 'speed') {
     return freq >= 2
-      ? [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel), perfRaceUpper(tier, limiter)]
+      ? [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel), perfRaceUpper(tier, hasCable, limiter)]
       : [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel)];
   }
 
@@ -73,7 +76,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
 // ── Recovery (deload week): −volume, keep patterns ────────────────────────
 
-function createPerfRecoverySession(tier: EquipmentTier): IntentSession {
+function createPerfRecoverySession(tier: EquipmentTier, hasCable: boolean): IntentSession {
   const ex: StrengthExercise[] = [
     {
       name: tier === 'commercial_gym' ? 'Conventional Deadlift' : 'Single-Leg RDL',
@@ -89,7 +92,7 @@ function createPerfRecoverySession(tier: EquipmentTier): IntentSession {
       name: 'Face Pulls',
       sets: 2,
       reps: 15,
-      weight: tier === 'commercial_gym' ? 'Light cable' : 'Band',
+      weight: hasCable ? 'Light cable' : 'Band',
       target_rir: 4,
     },
     { name: 'Dead Bug', sets: 2, reps: '8/side', weight: 'Bodyweight', target_rir: 4 },
@@ -109,7 +112,7 @@ function createPerfRecoverySession(tier: EquipmentTier): IntentSession {
 
 // ── Base: hypertrophy (weeks 1–8 in a typical macrocycle) ───────────────────
 
-function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
+function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number, hasGHD?: boolean): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 3;
   const rir = 3;
@@ -149,14 +152,25 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     });
   }
 
-  ex.push({
-    name: 'Nordic Hamstring Curl',
-    sets: 2,
-    reps: 5,
-    weight: 'Assisted — band or partner',
-    target_rir: rir,
-    notes: 'Hamstring resilience — low volume, high intent',
-  });
+  if (hasGHD) {
+    ex.push({
+      name: 'Nordic Hamstring Curl',
+      sets: 2,
+      reps: 5,
+      weight: 'Controlled — use band for assistance as needed',
+      target_rir: rir,
+      notes: 'Eccentric hamstring resilience — low volume, high intent',
+    });
+  } else {
+    ex.push({
+      name: 'Single-Leg RDL',
+      sets: 2,
+      reps: '8/leg',
+      weight: tier === 'commercial_gym' ? 'Light-moderate DB/barbell' : 'Heaviest available',
+      target_rir: rir,
+      notes: 'Unilateral hip hinge — better running transfer than bilateral; 2s lowering',
+    });
+  }
 
   if (limiter === 'run' || limiter === 'bike') {
     ex.push({
@@ -180,7 +194,7 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     intent: 'LOWER_DURABILITY',
     priority: 'required',
     name: 'Tri Performance — Base Hypertrophy (Lower)',
-    description: `Base Week ${planWeekLabel} — Two primary lower compounds (≈65% 1RM, RIR ${rir}) plus Nordic curls 2×5 for hamstring resilience; accessories stay light.`,
+    description: `Base Week ${planWeekLabel} — Two primary lower compounds (≈65% 1RM, RIR ${rir}) plus ${hasGHD ? 'Nordic curls 2×5' : 'single-leg RDL 2×8/leg'} for hamstring resilience; accessories stay light.`,
     duration: tier === 'commercial_gym' ? 50 : 48,
     exercises: ex,
     repProfile: 'hypertrophy',
@@ -188,7 +202,7 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
   };
 }
 
-function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
+function perfBaseUpper(tier: EquipmentTier, hasCable: boolean, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 3;
   const rir = 3;
@@ -210,13 +224,24 @@ function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
       weight: '65% 1RM',
       target_rir: rir,
     });
-    ex.push({
-      name: 'Lat Pull-Down',
-      sets,
-      reps: 10,
-      weight: 'Moderate — full ROM',
-      target_rir: rir,
-    });
+    if (hasCable) {
+      ex.push({
+        name: 'Lat Pull-Down',
+        sets,
+        reps: 10,
+        weight: 'Moderate — full ROM',
+        target_rir: rir,
+      });
+    } else {
+      ex.push({
+        name: 'Pull-ups',
+        sets,
+        reps: limiter === 'swim' ? 6 : 8,
+        weight: 'Bodyweight',
+        target_rir: rir,
+        notes: 'Lat strength for swim pull',
+      });
+    }
   } else {
     ex.push({
       name: 'Inverted Rows',
@@ -245,7 +270,7 @@ function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     name: 'Face Pulls',
     sets: 3,
     reps: 15,
-    weight: tier === 'commercial_gym' ? 'Light cable (rope)' : 'Band',
+    weight: hasCable ? 'Light cable (rope)' : 'Band',
   });
   ex.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Light-moderate band' });
 
@@ -262,7 +287,7 @@ function perfBaseUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     name: 'Pallof Press',
     sets: 3,
     reps: '10/side',
-    weight: tier === 'commercial_gym' ? 'Light cable' : 'Band anchor',
+    weight: hasCable ? 'Light cable' : 'Band anchor',
   });
 
   return {
@@ -340,7 +365,7 @@ function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
   };
 }
 
-function perfBuildUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
+function perfBuildUpper(tier: EquipmentTier, hasCable: boolean, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 4;
   const rir = 2;
@@ -397,7 +422,7 @@ function perfBuildUpper(tier: EquipmentTier, limiter: LimiterSport, weekInPhase:
     name: 'Face Pulls',
     sets: 3,
     reps: 15,
-    weight: tier === 'commercial_gym' ? 'Cable' : 'Band',
+    weight: hasCable ? 'Cable' : 'Band',
   });
   ex.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Band' });
 
@@ -495,7 +520,7 @@ function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
   };
 }
 
-function perfRaceUpper(tier: EquipmentTier, limiter: LimiterSport): IntentSession {
+function perfRaceUpper(tier: EquipmentTier, hasCable: boolean, limiter: LimiterSport): IntentSession {
   const ex: StrengthExercise[] = [];
 
   if (tier === 'commercial_gym') {
@@ -506,13 +531,23 @@ function perfRaceUpper(tier: EquipmentTier, limiter: LimiterSport): IntentSessio
       weight: '75% 1RM — crisp rows',
       target_rir: 2,
     });
-    ex.push({
-      name: 'Explosive Lat Pull-Down',
-      sets: 3,
-      reps: 5,
-      weight: 'Moderate — fast concentric',
-      target_rir: 2,
-    });
+    if (hasCable) {
+      ex.push({
+        name: 'Explosive Lat Pull-Down',
+        sets: 3,
+        reps: 5,
+        weight: 'Moderate — fast concentric',
+        target_rir: 2,
+      });
+    } else {
+      ex.push({
+        name: 'Pull-ups (Explosive)',
+        sets: 3,
+        reps: 4,
+        weight: 'Bodyweight',
+        target_rir: 2,
+      });
+    }
   } else {
     ex.push({
       name: 'Pull-ups (Explosive)',
@@ -527,7 +562,7 @@ function perfRaceUpper(tier: EquipmentTier, limiter: LimiterSport): IntentSessio
     name: 'Face Pulls',
     sets: 3,
     reps: 15,
-    weight: tier === 'commercial_gym' ? 'Light cable' : 'Band',
+    weight: hasCable ? 'Light cable' : 'Band',
   });
   ex.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Band' });
 
@@ -555,7 +590,7 @@ function perfRaceUpper(tier: EquipmentTier, limiter: LimiterSport): IntentSessio
 
 // ── Taper: neural priming — light, fast, minimal soreness ───────────────────
 
-function perfTaperSession(tier: EquipmentTier): IntentSession {
+function perfTaperSession(tier: EquipmentTier, hasCable: boolean): IntentSession {
   const ex: StrengthExercise[] = [
     {
       name: tier === 'commercial_gym' ? 'Conventional Deadlift' : 'Single-Leg RDL',
@@ -589,7 +624,7 @@ function perfTaperSession(tier: EquipmentTier): IntentSession {
       name: 'Face Pulls',
       sets: 2,
       reps: 15,
-      weight: tier === 'commercial_gym' ? 'Very light cable' : 'Band',
+      weight: hasCable ? 'Very light cable' : 'Band',
     },
   ];
 

@@ -116,6 +116,17 @@ export interface AthleteState {
    * before session placement so returning swimmers are not dropped into full 70.3 swim share.
    */
   swim_volume_multiplier?: number;
+  /**
+   * Athlete-recorded choices from the conflict resolution UI, keyed by `conflict_id`
+   * (e.g. `"w3-quality-run-after-bike": "shift_quality_to_long_run"`).
+   * `week-builder` reads this at each placement decision so recorded preferences are
+   * honoured on regeneration without re-emitting the same conflict event.
+   */
+  conflict_preferences?: Record<string, string>;
+  /** True when athlete has explicit cable machine access. Barbell-capable home gyms may lack one. */
+  has_cable_machine?: boolean;
+  /** True when athlete has a GHD, Nordic bench, or fixed floor anchor. Required before prescribing Nordic Hamstring Curls. */
+  has_ghd?: boolean;
 }
 
 export interface AthleteMemory {
@@ -131,6 +142,11 @@ export interface CombinedPlanRequest {
   athlete_state: AthleteState;
   athlete_memory?: AthleteMemory;
   start_date?: string;
+  /**
+   * When true, build the same plan contract and sessions but do not insert a `plans` row.
+   * Response includes `plan_contract_v1`, `sessions_by_week`, and `preview_mode: true`.
+   */
+  preview?: boolean;
 }
 
 // ── Internal phase timeline ──────────────────────────────────────────────────

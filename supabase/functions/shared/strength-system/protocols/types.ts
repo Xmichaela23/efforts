@@ -55,6 +55,10 @@ export interface ProtocolContext {
     bench1RM?: number;
     overhead1RM?: number;
     equipment: 'home_gym' | 'commercial_gym';
+    /** True only when athlete explicitly has a cable machine (or commercial gym membership). Barbell-capable home gyms may lack one. */
+    hasCable?: boolean;
+    /** True only when athlete has a GHD machine, Nordic bench, or fixed floor anchor. Nordic Hamstring Curls must not be prescribed without this. */
+    hasGHD?: boolean;
   };
   
   // Strength training configuration

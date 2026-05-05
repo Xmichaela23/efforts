@@ -60,6 +60,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const planWeekLabel = Math.max(1, Number.isFinite(context.weekIndex) ? context.weekIndex : weekInPhase);
   const tier: EquipmentTier =
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
+  const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
   const freq = strengthFrequency ?? 2;
   const strengthIntent = context.triathlonContext?.strengthIntent;
@@ -68,7 +69,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
   // Recovery weeks: one light full-body, no intensity
   if (isRecovery) {
-    return [createRecoverySession(tier, weekInPhase)];
+    return [createRecoverySession(tier, hasCable, weekInPhase)];
   }
 
   // Taper: neural priming only, ≤ 1 session regardless of freq setting
@@ -85,7 +86,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return freq >= 2
       ? [
         createBasePosteriorChain(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
-        createBaseUpperSwim(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
+        createBaseUpperSwim(tier, hasCable, limiter, weekInPhase, planWeekLabel, strengthIntent),
       ]
       : [createBasePosteriorChain(tier, limiter, weekInPhase, planWeekLabel, strengthIntent)];
   }
@@ -94,13 +95,13 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return freq >= 2
       ? [
         createBuildExplosiveLower(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
-        createBuildSwimPower(tier, limiter, weekInPhase, planWeekLabel),
+        createBuildSwimPower(tier, hasCable, limiter, weekInPhase, planWeekLabel),
       ]
       : [createBuildExplosiveLower(tier, limiter, weekInPhase, planWeekLabel, strengthIntent)];
   }
 
   // race_specific — maintenance only, single session
-  return [createRaceSpecificMaintenance(tier, limiter)];
+  return [createRaceSpecificMaintenance(tier, hasCable, limiter)];
 }
 
 // ============================================================================
@@ -210,6 +211,7 @@ function createBasePosteriorChain(
 
 function createBaseUpperSwim(
   tier: EquipmentTier,
+  hasCable: boolean,
   limiter: LimiterSport,
   weekInPhase: number,
   planWeekLabel: number,
@@ -223,17 +225,31 @@ function createBaseUpperSwim(
 
   // ── Primary pulling (EVF muscles — Early Vertical Forearm) ───────────────
   if (tier === 'commercial_gym') {
-    exercises.push({
-      name: 'Lat Pull-Down',
-      sets, reps: 10,
-      weight: 'Moderate cable — full range', target_rir: rir,
-      notes: 'Initiate with scapular depression before elbow drive',
-    });
-    exercises.push({
-      name: 'Seated Cable Row',
-      sets, reps: 10,
-      weight: 'Moderate — squeeze between shoulder blades', target_rir: rir,
-    });
+    if (hasCable) {
+      exercises.push({
+        name: 'Lat Pull-Down',
+        sets, reps: 10,
+        weight: 'Moderate cable — full range', target_rir: rir,
+        notes: 'Initiate with scapular depression before elbow drive',
+      });
+      exercises.push({
+        name: 'Seated Cable Row',
+        sets, reps: 10,
+        weight: 'Moderate — squeeze between shoulder blades', target_rir: rir,
+      });
+    } else {
+      exercises.push({
+        name: 'Pull-ups / Assisted Pull-ups',
+        sets, reps: limiter === 'swim' ? 6 : 8,
+        weight: 'Bodyweight (use band if needed)', target_rir: rir,
+        notes: 'Full hang, retract scapulae before pulling',
+      });
+      exercises.push({
+        name: 'Barbell Row',
+        sets, reps: 10,
+        weight: '65% 1RM — retract scapulae', target_rir: rir,
+      });
+    }
   } else {
     exercises.push({
       name: 'Pull-ups / Assisted Pull-ups',
@@ -263,7 +279,7 @@ function createBaseUpperSwim(
   exercises.push({
     name: 'Face Pulls',
     sets: 3, reps: 15,
-    weight: tier === 'commercial_gym' ? 'Light cable (rope attachment)' : 'Band',
+    weight: hasCable ? 'Light cable (rope attachment)' : 'Band',
     notes: 'Elbows high, external rotation at end range',
   });
   exercises.push({
@@ -304,7 +320,7 @@ function createBaseUpperSwim(
   exercises.push({
     name: 'Pallof Press',
     sets: 3, reps: '10/side',
-    weight: tier === 'commercial_gym' ? 'Light cable' : 'Band anchor',
+    weight: hasCable ? 'Light cable' : 'Band anchor',
     notes: 'Resist rotation — brace and breathe',
   });
 
@@ -425,6 +441,7 @@ function createBuildExplosiveLower(
 
 function createBuildSwimPower(
   tier: EquipmentTier,
+  hasCable: boolean,
   limiter: LimiterSport,
   _weekInPhase: number,
   planWeekLabel: number,
@@ -435,13 +452,23 @@ function createBuildSwimPower(
 
   // ── Power pull (swim catch power) ─────────────────────────────────────────
   if (tier === 'commercial_gym') {
-    exercises.push({
-      name: 'Explosive Lat Pull-Down',
-      sets, reps: 6,
-      weight: 'Moderate-heavy — fast pull, controlled return',
-      target_rir: 1,
-      notes: 'Rate of force development for the catch phase',
-    });
+    if (hasCable) {
+      exercises.push({
+        name: 'Explosive Lat Pull-Down',
+        sets, reps: 6,
+        weight: 'Moderate-heavy — fast pull, controlled return',
+        target_rir: 1,
+        notes: 'Rate of force development for the catch phase',
+      });
+    } else {
+      exercises.push({
+        name: 'Pull-ups (Explosive)',
+        sets, reps: 4,
+        weight: 'Bodyweight — pull fast, lower in 3s',
+        target_rir: 1,
+        notes: 'Full ROM — scapulae pack before pulling',
+      });
+    }
     exercises.push({
       name: 'Dumbbell Power Row (Single Arm)',
       sets, reps: '6/side',
@@ -469,16 +496,16 @@ function createBuildSwimPower(
     exercises.push({
       name: 'Single-Arm Cable External Rotation',
       sets: 3, reps: '12/side',
-      weight: tier === 'commercial_gym' ? 'Light cable (elbow at 90°)' : 'Band',
+      weight: hasCable ? 'Light cable (elbow at 90°)' : 'Band',
       notes: 'Protect the shoulder under swimming fatigue',
     });
   }
 
   // ── Scapular stability (all disciplines) ─────────────────────────────────
-  exercises.push({ name: 'Face Pulls', sets: 3, reps: 15, weight: tier === 'commercial_gym' ? 'Cable (rope)' : 'Band', notes: 'Elbows high' });
+  exercises.push({ name: 'Face Pulls', sets: 3, reps: 15, weight: hasCable ? 'Cable (rope)' : 'Band', notes: 'Elbows high' });
 
   // ── Core: anti-rotation + rotational power ────────────────────────────────
-  if (tier === 'commercial_gym') {
+  if (hasCable) {
     exercises.push({
       name: 'Cable Wood Chop (High to Low)',
       sets: 3, reps: '10/side',
@@ -513,6 +540,7 @@ function createBuildSwimPower(
 
 function createRaceSpecificMaintenance(
   tier: EquipmentTier,
+  hasCable: boolean,
   limiter: LimiterSport,
 ): IntentSession {
   const exercises: StrengthExercise[] = [];
@@ -524,11 +552,11 @@ function createRaceSpecificMaintenance(
 
   // ── Upper: sport-specific shoulder maintenance ────────────────────────────
   if (limiter === 'swim') {
-    exercises.push({ name: 'Face Pulls', sets: 2, reps: 15, weight: tier === 'commercial_gym' ? 'Light cable' : 'Band', notes: 'Shoulder health priority' });
+    exercises.push({ name: 'Face Pulls', sets: 2, reps: 15, weight: hasCable ? 'Light cable' : 'Band', notes: 'Shoulder health priority' });
     exercises.push({ name: 'Band Pull-Aparts', sets: 2, reps: 20, weight: 'Light band' });
     exercises.push({ name: 'External Rotation (Side-Lying)', sets: 2, reps: '15/side', weight: 'Very light', notes: 'Rotator cuff maintenance' });
   } else {
-    exercises.push({ name: 'Face Pulls', sets: 3, reps: 15, weight: tier === 'commercial_gym' ? 'Light cable' : 'Band' });
+    exercises.push({ name: 'Face Pulls', sets: 3, reps: 15, weight: hasCable ? 'Light cable' : 'Band' });
     exercises.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Light band' });
   }
 
@@ -596,7 +624,7 @@ function createTaperPrimingSession(tier: EquipmentTier): IntentSession {
 // RECOVERY WEEK — one easy full-body session
 // ============================================================================
 
-function createRecoverySession(tier: EquipmentTier, weekInPhase: number): IntentSession {
+function createRecoverySession(tier: EquipmentTier, hasCable: boolean, weekInPhase: number): IntentSession {
   return {
     intent: 'FULLBODY_MAINTENANCE',
     priority: 'preferred',
@@ -609,7 +637,7 @@ function createRecoverySession(tier: EquipmentTier, weekInPhase: number): Intent
       { name: 'Bodyweight Squat or Goblet Squat', sets: 2, reps: 12, weight: 'Bodyweight / light KB', target_rir: 5 },
       { name: 'Hip Thrusts', sets: 2, reps: 12, weight: 'Light load', target_rir: 5 },
       { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight', target_rir: 5 },
-      { name: 'Face Pulls', sets: 2, reps: 15, weight: tier === 'commercial_gym' ? 'Light cable' : 'Band', target_rir: 5 },
+      { name: 'Face Pulls', sets: 2, reps: 15, weight: hasCable ? 'Light cable' : 'Band', target_rir: 5 },
       { name: 'Side Plank', sets: 2, reps: '20s/side', weight: 'Bodyweight' },
     ],
     repProfile: 'maintenance',

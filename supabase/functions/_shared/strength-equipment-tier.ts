@@ -9,6 +9,26 @@ export function normStrengthEquipmentStrings(strengthEquipment: unknown): string
   return strengthEquipment.map((s) => String(s).toLowerCase());
 }
 
+/**
+ * True only when the athlete has a GHD machine, dedicated Nordic bench, or similar
+ * fixed floor anchor (e.g. "ghd", "nordic bench", "glute ham raise").
+ * No current equipment UI option produces this — so Nordics will not fire until one is added.
+ */
+export function hasGHD(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some(
+    (s) => s.includes('ghd') || s.includes('nordic bench') || s.includes('glute ham raise'),
+  );
+}
+
+export function hasCableMachine(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return (
+    n.some((s) => s.includes('cable')) ||
+    n.some((s) => s.includes('commercial gym'))
+  );
+}
+
 export function hasBarbellCapability(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);
   const some = (sub: string) => n.some((s) => s.includes(sub));

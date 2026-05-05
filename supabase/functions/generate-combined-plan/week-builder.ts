@@ -136,6 +136,54 @@ function mkConflictId(weekNum: number, slug: string): string {
   return `w${weekNum}-${slug}`;
 }
 
+/**
+ * Action strings that mean "accept the engine's placement silently — don't re-emit the conflict."
+ * Populated from the resolver's `action` strings for "accept" options.
+ */
+const PREF_ACCEPT_ACTIONS = new Set<string>([
+  'move_to_alternate_day',
+  // quality run
+  'accept_planner_quality_run_day',
+  'accept_planner_adjacent_quality_run',
+  'accept_planner_quality_run_stimulus',
+  'revert_quality_run_to_preferred_day',
+  // swim
+  'accept_planner_swim_stimulus',
+  'accept_planner_adjacent_swim',
+  'soften_swim_main_set',
+  // bike
+  'accept_planner_bike_stimulus',
+  'accept_planner_adjacent_bike',
+  'soften_bike_quality_week',
+  // third swim
+  'accept_planner_third_swim_day',
+  'defer_third_swim',
+  // strength
+  'accept_planner_lower_body_day',
+  'accept_planner_adjacent_strength',
+  'nudge_strength_day',
+  // brick
+  'accept_planner_brick_day',
+  'accept_planner_brick_layout',
+  'nudge_brick_day',
+]);
+
+/** Action strings that mean "skip this session entirely this week." */
+const PREF_DROP_ACTIONS = new Set<string>([
+  'drop_this_week',
+  'accept_drop_quality_run',
+  'trim_peer_sessions_retry',
+  'drop_third_swim_week',
+  'accept_drop_third_swim',
+]);
+
+/** Action strings that mean "keep the quality run on its preferred day despite the anchor conflict." */
+const PREF_KEEP_QUALITY_RUN_ACTIONS = new Set<string>([
+  'keep_quality_run_preferred_day',
+  'keep_quality_run_thursday',
+  'keep_quality_run_same_day',
+]);
+
 function uniqReasons(r: WeekStateReason[]): WeekStateReason[] {
   return [...new Set(r)];
 }
@@ -458,6 +506,16 @@ export function buildWeek(
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
   const conflictEvents: ConflictEvent[] = [];
 
+  // ── Conflict-preference helpers ──────────────────────────────────────────
+  const conflictPrefs: Record<string, string> = athleteState.conflict_preferences ?? {};
+  /** Returns the recorded preference action for this week's conflict slug, or undefined. */
+  const getPref = (slug: string): string | undefined => conflictPrefs[mkConflictId(weekNum, slug)];
+
+  // Flags set during conflict detection; consumed at placement sites later.
+  let shiftQualityRunToLongRun = false;
+  let dropQualityRunThisWeek = false;
+  let dropThirdSwimThisWeek = false;
+
   // Diagnostic: log all day-preference state for every week so we can trace preferred_days flow.
   console.log('[buildWeek] week', weekNum, {
     days_per_week: athleteState.days_per_week,
@@ -735,26 +793,29 @@ export function buildWeek(
     }
   }
   if (swimQualityDay !== swimQualityBeforeLongAnchor) {
-    const reasons: WeekStateReason[] = uniqReasons([
-      'anchor_conflict',
-      ...(isRecovery ? (['recovery_week'] as const) : []),
-    ]);
-    const swimAnchorHits: string[] = [];
-    if (longRideDay === swimQualityBeforeLongAnchor) swimAnchorHits.push(longRideDay);
-    if (longRunActualDay === swimQualityBeforeLongAnchor) swimAnchorHits.push(longRunActualDay);
-    if (restDayNames.has(swimQualityBeforeLongAnchor)) swimAnchorHits.push('Rest day');
-    conflictEvents.push({
-      conflict_id: mkConflictId(weekNum, 'swim-quality-long-anchor'),
-      conflict_type: 'quality_swim_blocked',
-      blocked_intent: { session_kind: 'quality_swim', preferred_day: conflictDayLo(swimQualityBeforeLongAnchor) },
-      blocking_reasons: reasons,
-      anchors_involved: swimAnchorHits,
-      applied_resolution: {
-        type: 'moved',
-        to_day: conflictDayLo(swimQualityDay),
-        note: `Quality swim moved from ${swimQualityBeforeLongAnchor} to ${swimQualityDay} (long ride / long run / rest anchors).`,
-      },
-    });
+    const swLongPref = getPref('swim-quality-long-anchor');
+    if (!PREF_ACCEPT_ACTIONS.has(swLongPref ?? '') && !PREF_DROP_ACTIONS.has(swLongPref ?? '')) {
+      const reasons: WeekStateReason[] = uniqReasons([
+        'anchor_conflict',
+        ...(isRecovery ? (['recovery_week'] as const) : []),
+      ]);
+      const swimAnchorHits: string[] = [];
+      if (longRideDay === swimQualityBeforeLongAnchor) swimAnchorHits.push(longRideDay);
+      if (longRunActualDay === swimQualityBeforeLongAnchor) swimAnchorHits.push(longRunActualDay);
+      if (restDayNames.has(swimQualityBeforeLongAnchor)) swimAnchorHits.push('Rest day');
+      conflictEvents.push({
+        conflict_id: mkConflictId(weekNum, 'swim-quality-long-anchor'),
+        conflict_type: 'quality_swim_blocked',
+        blocked_intent: { session_kind: 'quality_swim', preferred_day: conflictDayLo(swimQualityBeforeLongAnchor) },
+        blocking_reasons: reasons,
+        anchors_involved: swimAnchorHits,
+        applied_resolution: {
+          type: 'moved',
+          to_day: conflictDayLo(swimQualityDay),
+          note: `Quality swim moved from ${swimQualityBeforeLongAnchor} to ${swimQualityDay} (long ride / long run / rest anchors).`,
+        },
+      });
+    }
   }
 
   const runQualityIdx =
@@ -791,21 +852,24 @@ export function buildWeek(
     }
   }
   if (swimQualityDay !== swimQualityBeforeRunSwimMatrix) {
-    conflictEvents.push({
-      conflict_id: mkConflictId(weekNum, 'swim-quality-run-matrix'),
-      conflict_type: 'quality_swim_blocked',
-      blocked_intent: {
-        session_kind: 'quality_swim',
-        preferred_day: conflictDayLo(swimQualityBeforeRunSwimMatrix),
-      },
-      blocking_reasons: uniqReasons(['consecutive_cross_discipline', 'anchor_conflict']),
-      anchors_involved: [runQualityDay],
-      applied_resolution: {
-        type: 'moved',
-        to_day: conflictDayLo(swimQualityDay),
-        note: `Quality swim moved off ${swimQualityBeforeRunSwimMatrix} so quality run can stay on ${runQualityDay} (completion/support matrix).`,
-      },
-    });
+    const swRunMatrixPref = getPref('swim-quality-run-matrix');
+    if (!PREF_ACCEPT_ACTIONS.has(swRunMatrixPref ?? '') && !PREF_DROP_ACTIONS.has(swRunMatrixPref ?? '')) {
+      conflictEvents.push({
+        conflict_id: mkConflictId(weekNum, 'swim-quality-run-matrix'),
+        conflict_type: 'quality_swim_blocked',
+        blocked_intent: {
+          session_kind: 'quality_swim',
+          preferred_day: conflictDayLo(swimQualityBeforeRunSwimMatrix),
+        },
+        blocking_reasons: uniqReasons(['consecutive_cross_discipline', 'anchor_conflict']),
+        anchors_involved: [runQualityDay],
+        applied_resolution: {
+          type: 'moved',
+          to_day: conflictDayLo(swimQualityDay),
+          note: `Quality swim moved off ${swimQualityBeforeRunSwimMatrix} so quality run can stay on ${runQualityDay} (completion/support matrix).`,
+        },
+      });
+    }
   }
 
   // Third swim (`preferred_days.swim[2]` → swim_third_day): only when swim_intent === 'focus'.
@@ -849,18 +913,24 @@ export function buildWeek(
     };
     swimThirdDay = resolveSwimThirdDay();
     if (swimThirdPreferred && swimThirdDay && swimThirdDay !== swimThirdPreferred) {
-      conflictEvents.push({
-        conflict_id: mkConflictId(weekNum, 'third-swim'),
-        conflict_type: 'third_swim_blocked',
-        blocked_intent: { session_kind: 'third_swim', preferred_day: conflictDayLo(swimThirdPreferred) },
-        blocking_reasons: uniqReasons(['anchor_conflict', 'no_clean_day']),
-        anchors_involved: [swimThirdPreferred],
-        applied_resolution: {
-          type: 'moved',
-          to_day: conflictDayLo(swimThirdDay),
-          note: `Third swim moved from ${swimThirdPreferred} to ${swimThirdDay} (swim / long-day / rest spacing).`,
-        },
-      });
+      const thirdSwimPref = getPref('third-swim');
+      if (PREF_DROP_ACTIONS.has(thirdSwimPref ?? '')) {
+        dropThirdSwimThisWeek = true;
+        swimThirdDay = null;
+      } else if (!PREF_ACCEPT_ACTIONS.has(thirdSwimPref ?? '')) {
+        conflictEvents.push({
+          conflict_id: mkConflictId(weekNum, 'third-swim'),
+          conflict_type: 'third_swim_blocked',
+          blocked_intent: { session_kind: 'third_swim', preferred_day: conflictDayLo(swimThirdPreferred) },
+          blocking_reasons: uniqReasons(['anchor_conflict', 'no_clean_day']),
+          anchors_involved: [swimThirdPreferred],
+          applied_resolution: {
+            type: 'moved',
+            to_day: conflictDayLo(swimThirdDay),
+            note: `Third swim moved from ${swimThirdPreferred} to ${swimThirdDay} (swim / long-day / rest spacing).`,
+          },
+        });
+      }
     }
   }
 
@@ -932,22 +1002,25 @@ export function buildWeek(
     }
   }
   if (bikeQualityDay !== bikeQualityPreferredDay) {
-    const bikeAnchorHits: string[] = [];
-    if (longRideDay === bikeQualityPreferredDay) bikeAnchorHits.push(longRideDay);
-    if (longRunActualDay === bikeQualityPreferredDay) bikeAnchorHits.push(longRunActualDay);
-    if (restDayNames.has(bikeQualityPreferredDay)) bikeAnchorHits.push('Rest day');
-    conflictEvents.push({
-      conflict_id: mkConflictId(weekNum, 'bike-quality-anchor'),
-      conflict_type: 'quality_bike_blocked',
-      blocked_intent: { session_kind: 'quality_bike', preferred_day: conflictDayLo(bikeQualityPreferredDay) },
-      blocking_reasons: uniqReasons(['anchor_conflict', ...(isRecovery ? (['recovery_week'] as const) : [])]),
-      anchors_involved: bikeAnchorHits.length > 0 ? bikeAnchorHits : [longRideDay, longRunActualDay],
-      applied_resolution: {
-        type: 'moved',
-        to_day: conflictDayLo(bikeQualityDay),
-        note: `Quality bike moved from ${bikeQualityPreferredDay} to ${bikeQualityDay} (long ride / long run / rest collision).`,
-      },
-    });
+    const bikeAnchorPref = getPref('bike-quality-anchor');
+    if (!PREF_ACCEPT_ACTIONS.has(bikeAnchorPref ?? '') && !PREF_DROP_ACTIONS.has(bikeAnchorPref ?? '')) {
+      const bikeAnchorHits: string[] = [];
+      if (longRideDay === bikeQualityPreferredDay) bikeAnchorHits.push(longRideDay);
+      if (longRunActualDay === bikeQualityPreferredDay) bikeAnchorHits.push(longRunActualDay);
+      if (restDayNames.has(bikeQualityPreferredDay)) bikeAnchorHits.push('Rest day');
+      conflictEvents.push({
+        conflict_id: mkConflictId(weekNum, 'bike-quality-anchor'),
+        conflict_type: 'quality_bike_blocked',
+        blocked_intent: { session_kind: 'quality_bike', preferred_day: conflictDayLo(bikeQualityPreferredDay) },
+        blocking_reasons: uniqReasons(['anchor_conflict', ...(isRecovery ? (['recovery_week'] as const) : [])]),
+        anchors_involved: bikeAnchorHits.length > 0 ? bikeAnchorHits : [longRideDay, longRunActualDay],
+        applied_resolution: {
+          type: 'moved',
+          to_day: conflictDayLo(bikeQualityDay),
+          note: `Quality bike moved from ${bikeQualityPreferredDay} to ${bikeQualityDay} (long ride / long run / rest collision).`,
+        },
+      });
+    }
   }
   if (bikeEasyDay === bikeQualityDay || bikeEasyDay === longRideDay || restDayNames.has(bikeEasyDay)) {
     for (let step = 1; step <= 6; step++) {
@@ -973,67 +1046,89 @@ export function buildWeek(
     const preferredRunQ = runQualityDay;
     const dayAfterBike = adjDay(bikeQualityDay, 1);
     if (preferredRunQ === dayAfterBike) {
-      const blockedQr = new Set<string>([
-        longRideDay,
-        longRunActualDay,
-        ...restDayNames,
-        ...brickDaysSetForQr,
-        bikeQualityDay,
-        adjDay(bikeQualityDay, -1),
-        adjDay(bikeQualityDay, 1),
-      ]);
-      if (!allowQualityRunSwimSameDay) blockedQr.add(swimQualityDay);
+      const qrPref = getPref('quality-run-after-bike');
 
-      const prio: string[] = [];
-      prio.push(adjDay(bikeQualityDay, 2));
-      prio.push(adjDay(bikeQualityDay, -1));
-      for (const d of DAYS_OF_WEEK) {
-        if (!prio.includes(d)) prio.push(d);
-      }
+      if (PREF_KEEP_QUALITY_RUN_ACTIONS.has(qrPref ?? '')) {
+        // Athlete accepted the back-to-back — keep preferred day as-is, no conflict emitted.
 
-      const anchorLabel = (athleteState.bike_quality_label ?? '').trim() || 'Group ride';
-      let movedTo: string | null = null;
-      for (const cand of prio) {
-        if (blockedQr.has(cand)) continue;
-        if (adjDay(bikeQualityDay, 1) === cand) continue;
-        movedTo = cand;
-        break;
-      }
-      if (movedTo != null && movedTo !== preferredRunQ) {
-        runQualityDay = movedTo;
-        conflictEvents.push({
-          conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
-          conflict_type: 'quality_run_blocked',
-          blocked_intent: {
-            session_kind: 'quality_run',
-            preferred_day: conflictDayLo(preferredRunQ),
-            intensity_class: 'HARD',
-          },
-          blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline']),
-          anchors_involved: [anchorLabel],
-          applied_resolution: {
-            type: 'moved',
-            to_day: conflictDayLo(movedTo),
-            note: `Moved quality run off ${preferredRunQ} to avoid HARD the day after ${bikeQualityDay} (${anchorLabel}).`,
-          },
-        });
-      } else if (movedTo == null) {
-        conflictEvents.push({
-          conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
-          conflict_type: 'quality_run_blocked',
-          blocked_intent: {
-            session_kind: 'quality_run',
-            preferred_day: conflictDayLo(preferredRunQ),
-            intensity_class: 'HARD',
-          },
-          blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline', 'no_clean_day']),
-          anchors_involved: [anchorLabel],
-          applied_resolution: {
-            type: 'none',
-            note:
-              'Quality run stayed adjacent to anchored quality bike; no cleaner weekday in this scan (hard/easy pass may still moderate intensity).',
-          },
-        });
+      } else if (qrPref === 'shift_quality_to_long_run') {
+        // Drop mid-week quality run; long run will carry race-pace quality work.
+        shiftQualityRunToLongRun = true;
+
+      } else if (PREF_DROP_ACTIONS.has(qrPref ?? '')) {
+        dropQualityRunThisWeek = true;
+
+      } else {
+        // Default path (no preference or a silent-accept preference):
+        // compute the best alternate day, optionally bump, optionally emit.
+        const blockedQr = new Set<string>([
+          longRideDay,
+          longRunActualDay,
+          ...restDayNames,
+          ...brickDaysSetForQr,
+          bikeQualityDay,
+          adjDay(bikeQualityDay, -1),
+          adjDay(bikeQualityDay, 1),
+        ]);
+        if (!allowQualityRunSwimSameDay) blockedQr.add(swimQualityDay);
+
+        const prio: string[] = [];
+        prio.push(adjDay(bikeQualityDay, 2));
+        prio.push(adjDay(bikeQualityDay, -1));
+        for (const d of DAYS_OF_WEEK) {
+          if (!prio.includes(d)) prio.push(d);
+        }
+
+        const anchorLabel = (athleteState.bike_quality_label ?? '').trim() || 'Group ride';
+        let movedTo: string | null = null;
+        for (const cand of prio) {
+          if (blockedQr.has(cand)) continue;
+          if (adjDay(bikeQualityDay, 1) === cand) continue;
+          movedTo = cand;
+          break;
+        }
+
+        // Silent-accept: engine's chosen day is accepted; no conflict event.
+        const silentAccept = PREF_ACCEPT_ACTIONS.has(qrPref ?? '');
+
+        if (movedTo != null && movedTo !== preferredRunQ) {
+          runQualityDay = movedTo;
+          if (!silentAccept) {
+            conflictEvents.push({
+              conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
+              conflict_type: 'quality_run_blocked',
+              blocked_intent: {
+                session_kind: 'quality_run',
+                preferred_day: conflictDayLo(preferredRunQ),
+                intensity_class: 'HARD',
+              },
+              blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline']),
+              anchors_involved: [anchorLabel],
+              applied_resolution: {
+                type: 'moved',
+                to_day: conflictDayLo(movedTo),
+                note: `Moved quality run off ${preferredRunQ} to avoid HARD the day after ${bikeQualityDay} (${anchorLabel}).`,
+              },
+            });
+          }
+        } else if (movedTo == null && !silentAccept) {
+          conflictEvents.push({
+            conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
+            conflict_type: 'quality_run_blocked',
+            blocked_intent: {
+              session_kind: 'quality_run',
+              preferred_day: conflictDayLo(preferredRunQ),
+              intensity_class: 'HARD',
+            },
+            blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline', 'no_clean_day']),
+            anchors_involved: [anchorLabel],
+            applied_resolution: {
+              type: 'none',
+              note:
+                'Quality run stayed adjacent to anchored quality bike; no cleaner weekday in this scan (hard/easy pass may still moderate intensity).',
+            },
+          });
+        }
       }
     }
   }
@@ -1068,7 +1163,23 @@ export function buildWeek(
 
   // ── Run quality (default Wednesday; from Arc `preferred_days.quality_run`) ──
   const runQualitySlot = grid.get(runQualityDay);
-  if (!runQualitySlot?.isRest) {
+  if (shiftQualityRunToLongRun) {
+    // Athlete chose to let the long run carry race-pace quality work instead of a mid-week session.
+    // Upgrade the already-placed long run to a race-pace variant (if it is not already one).
+    const lrSlotForQuality = grid.get(longRunActualDay);
+    if (lrSlotForQuality && !raceThisWeek) {
+      const lrRunIdx = lrSlotForQuality.sessions.findIndex((s) => s.type === 'run');
+      const lrUseStructuredRacePace =
+        phase === 'race_specific' && !isRecovery && !triRaceNextPlanWeek && weeksToRace > 3;
+      if (lrRunIdx >= 0 && !lrUseStructuredRacePace) {
+        const rpMiles = Math.max(4, Math.round(longRunMiles * 0.65));
+        lrSlotForQuality.sessions[lrRunIdx] = hasTri
+          ? racePaceRun(longRunActualDay, rpMiles, primaryGoal.distance as TriRaceDistance, servedGoal)
+          : marathonPaceRun(longRunActualDay, rpMiles, servedGoal);
+      }
+    }
+    // Quality run slot left empty — no mid-week session placed.
+  } else if (!dropQualityRunThisWeek && !runQualitySlot?.isRest) {
     if (recoveryRebuildWeek1) {
       const easyMi = Math.max(3, Math.round(longRunMiles * 0.25));
       runQualitySlot!.sessions.push(easyRun(runQualityDay, easyMi, servedGoal));
@@ -1122,7 +1233,7 @@ export function buildWeek(
         }
       }
     }
-  }
+  } // end else if (!dropQualityRunThisWeek && !runQualitySlot?.isRest)
 
   // ── Tri swims (program templates × swim_volume_multiplier) ────────────────
   let qualitySwimPlaced = false;
@@ -1272,6 +1383,8 @@ export function buildWeek(
       const strSlot = grid.get(strDay);
       if (strSlot) {
         const equipmentType = athleteState.equipment_type ?? 'commercial_gym';
+        const hasCable = athleteState.has_cable_machine ?? (equipmentType === 'commercial_gym' && !athleteState.equipment_type?.includes('home'));
+        const hasGhd = athleteState.has_ghd ?? false;
         if (hasTri) {
           // Tri slot 1 (first preferred day, e.g. Monday) = upper body (index 1): lighter load
           // before Wednesday quality bike. Slot 2 (Thursday) = lower body (index 0): AM/PM with
@@ -1284,6 +1397,8 @@ export function buildWeek(
             limiterSport,
             sessionIndex: 1,
             equipmentType,
+            hasCable,
+            hasGhd,
             longRideDayName: longRideDay,
             longRunDayName: longRunActualDay,
             strengthProtocolId: athleteState.strength_protocol,
@@ -1340,25 +1455,28 @@ export function buildWeek(
       }
       const strDay2 = pool2[0];
       if (strDay2 && hasTri && (lowerPrefBypassUsed || lower48hGuardDropped)) {
-        const reasons: WeekStateReason[] = [];
-        if (lowerPrefBypassUsed) reasons.push('anchor_conflict');
-        if (lower48hGuardDropped) {
-          reasons.push('pre_long_run_48h', 'pre_brick_48h', 'no_clean_day');
+        const heavyLowerPref = getPref(`heavy-lower-${strDay2}`);
+        if (!PREF_ACCEPT_ACTIONS.has(heavyLowerPref ?? '') && !PREF_DROP_ACTIONS.has(heavyLowerPref ?? '')) {
+          const reasons: WeekStateReason[] = [];
+          if (lowerPrefBypassUsed) reasons.push('anchor_conflict');
+          if (lower48hGuardDropped) {
+            reasons.push('pre_long_run_48h', 'pre_brick_48h', 'no_clean_day');
+          }
+          conflictEvents.push({
+            conflict_id: mkConflictId(weekNum, `heavy-lower-${strDay2}`),
+            conflict_type: 'heavy_lower_blocked',
+            blocked_intent: { session_kind: 'lower_body_strength', intensity_class: 'HARD' },
+            blocking_reasons: uniqReasons(reasons),
+            anchors_involved: [...brickDaysInGrid, longRunActualDay],
+            applied_resolution: {
+              type: 'moved',
+              to_day: conflictDayLo(strDay2),
+              note: lower48hGuardDropped
+                ? `Lower-body strength placed on ${strDay2} without the 48h long-run/brick clearance row (Mon–Fri density).`
+                : `Lower-body strength on ${strDay2} — preferred strength days skipped while keeping the 48h guard.`,
+            },
+          });
         }
-        conflictEvents.push({
-          conflict_id: mkConflictId(weekNum, `heavy-lower-${strDay2}`),
-          conflict_type: 'heavy_lower_blocked',
-          blocked_intent: { session_kind: 'lower_body_strength', intensity_class: 'HARD' },
-          blocking_reasons: uniqReasons(reasons),
-          anchors_involved: [...brickDaysInGrid, longRunActualDay],
-          applied_resolution: {
-            type: 'moved',
-            to_day: conflictDayLo(strDay2),
-            note: lower48hGuardDropped
-              ? `Lower-body strength placed on ${strDay2} without the 48h long-run/brick clearance row (Mon–Fri density).`
-              : `Lower-body strength on ${strDay2} — preferred strength days skipped while keeping the 48h guard.`,
-          },
-        });
       }
       if (strDay2) {
         const strSlot2 = grid.get(strDay2);
@@ -1375,6 +1493,8 @@ export function buildWeek(
               limiterSport,
               sessionIndex: 0,
               equipmentType: equipmentType2,
+              hasCable,
+              hasGhd,
               longRideDayName: longRideDay,
               longRunDayName: longRunActualDay,
               strengthProtocolId: athleteState.strength_protocol,

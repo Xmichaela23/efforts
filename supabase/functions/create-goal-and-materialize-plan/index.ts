@@ -31,6 +31,8 @@ import {
 } from '../_shared/week-optimizer.ts';
 import {
   hasBarbellCapability,
+  hasCableMachine,
+  hasGHD,
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveProtocolIdForCombinedTriPlan } from '../shared/strength-system/protocols/selector.ts';
@@ -63,6 +65,18 @@ interface CreateGoalRequest {
   };
   /** When set, combined-plan + run/tri generators use this anchor instead of guessing. */
   plan_start_date?: string | null;
+  /**
+   * When true, `generate-combined-plan` runs in preview mode (no plan row, no activate).
+   * `build_existing` skips persisting the merged `training_prefs` until a non-preview call.
+   */
+  preview?: boolean;
+  /**
+   * Ephemeral conflict preferences accumulated by the conflict-resolution UI loop.
+   * Merged into `training_prefs.conflict_preferences` in memory so week-builder can honour
+   * them without a DB write during preview iterations. On the final non-preview call they
+   * are persisted via the normal `training_prefs` update.
+   */
+  ephemeral_conflict_preferences?: Record<string, string>;
 }
 
 class AppError extends Error {
@@ -775,7 +789,13 @@ async function buildCombinedPlan(
   },
   /** From goal flow (`plan_start_date`). When omitted, combined plan still used server's current Monday (legacy). */
   explicit_plan_start_date?: string | null,
-): Promise<{ plan_id: string } | null> {
+  /** Dry-run combined generation: no DB plan, no prefs writes, no activate-plan. */
+  planPreview?: boolean,
+): Promise<
+  | { plan_id: string; preview: false }
+  | { preview: true; combined_preview: Record<string, unknown> }
+  | null
+> {
 
   // Gather all active event goals (including the just-created one)
   const { data: allEventGoals } = await supabase
@@ -786,6 +806,10 @@ async function buildCombinedPlan(
     .eq('status', 'active');
 
   if (!allEventGoals || allEventGoals.length < 2) return null; // No sibling goals; fall through
+
+  const workingGoals = planPreview
+    ? allEventGoals.map((g) => (g.id === newGoalId ? { ...g, training_prefs: newGoal.training_prefs } : g))
+    : allEventGoals;
 
   // Get athlete snapshots for CTL + volume estimates, and baselines for equipment
   const [{ data: snapshots }, { data: combinedBaseline }] = await Promise.all([
@@ -828,7 +852,7 @@ async function buildCombinedPlan(
   }
 
   // Build GoalInput array for the combined engine
-  const goalsForCombined = allEventGoals.map(g => {
+  const goalsForCombined = workingGoals.map(g => {
     const isNew = g.id === newGoalId;
     const rawPriority = String((isNew ? (newGoal.training_prefs as any)?.priority : g.priority) || g.priority || 'A');
     return {
@@ -846,7 +870,7 @@ async function buildCombinedPlan(
   // Resolve approach for the combined plan.
   // The primary event goal drives the approach; defaults to the same logic as standalone.
   const primaryGoal = goalsForCombined.find(g => g.priority === 'A') ?? goalsForCombined[0];
-  const primaryGoalPrefs = (allEventGoals.find(g => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+  const primaryGoalPrefs = (workingGoals.find(g => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
   const primaryGoalType  = String(primaryGoalPrefs?.goal_type || '').toLowerCase();
   const triApproach = (newGoal.training_prefs?.tri_approach as string | undefined)
     ?? primaryGoalPrefs?.tri_approach
@@ -877,6 +901,8 @@ async function buildCombinedPlan(
     combinedStrengthEquipment,
     combinedBaseline?.performance_numbers,
   );
+  const hasCableForPlan = hasCableMachine(combinedStrengthEquipment);
+  const hasGHDForPlan = hasGHD(combinedStrengthEquipment);
 
   // base_first always defaults to 2:1 loading (completion-focused, slower recovery).
   // race_peak defers to fitness level (beginner→2:1, intermediate/advanced→3:1).
@@ -887,7 +913,7 @@ async function buildCombinedPlan(
   const focusForCombined = new Date().toISOString().slice(0, 10);
   const arcForCombined = await getArcContext(supabase, user_id, focusForCombined);
 
-  for (const g of allEventGoals || []) {
+  for (const g of workingGoals) {
     const sp = String(g.sport || '').toLowerCase();
     if (sp !== 'triathlon' && sp !== 'tri') continue;
     const prev = g.training_prefs;
@@ -899,12 +925,14 @@ async function buildCombinedPlan(
     if (notes.length > 0) {
       console.log(`[create-goal] combined plan training_prefs backfill goal ${g.id}:`, notes.join(', '));
       console.log('[build] training_prefs after backfill:', base);
-      const { error: upErr } = await supabase
-        .from('goals')
-        .update({ training_prefs: base, updated_at: new Date().toISOString() })
-        .eq('id', g.id)
-        .eq('user_id', user_id);
-      if (upErr) console.warn('[buildCombinedPlan] goals training_prefs backfill update', upErr.message);
+      if (!planPreview) {
+        const { error: upErr } = await supabase
+          .from('goals')
+          .update({ training_prefs: base, updated_at: new Date().toISOString() })
+          .eq('id', g.id)
+          .eq('user_id', user_id);
+        if (upErr) console.warn('[buildCombinedPlan] goals training_prefs backfill update', upErr.message);
+      }
       (g as { training_prefs: Record<string, unknown> }).training_prefs = base;
     }
   }
@@ -924,7 +952,7 @@ async function buildCombinedPlan(
   // optimizer-derived preferred_days (quality_bike, quality_run, etc.) actually
   // flow into the athlete_state we send to generate-combined-plan.
   const backfilledPrimaryPrefs =
-    (allEventGoals.find((g) => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+    (workingGoals.find((g) => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
   const coEqualProvisional1x = Boolean(backfilledPrimaryPrefs?.co_equal_strength_provisional_1x);
   const freshCombinedPrefs = mergeCombinedSchedulePrefs(
     newGoal.training_prefs as Record<string, unknown>,
@@ -965,6 +993,8 @@ async function buildCombinedPlan(
       weekly_hours_available: weeklyHours,
       loading_pattern: loadingPattern,
       equipment_type: resolvedEquipmentType,
+      has_cable_machine: hasCableForPlan,
+      has_ghd: hasGHDForPlan,
       tri_approach: triApproach,
       swim_volume_multiplier,
       rest_days: freshCombinedPrefs.rest_days ?? [],
@@ -1014,7 +1044,7 @@ async function buildCombinedPlan(
         ? { training_intent: freshCombinedPrefs.training_intent }
         : {}),
       ...(() => {
-        const inferredLabel = deriveBikeQualityLabel(allEventGoals);
+        const inferredLabel = deriveBikeQualityLabel(workingGoals);
         const hasRouteEstimate =
           freshCombinedPrefs.bike_quality_route_estimated_hours !== undefined ||
           freshCombinedPrefs.bike_quality_route_estimated_minutes !== undefined ||
@@ -1041,8 +1071,20 @@ async function buildCombinedPlan(
         ? { structural_load_hint: combinedTransition.structural_load_hint }
         : {}),
       ...(freshDpw != null ? { days_per_week: freshDpw } : {}),
+      ...(freshCombinedPrefs.conflict_preferences && Object.keys(freshCombinedPrefs.conflict_preferences).length > 0
+        ? { conflict_preferences: freshCombinedPrefs.conflict_preferences }
+        : {}),
+      ...(planPreview ? { preview: true } : {}),
     },
   });
+
+  if (planPreview) {
+    if (!combined?.success || combined.preview_mode !== true) {
+      console.error('[buildCombinedPlan] generate-combined-plan preview failed:', combined?.error);
+      return null;
+    }
+    return { preview: true as const, combined_preview: combined as Record<string, unknown> };
+  }
 
   if (!combined?.plan_id) {
     console.error('[buildCombinedPlan] generate-combined-plan failed:', combined?.error);
@@ -1079,7 +1121,7 @@ async function buildCombinedPlan(
   }
 
   console.log(`[buildCombinedPlan] Created combined plan ${combinedPlanId} for ${goalIds.length} goals, retired ${(oldPlans || []).length} standalone plans`);
-  return { plan_id: combinedPlanId };
+  return { plan_id: combinedPlanId, preview: false as const };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1115,6 +1157,13 @@ Deno.serve(async (req: Request) => {
     const plan_id = trimId(raw.plan_id);
     const goal = raw.goal;
     const plan_start_date = raw.plan_start_date;
+    const bodyPreview = raw.preview === true;
+    const ephemeralConflictPrefs =
+      raw.ephemeral_conflict_preferences &&
+      typeof raw.ephemeral_conflict_preferences === 'object' &&
+      !Array.isArray(raw.ephemeral_conflict_preferences)
+        ? (raw.ephemeral_conflict_preferences as Record<string, string>)
+        : null;
 
     if (!user_id) throw new AppError('missing_user_id', 'user_id required');
     if (!['create', 'build_existing', 'link_existing'].includes(mode)) throw new AppError('invalid_mode', 'mode must be create, build_existing, or link_existing');
@@ -1200,10 +1249,25 @@ Deno.serve(async (req: Request) => {
       if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
         console.log('[build] training_prefs after backfill:', mergedPrefs);
       }
-      if (mode === 'build_existing' && existing_goal_id) {
+      if (ephemeralConflictPrefs) {
+        const existingCp =
+          typeof mergedPrefs.conflict_preferences === 'object' &&
+          mergedPrefs.conflict_preferences !== null &&
+          !Array.isArray(mergedPrefs.conflict_preferences)
+            ? (mergedPrefs.conflict_preferences as Record<string, string>)
+            : {};
+        resolvedGoal = {
+          ...resolvedGoal,
+          training_prefs: {
+            ...mergedPrefs,
+            conflict_preferences: { ...existingCp, ...ephemeralConflictPrefs },
+          },
+        };
+      }
+      if (mode === 'build_existing' && existing_goal_id && !bodyPreview) {
         await supabase
           .from('goals')
-          .update({ training_prefs: mergedPrefs, updated_at: new Date().toISOString() })
+          .update({ training_prefs: resolvedGoal.training_prefs, updated_at: new Date().toISOString() })
           .eq('id', existing_goal_id)
           .eq('user_id', user_id);
       }
@@ -1305,8 +1369,23 @@ Deno.serve(async (req: Request) => {
           user_id, createdGoalId, resolvedGoal!, fitness,
           combinedTransitionFromPostRace(postRaceRecovery),
           plan_start_date ?? null,
+          bodyPreview,
         );
         if (combinedResult) {
+          if (combinedResult.preview) {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                mode,
+                goal_id: createdGoalId,
+                preview: true,
+                combined_preview: combinedResult.combined_preview,
+                sport: 'multi_sport',
+                combined: true,
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
           createdPlanId = combinedResult.plan_id;
           return new Response(
             JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id, sport: 'multi_sport', combined: true }),
@@ -1658,8 +1737,23 @@ Deno.serve(async (req: Request) => {
         user_id, createdGoalId, resolvedGoal!, fitness,
         combinedTransitionFromPostRace(postRaceRecovery),
         plan_start_date ?? null,
+        bodyPreview,
       );
       if (combinedResult) {
+        if (combinedResult.preview) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              mode,
+              goal_id: createdGoalId,
+              preview: true,
+              combined_preview: combinedResult.combined_preview,
+              sport: 'multi_sport',
+              combined: true,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
         createdPlanId = combinedResult.plan_id;
         return new Response(
           JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id, sport: 'multi_sport', combined: true }),
