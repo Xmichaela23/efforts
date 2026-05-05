@@ -172,14 +172,6 @@ function cloneDays(d: Record<DayName, SessionSlot[]>): Record<DayName, SessionSl
   return o;
 }
 
-/** Shoulder / pull load: avoid quality_swim stacked with upper-body lifting. */
-function dayHasUpperStrength(slots: SessionSlot[]): boolean {
-  return slots.some((s) => s.kind === 'upper_body_strength');
-}
-
-function dayHasQualitySwim(slots: SessionSlot[]): boolean {
-  return slots.some((s) => s.kind === 'quality_swim');
-}
 
 function place(
   days: Record<DayName, SessionSlot[]>,
@@ -651,7 +643,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         for (const uc of upperOrder) {
           if (uc === longRide || uc === longRun) continue;
           if (uc === consolidatedQrLowerDay) continue;
-          if (dayHasQualitySwim(days[uc])) continue;
           if (!canPlace(days, uc, 'upper_body_strength')) continue;
           if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
           const gap = Math.abs(DAY_INDEX[uc] - DAY_INDEX[consolidatedQrLowerDay]);
@@ -684,7 +675,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
         for (const uc of upperOrder) {
           if (uc === longRide || uc === longRun) continue;
-          if (dayHasQualitySwim(days[uc])) continue;
           if (days[uc].length >= 2) continue;
           if (!canPlace(days, uc, 'upper_body_strength')) continue;
           if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
@@ -740,7 +730,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       let upperDay: DayName | undefined;
       for (const c of ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'] as DayName[]) {
         if (c === longRide || c === longRun) continue;
-        if (dayHasQualitySwim(days[c])) continue;
         if (days[c].length >= 2) continue;
         if (!canPlace(days, c, 'upper_body_strength')) continue;
         if (!sequentialOk(days, c, 'upper_body_strength', inputs.athlete)) continue;
@@ -874,7 +863,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       // has 2 sessions even if each pairwise matrix check passes.
       if (days[c].length >= 2) continue;
       if (!canPlace(days, c, kind)) continue;
-      if (kind === 'quality_swim' && dayHasUpperStrength(days[c])) continue;
       picked = c;
       break;
     }

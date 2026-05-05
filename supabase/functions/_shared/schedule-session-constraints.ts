@@ -40,14 +40,16 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  * true = may share the same calendar day (strict / completion default).
  * Symmetric. Source: product matrix (Apr 2026); extended with dedicated `quality_swim` row
  * so `quality_run` × `quality_swim` is ✗ by default (was wrongly ✓ via `easy_swim` alias).
+ * May 2026: `quality_bike` × `easy_run` flipped to ✗ — quality bike day is protected; easy run
+ * on a group-ride day adds fatigue without stimulus and should not be placed by the optimizer.
  * ✓/✗ rows: [easy_bike, easy_run, easy_swim, quality_swim, quality_bike, quality_run, long_ride, long_run, lower_body, upper_body]
  */
 const ROWS: Record<MatrixSessionKind, number[]> = {
   easy_bike:            [1, 1, 1, 1, 0, 1, 0, 0, 1, 1],
-  easy_run:             [1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+  easy_run:             [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
   easy_swim:            [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
   quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
-  quality_bike:         [0, 1, 1, 1, 0, 0, 0, 0, 0, 1],
+  quality_bike:         [0, 0, 1, 1, 0, 0, 0, 0, 0, 1],
   quality_run:          [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
   long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
   long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
