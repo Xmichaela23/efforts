@@ -98,6 +98,20 @@ const SWIM_LOAD_SPLIT_USER_MESSAGE = 'Split it evenly between bike and run.';
 const ARC_SETUP_FORK_PRIMARY_BTN =
   'min-h-[48px] text-[15px] sm:text-base font-semibold px-4 py-3 rounded-xl border disabled:opacity-50 flex-1 min-w-0 transition-colors';
 
+/** Returns true if the athlete has already chosen a strength intent in this thread. */
+function priorThreadHasStrengthChoice(prior: ChatMessage[]): boolean {
+  return prior.some(
+    (m) =>
+      m.role === 'user' &&
+      (m.content === STRENGTH_SUPPORT_USER_MESSAGE ||
+        m.content === STRENGTH_BUILD_USER_MESSAGE ||
+        /strength_intent.*support/i.test(m.content) ||
+        /strength_intent.*performance/i.test(m.content) ||
+        /^Strength supports tri/i.test(m.content) ||
+        /^Build strength —/i.test(m.content)),
+  );
+}
+
 /** Last explicit swim-intent choice in the thread (button text or same opening line). */
 function priorThreadSwimIntentResolution(prior: ChatMessage[]): 'focus' | 'race' | null {
   let resolved: 'focus' | 'race' | null = null;
@@ -222,7 +236,7 @@ type AssistantMessageDisclosure =
 function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]): AssistantMessageDisclosure | null {
   if (m.conflict) return 'week_conflict';
   const visible = m.content;
-  if (looksLikeStrengthIntentFork(visible) || looksLikeStrengthIntentStateConfirm(visible)) return 'strength_fork';
+  if ((looksLikeStrengthIntentFork(visible) || looksLikeStrengthIntentStateConfirm(visible)) && !priorThreadHasStrengthChoice(priorMessages)) return 'strength_fork';
   // Only surface training_intent once — suppress if the athlete has already locked completion.
   if (looksLikePerformanceIntentConfirmation(visible) && !priorThreadHasCompletionChoice(priorMessages)) {
     return 'training_intent';
