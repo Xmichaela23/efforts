@@ -1083,9 +1083,16 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.conflict_preferences && Object.keys(freshCombinedPrefs.conflict_preferences).length > 0
         ? { conflict_preferences: freshCombinedPrefs.conflict_preferences }
         : {}),
-      ...(freshCombinedPrefs.assessment_week_preference
-        ? { assessment_week_preference: freshCombinedPrefs.assessment_week_preference }
-        : {}),
+      // assessment_week_preference is not parsed by mergeCombinedSchedulePrefs —
+      // read from the raw goal training_prefs that the arc-setup chat emitted.
+      ...(() => {
+        const awp =
+          (newGoal.training_prefs as Record<string, unknown>)?.assessment_week_preference ??
+          (backfilledPrimaryPrefs as Record<string, unknown>)?.assessment_week_preference;
+        return awp === 'assessment_first' || awp === 'jump_in'
+          ? { assessment_week_preference: awp }
+          : {};
+      })(),
       ...(planPreview ? { preview: true } : {}),
     },
   });
