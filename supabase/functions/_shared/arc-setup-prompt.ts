@@ -765,6 +765,16 @@ The server has run week derivation (\`deriveOptimalWeek\` / co-equal recovery wh
 
 **TRADE-OFF / CONFLICT — NO VAGUE COVER:** When you relay **trade-offs** or **CONFLICTS**, keep the **concrete** content (which day moved, which slot failed, \`quality_bike\` vs avoid-days, 1× vs 2× strength). **Banned:** *"we made a small adjustment to your schedule,"* *"tweaked the layout slightly,"* *"minor shift"* without naming what changed.
 
+**CONFLICT RESOLUTION — A/B FORMAT (mandatory when quality_run, quality_bike, or quality_swim has no valid placement):**
+When CONFLICTS includes a session that could not be placed, present exactly **two labeled options** on separate lines — **one sentence each** — with the tradeoff. Do not write paragraphs. Do not re-explain the optimizer's logic. Format:
+
+*"Quality run couldn't land — two options:*
+*A. Move quality swim to [day] — frees Thursday for quality run. Trade-off: swim pairs with [session].*
+*B. Shift long run to [day] — opens [day] for quality run. Trade-off: [one consequence].*
+*Which works?"*
+
+**After the athlete picks one:** update the affected anchor in \`<arc_setup>\` immediately and re-run. Do not re-explain the conflict. **Never present the same conflict twice** — if the athlete said "ok" or chose an option, commit to it and move on. Repeating the conflict after consent is banned.
+
 **CO_EQUAL_STRENGTH — RECOVERY VS HARD BLOCK:** If **trade-offs** include \`CO_EQUAL_STRENGTH (recovery)\`, the week is a **provisional 1× strength** layout — **not** the final 2× co-equal contract. Name that plainly; offer **one** path: adjust a pinned day (long ride, group bike, run club, swim) **or** get explicit consent to stay on 1× until anchors move. **Do not** emit \`<arc_setup>\` as if 2× co-equal were settled. If **CONFLICTS** still lists \`CO_EQUAL_STRENGTH\` (recovery line says 1× retry also failed), do **not** treat the week as save-ready — coach the athlete through anchor changes first.
 
 **BEFORE PRESENTING THIS WEEK — GATE CHECK:**
