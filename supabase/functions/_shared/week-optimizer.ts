@@ -437,16 +437,22 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       blockedQr.add(dayAfter(qualityBikeDay));
     }
 
-    // Honor athlete's preferred quality_run day if it clears the hard-ban matrix.
+    // Honor athlete's stated quality_run preference using only the same-day matrix
+    // (canPlace). The adjacent-day sequential rule is an algorithmic default — when
+    // the athlete explicitly states a day (e.g. Thu intervals after Wed group ride)
+    // that is an informed choice and we respect it. Log a trade-off note if the
+    // sequential rule would normally object, so the plan is auditable.
     const preferredQr = inputs.preferences.quality_run;
-    if (
-      preferredQr &&
-      !blockedQr.has(preferredQr) &&
-      canPlace(days, preferredQr, 'quality_run') &&
-      sequentialOk(days, preferredQr, 'quality_run', inputs.athlete)
-    ) {
+    if (preferredQr && canPlace(days, preferredQr, 'quality_run')) {
       qualityRunDay = preferredQr;
       place(days, preferredQr, 'quality_run');
+      if (!sequentialOk(days, preferredQr, 'quality_run', inputs.athlete)) {
+        trade_offs.push(
+          `quality_run: placed on ${preferredQr} per athlete preference` +
+          (qualityBikeDay ? ` — back-to-back with quality_bike (${qualityBikeDay}); athlete-declared schedule` : '') +
+          '.',
+        );
+      }
     }
 
     if (!qualityRunDay) {
