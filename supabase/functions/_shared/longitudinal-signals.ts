@@ -372,21 +372,23 @@ function detectSessionSkipPatterns(planned: PlannedRow[], facts: WorkoutFactRow[
 }
 
 function detectEasyPaceDrift(facts: WorkoutFactRow[], out: LongitudinalSignal[]): void {
+  // 330–900 s/km = ~5:30–15:00/km. Below 330 is not easy; above 900 is a GPS/logging artefact.
   const easyRuns = facts.filter((f) => {
     if (f.discipline !== 'run') return false;
     const rf = f.run_facts;
-    if (!rf?.pace_avg_s_per_km) return false;
-    return rf.pace_avg_s_per_km > 330;
+    const p = rf?.pace_avg_s_per_km;
+    return typeof p === 'number' && p > 330 && p < 900;
   });
   if (easyRuns.length < 5) return;
 
   const mid = Math.ceil(easyRuns.length / 2);
-  const paces = easyRuns.map((f) => f.run_facts.pace_avg_s_per_km);
+  const paces = easyRuns.map((f) => f.run_facts.pace_avg_s_per_km as number);
   const avgFirst = paces.slice(0, mid).reduce((a: number, b: number) => a + b, 0) / mid;
   const avgSecond = paces.slice(mid).reduce((a: number, b: number) => a + b, 0) / (paces.length - mid);
   const deltaSecKm = Math.round(avgFirst - avgSecond);
 
-  if (deltaSecKm >= 8) {
+  // >60 s/km delta over a 6-week window is implausible — signals dirty data, not a real trend.
+  if (deltaSecKm >= 8 && deltaSecKm <= 60) {
     const deltaPerMi = Math.round(deltaSecKm * 1.60934);
     out.push({
       id: 'easy_pace_creeping_faster',

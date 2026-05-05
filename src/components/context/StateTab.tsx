@@ -16,6 +16,28 @@ import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
 import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
+import { fetchArcContext } from '@/lib/fetch-arc-context';
+import { shouldShowNudge } from '@/lib/nudge-policy';
+
+const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
+
+function isNudgeSnoozed(kind: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(`${NUDGE_DISMISS_KEY}${kind}`);
+    if (!raw) return false;
+    const ymd = raw.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+    return (Date.now() - new Date(`${ymd}T12:00:00`).getTime()) / 86400000 < 7;
+  } catch {
+    return false;
+  }
+}
+
+function snoozeNudge(kind: string): void {
+  try {
+    window.localStorage.setItem(`${NUDGE_DISMISS_KEY}${kind}`, new Date().toISOString().slice(0, 10));
+  } catch { void 0; }
+}
 
 type CoachDataProp = {
   data: CoachWeekContextV1 | null;
@@ -598,6 +620,23 @@ export default function StateTab({
     workoutId: string;
     daysAfterRace: number;
   } | null>(null);
+  const [longitudinalSignals, setLongitudinalSignals] = useState<unknown>(null);
+  const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
+
+  useEffect(() => {
+    fetchArcContext().then((arc) => {
+      setLongitudinalSignals(arc?.longitudinal_signals ?? null);
+    });
+  }, []);
+
+  const nudgeDecision = shouldShowNudge(longitudinalSignals as Parameters<typeof shouldShowNudge>[0]);
+  // nudgeDismissNonce is incremented on dismiss to force re-evaluation of isNudgeSnoozed.
+  const showNudge =
+    nudgeDismissNonce >= 0 &&
+    nudgeDecision.show &&
+    !!nudgeDecision.nudge_kind &&
+    !!nudgeDecision.headline &&
+    !isNudgeSnoozed(nudgeDecision.nudge_kind);
 
   const raceReadiness = pickRaceReadinessFromCoachData(data as CoachWeekContextV1 | null);
   const raceFinishProjection = pickRaceFinishProjectionV1FromCoachData(data as CoachWeekContextV1 | null);
@@ -1274,6 +1313,44 @@ export default function StateTab({
                 );
               })}
             </Row>
+          </div>
+        )}
+
+        {/* SIGNAL — longitudinal nudge, only when there's an actionable signal */}
+        {showNudge && (
+          <div className="px-3 py-3">
+            <div className="flex items-start gap-3">
+              <span className="text-[10px] font-semibold tracking-[0.12em] text-white/70 uppercase pt-0.5 w-[72px] shrink-0">SIGNAL</span>
+              <div className="flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`text-[12px] leading-snug flex-1 ${
+                    nudgeDecision.severity === 'concern' ? 'text-amber-400/85' : 'text-white/75'
+                  }`}>
+                    {nudgeDecision.headline}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 p-0.5 text-white/30 hover:text-white/65 bg-transparent border-none cursor-pointer"
+                    aria-label="Dismiss signal"
+                    onClick={() => {
+                      snoozeNudge(nudgeDecision.nudge_kind!);
+                      setNudgeDismissNonce((n) => n + 1);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="mt-1.5 text-[11px] text-teal-400/70 hover:text-teal-300/90 bg-transparent border-none cursor-pointer p-0"
+                  onClick={() => navigate('/arc-setup', { state: { arcNudgeSeed: nudgeDecision.headline } })}
+                >
+                  Review with Arc →
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
