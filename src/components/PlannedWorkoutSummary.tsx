@@ -5,6 +5,7 @@ import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
+import { swimDrillEquipmentFromTokens } from '@/lib/plan-tokens/swim-drill-tokens';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -655,6 +656,18 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
   const workoutType = String(workout.type || workout.workout_type || '').toLowerCase();
   const disciplineColor = getDisciplinePhosphorCore(workoutType);
+
+  const swimEquipment = (() => {
+    if (workoutType !== 'swim') return null;
+    const toks: string[] = Array.isArray((workout as any)?.steps_preset)
+      ? (workout as any).steps_preset.map((t: unknown) => String(t))
+      : [];
+    const drillToks = toks.filter((t) => t.startsWith('swim_drills_'));
+    if (!drillToks.length) return null;
+    const eq = swimDrillEquipmentFromTokens(drillToks);
+    if (!eq.required.length && !eq.optional.length) return null;
+    return eq;
+  })();
   
   return (
     <div className="flex items-start justify-between gap-3">
@@ -673,6 +686,20 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             ) : null}
           </span>
         </div>
+        {swimEquipment && (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {swimEquipment.required.map((eq) => (
+              <span key={eq} className="px-2 py-0.5 text-[11px] rounded-md bg-blue-500/15 border border-blue-400/25 text-blue-200/80">
+                bring: {eq}
+              </span>
+            ))}
+            {swimEquipment.optional.map((eq) => (
+              <span key={eq} className="px-2 py-0.5 text-[11px] rounded-md bg-white/[0.05] border border-white/10 text-white/45">
+                optional: {eq}
+              </span>
+            ))}
+          </div>
+        )}
         {!hideLines && !isStrength && (
           <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
             {stacked.length > 1 ? (

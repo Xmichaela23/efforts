@@ -33,12 +33,14 @@ export const SWIM_DRILL_TOKEN_POOL: readonly string[] = [
   'swim_drills_4x50yd_kick',
   'swim_drills_4x50yd_zipper',
   'swim_drills_4x50yd_doggypaddle',
+  'swim_drills_4x50yd_snorkel_freeswim',
   'swim_drills_2x50yd_catchup',
   'swim_drills_2x50yd_singlearm',
   'swim_drills_2x50yd_fist',
   'swim_drills_2x50yd_fingertipdrag',
   'swim_drills_2x50yd_616',
   'swim_drills_2x100yd_scullfront',
+  'swim_drills_2x100yd_snorkel_freeswim',
   'swim_drills_1x100yd_scullfront',
 ];
 
@@ -63,23 +65,73 @@ export function resolveSwimDrillPhase(phaseName: string): SwimDrillPhase {
 
 /** Phase-specific drill pools (existing `swim_drills_*` tokens only; no pull/paddles). */
 const SWIM_DRILL_POOLS: Record<SwimDrillPhase, readonly string[]> = {
+  // Base: technique-forward — snorkel isolates body position without breathing interruption.
   base: [
     'swim_drills_4x50yd_catchup',
     'swim_drills_4x50yd_fingertipdrag',
     'swim_drills_4x50yd_fist',
     'swim_drills_4x50yd_kick',
+    'swim_drills_4x50yd_snorkel_freeswim',
     'swim_drills_2x50yd_catchup',
     'swim_drills_2x50yd_fingertipdrag',
   ],
+  // Build: maintain technique under accumulating load; snorkel at longer interval for efficiency focus.
   build: [
     'swim_drills_4x50yd_catchup',
     'swim_drills_4x50yd_fist',
+    'swim_drills_2x100yd_snorkel_freeswim',
     'swim_drills_2x50yd_fingertipdrag',
     'swim_drills_2x50yd_catchup',
   ],
+  // Peak / race-specific: familiar patterns only — no new equipment demands.
   peak: ['swim_drills_2x50yd_catchup', 'swim_drills_2x50yd_fingertipdrag'],
   taper: ['swim_drills_2x50yd_catchup'],
 };
+
+// ── Equipment annotation ──────────────────────────────────────────────────────
+
+export type DrillEquipment = {
+  /** Must be present for the drill to work as prescribed. */
+  required: string[];
+  /** Worthwhile to bring — enhances drill quality but not blocking. */
+  optional: string[];
+};
+
+const NO_EQUIPMENT: DrillEquipment = { required: [], optional: [] };
+
+/**
+ * Maps the trailing drill name (e.g. `kick`, `snorkel_freeswim`) to gear requirements.
+ * Drills not listed here map to `NO_EQUIPMENT`.
+ */
+export const DRILL_EQUIPMENT_MAP: Record<string, DrillEquipment> = {
+  kick:             { required: ['kickboard'], optional: [] },
+  scull:            { required: ['pull buoy'], optional: [] },
+  scullfront:       { required: ['pull buoy'], optional: [] },
+  snorkel_freeswim: { required: ['snorkel'],   optional: [] },
+  // Following drills are better with a snorkel but work fine without.
+  catchup:          { required: [], optional: ['snorkel'] },
+  fingertipdrag:    { required: [], optional: ['snorkel'] },
+  singlearm:        { required: [], optional: ['snorkel'] },
+  fist:             { required: [], optional: ['snorkel'] },
+};
+
+/**
+ * Derives deduplicated required + optional equipment from a set of `swim_drills_*` tokens.
+ * Safe to call with any token list — non-drill tokens are ignored.
+ */
+export function swimDrillEquipmentFromTokens(tokens: string[]): DrillEquipment {
+  const required = new Set<string>();
+  const optional = new Set<string>();
+  for (const tok of tokens) {
+    // Token format: swim_drills_NxDistyd_<drill_name>
+    const m = String(tok).match(/^swim_drills_\d+x\d+yd_(.+)$/i);
+    if (!m) continue;
+    const eq = DRILL_EQUIPMENT_MAP[m[1].toLowerCase()] ?? NO_EQUIPMENT;
+    for (const r of eq.required) required.add(r);
+    for (const o of eq.optional) optional.add(o);
+  }
+  return { required: [...required], optional: [...optional] };
+}
 
 /**
  * Deterministic drill selection for plan weeks (no randomness in edge).
