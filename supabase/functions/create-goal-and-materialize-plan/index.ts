@@ -1240,66 +1240,48 @@ Deno.serve(async (req: Request) => {
       throw new AppError('missing_goal_id', 'existing_goal_id required for build_existing mode');
     }
 
+    // When the client forwards the goal it just inserted, use it directly —
+    // eliminates the read-after-write DB lookup that was the root cause of goal_not_found.
     let resolvedGoal = goal || null;
-    // Tracks the ACTUAL goal id used in build_existing mode (may differ from existing_goal_id
-    // when the fallback path substitutes the most-recently-created active goal).
     let resolvedBuildId: string | undefined;
     if (mode === 'build_existing') {
-      // Retry once after a short delay — handles rare cases where a freshly committed
-      // goal insert is not yet visible on the edge function's DB connection.
-      let existingGoal: Record<string, unknown> | null = null;
-      let existingGoalErr: { message?: string } | null = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        if (attempt > 0) await new Promise(r => setTimeout(r, 400));
-        const res = await supabase
+      if (resolvedGoal) {
+        // Goal data was forwarded by the client (from the insert return value).
+        // No DB read needed — we already have the authoritative data.
+        resolvedBuildId = existing_goal_id ?? undefined;
+        // Validate fields that the plan engine requires.
+        if (String(resolvedGoal.sport || '').toLowerCase() === 'run' && !resolvedGoal.distance) {
+          throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
+        }
+      } else {
+        // No goal data forwarded — fall back to a DB lookup (covers calls from other clients,
+        // webhooks, or the Goals screen "Build Plan" button which doesn't forward goal data).
+        if (!existing_goal_id) throw new AppError('missing_goal_id', 'existing_goal_id required for build_existing mode');
+        const { data: existingGoal, error: existingGoalErr } = await supabase
           .from('goals')
           .select('*')
           .eq('id', existing_goal_id)
           .eq('user_id', user_id)
           .maybeSingle();
-        existingGoal = res.data as Record<string, unknown> | null;
-        existingGoalErr = res.error as { message?: string } | null;
-        if (existingGoal) break;
-      }
-      if (existingGoalErr || !existingGoal) {
-        // Final fallback: find the most recent active event goal for this user (handles
-        // stale IDs from the client when insertedGoals is empty and fallback picked an
-        // old orphan goal that was since cleaned up).
-        const { data: fallbackGoal } = await supabase
-          .from('goals')
-          .select('*')
-          .eq('user_id', user_id)
-          .eq('goal_type', 'event')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (fallbackGoal) {
-          const fb = fallbackGoal as Record<string, unknown>;
-          console.warn('[create-goal] goal_not_found by id — using most recent active goal as fallback',
-            { tried_id: existing_goal_id, fallback_id: fb.id, user_id });
-          existingGoal = fb;
-          // Note: existing_goal_id is const — we shadow it below via resolvedGoalId.
-        } else {
+        if (existingGoalErr || !existingGoal) {
           console.error('[create-goal] goal_not_found', { existing_goal_id, user_id, err: existingGoalErr?.message });
           throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
         }
+        if (existingGoal.goal_type !== 'event') throw new AppError('invalid_goal_type', 'Only event goals can auto-build');
+        if ((existingGoal.status || 'active') !== 'active') throw new AppError('goal_not_active', 'Goal must be active to build a plan');
+        if (String(existingGoal.sport || '').toLowerCase() === 'run' && !existingGoal.distance) {
+          throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
+        }
+        resolvedBuildId = String(existing_goal_id);
+        resolvedGoal = {
+          name: existingGoal.name,
+          target_date: existingGoal.target_date,
+          sport: existingGoal.sport,
+          distance: existingGoal.distance,
+          training_prefs: existingGoal.training_prefs || {},
+          notes: existingGoal.notes || null,
+        };
       }
-      if (!existingGoal) throw new AppError('goal_not_found', 'Goal not found', 404); // TypeScript narrowing
-      resolvedBuildId = String((existingGoal as Record<string, unknown>).id ?? existing_goal_id ?? '');
-      if (existingGoal.goal_type !== 'event') throw new AppError('invalid_goal_type', 'Only event goals can auto-build');
-      if ((existingGoal.status || 'active') !== 'active') throw new AppError('goal_not_active', 'Goal must be active to build a plan');
-      if (String(existingGoal.sport || '').toLowerCase() === 'run' && !existingGoal.distance) {
-        throw new AppError('missing_distance', 'Set a race distance on this goal before building a plan.');
-      }
-      resolvedGoal = {
-        name: existingGoal.name,
-        target_date: existingGoal.target_date,
-        sport: existingGoal.sport,
-        distance: existingGoal.distance,
-        training_prefs: existingGoal.training_prefs || {},
-        notes: existingGoal.notes || null,
-      };
     }
 
     const focusDateStr = new Date().toISOString().slice(0, 10);

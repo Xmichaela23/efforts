@@ -481,7 +481,16 @@ async function parseArcInvokeError(
   return { message: msg || fallback };
 }
 
-type InsertedGoalRow = { id: string; priority: string; target_date: string | null; sport: string | null };
+type InsertedGoalRow = {
+  id: string;
+  priority: string;
+  target_date: string | null;
+  sport: string | null;
+  name: string | null;
+  distance: string | null;
+  training_prefs: Record<string, unknown> | null;
+  notes: string | null;
+};
 
 async function persistArcSetup(
   payload: ArcSetupPayload,
@@ -516,7 +525,7 @@ async function persistArcSetup(
         }
         return base;
       });
-      const { data, error } = await supabase.from('goals').insert(rows).select('id, priority, target_date, sport');
+      const { data, error } = await supabase.from('goals').insert(rows).select('id, priority, target_date, sport, name, distance, training_prefs, notes');
       if (error) {
         console.error('GOALS INSERT FAILED:', error.message, (error as { details?: string }).details, (error as { hint?: string }).hint);
         console.error('[arc-setup] goal insert', error);
@@ -770,22 +779,17 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
       return;
     }
 
-    // Use the IDs returned by the insert directly — avoids a round-trip re-query
-    // and eliminates the "Goal not found" race that occurred when the edge function
-    // was called with an ID that the DB hadn't yet made visible to a secondary query.
-    let eventGoals = (insertedGoals || []) as {
-      id: string;
-      priority: string;
-      target_date: string | null;
-      sport: string | null;
-    }[];
+    // Use the rows returned by the insert directly — they carry the full goal data so the
+    // edge function can resolve the goal without a DB re-query (eliminating the read-after-write
+    // race that caused "goal not found").
+    let eventGoals = (insertedGoals || []) as InsertedGoalRow[];
 
     if (eventGoals.length === 0) {
       // No new goals inserted (athlete_identity-only update or user already had goals).
       // Fall back to a DB query to find existing active event goals.
       const { data: evRows, error: evErr } = await supabase
         .from('goals')
-        .select('id, priority, target_date, sport')
+        .select('id, priority, target_date, sport, name, distance, training_prefs, notes')
         .eq('user_id', userId)
         .eq('goal_type', 'event')
         .eq('status', 'active');
@@ -796,7 +800,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
         navigate('/goals', { replace: true, state: { fromArcSetup: true } });
         return;
       }
-      eventGoals = (evRows || []) as typeof eventGoals;
+      eventGoals = (evRows || []) as InsertedGoalRow[];
     }
 
     const primaryId = pickPrimaryEventGoalId(eventGoals);
@@ -807,7 +811,20 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
       return;
     }
 
-    const primarySport = eventGoals.find((g) => g.id === primaryId)?.sport ?? null;
+    const primaryGoalRow = eventGoals.find((g) => g.id === primaryId) ?? null;
+    const primarySport = primaryGoalRow?.sport ?? null;
+    // Goal data to forward to the edge function — it uses this directly instead of re-querying.
+    const primaryGoalData = primaryGoalRow
+      ? {
+          name: primaryGoalRow.name ?? null,
+          target_date: primaryGoalRow.target_date ?? null,
+          sport: primaryGoalRow.sport ?? null,
+          distance: primaryGoalRow.distance ?? null,
+          training_prefs: (primaryGoalRow.training_prefs as Record<string, unknown> | null) ?? null,
+          notes: primaryGoalRow.notes ?? null,
+        }
+      : null;
+
     const { data: planRows, error: planErr } = await supabase
       .from('plans')
       .select('id, goal_id, status, config, plan_type')
@@ -829,6 +846,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
       combine,
       replacePlanId,
       planStart: planStart ?? null,
+      primaryGoalData,
     };
 
     // Combined plans go through the conflict-resolution loop (preview → ask → regenerate → save).
@@ -845,6 +863,8 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
       existing_goal_id: String(primaryId),
       combine,
       replace_plan_id: replacePlanId,
+      // Forward the full goal row — edge function uses this instead of re-querying DB.
+      ...(primaryGoalData ? { goal: primaryGoalData } : {}),
       ...(planStart ? { plan_start_date: planStart } : {}),
     });
 

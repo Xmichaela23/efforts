@@ -17,6 +17,15 @@ export type ConflictLoopContext = {
   combine: boolean;
   replacePlanId: string | null;
   planStart: string | null;
+  /** Full goal data from the just-inserted row — eliminates the read-after-write lookup in the edge function. */
+  primaryGoalData?: {
+    name: string | null;
+    target_date: string | null;
+    sport: string | null;
+    distance: string | null;
+    training_prefs: Record<string, unknown> | null;
+    notes: string | null;
+  } | null;
 };
 
 // ── Internal types ────────────────────────────────────────────────────────────
@@ -69,6 +78,9 @@ export function useConflictResolutionLoop({
       mode: 'build_existing',
       existing_goal_id: ctx.primaryId,
       combine: ctx.combine,
+      // Pass the goal data we already have — the edge function uses this directly instead
+      // of re-querying the DB, eliminating the read-after-write race that caused goal_not_found.
+      ...(ctx.primaryGoalData ? { goal: ctx.primaryGoalData } : {}),
       ...(ctx.replacePlanId ? { replace_plan_id: ctx.replacePlanId } : {}),
       ...(ctx.planStart ? { plan_start_date: ctx.planStart } : {}),
       preview,
