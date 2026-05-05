@@ -17,8 +17,13 @@ import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
 import { fixTransposedEasyBikeRunAgainstSwimOrder } from '@/lib/tri-preferred-days-sanity';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
 import { findOrphanActivePlanConflictId, type PlanRowLite } from '@/lib/plan-goal-conflict';
+import {
+  useConflictResolutionLoop,
+  type ActiveConflict,
+  type ConflictLoopContext,
+} from '@/hooks/useConflictResolutionLoop';
 
-type ChatMessage = { role: 'assistant' | 'user'; content: string };
+type ChatMessage = { role: 'assistant' | 'user'; content: string; conflict?: ActiveConflict };
 
 /**
  * Messages sent to arc-setup-chat (sliding window). Too few turns drop earlier
@@ -48,6 +53,20 @@ function looksLikePerformanceIntentConfirmation(visible: string): boolean {
     /performance build/i.test(t) ||
     /(going|want to go) faster/i.test(t) ||
     (/\bPR\b/i.test(t) && /right\?/i.test(t))
+  );
+}
+
+/**
+ * Returns true if the athlete has already explicitly chosen completion intent in this thread.
+ * Used to suppress the training_intent disclosure once the choice is locked.
+ */
+function priorThreadHasCompletionChoice(priorMessages: ChatMessage[]): boolean {
+  return priorMessages.some(
+    (m) =>
+      m.role === 'user' &&
+      (/completion intent/i.test(m.content) ||
+        /strong.{0,20}healthy finish/i.test(m.content) ||
+        /not chasing a faster time/i.test(m.content)),
   );
 }
 
@@ -193,11 +212,21 @@ function looksLikeSwimLoadSourceFork(visible: string): boolean {
   return hasCue;
 }
 
-type AssistantMessageDisclosure = 'strength_fork' | 'training_intent' | 'swim_fork' | 'swim_load_source';
+type AssistantMessageDisclosure =
+  | 'strength_fork'
+  | 'training_intent'
+  | 'swim_fork'
+  | 'swim_load_source'
+  | 'week_conflict';
 
-function assistantMessageDisclosure(visible: string, priorMessages: ChatMessage[]): AssistantMessageDisclosure | null {
+function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]): AssistantMessageDisclosure | null {
+  if (m.conflict) return 'week_conflict';
+  const visible = m.content;
   if (looksLikeStrengthIntentFork(visible) || looksLikeStrengthIntentStateConfirm(visible)) return 'strength_fork';
-  if (looksLikePerformanceIntentConfirmation(visible)) return 'training_intent';
+  // Only surface training_intent once — suppress if the athlete has already locked completion.
+  if (looksLikePerformanceIntentConfirmation(visible) && !priorThreadHasCompletionChoice(priorMessages)) {
+    return 'training_intent';
+  }
   if (priorThreadSwimIntentResolution(priorMessages) === 'focus' && looksLikeSwimLoadSourceFork(visible)) {
     return 'swim_load_source';
   }
@@ -549,6 +578,14 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
   /** Latest `<arc_setup>` payload from the model (sticky until replaced) — echoed to server to reduce re-asks / drift */
   const lastDraftArcSetupRef = useRef<ArcSetupPayload | null>(null);
   const arcNudgeSeedAppliedRef = useRef(false);
+
+  const { startLoop, handleConflictChoice } = useConflictResolutionLoop({
+    setMessages,
+    setSending,
+    setSaveBanner,
+    setError,
+    navigate,
+  });
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -735,11 +772,23 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
     }
 
     const replacePlanId = findOrphanActivePlanConflictId((planRows || []) as PlanRowLite[], primarySport);
-
     const planStart = parsePlanStartDate(confirmPayload.plan_start_date);
+    const combine = eventGoals.length >= 2;
+    const loopCtx: ConflictLoopContext = {
+      primaryId: String(primaryId),
+      combine,
+      replacePlanId,
+      planStart: planStart ?? null,
+    };
+
+    // Combined plans go through the conflict-resolution loop (preview → ask → regenerate → save).
+    // Single-sport plans have no conflict_events; skip straight to build.
+    if (combine) {
+      await startLoop(loopCtx);
+      return;
+    }
 
     setSaveBanner('Building your training calendar…');
-    const combine = eventGoals.length >= 2;
     const { data, error: fnErr } = await invokeFunction('create-goal-and-materialize-plan', {
       user_id: userId,
       mode: 'build_existing',
@@ -823,7 +872,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
               </div>
             );
           }
-          const disc = assistantMessageDisclosure(m.content, messages.slice(0, i));
+          const disc = assistantMessageDisclosure(m, messages.slice(0, i));
           return (
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
@@ -839,7 +888,11 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                           ? 'More detail: what Swim focus vs Swim to race changes'
                           : disc === 'swim_load_source'
                             ? 'More detail: how extra swim load is funded'
-                            : 'More detail: performance vs completion training intent'
+                            : disc === 'week_conflict'
+                              ? 'More detail: science behind this scheduling trade-off'
+                              : disc === 'training_intent'
+                              ? 'More detail: what performance vs completion training intent means'
+                              : 'More detail: science behind this scheduling trade-off'
                     }
                     aria-expanded={intentInfoOpenIdx === i}
                     onClick={() => setIntentInfoOpenIdx((v) => (v === i ? null : i))}
@@ -907,7 +960,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     onClick={() => void sendUserMessage(COMPLETION_INTENT_USER_MESSAGE)}
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full sm:w-auto sm:min-w-[12rem] bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
                   >
-                    Change intent
+                    No — strong finish, not a time goal
                   </button>
                 </div>
               )}
@@ -940,6 +993,43 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                       Split it
                     </button>
                   </div>
+                </div>
+              )}
+
+              {disc === 'week_conflict' && m.conflict && i === messages.length - 1 && (
+                <div
+                  className="mt-3 flex flex-col sm:flex-row gap-2.5"
+                  role="group"
+                  aria-label="Scheduling choice"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() =>
+                      void handleConflictChoice(
+                        m.conflict!.conflictId,
+                        m.conflict!.primaryAction,
+                        m.conflict!.primaryLabel,
+                      )
+                    }
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    {m.conflict.primaryLabel}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() =>
+                      void handleConflictChoice(
+                        m.conflict!.conflictId,
+                        m.conflict!.secondaryAction,
+                        m.conflict!.secondaryLabel,
+                      )
+                    }
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    {m.conflict.secondaryLabel}
+                  </button>
                 </div>
               )}
 
