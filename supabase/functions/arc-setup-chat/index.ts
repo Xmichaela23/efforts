@@ -138,6 +138,7 @@ Deno.serve(async (req) => {
             .map((x) => normalizeDayName(x))
             .filter((d): d is DayName => d != null)
         : [];
+      const qualityRunPref = toDay(pd.quality_run);
       const inputs: WeekOptimizerInputs = {
         anchors: {
           ...(toDay(pd.long_ride) ? { long_ride: toDay(pd.long_ride)! } : {}),
@@ -149,6 +150,7 @@ Deno.serve(async (req) => {
           strength_frequency: strengthFrequency,
           training_days: Math.min(7, Math.max(4, daysPerWeek)) as 4 | 5 | 6 | 7,
           ...(hardBikeAvoidDays.length ? { hard_bike_avoid_days: hardBikeAvoidDays } : {}),
+          ...(qualityRunPref ? { quality_run: qualityRunPref } : {}),
         },
         athlete: {
           ...(trainingIntent ? { training_intent: trainingIntent } : {}),
