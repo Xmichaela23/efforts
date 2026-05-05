@@ -204,6 +204,11 @@ Deno.serve(async (req: Request) => {
           .filter((w) => Array.isArray(w.week_trade_offs) && w.week_trade_offs.length > 0)
           .map((w) => [String(w.weekNum), w.week_trade_offs as string[]]),
       ),
+      conflict_events: Object.fromEntries(
+        generatedWeeks
+          .filter((w) => Array.isArray(w.conflict_events) && w.conflict_events!.length > 0)
+          .map((w) => [String(w.weekNum), w.conflict_events!]),
+      ),
     };
 
     // ── Write plan to DB ───────────────────────────────────────────────────

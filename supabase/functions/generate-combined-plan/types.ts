@@ -196,6 +196,44 @@ export interface PlannedSession {
   strength_exercises?: PlannedStrengthExercise[];
 }
 
+/** Typed scheduling conflicts for downstream resolver (Arc); additive to week_trade_offs prose. */
+export type ConflictType =
+  | 'quality_run_blocked'
+  | 'quality_swim_blocked'
+  | 'quality_bike_blocked'
+  | 'heavy_lower_blocked'
+  | 'brick_blocked'
+  | 'third_swim_blocked';
+
+export type WeekStateReason =
+  | 'consecutive_same_discipline'
+  | 'consecutive_cross_discipline'
+  | 'pre_long_run_48h'
+  | 'pre_brick_48h'
+  | 'no_clean_day'
+  | 'recovery_week'
+  | 'taper_week'
+  | 'race_week'
+  | 'post_race_rebuild'
+  | 'anchor_conflict';
+
+export type ConflictEvent = {
+  conflict_id: string;
+  conflict_type: ConflictType;
+  blocked_intent: {
+    session_kind: string;
+    preferred_day?: string;
+    intensity_class?: string;
+  };
+  blocking_reasons: WeekStateReason[];
+  anchors_involved: string[];
+  applied_resolution?: {
+    type: 'moved' | 'consolidated' | 'dropped' | 'none';
+    to_day?: string;
+    note: string;
+  };
+};
+
 export interface GeneratedWeek {
   weekNum: number;
   phase: Phase;
@@ -209,6 +247,8 @@ export interface GeneratedWeek {
   eighty_twenty_ratio: number; // fraction of time at Z1-2
   /** Athlete/coach-facing notes when 80/20 enforcement replaced a session (see enforce8020). */
   week_trade_offs?: string[];
+  /** Structured conflicts / resolutions for resolver + Arc (week-builder only today). */
+  conflict_events?: ConflictEvent[];
 }
 
 // ── Output ───────────────────────────────────────────────────────────────────
