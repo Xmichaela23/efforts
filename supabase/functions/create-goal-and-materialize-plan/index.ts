@@ -657,6 +657,7 @@ function backfillTriTrainingPrefsDefenseInDepth(
       training_days: trainingDays,
       ...(restDaysIn?.length ? { rest_days: restDaysIn } : {}),
       ...(hardBikeAvoidDays.length ? { hard_bike_avoid_days: hardBikeAvoidDays } : {}),
+      ...(qualityRunDay ? { quality_run: qualityRunDay } : {}),
     },
     athlete: {
       ...(trainingIntent ? { training_intent: trainingIntent } : {}),
@@ -1081,6 +1082,9 @@ async function buildCombinedPlan(
       ...(freshDpw != null ? { days_per_week: freshDpw } : {}),
       ...(freshCombinedPrefs.conflict_preferences && Object.keys(freshCombinedPrefs.conflict_preferences).length > 0
         ? { conflict_preferences: freshCombinedPrefs.conflict_preferences }
+        : {}),
+      ...(freshCombinedPrefs.assessment_week_preference
+        ? { assessment_week_preference: freshCombinedPrefs.assessment_week_preference }
         : {}),
       ...(planPreview ? { preview: true } : {}),
     },

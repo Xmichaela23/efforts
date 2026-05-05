@@ -86,6 +86,13 @@ export interface WeekOptimizerInputs {
      * the week builder, not in `deriveOptimalWeek()`.
      */
     hard_bike_avoid_days?: DayName[];
+    /**
+     * Athlete's preferred day for **quality_run** (intervals / tempo). When set and the
+     * day passes the hard-ban matrix (not adjacent to quality_bike, not long_run / long_ride
+     * day), the optimizer places quality_run there before falling back to the algorithmic
+     * priority list.
+     */
+    quality_run?: DayName;
   };
   athlete: {
     training_intent?: 'performance' | 'completion' | 'first_race' | 'comeback';
@@ -430,24 +437,38 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       blockedQr.add(dayAfter(qualityBikeDay));
     }
 
-    const prio: DayName[] = [];
-    if (qualityBikeDay) {
-      prio.push(nDaysAfter(qualityBikeDay, 2));
-      prio.push(dayBefore(qualityBikeDay));
-    }
-    prio.push(nDaysAfter(longRide, -2));
-    for (const d of ALL_DAYS) {
-      if (!prio.includes(d)) prio.push(d);
+    // Honor athlete's preferred quality_run day if it clears the hard-ban matrix.
+    const preferredQr = inputs.preferences.quality_run;
+    if (
+      preferredQr &&
+      !blockedQr.has(preferredQr) &&
+      canPlace(days, preferredQr, 'quality_run') &&
+      sequentialOk(days, preferredQr, 'quality_run', inputs.athlete)
+    ) {
+      qualityRunDay = preferredQr;
+      place(days, preferredQr, 'quality_run');
     }
 
-    for (const c of prio) {
-      if (blockedQr.has(c)) continue;
-      if (!canPlace(days, c, 'quality_run')) continue;
-      if (!sequentialOk(days, c, 'quality_run', inputs.athlete)) continue;
+    if (!qualityRunDay) {
+      const prio: DayName[] = [];
+      if (qualityBikeDay) {
+        prio.push(nDaysAfter(qualityBikeDay, 2));
+        prio.push(dayBefore(qualityBikeDay));
+      }
+      prio.push(nDaysAfter(longRide, -2));
+      for (const d of ALL_DAYS) {
+        if (!prio.includes(d)) prio.push(d);
+      }
 
-      qualityRunDay = c;
-      place(days, c, 'quality_run');
-      break;
+      for (const c of prio) {
+        if (blockedQr.has(c)) continue;
+        if (!canPlace(days, c, 'quality_run')) continue;
+        if (!sequentialOk(days, c, 'quality_run', inputs.athlete)) continue;
+
+        qualityRunDay = c;
+        place(days, c, 'quality_run');
+        break;
+      }
     }
   }
 
