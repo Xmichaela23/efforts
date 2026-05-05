@@ -885,7 +885,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                       disc === 'strength_fork'
                         ? 'More detail: what each strength choice saves on your plan'
                         : disc === 'swim_fork'
-                          ? 'More detail: what Swim focus vs Swim to race changes'
+                          ? 'More detail: what A vs B changes in your plan'
                           : disc === 'swim_load_source'
                             ? 'More detail: how extra swim load is funded'
                             : disc === 'week_conflict'
@@ -939,7 +939,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     onClick={() => void sendUserMessage(SWIM_FOCUS_USER_MESSAGE)}
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
                   >
-                    Swim focus
+                    A — Swim focus
                   </button>
                   <button
                     type="button"
@@ -947,7 +947,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     onClick={() => void sendUserMessage(SWIM_TO_RACE_USER_MESSAGE)}
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
                   >
-                    Swim to race
+                    B — Race-ready
                   </button>
                 </div>
               )}
