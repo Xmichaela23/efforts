@@ -123,8 +123,8 @@ export function swimDrillEquipmentFromTokens(tokens: string[]): DrillEquipment {
   const required = new Set<string>();
   const optional = new Set<string>();
   for (const tok of tokens) {
-    // Token format: swim_drills_NxDistyd_<drill_name>
-    const m = String(tok).match(/^swim_drills_\d+x\d+yd_(.+)$/i);
+    // Token format: swim_drills_NxDist(yd|m)_<drill_name>
+    const m = String(tok).match(/^swim_drills_\d+x\d+(?:yd|m)_(.+)$/i);
     if (!m) continue;
     const eq = DRILL_EQUIPMENT_MAP[m[1].toLowerCase()] ?? NO_EQUIPMENT;
     for (const r of eq.required) required.add(r);

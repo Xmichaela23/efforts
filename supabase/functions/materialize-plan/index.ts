@@ -862,6 +862,54 @@ function parseIntSafe(s?: string | number | null): number | null { const n = typ
 
 function uid(): string { try { return crypto.randomUUID(); } catch { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; } }
 
+/**
+ * Pre-built steps for assessment week sessions.
+ * No pace targets — the athlete discovers their pace; that's the point of the test.
+ * Steps use duration_s or distance_m matching the session's test protocol.
+ */
+function buildAssessmentSteps(tags: string[]): { id: string; kind: string; duration_s?: number; distance_m?: number; label: string }[] {
+  // Swim CSS Test: 400 yd warmup → 3 min rest → 400 yd TT → 3 min rest → 200 yd TT → 200 yd cool-down
+  if (tags.includes('css_test')) {
+    return [
+      { id: uid(), kind: 'warmup',   distance_m: 366, label: 'Easy warmup — 400 yd' },
+      { id: uid(), kind: 'recovery', duration_s: 180, label: 'Rest — 3 min' },
+      { id: uid(), kind: 'work',     distance_m: 366, label: '400 yd time trial — max effort' },
+      { id: uid(), kind: 'recovery', duration_s: 180, label: 'Rest — 3 min' },
+      { id: uid(), kind: 'work',     distance_m: 183, label: '200 yd time trial — max effort' },
+      { id: uid(), kind: 'cooldown', distance_m: 183, label: 'Easy cool-down — 200 yd' },
+    ];
+  }
+  // Bike FTP Test: 10 min easy → 2 × 1 min hard / 1 min easy → 20 min TT → 5 min cool-down
+  if (tags.includes('ftp_test')) {
+    return [
+      { id: uid(), kind: 'warmup',   duration_s: 600,  label: 'Easy spin — 10 min' },
+      { id: uid(), kind: 'work',     duration_s: 60,   label: 'Hard effort opener — 1 min' },
+      { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 60,   label: 'Hard effort opener — 1 min' },
+      { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 1200, label: '20-min FTP time trial — max sustainable effort' },
+      { id: uid(), kind: 'cooldown', duration_s: 300,  label: 'Easy cool-down — 5 min' },
+    ];
+  }
+  // Run 12-min TT: 15 min easy → 4 × 30 sec strides / 30 sec walk → 12 min TT → 10 min cool-down
+  if (tags.includes('run_test')) {
+    return [
+      { id: uid(), kind: 'warmup',   duration_s: 900, label: 'Easy warmup — 15 min' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
+      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
+      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
+      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
+      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
+      { id: uid(), kind: 'work',     duration_s: 720, label: '12-min time trial — max sustainable effort' },
+      { id: uid(), kind: 'cooldown', duration_s: 600, label: 'Easy cool-down — 10 min' },
+    ];
+  }
+  return [];
+}
+
 function minutesTokenToSeconds(tok: string): number | null {
   const m = tok.match(/(\d+)\s*min/i); if (m) return parseInt(m[1],10)*60; return null;
 }
@@ -1989,11 +2037,19 @@ function toV3Step(st: any, row?: any): any {
   
   // Distance: explicit or calculated from duration + pace (for time-based steps)
   // CRITICAL: If step has duration_s (time-based), ALWAYS calculate distance from duration + pace
-  // NEVER use distance_m for time-based steps, even if it exists (it's likely incorrect)
+  // NEVER use distance_m for time-based steps, even if it exists (it's likely incorrect).
+  // SWIM EXCEPTION: swim steps with distance_m have duration_s added by the pace estimator for
+  // total-duration accounting only. Treat them as distance-based — use distance_m for distanceMeters
+  // and keep seconds for duration display. Do not try to re-derive distance from pace (swim steps
+  // have no pace_sec_per_mi, so the calculation would produce undefined and lose the distance).
+  const isSwimRow = String(row?.type||'').toLowerCase() === 'swim';
   const hasExplicitDuration = typeof st?.duration_s === 'number' && st.duration_s > 0;
   const hasExplicitDistance = typeof st?.distance_m === 'number' && st.distance_m > 0;
-  
-  if (hasExplicitDuration && typeof out.seconds === 'number' && out.seconds > 0) {
+
+  if (hasExplicitDuration && hasExplicitDistance && isSwimRow) {
+    // Swim distance-based step: distance_m is authoritative; duration_s is pace-estimated.
+    out.distanceMeters = Math.max(1, Math.round(st.distance_m));
+  } else if (hasExplicitDuration && typeof out.seconds === 'number' && out.seconds > 0) {
     // Time-based step: calculate distance from duration and pace (IGNORE any existing distance_m)
     let paceSecPerMi: number | null = null;
     
@@ -2292,6 +2348,27 @@ Deno.serve(async (req) => {
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
         const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
+        const rowTags: string[] = Array.isArray((row as any)?.tags)
+          ? (row as any).tags.map((t: any) => String(t).toLowerCase())
+          : [];
+
+        // Assessment sessions bypass token expansion — inject pre-built steps directly.
+        if (rowTags.includes('assessment')) {
+          const assessSteps = buildAssessmentSteps(rowTags);
+          if (assessSteps.length > 0) {
+            const withIndex = assessSteps.map((st, idx) => ({ ...st, planned_index: idx }));
+            const v3 = withIndex.map((st: any) => toV3Step(st, row));
+            const actualTotal = v3.reduce((sum: number, st: any) => sum + (Number(st?.seconds) || 0), 0);
+            const originalDuration = typeof row.duration === 'number' && row.duration > 0 ? row.duration : 0;
+            const finalTotalSeconds = actualTotal > 0 ? actualTotal : (originalDuration * 60);
+            const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
+            const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds }, total_duration_seconds: finalTotalSeconds, duration: Math.max(1, finalDuration) };
+            await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
+            count++;
+            continue;
+          }
+        }
+
         const weekNum =
           typeof row?.week_number === 'number' && Number.isFinite(row.week_number)
             ? row.week_number
