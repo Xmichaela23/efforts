@@ -460,9 +460,11 @@ async function parseArcInvokeError(
   return { message: msg || fallback };
 }
 
+type InsertedGoalRow = { id: string; priority: string; target_date: string | null; sport: string | null };
+
 async function persistArcSetup(
   payload: ArcSetupPayload,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; insertedGoals?: InsertedGoalRow[] }> {
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
@@ -481,6 +483,8 @@ async function persistArcSetup(
     return { ok: false, error: 'Nothing to save.' };
   }
 
+  let insertedGoalRows: InsertedGoalRow[] = [];
+
   try {
     if (validGoals.length > 0) {
       const rows = validGoals.map((row) => {
@@ -491,13 +495,14 @@ async function persistArcSetup(
         }
         return base;
       });
-      const { data, error } = await supabase.from('goals').insert(rows).select();
+      const { data, error } = await supabase.from('goals').insert(rows).select('id, priority, target_date, sport');
       if (error) {
         console.error('GOALS INSERT FAILED:', error.message, (error as { details?: string }).details, (error as { hint?: string }).hint);
         console.error('[arc-setup] goal insert', error);
         return { ok: false, error: error.message };
       }
-      const newGoalIds = (data || []).map((r: { id: string }) => r.id).filter(Boolean);
+      insertedGoalRows = ((data || []) as InsertedGoalRow[]).filter((r) => typeof r.id === 'string' && r.id);
+      const newGoalIds = insertedGoalRows.map((r) => r.id);
       if (newGoalIds.length > 0) {
         const { error: reErr } = await supabase.functions.invoke('refresh-goal-race-projections', {
           body: { goal_ids: newGoalIds },
@@ -555,7 +560,7 @@ async function persistArcSetup(
       window.dispatchEvent(new CustomEvent('planned:invalidate'));
       window.dispatchEvent(new CustomEvent('goals:invalidate'));
     } catch {}
-    return { ok: true };
+    return { ok: true, insertedGoals: insertedGoalRows };
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
     return { ok: false, error: msg };
@@ -728,7 +733,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
     setSending(true);
     setError(null);
     setSaveBanner(null);
-    const { ok, error: pe } = await persistArcSetup(confirmPayload);
+    const { ok, error: pe, insertedGoals } = await persistArcSetup(confirmPayload);
     if (!ok) {
       setSending(false);
       setError(pe || 'Save failed');
@@ -743,26 +748,35 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
       return;
     }
 
-    const { data: evRows, error: evErr } = await supabase
-      .from('goals')
-      .select('id, priority, target_date, sport')
-      .eq('user_id', userId)
-      .eq('goal_type', 'event')
-      .eq('status', 'active');
-
-    if (evErr) {
-      setSending(false);
-      setError(evErr.message);
-      navigate('/goals', { replace: true, state: { fromArcSetup: true } });
-      return;
-    }
-
-    const eventGoals = (evRows || []) as {
+    // Use the IDs returned by the insert directly — avoids a round-trip re-query
+    // and eliminates the "Goal not found" race that occurred when the edge function
+    // was called with an ID that the DB hadn't yet made visible to a secondary query.
+    let eventGoals = (insertedGoals || []) as {
       id: string;
       priority: string;
       target_date: string | null;
       sport: string | null;
     }[];
+
+    if (eventGoals.length === 0) {
+      // No new goals inserted (athlete_identity-only update or user already had goals).
+      // Fall back to a DB query to find existing active event goals.
+      const { data: evRows, error: evErr } = await supabase
+        .from('goals')
+        .select('id, priority, target_date, sport')
+        .eq('user_id', userId)
+        .eq('goal_type', 'event')
+        .eq('status', 'active');
+
+      if (evErr) {
+        setSending(false);
+        setError(evErr.message);
+        navigate('/goals', { replace: true, state: { fromArcSetup: true } });
+        return;
+      }
+      eventGoals = (evRows || []) as typeof eventGoals;
+    }
+
     const primaryId = pickPrimaryEventGoalId(eventGoals);
 
     if (!primaryId) {

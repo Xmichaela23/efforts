@@ -98,7 +98,8 @@ export function useConflictResolutionLoop({
 
     if (fnErr || !data || (data as { success?: boolean }).success !== true) {
       const d = data as { error?: string; error_code?: string } | null;
-      if (d?.error_code === 'missing_pace_benchmark') {
+      const code = d?.error_code || (fnErr as { code?: string } | null)?.code;
+      if (code === 'missing_pace_benchmark') {
         navigate('/goals', { replace: true, state: { fromArcSetup: true, needPaceCalibration: true } });
         return;
       }

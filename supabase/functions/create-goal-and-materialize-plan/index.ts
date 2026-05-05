@@ -1225,7 +1225,10 @@ Deno.serve(async (req: Request) => {
         .eq('id', existing_goal_id)
         .eq('user_id', user_id)
         .maybeSingle();
-      if (existingGoalErr || !existingGoal) throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
+      if (existingGoalErr || !existingGoal) {
+        console.error('[create-goal] goal_not_found', { existing_goal_id, user_id, err: existingGoalErr?.message });
+        throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
+      }
       if (existingGoal.goal_type !== 'event') throw new AppError('invalid_goal_type', 'Only event goals can auto-build');
       if ((existingGoal.status || 'active') !== 'active') throw new AppError('goal_not_active', 'Goal must be active to build a plan');
       if (String(existingGoal.sport || '').toLowerCase() === 'run' && !existingGoal.distance) {

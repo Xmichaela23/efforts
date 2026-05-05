@@ -685,6 +685,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         for (const uc of upperOrder) {
           if (uc === longRide || uc === longRun) continue;
           if (dayHasQualitySwim(days[uc])) continue;
+          if (days[uc].length >= 2) continue;
           if (!canPlace(days, uc, 'upper_body_strength')) continue;
           if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
 
@@ -695,6 +696,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             if (lc === uc) continue;
             if (lc === longRide || lc === longRun) continue;
             if (noLowerBody.has(lc)) continue;
+            if (days[lc].length >= 2) continue;
             if (!canPlaceWithModifier(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
             if (!sequentialOk(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
             const gap = Math.abs(DAY_INDEX[lc] - DAY_INDEX[uc]);
@@ -739,6 +741,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       for (const c of ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'] as DayName[]) {
         if (c === longRide || c === longRun) continue;
         if (dayHasQualitySwim(days[c])) continue;
+        if (days[c].length >= 2) continue;
         if (!canPlace(days, c, 'upper_body_strength')) continue;
         if (!sequentialOk(days, c, 'upper_body_strength', inputs.athlete)) continue;
         upperDay = c;
@@ -771,6 +774,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           if (upperDay && c === upperDay) continue;
           if (c === longRide || c === longRun) continue;
           if (noLowerBody.has(c)) continue;
+          if (days[c].length >= 2) continue;
           if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
           if (!sequentialOk(days, c, 'lower_body_strength', inputs.athlete)) continue;
           if (upperDay) {
@@ -866,6 +870,9 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     let picked: DayName | undefined;
     for (const c of ordered) {
       if (reservedQrDay && c === reservedQrDay && !qualityRunDay) continue;
+      // Never create a 3-session day: swim should not land on a day that already
+      // has 2 sessions even if each pairwise matrix check passes.
+      if (days[c].length >= 2) continue;
       if (!canPlace(days, c, kind)) continue;
       if (kind === 'quality_swim' && dayHasUpperStrength(days[c])) continue;
       picked = c;
