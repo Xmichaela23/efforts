@@ -523,6 +523,7 @@ async function persistArcSetup(
         return { ok: false, error: error.message };
       }
       insertedGoalRows = ((data || []) as InsertedGoalRow[]).filter((r) => typeof r.id === 'string' && r.id);
+      console.log('[arc-setup] inserted goals:', insertedGoalRows.map(r => ({ id: r.id, priority: r.priority, target_date: r.target_date })));
       const newGoalIds = insertedGoalRows.map((r) => r.id);
       if (newGoalIds.length > 0) {
         const { error: reErr } = await supabase.functions.invoke('refresh-goal-race-projections', {

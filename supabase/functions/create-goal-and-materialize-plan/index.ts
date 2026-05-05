@@ -798,13 +798,29 @@ async function buildCombinedPlan(
   | null
 > {
 
-  // Gather all active event goals (including the just-created one)
-  const { data: allEventGoals } = await supabase
+  // Gather all active event goals, newest first. Repeated confirm attempts can leave
+  // duplicate orphan goals in the DB; limit to the 2 most recent and always include
+  // the goal we just created so it is never crowded out by stale rows.
+  const { data: rawEventGoals } = await supabase
     .from('goals')
-    .select('id, name, sport, distance, target_date, priority, training_prefs, status, projection')
+    .select('id, name, sport, distance, target_date, priority, training_prefs, status, projection, created_at')
     .eq('user_id', user_id)
     .eq('goal_type', 'event')
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(10); // fetch a small window, dedupe below
+
+  // Always include newGoalId; take the first non-newGoalId sibling as the partner.
+  const allEventGoals = (() => {
+    if (!rawEventGoals || rawEventGoals.length === 0) return rawEventGoals;
+    const primary = rawEventGoals.find(g => g.id === newGoalId);
+    const siblings = rawEventGoals.filter(g => g.id !== newGoalId);
+    // Partner: the sibling with the earliest created_at among the top-10 recents
+    // (most likely the other goal from the same confirm flow, not an old orphan).
+    const partner = siblings[0] ?? null;
+    if (!primary) return rawEventGoals.slice(0, 2); // fallback
+    return partner ? [primary, partner] : [primary];
+  })();
 
   if (!allEventGoals || allEventGoals.length < 2) return null; // No sibling goals; fall through
 
@@ -1225,17 +1241,52 @@ Deno.serve(async (req: Request) => {
     }
 
     let resolvedGoal = goal || null;
+    // Tracks the ACTUAL goal id used in build_existing mode (may differ from existing_goal_id
+    // when the fallback path substitutes the most-recently-created active goal).
+    let resolvedBuildId: string | undefined;
     if (mode === 'build_existing') {
-      const { data: existingGoal, error: existingGoalErr } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('id', existing_goal_id)
-        .eq('user_id', user_id)
-        .maybeSingle();
-      if (existingGoalErr || !existingGoal) {
-        console.error('[create-goal] goal_not_found', { existing_goal_id, user_id, err: existingGoalErr?.message });
-        throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
+      // Retry once after a short delay — handles rare cases where a freshly committed
+      // goal insert is not yet visible on the edge function's DB connection.
+      let existingGoal: Record<string, unknown> | null = null;
+      let existingGoalErr: { message?: string } | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 400));
+        const res = await supabase
+          .from('goals')
+          .select('*')
+          .eq('id', existing_goal_id)
+          .eq('user_id', user_id)
+          .maybeSingle();
+        existingGoal = res.data as Record<string, unknown> | null;
+        existingGoalErr = res.error as { message?: string } | null;
+        if (existingGoal) break;
       }
+      if (existingGoalErr || !existingGoal) {
+        // Final fallback: find the most recent active event goal for this user (handles
+        // stale IDs from the client when insertedGoals is empty and fallback picked an
+        // old orphan goal that was since cleaned up).
+        const { data: fallbackGoal } = await supabase
+          .from('goals')
+          .select('*')
+          .eq('user_id', user_id)
+          .eq('goal_type', 'event')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fallbackGoal) {
+          const fb = fallbackGoal as Record<string, unknown>;
+          console.warn('[create-goal] goal_not_found by id — using most recent active goal as fallback',
+            { tried_id: existing_goal_id, fallback_id: fb.id, user_id });
+          existingGoal = fb;
+          // Note: existing_goal_id is const — we shadow it below via resolvedGoalId.
+        } else {
+          console.error('[create-goal] goal_not_found', { existing_goal_id, user_id, err: existingGoalErr?.message });
+          throw new AppError('goal_not_found', existingGoalErr?.message || 'Goal not found', 404);
+        }
+      }
+      if (!existingGoal) throw new AppError('goal_not_found', 'Goal not found', 404); // TypeScript narrowing
+      resolvedBuildId = String((existingGoal as Record<string, unknown>).id ?? existing_goal_id ?? '');
       if (existingGoal.goal_type !== 'event') throw new AppError('invalid_goal_type', 'Only event goals can auto-build');
       if ((existingGoal.status || 'active') !== 'active') throw new AppError('goal_not_active', 'Goal must be active to build a plan');
       if (String(existingGoal.sport || '').toLowerCase() === 'run' && !existingGoal.distance) {
@@ -1286,12 +1337,15 @@ Deno.serve(async (req: Request) => {
           },
         };
       }
-      if (mode === 'build_existing' && existing_goal_id && !bodyPreview) {
-        await supabase
-          .from('goals')
-          .update({ training_prefs: resolvedGoal.training_prefs, updated_at: new Date().toISOString() })
-          .eq('id', existing_goal_id)
-          .eq('user_id', user_id);
+      if (mode === 'build_existing' && !bodyPreview) {
+        const updateGoalId = resolvedBuildId || existing_goal_id;
+        if (updateGoalId) {
+          await supabase
+            .from('goals')
+            .update({ training_prefs: resolvedGoal.training_prefs, updated_at: new Date().toISOString() })
+            .eq('id', updateGoalId)
+            .eq('user_id', user_id);
+        }
       }
     }
 
@@ -1368,7 +1422,7 @@ Deno.serve(async (req: Request) => {
         if (goalInsertErr || !createdGoal) throw new AppError('goal_create_failed', goalInsertErr?.message || 'Failed to create goal');
         createdGoalId = createdGoal.id;
       } else {
-        createdGoalId = existing_goal_id || null;
+        createdGoalId = resolvedBuildId || existing_goal_id || null;
       }
 
       // ── Combined plan routing ────────────────────────────────────────────
