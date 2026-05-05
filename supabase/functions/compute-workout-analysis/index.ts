@@ -688,6 +688,153 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
   };
 }
 
+// ── Assessment baseline extraction ──────────────────────────────────────────
+// Runs after the standard analysis pipeline for workouts linked to an assessment
+// planned_workout. Extracts CSS (swim) and threshold pace (run) and writes them
+// back to user_baselines so the Arc no longer treats the discipline as missing.
+// Bike FTP is handled automatically by learn-fitness-profile via power_20min.
+async function extractAssessmentBaseline(
+  supabase: any,
+  w: { planned_id: any; user_id: any; type?: any },
+  laps: any[],
+): Promise<void> {
+  if (!w.planned_id || !w.user_id) return;
+  try {
+    const { data: planned } = await supabase
+      .from('planned_workouts')
+      .select('tags')
+      .eq('id', String(w.planned_id))
+      .maybeSingle();
+
+    const tags: string[] = Array.isArray(planned?.tags) ? planned.tags : [];
+    if (!tags.includes('assessment')) return;
+
+    console.log(`[assessment] linked to assessment tags: ${tags.join(', ')}`);
+
+    // FTP test: handled end-to-end by learn-fitness-profile via computed.analysis.bests.power_20min
+    if (tags.includes('ftp_test')) {
+      console.log('[assessment] ftp_test — write-back delegated to learn-fitness-profile pipeline');
+      return;
+    }
+
+    // Fetch existing baselines for merge
+    const { data: baseline } = await supabase
+      .from('user_baselines')
+      .select('id, learned_fitness, performance_numbers')
+      .eq('user_id', String(w.user_id))
+      .maybeSingle();
+
+    const existingLF: Record<string, any> =
+      (typeof baseline?.learned_fitness === 'string'
+        ? JSON.parse(baseline.learned_fitness)
+        : baseline?.learned_fitness) ?? {};
+    const existingPN: Record<string, any> =
+      (typeof baseline?.performance_numbers === 'string'
+        ? JSON.parse(baseline.performance_numbers)
+        : baseline?.performance_numbers) ?? {};
+
+    const lapDist = (L: any) =>
+      Number(L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ?? L?.distance ?? 0);
+    const lapTime = (L: any) =>
+      Number(L?.totalTimerTimeInSeconds ?? L?.totalElapsedTimeInSeconds ?? L?.time_s ?? L?.elapsed_time ?? 0);
+
+    // ── Swim CSS test ────────────────────────────────────────────────────────
+    // Protocol: 400 yd warmup → rest → 400 yd TT → rest → 200 yd TT → 200 yd cool-down
+    // 400 yd ≈ 366 m, 200 yd ≈ 183 m.
+    // Identify TT laps by being the fastest among laps in each distance range.
+    if (tags.includes('css_test')) {
+      const meaningfulLaps = laps.filter((L) => lapDist(L) > 100 && lapTime(L) > 30);
+      const longGroup = meaningfulLaps.filter((L) => lapDist(L) >= 300 && lapDist(L) <= 430);
+      const shortGroup = meaningfulLaps.filter((L) => lapDist(L) >= 140 && lapDist(L) <= 230);
+
+      if (longGroup.length >= 1 && shortGroup.length >= 1) {
+        const best400 = longGroup.reduce((a, b) => (lapTime(a) <= lapTime(b) ? a : b));
+        const best200 = shortGroup.reduce((a, b) => (lapTime(a) <= lapTime(b) ? a : b));
+        const t400 = lapTime(best400);
+        const t200 = lapTime(best200);
+        const d400 = lapDist(best400);
+        const d200 = lapDist(best200);
+
+        if (t400 > 0 && t200 > 0 && t400 > t200 && d400 > d200) {
+          const cssSecPer100m = Math.round(((t400 - t200) / (d400 - d200)) * 100);
+          console.log(
+            `[assessment] CSS = ${cssSecPer100m} sec/100m  (400yd=${t400}s d=${d400}m, 200yd=${t200}s d=${d200}m)`,
+          );
+          if (cssSecPer100m > 55 && cssSecPer100m < 200) {
+            const newLF = {
+              ...existingLF,
+              swim_pace_per_100m: {
+                value: cssSecPer100m,
+                confidence: 'high',
+                source: 'CSS test (400/200 yd time trial)',
+                sample_count: 1,
+                tested_at: new Date().toISOString(),
+              },
+            };
+            const newPN = { ...existingPN, swimPace100: cssSecPer100m };
+            await supabase
+              .from('user_baselines')
+              .update({ learned_fitness: newLF, performance_numbers: newPN, updated_at: new Date().toISOString() })
+              .eq('user_id', String(w.user_id));
+            console.log(`[assessment] ✅ swimPace100 = ${cssSecPer100m} sec/100m written`);
+          } else {
+            console.warn(`[assessment] CSS ${cssSecPer100m} outside 55–200 range — skipped`);
+          }
+        } else {
+          console.warn('[assessment] CSS: lap time/distance logic failed sanity check');
+        }
+      } else {
+        console.warn(
+          `[assessment] CSS: could not find 400/200 lap pair (long=${longGroup.length}, short=${shortGroup.length})`,
+        );
+      }
+    }
+
+    // ── Run 12-min time trial ────────────────────────────────────────────────
+    // Protocol: 15 min warmup → 4×stride/walk → 12-min TT → 10 min cool-down
+    // The TT lap has duration ~720 s (tolerance ±60 s) and distance > 500 m.
+    if (tags.includes('run_test')) {
+      const ttLap = laps.find((L) => {
+        const t = lapTime(L);
+        const d = lapDist(L);
+        return t >= 660 && t <= 780 && d > 500;
+      });
+
+      if (ttLap) {
+        const t = lapTime(ttLap);
+        const d = lapDist(ttLap);
+        const paceSecPerKm = Math.round(t / (d / 1000));
+        console.log(`[assessment] Run TT: ${d}m in ${t}s = ${paceSecPerKm} sec/km threshold pace`);
+
+        if (paceSecPerKm > 180 && paceSecPerKm < 600) {
+          const newLF = {
+            ...existingLF,
+            run_threshold_pace_sec_per_km: {
+              value: paceSecPerKm,
+              confidence: 'high',
+              source: 'Run 12-min time trial',
+              sample_count: 1,
+              tested_at: new Date().toISOString(),
+            },
+          };
+          await supabase
+            .from('user_baselines')
+            .update({ learned_fitness: newLF, updated_at: new Date().toISOString() })
+            .eq('user_id', String(w.user_id));
+          console.log(`[assessment] ✅ run_threshold_pace_sec_per_km = ${paceSecPerKm} written`);
+        } else {
+          console.warn(`[assessment] run pace ${paceSecPerKm} outside 180–600 range — skipped`);
+        }
+      } else {
+        console.warn(`[assessment] run_test: no ~720s lap found in ${laps.length} laps`);
+      }
+    }
+  } catch (e) {
+    // Non-fatal: log but never fail the main analysis pipeline
+    console.error('[assessment] extractAssessmentBaseline error:', e);
+  }
+}
+
 Deno.serve(async (req) => {
   // CORS
   if (req.method === 'OPTIONS') {
@@ -1797,6 +1944,9 @@ Deno.serve(async (req) => {
     }
     
     console.log('✅ UPDATE result: merged via RPC', rpcData);
+
+    // Assessment write-back: extract CSS / run-TT baseline if this is a linked assessment session
+    await extractAssessmentBaseline(supabase, w, laps);
 
     // FIX: Update analysis_status to complete on success
     // Note: analyze-running-workout will also set this, but we set it here for consistency

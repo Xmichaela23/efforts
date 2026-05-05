@@ -1241,7 +1241,7 @@ export function buildWeek(
   if (hasTri && swimTemplates.length > 0) {
     const t0 = swimTemplates[0]!;
     const y0 = scaledTemplateYards(t0, 0);
-    if (!qualitySwimSlot?.isRest) {
+    if (!qualitySwimSlot?.isRest && qualitySwimSlot!.sessions.length < 2) {
       qualitySwimSlot!.sessions.push(
         swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0),
       );
@@ -1271,7 +1271,7 @@ export function buildWeek(
   if (!easySwimSlot?.isRest && hasTri && swimTemplates.length >= 2) {
     const t1 = swimTemplates[1]!;
     const y1 = scaledTemplateYards(t1, 1);
-    if (swimEasyDay !== swimQualityDay || !qualitySwimPlaced) {
+    if ((swimEasyDay !== swimQualityDay || !qualitySwimPlaced) && easySwimSlot!.sessions.length < 2) {
       const useOpenWater =
         t1.session_type === 'easy' &&
         hasTri &&
@@ -1291,7 +1291,7 @@ export function buildWeek(
   // ── Third swim (focus program template slot 2) ─────────────────────────────
   if (swimThirdDay && hasTri && !recoveryRebuildWeek1 && swimTemplates.length >= 3) {
     const thirdSwimSlot = grid.get(swimThirdDay);
-    if (!thirdSwimSlot?.isRest) {
+    if (!thirdSwimSlot?.isRest && thirdSwimSlot!.sessions.length < 2) {
       const t2 = swimTemplates[2]!;
       const y2 = scaledTemplateYards(t2, 2);
       thirdSwimSlot!.sessions.push(
@@ -1381,7 +1381,7 @@ export function buildWeek(
     const strDay = candidates1[0];
     if (strDay) {
       const strSlot = grid.get(strDay);
-      if (strSlot) {
+      if (strSlot && strSlot.sessions.length < 2) {
         const equipmentType = athleteState.equipment_type ?? 'commercial_gym';
         const hasCable = athleteState.has_cable_machine ?? (equipmentType === 'commercial_gym' && !athleteState.equipment_type?.includes('home'));
         const hasGhd = athleteState.has_ghd ?? false;
@@ -1419,8 +1419,11 @@ export function buildWeek(
     // Slot 2: second non-blocked day when strFreq is 2 (base, or build/RS + performance intent)
     if (strFreq >= 2 && strDay) {
       const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
+      // Performance/co-equal strength: lower body pairs AM/PM with quality_run (Thursday).
+      // Support strength: avoid quality_run day to prevent stacking two high-demand sessions.
+      const allowLowerOnQualityRunDay = athleteState.strength_intent === 'performance';
       const baseLowerDay = (d: string) =>
-        !blocked.has(d) && d !== strDay && (!hasTri || d !== runQualityDay);
+        !blocked.has(d) && d !== strDay && (!hasTri || allowLowerOnQualityRunDay || d !== runQualityDay);
       const passesHeavyLowerGuard = (d: string) =>
         !heavyLowerBlockedWithin48hOfLongRunOrBrick(d, longRunActualDay, brickDaysSet);
 
@@ -1480,7 +1483,7 @@ export function buildWeek(
       }
       if (strDay2) {
         const strSlot2 = grid.get(strDay2);
-        if (strSlot2) {
+        if (strSlot2 && strSlot2.sessions.length < 2) {
           const equipmentType2 = athleteState.equipment_type ?? 'commercial_gym';
           if (hasTri) {
             // Tri slot 2 (second preferred day, e.g. Thursday) = lower body (index 0): pairs
@@ -1527,7 +1530,7 @@ export function buildWeek(
   if (hasTri && !raceThisWeek) {
     const midRideSlot = grid.get(bikeEasyDay);
     if (midRideSlot && !midRideSlot.isRest) {
-      const slotFree = midRideSlot.sessions.length <= 1;
+      const slotFree = midRideSlot.sessions.length < 2;
       if ((recoveryRebuildWeek1 || isRecovery) && slotFree) {
         midRideSlot.sessions.push(easyBike(bikeEasyDay, 0.75, servedGoal));
       } else if (!isRecovery) {
@@ -1727,4 +1730,106 @@ function resolveGroupRideHours(
   }
   // Defaults for anchored hard group rides when no route estimate is available.
   return 1.5;
+}
+
+/**
+ * Assessment week sessions — three 45-minute discipline time trials placed on
+ * Monday (swim CSS test), Wednesday (bike FTP test), and Friday (run 12-min TT).
+ *
+ * These are returned as `PlannedSession` objects with `steps_preset: []`.
+ * materialize-plan skips token expansion on empty presets and renders the
+ * session as instructions-only (the description text is the full protocol).
+ *
+ * Called when `athleteState.assessment_week_preference === 'assessment_first'`.
+ * The caller shifts all existing plan weeks +1 and inserts these as week 1.
+ */
+export function buildAssessmentWeekSessions(
+  disciplines: ('swim' | 'bike' | 'run')[] = ['swim', 'bike', 'run'],
+): PlannedSession[] {
+  const hasSw = disciplines.includes('swim');
+  const hasBk = disciplines.includes('bike');
+  const hasRn = disciplines.includes('run');
+  const isRunOnly = hasRn && !hasSw && !hasBk;
+
+  // Day assignments:
+  //   Full tri (swim+bike+run): Mon / Wed / Fri
+  //   Two disciplines:          Mon / Wed
+  //   Run only:                 Wednesday (midweek; don't leave a lonely Friday)
+  const swimDay = 'Monday';
+  const bikeDay = hasSw ? 'Wednesday' : 'Monday';
+  const runDay  = (hasSw || hasBk) ? (hasSw && hasBk ? 'Friday' : 'Wednesday') : 'Wednesday';
+
+  const sessions: PlannedSession[] = [];
+
+  if (hasSw) {
+    sessions.push({
+      day: swimDay,
+      type: 'swim',
+      name: 'Swim Baseline — CSS Test',
+      description:
+        'Critical Swim Speed (CSS) assessment. ' +
+        'Warm up 400 yd easy freestyle, rest 3 min. ' +
+        'Swim 400 yd all-out — time it. Rest 3 min. ' +
+        'Swim 200 yd all-out — time it. ' +
+        'Cool down 200 yd easy. ' +
+        'Record both times: your coach uses them to set your threshold swim pace for the entire plan.',
+      duration: 45,
+      tss: 65,
+      weighted_tss: 65,
+      intensity_class: 'HARD',
+      steps_preset: [],
+      tags: ['assessment', 'css_test', 'time_trial'],
+      serves_goal: 'shared',
+      zone_targets: 'maximal effort on each test set',
+    });
+  }
+
+  if (hasBk) {
+    sessions.push({
+      day: bikeDay,
+      type: 'bike',
+      name: 'Bike Baseline — 20-Minute FTP Test',
+      description:
+        '20-minute FTP assessment. ' +
+        'Warm up 10 min easy spin building to moderate effort, then 2 × 1 min hard / 1 min easy. ' +
+        'Ride 20 min all-out as evenly paced as possible — this is not a sprint. ' +
+        'Cool down 5 min easy. ' +
+        'Record average power (or average heart rate if no power meter). ' +
+        'Your FTP ≈ average power × 0.95. ' +
+        'Your coach uses this to set all bike training zones for the plan.',
+      duration: 45,
+      tss: 70,
+      weighted_tss: 70,
+      intensity_class: 'HARD',
+      steps_preset: [],
+      tags: ['assessment', 'ftp_test', 'time_trial'],
+      serves_goal: 'shared',
+      zone_targets: 'maximal sustainable effort for 20 min',
+    });
+  }
+
+  if (hasRn) {
+    sessions.push({
+      day: runDay,
+      type: 'run',
+      name: 'Run Baseline — 12-Minute Time Trial',
+      description:
+        'Running threshold assessment. ' +
+        'Warm up 15 min easy (conversational pace), then 4 × 30 sec strides with 30 sec walk recovery. ' +
+        'Run 12 min all-out on a flat surface — start evenly, not a sprint. ' +
+        'Cool down 10 min easy walk/jog. ' +
+        'Record distance covered (or average pace). ' +
+        'Your coach uses this to set your run zones and easy/threshold paces for the entire plan.',
+      duration: 45,
+      tss: 70,
+      weighted_tss: Math.round(70 * 1.3),
+      intensity_class: 'HARD',
+      steps_preset: [],
+      tags: ['assessment', 'run_test', 'time_trial'],
+      serves_goal: 'shared',
+      zone_targets: 'maximal sustainable effort for 12 min',
+    });
+  }
+
+  return sessions;
 }

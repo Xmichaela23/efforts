@@ -11,7 +11,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type { CombinedPlanRequest, GoalInput, AthleteState, AthleteMemory } from './types.ts';
 import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-structure.ts';
-import { buildWeek } from './week-builder.ts';
+import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
 import { validatePlan, failedChecks } from './validator.ts';
 import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
@@ -122,28 +122,44 @@ Deno.serve(async (req: Request) => {
 
     // ── Build sessions_by_week (sessions format used by activate-plan) ─────
     const sessions_by_week: Record<string, any[]> = {};
+
+    const serializeSession = (s: any) => ({
+      day: s.day,
+      type: s.type,
+      discipline: s.type,
+      name: s.name,
+      description: s.description,
+      duration: s.duration,
+      steps_preset: s.steps_preset,
+      tags: s.tags,
+      timing: s.timing,
+      intensity_class: s.intensity_class,
+      tss: s.tss,
+      weighted_tss: s.weighted_tss,
+      zone_targets: s.zone_targets,
+      serves_goal: s.serves_goal,
+      ...(Array.isArray(s.strength_exercises) && s.strength_exercises.length > 0
+        ? { strength_exercises: s.strength_exercises }
+        : {}),
+    });
+
+    // When assessment_first: shift all training weeks +1, prepend assessment as week 1.
+    const includeAssessmentWeek = state.assessment_week_preference === 'assessment_first';
+    const weekOffset = includeAssessmentWeek ? 1 : 0;
+
     for (const w of generatedWeeks) {
-      sessions_by_week[String(w.weekNum)] = w.sessions.map(s => ({
-        day: s.day,
-        type: s.type,
-        discipline: s.type,
-        name: s.name,
-        description: s.description,
-        duration: s.duration,
-        steps_preset: s.steps_preset,
-        tags: s.tags,
-        timing: s.timing,
-        // Extended fields (stored in JSONB, used by coach for context)
-        intensity_class: s.intensity_class,
-        tss: s.tss,
-        weighted_tss: s.weighted_tss,
-        zone_targets: s.zone_targets,
-        serves_goal: s.serves_goal,
-        ...(Array.isArray(s.strength_exercises) && s.strength_exercises.length > 0
-          ? { strength_exercises: s.strength_exercises }
-          : {}),
-      }));
+      sessions_by_week[String(w.weekNum + weekOffset)] = w.sessions.map(serializeSession);
     }
+
+    if (includeAssessmentWeek) {
+      const assessmentDisciplines: ('swim' | 'bike' | 'run')[] = hasTriGoal
+        ? ['swim', 'bike', 'run']
+        : ['run']; // marathon, HM, 5K, 10K — run baseline only
+      sessions_by_week['1'] = buildAssessmentWeekSessions(assessmentDisciplines).map(serializeSession);
+    }
+
+    // Total duration including any prepended assessment week
+    const effectiveTotalWeeks = totalWeeks + weekOffset;
 
     // ── Build plan_contract_v1 ─────────────────────────────────────────────
     const primaryGoal = goals.find(g => g.priority === 'A') ?? goals[0];
@@ -177,7 +193,7 @@ Deno.serve(async (req: Request) => {
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
       sport: 'multi_sport',
       start_date: start_date ?? new Date().toISOString().slice(0, 10),
-      duration_weeks: totalWeeks,
+      duration_weeks: effectiveTotalWeeks,
       loading_pattern: loadingPattern,
       weekly_tss_target: Math.round(
         scaledWeeklyTSS('build', state.current_ctl, state.weekly_hours_available, 1.0)
@@ -213,15 +229,15 @@ Deno.serve(async (req: Request) => {
       ),
     };
 
-    const planName = totalWeeks <= 10
-      ? `${allGoalNames} — ${totalWeeks}-Week Combined Plan`
+    const planName = effectiveTotalWeeks <= 10
+      ? `${allGoalNames} — ${effectiveTotalWeeks}-Week Combined Plan`
       : `${allGoalNames} — Multi-Sport Plan`;
 
     const peakWeek = generatedWeeks.reduce((best, w) =>
       w.total_raw_tss > (best?.total_raw_tss ?? 0) ? w : best
     , generatedWeeks[0]);
 
-    const avgTSS = Math.round(generatedWeeks.reduce((s, w) => s + w.total_raw_tss, 0) / totalWeeks);
+    const avgTSS = Math.round(generatedWeeks.reduce((s, w) => s + w.total_raw_tss, 0) / effectiveTotalWeeks);
 
     const plan_config = {
       ...plan_contract_v1,
@@ -235,7 +251,7 @@ Deno.serve(async (req: Request) => {
 
     const previewSummary = {
       name: planName,
-      total_weeks: totalWeeks,
+      total_weeks: effectiveTotalWeeks,
       peak_weekly_tss: peakWeek.total_raw_tss,
       avg_weekly_tss: avgTSS,
       loading_pattern: loadingPattern,
@@ -265,7 +281,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         preview_mode: true,
         plan_id: null,
-        total_weeks: totalWeeks,
+        total_weeks: effectiveTotalWeeks,
         validation,
         validation_failures: failures,
         sessions_by_week,
@@ -287,10 +303,10 @@ Deno.serve(async (req: Request) => {
       .insert({
         user_id,
         name: planName,
-        description: buildDescription(goals, totalWeeks, loadingPattern, validation, peakWeek.total_raw_tss, avgTSS),
+        description: buildDescription(goals, effectiveTotalWeeks, loadingPattern, validation, peakWeek.total_raw_tss, avgTSS),
         plan_type: 'generated',
         status: 'active',
-        duration_weeks: totalWeeks,
+        duration_weeks: effectiveTotalWeeks,
         sessions_by_week,
         config: plan_config,
       })
@@ -305,7 +321,7 @@ Deno.serve(async (req: Request) => {
     return json({
       success: true,
       plan_id: plan.id,
-      total_weeks: totalWeeks,
+      total_weeks: effectiveTotalWeeks,
       validation,
       validation_failures: failures,
       preview: previewSummary,

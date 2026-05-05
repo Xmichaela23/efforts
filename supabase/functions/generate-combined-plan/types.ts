@@ -133,6 +133,13 @@ export interface AthleteState {
    * to set the long ride cap. Falls back to the hardcoded value when not yet computed.
    */
   projected_bike_hours?: number;
+  /**
+   * Athlete's response to the assessment week question in Arc setup chat.
+   * - `assessment_first` → prepend a week-0 assessment block; all training weeks shift +1.
+   * - `jump_in` → skip assessment; plan uses RPE-based intensity early, sharpens via adapt-plan.
+   * - `undefined` / not set → treat as `jump_in` (no gate in chat or data was already sufficient).
+   */
+  assessment_week_preference?: 'assessment_first' | 'jump_in';
 }
 
 export interface AthleteMemory {

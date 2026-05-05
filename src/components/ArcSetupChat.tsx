@@ -231,7 +231,25 @@ type AssistantMessageDisclosure =
   | 'training_intent'
   | 'swim_fork'
   | 'swim_load_source'
-  | 'week_conflict';
+  | 'week_conflict'
+  | 'assessment_week';
+
+function looksLikeAssessmentWeekQuestion(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    t.includes('assessment week') &&
+    (t.includes('start with an assessment') || t.includes('jump straight into training'))
+  );
+}
+
+function priorThreadHasAssessmentChoice(messages: ChatMessage[]): boolean {
+  return messages.some(
+    (m) =>
+      m.role === 'user' &&
+      (m.content.toLowerCase().includes('start with an assessment') ||
+        m.content.toLowerCase().includes('jump straight into training')),
+  );
+}
 
 function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]): AssistantMessageDisclosure | null {
   if (m.conflict) return 'week_conflict';
@@ -245,6 +263,9 @@ function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]
     return 'swim_load_source';
   }
   if (looksLikeSwimFork(visible)) return 'swim_fork';
+  if (looksLikeAssessmentWeekQuestion(visible) && !priorThreadHasAssessmentChoice(priorMessages)) {
+    return 'assessment_week';
+  }
   return null;
 }
 
@@ -905,7 +926,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
                 <span className="align-baseline">{m.content}</span>
-                {disc && (
+                {disc && disc !== 'assessment_week' && (
                   <button
                     type="button"
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
@@ -1021,6 +1042,31 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                       Split it
                     </button>
                   </div>
+                </div>
+              )}
+
+              {disc === 'assessment_week' && i === messages.length - 1 && (
+                <div
+                  className="mt-3 flex flex-col gap-2.5"
+                  role="group"
+                  aria-label="Assessment week choice"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Start with an assessment week')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Start with an assessment week
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Jump straight into training')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Jump straight into training
+                  </button>
                 </div>
               )}
 

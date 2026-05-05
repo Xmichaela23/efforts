@@ -56,8 +56,20 @@ export interface RaceProjection {
 const MODEL: RaceProjection['projection_model_version'] = 'v1';
 const R703 = { swim: 0.11, bike: 0.51, run: 0.35, t1t2: 0.03 } as const;
 const THREE_Y_MS = 3 * 365.25 * 24 * 60 * 60 * 1000;
-const HM_KM = 21.0975;
-const RUN_FATIGUE_ON_BIKE = 1.08;
+const RACE_RUN_KM: Record<string, number> = {
+  sprint:  5,
+  olympic: 10,
+  '70.3':  21.0975,
+  half:    21.0975,
+  ironman: 42.195,
+  full:    42.195,
+};
+const RUN_FATIGUE_BY_DISTANCE: Record<string, number> = {
+  sprint:  1.03, // 3% — short bike, legs mostly fresh
+  olympic: 1.05, // 5% — moderate fatigue
+  '70.3':  1.08, // 8% — well established for half-iron run
+  ironman: 1.13, // 13% — marathon off 180 km bike
+};
 const BIKE_WEEKLY_IMPROV_CAP = 0.2; // 20% max time reduction
 const BIKE_WEEKLY_RATE = 0.008; // 0.8% per week
 const SWIM_DORMANT_DAYS = 90;
@@ -96,6 +108,32 @@ export const AGE_GROUP_SWIM_MEDIANS: Record<string, number> = {
 
 /** Fallback OW swim minutes when no age / no data (rusty, middle-of-pack default) */
 const SWIM_FALLBACK_OW_MIN = 48;
+
+/**
+ * Average 70.3 bike split (minutes) by age group + gender.
+ * Source: ObsTri aggregate across all Ironman 70.3 events (obstri.com).
+ * Female 18-49 bands cluster tightly (~189-191 min) due to selection — experienced athletes
+ * self-select into the sport; the age slope steepens from 50+.
+ * Keys match getAgeGroupKey() output.
+ */
+export const AGE_GROUP_BIKE_MEDIANS: Record<string, number> = {
+  'M18-24': 171, 'M25-29': 174, 'M30-34': 172, 'M35-39': 172,
+  'M40-44': 173, 'M45-49': 175, 'M50-54': 177, 'M55-59': 180,
+  'M60-64': 184, 'M65+':   189,
+  'F18-24': 189, 'F25-29': 190, 'F30-34': 189, 'F35-39': 189,
+  'F40-44': 190, 'F45-49': 191, 'F50-54': 193, 'F55-59': 197,
+  'F60-64': 200, 'F65+':   209,
+};
+
+/** Bike course distance (km) by race distance key. Aliases for 'half' and 'full' included. */
+const RACE_BIKE_KM: Record<string, number> = {
+  sprint:  20,
+  olympic: 40,
+  '70.3':  90,
+  half:    90,
+  ironman: 180,
+  full:    180,
+};
 
 /**
  * 5-year age band key for AGE_GROUP_SWIM_MEDIANS (e.g. 57 → M55-59, gender M|F).
@@ -171,6 +209,38 @@ function learnedSwimPaceFromSessions(lf: LearnedFitness | null): { value: number
   const v = Number(o.value);
   if (!Number.isFinite(v) || v < 50 || v > 600) return { value: 0, ok: false };
   return { value: v, ok: true };
+}
+
+/**
+ * Confidence-weighted average across sources. Sources with weight ≤ 0 are ignored.
+ * Returns 0 if no valid sources remain.
+ */
+function weightedAvg(sources: { value: number; weight: number }[]): number {
+  const valid = sources.filter((s) => s.weight > 0 && Number.isFinite(s.value) && Number.isFinite(s.weight));
+  if (!valid.length) return 0;
+  const total = valid.reduce((a, s) => a + s.weight, 0);
+  if (total <= 0) return valid[0].value;
+  return valid.reduce((a, s) => a + s.value * s.weight, 0) / total;
+}
+
+/**
+ * FTP (watts) → projected bike split (minutes) for any tri distance.
+ *
+ * Power-law scaling anchored to a real reference point:
+ *   250 W athlete completes a flat 90 km (70.3) in 150 min.
+ *   Speed scales as P^0.75 — empirically validated for sustained cycling.
+ *
+ * A 12% cap on training-weeks improvement prevents runaway optimism
+ * on long plans. Always blended with age-group median and any prior split.
+ */
+function ftpToBikeMin(ftpW: number, distanceKm: number, weeksRemaining: number): number {
+  const REF_FTP = 250;
+  const REF_MIN_PER_KM = 150 / 90; // 1.667 min/km at reference
+  const EXPONENT = 0.75;
+  const improveRate = Math.min(0.12, weeksRemaining * 0.006);
+  const scaledMinPerKm = REF_MIN_PER_KM * Math.pow(REF_FTP / ftpW, EXPONENT);
+  const base = scaledMinPerKm * distanceKm;
+  return Math.max(60, Math.round(base * (1 - improveRate)));
 }
 
 function performanceNumbersSwimSecPer100m(perf: Record<string, unknown> | null | undefined): number | null {
@@ -338,10 +408,12 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
   }
 
   // ── Run: current threshold > prior share (only if no threshold) > 120
+  const runFatigue = RUN_FATIGUE_BY_DISTANCE[inputs.goal.distance] ?? 1.08;
   let runMin: number;
   if (thr.ok) {
-    runMin = (HM_KM * thr.value * RUN_FATIGUE_ON_BIKE) / 60;
-    assumptions.push('Run leg uses learned threshold pace with +8% fatigue vs standalone HM pace.');
+    const runDistKm = RACE_RUN_KM[inputs.goal.distance] ?? 21.0975;
+    runMin = (runDistKm * thr.value * runFatigue) / 60;
+    assumptions.push(`Run leg uses learned threshold pace with +${Math.round((runFatigue - 1) * 100)}% fatigue vs standalone pace (${inputs.goal.distance} distance).`);
   } else if (prior && priorFr) {
     runMin = priorTotalMin * priorFr.run;
     assumptions.push('Run: no confident learned run threshold — leg share from prior 70.3 as fallback (not a pace target).');
@@ -349,18 +421,46 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
     runMin = 120;
   }
 
-  // ── Bike: FTP-based proxy > prior share (if no FTP) > neutral placeholder
+  // ── Bike: confidence-weighted blend of age-group average, FTP physics model, prior split
   const improve = Math.min(BIKE_WEEKLY_IMPROV_CAP, wk * BIKE_WEEKLY_RATE);
-  let bikeMin: number;
+
+  const bikeYmd = birthYmdFromIdentity(inputs.athlete_identity, inputs.profile_birthday ?? null);
+  const bikeAge = bikeYmd != null ? ageFromBirthYmd(bikeYmd, today) : null;
+  const bikeG = genderMF(inputs.athlete_identity, inputs.profile_gender ?? null);
+  const bikeKey = bikeAge != null && bikeAge >= 15 && bikeAge < 100
+    ? getAgeGroupKey(bikeAge, bikeG)
+    : (bikeG === 'F' ? 'F40-44' : 'M40-44');
+  const bikeMedian = AGE_GROUP_BIKE_MEDIANS[bikeKey] ?? 173;
+
+  const bikeSources: { value: number; weight: number }[] = [
+    { value: bikeMedian, weight: 0.3 },
+  ];
+
   if (ftp.ok) {
-    bikeMin = Math.max(90, 160 * (1 - improve * 0.5));
-    assumptions.push('Bike: v1 time from FTP + training-weeks offset (placeholder curve).');
-  } else if (prior && priorFr) {
-    bikeMin = Math.max(60, priorTotalMin * priorFr.bike * (1 - improve));
-    assumptions.push('Bike: no FTP on file — prior race bike share scaled by build weeks (not a repeat of that finish).');
+    const bikeDistanceKm = RACE_BIKE_KM[inputs.goal.distance] ?? 90;
+    const ftpBike = ftpToBikeMin(ftp.value, bikeDistanceKm, wk);
+    bikeSources.push({ value: ftpBike, weight: 0.5 });
+    assumptions.push(
+      `Bike: FTP power-law model → ~${Math.round(ftpBike)} min (${Math.round(ftp.value)}W, ${bikeDistanceKm} km, P^0.75 scaling).`,
+    );
   } else {
-    bikeMin = Math.max(90, 160 * (1 - improve * 0.5));
+    assumptions.push(`Bike: no FTP — ${bikeKey} age-group average (~${Math.round(bikeMedian)} min) as baseline (ObsTri).`);
   }
+
+  // Use actual prior bike split if present (higher confidence than derived ratio)
+  if (prior && prior.splits?.bike_min && prior.splits.bike_min > 60) {
+    const priorBike = Math.max(60, prior.splits.bike_min * (1 - improve));
+    bikeSources.push({ value: priorBike, weight: 0.5 });
+    assumptions.push(
+      `Bike: prior race split (${Math.round(prior.splits.bike_min)} min) blended in with training-weeks trend.`,
+    );
+  } else if (prior && priorFr && priorTotalMin > 0) {
+    const priorBike = Math.max(60, priorTotalMin * priorFr.bike * (1 - improve));
+    bikeSources.push({ value: priorBike, weight: 0.3 });
+    assumptions.push('Bike: prior race total scaled by leg fraction (no individual bike split on file).');
+  }
+
+  let bikeMin = Math.max(90, weightedAvg(bikeSources));
 
   // ── T1/T2: default model ratio for prior-total, else 10m placeholder
   let t1t2Min: number;
