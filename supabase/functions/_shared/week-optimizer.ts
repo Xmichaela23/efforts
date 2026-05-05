@@ -860,8 +860,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       .filter((c) => !swimSlots.some((s) => s.day === c))
       .sort((a, b) => dayLoad(a) - dayLoad(b));
 
+    // If the athlete stated a quality_run preference, protect that day from swim
+    // placement — quality_run must be placed there later and cannot share with any swim kind.
+    const reservedQrDay = inputs.preferences.quality_run;
     let picked: DayName | undefined;
     for (const c of ordered) {
+      if (reservedQrDay && c === reservedQrDay && !qualityRunDay) continue;
       if (!canPlace(days, c, kind)) continue;
       if (kind === 'quality_swim' && dayHasUpperStrength(days[c])) continue;
       picked = c;
