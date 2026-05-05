@@ -656,7 +656,7 @@ export function buildWeek(
   }
   if (hasTri) {
     const weeklyHours = athleteState.weekly_hours_available;
-    const raceBikeDuration = expectedBikeDurationHours(primaryGoal.distance);
+    const raceBikeDuration = athleteState.projected_bike_hours ?? expectedBikeDurationHours(primaryGoal.distance);
     const capFromBudgetAndRace = Math.min(raceBikeDuration * 1.1, weeklyHours * 0.45);
     const longRideCapHours = Math.max(raceBikeDuration * 0.8, capFromBudgetAndRace);
     longRideHours = Math.min(longRideCapHours, longRideHours);

@@ -127,6 +127,12 @@ export interface AthleteState {
   has_cable_machine?: boolean;
   /** True when athlete has a GHD, Nordic bench, or fixed floor anchor. Required before prescribing Nordic Hamstring Curls. */
   has_ghd?: boolean;
+  /**
+   * Per-athlete projected bike leg duration (hours) from goals.projection.bike_min.
+   * When present, used instead of the hardcoded expectedBikeDurationHours() distance estimate
+   * to set the long ride cap. Falls back to the hardcoded value when not yet computed.
+   */
+  projected_bike_hours?: number;
 }
 
 export interface AthleteMemory {

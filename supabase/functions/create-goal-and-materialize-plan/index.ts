@@ -800,7 +800,7 @@ async function buildCombinedPlan(
   // Gather all active event goals (including the just-created one)
   const { data: allEventGoals } = await supabase
     .from('goals')
-    .select('id, name, sport, distance, target_date, priority, training_prefs, status')
+    .select('id, name, sport, distance, target_date, priority, training_prefs, status, projection')
     .eq('user_id', user_id)
     .eq('goal_type', 'event')
     .eq('status', 'active');
@@ -871,6 +871,13 @@ async function buildCombinedPlan(
   // The primary event goal drives the approach; defaults to the same logic as standalone.
   const primaryGoal = goalsForCombined.find(g => g.priority === 'A') ?? goalsForCombined[0];
   const primaryGoalPrefs = (workingGoals.find(g => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+  // Extract per-athlete bike split from stored projection (computed by recomputeRaceProjectionsForUser
+  // on prior plan saves). Falls back to hardcoded distance estimate when not yet available.
+  const primaryGoalProjection = (workingGoals.find(g => g.id === primaryGoal?.id) as any)?.projection as Record<string, unknown> | null | undefined;
+  const projectedBikeMin = typeof primaryGoalProjection?.bike_min === 'number' && primaryGoalProjection.bike_min > 0
+    ? primaryGoalProjection.bike_min
+    : null;
+  const projectedBikeHours = projectedBikeMin != null ? Math.round((projectedBikeMin / 60) * 4) / 4 : null;
   const primaryGoalType  = String(primaryGoalPrefs?.goal_type || '').toLowerCase();
   const triApproach = (newGoal.training_prefs?.tri_approach as string | undefined)
     ?? primaryGoalPrefs?.tri_approach
@@ -995,6 +1002,7 @@ async function buildCombinedPlan(
       equipment_type: resolvedEquipmentType,
       has_cable_machine: hasCableForPlan,
       has_ghd: hasGHDForPlan,
+      ...(projectedBikeHours != null ? { projected_bike_hours: projectedBikeHours } : {}),
       tri_approach: triApproach,
       swim_volume_multiplier,
       rest_days: freshCombinedPrefs.rest_days ?? [],
