@@ -522,7 +522,7 @@ function Step1Races({
           value={inputText}
           onChange={e => setInputText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void extract(); }}
-          placeholder="e.g. Ironman Santa Cruz, New York Marathon as a tune-up"
+          placeholder="e.g. Ironman Santa Cruz, Chicago Marathon"
           rows={4}
           disabled={phase === 'extracting'}
           className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[15px] px-3.5 py-3.5 focus:outline-none focus:border-teal-500/50 resize-none leading-relaxed disabled:opacity-50"
