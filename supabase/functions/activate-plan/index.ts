@@ -41,11 +41,15 @@ type SessionsByWeek = Record<string, Array<any>>
 // ── Coaching notes ───────────────────────────────────────────────────────────
 
 function isQualityRow(r: any): boolean {
+  // intensity_class is the reliable signal — set by the plan engine when the athlete confirms
+  // a session is hard (e.g. group ride → quality_bike → intensity_class: 'threshold').
+  // Name matching is a fallback for sessions without it.
+  const ic = String(r.intensity_class || '').toLowerCase()
+  if (ic === 'threshold' || ic === 'vo2max' || ic === 'quality') return true
   const n = String(r.name || '').toLowerCase()
   const tags: string[] = Array.isArray(r.tags) ? r.tags.map((t: any) => String(t).toLowerCase()) : []
-  return tags.includes('quality') || tags.includes('threshold') || tags.includes('css') ||
-    n.includes('quality') || n.includes('interval') || n.includes('threshold') ||
-    n.includes('tempo') || n.includes('ftp') || n.includes('css')
+  return tags.includes('quality') || tags.includes('quality_bike') || tags.includes('threshold') || tags.includes('css') ||
+    /interval|threshold|tempo|ftp|css|quality/.test(n)
 }
 
 function isHardRow(r: any): boolean {
@@ -96,7 +100,7 @@ function applyCoachingNotes(rows: any[]): void {
       for (const r of rows) {
         const d = String(r.date || '').slice(0, 10)
         if (d === qRunDate && r.type === 'run' && isQualityRow(r)) {
-          r.computed = { ...(r.computed || {}), coaching_note: `Intervals are 12–18 hours after your group ride. If yesterday went deep, treat this as tempo rather than full quality — the adaptation still happens, the injury risk doesn't.` }
+          r.computed = { ...(r.computed || {}), coaching_note: `Coming off yesterday's group ride — if it went deep, dial this back to tempo.` }
         }
       }
     }

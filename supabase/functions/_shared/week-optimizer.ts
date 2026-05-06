@@ -577,9 +577,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       if (canPlace(days, dAfterLongRun, 'easy_run') &&
         sequentialOk(days, dAfterLongRun, 'easy_run', inputs.athlete, { allow_easy_run_after_long_run: true })) {
         picked = dAfterLongRun;
-        trade_offs.push(
-          `easy_run on ${dAfterLongRun} immediately follows long_run (${longRun}) — last resort; prefer swim or rest that day when possible.`,
-        );
+        // Only flag for completion/first_race athletes — for performance athletes a recovery
+        // run the day after long run is standard practice, not a trade-off worth surfacing.
+        if (!isPerf) {
+          trade_offs.push(
+            `easy_run on ${dAfterLongRun} immediately follows long_run (${longRun}) — last resort; prefer swim or rest that day when possible.`,
+          );
+        }
       }
     }
     if (picked) {
