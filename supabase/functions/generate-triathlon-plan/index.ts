@@ -83,6 +83,9 @@ Deno.serve(async (req: Request) => {
       equipment_type:              request.equipment_type,
       limiter_sport:               request.limiter_sport,
       existing_run_days:           request.existing_run_days,
+      preferred_days:              request.preferred_days,
+      has_cable:                   request.has_cable,
+      has_ghd:                     request.has_ghd,
     });
 
     const plan = generator.generatePlan();

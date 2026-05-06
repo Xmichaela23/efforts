@@ -107,17 +107,16 @@ export function useArcSetupComplete() {
         primaryGoalData: ctxOrErr.primaryGoalData,
       };
 
-      if (ctx.combine) {
-        await startLoop(ctx);
-        return;
-      }
-
+      // The wizard already captured all scheduling preferences (preferred days,
+      // training intent, etc.), so there are no conflicts to resolve via the
+      // preview loop. Skip the conflict detection pass and go straight to the
+      // real save for both single-sport and combined paths.
       setSaveBanner('Building your training calendar…');
       const { data, error: fnErr } = await invokeFunction('create-goal-and-materialize-plan', {
         user_id: userId,
         mode: 'build_existing',
         existing_goal_id: ctx.primaryId,
-        combine: false,
+        combine: ctx.combine,
         ...(ctx.replacePlanId ? { replace_plan_id: ctx.replacePlanId } : {}),
         ...(ctx.primaryGoalData ? { goal: ctx.primaryGoalData } : {}),
         ...(ctx.planStart ? { plan_start_date: ctx.planStart } : {}),

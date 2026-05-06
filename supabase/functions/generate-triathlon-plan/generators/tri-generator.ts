@@ -130,11 +130,77 @@ const LONG_RIDE_PROGRESSION: Record<TriDistance, Record<string, number[]>> = {
 // MAIN GENERATOR CLASS
 // ============================================================================
 
+// ── Day-name helpers ─────────────────────────────────────────────────────────
+
+const DAY_CANONICAL: Record<string, string> = {
+  monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
+  thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday',
+};
+function canonicalDay(raw: string): string {
+  return DAY_CANONICAL[raw.toLowerCase().trim()] ?? raw;
+}
+
+/**
+ * Default week layout (slot → canonical day name).
+ * All session placement in generateWeek() routes through slotDay() so that
+ * athlete-supplied preferred_days can override any slot without touching each
+ * individual call site.
+ */
+const DEFAULT_SLOT_DAYS: Record<string, string> = {
+  easy_swim:              'Monday',
+  quality_bike:           'Tuesday',
+  quality_run:            'Wednesday',
+  quality_swim:           'Wednesday',
+  mid_ride:               'Thursday',
+  easy_run:               'Friday',
+  long_ride:              'Saturday',
+  long_run:               'Sunday',
+  strength_1:             'Monday',
+  strength_2:             'Wednesday',
+};
+
 export class TriathlonGenerator {
   protected params: TriGeneratorParams;
+  /** Resolved slot → canonical day map built once from preferred_days */
+  private readonly slotMap: Record<string, string>;
 
   constructor(params: TriGeneratorParams) {
     this.params = params;
+    this.slotMap = this.buildSlotMap(params.preferred_days);
+  }
+
+  /**
+   * Build a slot→day map by overlaying preferred_days on top of the defaults.
+   * Called once in the constructor; all session placement uses slotDay().
+   */
+  private buildSlotMap(
+    pd?: TriGeneratorParams['preferred_days'],
+  ): Record<string, string> {
+    const m = { ...DEFAULT_SLOT_DAYS };
+    if (!pd) return m;
+    if (pd.quality_bike) m.quality_bike   = canonicalDay(pd.quality_bike);
+    if (pd.easy_bike)    m.mid_ride       = canonicalDay(pd.easy_bike);
+    if (pd.long_ride)    m.long_ride      = canonicalDay(pd.long_ride);
+    if (pd.quality_run)  m.quality_run    = canonicalDay(pd.quality_run);
+    if (pd.easy_run)     m.easy_run       = canonicalDay(pd.easy_run);
+    if (pd.long_run)     m.long_run       = canonicalDay(pd.long_run);
+    // swim[0] = easy/recovery swim, swim[1] = quality swim
+    if (Array.isArray(pd.swim)) {
+      if (pd.swim[0]) m.easy_swim    = canonicalDay(pd.swim[0]);
+      if (pd.swim[1]) m.quality_swim = canonicalDay(pd.swim[1]);
+      // Run quality follows swim quality day when the athlete pins their swim days
+      if (pd.swim[1] && !pd.quality_run) m.quality_run = canonicalDay(pd.swim[1]);
+    }
+    if (Array.isArray(pd.strength)) {
+      if (pd.strength[0]) m.strength_1 = canonicalDay(pd.strength[0]);
+      if (pd.strength[1]) m.strength_2 = canonicalDay(pd.strength[1]);
+    }
+    return m;
+  }
+
+  /** Return the canonical day name for a given session slot. */
+  protected slotDay(slot: string): string {
+    return this.slotMap[slot] ?? DEFAULT_SLOT_DAYS[slot] ?? 'Monday';
   }
 
   generatePlan(): TriTrainingPlan {
@@ -308,93 +374,98 @@ export class TriathlonGenerator {
       (this.params.existing_run_days ?? []).map(d => String(d))
     );
 
-    // ── Sunday: Long Run ────────────────────────────────────────────────────
-    // Skip if run plan already covers Sunday (its long run IS this plan's long run).
-    if (longRunMi > 0 && !existingRunDays.has('Sunday')) {
-      sessions.push(this.longRunSession(longRunMi, 'Sunday'));
+    const dayLongRun    = this.slotDay('long_run');
+    const dayLongRide   = this.slotDay('long_ride');
+    const dayQualBike   = this.slotDay('quality_bike');
+    const dayQualRun    = this.slotDay('quality_run');
+    const dayQualSwim   = this.slotDay('quality_swim');
+    const dayMidRide    = this.slotDay('mid_ride');
+    const dayEasySwim   = this.slotDay('easy_swim');
+    const dayEasyRun    = this.slotDay('easy_run');
+    const dayStrength1  = this.slotDay('strength_1');
+    const dayStrength2  = this.slotDay('strength_2');
+
+    // ── Long Run ─────────────────────────────────────────────────────────────
+    if (longRunMi > 0 && !existingRunDays.has(dayLongRun)) {
+      sessions.push(this.longRunSession(longRunMi, dayLongRun));
     }
 
-    // ── Saturday: Long Ride (or Brick in Build/Race-Specific) ───────────────
-    // Brick run leg is very short (≤20 min off-the-bike) — keep even if Saturday
-    // is a run day, since brick specificity is critical for race prep.
+    // ── Long Ride (or Brick in Build/Race-Specific) ───────────────────────────
+    // Brick run leg is very short (≤20 min off-the-bike) — keep even if the long
+    // ride day is also a run day, since brick specificity is critical for race prep.
     if (longRideHr > 0) {
       if (bricksThisWeek >= 1 && phase.name !== 'Base') {
-        sessions.push(...this.brickSession(longRideHr, Math.min(20, Math.round(longRunMi * 0.20)), 'Saturday', phase, weekInPhase));
+        sessions.push(...this.brickSession(longRideHr, Math.min(20, Math.round(longRunMi * 0.20)), dayLongRide, phase, weekInPhase));
       } else {
-        sessions.push(this.longRideSession(longRideHr, 'Saturday'));
+        sessions.push(this.longRideSession(longRideHr, dayLongRide));
       }
     }
 
-    // ── Tuesday: Bike Quality ────────────────────────────────────────────────
+    // ── Bike Quality ──────────────────────────────────────────────────────────
     if (recoveryRebuildW1) {
-      sessions.push(this.recoveryRebuildEasyBikeSession('Tuesday'));
+      sessions.push(this.recoveryRebuildEasyBikeSession(dayQualBike));
     } else if (!isTaper || isRecovery) {
-      sessions.push(this.bikeQualitySession(phase, isRecovery, 'Tuesday'));
+      sessions.push(this.bikeQualitySession(phase, isRecovery, dayQualBike));
     } else {
-      sessions.push(this.bikeOpenersSession('Tuesday'));
+      sessions.push(this.bikeOpenersSession(dayQualBike));
     }
 
-    // ── Wednesday: Run Quality + Swim ───────────────────────────────────────
-    // If run plan already has a Wednesday run (e.g. tempo), skip the tri run quality
-    // session — the run plan's hard effort counts toward triathlon run fitness.
+    // ── Run Quality + Swim ────────────────────────────────────────────────────
+    // Run quality and quality swim may land on different days if the athlete
+    // set different preferred days for quality_run vs swim[1].
     const runQualMi = this.runQualityMiles(phase, isRecovery, week);
     const swimWeekForQuality = recoveryRebuildW1 ? Math.round(weekSwimYd * 0.55) : weekSwimYd;
-    if (!existingRunDays.has('Wednesday')) {
+    if (!existingRunDays.has(dayQualRun)) {
       if (recoveryRebuildW1) {
         const easyMi = Math.max(3, Math.round(longRunMi * 0.25));
-        sessions.push(this.easyRunSession(easyMi, 'Wednesday'));
+        sessions.push(this.easyRunSession(easyMi, dayQualRun));
       } else {
-        sessions.push(this.runQualitySession(runQualMi, phase, 'Wednesday'));
+        sessions.push(this.runQualitySession(runQualMi, phase, dayQualRun));
       }
     }
-    sessions.push(this.swimQualitySession(swimWeekForQuality, phase, isRecovery, 'Wednesday', week));
+    sessions.push(this.swimQualitySession(swimWeekForQuality, phase, isRecovery, dayQualSwim, week));
 
-    // ── Thursday: Second Brick (Race-Specific) or Endurance Ride ─────────────
+    // ── Second Brick (Race-Specific) or Mid-Week Endurance Ride ───────────────
     if (bricksThisWeek >= 2) {
       const brickBikeHr = Math.max(0.75, longRideHr * 0.5);
       const brickRunMin = 20;
-      sessions.push(...this.brickSession(brickBikeHr, brickRunMin, 'Thursday', phase, weekInPhase));
+      sessions.push(...this.brickSession(brickBikeHr, brickRunMin, dayMidRide, phase, weekInPhase));
     } else {
       const midRideHr = isRecovery ? longRideHr * 0.5 : longRideHr * 0.6;
-      sessions.push(this.midRideSession(midRideHr, 'Thursday'));
+      sessions.push(this.midRideSession(midRideHr, dayMidRide));
     }
 
-    // ── Monday: Easy Recovery Swim ───────────────────────────────────────────
+    // ── Easy Recovery Swim ────────────────────────────────────────────────────
     const recSwimYd = recoveryRebuildW1
       ? Math.max(1000, Math.round(weekSwimYd * 0.28))
       : Math.max(1500, Math.round(weekSwimYd * 0.35));
-    sessions.push(this.easySwimSession(recSwimYd, 'Monday', week, phase));
+    sessions.push(this.easySwimSession(recSwimYd, dayEasySwim, week, phase));
 
-    // ── Friday: Easy Run ─────────────────────────────────────────────────────
-    // Skip if run plan already has a Friday run — no point doubling up easy miles.
-    if (supportRunMi >= 3 && !isTaper && !existingRunDays.has('Friday')) {
+    // ── Easy Run ──────────────────────────────────────────────────────────────
+    if (supportRunMi >= 3 && !isTaper && !existingRunDays.has(dayEasyRun)) {
       let easyRunMi = Math.max(3, Math.round(supportRunMi * 0.6));
       if (recoveryRebuildW1) {
         const capMi = Math.max(3, Math.round(30 / this.easyPaceMinPerMile()));
         easyRunMi = Math.min(easyRunMi, capMi);
       }
-      sessions.push(this.easyRunSession(easyRunMi, 'Friday'));
+      sessions.push(this.easyRunSession(easyRunMi, dayEasyRun));
     }
 
     // ── Strength (optional, protocol-driven) ─────────────────────────────────
-    // Strength goes on the lightest aerobic days. The triathlon protocol selects
-    // phase-appropriate exercises and respects brick-day placement guardrails.
+    // Use preferred strength days from the slot map; fall back to a brick-safe
+    // swap only when the requested day already contains a brick this week.
     if ((this.params.strength_frequency ?? 0) > 0 && !isRecovery && !recoveryRebuildW1) {
-      // Compute weekInPhase: how many weeks into the current phase is this week?
       const phaseStartWeek = ps.phases.find(p => p.name === phase.name)?.start_week ?? 1;
       const wipForStrength = Math.max(1, week - phaseStartWeek + 1);
 
-      // Identify brick days in this week so placement avoids them
       const brickDays = sessions.filter(s => s.tags?.includes('brick')).map(s => s.day);
-      const hasBrickMonday = brickDays.includes('Monday');
-      const strDay1 = hasBrickMonday ? 'Tuesday' : 'Monday';
+      const strDay1 = brickDays.includes(dayStrength1) ? dayQualBike : dayStrength1;
 
       const strSession = this.buildProtocolStrengthSession(strDay1, phase, wipForStrength, 0, brickDays);
       if (strSession) sessions.push(strSession);
 
       if ((this.params.strength_frequency ?? 0) >= 2) {
-        const hasBrickWed = brickDays.includes('Wednesday');
-        const strDay2 = hasBrickWed ? 'Thursday' : 'Wednesday';
+        const strDay2 = brickDays.includes(dayStrength2) ? dayMidRide : dayStrength2;
         const strSession2 = this.buildProtocolStrengthSession(strDay2, phase, wipForStrength, 1, brickDays);
         if (strSession2) sessions.push(strSession2);
       }
@@ -889,6 +960,8 @@ export class TriathlonGenerator {
 
     const limiter = this.params.limiter_sport ?? 'run';
     const equipmentType = this.params.equipment_type ?? 'commercial_gym';
+    const hasCable = this.params.has_cable ?? (equipmentType === 'commercial_gym');
+    const hasGHD   = this.params.has_ghd   ?? false;
 
     const protocolPhaseName = phaseNameMap[phase.name] ?? phase.name ?? 'Base';
 
@@ -902,11 +975,11 @@ export class TriathlonGenerator {
       totalWeeks: this.params.total_weeks ?? 16,
       isRecovery: false,
       primarySchedule: {
-        longSessionDays: ['Saturday', 'Sunday'],
-        qualitySessionDays: ['Tuesday', 'Thursday'],
-        easySessionDays: ['Monday', 'Wednesday', 'Friday'],
+        longSessionDays: [this.slotDay('long_run'), this.slotDay('long_ride')],
+        qualitySessionDays: [this.slotDay('quality_bike'), this.slotDay('mid_ride')],
+        easySessionDays: [this.slotDay('easy_swim'), this.slotDay('quality_run'), this.slotDay('easy_run')],
       },
-      userBaselines: { equipment: equipmentType },
+      userBaselines: { equipment: equipmentType, hasCable, hasGHD },
       strengthFrequency: (this.params.strength_frequency ?? 1) as 1 | 2,
       constraints: {},
       triathlonContext: {

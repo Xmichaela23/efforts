@@ -67,12 +67,44 @@ export interface GenerateTriPlanRequest {
   units?: 'imperial' | 'metric';
 
   /**
+   * Athlete's preferred session-slot days from the setup wizard (mirrors TriGeneratorParams).
+   */
+  preferred_days?: {
+    quality_bike?: string;
+    easy_bike?: string;
+    long_ride?: string;
+    quality_run?: string;
+    easy_run?: string;
+    long_run?: string;
+    swim?: string[];
+    strength?: string[];
+  };
+
+  /**
    * Days of the week that already have run sessions in another active plan
    * (e.g. ['Monday','Wednesday','Thursday','Sunday'] from a concurrent run plan).
    * The triathlon generator uses this to avoid stacking its own run sessions on
    * the same days — treating the run plan's sessions as satisfying that volume.
    */
   existing_run_days?: string[];
+
+  /**
+   * Athlete's preferred session-slot days from the setup wizard.
+   * Keys: quality_bike, easy_bike, long_ride, quality_run, easy_run, long_run,
+   *       swim (string[]), strength (string[]).
+   * Values are lowercase day names: 'monday'…'sunday'.
+   * When present the generator maps its default slots to these days.
+   */
+  preferred_days?: {
+    quality_bike?: string;
+    easy_bike?: string;
+    long_ride?: string;
+    quality_run?: string;
+    easy_run?: string;
+    long_run?: string;
+    swim?: string[];
+    strength?: string[];
+  };
 }
 
 export type TriDistance = 'sprint' | 'olympic' | '70.3' | 'ironman';
@@ -124,9 +156,33 @@ export interface TriGeneratorParams {
   training_intent?: TrainingIntent;
 
   strength_frequency?: number;
+  /** Whether the athlete has access to a commercial gym or is limited to home/bodyweight equipment. */
+  equipment_type?: 'home_gym' | 'commercial_gym';
+  /** True when the athlete has a cable machine (or commercial gym membership with cable access). */
+  has_cable?: boolean;
+  /** True when the athlete has a GHD machine or Nordic bench (unlocks Nordic Hamstring Curls). */
+  has_ghd?: boolean;
 
   /** Days already occupied by run sessions in a concurrent run plan */
   existing_run_days?: string[];
+
+  /**
+   * Athlete's preferred session-slot days from the setup wizard.
+   * Keys: quality_bike, easy_bike, long_ride, quality_run, easy_run, long_run,
+   *       swim (string[]), strength (string[]).
+   * Values are lowercase day names: 'monday'…'sunday'.
+   * When present the generator maps its default slots to these days.
+   */
+  preferred_days?: {
+    quality_bike?: string;
+    easy_bike?: string;
+    long_ride?: string;
+    quality_run?: string;
+    easy_run?: string;
+    long_run?: string;
+    swim?: string[];
+    strength?: string[];
+  };
 }
 
 export interface TriSession {

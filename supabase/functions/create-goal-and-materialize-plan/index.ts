@@ -1452,6 +1452,18 @@ Deno.serve(async (req: Request) => {
         }
       }
       // ── End combined plan routing ─────────────────────────────────────────
+      // If the caller explicitly requested a combined plan (combine=true) and
+      // buildCombinedPlan returned null (e.g. read-after-write: sibling goal not
+      // yet visible), return an informative error instead of silently falling
+      // through to standalone plan generation. The client can retry without preview.
+      if (combine && bodyPreview) {
+        // During a preview pass, a failed combined plan is not actionable — just
+        // return a no-conflict response so the client skips straight to real save.
+        return new Response(
+          JSON.stringify({ success: true, mode, preview: true, combined_preview: {}, sport: 'multi_sport', combined: true }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
 
       // Detect concurrent run plans to avoid stacking duplicate run sessions.
       // Extract which days of the week the existing run plan places runs on,
@@ -1489,6 +1501,12 @@ Deno.serve(async (req: Request) => {
         .limit(8);
 
       const latestSnap = triSnapshots?.[0] ?? null;
+      const triPreferredDays = (() => {
+        const pd = resolvedGoal?.training_prefs?.preferred_days;
+        if (!pd || typeof pd !== 'object' || Array.isArray(pd)) return undefined;
+        return pd as Record<string, unknown>;
+      })();
+
       const triGenerateBody: Record<string, any> = {
         user_id,
         distance:         triDistanceApi,
@@ -1517,6 +1535,11 @@ Deno.serve(async (req: Request) => {
         // Derived from goal type if not explicitly set in training_prefs.
         approach: resolvedGoal?.training_prefs?.tri_approach
           ?? (goalType === 'speed' ? 'race_peak' : 'base_first'),
+        // Athlete-preferred days from the setup wizard — session placement honors these.
+        ...(triPreferredDays ? { preferred_days: triPreferredDays } : {}),
+        // Fine-grained equipment flags — drive exercise substitution in the protocol.
+        has_cable: hasCableMachine(triBaseline?.equipment?.strength ?? []),
+        has_ghd:   hasGHD(triBaseline?.equipment?.strength ?? []),
         ...(plan_start_date ? { start_date: plan_start_date } : {}),
         // Days already covered by a concurrent run plan — tri generator defers to those sessions
         ...(existingRunDaySet.size > 0 ? { existing_run_days: [...existingRunDaySet] } : {}),
