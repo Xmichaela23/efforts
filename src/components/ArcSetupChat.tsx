@@ -246,7 +246,8 @@ type AssistantMessageDisclosure =
   | 'week_conflict'
   | 'assessment_week'
   | 'plan_start_date'
-  | 'week_confirm';
+  | 'week_confirm'
+  | 'long_day_schedule';
 
 function looksLikeAssessmentWeekQuestion(text: string): boolean {
   const t = text.toLowerCase();
@@ -262,6 +263,15 @@ function priorThreadHasAssessmentChoice(messages: ChatMessage[]): boolean {
       m.role === 'user' &&
       (m.content.toLowerCase().includes('start with an assessment') ||
         m.content.toLowerCase().includes('jump straight into training')),
+  );
+}
+
+/** Detects "Long ride and long run — are those weekend days, or do you train around a different schedule?" */
+function looksLikeLongDayScheduleQuestion(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    (t.includes('long ride') || t.includes('long run')) &&
+    (t.includes('weekend') || t.includes('different schedule') || t.includes('weekend days'))
   );
 }
 
@@ -337,6 +347,9 @@ function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]
   }
   if (looksLikeWeekConfirmationQuestion(visible)) {
     return 'week_confirm';
+  }
+  if (looksLikeLongDayScheduleQuestion(visible)) {
+    return 'long_day_schedule';
   }
   return null;
 }
@@ -1049,7 +1062,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
                 <span className="align-baseline">{m.content}</span>
-                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && disc !== 'week_confirm' && (
+                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && disc !== 'week_confirm' && disc !== 'long_day_schedule' && (
                   <button
                     type="button"
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
@@ -1214,6 +1227,31 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
                   >
                     Different date
+                  </button>
+                </div>
+              )}
+
+              {disc === 'long_day_schedule' && i === messages.length - 1 && (
+                <div
+                  className="mt-3 flex flex-col gap-2.5"
+                  role="group"
+                  aria-label="Long day schedule"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Weekend days — Saturday long ride, Sunday long run')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Weekend days
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Different schedule — my long days are on other days')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Different schedule
                   </button>
                 </div>
               )}
