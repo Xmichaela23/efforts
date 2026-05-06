@@ -887,7 +887,8 @@ export function buildWeek(
     const resolveSwimThirdDay = (): string | null => {
       const bumpFrom = (dayName: string): string | null => {
         if (!thirdHardBlocked.has(dayName)) return dayName;
-        const startIdx = Math.max(0, DAYS_OF_WEEK.indexOf(dayName));
+        const dayTyped = dayName as (typeof DAYS_OF_WEEK)[number];
+        const startIdx = Math.max(0, DAYS_OF_WEEK.indexOf(dayTyped));
         for (let step = 1; step <= 6; step++) {
           const cand = DAYS_OF_WEEK[(startIdx + step) % 7]!;
           if (!thirdHardBlocked.has(cand)) return cand;
@@ -1092,7 +1093,7 @@ export function buildWeek(
         const silentAccept = PREF_ACCEPT_ACTIONS.has(qrPref ?? '');
 
         if (movedTo != null && movedTo !== preferredRunQ) {
-          runQualityDay = movedTo;
+          runQualityDay = movedTo as (typeof DAYS_OF_WEEK)[number];
           if (!silentAccept) {
             conflictEvents.push({
               conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
@@ -1588,7 +1589,7 @@ export function buildWeek(
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
   const week8020TradeOffs = enforce8020(grid, phase);
 
-  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid));
+  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid), bikeQualityDay);
 
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).

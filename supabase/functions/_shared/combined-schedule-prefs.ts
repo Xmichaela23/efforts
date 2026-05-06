@@ -175,6 +175,10 @@ export function parsePreferredDaysPatch(
   const strRaw = o.strength ?? o.strength_days;
   if (Array.isArray(strRaw) && strRaw.length > 0) {
     patch.strength_preferred_days = strRaw.map((x) => {
+      if (typeof x === 'object' && x !== null && 'day' in x) {
+        const idx = parseSunFirstDayIndex((x as { day: unknown }).day);
+        return idx !== undefined ? titleCaseWeekdayFromIndex(idx) : String((x as { day: unknown }).day).trim();
+      }
       const idx = parseSunFirstDayIndex(x);
       return idx !== undefined ? titleCaseWeekdayFromIndex(idx) : String(x).trim();
     }).filter((s) => s.length > 0);

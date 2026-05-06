@@ -221,6 +221,11 @@ export interface PlannedSession {
   serves_goal: string;   // goal.id or 'shared'
   zone_targets: string;  // "Z2" | "Z4 intervals" | etc.
   timing?: 'AM' | 'PM';
+  /**
+   * Scheduling slot kind aligned with `week-optimizer` / matrix vocabulary (e.g. `quality_bike`).
+   * Stable across display copy changes — prefer this over parsing `name` in tests or analytics.
+   */
+  session_kind?: string;
   /** When set (e.g. neural_speed / triathlon protocol), activate-plan persists this and materialize uses it instead of token-derived exercises. */
   strength_exercises?: PlannedStrengthExercise[];
 }

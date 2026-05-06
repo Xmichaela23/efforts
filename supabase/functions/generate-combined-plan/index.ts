@@ -138,6 +138,7 @@ Deno.serve(async (req: Request) => {
       weighted_tss: s.weighted_tss,
       zone_targets: s.zone_targets,
       serves_goal: s.serves_goal,
+      ...(typeof s.session_kind === 'string' && s.session_kind ? { session_kind: s.session_kind } : {}),
       ...(Array.isArray(s.strength_exercises) && s.strength_exercises.length > 0
         ? { strength_exercises: s.strength_exercises }
         : {}),

@@ -113,6 +113,12 @@ export interface SessionSlot {
   note?: string;
 }
 
+/** Explicit slot kinds — avoids guessing from array index (weekday order ≠ upper/lower order). */
+export type StrengthPreferredSlot = {
+  day: DayName;
+  kind: 'upper_body_strength' | 'lower_body_strength';
+};
+
 export interface PreferredDaysOut {
   long_ride?: DayName;
   quality_bike?: DayName;
@@ -122,8 +128,11 @@ export interface PreferredDaysOut {
   easy_run?: DayName;
   /** Ordered `[easy_day, quality_day]`; optional third index for focus swim program maps to `swim_third_day`. */
   swim?: DayName[];
-  /** Chronological list of strength weekdays (1–3). */
-  strength?: DayName[];
+  /**
+   * Strength weekdays with explicit `kind` per slot (optimizer export). Legacy `DayName[]` is still
+   * accepted in validators/parsers: index 0 = upper, remaining = lower (arc-setup template contract).
+   */
+  strength?: StrengthPreferredSlot[] | DayName[];
 }
 
 export interface OptimalWeek {
@@ -170,6 +179,54 @@ function cloneDays(d: Record<DayName, SessionSlot[]>): Record<DayName, SessionSl
     o[day] = d[day].map((s) => ({ ...s }));
   }
   return o;
+}
+
+/**
+ * `preferred_days.strength` export order: all upper-body days first, then all lower-body days,
+ * each group sorted Mon→Sun. Matches `validatePreferredDays` when slots carry explicit `kind`.
+ */
+function orderStrengthSlotsForPreferredDaysExport(
+  days: Record<DayName, SessionSlot[]>,
+  chronological: DayName[],
+): DayName[] {
+  const byWeekday = (a: DayName, b: DayName) => DAY_INDEX[a] - DAY_INDEX[b];
+  const upper = chronological
+    .filter((d) => days[d].some((s) => s.kind === 'upper_body_strength'))
+    .sort(byWeekday);
+  const lower = chronological
+    .filter((d) => days[d].some((s) => s.kind === 'lower_body_strength'))
+    .sort(byWeekday);
+  const unk = chronological
+    .filter((d) => !upper.includes(d) && !lower.includes(d))
+    .sort(byWeekday);
+  return [...upper, ...lower, ...unk];
+}
+
+function strengthPreferredSlotsFromWeek(
+  days: Record<DayName, SessionSlot[]>,
+  chronological: DayName[],
+): StrengthPreferredSlot[] {
+  return orderStrengthSlotsForPreferredDaysExport(days, chronological).map((d) => ({
+      day: d,
+      kind: days[d].some((s) => s.kind === 'upper_body_strength')
+        ? 'upper_body_strength'
+        : 'lower_body_strength',
+    }));
+}
+
+function normalizeStrengthPreferredEntries(
+  raw: PreferredDaysOut['strength'] | undefined,
+): { day: DayName; kind: SessionKind }[] {
+  if (!raw?.length) return [];
+  const first = raw[0];
+  if (typeof first === 'object' && first !== null && 'day' in first && 'kind' in first) {
+    return (raw as StrengthPreferredSlot[]).map((s) => ({ day: s.day, kind: s.kind }));
+  }
+  const dayNames = raw as DayName[];
+  return dayNames.map((d, i) => ({
+    day: d,
+    kind: i === 0 ? 'upper_body_strength' : 'lower_body_strength',
+  }));
 }
 
 
@@ -979,9 +1036,10 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   const finalSwims = swimSlots.filter(
     (s) => days[s.day].some((slot) => slot.kind === s.kind),
   );
-  const finalStrength = strengthDays.filter(
+  const strengthDaysPresent = strengthDays.filter(
     (d) => days[d].some((s) => s.kind === 'upper_body_strength' || s.kind === 'lower_body_strength'),
   );
+  const finalStrength = strengthPreferredSlotsFromWeek(days, strengthDaysPresent);
   const swimArray = finalSwims.map((s) => s.day);
 
   const preferred_days: PreferredDaysOut = {
@@ -1088,28 +1146,56 @@ export function deriveOptimalWeekWithCoEqualRecovery(
  * Returns a list of conflict strings; empty means the week is matrix-OK.
  *
  * Used by the materializer to decide whether to repair via deriveOptimalWeek().
+ *
+ * @param preferences When set, `quality_run` placement mirrors `deriveOptimalWeek`: athlete-stated
+ *   `preferences.quality_run` that matches `pd.quality_run` skips sequential checks (same-day matrix only).
+ *   `easy_run` on the calendar day after `pd.long_run` uses the same `allow_easy_run_after_long_run` pass as derive's last-resort `placeEasyRun`.
  */
 export function validatePreferredDays(
   pd: PreferredDaysOut,
   athlete: WeekOptimizerInputs['athlete'] = {},
+  preferences?: WeekOptimizerInputs['preferences'],
 ): string[] {
   const days = emptyWeek();
   const out: string[] = [];
 
   const qrDay = pd.quality_run;
-  const stArr = pd.strength;
+  const strengthDaysOnly = normalizeStrengthPreferredEntries(pd.strength).map((s) => s.day);
+  const stArr = strengthDaysOnly.length ? strengthDaysOnly : undefined;
   const consolidatedQrLower =
     athlete.training_intent === 'performance' &&
     athlete.strength_intent === 'performance' &&
     qrDay != null &&
-    Array.isArray(stArr) &&
+    stArr != null &&
     stArr.includes(qrDay);
+
+  const athleteDeclaredQr =
+    preferences?.quality_run != null &&
+    preferences.quality_run === pd.quality_run &&
+    pd.quality_run != null;
+
+  /** Same last-resort as `placeEasyRun` when the only slot is the day after long_run. */
+  function sequentialRelaxForSlot(
+    day: DayName,
+    kind: SessionKind,
+    base?: SequentialRelax,
+  ): SequentialRelax | undefined {
+    if (
+      kind === 'easy_run' &&
+      pd.long_run != null &&
+      day === dayAfter(pd.long_run)
+    ) {
+      return { ...base, allow_easy_run_after_long_run: true };
+    }
+    return base;
+  }
 
   function tryPlace(
     day: DayName | undefined,
     kind: SessionKind,
     label: string,
     seqRelax?: SequentialRelax,
+    skipSequential = false,
   ) {
     if (!day) return;
     const stackLowerWithQr =
@@ -1130,7 +1216,7 @@ export function validatePreferredDays(
         return;
       }
     }
-    if (!sequentialOk(days, day, kind, athlete, seqRelax)) {
+    if (!skipSequential && !sequentialOk(days, day, kind, athlete, sequentialRelaxForSlot(day, kind, seqRelax))) {
       out.push(`${label} on ${day} fails sequential rules (yesterday: ${(days[dayBefore(day)] ?? []).map((s) => s.kind).join(' + ') || 'rest'}).`);
       return;
     }
@@ -1145,15 +1231,13 @@ export function validatePreferredDays(
     'quality_run',
     'quality_run',
     consolidatedQrLower ? { quality_run_day_after_qb_with_same_day_lower: true } : undefined,
+    athleteDeclaredQr,
   );
   tryPlace(pd.easy_bike, 'easy_bike', 'easy_bike');
   tryPlace(pd.easy_run, 'easy_run', 'easy_run');
 
-  // Strength: kinds unknown from preferred_days; assume upper for first, lower for second.
-  if (Array.isArray(pd.strength)) {
-    pd.strength.forEach((d, i) => {
-      tryPlace(d, i === 0 ? 'upper_body_strength' : 'lower_body_strength', `strength[${i}]`);
-    });
+  for (const { day, kind } of normalizeStrengthPreferredEntries(pd.strength)) {
+    tryPlace(day, kind, `strength(${kind})`);
   }
   // Swim ordering: [easy, quality].
   if (Array.isArray(pd.swim)) {
@@ -1179,6 +1263,9 @@ const DAY_ALIASES: Record<string, DayName> = {
 
 export function normalizeDayName(raw: unknown): DayName | undefined {
   if (raw == null) return undefined;
+  if (typeof raw === 'object' && raw !== null && 'day' in raw) {
+    return normalizeDayName((raw as { day: unknown }).day);
+  }
   if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= 6) {
     return ALL_DAYS[raw];
   }

@@ -746,7 +746,7 @@ function backfillTriTrainingPrefsDefenseInDepth(
   };
 
   const validationErrors = hasFullPreferred
-    ? validatePreferredDays(candidate, inputs.athlete)
+    ? validatePreferredDays(candidate, inputs.athlete, inputs.preferences)
     : ['incomplete preferred_days'];
 
   if (validationErrors.length === 0) {
@@ -778,7 +778,7 @@ function backfillTriTrainingPrefsDefenseInDepth(
   if (candidate.easy_run) pinRestore.easy_run = candidate.easy_run;
   if (Object.keys(pinRestore).length > 0) {
     const withPins = { ...merged, ...pinRestore } as PreferredDaysOut;
-    const pinErrs = validatePreferredDays(withPins, inputs.athlete);
+    const pinErrs = validatePreferredDays(withPins, inputs.athlete, inputs.preferences);
     if (pinErrs.length === 0) {
       Object.assign(merged, pinRestore);
       console.log('[preferred_days pin-restore] restored', { keys: Object.keys(pinRestore) });

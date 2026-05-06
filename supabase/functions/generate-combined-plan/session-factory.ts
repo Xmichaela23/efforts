@@ -393,18 +393,21 @@ export function groupRideSession(
     phase === 'base'
       ? 'Keep overall effort aerobic — Z2 with climb surges.'
       : 'This is your quality bike session — give the climbs real effort.';
-  return session(
-    day,
-    'bike',
-    label,
-    `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}`,
-    min,
-    'HARD',
-    [],
-    ['quality', 'group_ride', 'anchor'],
-    'Group-ride variable effort',
-    goalId,
-  );
+  return {
+    ...session(
+      day,
+      'bike',
+      label,
+      `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}`,
+      min,
+      'HARD',
+      [],
+      ['quality', 'group_ride', 'anchor'],
+      'Group-ride variable effort',
+      goalId,
+    ),
+    session_kind: 'quality_bike',
+  };
 }
 
 /**
@@ -443,13 +446,15 @@ export function easyBike(day: string, hours: number, goalId: string): PlannedSes
  * base → sweet spot 2×15; build → FTP threshold 3×20; race_specific → VO2 6×5. Taper: `bikeOpeners` at call site.
  */
 export function groupRideQualityBikeSession(day: string, phase: Phase, goalId: string): PlannedSession {
+  let inner: PlannedSession;
   if (phase === 'race_specific') {
-    return vo2Bike(day, 6, goalId);
+    inner = vo2Bike(day, 6, goalId);
+  } else if (phase === 'build') {
+    inner = thresholdBike(day, 3, 20, goalId);
+  } else {
+    inner = sweetSpotBike(day, 2, 15, goalId);
   }
-  if (phase === 'build') {
-    return thresholdBike(day, 3, 20, goalId);
-  }
-  return sweetSpotBike(day, 2, 15, goalId);
+  return { ...inner, session_kind: 'quality_bike' };
 }
 
 export function bikeOpeners(day: string, goalId: string): PlannedSession {
