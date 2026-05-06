@@ -566,6 +566,66 @@ function pdDays(pd: Record<string, unknown> | null, ...keys: string[]): DayName[
 }
 
 /**
+ * Heuristic scan of one serialized week from `sessions_by_week` (post–generate-combined-plan).
+ * Used only for `[buildCombinedPlan] anchors_honored` — confirms the emitted plan, not inputs.
+ */
+function summarizeAnchorsHonoredFromWeekSessions(sessions: unknown): {
+  quality_bike: string | null;
+  strength_days: string[];
+  group_run_day: string | null;
+} {
+  const arr = Array.isArray(sessions) ? sessions : [];
+  const strengthDays: string[] = [];
+  let qualityBike: string | null = null;
+  let groupRun: string | null = null;
+  for (const raw of arr) {
+    if (!raw || typeof raw !== 'object') continue;
+    const s = raw as Record<string, unknown>;
+    const day = typeof s.day === 'string' ? s.day : null;
+    if (!day) continue;
+    const name = String(s.name ?? '');
+    const type = String(s.type ?? s.discipline ?? '');
+    if (type === 'strength' && !strengthDays.includes(day)) strengthDays.push(day);
+    if (type === 'ride' || type === 'bike') {
+      if (
+        /\bgroup\s*ride\b/i.test(name) ||
+        /\bsweet\s*spot\b/i.test(name) ||
+        (/\bthreshold\b/i.test(name) && !/\brun\b/i.test(name))
+      ) {
+        qualityBike ??= day;
+      }
+    }
+    if (type === 'run') {
+      if (
+        /\bintervals?\b|\bthreshold\b|\btempo\b|\btrack\b|\bvo2\b|\bhmp\b|\bhalf-?marathon\s+pace\b/i.test(name)
+      ) {
+        groupRun ??= day;
+      }
+    }
+  }
+  strengthDays.sort();
+  return { quality_bike: qualityBike, strength_days: strengthDays, group_run_day: groupRun };
+}
+
+function pickCanonicalWeekSessions(
+  sessionsByWeek: Record<string, unknown> | null | undefined,
+  assessmentFirst: boolean,
+): { weekKey: string; sessions: unknown[] } {
+  if (!sessionsByWeek || typeof sessionsByWeek !== 'object') {
+    return { weekKey: '', sessions: [] };
+  }
+  const tryKeys = assessmentFirst ? ['2', '3', '1'] : ['1', '2', '3'];
+  for (const k of tryKeys) {
+    const w = sessionsByWeek[k];
+    if (Array.isArray(w) && w.length > 0) return { weekKey: k, sessions: w };
+  }
+  const sorted = Object.keys(sessionsByWeek).sort((a, b) => Number(a) - Number(b));
+  const first = sorted[0];
+  const w = first != null ? sessionsByWeek[first] : undefined;
+  return { weekKey: first ?? '', sessions: Array.isArray(w) ? w : [] };
+}
+
+/**
  * Defense in depth: ensure tri goals have `strength_intent` and a matrix-valid
  * `preferred_days` before any generator runs. Replaces the legacy static
  * DEFAULT_TRI_PREFERRED_DAYS fallback (which produced sequential conflicts) with
@@ -704,6 +764,29 @@ function backfillTriTrainingPrefsDefenseInDepth(
   // put them back so we don't clobber their calendar with algorithmic defaults.
   if (swimDays && swimDays.length > 0) {
     merged.swim = swimDays;
+  }
+
+  // Re-apply explicit bike/run/long pins from the incoming preferred_days when the matrix
+  // still accepts them. Defense-in-depth: never silently drop wizard anchors when the
+  // optimizer output differs (e.g. prior quality_bike anchor edge cases).
+  const pinRestore: Partial<PreferredDaysOut> = {};
+  if (candidate.long_ride) pinRestore.long_ride = candidate.long_ride;
+  if (candidate.long_run) pinRestore.long_run = candidate.long_run;
+  if (candidate.quality_bike) pinRestore.quality_bike = candidate.quality_bike;
+  if (candidate.easy_bike) pinRestore.easy_bike = candidate.easy_bike;
+  if (candidate.quality_run) pinRestore.quality_run = candidate.quality_run;
+  if (candidate.easy_run) pinRestore.easy_run = candidate.easy_run;
+  if (Object.keys(pinRestore).length > 0) {
+    const withPins = { ...merged, ...pinRestore } as PreferredDaysOut;
+    const pinErrs = validatePreferredDays(withPins, inputs.athlete);
+    if (pinErrs.length === 0) {
+      Object.assign(merged, pinRestore);
+      console.log('[preferred_days pin-restore] restored', { keys: Object.keys(pinRestore) });
+    } else {
+      const skipMsg = pinErrs.join(' | ');
+      notes.push(`preferred_days pin-restore skipped: ${skipMsg}`);
+      console.log('[preferred_days pin-restore] skipped:', skipMsg);
+    }
   }
 
   trainingPrefs.preferred_days = merged;
@@ -937,6 +1020,7 @@ async function buildCombinedPlan(
   const focusForCombined = new Date().toISOString().slice(0, 10);
   const arcForCombined = await getArcContext(supabase, user_id, focusForCombined);
 
+  const weekOptimizerDerivedGoalIds: string[] = [];
   for (const g of workingGoals) {
     const sp = String(g.sport || '').toLowerCase();
     if (sp !== 'triathlon' && sp !== 'tri') continue;
@@ -946,6 +1030,9 @@ async function buildCombinedPlan(
         ? { ...(prev as Record<string, unknown>) }
         : {};
     const notes = backfillTriTrainingPrefsDefenseInDepth(base, arcForCombined);
+    if (notes.some((n) => n.includes('preferred_days→optimizer'))) {
+      weekOptimizerDerivedGoalIds.push(g.id);
+    }
     if (notes.length > 0) {
       console.log(`[create-goal] combined plan training_prefs backfill goal ${g.id}:`, notes.join(', '));
       console.log('[build] training_prefs after backfill:', base);
@@ -960,6 +1047,11 @@ async function buildCombinedPlan(
       (g as { training_prefs: Record<string, unknown> }).training_prefs = base;
     }
   }
+
+  console.log(
+    '[buildCombinedPlan] week_optimizer_derived_for_goal_ids:',
+    weekOptimizerDerivedGoalIds.length > 0 ? weekOptimizerDerivedGoalIds.join(',') : '(none)',
+  );
 
   const swim_volume_multiplier = swimVolumeMultiplierFromArcWorkouts(arcForCombined.swim_training_from_workouts);
 
@@ -977,6 +1069,9 @@ async function buildCombinedPlan(
   // flow into the athlete_state we send to generate-combined-plan.
   const backfilledPrimaryPrefs =
     (workingGoals.find((g) => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
+  const assessmentWeekFirst =
+    backfilledPrimaryPrefs?.assessment_week_preference === 'assessment_first' ||
+    (newGoal.training_prefs as Record<string, unknown>)?.assessment_week_preference === 'assessment_first';
   const coEqualProvisional1x = Boolean(backfilledPrimaryPrefs?.co_equal_strength_provisional_1x);
   const freshCombinedPrefs = mergeCombinedSchedulePrefs(
     newGoal.training_prefs as Record<string, unknown>,
@@ -993,6 +1088,7 @@ async function buildCombinedPlan(
   );
   console.log('[buildCombinedPlan] freshCombinedPrefs after backfill:', JSON.stringify({
     bike_quality_day: freshCombinedPrefs.bike_quality_day,
+    bike_quality_label: freshCombinedPrefs.bike_quality_label,
     bike_easy_day: freshCombinedPrefs.bike_easy_day,
     run_quality_day: freshCombinedPrefs.run_quality_day,
     run_easy_day: freshCombinedPrefs.run_easy_day,
@@ -1006,6 +1102,37 @@ async function buildCombinedPlan(
 
   const combinedPlanStartDate =
     normalizeDateOnlyYmd(explicit_plan_start_date) ?? currentWeekMondayISO();
+
+  const resolvedBikeQualityLabelForCombined = (() => {
+    const fromPrefs = freshCombinedPrefs.bike_quality_label?.trim();
+    if (fromPrefs) return fromPrefs;
+    const inferredLabel = deriveBikeQualityLabel(workingGoals);
+    const hasRouteEstimate =
+      freshCombinedPrefs.bike_quality_route_estimated_hours !== undefined ||
+      freshCombinedPrefs.bike_quality_route_estimated_minutes !== undefined ||
+      freshCombinedPrefs.bike_quality_group_ride_hours !== undefined ||
+      freshCombinedPrefs.bike_quality_group_ride_minutes !== undefined;
+    if (inferredLabel) return inferredLabel as string;
+    if (hasRouteEstimate && freshCombinedPrefs.bike_quality_day !== undefined) {
+      return 'Group Ride';
+    }
+    return undefined;
+  })();
+
+  console.log('[buildCombinedPlan] athlete_state schedule fields:', JSON.stringify({
+    long_run_day: freshCombinedPrefs.long_run_day,
+    long_ride_day: freshCombinedPrefs.long_ride_day,
+    bike_quality_day: freshCombinedPrefs.bike_quality_day,
+    bike_easy_day: freshCombinedPrefs.bike_easy_day,
+    run_quality_day: freshCombinedPrefs.run_quality_day,
+    run_easy_day: freshCombinedPrefs.run_easy_day,
+    swim_easy_day: freshCombinedPrefs.swim_easy_day,
+    swim_quality_day: freshCombinedPrefs.swim_quality_day,
+    swim_third_day: freshCombinedPrefs.swim_third_day,
+    strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
+    bike_quality_label: resolvedBikeQualityLabelForCombined,
+    strength_sessions_cap: coEqualProvisional1x ? 1 : undefined,
+  }));
 
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
@@ -1068,19 +1195,9 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.training_intent !== undefined
         ? { training_intent: freshCombinedPrefs.training_intent }
         : {}),
-      ...(() => {
-        const inferredLabel = deriveBikeQualityLabel(workingGoals);
-        const hasRouteEstimate =
-          freshCombinedPrefs.bike_quality_route_estimated_hours !== undefined ||
-          freshCombinedPrefs.bike_quality_route_estimated_minutes !== undefined ||
-          freshCombinedPrefs.bike_quality_group_ride_hours !== undefined ||
-          freshCombinedPrefs.bike_quality_group_ride_minutes !== undefined;
-        if (inferredLabel) return { bike_quality_label: inferredLabel as string };
-        if (hasRouteEstimate && freshCombinedPrefs.bike_quality_day !== undefined) {
-          return { bike_quality_label: 'Group Ride' };
-        }
-        return {};
-      })(),
+      ...(resolvedBikeQualityLabelForCombined
+        ? { bike_quality_label: resolvedBikeQualityLabelForCombined }
+        : {}),
       strength_protocol: resolvedCombinedStrengthProtocol,
       ...(freshCombinedPrefs.strength_intent
         ? { strength_intent: freshCombinedPrefs.strength_intent }
@@ -1118,6 +1235,13 @@ async function buildCombinedPlan(
       console.error('[buildCombinedPlan] generate-combined-plan preview failed:', combined?.error);
       return null;
     }
+    const sbwPrev = combined?.sessions_by_week as Record<string, unknown> | undefined;
+    const { weekKey: wkP, sessions: sessP } = pickCanonicalWeekSessions(sbwPrev, Boolean(assessmentWeekFirst));
+    const honoredP = summarizeAnchorsHonoredFromWeekSessions(sessP);
+    console.log(
+      '[buildCombinedPlan] anchors_honored:',
+      JSON.stringify({ ...honoredP, source_week_key: wkP, source: 'preview_response' }),
+    );
     return { preview: true as const, combined_preview: combined as Record<string, unknown> };
   }
 
@@ -1156,6 +1280,21 @@ async function buildCombinedPlan(
   }
 
   console.log(`[buildCombinedPlan] Created combined plan ${combinedPlanId} for ${goalIds.length} goals, retired ${(oldPlans || []).length} standalone plans`);
+
+  const { data: planAnchorsRow } = await supabase
+    .from('plans')
+    .select('sessions_by_week')
+    .eq('id', combinedPlanId)
+    .eq('user_id', user_id)
+    .maybeSingle();
+  const sbwDb = planAnchorsRow?.sessions_by_week as Record<string, unknown> | undefined;
+  const { weekKey: wkDb, sessions: sessDb } = pickCanonicalWeekSessions(sbwDb, Boolean(assessmentWeekFirst));
+  const honoredDb = summarizeAnchorsHonoredFromWeekSessions(sessDb);
+  console.log(
+    '[buildCombinedPlan] anchors_honored:',
+    JSON.stringify({ ...honoredDb, source_week_key: wkDb, source: 'plan_row_sessions_by_week' }),
+  );
+
   return { plan_id: combinedPlanId, preview: false as const };
 }
 

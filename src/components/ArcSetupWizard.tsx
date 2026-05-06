@@ -276,6 +276,12 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     days_per_week: state.daysPerWeek || 7,
     preferred_days: preferredDays,
     strength_frequency: strengthFreq,
+    ...(triPlan &&
+    state.hasGroupRide &&
+    state.groupRideIntensity === 'quality_bike' &&
+    state.groupRideDay
+      ? { bike_quality_label: 'Group Ride' }
+      : {}),
     ...(state.strengthIncluded && state.strengthIntent
       ? { strength_intent: state.strengthIntent }
       : {}),

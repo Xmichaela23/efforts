@@ -239,6 +239,11 @@ export interface CombinedSchedulePrefs {
   bike_quality_route_estimated_minutes?: number;
   /** Mid-week easy aerobic bike add-on. 0=Sun … 6=Sat */
   bike_easy_day?: number;
+  /**
+   * When set (e.g. wizard hard group ride), week-builder uses group-ride copy for bike quality.
+   * Distinct from structured mid-week quality naming when absent.
+   */
+  bike_quality_label?: string;
   /** Arc-level intent used by scheduling exceptions and progression defaults. */
   training_intent?: TrainingIntentArc;
   rest_days?: number[];
@@ -311,6 +316,9 @@ export function mergeCombinedSchedulePrefs(
       tiRaw === 'completion' || tiRaw === 'performance' || tiRaw === 'first_race' || tiRaw === 'comeback'
         ? (tiRaw as TrainingIntentArc)
         : undefined;
+    const bqlRaw = src.bike_quality_label ?? src.bikeQualityLabel;
+    const bikeQualityLabel =
+      typeof bqlRaw === 'string' && bqlRaw.trim().length > 0 ? bqlRaw.trim() : undefined;
     const groupRideHours = pickFinitePositive(src, [
       'bike_quality_group_ride_hours',
       'bikeQualityGroupRideHours',
@@ -360,6 +368,7 @@ export function mergeCombinedSchedulePrefs(
     if (swimI !== undefined) out.swim_intent = swimI;
     if (swimLS !== undefined) out.swim_load_source = swimLS;
     if (ti !== undefined) out.training_intent = ti;
+    if (bikeQualityLabel !== undefined) out.bike_quality_label = bikeQualityLabel;
     if (pdPatch.long_run_day !== undefined) out.long_run_day = pdPatch.long_run_day;
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
     if (pdPatch.swim_easy_day !== undefined) out.swim_easy_day = pdPatch.swim_easy_day;

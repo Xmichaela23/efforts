@@ -348,6 +348,9 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   const groupRun = inputs.anchors?.group_run;
   const mastersSwim = inputs.anchors?.masters_swim;
 
+  /** Set only when `quality_bike` was actually placed on the anchored day. */
+  let qualityBikeDay: DayName | undefined;
+
   if (qualityBikeAnchor) {
     if (qualityBikeAnchor.day === longRide || qualityBikeAnchor.day === longRun) {
       conflicts.push(
@@ -355,6 +358,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       );
     } else if (canPlace(days, qualityBikeAnchor.day, 'quality_bike')) {
       place(days, qualityBikeAnchor.day, 'quality_bike', { note: qualityBikeAnchor.note });
+      qualityBikeDay = qualityBikeAnchor.day;
+    } else {
+      conflicts.push(
+        `quality_bike anchor on ${qualityBikeAnchor.day} doesn't pass the same-day matrix — will try algorithmic placement.`,
+      );
     }
   }
 
@@ -385,9 +393,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     }
   }
 
-  // ── quality_bike (if no anchor) ──────────────────────────────────────────
-  let qualityBikeDay: DayName | undefined =
-    qualityBikeAnchor && !conflicts.length ? qualityBikeAnchor.day : qualityBikeAnchor?.day;
+  // ── quality_bike (if not yet placed — e.g. failed anchor or long-day collision) ──
   if (!qualityBikeDay) {
     const avoidHardBike = new Set<DayName>(inputs.preferences.hard_bike_avoid_days ?? []);
     const candidates: DayName[] = ['tuesday', 'wednesday', 'thursday'];
@@ -989,8 +995,14 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     ...(finalStrength.length ? { strength: finalStrength } : {}),
   };
 
-  // Notify the AI when quality run lands adjacent to quality bike — the AI surfaces this
-  // in the week summary so the athlete hears it before confirming.
+  const placedSlotsSummary = ALL_DAYS.map((d) => {
+    const kinds = days[d].map((s) => s.kind);
+    return kinds.length ? `${d}=${kinds.join('+')}` : null;
+  }).filter(Boolean).join('; ') || '(none)';
+  console.log(
+    `[optimal-week] placed slots: ${placedSlotsSummary}; preferred_days_keys=${Object.keys(preferred_days).join(',')}`,
+  );
+
   if (qualityBikeDay && qualityRunDay) {
     const gap = Math.abs(DAY_INDEX[qualityRunDay] - DAY_INDEX[qualityBikeDay]);
     const wrap = Math.min(gap, 7 - gap);
