@@ -735,9 +735,14 @@ function Step4Bike({
   const canContinue = state.bikeStructure !== null &&
     (state.bikeStructure !== 'group_ride' || (!!state.groupRideDay && state.groupRideIntensity !== null));
 
-  const ftp = typeof arc?.learnedFitness?.ride_ftp_estimated === 'number'
-    ? Math.round(arc.learnedFitness.ride_ftp_estimated as number)
-    : null;
+  const ftp = (() => {
+    // Prefer manual performance_numbers.ftp, fall back to auto-learned
+    const manual = arc?.performanceNumbers?.ftp ?? arc?.performanceNumbers?.FTP;
+    if (typeof manual === 'number' && manual > 0) return Math.round(manual);
+    const learned = arc?.learnedFitness?.ride_ftp_estimated;
+    if (typeof learned === 'number' && learned > 0) return Math.round(learned);
+    return null;
+  })();
 
   const bikeNote = arc
     ? ftp
