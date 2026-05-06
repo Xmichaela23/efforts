@@ -489,6 +489,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     observations,
     narrative_text: performanceNarrativeText,
+    coaching_note: plannedComp?.coaching_note ?? null,
     arc_performance: arcPerformance,
     race_debrief_text: raceDebriefText,
     race:

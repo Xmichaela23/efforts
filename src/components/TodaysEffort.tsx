@@ -129,6 +129,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [markingComplete, setMarkingComplete] = useState(false);
   const [skippingSession, setSkippingSession] = useState(false);
   const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip'>('detail');
+  const [dismissedNotes, setDismissedNotes] = useState<Set<string>>(new Set());
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -1772,13 +1773,40 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </DrawerHeader>
           
           <div className="px-4 pb-4 overflow-y-auto" style={{ maxHeight: '50vh' }}>
-            {selectedPlannedWorkout && plannedDrawerStep === 'detail' && (
-              <PlannedWorkoutSummary 
-                workout={selectedPlannedWorkout} 
-                baselines={baselines as any} 
-                hideLines={false} 
-              />
-            )}
+            {selectedPlannedWorkout && plannedDrawerStep === 'detail' && (() => {
+              const coachingNote = (selectedPlannedWorkout as any)?.computed?.coaching_note as string | undefined;
+              const dismissKey = coachingNote ? `efforts.coaching_note.dismissed.${selectedPlannedWorkout.id}` : null;
+              const isDismissed = dismissKey
+                ? (dismissedNotes.has(dismissKey) || localStorage.getItem(dismissKey) === '1')
+                : true;
+              return (
+                <>
+                  {coachingNote && !isDismissed && (
+                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2.5">
+                      <p className="flex-1 text-sm leading-snug text-white/60">{coachingNote}</p>
+                      <button
+                        type="button"
+                        aria-label="Dismiss coaching note"
+                        className="mt-0.5 shrink-0 text-white/30 hover:text-white/60 text-base leading-none"
+                        onClick={() => {
+                          if (dismissKey) {
+                            localStorage.setItem(dismissKey, '1');
+                            setDismissedNotes((prev) => new Set([...prev, dismissKey]));
+                          }
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                  <PlannedWorkoutSummary
+                    workout={selectedPlannedWorkout}
+                    baselines={baselines as any}
+                    hideLines={false}
+                  />
+                </>
+              );
+            })()}
           </div>
 
           <DrawerFooter

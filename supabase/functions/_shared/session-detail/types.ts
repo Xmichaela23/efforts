@@ -104,6 +104,12 @@ export type SessionDetailV1 = {
   observations: string[];
   narrative_text: string | null;
   /**
+   * Schedule-aware coaching note written at plan generation time. Surfaced in Today's Effort
+   * and the planned workout screen. Informational only — does not gate anything.
+   * Examples: "Intervals are 12-18h after your group ride", "Four hard sessions this week".
+   */
+  coaching_note?: string | null;
+  /**
    * Compact Arc snapshot from `getArcContext` (workout date). Insights `narrative_text` is
    * athlete coaching copy only; `coaching_context` is tooling/LLM routing (not prefixed to narrative).
    */

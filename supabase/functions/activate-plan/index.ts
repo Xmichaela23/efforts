@@ -38,6 +38,107 @@ function estimatePlannedWorkload(
 
 type SessionsByWeek = Record<string, Array<any>>
 
+// ── Coaching notes ───────────────────────────────────────────────────────────
+
+function isQualityRow(r: any): boolean {
+  const n = String(r.name || '').toLowerCase()
+  const tags: string[] = Array.isArray(r.tags) ? r.tags.map((t: any) => String(t).toLowerCase()) : []
+  return tags.includes('quality') || tags.includes('threshold') || tags.includes('css') ||
+    n.includes('quality') || n.includes('interval') || n.includes('threshold') ||
+    n.includes('tempo') || n.includes('ftp') || n.includes('css')
+}
+
+function isHardRow(r: any): boolean {
+  const n = String(r.name || '').toLowerCase()
+  return isQualityRow(r) ||
+    (r.type === 'run' && (r.duration || 0) >= 70) ||
+    (r.type === 'ride' && (r.duration || 0) >= 90) ||
+    (r.type === 'strength' && /lower|leg|squat|deadlift|rdl|hip thrust/i.test(n))
+}
+
+/**
+ * Scans all rows being inserted and writes coaching_note into computed for
+ * three schedule-context conditions. Mutates rows in place — called once at
+ * activation time; notes never recompute on screen load.
+ */
+function applyCoachingNotes(rows: any[]): void {
+  // Group rows by date (ISO string, first 10 chars)
+  const byDate = new Map<string, any[]>()
+  for (const r of rows) {
+    const d = String(r.date || '').slice(0, 10)
+    if (!d) continue
+    if (!byDate.has(d)) byDate.set(d, [])
+    byDate.get(d)!.push(r)
+  }
+
+  const dates = [...byDate.keys()].sort()
+
+  // Find quality bike date and quality run date (first in plan — week 1 representative)
+  let qBikeDate: string | undefined
+  let qRunDate: string | undefined
+  // Use week 1 only to pick the representative days for note targeting
+  const week1Rows = rows.filter((r) => (r.week_number ?? 1) === 1)
+  for (const r of week1Rows) {
+    const d = String(r.date || '').slice(0, 10)
+    if (r.type === 'ride' && isQualityRow(r) && !qBikeDate) qBikeDate = d
+    if (r.type === 'run' && isQualityRow(r) && !qRunDate) qRunDate = d
+  }
+
+  const dayOfWeek = (iso: string) => new Date(iso).getDay() // 0=Sun, 1=Mon … 6=Sat
+
+  // Condition 1: quality run day adjacent (1 day apart) to quality bike day
+  if (qBikeDate && qRunDate) {
+    const diffDays = Math.round(
+      Math.abs(new Date(qRunDate).getTime() - new Date(qBikeDate).getTime()) / 86_400_000,
+    )
+    if (diffDays === 1) {
+      // Write note only on the quality run session
+      for (const r of rows) {
+        const d = String(r.date || '').slice(0, 10)
+        if (d === qRunDate && r.type === 'run' && isQualityRow(r)) {
+          r.computed = { ...(r.computed || {}), coaching_note: `Intervals are 12–18 hours after your group ride. If yesterday went deep, treat this as tempo rather than full quality — the adaptation still happens, the injury risk doesn't.` }
+        }
+      }
+    }
+  }
+
+  // Condition 2: 3+ sessions on any single day (belt + suspenders after optimizer fix)
+  for (const [date, daySessions] of byDate) {
+    if (daySessions.length >= 3) {
+      const names = daySessions.map((r: any) => r.name).filter(Boolean).join(', ')
+      const note = `Three sessions today: ${names}. Easy session first, then quality, then strength — don't compress rest between them.`
+      for (const r of daySessions) {
+        r.computed = { ...(r.computed || {}), coaching_note: note }
+      }
+    }
+  }
+
+  // Condition 3: 4+ hard days in week 1 with no mid-week rest (Tue + Wed + Thu all have sessions)
+  const week1Dates = dates.filter((d) => {
+    const r = byDate.get(d)!.find((row: any) => (row.week_number ?? 1) === 1)
+    return !!r
+  })
+  const week1HardDates = week1Dates.filter((d) => byDate.get(d)!.some(isHardRow))
+  const hasTue = week1Dates.some((d) => dayOfWeek(d) === 2 && byDate.get(d)!.length > 0)
+  const hasWed = week1Dates.some((d) => dayOfWeek(d) === 3 && byDate.get(d)!.length > 0)
+  const hasThu = week1Dates.some((d) => dayOfWeek(d) === 4 && byDate.get(d)!.length > 0)
+
+  if (week1HardDates.length >= 4 && hasTue && hasWed && hasThu) {
+    const noteDate = qBikeDate ?? week1HardDates[0]
+    if (noteDate) {
+      for (const r of rows) {
+        const d = String(r.date || '').slice(0, 10)
+        if (d === noteDate && r.type === 'ride' && isQualityRow(r)) {
+          // Only write if not already set by a more specific note
+          if (!r.computed?.coaching_note) {
+            r.computed = { ...(r.computed || {}), coaching_note: `Four hard sessions this week with no full recovery day mid-week. Wednesday ride intensity sets the tone — keep it controlled and the rest of the week holds together.` }
+          }
+        }
+      }
+    }
+  }
+}
+
 function toISO(d: Date) {
   const y = d.getFullYear()
   const m = String(d.getMonth()+1).padStart(2, '0')
@@ -470,6 +571,11 @@ Deno.serve(async (req) => {
         rows.push(baseRow)
       }
     }
+
+    // Compute schedule-aware coaching notes from the full rows set.
+    // Notes are generated once here at activation time and stored in computed.coaching_note.
+    // The optimizer has already placed sessions; we re-derive context from the rows themselves.
+    applyCoachingNotes(rows)
 
     let inserted = 0
     if (rows.length) {

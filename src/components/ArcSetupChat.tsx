@@ -232,7 +232,8 @@ type AssistantMessageDisclosure =
   | 'swim_fork'
   | 'swim_load_source'
   | 'week_conflict'
-  | 'assessment_week';
+  | 'assessment_week'
+  | 'plan_start_date';
 
 function looksLikeAssessmentWeekQuestion(text: string): boolean {
   const t = text.toLowerCase();
@@ -251,6 +252,43 @@ function priorThreadHasAssessmentChoice(messages: ChatMessage[]): boolean {
   );
 }
 
+/**
+ * Detects "does [date] work for week 1 start, or another day?" style questions.
+ * The AI proposes a specific start date — athlete should tap Yes or pick another.
+ */
+function looksLikePlanStartDateQuestion(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    (t.includes('week 1 start') || t.includes('week one start') || t.includes('start —') || t.includes('start date')) &&
+    (t.includes('work, or another') || t.includes('work or another') || t.includes('does that work') ||
+     t.includes('another day?') || t.includes('sound right?') || t.includes('or another date'))
+  );
+}
+
+/** Extract the proposed date label from a plan-start question for the button label. */
+function extractProposedStartLabel(text: string): string {
+  // Look for "next Monday the 11th", "May 11th", "the 11th", etc.
+  const monthDay = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:st|nd|rd|th)?\b/i);
+  if (monthDay) return monthDay[0];
+  const nextDay = text.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+the\s+\d{1,2}(?:st|nd|rd|th)?)?/i);
+  if (nextDay) return nextDay[0];
+  const theDate = text.match(/the\s+\d{1,2}(?:st|nd|rd|th)/i);
+  if (theDate) return theDate[0];
+  return 'that date';
+}
+
+function priorThreadHasPlanStartAnswer(messages: ChatMessage[]): boolean {
+  return messages.some(
+    (m) =>
+      m.role === 'user' &&
+      (m.content.toLowerCase().includes('yes') ||
+       m.content.toLowerCase().includes('works') ||
+       m.content.toLowerCase().includes('the ') ||
+       /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(m.content) ||
+       /\d{4}-\d{2}-\d{2}/.test(m.content)),
+  );
+}
+
 function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]): AssistantMessageDisclosure | null {
   if (m.conflict) return 'week_conflict';
   const visible = m.content;
@@ -265,6 +303,9 @@ function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]
   if (looksLikeSwimFork(visible)) return 'swim_fork';
   if (looksLikeAssessmentWeekQuestion(visible) && !priorThreadHasAssessmentChoice(priorMessages)) {
     return 'assessment_week';
+  }
+  if (looksLikePlanStartDateQuestion(visible)) {
+    return 'plan_start_date';
   }
   return null;
 }
@@ -947,7 +988,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
                 <span className="align-baseline">{m.content}</span>
-                {disc && disc !== 'assessment_week' && (
+                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && (
                   <button
                     type="button"
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
@@ -1087,6 +1128,31 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
                   >
                     Jump straight into training
+                  </button>
+                </div>
+              )}
+
+              {disc === 'plan_start_date' && i === messages.length - 1 && (
+                <div
+                  className="mt-3 flex flex-col gap-2.5"
+                  role="group"
+                  aria-label="Plan start date choice"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(`Yes, ${extractProposedStartLabel(m.content)} works`)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Yes, {extractProposedStartLabel(m.content)} works
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Different date — let me pick another')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Different date
                   </button>
                 </div>
               )}
