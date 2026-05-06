@@ -1,12 +1,14 @@
 /**
  * extract-races — single-purpose race extraction.
  *
- * Input:  { text: string }   — athlete's natural-language race description
+ * Input:  { text: string }
  * Output: { races: ExtractedRace[] }
  *
- * Uses Anthropic web search to confirm race dates when needed.
- * No arc context, no conversation history, no state machine.
+ * Uses callLLM (same shared helper as everywhere else) — no web search tools,
+ * no continuation loop, no beta headers. Model knows most major race dates
+ * from training data; anything it can't date the user fills in on confirm cards.
  */
+import { callLLM } from '../_shared/llm.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -14,104 +16,24 @@ const corsHeaders: Record<string, string> = {
   Vary: 'Origin',
 };
 
-const SYSTEM_PROMPT = `You extract race details from an athlete's text and return ONLY valid JSON.
+const SYSTEM_PROMPT = `You extract race details from an athlete's text. Return ONLY valid JSON — no explanation, no markdown fences.
 
-Return this exact structure with no other text, no markdown fences, no explanation:
+Return this exact structure:
 {"races":[{"name":"...","distance":"...","date":"YYYY-MM-DD","priority":"A"}]}
 
 Distance must be exactly one of: sprint, olympic, 70.3, ironman, marathon, half marathon, 5k, 10k
 
 Rules:
-- Use web search to confirm the exact race date when the athlete names a specific event (search "<event name> <year> date")
-- If the year is not stated, assume the next upcoming occurrence of the event
+- Use your knowledge of real race calendars to find the next upcoming date for named events
+- If the year is not stated, use the next upcoming occurrence (today is ${new Date().toISOString().slice(0, 10)})
 - Priority: if two races, the later date = A, earlier date = B; if one race, always A
-- If priority is explicitly stated (e.g. "A race", "tune-up", "B race"), honour it
-- If a date cannot be found after searching, omit the date field entirely (do not guess)
-- name should be the full official event name if you can find it, otherwise use what the athlete said
-- Return the races array sorted by date ascending`;
-
-type AnthropicContent = {
-  type: string;
-  text?: string;
-  name?: string;
-  input?: Record<string, unknown>;
-  content?: unknown[];
-};
-
-type AnthropicResponse = {
-  content: AnthropicContent[];
-  stop_reason: string | null;
-  usage?: unknown;
-};
-
-const WEB_SEARCH_TOOL = {
-  type: 'web_search_20250305',
-  name: 'web_search',
-  max_uses: 4,
-};
-
-async function callWithWebSearch(apiKey: string, userText: string, today: string): Promise<string | null> {
-  let messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
-    { role: 'user', content: `Today is ${today}.\n\n${userText}` },
-  ];
-
-  let data: AnthropicResponse | null = null;
-  let loops = 0;
-  const MAX_LOOPS = 8;
-
-  while (loops < MAX_LOOPS) {
-    loops++;
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        system: SYSTEM_PROMPT,
-        messages,
-        max_tokens: 1024,
-        temperature: 0,
-        tools: [WEB_SEARCH_TOOL],
-      }),
-    });
-
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => '');
-      console.warn(`[extract-races] Anthropic ${resp.status}: ${body.slice(0, 400)}`);
-      return null;
-    }
-
-    data = await resp.json() as AnthropicResponse;
-    const reason = data.stop_reason || '';
-
-    if (reason === 'pause_turn' && data.content) {
-      // Web search in progress — append assistant block and loop (no user turn needed)
-      messages = [...messages, { role: 'assistant', content: data.content }];
-      continue;
-    }
-
-    // end_turn or anything else — done
-    break;
-  }
-
-  if (!data?.content) return null;
-
-  const text = (data.content as AnthropicContent[])
-    .filter(b => b.type === 'text' && typeof b.text === 'string')
-    .map(b => b.text as string)
-    .join('')
-    .trim();
-
-  return text || null;
-}
+- If priority is explicitly stated ("A race", "tune-up", "B race"), honour it
+- If you genuinely cannot determine a date, omit the date field — do not guess
+- name should be the full official event name where known
+- Return races sorted by date ascending`;
 
 function parseRaces(raw: string): { name: string; distance: string; date?: string; priority: 'A' | 'B' }[] {
-  // Strip any markdown fences just in case
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   try {
     const parsed = JSON.parse(cleaned);
     const arr = Array.isArray(parsed.races) ? parsed.races : Array.isArray(parsed) ? parsed : [];
@@ -149,19 +71,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'LLM not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const raw = await callWithWebSearch(apiKey, text, today);
+    const raw = await callLLM({
+      model: 'sonnet',
+      system: SYSTEM_PROMPT,
+      user: text,
+      maxTokens: 512,
+      temperature: 0,
+    });
 
     if (!raw) {
-      return new Response(JSON.stringify({ races: [], error: 'Could not extract races' }), {
+      return new Response(JSON.stringify({ races: [], error: 'LLM unavailable' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
