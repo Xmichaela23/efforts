@@ -973,16 +973,25 @@ function Step8Strength({
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
-      title="Strength training in the plan?"
+      title="Strength in this plan?"
+      subtitle="Yes/No is only whether we schedule strength. Equipment below is already saved in your profile — not something you confirm on this step."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
-      {arc && state.strengthIncluded !== false && (
+      {arc && (
         <ArcHint>
-          {equipList.length > 0
-            ? `Equipment on file: ${equipList.join(', ')}. Exercises will be selected from what you have.`
-            : `No strength equipment on file. If you say yes, sessions will default to bodyweight work.`}
+          {equipList.length > 0 ? (
+            <>
+              <span className="block font-medium text-teal-200/90 mb-1">From your profile</span>
+              {equipList.join(', ')}. Exercises follow this list when strength is included.
+            </>
+          ) : (
+            <>
+              No strength gear in your profile yet. If you choose Yes, we start conservative (bands / bodyweight) until you add equipment under Baselines.
+            </>
+          )}
         </ArcHint>
       )}
+      <p className="text-sm text-white/55 -mt-1 mb-1">Include strength sessions in your season plan?</p>
       <div className="flex gap-2">
         <ChoiceBtn active={state.strengthIncluded === true} onClick={() => setState({ ...state, strengthIncluded: true })}>
           Yes

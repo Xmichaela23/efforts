@@ -1485,6 +1485,11 @@ export function buildWeek(
         const strSlot2 = grid.get(strDay2);
         if (strSlot2 && strSlot2.sessions.length < 2) {
           const equipmentType2 = athleteState.equipment_type ?? 'commercial_gym';
+          // Must compute here: slot-1 block scopes hasCable/hasGhd inside its own `if` — using them here was a ReferenceError.
+          const hasCable2 =
+            athleteState.has_cable_machine ??
+            (equipmentType2 === 'commercial_gym' && !athleteState.equipment_type?.includes('home'));
+          const hasGhd2 = athleteState.has_ghd ?? false;
           if (hasTri) {
             // Tri slot 2 (second preferred day, e.g. Thursday) = lower body (index 0): pairs
             // with quality run in the AM/PM performance exception.
@@ -1496,8 +1501,8 @@ export function buildWeek(
               limiterSport,
               sessionIndex: 0,
               equipmentType: equipmentType2,
-              hasCable,
-              hasGhd,
+              hasCable: hasCable2,
+              hasGhd: hasGhd2,
               longRideDayName: longRideDay,
               longRunDayName: longRunActualDay,
               strengthProtocolId: athleteState.strength_protocol,
