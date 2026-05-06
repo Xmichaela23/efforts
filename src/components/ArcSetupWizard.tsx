@@ -137,10 +137,10 @@ type WizardState = {
   groupRideIntensity: 'quality_bike' | 'easy_bike' | null;
   soloQualityBikeDay: Day | '';
   // Step 5
-  hasRunClub: boolean | null;
-  runClubDay: Day | '';
-  runClubType: 'quality_run' | 'easy_run' | null;
-  qualityRunDay: Day | '';
+  runStructure: 'group_run' | 'solo_quality' | 'by_feel' | null;
+  groupRunDay: Day | '';
+  groupRunIntensity: 'quality_run' | 'easy_run' | null;
+  soloQualityRunDay: Day | '';
   // Step 6 (tri)
   longRideDay: Day | '';
   longRunDay: Day | '';
@@ -168,7 +168,7 @@ function blank(): WizardState {
     trainingIntent: null,
     swimIntent: null,
     bikeStructure: null, groupRideDay: '', groupRideIntensity: null, soloQualityBikeDay: '',
-    hasRunClub: null, runClubDay: '', runClubType: null, qualityRunDay: '',
+    runStructure: null, groupRunDay: '', groupRunIntensity: null, soloQualityRunDay: '',
     longRideDay: '', longRunDay: '',
     daysPerWeek: null,
     strengthIncluded: null, strengthIntent: null,
@@ -183,7 +183,7 @@ function blank(): WizardState {
 function inferDays(state: WizardState) {
   const taken = new Set<string>([
     state.groupRideDay, state.soloQualityBikeDay,
-    state.runClubDay, state.qualityRunDay,
+    state.groupRunDay, state.soloQualityRunDay,
     state.longRideDay || 'saturday', state.longRunDay || 'sunday',
   ].filter(Boolean));
 
@@ -208,13 +208,24 @@ function inferDays(state: WizardState) {
     return pick(['thursday', 'tuesday', 'monday', 'friday'].filter(d => d !== qualityBike));
   })();
 
-  const qualityRun = state.runClubType === 'quality_run' && state.runClubDay
-    ? state.runClubDay
-    : state.qualityRunDay || pick(['thursday', 'tuesday', 'wednesday'].filter(d => d !== qualityBike && d !== easyBike));
+  const qualityRun = (() => {
+    if (state.runStructure === 'group_run') {
+      return state.groupRunIntensity === 'quality_run' && state.groupRunDay
+        ? state.groupRunDay
+        : state.soloQualityRunDay || pick(['thursday', 'tuesday', 'wednesday'].filter(d => d !== qualityBike && d !== easyBike));
+    }
+    if (state.runStructure === 'solo_quality') {
+      return state.soloQualityRunDay || pick(['thursday', 'tuesday', 'wednesday'].filter(d => d !== qualityBike && d !== easyBike));
+    }
+    return pick(['thursday', 'tuesday', 'wednesday'].filter(d => d !== qualityBike && d !== easyBike));
+  })();
 
-  const easyRun = state.runClubType === 'easy_run' && state.runClubDay
-    ? state.runClubDay
-    : pick(['friday', 'monday', 'tuesday', 'wednesday'].filter(d => d !== qualityRun && d !== qualityBike));
+  const easyRun = (() => {
+    if (state.runStructure === 'group_run' && state.groupRunIntensity === 'easy_run' && state.groupRunDay) {
+      return state.groupRunDay;
+    }
+    return pick(['friday', 'monday', 'tuesday', 'wednesday'].filter(d => d !== qualityRun && d !== qualityBike));
+  })();
 
   const swimCount = state.swimIntent === 'focus' ? 3 : 2;
   const swimCandidates = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -827,8 +838,8 @@ function Step4Bike({
 function Step5Run({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
-  const canContinue = state.hasRunClub !== null &&
-    (state.hasRunClub === false || (!!state.runClubDay && state.runClubType !== null));
+  const canContinue = state.runStructure !== null &&
+    (state.runStructure !== 'group_run' || (!!state.groupRunDay && state.groupRunIntensity !== null));
 
   // learned_fitness paces are stored as { value: number, confidence, sample_count }
   const readLearnedPace = (key: string): number | null => {
@@ -850,60 +861,75 @@ function Step5Run({
       : `No threshold pace on file. Run targets will use effort zones until we have data.`
     : null;
 
+  const reset = (structure: typeof state.runStructure) =>
+    setState({ ...state, runStructure: structure, groupRunDay: '', groupRunIntensity: null, soloQualityRunDay: '' });
+
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
-      title="Fixed run night or run group?"
-      subtitle="Track nights and tempo groups anchor your quality run. Social long runs can anchor your long run day."
+      title="How do you structure your running?"
+      subtitle="We'll anchor your quality sessions around whatever you already do."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
       {runPaceNote && <ArcHint>{runPaceNote}</ArcHint>}
-      <div className="flex gap-2">
-        <ChoiceBtn active={state.hasRunClub === true} onClick={() => setState({ ...state, hasRunClub: true })}>
-          Yes
-        </ChoiceBtn>
-        <ChoiceBtn active={state.hasRunClub === false} onClick={() => setState({ ...state, hasRunClub: false, runClubDay: '', runClubType: null })}>
-          No
-        </ChoiceBtn>
-      </div>
 
-      {state.hasRunClub === true && (
+      <ChoiceBtn active={state.runStructure === 'group_run'} onClick={() => reset('group_run')}>
+        <span className="block font-semibold">Track night or run group</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">A recurring session you show up to — we'll pin your run schedule around it.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.runStructure === 'solo_quality'} onClick={() => reset('solo_quality')}>
+        <span className="block font-semibold">Solo quality sessions</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Intervals, tempo, threshold — structured work you do on your own schedule.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.runStructure === 'by_feel'} onClick={() => reset('by_feel')}>
+        <span className="block font-semibold">Nothing fixed — I run by feel</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">The plan will place your quality run session algorithmically.</span>
+      </ChoiceBtn>
+
+      {state.runStructure === 'group_run' && (
         <>
           <DayPicker
-            value={state.runClubDay as Day | ''}
-            onChange={d => setState({ ...state, runClubDay: d })}
+            value={state.groupRunDay as Day | ''}
+            onChange={d => setState({ ...state, groupRunDay: d })}
             label="Which day?"
           />
           <div>
             <p className="text-sm text-white/50 mb-2">What kind of session?</p>
             <div className="space-y-2">
               <ChoiceBtn
-                active={state.runClubType === 'quality_run'}
-                onClick={() => setState({ ...state, runClubType: 'quality_run' })}
+                active={state.groupRunIntensity === 'quality_run'}
+                onClick={() => setState({ ...state, groupRunIntensity: 'quality_run' })}
               >
                 <span className="block font-semibold">Track / tempo / intervals</span>
-                <span className="block text-[13px] text-white/55 mt-0.5">Hard effort. Counts as your quality run.</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Hard effort. Counts as your quality run for the week.</span>
               </ChoiceBtn>
               <ChoiceBtn
-                active={state.runClubType === 'easy_run'}
-                onClick={() => setState({ ...state, runClubType: 'easy_run' })}
+                active={state.groupRunIntensity === 'easy_run'}
+                onClick={() => setState({ ...state, groupRunIntensity: 'easy_run' })}
               >
                 <span className="block font-semibold">Easy / social long run</span>
-                <span className="block text-[13px] text-white/55 mt-0.5">Conversational pace. Counts as easy aerobic or long run.</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Conversational pace. Counts as aerobic. We'll add a separate quality session.</span>
               </ChoiceBtn>
             </div>
           </div>
+          {state.groupRunIntensity === 'easy_run' && (
+            <DayPicker
+              value={state.soloQualityRunDay as Day | ''}
+              onChange={d => setState({ ...state, soloQualityRunDay: d })}
+              label="Preferred day for quality intervals? (optional)"
+              exclude={[state.groupRunDay].filter(Boolean)}
+            />
+          )}
         </>
       )}
 
-      <DayPicker
-        value={state.qualityRunDay as Day | ''}
-        onChange={d => setState({ ...state, qualityRunDay: d })}
-        label={state.runClubType === 'quality_run'
-          ? 'That works. Any day to avoid for hard run sessions?'
-          : 'Preferred day for quality run intervals? (optional — Thursday is a common choice)'}
-        exclude={[state.runClubDay].filter(Boolean)}
-      />
+      {state.runStructure === 'solo_quality' && (
+        <DayPicker
+          value={state.soloQualityRunDay as Day | ''}
+          onChange={d => setState({ ...state, soloQualityRunDay: d })}
+          label="Which day? (optional)"
+        />
+      )}
     </StepLayout>
   );
 }
