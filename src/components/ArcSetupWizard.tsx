@@ -649,15 +649,15 @@ function Step2Intent({
     >
       <ChoiceBtn active={state.trainingIntent === 'performance'} onClick={() => setState({ ...state, trainingIntent: 'performance' })}>
         <span className="block font-semibold text-white">Race the clock</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">Structured load, progressive intensity, chasing a faster finish.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Interval and threshold sessions, pace targets on every quality workout, recovery every 3–4 weeks. Built to go faster.</span>
       </ChoiceBtn>
       <ChoiceBtn active={state.trainingIntent === 'completion'} onClick={() => setState({ ...state, trainingIntent: 'completion' })}>
         <span className="block font-semibold text-white">Strong, healthy finish</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">Durable training, consistent work, finish feeling good.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Tempo-based quality work, no pace targets, recovery every 3 weeks. Built to finish feeling good.</span>
       </ChoiceBtn>
       <ChoiceBtn active={state.trainingIntent === 'first_race'} onClick={() => setState({ ...state, trainingIntent: 'first_race' })}>
         <span className="block font-semibold text-white">First time at this distance</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">Get to the start line healthy and ready — everything else follows.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Conservative ramp, recovery every 2 weeks, no intensity pressure. Built to get you to the line.</span>
       </ChoiceBtn>
     </StepLayout>
   );
