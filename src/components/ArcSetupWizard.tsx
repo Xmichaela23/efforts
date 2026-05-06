@@ -1024,22 +1024,75 @@ function Step9Confirm({
   arc: WizardArcContext | null;
 }) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
+  const tri = isTri(primaryRace?.distance || '');
   const weeksOut = primaryRace?.targetDate
     ? Math.round((new Date(primaryRace.targetDate + 'T12:00:00').getTime() - Date.now()) / 604_800_000)
     : null;
 
-  const summaryItems = [
-    `${state.races.length > 1 ? state.races.length + ' races' : primaryRace?.name || 'Race'} · ${primaryRace?.distance}`,
-    state.trainingIntent === 'performance' ? 'Performance build' : state.trainingIntent === 'first_race' ? 'First-time finish' : 'Strong finish',
-    isTri(primaryRace?.distance || '') && state.swimIntent
-      ? state.swimIntent === 'focus' ? '3 swims/week' : '2 swims/week'
-      : null,
-    state.daysPerWeek ? `${state.daysPerWeek} days/week` : null,
-    state.strengthIncluded
-      ? state.strengthIntent === 'performance' ? 'Strength co-equal (2×)' : 'Strength support (1–2×)'
-      : 'No strength sessions',
-    weeksOut != null ? `${weeksOut} weeks to race` : null,
-  ].filter(Boolean) as string[];
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  // ── Schedule picture ────────────────────────────────────────────────────────
+  type ScheduleRow = { label: string; value: string; conflict?: string };
+  const schedule: ScheduleRow[] = [];
+
+  if (tri && state.hasGroupRide && state.groupRideDay) {
+    schedule.push({
+      label: 'Group ride',
+      value: `${cap(state.groupRideDay)} · ${state.groupRideIntensity === 'quality_bike' ? 'hard (quality)' : 'easy (aerobic)'}`,
+    });
+  }
+  if (state.hasGroupRun && state.groupRunDay) {
+    const conflict = tri && state.hasGroupRide && state.groupRideDay === state.groupRunDay
+      ? 'Same day as group ride — planner will flag this'
+      : undefined;
+    schedule.push({
+      label: 'Group run / track night',
+      value: `${cap(state.groupRunDay)} · ${state.groupRunIntensity === 'quality_run' ? 'hard (quality)' : 'easy (aerobic)'}`,
+      conflict,
+    });
+  }
+  if (tri) {
+    const longRide = state.longRideDay || 'saturday';
+    const longRun = state.longRunDay || 'sunday';
+    const rideRunConflict = longRide === longRun ? 'Long ride and long run on the same day — planner will flag this' : undefined;
+    const rideGroupConflict = !rideRunConflict && state.hasGroupRide && state.groupRideDay === longRide
+      ? 'Same day as group ride — planner will flag this' : undefined;
+    schedule.push({ label: 'Long ride', value: cap(longRide), conflict: rideRunConflict ?? rideGroupConflict });
+    schedule.push({ label: 'Long run', value: cap(longRun) });
+  } else {
+    schedule.push({ label: 'Long run', value: cap(state.longRunDay || 'sunday') });
+  }
+  if (!state.hasGroupRide && !state.hasGroupRun) {
+    schedule.push({ label: 'Quality sessions', value: 'Planner places around long days' });
+  } else if (tri && !state.hasGroupRide) {
+    schedule.push({ label: 'Quality bike', value: 'Planner places around anchors' });
+  } else if (!state.hasGroupRun) {
+    schedule.push({ label: 'Quality run', value: 'Planner places around anchors' });
+  }
+
+  // Arc baselines for the fitness card
+  const readPace = (key: string): number | null => {
+    if (!arc) return null;
+    const raw = arc.learnedFitness?.[key];
+    if (typeof raw === 'number' && raw > 0) return raw;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const v = (raw as { value?: unknown }).value;
+      if (typeof v === 'number' && v > 0) return v;
+    }
+    return null;
+  };
+  const ftpManual = arc?.performanceNumbers?.ftp ?? arc?.performanceNumbers?.FTP;
+  const ftp = (typeof ftpManual === 'number' && ftpManual > 0)
+    ? Math.round(ftpManual)
+    : typeof arc?.learnedFitness?.ride_ftp_estimated === 'number'
+      ? Math.round(arc.learnedFitness.ride_ftp_estimated as number) : null;
+  const threshSec = readPace('run_threshold_pace_sec_per_km');
+  const fitnessLines: string[] = [];
+  if (arc && arc.swimSessions28 > 0) fitnessLines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
+  if (ftp) fitnessLines.push(`Bike FTP: ~${ftp}w`);
+  if (threshSec) fitnessLines.push(`Run threshold: ${fmtPaceKm(threshSec)}`);
+
+  const conflicts = schedule.filter(r => r.conflict);
 
   return (
     <StepLayout
@@ -1052,44 +1105,44 @@ function Step9Confirm({
       saving={saving}
     >
       {/* Season summary card */}
-      <div className="rounded-2xl border border-teal-500/25 bg-gradient-to-b from-teal-950/55 via-zinc-950/50 to-zinc-950/90 px-4 py-5">
+      <div className="rounded-2xl border border-teal-500/25 bg-gradient-to-b from-teal-950/55 via-zinc-950/50 to-zinc-950/90 px-4 py-5 space-y-1.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-400/90 mb-2">Your season</p>
-        <div className="space-y-1.5">
-          {summaryItems.map((item, i) => (
-            <p key={i} className="text-[15px] text-white/80">· {item}</p>
-          ))}
-        </div>
+        <p className="text-[15px] text-white/80">· {state.races.length > 1 ? state.races.length + ' races' : primaryRace?.name || 'Race'} · {primaryRace?.distance}</p>
+        <p className="text-[15px] text-white/80">· {state.trainingIntent === 'performance' ? 'Performance build' : state.trainingIntent === 'first_race' ? 'First-time finish' : 'Strong finish'}</p>
+        {tri && state.swimIntent && <p className="text-[15px] text-white/80">· {state.swimIntent === 'focus' ? '3 swims/week' : '2 swims/week'}</p>}
+        {state.daysPerWeek && <p className="text-[15px] text-white/80">· {state.daysPerWeek} days/week</p>}
+        <p className="text-[15px] text-white/80">· {state.strengthIncluded ? state.strengthIntent === 'performance' ? 'Strength co-equal (2×)' : 'Strength support (1–2×)' : 'No strength sessions'}</p>
+        {weeksOut != null && <p className="text-[15px] text-white/80">· {weeksOut} weeks to race</p>}
       </div>
 
-      {/* Fitness snapshot from Arc */}
-      {arc && (() => {
-        const readPace = (key: string): number | null => {
-          const raw = arc.learnedFitness?.[key];
-          if (typeof raw === 'number' && raw > 0) return raw;
-          if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-            const v = (raw as { value?: unknown }).value;
-            if (typeof v === 'number' && v > 0) return v;
-          }
-          return null;
-        };
-        const ftpManual = arc.performanceNumbers?.ftp ?? arc.performanceNumbers?.FTP;
-        const ftp = (typeof ftpManual === 'number' && ftpManual > 0)
-          ? Math.round(ftpManual)
-          : typeof arc.learnedFitness?.ride_ftp_estimated === 'number'
-            ? Math.round(arc.learnedFitness.ride_ftp_estimated as number) : null;
-        const threshSec = readPace('run_threshold_pace_sec_per_km');
-        const lines: string[] = [];
-        if (arc.swimSessions28 > 0) lines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
-        if (ftp) lines.push(`Bike FTP: ~${ftp}w`);
-        if (threshSec) lines.push(`Run threshold: ${fmtPaceKm(threshSec)}`);
-        if (!lines.length) return null;
-        return (
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/35 mb-2">From your training history</p>
-            {lines.map((l, i) => <p key={i} className="text-[14px] text-white/60">· {l}</p>)}
-          </div>
-        );
-      })()}
+      {/* Schedule picture */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/35 mb-3">Week structure</p>
+        <div className="space-y-2">
+          {schedule.map((row, i) => (
+            <div key={i}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[13px] text-white/45 shrink-0">{row.label}</span>
+                <span className="text-[14px] text-white/80 text-right">{row.value}</span>
+              </div>
+              {row.conflict && (
+                <p className="text-[12px] text-amber-400/80 mt-0.5 text-right">{row.conflict}</p>
+              )}
+            </div>
+          ))}
+        </div>
+        {conflicts.length === 0 && (
+          <p className="text-[11px] text-white/25 mt-3">No conflicts detected. Planner will optimize spacing.</p>
+        )}
+      </div>
+
+      {/* Fitness baselines */}
+      {fitnessLines.length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/35 mb-2">Baselines in use</p>
+          {fitnessLines.map((l, i) => <p key={i} className="text-[14px] text-white/60">· {l}</p>)}
+        </div>
+      )}
 
       {/* Plan start date */}
       <div>
