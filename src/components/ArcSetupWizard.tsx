@@ -829,12 +829,18 @@ function Step5Run({
   const canContinue = state.hasRunClub !== null &&
     (state.hasRunClub === false || (!!state.runClubDay && state.runClubType !== null));
 
-  const threshSec = typeof arc?.learnedFitness?.run_threshold_pace_sec_per_km === 'number'
-    ? arc.learnedFitness.run_threshold_pace_sec_per_km as number
-    : null;
-  const easySec = typeof arc?.learnedFitness?.run_easy_pace_sec_per_km === 'number'
-    ? arc.learnedFitness.run_easy_pace_sec_per_km as number
-    : null;
+  // learned_fitness paces are stored as { value: number, confidence, sample_count }
+  const readLearnedPace = (key: string): number | null => {
+    const raw = arc?.learnedFitness?.[key];
+    if (typeof raw === 'number' && raw > 0) return raw;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const v = (raw as { value?: unknown }).value;
+      if (typeof v === 'number' && v > 0) return v;
+    }
+    return null;
+  };
+  const threshSec = readLearnedPace('run_threshold_pace_sec_per_km');
+  const easySec   = readLearnedPace('run_easy_pace_sec_per_km');
   const runPaceNote = arc
     ? threshSec
       ? easySec
@@ -1090,10 +1096,21 @@ function Step9Confirm({
 
       {/* Fitness snapshot from Arc */}
       {arc && (() => {
-        const ftp = typeof arc.learnedFitness?.ride_ftp_estimated === 'number'
-          ? Math.round(arc.learnedFitness.ride_ftp_estimated as number) : null;
-        const threshSec = typeof arc.learnedFitness?.run_threshold_pace_sec_per_km === 'number'
-          ? arc.learnedFitness.run_threshold_pace_sec_per_km as number : null;
+        const readPace = (key: string): number | null => {
+          const raw = arc.learnedFitness?.[key];
+          if (typeof raw === 'number' && raw > 0) return raw;
+          if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            const v = (raw as { value?: unknown }).value;
+            if (typeof v === 'number' && v > 0) return v;
+          }
+          return null;
+        };
+        const ftpManual = arc.performanceNumbers?.ftp ?? arc.performanceNumbers?.FTP;
+        const ftp = (typeof ftpManual === 'number' && ftpManual > 0)
+          ? Math.round(ftpManual)
+          : typeof arc.learnedFitness?.ride_ftp_estimated === 'number'
+            ? Math.round(arc.learnedFitness.ride_ftp_estimated as number) : null;
+        const threshSec = readPace('run_threshold_pace_sec_per_km');
         const lines: string[] = [];
         if (arc.swimSessions28 > 0) lines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
         if (ftp) lines.push(`Bike FTP: ~${ftp}w`);
