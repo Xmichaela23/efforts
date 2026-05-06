@@ -51,15 +51,16 @@ const WEB_SEARCH_TOOL = {
 };
 
 async function callWithWebSearch(apiKey: string, userText: string, today: string): Promise<string | null> {
-  const messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
+  let messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
     { role: 'user', content: `Today is ${today}.\n\n${userText}` },
   ];
 
-  let iterations = 0;
-  const MAX_ITER = 6;
+  let data: AnthropicResponse | null = null;
+  let loops = 0;
+  const MAX_LOOPS = 8;
 
-  while (iterations < MAX_ITER) {
-    iterations++;
+  while (loops < MAX_LOOPS) {
+    loops++;
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -80,39 +81,32 @@ async function callWithWebSearch(apiKey: string, userText: string, today: string
 
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
-      console.warn(`[extract-races] Anthropic ${resp.status}: ${body.slice(0, 200)}`);
+      console.warn(`[extract-races] Anthropic ${resp.status}: ${body.slice(0, 400)}`);
       return null;
     }
 
-    const data: AnthropicResponse = await resp.json();
+    data = await resp.json() as AnthropicResponse;
+    const reason = data.stop_reason || '';
 
-    // Collect all text blocks from this response
-    const textBlocks = (data.content || [])
-      .filter(b => b.type === 'text' && typeof b.text === 'string')
-      .map(b => b.text as string);
-
-    if (data.stop_reason === 'end_turn') {
-      return textBlocks.join('').trim() || null;
-    }
-
-    if (data.stop_reason === 'pause_turn') {
-      // Model used web search — append assistant content and continue
-      messages.push({ role: 'assistant', content: data.content });
-      // Add a continuation user turn as required by the API
-      messages.push({ role: 'user', content: 'Continue.' });
+    if (reason === 'pause_turn' && data.content) {
+      // Web search in progress — append assistant block and loop (no user turn needed)
+      messages = [...messages, { role: 'assistant', content: data.content }];
       continue;
     }
 
-    // Any other stop reason (tool_use that isn't web search, max_tokens, etc.)
-    // — try to extract text from what we have
-    if (textBlocks.length > 0) {
-      return textBlocks.join('').trim();
-    }
-
+    // end_turn or anything else — done
     break;
   }
 
-  return null;
+  if (!data?.content) return null;
+
+  const text = (data.content as AnthropicContent[])
+    .filter(b => b.type === 'text' && typeof b.text === 'string')
+    .map(b => b.text as string)
+    .join('')
+    .trim();
+
+  return text || null;
 }
 
 function parseRaces(raw: string): { name: string; distance: string; date?: string; priority: 'A' | 'B' }[] {
