@@ -979,8 +979,8 @@ function Step8Strength({
       {arc && state.strengthIncluded !== false && (
         <ArcHint>
           {equipList.length > 0
-            ? `Equipment on file: ${equipList.join(', ')}. Strength pre-selected — change it if you want.`
-            : `No equipment on file. You'll set this up now.`}
+            ? `Equipment on file: ${equipList.join(', ')}. Exercises will be selected from what you have.`
+            : `No strength equipment on file. If you say yes, sessions will default to bodyweight work.`}
         </ArcHint>
       )}
       <div className="flex gap-2">
