@@ -115,10 +115,6 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
       .single();
     
     const sourcePreference = userData?.preferences?.source_preference || 'both';
-    if (sourcePreference === 'garmin') {
-      console.log(`⏭️ Skipping Strava activity ${activityId} - user prefers Garmin only`);
-      return;
-    }
     const connectionData = userConnection.connection_data || {};
     let accessToken = connectionData.access_token || (userConnection as any).access_token;
     const expiresAtIso = (userConnection as any).expires_at as string | null;
@@ -176,6 +172,32 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
       }
     }
 
+    // When Garmin is the preferred source, only fall back to Strava if Garmin has no record
+    // for this specific workout (e.g. activity was only tracked on Strava, not on Garmin device).
+    if (sourcePreference === 'garmin') {
+      const activityDate = (activityData.start_date_local || activityData.start_date || '').split('T')[0];
+      const s = (activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase() || '');
+      const mappedType = s.includes('run') ? 'run'
+        : (s.includes('ride') || s.includes('bike')) ? 'ride'
+        : s.includes('swim') ? 'swim'
+        : (s.includes('walk') || s.includes('hike')) ? 'walk'
+        : (s.includes('weight') || s.includes('strength')) ? 'strength'
+        : 'run';
+      const { data: garminWorkout } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', activityDate)
+        .eq('type', mappedType)
+        .not('garmin_activity_id', 'is', null)
+        .maybeSingle();
+      if (garminWorkout) {
+        console.log(`⏭️ Skipping Strava activity ${activityId} - Garmin record exists for ${activityDate} ${mappedType}`);
+        return;
+      }
+      console.log(`⚡ Garmin preferred but no Garmin record for ${activityDate} ${mappedType} — ingesting from Strava`);
+    }
+
     // Store the activity in our system
     await storeStravaActivity(activityId, userId, activityData);
     
@@ -217,10 +239,6 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
       .single();
     
     const sourcePreference = userData?.preferences?.source_preference || 'both';
-    if (sourcePreference === 'garmin') {
-      console.log(`⏭️ Skipping Strava activity update ${activityId} - user prefers Garmin only`);
-      return;
-    }
     const connectionData = userConnection.connection_data || {};
     let accessToken = connectionData.access_token || (userConnection as any).access_token;
     if (!accessToken) {
@@ -242,6 +260,32 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     if (!activityData) {
       console.log(`⚠️ Could not fetch updated activity ${activityId} from Strava (status ${status})`);
       return;
+    }
+
+    // When Garmin is the preferred source, only fall back to Strava if Garmin has no record
+    // for this specific workout (e.g. activity was only tracked on Strava, not on Garmin device).
+    if (sourcePreference === 'garmin') {
+      const activityDate = (activityData.start_date_local || activityData.start_date || '').split('T')[0];
+      const s = (activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase() || '');
+      const mappedType = s.includes('run') ? 'run'
+        : (s.includes('ride') || s.includes('bike')) ? 'ride'
+        : s.includes('swim') ? 'swim'
+        : (s.includes('walk') || s.includes('hike')) ? 'walk'
+        : (s.includes('weight') || s.includes('strength')) ? 'strength'
+        : 'run';
+      const { data: garminWorkout } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('date', activityDate)
+        .eq('type', mappedType)
+        .not('garmin_activity_id', 'is', null)
+        .maybeSingle();
+      if (garminWorkout) {
+        console.log(`⏭️ Skipping Strava activity update ${activityId} - Garmin record exists for ${activityDate} ${mappedType}`);
+        return;
+      }
+      console.log(`⚡ Garmin preferred but no Garmin record for ${activityDate} ${mappedType} — ingesting update from Strava`);
     }
 
     // Compute stream-based max cadence for runs/walks to match Strava UI
