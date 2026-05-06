@@ -566,8 +566,12 @@ function pdDays(pd: Record<string, unknown> | null, ...keys: string[]): DayName[
 }
 
 /**
- * Heuristic scan of one serialized week from `sessions_by_week` (post–generate-combined-plan).
+ * Scan one serialized week from `sessions_by_week` (post–generate-combined-plan).
  * Used only for `[buildCombinedPlan] anchors_honored` — confirms the emitted plan, not inputs.
+ *
+ * Prefers **`session_kind`** (generate-combined-plan contract) so recovery weeks that rename
+ * mid-week bike to "Easy Ride" still report `quality_bike: null` only when the slot truly
+ * is not `quality_bike`. Falls back to display-name regex for legacy rows without `session_kind`.
  */
 function summarizeAnchorsHonoredFromWeekSessions(sessions: unknown): {
   quality_bike: string | null;
@@ -584,21 +588,31 @@ function summarizeAnchorsHonoredFromWeekSessions(sessions: unknown): {
     const day = typeof s.day === 'string' ? s.day : null;
     if (!day) continue;
     const name = String(s.name ?? '');
-    const type = String(s.type ?? s.discipline ?? '');
-    if (type === 'strength' && !strengthDays.includes(day)) strengthDays.push(day);
+    const type = String(s.type ?? s.discipline ?? '').toLowerCase();
+    const skRaw = s.session_kind;
+    const sk = typeof skRaw === 'string' && skRaw.length > 0 ? skRaw : '';
+
+    const isStrength =
+      type === 'strength' ||
+      sk === 'upper_body_strength' ||
+      sk === 'lower_body_strength';
+    if (isStrength && !strengthDays.includes(day)) strengthDays.push(day);
+
     if (type === 'ride' || type === 'bike') {
-      if (
+      const legacyQualityBikeName =
         /\bgroup\s*ride\b/i.test(name) ||
         /\bsweet\s*spot\b/i.test(name) ||
-        (/\bthreshold\b/i.test(name) && !/\brun\b/i.test(name))
-      ) {
+        (/\bthreshold\b/i.test(name) && !/\brun\b/i.test(name));
+      if (sk === 'quality_bike' || (!sk && legacyQualityBikeName)) {
         qualityBike ??= day;
       }
     }
     if (type === 'run') {
-      if (
-        /\bintervals?\b|\bthreshold\b|\btempo\b|\btrack\b|\bvo2\b|\bhmp\b|\bhalf-?marathon\s+pace\b/i.test(name)
-      ) {
+      const legacyQualityRunName =
+        /\bintervals?\b|\bthreshold\b|\btempo\b|\btrack\b|\bvo2\b|\bhmp\b|\bhalf-?marathon\s+pace\b/i.test(
+          name,
+        );
+      if (sk === 'quality_run' || (!sk && legacyQualityRunName)) {
         groupRun ??= day;
       }
     }
