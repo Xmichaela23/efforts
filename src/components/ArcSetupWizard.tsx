@@ -673,7 +673,7 @@ function Step3Swim({
       ? `2 swims/week in the last 4 weeks — race-ready pre-selected.`
       : arc.swimSessions28 === 1
       ? `1 swim in the last 4 weeks. Race-ready (2×) is a good step up from here.`
-      : null
+      : `No swims logged in the last 4 weeks. Starting with race-ready (2×) builds the habit.`
     : null;
 
   return (
@@ -706,6 +706,12 @@ function Step4Bike({
     ? Math.round(arc.learnedFitness.ride_ftp_estimated as number)
     : null;
 
+  const bikeNote = arc
+    ? ftp
+      ? `FTP on file: ~${ftp}w. Bike intervals will be calibrated to that baseline.`
+      : `No FTP on file. Bike intervals will use RPE until we calibrate.`
+    : null;
+
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
@@ -713,7 +719,7 @@ function Step4Bike({
       subtitle="We'll anchor your bike schedule around it."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
-      {ftp && <ArcHint>FTP on file: ~{ftp}w. Bike intervals will be calibrated to that baseline.</ArcHint>}
+      {bikeNote && <ArcHint>{bikeNote}</ArcHint>}
       <div className="flex gap-2">
         <ChoiceBtn active={state.hasGroupRide === true} onClick={() => setState({ ...state, hasGroupRide: true })}>
           Yes
@@ -777,10 +783,12 @@ function Step5Run({
   const easySec = typeof arc?.learnedFitness?.run_easy_pace_sec_per_km === 'number'
     ? arc.learnedFitness.run_easy_pace_sec_per_km as number
     : null;
-  const runPaceNote = threshSec
-    ? easySec
-      ? `Run paces on file — threshold: ${fmtPaceKm(threshSec)}, easy: ${fmtPaceKm(easySec)}. Intervals will land around these.`
-      : `Threshold pace on file: ${fmtPaceKm(threshSec)}. Run intervals will be calibrated to that.`
+  const runPaceNote = arc
+    ? threshSec
+      ? easySec
+        ? `Run paces on file — threshold: ${fmtPaceKm(threshSec)}, easy: ${fmtPaceKm(easySec)}. Intervals will land around these.`
+        : `Threshold pace on file: ${fmtPaceKm(threshSec)}. Run intervals will be calibrated to that.`
+      : `No threshold pace on file. Run targets will use effort zones until we have data.`
     : null;
 
   return (
@@ -943,8 +951,12 @@ function Step8Strength({
       title="Strength training in the plan?"
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
-      {equipList.length > 0 && state.strengthIncluded !== false && (
-        <ArcHint>Equipment on file: {equipList.join(', ')}. Strength pre-selected — change it if you want.</ArcHint>
+      {arc && state.strengthIncluded !== false && (
+        <ArcHint>
+          {equipList.length > 0
+            ? `Equipment on file: ${equipList.join(', ')}. Strength pre-selected — change it if you want.`
+            : `No equipment on file. You'll set this up now.`}
+        </ArcHint>
       )}
       <div className="flex gap-2">
         <ChoiceBtn active={state.strengthIncluded === true} onClick={() => setState({ ...state, strengthIncluded: true })}>
