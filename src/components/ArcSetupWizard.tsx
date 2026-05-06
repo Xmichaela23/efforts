@@ -119,7 +119,7 @@ type WizardState = {
   // Step 3 (tri)
   swimIntent: 'focus' | 'race' | null;
   // Step 4 (tri)
-  hasGroupRide: boolean | null;
+  bikeStructure: 'group_ride' | 'solo_quality' | 'by_feel' | null;
   groupRideDay: Day | '';
   groupRideIntensity: 'quality_bike' | 'easy_bike' | null;
   soloQualityBikeDay: Day | '';
@@ -154,7 +154,7 @@ function blank(): WizardState {
     races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }],
     trainingIntent: null,
     swimIntent: null,
-    hasGroupRide: null, groupRideDay: '', groupRideIntensity: null, soloQualityBikeDay: '',
+    bikeStructure: null, groupRideDay: '', groupRideIntensity: null, soloQualityBikeDay: '',
     hasRunClub: null, runClubDay: '', runClubType: null, qualityRunDay: '',
     longRideDay: '', longRunDay: '',
     daysPerWeek: null,
@@ -176,13 +176,24 @@ function inferDays(state: WizardState) {
 
   const pick = (candidates: string[]) => candidates.find(d => !taken.has(d)) || candidates[0] || 'friday';
 
-  const qualityBike = state.groupRideIntensity === 'quality_bike' && state.groupRideDay
-    ? state.groupRideDay
-    : state.soloQualityBikeDay || pick(['tuesday', 'wednesday', 'thursday']);
+  const qualityBike = (() => {
+    if (state.bikeStructure === 'group_ride') {
+      return state.groupRideIntensity === 'quality_bike' && state.groupRideDay
+        ? state.groupRideDay
+        : state.soloQualityBikeDay || pick(['tuesday', 'wednesday', 'thursday']);
+    }
+    if (state.bikeStructure === 'solo_quality') {
+      return state.soloQualityBikeDay || pick(['tuesday', 'wednesday', 'thursday']);
+    }
+    return pick(['tuesday', 'wednesday', 'thursday']); // by_feel: optimizer picks
+  })();
 
-  const easyBike = state.groupRideIntensity === 'easy_bike' && state.groupRideDay
-    ? state.groupRideDay
-    : pick(['thursday', 'tuesday', 'monday', 'friday'].filter(d => d !== qualityBike));
+  const easyBike = (() => {
+    if (state.bikeStructure === 'group_ride' && state.groupRideIntensity === 'easy_bike' && state.groupRideDay) {
+      return state.groupRideDay;
+    }
+    return pick(['thursday', 'tuesday', 'monday', 'friday'].filter(d => d !== qualityBike));
+  })();
 
   const qualityRun = state.runClubType === 'quality_run' && state.runClubDay
     ? state.runClubDay
@@ -699,8 +710,8 @@ function Step3Swim({
 function Step4Bike({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
-  const canContinue = state.hasGroupRide !== null &&
-    (state.hasGroupRide === false || (!!state.groupRideDay && state.groupRideIntensity !== null));
+  const canContinue = state.bikeStructure !== null &&
+    (state.bikeStructure !== 'group_ride' || (!!state.groupRideDay && state.groupRideIntensity !== null));
 
   const ftp = typeof arc?.learnedFitness?.ride_ftp_estimated === 'number'
     ? Math.round(arc.learnedFitness.ride_ftp_estimated as number)
@@ -712,24 +723,32 @@ function Step4Bike({
       : `No FTP on file. Bike intervals will use RPE until we calibrate.`
     : null;
 
+  const reset = (structure: typeof state.bikeStructure) =>
+    setState({ ...state, bikeStructure: structure, groupRideDay: '', groupRideIntensity: null, soloQualityBikeDay: '' });
+
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
-      title="Do you have a recurring group ride?"
-      subtitle="We'll anchor your bike schedule around it."
+      title="How do you structure your bike training?"
+      subtitle="We'll anchor your quality sessions around whatever you already do."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
       {bikeNote && <ArcHint>{bikeNote}</ArcHint>}
-      <div className="flex gap-2">
-        <ChoiceBtn active={state.hasGroupRide === true} onClick={() => setState({ ...state, hasGroupRide: true })}>
-          Yes
-        </ChoiceBtn>
-        <ChoiceBtn active={state.hasGroupRide === false} onClick={() => setState({ ...state, hasGroupRide: false, groupRideDay: '', groupRideIntensity: null })}>
-          No
-        </ChoiceBtn>
-      </div>
 
-      {state.hasGroupRide === true && (
+      <ChoiceBtn active={state.bikeStructure === 'group_ride'} onClick={() => reset('group_ride')}>
+        <span className="block font-semibold">Regular group ride</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">A ride you show up to each week — we'll pin your bike schedule to it.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.bikeStructure === 'solo_quality'} onClick={() => reset('solo_quality')}>
+        <span className="block font-semibold">Solo quality sessions</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Intervals, tempo, Zwift races — structured work you do on your own schedule.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.bikeStructure === 'by_feel'} onClick={() => reset('by_feel')}>
+        <span className="block font-semibold">Nothing fixed — I ride by feel</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">The plan will place your quality bike session algorithmically.</span>
+      </ChoiceBtn>
+
+      {state.bikeStructure === 'group_ride' && (
         <>
           <DayPicker
             value={state.groupRideDay as Day | ''}
@@ -737,34 +756,40 @@ function Step4Bike({
             label="Which day?"
           />
           <div>
-            <p className="text-sm text-white/50 mb-2">How would you describe the intensity?</p>
+            <p className="text-sm text-white/50 mb-2">How hard is it?</p>
             <div className="space-y-2">
               <ChoiceBtn
                 active={state.groupRideIntensity === 'quality_bike'}
                 onClick={() => setState({ ...state, groupRideIntensity: 'quality_bike' })}
               >
-                <span className="block font-semibold">Competitive / challenging</span>
-                <span className="block text-[13px] text-white/55 mt-0.5">Hard efforts, hard pace. Counts as your quality bike session.</span>
+                <span className="block font-semibold">Hard — competitive pace, real efforts</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Counts as your quality bike session for the week.</span>
               </ChoiceBtn>
               <ChoiceBtn
                 active={state.groupRideIntensity === 'easy_bike'}
                 onClick={() => setState({ ...state, groupRideIntensity: 'easy_bike' })}
               >
-                <span className="block font-semibold">Easy / social</span>
-                <span className="block text-[13px] text-white/55 mt-0.5">Conversational pace. Counts as your easy aerobic ride.</span>
+                <span className="block font-semibold">Easy — social, conversational pace</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Counts as aerobic. We'll add a separate quality session.</span>
               </ChoiceBtn>
             </div>
           </div>
+          {state.groupRideIntensity === 'easy_bike' && (
+            <DayPicker
+              value={state.soloQualityBikeDay as Day | ''}
+              onChange={d => setState({ ...state, soloQualityBikeDay: d })}
+              label="Preferred day for quality intervals? (optional)"
+              exclude={[state.groupRideDay].filter(Boolean)}
+            />
+          )}
         </>
       )}
 
-      {/* Solo quality bike day — show when group ride is easy or when no group ride */}
-      {(state.hasGroupRide === false || state.groupRideIntensity === 'easy_bike') && (
+      {state.bikeStructure === 'solo_quality' && (
         <DayPicker
           value={state.soloQualityBikeDay as Day | ''}
           onChange={d => setState({ ...state, soloQualityBikeDay: d })}
-          label="Preferred day for solo quality intervals? (optional)"
-          exclude={[state.groupRideDay].filter(Boolean)}
+          label="Which day? (optional)"
         />
       )}
     </StepLayout>
