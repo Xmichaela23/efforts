@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppProvider } from "@/contexts/AppContext";
 import Index from "./pages/Index";
@@ -20,8 +20,14 @@ import PlansBuild from "./pages/PlansBuild";
 import PlanWizard from "./components/PlanWizard";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
 import ArcSetupPage from "./pages/ArcSetupPage";
+import TrainingBaselines from "./components/TrainingBaselines";
 
 const queryClient = new QueryClient();
+
+const BaselinesPage = () => {
+  const navigate = useNavigate();
+  return <TrainingBaselines onClose={() => navigate('/')} />;
+};
 
 const App = () => (
 <ThemeProvider defaultTheme="light">
@@ -47,6 +53,7 @@ const App = () => (
 <Route path="/plans/pt" element={<MobilityPlanBuilderPage />} />
 <Route path="/plans/generate" element={<PlanWizard />} />
 <Route path="/arc-setup" element={<ArcSetupPage />} />
+<Route path="/baselines" element={<BaselinesPage />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>
