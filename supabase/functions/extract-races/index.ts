@@ -1,10 +1,9 @@
 /**
- * extract-races — single-purpose race extraction.
+ * extract-races — single-purpose race extraction with web search.
  *
- * Input:  { text: string }
- * Output: { races: ExtractedRace[] }
+ * Uses the exact same API call shape as callClaudeArcSetupConversation
+ * (prompt-caching beta header, system as content array, pause_turn loop).
  */
-import { callLLM } from '../_shared/llm.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -12,9 +11,7 @@ const corsHeaders: Record<string, string> = {
   Vary: 'Origin',
 };
 
-const makePrompt = (today: string) => `You are a triathlon and running race calendar expert. Extract race details and return ONLY valid JSON.
-
-Today is ${today}. The athlete likely means the next upcoming occurrence of each race.
+const SYSTEM_PROMPT = `You extract race details from an athlete's text and return ONLY valid JSON.
 
 Return this exact structure — no other text, no markdown fences:
 {"races":[{"name":"...","distance":"...","date":"YYYY-MM-DD","priority":"A"}]}
@@ -22,19 +19,85 @@ Return this exact structure — no other text, no markdown fences:
 Distance must be exactly one of: sprint, olympic, 70.3, ironman, marathon, half marathon, 5k, 10k
 
 Rules:
-- Use your knowledge of real race calendars to provide the date for each event
-- IRONMAN and 70.3 events have fixed annual dates — use the ${new Date(today).getFullYear()} date if it's in the future, otherwise ${new Date(today).getFullYear() + 1}
-- Well-known examples: IRONMAN 70.3 Santa Cruz is typically in September; IRONMAN 70.3 Redding is typically in April/May; IRONMAN Lake Placid is July; IRONMAN World Championship is October
-- If you have moderate confidence in a date, include it — the athlete can correct it on the confirmation screen
+- Use web search to find the exact date for each named race
+- If year is not stated, assume the next upcoming occurrence
 - Priority: two races → later date = A, earlier = B; one race → always A
 - Honour explicit priority ("A race", "tune-up", "B race")
-- Use the full official event name (e.g. "IRONMAN 70.3 Santa Cruz" not just "Santa Cruz")
+- Include the race even if you cannot find the date — just omit the date field
+- Use the full official event name (e.g. "IRONMAN 70.3 Santa Cruz" not "Santa Cruz iron man")
 - Return races sorted by date ascending`;
 
+const WEB_SEARCH_TOOL = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+  max_uses: 5,
+};
+
+type ContentBlock = { type: string; text?: string };
+
+function extractText(content: unknown): string {
+  if (!Array.isArray(content)) return '';
+  return (content as ContentBlock[])
+    .filter(b => b.type === 'text' && typeof b.text === 'string')
+    .map(b => b.text as string)
+    .join('')
+    .trim();
+}
+
+async function callWithWebSearch(apiKey: string, userText: string, today: string): Promise<string | null> {
+  let messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
+    { role: 'user', content: `Today is ${today}.\n\n${userText}` },
+  ];
+
+  let data: { content?: unknown; stop_reason?: string } | null = null;
+  let loops = 0;
+
+  while (loops < 8) {
+    loops++;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        messages,
+        max_tokens: 1024,
+        temperature: 0,
+        tools: [WEB_SEARCH_TOOL],
+      }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      console.error(`[extract-races] ${resp.status}: ${body.slice(0, 400)}`);
+      return null;
+    }
+
+    data = await resp.json() as { content?: unknown; stop_reason?: string };
+    console.log(`[extract-races] loop=${loops} stop_reason=${data.stop_reason}`);
+
+    if (data.stop_reason === 'pause_turn' && data.content) {
+      messages = [...messages, { role: 'assistant', content: data.content as unknown[] }];
+      continue;
+    }
+
+    break;
+  }
+
+  if (!data?.content) return null;
+  const text = extractText(data.content);
+  console.log(`[extract-races] raw: ${text.slice(0, 300)}`);
+  return text || null;
+}
 
 function parseRaces(raw: string): { name: string; distance: string; date?: string; priority: 'A' | 'B' }[] {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-  // Find first '{' in case model prefixed anything
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
   const slice = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
@@ -50,7 +113,7 @@ function parseRaces(raw: string): { name: string; distance: string; date?: strin
         priority: r.priority === 'B' ? 'B' : 'A',
       }));
   } catch (e) {
-    console.error(`[extract-races] parse failed: ${e}. Raw: ${raw.slice(0, 200)}`);
+    console.error(`[extract-races] parse error: ${e}. raw: ${raw.slice(0, 300)}`);
     return [];
   }
 }
@@ -72,23 +135,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'LLM not configured' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const today = new Date().toISOString().slice(0, 10);
-    const raw = await callLLM({
-      model: 'sonnet',
-      system: makePrompt(today),
-      user: text,
-      maxTokens: 512,
-      temperature: 0,
-    });
+    const raw = await callWithWebSearch(apiKey, text, today);
 
     if (!raw) {
-      return new Response(JSON.stringify({ races: [], error: 'LLM unavailable' }), {
+      return new Response(JSON.stringify({ races: [], error: 'No LLM response' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const races = parseRaces(raw);
-    console.log(`[extract-races] raw="${raw.slice(0, 200)}" races=${races.length}`);
     return new Response(JSON.stringify({ races }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
