@@ -16,11 +16,12 @@
  * Step 8  — Strength (included + intent)            [tri only]
  * Step 9  — Start date + notes + confirm
  */
-import React, { useState, useCallback, useId } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
+import { supabase } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -344,16 +345,50 @@ function StepLayout({
 
 // ─── Step components ──────────────────────────────────────────────────────────
 
+type RaceInputPhase = 'input' | 'extracting' | 'confirm';
+
 function Step1Races({
   state, setState, onNext,
 }: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void }) {
-  const addRace = () => {
-    const count = state.races.length;
-    const priority = count === 0 ? 'A' : count === 1 ? 'B' : 'C';
-    setState({
-      ...state,
-      races: [...state.races, { id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: priority as 'A' | 'B' | 'C' }],
-    });
+  const [phase, setPhase] = useState<RaceInputPhase>(
+    // If races were already extracted (e.g. back-navigation), start at confirm
+    state.races.some(r => r.name.trim() && r.targetDate) ? 'confirm' : 'input',
+  );
+  const [inputText, setInputText] = useState('');
+  const [extractError, setExtractError] = useState<string | null>(null);
+
+  const extract = async () => {
+    const t = inputText.trim();
+    if (!t) return;
+    setExtractError(null);
+    setPhase('extracting');
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-races', {
+        body: { text: t },
+      });
+      if (error || !data) throw new Error((error as { message?: string } | null)?.message || 'Extraction failed');
+      const races = (data as { races?: unknown[] }).races;
+      if (!Array.isArray(races) || races.length === 0) {
+        setExtractError("Couldn't find those races — try being more specific, or add them manually below.");
+        setPhase('input');
+        return;
+      }
+      const mapped: WizardRace[] = races.map((r) => {
+        const ro = r as { name?: string; distance?: string; date?: string; priority?: string };
+        return {
+          id: crypto.randomUUID(),
+          name: ro.name || 'Race',
+          distance: normalizeDistance(ro.distance || '70.3'),
+          targetDate: ro.date || '',
+          priority: ro.priority === 'B' ? 'B' : ro.priority === 'C' ? 'C' : 'A',
+        };
+      });
+      setState({ ...state, races: mapped });
+      setPhase('confirm');
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : 'Extraction failed');
+      setPhase('input');
+    }
   };
 
   const updateRace = (id: string, patch: Partial<WizardRace>) => {
@@ -363,19 +398,71 @@ function Step1Races({
   const removeRace = (id: string) => {
     if (state.races.length <= 1) return;
     const remaining = state.races.filter(r => r.id !== id);
-    // Ensure there's an A-race
     if (!remaining.find(r => r.priority === 'A')) remaining[0]!.priority = 'A';
     setState({ ...state, races: remaining });
   };
 
+  const addRace = () => {
+    const count = state.races.length;
+    setState({
+      ...state,
+      races: [...state.races, {
+        id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '',
+        priority: count === 0 ? 'A' : count === 1 ? 'B' : 'C',
+      }],
+    });
+  };
+
   const canContinue = state.races.some(r => r.name.trim() && r.targetDate);
 
+  // ── Input phase ────────────────────────────────────────────────────────────
+  if (phase === 'input' || phase === 'extracting') {
+    return (
+      <StepLayout
+        step={1} totalSteps={9}
+        title="What does your season look like?"
+        subtitle="Describe your race or races — we'll look up the dates and details."
+        onContinue={extract}
+        canContinue={inputText.trim().length > 0 && phase === 'input'}
+        continueLabel="Find my races"
+        saving={phase === 'extracting'}
+      >
+        <textarea
+          value={inputText}
+          onChange={e => setInputText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void extract(); }}
+          placeholder={`e.g. "70.3 Santa Cruz September 13th as my A race, Redding 70.3 August 16th as a tune-up"`}
+          rows={4}
+          disabled={phase === 'extracting'}
+          className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[15px] px-3.5 py-3.5 focus:outline-none focus:border-teal-500/50 resize-none leading-relaxed disabled:opacity-50"
+        />
+        {phase === 'extracting' && (
+          <div className="flex items-center gap-2 text-sm text-white/45">
+            <Loader2 className="h-4 w-4 animate-spin" /> Looking up your races…
+          </div>
+        )}
+        {extractError && (
+          <p className="text-sm text-red-300/80">{extractError}</p>
+        )}
+        <button
+          type="button"
+          onClick={() => { setState({ ...state, races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }] }); setPhase('confirm'); }}
+          className="text-sm text-white/35 hover:text-white/55 underline underline-offset-2"
+        >
+          Add manually instead
+        </button>
+      </StepLayout>
+    );
+  }
+
+  // ── Confirm phase ──────────────────────────────────────────────────────────
   return (
     <StepLayout
       step={1} totalSteps={9}
-      title="What does your season look like?"
-      subtitle="Add your race or races. We'll build the plan around your goals."
-      onContinue={onNext} canContinue={canContinue}
+      title="Do these look right?"
+      subtitle="Adjust anything before continuing."
+      onContinue={onNext}
+      canContinue={canContinue}
     >
       {state.races.map((race, idx) => (
         <div key={race.id} className="rounded-xl border border-white/15 bg-white/[0.04] p-4 space-y-3">
@@ -384,11 +471,7 @@ function Step1Races({
               {race.priority}-Race
             </span>
             {state.races.length > 1 && (
-              <button
-                type="button"
-                onClick={() => removeRace(race.id)}
-                className="text-white/30 hover:text-white/60"
-              >
+              <button type="button" onClick={() => removeRace(race.id)} className="text-white/30 hover:text-white/60">
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
@@ -398,7 +481,7 @@ function Step1Races({
             type="text"
             value={race.name}
             onChange={e => updateRace(race.id, { name: e.target.value })}
-            placeholder="Race name (e.g. 70.3 Santa Cruz)"
+            placeholder="Race name"
             className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[15px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
           />
 
@@ -436,8 +519,7 @@ function Step1Races({
               <div className="flex gap-2">
                 {(['A', 'B', 'C'] as const).map(p => (
                   <button
-                    key={p}
-                    type="button"
+                    key={p} type="button"
                     onClick={() => updateRace(race.id, { priority: p })}
                     className={`h-9 w-12 rounded-lg text-sm font-semibold border transition-colors
                       ${race.priority === p ? 'border-teal-400/70 bg-teal-500/15 text-teal-100' : 'border-white/15 text-white/50 bg-white/[0.05]'}`}
@@ -453,15 +535,36 @@ function Step1Races({
 
       {state.races.length < 3 && (
         <button
-          type="button"
-          onClick={addRace}
+          type="button" onClick={addRace}
           className="w-full min-h-[48px] rounded-xl border border-dashed border-white/20 text-white/50 text-sm flex items-center justify-center gap-2 hover:border-white/35 hover:text-white/70"
         >
           <Plus className="h-4 w-4" /> Add another race
         </button>
       )}
+
+      <button
+        type="button"
+        onClick={() => setPhase('input')}
+        className="text-sm text-white/35 hover:text-white/55 underline underline-offset-2"
+      >
+        ← Search again
+      </button>
     </StepLayout>
   );
+}
+
+/** Map LLM distance strings to the canonical display values used by the wizard. */
+function normalizeDistance(raw: string): string {
+  const s = raw.toLowerCase().trim();
+  if (s === 'ironman' || s === 'full' || s === 'full ironman') return 'Ironman';
+  if (s === '70.3' || s === 'half ironman' || s === 'half-ironman') return '70.3';
+  if (s === 'olympic') return 'Olympic';
+  if (s === 'sprint') return 'Sprint';
+  if (s === 'marathon') return 'Marathon';
+  if (s === 'half marathon' || s === 'half-marathon') return 'Half Marathon';
+  if (s === '10k' || s === '10km') return '10K';
+  if (s === '5k' || s === '5km') return '5K';
+  return raw; // pass through if unrecognized
 }
 
 function Step2Intent({
