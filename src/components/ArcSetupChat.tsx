@@ -247,7 +247,8 @@ type AssistantMessageDisclosure =
   | 'assessment_week'
   | 'plan_start_date'
   | 'week_confirm'
-  | 'long_day_schedule';
+  | 'long_day_schedule'
+  | 'quality_run_day';
 
 function looksLikeAssessmentWeekQuestion(text: string): boolean {
   const t = text.toLowerCase();
@@ -266,6 +267,24 @@ function priorThreadHasAssessmentChoice(messages: ChatMessage[]): boolean {
   );
 }
 
+/**
+ * Detects "For your quality run, [day] fits well...does [day] work, or another day?"
+ * The AI proposes a specific day for quality run — athlete confirms or picks another.
+ */
+function looksLikeQualityRunDayQuestion(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    (t.includes('quality run') || t.includes('quality intervals')) &&
+    (t.includes('does') && (t.includes('work, or another') || t.includes('work or another') || t.includes('another day')))
+  );
+}
+
+/** Extract proposed day name from a quality run day question. */
+function extractProposedQualityRunDay(text: string): string {
+  const m = text.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+  return m ? m[0] : 'that day';
+}
+
 /** Detects "Long ride and long run — are those weekend days, or do you train around a different schedule?" */
 function looksLikeLongDayScheduleQuestion(text: string): boolean {
   const t = text.toLowerCase();
@@ -281,12 +300,19 @@ function looksLikeWeekConfirmationQuestion(text: string): boolean {
   return looksLikeWeekSummary(t) && /does that work|sound right\?|look right\?/i.test(text);
 }
 
-/** Detects "Here's a draft we can save—check the card below." without a question mark. */
+/** Detects AI phrases that mean "the plan is ready to save" but may lack <arc_setup>. */
 function looksLikeDraftReadyMessage(text: string): boolean {
   const t = text.toLowerCase();
+  if (t.trimEnd().endsWith('?')) return false;
   return (
-    (t.includes("here's a draft") || t.includes('here is a draft') || t.includes('draft we can save')) &&
-    !t.trimEnd().endsWith('?')
+    t.includes("here's a draft") ||
+    t.includes('here is a draft') ||
+    t.includes('draft we can save') ||
+    t.includes("that's the full picture") ||
+    t.includes("here's what i have") ||
+    t.includes("there's your save card") ||
+    t.includes('check it over and tap') ||
+    t.includes('tap looks right')
   );
 }
 
@@ -350,6 +376,9 @@ function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]
   }
   if (looksLikeLongDayScheduleQuestion(visible)) {
     return 'long_day_schedule';
+  }
+  if (looksLikeQualityRunDayQuestion(visible)) {
+    return 'quality_run_day';
   }
   return null;
 }
@@ -831,11 +860,9 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
           typeof cached.athlete_identity === 'object' &&
           !Array.isArray(cached.athlete_identity) &&
           Object.keys(cached.athlete_identity as object).length > 0;
-        if (
-          userTurnCount >= 3 &&
-          arcEventGoalsHaveRequiredTrainingPrefs(cached) &&
-          (payloadHasDatedEventGoal(cached) || cachedHasId)
-        ) {
+        // Relaxed gate: if we have any cached payload with a goal or identity, show the card.
+        // The AI forgot to re-emit <arc_setup> — using what we have is better than looping.
+        if (userTurnCount >= 3 && (payloadHasDatedEventGoal(cached) || cachedHasId)) {
           setPendingSetup({
             payload: cached,
             goalPreviews: cachedValidGoals.map(
@@ -1062,7 +1089,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
                 <span className="align-baseline">{m.content}</span>
-                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && disc !== 'week_confirm' && disc !== 'long_day_schedule' && (
+                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && disc !== 'week_confirm' && disc !== 'long_day_schedule' && disc !== 'quality_run_day' && (
                   <button
                     type="button"
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
@@ -1252,6 +1279,31 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
                   >
                     Different schedule
+                  </button>
+                </div>
+              )}
+
+              {disc === 'quality_run_day' && i === messages.length - 1 && (
+                <div
+                  className="mt-3 flex flex-col gap-2.5"
+                  role="group"
+                  aria-label="Quality run day"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage(`Yes, ${extractProposedQualityRunDay(m.content)} works`)}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Yes, {extractProposedQualityRunDay(m.content)} works
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Different day')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Different day
                   </button>
                 </div>
               )}

@@ -989,6 +989,18 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     ...(finalStrength.length ? { strength: finalStrength } : {}),
   };
 
+  // Notify the AI when quality run lands adjacent to quality bike — the AI surfaces this
+  // in the week summary so the athlete hears it before confirming.
+  if (qualityBikeDay && qualityRunDay) {
+    const gap = Math.abs(DAY_INDEX[qualityRunDay] - DAY_INDEX[qualityBikeDay]);
+    const wrap = Math.min(gap, 7 - gap);
+    if (wrap === 1) {
+      trade_offs.push(
+        `ADJACENT_QUALITY: quality_run (${qualityRunDay}) is back-to-back with quality_bike (${qualityBikeDay}). That's your declared schedule with the group ride pinned. Remind the athlete: keep ${qualityBikeDay} controlled and ${qualityRunDay} intervals will land fresh enough to count.`,
+      );
+    }
+  }
+
   return {
     days,
     rest_days: [...restDays].sort((a, b) => DAY_INDEX[a] - DAY_INDEX[b]),
