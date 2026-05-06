@@ -16,13 +16,73 @@
  * Step 8  — Strength (included + intent)            [tri only]
  * Step 9  — Start date + notes + confirm
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
+
+// ─── Arc context (client-side slice) ─────────────────────────────────────────
+
+/**
+ * Slim client-side Arc snapshot — only what the wizard steps need.
+ * Loaded once at mount, passed down as a prop. Steps never call getArcContext directly.
+ */
+export type WizardArcContext = {
+  learnedFitness: Record<string, unknown> | null;
+  equipment: Record<string, unknown> | null;
+  swimSessions28: number;
+  swimSessions90: number;
+};
+
+async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
+  const today = new Date().toISOString().slice(0, 10);
+  const start90 = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+  const start28 = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
+
+  const [baselinesRes, swimRes] = await Promise.all([
+    supabase
+      .from('user_baselines')
+      .select('learned_fitness, equipment')
+      .eq('user_id', userId)
+      .maybeSingle(),
+    supabase
+      .from('workouts')
+      .select('date')
+      .eq('user_id', userId)
+      .eq('workout_status', 'completed')
+      .in('type', ['swim', 'swimming'])
+      .gte('date', start90)
+      .lte('date', today),
+  ]);
+
+  const baseline = baselinesRes.data as Record<string, unknown> | null;
+
+  const lf = baseline?.learned_fitness;
+  const learnedFitness =
+    lf && typeof lf === 'object' && !Array.isArray(lf) ? (lf as Record<string, unknown>) : null;
+
+  const eq = baseline?.equipment;
+  const equipment =
+    eq && typeof eq === 'object' && !Array.isArray(eq) ? (eq as Record<string, unknown>) : null;
+
+  const swimRows = (swimRes.data ?? []) as { date?: string }[];
+  const swimSessions28 = swimRows.filter(
+    r => typeof r.date === 'string' && r.date.slice(0, 10) >= start28,
+  ).length;
+  const swimSessions90 = swimRows.length;
+
+  return { learnedFitness, equipment, swimSessions28, swimSessions90 };
+}
+
+/** Format seconds-per-km as "m:ss/km" */
+function fmtPaceKm(secPerKm: number): string {
+  const min = Math.floor(secPerKm / 60);
+  const sec = Math.round(secPerKm % 60);
+  return `${min}:${sec.toString().padStart(2, '0')}/km`;
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -254,6 +314,14 @@ function ChoiceBtn({
     >
       {children}
     </button>
+  );
+}
+
+function ArcHint({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[13px] text-teal-300/80 bg-teal-950/40 border border-teal-500/20 rounded-lg px-3 py-2 leading-snug">
+      {children}
+    </p>
   );
 }
 
@@ -596,8 +664,18 @@ function Step2Intent({
 }
 
 function Step3Swim({
-  state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  state, setState, onNext, onBack, step, totalSteps, arc,
+}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+  const swimNote = arc
+    ? arc.swimSessions28 >= 3
+      ? `You averaged ${arc.swimSessions28} swims/week in the last 4 weeks — swim focus pre-selected.`
+      : arc.swimSessions28 === 2
+      ? `2 swims/week in the last 4 weeks — race-ready pre-selected.`
+      : arc.swimSessions28 === 1
+      ? `1 swim in the last 4 weeks. Race-ready (2×) is a good step up from here.`
+      : null
+    : null;
+
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
@@ -605,6 +683,7 @@ function Step3Swim({
       subtitle="Swim focus builds real fitness. Race-ready keeps it sharp without adding load to bike and run."
       onBack={onBack} onContinue={onNext} canContinue={state.swimIntent !== null}
     >
+      {swimNote && <ArcHint>{swimNote}</ArcHint>}
       <ChoiceBtn active={state.swimIntent === 'race'} onClick={() => setState({ ...state, swimIntent: 'race' })}>
         <span className="block font-semibold text-white">Race-ready — 2 sessions/week</span>
         <span className="block text-[13px] text-white/55 mt-0.5">One quality, one aerobic. Swim stays sharp without eating into bike/run budget.</span>
@@ -618,10 +697,14 @@ function Step3Swim({
 }
 
 function Step4Bike({
-  state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  state, setState, onNext, onBack, step, totalSteps, arc,
+}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const canContinue = state.hasGroupRide !== null &&
     (state.hasGroupRide === false || (!!state.groupRideDay && state.groupRideIntensity !== null));
+
+  const ftp = typeof arc?.learnedFitness?.ride_ftp_estimated === 'number'
+    ? Math.round(arc.learnedFitness.ride_ftp_estimated as number)
+    : null;
 
   return (
     <StepLayout
@@ -630,6 +713,7 @@ function Step4Bike({
       subtitle="We'll anchor your bike schedule around it."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
+      {ftp && <ArcHint>FTP on file: ~{ftp}w. Bike intervals will be calibrated to that baseline.</ArcHint>}
       <div className="flex gap-2">
         <ChoiceBtn active={state.hasGroupRide === true} onClick={() => setState({ ...state, hasGroupRide: true })}>
           Yes
@@ -682,10 +766,22 @@ function Step4Bike({
 }
 
 function Step5Run({
-  state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  state, setState, onNext, onBack, step, totalSteps, arc,
+}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const canContinue = state.hasRunClub !== null &&
     (state.hasRunClub === false || (!!state.runClubDay && state.runClubType !== null));
+
+  const threshSec = typeof arc?.learnedFitness?.run_threshold_pace_sec_per_km === 'number'
+    ? arc.learnedFitness.run_threshold_pace_sec_per_km as number
+    : null;
+  const easySec = typeof arc?.learnedFitness?.run_easy_pace_sec_per_km === 'number'
+    ? arc.learnedFitness.run_easy_pace_sec_per_km as number
+    : null;
+  const runPaceNote = threshSec
+    ? easySec
+      ? `Run paces on file — threshold: ${fmtPaceKm(threshSec)}, easy: ${fmtPaceKm(easySec)}. Intervals will land around these.`
+      : `Threshold pace on file: ${fmtPaceKm(threshSec)}. Run intervals will be calibrated to that.`
+    : null;
 
   return (
     <StepLayout
@@ -694,6 +790,7 @@ function Step5Run({
       subtitle="Track nights and tempo groups anchor your quality run. Social long runs can anchor your long run day."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
+      {runPaceNote && <ArcHint>{runPaceNote}</ArcHint>}
       <div className="flex gap-2">
         <ChoiceBtn active={state.hasRunClub === true} onClick={() => setState({ ...state, hasRunClub: true })}>
           Yes
@@ -831,10 +928,14 @@ function Step7Budget({
 }
 
 function Step8Strength({
-  state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  state, setState, onNext, onBack, step, totalSteps, arc,
+}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const canContinue = state.strengthIncluded !== null &&
     (state.strengthIncluded === false || state.strengthIntent !== null);
+
+  const equipList = Array.isArray(arc?.equipment?.strength)
+    ? (arc.equipment.strength as string[]).filter(Boolean)
+    : [];
 
   return (
     <StepLayout
@@ -842,6 +943,9 @@ function Step8Strength({
       title="Strength training in the plan?"
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
+      {equipList.length > 0 && state.strengthIncluded !== false && (
+        <ArcHint>Equipment on file: {equipList.join(', ')}. Strength pre-selected — change it if you want.</ArcHint>
+      )}
       <div className="flex gap-2">
         <ChoiceBtn active={state.strengthIncluded === true} onClick={() => setState({ ...state, strengthIncluded: true })}>
           Yes
@@ -875,11 +979,12 @@ function Step8Strength({
 }
 
 function Step9Confirm({
-  state, setState, onBack, onConfirm, step, totalSteps, saving, error,
+  state, setState, onBack, onConfirm, step, totalSteps, saving, error, arc,
 }: {
   state: WizardState; setState: (s: WizardState) => void;
   onBack: () => void; onConfirm: () => void;
   step: number; totalSteps: number; saving: boolean; error: string | null;
+  arc: WizardArcContext | null;
 }) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
   const weeksOut = primaryRace?.targetDate
@@ -918,6 +1023,25 @@ function Step9Confirm({
           ))}
         </div>
       </div>
+
+      {/* Fitness snapshot from Arc */}
+      {arc && (() => {
+        const ftp = typeof arc.learnedFitness?.ride_ftp_estimated === 'number'
+          ? Math.round(arc.learnedFitness.ride_ftp_estimated as number) : null;
+        const threshSec = typeof arc.learnedFitness?.run_threshold_pace_sec_per_km === 'number'
+          ? arc.learnedFitness.run_threshold_pace_sec_per_km as number : null;
+        const lines: string[] = [];
+        if (arc.swimSessions28 > 0) lines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
+        if (ftp) lines.push(`Bike FTP: ~${ftp}w`);
+        if (threshSec) lines.push(`Run threshold: ${fmtPaceKm(threshSec)}`);
+        if (!lines.length) return null;
+        return (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/35 mb-2">From your training history</p>
+            {lines.map((l, i) => <p key={i} className="text-[14px] text-white/60">· {l}</p>)}
+          </div>
+        );
+      })()}
 
       {/* Plan start date */}
       <div>
@@ -1024,8 +1148,39 @@ export default function ArcSetupWizard() {
   const navigate = useNavigate();
   const [state, setState] = useState<WizardState>(blank);
   const [stepIdx, setStepIdx] = useState(0);
+  const [arcCtx, setArcCtx] = useState<WizardArcContext | null>(null);
   const { complete, saving, error, saveBanner, conflictOverlay, handleConflictChoice } =
     useArcSetupComplete();
+
+  // Load Arc context once at mount
+  useEffect(() => {
+    const userId = getStoredUserId();
+    if (!userId) return;
+    loadWizardArcContext(userId)
+      .then(setArcCtx)
+      .catch(e => console.warn('[ArcSetupWizard] arc context load failed', e));
+  }, []);
+
+  // Pre-select answers when Arc data arrives (only if athlete hasn't answered yet)
+  useEffect(() => {
+    if (!arcCtx) return;
+    setState(prev => {
+      const patch: Partial<WizardState> = {};
+
+      // Swim: pre-select frequency based on recent sessions
+      if (prev.swimIntent === null && arcCtx.swimSessions28 >= 2) {
+        patch.swimIntent = arcCtx.swimSessions28 >= 3 ? 'focus' : 'race';
+      }
+
+      // Strength: pre-select yes if strength equipment is on file
+      if (prev.strengthIncluded === null) {
+        const equip = arcCtx.equipment?.strength;
+        if (Array.isArray(equip) && equip.length > 0) patch.strengthIncluded = true;
+      }
+
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+  }, [arcCtx]);
 
   const steps = getSteps(state);
   const totalSteps = steps.length;
@@ -1079,13 +1234,13 @@ export default function ArcSetupWizard() {
               <Step2Intent {...sharedProps} onNext={next} onBack={back} />
             )}
             {currentStep === 'swim' && (
-              <Step3Swim {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <Step3Swim {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'bike' && (
-              <Step4Bike {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <Step4Bike {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'run' && (
-              <Step5Run {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <Step5Run {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'longdays' && (
               <Step6LongDays {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
@@ -1094,7 +1249,7 @@ export default function ArcSetupWizard() {
               <Step7Budget {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'strength' && (
-              <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'confirm' && (
               <Step9Confirm
@@ -1105,6 +1260,7 @@ export default function ArcSetupWizard() {
                 totalSteps={totalSteps}
                 saving={saving}
                 error={error}
+                arc={arcCtx}
               />
             )}
           </>
