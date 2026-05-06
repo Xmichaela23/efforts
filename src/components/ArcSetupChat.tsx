@@ -41,9 +41,21 @@ function threadForApi(thread: ChatMessage[]): { role: 'user' | 'assistant'; cont
 }
 
 /** Heuristic: coach is asking the athlete to confirm a performance / "faster time" read (State → confirm). */
+function looksLikeWeekSummary(visible: string): boolean {
+  const t = visible.toLowerCase();
+  return (
+    t.includes('week the optimizer built') ||
+    t.includes('optimizer built') ||
+    t.includes("here's the week") ||
+    t.includes('long ride') && t.includes('long run') && t.includes('quality')
+  );
+}
+
 function looksLikePerformanceIntentConfirmation(visible: string): boolean {
   const t = visible.trim();
   if (!t) return false;
+  // Don't fire on week-summary messages — intent is already locked, the ? is about the week layout
+  if (looksLikeWeekSummary(t)) return false;
   const seeksConfirm = /[?？]\s*$|right\?|sound right|good\?/i.test(t) || /—\s*right\?/i.test(t);
   if (!seeksConfirm) return false;
   return (
@@ -233,7 +245,8 @@ type AssistantMessageDisclosure =
   | 'swim_load_source'
   | 'week_conflict'
   | 'assessment_week'
-  | 'plan_start_date';
+  | 'plan_start_date'
+  | 'week_confirm';
 
 function looksLikeAssessmentWeekQuestion(text: string): boolean {
   const t = text.toLowerCase();
@@ -249,6 +262,21 @@ function priorThreadHasAssessmentChoice(messages: ChatMessage[]): boolean {
       m.role === 'user' &&
       (m.content.toLowerCase().includes('start with an assessment') ||
         m.content.toLowerCase().includes('jump straight into training')),
+  );
+}
+
+/** Detects the "Here's the week the optimizer built...Does that work?" confirmation turn. */
+function looksLikeWeekConfirmationQuestion(text: string): boolean {
+  const t = text.toLowerCase();
+  return looksLikeWeekSummary(t) && /does that work|sound right\?|look right\?/i.test(text);
+}
+
+/** Detects "Here's a draft we can save—check the card below." without a question mark. */
+function looksLikeDraftReadyMessage(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    (t.includes("here's a draft") || t.includes('here is a draft') || t.includes('draft we can save')) &&
+    !t.trimEnd().endsWith('?')
   );
 }
 
@@ -306,6 +334,9 @@ function assistantMessageDisclosure(m: ChatMessage, priorMessages: ChatMessage[]
   }
   if (looksLikePlanStartDateQuestion(visible)) {
     return 'plan_start_date';
+  }
+  if (looksLikeWeekConfirmationQuestion(visible)) {
+    return 'week_confirm';
   }
   return null;
 }
@@ -772,6 +803,36 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
               ? payload.summary.trim()
               : 'Review and confirm to save to your account.',
         });
+      } else if (
+        // AI said "here's a draft we can save" without re-emitting <arc_setup>.
+        // Use the cached payload so the confirm card still appears — eliminates the
+        // "ok → here's a draft → ok" loop caused by the AI forgetting to re-emit the block.
+        payload == null &&
+        looksLikeDraftReadyMessage(show) &&
+        lastDraftArcSetupRef.current != null
+      ) {
+        const cached = lastDraftArcSetupRef.current;
+        const cachedValidGoals = collectValidGoals(cached);
+        const cachedHasId =
+          cached?.athlete_identity &&
+          typeof cached.athlete_identity === 'object' &&
+          !Array.isArray(cached.athlete_identity) &&
+          Object.keys(cached.athlete_identity as object).length > 0;
+        if (
+          userTurnCount >= 3 &&
+          arcEventGoalsHaveRequiredTrainingPrefs(cached) &&
+          (payloadHasDatedEventGoal(cached) || cachedHasId)
+        ) {
+          setPendingSetup({
+            payload: cached,
+            goalPreviews: cachedValidGoals.map(
+              (g) => [g.name, g.goal_type, g.target_date || ''].filter(Boolean).join(' · ')
+            ),
+            summaryLine: 'Review and confirm to save to your account.',
+          });
+        } else {
+          setPendingSetup(null);
+        }
       } else {
         setPendingSetup(null);
       }
@@ -988,7 +1049,7 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
             <div key={i} className="min-w-0 pr-1">
               <div className="text-[17px] sm:text-lg leading-relaxed text-white/85 break-words [overflow-wrap:anywhere]">
                 <span className="align-baseline">{m.content}</span>
-                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && (
+                {disc && disc !== 'assessment_week' && disc !== 'plan_start_date' && disc !== 'week_confirm' && (
                   <button
                     type="button"
                     className="inline align-baseline ml-1.5 -translate-y-px text-white/35 hover:text-teal-300/90 text-[1.05rem] leading-none p-0.5 rounded"
@@ -1153,6 +1214,31 @@ export default function ArcSetupChat({ focusDate, seedUserMessage }: ArcSetupCha
                     className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
                   >
                     Different date
+                  </button>
+                </div>
+              )}
+
+              {disc === 'week_confirm' && i === messages.length - 1 && (
+                <div
+                  className="mt-3 flex flex-col gap-2.5"
+                  role="group"
+                  aria-label="Week confirmation"
+                >
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Yes, that works')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-teal-500/25 text-teal-50 border-teal-400/45 hover:bg-teal-500/35`}
+                  >
+                    Yes, that works
+                  </button>
+                  <button
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void sendUserMessage('Make a change')}
+                    className={`${ARC_SETUP_FORK_PRIMARY_BTN} w-full text-left bg-white/[0.09] text-teal-50 border-white/20 hover:bg-white/[0.14]`}
+                  >
+                    Make a change
                   </button>
                 </div>
               )}
