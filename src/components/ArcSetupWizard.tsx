@@ -82,11 +82,12 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   return { learnedFitness, equipment, performanceNumbers, swimSessions28, swimSessions90 };
 }
 
-/** Format seconds-per-km as "m:ss/km" */
+/** Format seconds-per-km as "m:ss/mi" (matches app-wide imperial display) */
 function fmtPaceKm(secPerKm: number): string {
-  const min = Math.floor(secPerKm / 60);
-  const sec = Math.round(secPerKm % 60);
-  return `${min}:${sec.toString().padStart(2, '0')}/km`;
+  const secPerMile = secPerKm * 1.60934;
+  const min = Math.floor(secPerMile / 60);
+  const sec = Math.round(secPerMile % 60);
+  return `${min}:${sec.toString().padStart(2, '0')}/mi`;
 }
 
 /** Format seconds-per-100yd as "m:ss/100yd" */
