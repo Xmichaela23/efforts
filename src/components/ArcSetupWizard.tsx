@@ -33,6 +33,7 @@ import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 export type WizardArcContext = {
   learnedFitness: Record<string, unknown> | null;
   equipment: Record<string, unknown> | null;
+  performanceNumbers: Record<string, unknown> | null;
   swimSessions28: number;
   swimSessions90: number;
 };
@@ -45,7 +46,7 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const [baselinesRes, swimRes] = await Promise.all([
     supabase
       .from('user_baselines')
-      .select('learned_fitness, equipment')
+      .select('learned_fitness, equipment, performance_numbers')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase
@@ -68,13 +69,17 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const equipment =
     eq && typeof eq === 'object' && !Array.isArray(eq) ? (eq as Record<string, unknown>) : null;
 
+  const pn = baseline?.performance_numbers;
+  const performanceNumbers =
+    pn && typeof pn === 'object' && !Array.isArray(pn) ? (pn as Record<string, unknown>) : null;
+
   const swimRows = (swimRes.data ?? []) as { date?: string }[];
   const swimSessions28 = swimRows.filter(
     r => typeof r.date === 'string' && r.date.slice(0, 10) >= start28,
   ).length;
   const swimSessions90 = swimRows.length;
 
-  return { learnedFitness, equipment, swimSessions28, swimSessions90 };
+  return { learnedFitness, equipment, performanceNumbers, swimSessions28, swimSessions90 };
 }
 
 /** Format seconds-per-km as "m:ss/km" */
@@ -82,6 +87,13 @@ function fmtPaceKm(secPerKm: number): string {
   const min = Math.floor(secPerKm / 60);
   const sec = Math.round(secPerKm % 60);
   return `${min}:${sec.toString().padStart(2, '0')}/km`;
+}
+
+/** Format seconds-per-100yd as "m:ss/100yd" */
+function fmtSwimPace(secPer100: number): string {
+  const min = Math.floor(secPer100 / 60);
+  const sec = Math.round(secPer100 % 60);
+  return `${min}:${sec.toString().padStart(2, '0')}/100yd`;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -677,14 +689,24 @@ function Step2Intent({
 function Step3Swim({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+  const swimPaceSec: number | null = (() => {
+    const pn = arc?.performanceNumbers;
+    if (!pn) return null;
+    const raw = pn['swimPacePer100'] ?? pn['swimPace100'] ?? pn['swim_pace_100_yd'] ?? pn['swim_pace_per_100_sec'];
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+
   const swimNote = arc
     ? arc.swimSessions28 >= 3
       ? `You averaged ${arc.swimSessions28} swims/week in the last 4 weeks — swim focus pre-selected.`
       : arc.swimSessions28 === 2
-      ? `2 swims/week in the last 4 weeks — race-ready pre-selected.`
+      ? `2 swims/week in the last 4 weeks — race-ready pre-selected.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
       : arc.swimSessions28 === 1
-      ? `1 swim in the last 4 weeks. Race-ready (2×) is a good step up from here.`
-      : `No swims logged in the last 4 weeks. Starting with race-ready (2×) builds the habit.`
+      ? `1 swim in the last 4 weeks. Race-ready (2×) is a good step up from here.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
+      : swimPaceSec
+        ? `No swims in the last 4 weeks — but your pace (${fmtSwimPace(swimPaceSec)}) is on file. Race-ready (2×) is enough to rebuild.`
+        : `No swims logged in the last 4 weeks. Race-ready (2×) is the minimum to build race fitness — if you're new to swimming, expect the first few weeks to be about finding your rhythm.`
     : null;
 
   return (
