@@ -31,6 +31,8 @@ import {
 import {
   apply703SlowSwimmerWeeklyFloors,
 } from './swim-tri-safety.ts';
+import { applyOverdistanceIfApplicable } from './swim-protocol-v21.ts';
+import { resolveSwimSlotYardsWithBudget } from './swim-protocol-volumes.ts';
 import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
@@ -561,6 +563,7 @@ export function buildWeek(
   const triApproach = athleteState.tri_approach ?? 'race_peak';
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
   const conflictEvents: ConflictEvent[] = [];
+  const swimVolTradeOffs: string[] = [];
 
   // ── Conflict-preference helpers ──────────────────────────────────────────
   const conflictPrefs: Record<string, string> = athleteState.conflict_preferences ?? {};
@@ -1008,12 +1011,15 @@ export function buildWeek(
   }
 
   const swimDistance = normalizeSwimProgramDistance(primaryGoal.distance);
+  const trainFitness = athleteState.training_fitness ?? 'intermediate';
   const swimSingleRecovery = hasTri && (isRecovery || recoveryRebuildWeek1);
   let swimTemplates: SwimSlotTemplate[] = !hasTri
     ? []
     : swimSingleRecovery
       ? [getRecoverySwimTemplate()]
-      : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock);
+      : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock, {
+          athleteFitness: trainFitness,
+        });
   if (hasTri && swimPct === 0 && !swimSingleRecovery && swimTemplates.length > 0) {
     swimTemplates = swimTemplates.map((t) => ({
       session_type: 'easy',
@@ -1022,33 +1028,30 @@ export function buildWeek(
       notes: 'Maintenance aerobic swim — run-primary emphasis, swim kept short.',
     }));
   }
-  // Apply swimMult then enforce swimBudget as a soft ceiling across all slots.
-  // 55 TSS/hr ÷ (1 yd/min ≈ 60 yd/hr at easy pace) → ~0.917 TSS/100yd, but we
-  // model it in time: swimBudget (TSS) → minutes at 55 TSS/hr → yards at 30 yd/min.
-  // Soft ceiling: if total raw yards exceed budget-implied yards, scale all slots
-  // down proportionally. Minimums (easy 800 yd, technique_aerobic 900 yd, quality 1000 yd) are still applied.
+  // Swim yards: protocol v2.1 hybrid — ramp targets × swimMult → per-session floor/ceiling →
+  // discretionary shrink toward swim TSS budget → drop lowest-priority slot if floors exceed budget.
   const SWIM_TSS_PER_HR = 55;
   const SWIM_YDS_PER_MIN = 30; // ~1650 yd/hr, mid-range for tri training
   const swimBudgetMinutes = (swimBudget / SWIM_TSS_PER_HR) * 60;
   const swimBudgetYards   = swimBudgetMinutes * SWIM_YDS_PER_MIN;
 
-  const rawSlotYards = swimTemplates.map((t) => Math.round(t.target_yards * swimMult));
-  const totalRawYards = rawSlotYards.reduce((s, y) => s + y, 0);
-  const budgetScale = totalRawYards > 0 && totalRawYards > swimBudgetYards
-    ? swimBudgetYards / totalRawYards
-    : 1;
-
-  const scaledTemplateYards = (t: SwimSlotTemplate, slotIdx: number): number => {
-    const budgetCapped = rawSlotYards[slotIdx]! * budgetScale;
-    const easyLike = t.session_type === 'easy' || t.session_type === 'technique_aerobic';
-    const floorYd =
-      t.session_type === 'technique_aerobic' ? 900 : easyLike ? 800 : 1000;
-    return Math.max(floorYd, Math.round(budgetCapped));
-  };
+  const preliminarySwimYards = swimTemplates.map((t) => Math.round(t.target_yards * swimMult));
+  const swimResolved = resolveSwimSlotYardsWithBudget({
+    templates: swimTemplates,
+    preliminaryYards: preliminarySwimYards,
+    swimBudgetYards,
+    distance: swimDistance,
+    fitness: trainFitness,
+    phase,
+    weekInPhase: weekInBlock,
+    ...(athleteState.structural_load_hint === 'low' ? { recoveryFloorScale: 0.7 as const } : {}),
+  });
+  swimTemplates = swimResolved.templates;
+  swimVolTradeOffs.push(...swimResolved.tradeOffs);
 
   const swimSlotYards703 = apply703SlowSwimmerWeeklyFloors({
     templates: swimTemplates,
-    slotYards: swimTemplates.map((t, i) => scaledTemplateYards(t, i)),
+    slotYards: swimResolved.yards,
     primaryGoal,
     athleteState,
     phase,
@@ -1058,6 +1061,27 @@ export function buildWeek(
     raceThisWeek: Boolean(raceThisWeek),
     isRecovery,
     recoveryRebuildWeek1,
+  });
+  const swimSlotYardsFinal = swimSlotYards703.map((y, i) => {
+    const t = swimTemplates[i];
+    if (!t || t.session_type !== 'endurance') return y;
+    return applyOverdistanceIfApplicable(y, {
+      raceDistance: swimDistance,
+      athleteFitness: trainFitness,
+      phase,
+      weekInPhase: weekInBlock,
+      sessionType: 'endurance',
+    });
+  });
+  const swimFromTplOpts = (template: SwimSlotTemplate, yards: number) => ({
+    swimRaceDistanceKey: swimDistance,
+    athleteFitness: trainFitness,
+    swimThresholdPace: athleteState.swim_threshold_pace ?? null,
+    enduranceOverdistanceNote:
+      template.session_type === 'endurance' &&
+      yards >= 4500 &&
+      swimDistance === 'full' &&
+      trainFitness === 'advanced',
   });
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =
@@ -1350,17 +1374,17 @@ export function buildWeek(
   const qualitySwimSlot = grid.get(swimQualityDay);
   if (hasTri && swimTemplates.length > 0) {
     const t0 = swimTemplates[0]!;
-    const y0 = swimSlotYards703[0] ?? scaledTemplateYards(t0, 0);
+    const y0 = swimSlotYardsFinal[0] ?? swimResolved.yards[0] ?? Math.round(t0.target_yards * swimMult);
     if (!qualitySwimSlot?.isRest && qualitySwimSlot!.sessions.length < 2) {
       qualitySwimSlot!.sessions.push(
-        swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0, athleteState.swim_equipment),
+        swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0, athleteState.swim_equipment, swimFromTplOpts(t0, y0)),
       );
       qualitySwimPlaced = true;
     } else {
       const fallSlot = grid.get(swimEasyDay);
       if (!fallSlot?.isRest) {
         fallSlot!.sessions.push(
-          swimSessionFromTemplate(t0, y0, swimEasyDay, weekNum, phase, servedGoal, 4, athleteState.swim_equipment),
+          swimSessionFromTemplate(t0, y0, swimEasyDay, weekNum, phase, servedGoal, 4, athleteState.swim_equipment, swimFromTplOpts(t0, y0)),
         );
         qualitySwimPlaced = true;
       }
@@ -1380,7 +1404,7 @@ export function buildWeek(
   const easySwimSlot = grid.get(swimEasyDay);
   if (!easySwimSlot?.isRest && hasTri && swimTemplates.length >= 2) {
     const t1 = swimTemplates[1]!;
-    const y1 = swimSlotYards703[1] ?? scaledTemplateYards(t1, 1);
+    const y1 = swimSlotYardsFinal[1] ?? swimResolved.yards[1] ?? Math.round(t1.target_yards * swimMult);
     if ((swimEasyDay !== swimQualityDay || !qualitySwimPlaced) && easySwimSlot!.sessions.length < 2) {
       const useOpenWater =
         t1.session_type === 'easy' &&
@@ -1393,7 +1417,7 @@ export function buildWeek(
       easySwimSlot!.sessions.push(
         useOpenWater
           ? openWaterPracticeSwim(swimEasyDay, owMin, servedGoal)
-          : swimSessionFromTemplate(t1, y1, swimEasyDay, weekNum, phase, servedGoal, 4, athleteState.swim_equipment),
+          : swimSessionFromTemplate(t1, y1, swimEasyDay, weekNum, phase, servedGoal, 4, athleteState.swim_equipment, swimFromTplOpts(t1, y1)),
       );
     }
   }
@@ -1403,9 +1427,9 @@ export function buildWeek(
     const thirdSwimSlot = grid.get(swimThirdDay);
     if (!thirdSwimSlot?.isRest && thirdSwimSlot!.sessions.length < 2) {
       const t2 = swimTemplates[2]!;
-      const y2 = swimSlotYards703[2] ?? scaledTemplateYards(t2, 2);
+      const y2 = swimSlotYardsFinal[2] ?? swimResolved.yards[2] ?? Math.round(t2.target_yards * swimMult);
       thirdSwimSlot!.sessions.push(
-        swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5, athleteState.swim_equipment),
+        swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5, athleteState.swim_equipment, swimFromTplOpts(t2, y2)),
       );
     }
   }
@@ -1859,10 +1883,7 @@ export function buildWeek(
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 
   const allSessions = gridSessions(grid);
-  const mergedTradeOffs = [
-    ...week8020TradeOffs,
-    ...qrLbTradeOffStrings,
-  ];
+  const mergedTradeOffs = [...swimVolTradeOffs, ...week8020TradeOffs, ...qrLbTradeOffStrings];
   return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs, conflictEvents);
 }
 

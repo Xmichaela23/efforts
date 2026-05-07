@@ -171,27 +171,62 @@ export function getProtocolFloor(
   fitness: SwimTrainingFitness,
   phase: Phase,
   sessionType: SwimSessionType,
+  opts?: { recoveryFloorScale?: number },
 ): number {
+  const scale =
+    opts?.recoveryFloorScale != null &&
+    opts.recoveryFloorScale > 0 &&
+    opts.recoveryFloorScale <= 1
+      ? opts.recoveryFloorScale
+      : 1;
+
   const band = getProtocolVolumeBand(distance, fitness, phase);
-  if (!band) return fallbackFloor(sessionType);
-  const bmin = band.min;
-  switch (sessionType) {
-    case 'threshold':
-    case 'race_specific_aerobic':
-      return snapProtocolYards(Math.max(1000, bmin), sessionType);
-    case 'css_aerobic':
-      return snapProtocolYards(Math.max(1000, bmin), sessionType);
-    case 'endurance':
-      return snapProtocolYards(Math.max(1200, bmin), sessionType);
-    case 'kick_focused':
-    case 'pull_focused':
-      return snapProtocolYards(Math.max(1000, Math.round(bmin * 0.92)), sessionType);
-    case 'technique_aerobic':
-      return snapProtocolYards(Math.max(900, Math.round(bmin * 0.88)), sessionType);
-    case 'easy':
-    default:
-      return snapProtocolYards(Math.max(800, Math.round(bmin * 0.72)), sessionType);
+  let floor: number;
+  if (!band) {
+    floor = fallbackFloor(sessionType);
+  } else {
+    const bmin = band.min;
+    switch (sessionType) {
+      case 'threshold':
+      case 'race_specific_aerobic':
+        floor = snapProtocolYards(Math.max(1000, bmin), sessionType);
+        break;
+      case 'css_aerobic':
+        floor = snapProtocolYards(Math.max(1000, bmin), sessionType);
+        break;
+      case 'endurance':
+        floor = snapProtocolYards(Math.max(1200, bmin), sessionType);
+        break;
+      case 'kick_focused':
+      case 'pull_focused':
+        floor = snapProtocolYards(Math.max(1000, Math.round(bmin * 0.92)), sessionType);
+        break;
+      case 'technique_aerobic':
+        floor = snapProtocolYards(Math.max(900, Math.round(bmin * 0.88)), sessionType);
+        break;
+      case 'easy':
+      default:
+        floor = snapProtocolYards(Math.max(800, Math.round(bmin * 0.72)), sessionType);
+        break;
+    }
   }
+
+  if (scale < 1) {
+    const minimumAfterScale: Partial<Record<SwimSessionType, number>> = {
+      threshold: 900,
+      css_aerobic: 900,
+      race_specific_aerobic: 900,
+      endurance: 900,
+      technique_aerobic: 650,
+      kick_focused: 700,
+      pull_focused: 700,
+      easy: 550,
+    };
+    const amin = minimumAfterScale[sessionType] ?? 700;
+    floor = snapProtocolYards(Math.max(amin, Math.round(floor * scale)), sessionType);
+  }
+
+  return floor;
 }
 
 /** Per-session protocol maximum yards (includes OD endurance ceiling + easy cap vs race distance). */
@@ -274,15 +309,24 @@ export function resolveSwimSlotYardsWithBudget(opts: {
   fitness: SwimTrainingFitness;
   phase: Phase;
   weekInPhase: number;
+  /** Post–big-race / structural low weeks — scales protocol floors (default 1). */
+  recoveryFloorScale?: number;
 }): { templates: SwimSlotTemplate[]; yards: number[]; tradeOffs: string[] } {
   const tradeOffs: string[] = [];
   let templates = [...opts.templates];
   let yards = opts.preliminaryYards.map((y) => Math.round(y));
 
+  const floorOpts =
+    opts.recoveryFloorScale != null &&
+    opts.recoveryFloorScale > 0 &&
+    opts.recoveryFloorScale < 1
+      ? { recoveryFloorScale: opts.recoveryFloorScale }
+      : undefined;
+
   const clampAll = (): void => {
     for (let i = 0; i < yards.length; i++) {
       const t = templates[i]!;
-      const floor = getProtocolFloor(opts.distance, opts.fitness, opts.phase, t.session_type);
+      const floor = getProtocolFloor(opts.distance, opts.fitness, opts.phase, t.session_type, floorOpts);
       const ceil = getProtocolCeiling(opts.distance, opts.fitness, opts.phase, t.session_type, {
         weekInPhase: opts.weekInPhase,
       });
@@ -293,7 +337,9 @@ export function resolveSwimSlotYardsWithBudget(opts: {
   };
 
   const floorsFor = (): number[] =>
-    templates.map((t) => getProtocolFloor(opts.distance, opts.fitness, opts.phase, t.session_type));
+    templates.map((t) =>
+      getProtocolFloor(opts.distance, opts.fitness, opts.phase, t.session_type, floorOpts),
+    );
 
   const ceilsFor = (): number[] =>
     templates.map((t) =>

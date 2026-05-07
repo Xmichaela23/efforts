@@ -225,6 +225,40 @@ export function parsePreferredDaysPatch(
   return patch;
 }
 
+/**
+ * Length of `preferred_days.swim` when present — Arc wizard swim anchors only (no fallback).
+ */
+export function preferredDaysSwimSlotCount(
+  src: Record<string, unknown> | null | undefined,
+): number {
+  if (!src || typeof src !== 'object') return 0;
+  const pd = src.preferred_days ?? src.preferredDays;
+  if (!pd || typeof pd !== 'object' || Array.isArray(pd)) return 0;
+  const swim = (pd as Record<string, unknown>).swim;
+  return Array.isArray(swim) ? swim.length : 0;
+}
+
+/**
+ * Swim anchor slots for **focus** (3×/wk) promotion: prefers `preferred_days.swim.length` when set;
+ * otherwise distinct numeric pins (`swim_*_day` from merged prefs).
+ */
+export function anchoredSwimSlotsForFocusPromotion(
+  mergedPrefs: CombinedSchedulePrefs,
+  ...trainingPrefsSources: Array<Record<string, unknown> | null | undefined>
+): number {
+  let maxArr = 0;
+  for (const s of trainingPrefsSources) {
+    maxArr = Math.max(maxArr, preferredDaysSwimSlotCount(s ?? undefined));
+  }
+  if (maxArr >= 1) return maxArr;
+
+  const d = new Set<number>();
+  if (mergedPrefs.swim_easy_day != null) d.add(mergedPrefs.swim_easy_day);
+  if (mergedPrefs.swim_quality_day != null) d.add(mergedPrefs.swim_quality_day);
+  if (mergedPrefs.swim_third_day != null) d.add(mergedPrefs.swim_third_day);
+  return d.size;
+}
+
 export interface CombinedSchedulePrefs {
   long_run_day?: number;
   long_ride_day?: number;

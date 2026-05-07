@@ -18,6 +18,15 @@ Deno.test('getProtocolFloor respects band and session role', () => {
   assertEquals(getProtocolFloor('sprint', 'beginner', 'base', 'easy') >= 800, true);
 });
 
+Deno.test('getProtocolFloor lowers floors when structural recovery scale (0.7)', () => {
+  const normal = getProtocolFloor('70.3', 'intermediate', 'build', 'threshold');
+  const recovery = getProtocolFloor('70.3', 'intermediate', 'build', 'threshold', {
+    recoveryFloorScale: 0.7,
+  });
+  assertEquals(recovery < normal, true);
+  assertEquals(recovery >= 900, true);
+});
+
 Deno.test('getProtocolCeiling — easy capped vs race distance', () => {
   const ce = getProtocolCeiling('sprint', 'advanced', 'build', 'easy');
   assertEquals(ce <= Math.round(raceCourseSwimYards('sprint') * 0.5), true);

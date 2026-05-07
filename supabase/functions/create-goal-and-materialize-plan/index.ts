@@ -19,6 +19,7 @@ import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
 import {
+  anchoredSwimSlotsForFocusPromotion,
   deriveRestDaysForBudget,
   mergeCombinedSchedulePrefs,
   parsePreferredDaysPatch,
@@ -1280,15 +1281,30 @@ async function buildCombinedPlan(
     const paceSlow = swimSecPer100Yd != null && swimSecPer100Yd >= 150;
     const cutoffTight = basePressure != null && basePressure.severity !== 'none';
     const currentIntent = String(freshCombinedPrefs.swim_intent ?? '').toLowerCase();
-    const promote = currentIntent !== 'focus' && (paceSlow || cutoffTight);
+    const cutoffEligible = currentIntent !== 'focus' && (paceSlow || cutoffTight);
+    const swimAnchorSlots = anchoredSwimSlotsForFocusPromotion(
+      freshCombinedPrefs,
+      backfilledPrimaryPrefs as Record<string, unknown>,
+      newGoal.training_prefs as Record<string, unknown>,
+      primaryGoal?.training_prefs as Record<string, unknown> | undefined,
+    );
+    const promote = cutoffEligible && swimAnchorSlots >= 3;
 
     const intent_promotion_reasons: string[] = [];
+    if (paceSlow) intent_promotion_reasons.push('pool_pace_ge_2_30_per_100yd');
+    if (cutoffTight) intent_promotion_reasons.push(`swim_cutoff_${basePressure?.severity ?? 'unknown'}`);
+    if (cutoffEligible && swimAnchorSlots < 3) {
+      intent_promotion_reasons.push(`focus_promotion_blocked_swim_anchor_slots_${swimAnchorSlots}`);
+    }
     if (promote) {
-      if (paceSlow) intent_promotion_reasons.push('pool_pace_ge_2_30_per_100yd');
-      if (cutoffTight) intent_promotion_reasons.push(`swim_cutoff_${basePressure?.severity ?? 'unknown'}`);
       freshCombinedPrefs.swim_intent = 'focus';
       if (!freshCombinedPrefs.swim_load_source) freshCombinedPrefs.swim_load_source = 'split';
       console.log('[buildCombinedPlan] swim_intent promoted to focus:', intent_promotion_reasons.join(', '));
+    } else if (cutoffEligible && swimAnchorSlots < 3) {
+      console.log(
+        '[buildCombinedPlan] swim_intent focus promotion skipped (need ≥3 swim anchor slots):',
+        swimAnchorSlots,
+      );
     }
 
     if (basePressure) {
@@ -1312,7 +1328,7 @@ async function buildCombinedPlan(
         narrative_hints: [
           'Slow baseline swim pace on file (≥2:30/100 yd) — add a third weekly swim when schedule allows.',
         ],
-        intent_promoted_to_focus: true,
+        intent_promoted_to_focus: promote,
         intent_promotion_reasons,
       };
     }
