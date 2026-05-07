@@ -1129,6 +1129,15 @@ async function buildCombinedPlan(
       freshCombinedPrefs.bike_easy_day = newGoalBikePatch.bike_easy_day;
     }
   }
+  // Two active goals keep separate `preferred_days`; merge + wizard payload can disagree with the
+  // A-priority row (e.g. partner still has Tuesday QB while A has Wednesday group ride after
+  // pin-restore). athlete_state must follow A's quality_bike anchor only for this field.
+  const aPriorityQualityBikePatch = parsePreferredDaysPatch(
+    backfilledPrimaryPrefs as Record<string, unknown>,
+  );
+  if (aPriorityQualityBikePatch.bike_quality_day !== undefined) {
+    freshCombinedPrefs.bike_quality_day = aPriorityQualityBikePatch.bike_quality_day;
+  }
   const freshDpw =
     readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
     readDaysPerWeekFromPrefs(backfilledPrimaryPrefs as Record<string, unknown>);
