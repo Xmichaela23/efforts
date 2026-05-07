@@ -85,7 +85,8 @@ const corsHeaders: Record<string, string> = {
 /** v29: Add last_completed_race.projected_seconds (course-model projection at race time). */
 /** v31: Coach reads swim_cutoff_pressure_v1 + swim intent guardrails in FACTS. */
 /** v32: 70.3 swim yardage gate → Olympic bridge pivot lines in snapshot longitudinal block + legacy FACTS. */
-const COACH_PAYLOAD_VERSION = 32;
+/** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
+const COACH_PAYLOAD_VERSION = 33;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -334,6 +335,8 @@ function deriveTriSwimIntentForCoach(
 
 /** Many coaches use ~5k yd/week swim durability benchmark before prioritizing a half-distance swim leg. */
 const SWIM_YARD_WEEKLY_GATE_703 = 5000;
+/** Olympic-distance pivot copy targets OW survival / cutoff stress — misaligned for fast pool baselines (e.g. sub ~2:00/100 yd). */
+const SWIM_FAST_BASELINE_SUPPRESS_OLYMPIC_PIVOT_SEC_PER_100YD = 120;
 
 function parseComputedLoose(v: unknown): Record<string, unknown> | null {
   if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
@@ -392,6 +395,11 @@ function olympic703BridgePivotCoachLines(opts: {
     Number.isFinite(opts.weeklySwimYards) &&
     opts.weeklySwimYards + 1e-6 < SWIM_YARD_WEEKLY_GATE_703;
 
+  const paceKnownFast =
+    opts.swimSecPer100Yd != null &&
+    Number.isFinite(opts.swimSecPer100Yd) &&
+    opts.swimSecPer100Yd <= SWIM_FAST_BASELINE_SUPPRESS_OLYMPIC_PIVOT_SEC_PER_100YD;
+
   const paceSlow = opts.swimSecPer100Yd != null && opts.swimSecPer100Yd >= 150;
   const sev = String(opts.swimCutoffPressureV1?.severity ?? '');
   const cutoffRisk = sev === 'elevated' || sev === 'high';
@@ -402,6 +410,9 @@ function olympic703BridgePivotCoachLines(opts: {
     cutoffRisk;
 
   if (!belowGate && !compoundUnknownVolume) return [];
+
+  // Fast pool swimmers: low weekly yards still miss OW durability, but Olympic-as-"bridge" is the wrong story.
+  if (belowGate && paceKnownFast) return [];
 
   if (belowGate && opts.weeklySwimYards != null) {
     return [
