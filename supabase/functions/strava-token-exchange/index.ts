@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
         access_token: token.access_token,
         refresh_token: token.refresh_token,
         expires_at: new Date(token.expires_at * 1000).toISOString(),
+        webhook_active: true,
         connection_data: {
           access_token: token.access_token,
           refresh_token: token.refresh_token,

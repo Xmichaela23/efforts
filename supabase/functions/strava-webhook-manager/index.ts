@@ -129,8 +129,7 @@ async function handleWebhookUnsubscription(userId: string, _accessToken: string)
 
     // IMPORTANT: Strava `push_subscriptions` are **one per OAuth application** (callback URL),
     // shared by every athlete. Calling DELETE here would unregister the app webhook for
-    // **all** Efforts users — not just this account. Per-user "off" is represented by
-    // `device_connections.webhook_active` + early return in `strava-webhook` only.
+    // **all** Efforts users. We only clear local metadata; ingestion is not gated on webhook_active.
 
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')

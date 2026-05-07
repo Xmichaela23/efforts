@@ -352,7 +352,8 @@ const Connections: React.FC = () => {
             ...conn,
             connected: !!existing,
             lastSync: existing?.last_sync || existing?.connection_data?.last_sync,
-            webhookActive: existing?.webhook_active || false,
+            // null/undefined = sync on; only explicit false means “off” in DB (legacy / old toggle)
+            webhookActive: existing?.webhook_active !== false,
             connectionData: existing?.connection_data || null,
             providerUserId: existing?.provider_user_id || null
           };
