@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { Copy } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
+import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 
 type StructuredPlannedViewProps = {
   workout: any;
@@ -12,6 +15,7 @@ type StructuredPlannedViewProps = {
 };
 
 const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, showHeader = true, onEdit, onComplete }) => {
+  const { toast } = useToast();
   // Normalize possibly stringified JSON blobs from planned_workouts
   const computedAny: any = (() => {
     try {
@@ -539,6 +543,31 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     return txt;
   })();
 
+  const handleCopyFormGoggles = async () => {
+    const script = buildFormGogglesSwimScript(workout);
+    if (!script) {
+      toast({
+        title: 'Nothing to copy',
+        description: 'This swim needs materialized steps. Try again after the plan is activated.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(script);
+      toast({
+        title: 'Copied for FORM Goggles',
+        description: 'FORM → Custom Workouts → Create From Text, then paste.',
+      });
+    } catch {
+      toast({
+        title: 'Copy failed',
+        description: 'Allow clipboard access for this site and try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleGarminExport = async () => {
     try {
       // Call the Garmin export function
@@ -667,6 +696,21 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             >50 m</button>
             {savingPool && <span className="text-gray-400">Saving…</span>}
           </div>
+          {hasComputedV3 ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleCopyFormGoggles}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white text-xs font-light tracking-wide hover:bg-white/[0.12] hover:border-white/30 transition-all duration-200 cursor-pointer"
+              >
+                <Copy className="h-3.5 w-3.5 opacity-80" aria-hidden />
+                Copy for FORM Goggles
+              </button>
+              <p className="mt-1.5 text-[11px] text-gray-400 font-light leading-snug max-w-md">
+                Plain-text layout for FORM&apos;s Script importer (Warm-up / Main / Cool-down). Paste in Custom Workouts → Create From Text.
+              </p>
+            </div>
+          ) : null}
           {!savingPool && autoDefaulted && (
             <div className="text-[11px] text-gray-400 mt-1">Defaulted from your units; change if venue differs.</div>
           )}
