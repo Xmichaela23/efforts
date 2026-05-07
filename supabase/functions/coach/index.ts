@@ -69,6 +69,8 @@ import {
   weekStartOf,
 } from '../_shared/plan-week.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
+import { swimSecPer100YdFromArcSwimInputs } from '../_shared/planning-context.ts';
+import { normalizeGoalDistanceKey } from '../_shared/race-projections.ts';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -81,8 +83,9 @@ const corsHeaders: Record<string, string> = {
 /** Keep `src/lib/coach-contract.ts` COACH_CLIENT_MIN_PAYLOAD_VERSION in sync. */
 /** v28: Wire coach to ArcContext + add Arc-aware overall_training_read + weekly_state_v1.empty_state. */
 /** v29: Add last_completed_race.projected_seconds (course-model projection at race time). */
-/** v30: Weekly coach swim_intent posture + longitudinal prompt shaping for tri goals. */
-const COACH_PAYLOAD_VERSION = 31;
+/** v31: Coach reads swim_cutoff_pressure_v1 + swim intent guardrails in FACTS. */
+/** v32: 70.3 swim yardage gate → Olympic bridge pivot lines in snapshot longitudinal block + legacy FACTS. */
+const COACH_PAYLOAD_VERSION = 32;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -327,6 +330,89 @@ function deriveTriSwimIntentForCoach(
   const raw = (tp as Record<string, unknown>).swim_intent ?? (tp as Record<string, unknown>).swimIntent;
   if (raw === 'focus') return 'focus';
   return 'race';
+}
+
+/** Many coaches use ~5k yd/week swim durability benchmark before prioritizing a half-distance swim leg. */
+const SWIM_YARD_WEEKLY_GATE_703 = 5000;
+
+function parseComputedLoose(v: unknown): Record<string, unknown> | null {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+  if (typeof v === 'string') {
+    try {
+      const j = JSON.parse(v) as unknown;
+      return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Sum main-set meters from materialized `computed.steps`, then convert to yards (pool plans use yd display). */
+function sumPlannedWeekSwimYards(plannedRows: unknown[]): number | null {
+  let meters = 0;
+  let sawSwim = false;
+  for (const raw of plannedRows) {
+    const row = raw as Record<string, unknown>;
+    const typ = String(row?.type || '').toLowerCase();
+    if (!typ.includes('swim')) continue;
+    sawSwim = true;
+    const comp = parseComputedLoose(row?.computed);
+    if (!comp) continue;
+    const steps = Array.isArray(comp.steps) ? (comp.steps as unknown[]) : [];
+    let rowM = 0;
+    for (const s of steps) {
+      if (!s || typeof s !== 'object') continue;
+      const st = s as Record<string, unknown>;
+      const dm = Number(st.distance_m ?? st.distanceMeters ?? 0);
+      if (Number.isFinite(dm) && dm > 0) rowM += dm;
+    }
+    const totalDm = Number(comp.total_distance_meters ?? comp.total_distance_m ?? 0);
+    if (rowM > 0) meters += rowM;
+    else if (Number.isFinite(totalDm) && totalDm > 0) meters += totalDm;
+  }
+  if (!sawSwim) return null;
+  if (meters <= 0) return null;
+  return meters / 0.9144;
+}
+
+/** Deterministic advisory when 70.3 swim weekly yardage is under common durability benchmarks. */
+function olympic703BridgePivotCoachLines(opts: {
+  primaryTriDistance: string | null | undefined;
+  weeklySwimYards: number | null;
+  swimCutoffPressureV1: Record<string, unknown> | null | undefined;
+  swimIntent: 'focus' | 'race' | null;
+  swimSecPer100Yd: number | null;
+}): string[] {
+  const dk = normalizeGoalDistanceKey(opts.primaryTriDistance ?? '');
+  if (dk !== '70.3') return [];
+
+  const belowGate =
+    opts.weeklySwimYards != null &&
+    Number.isFinite(opts.weeklySwimYards) &&
+    opts.weeklySwimYards + 1e-6 < SWIM_YARD_WEEKLY_GATE_703;
+
+  const paceSlow = opts.swimSecPer100Yd != null && opts.swimSecPer100Yd >= 150;
+  const sev = String(opts.swimCutoffPressureV1?.severity ?? '');
+  const cutoffRisk = sev === 'elevated' || sev === 'high';
+  const compoundUnknownVolume =
+    opts.weeklySwimYards == null &&
+    opts.swimIntent === 'race' &&
+    paceSlow &&
+    cutoffRisk;
+
+  if (!belowGate && !compoundUnknownVolume) return [];
+
+  if (belowGate && opts.weeklySwimYards != null) {
+    return [
+      `SWIM VOLUME GATE (70.3): Planned swims this week total ~${Math.round(opts.weeklySwimYards)} yd — under the ~${SWIM_YARD_WEEKLY_GATE_703}+ yd/week benchmark many coaches use for half-distance swim durability (shoulders + open-water margin).`,
+      `OLYMPIC BRIDGE (optional pivot): At slow pool paces or tight swim-cutoff margin, holding a 70.3 on chronically sub-${SWIM_YARD_WEEKLY_GATE_703} yd swim weeks raises DNF risk. You may suggest Olympic distance once as a safer progression (~1.5 km swim, lower total weekly load, practice for mass starts and sighting) until swim consistency supports a half — empathetic; athlete chooses the race.`,
+    ];
+  }
+
+  return [
+    `SWIM VOLUME SIGNAL (70.3): Could not sum yards from planned rows; swim_intent is race (2×), baseline pace is slow (≥~2:30/100 yd), and swim cutoff pressure is elevated — combined signal that Olympic distance may fit better than a 70.3 until weekly swim durability improves — mention once as optional pivot.`,
+  ];
 }
 
 function swimCutoffPressureCoachFacts(planConfig: Record<string, unknown> | null | undefined): string[] {
@@ -3098,11 +3184,31 @@ Deno.serve(async (req) => {
             }
           }
 
-          const longitudinalPatternsText =
-            longitudinalSignalsResult?.signals?.length
-              ? longitudinalSignalsToPrompt(longitudinalSignalsResult, { swimIntent: triSwimIntent })
-              : '';
-          const coachingLongitudinalBlock = [adaptationBlock, longitudinalPatternsText.trim() || null]
+          const weeklySwimYds703 = sumPlannedWeekSwimYards(plannedWeekArr);
+          const pc703 = planConfig as Record<string, unknown> | null | undefined;
+          const contract703 = pc703?.plan_contract_v1 as Record<string, unknown> | undefined;
+          const swimCut703 = contract703?.swim_cutoff_pressure_v1 as Record<string, unknown> | undefined;
+          const primary703Dist =
+            goalContext.primary_event && isTriGoalLite(goalContext.primary_event)
+              ? goalContext.primary_event.distance
+              : null;
+          const swimSec703 = swimSecPer100YdFromArcSwimInputs({
+            performance_numbers: arc.performance_numbers,
+            learned_fitness: arc.learned_fitness,
+            units: arc.units,
+          });
+          const olympic703Block = (() => {
+            const lines = olympic703BridgePivotCoachLines({
+              primaryTriDistance: primary703Dist,
+              weeklySwimYards: weeklySwimYds703,
+              swimCutoffPressureV1: swimCut703,
+              swimIntent: triSwimIntent,
+              swimSecPer100Yd: swimSec703,
+            });
+            return lines.length ? lines.join('\n') : null;
+          })();
+
+          const coachingLongitudinalBlock = [adaptationBlock, longitudinalPatternsText.trim() || null, olympic703Block]
             .filter((x): x is string => Boolean(x && String(x).trim()))
             .join('\n\n') || null;
 
@@ -3869,6 +3975,28 @@ Deno.serve(async (req) => {
             ? longitudinalSignalsToPrompt(longitudinalSignalsResult, { swimIntent: triSwimIntent })
             : '';
         for (const line of swimCutoffPressureCoachFacts(planConfig)) {
+          narrativeFacts.push(line);
+        }
+        const weeklySwimYdsLegacy = sumPlannedWeekSwimYards(plannedWeekArr);
+        const pcLeg = planConfig as Record<string, unknown> | null | undefined;
+        const contractLeg = pcLeg?.plan_contract_v1 as Record<string, unknown> | undefined;
+        const swimCutLeg = contractLeg?.swim_cutoff_pressure_v1 as Record<string, unknown> | undefined;
+        const primaryDistLeg =
+          goalContext.primary_event && isTriGoalLite(goalContext.primary_event)
+            ? goalContext.primary_event.distance
+            : null;
+        const swimSecLeg = swimSecPer100YdFromArcSwimInputs({
+          performance_numbers: arc.performance_numbers,
+          learned_fitness: arc.learned_fitness,
+          units: arc.units,
+        });
+        for (const line of olympic703BridgePivotCoachLines({
+          primaryTriDistance: primaryDistLeg,
+          weeklySwimYards: weeklySwimYdsLegacy,
+          swimCutoffPressureV1: swimCutLeg,
+          swimIntent: triSwimIntent,
+          swimSecPer100Yd: swimSecLeg,
+        })) {
           narrativeFacts.push(line);
         }
         if (longLegacyBlock.trim()) narrativeFacts.push(longLegacyBlock);
