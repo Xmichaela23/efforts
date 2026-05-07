@@ -64,7 +64,8 @@ export function coachVisibleProseSeeksReply(visible: string): boolean {
 
 /**
  * Triathlon event goals must have strength resolved (in: strength_intent + preferred_days.strength[];
- * out: strength_frequency 0), **swim_intent** (`focus` | `race`), plus preferred_days (long ride/run, swim[], quality_run + easy_run,
+ * out: strength_frequency 0), **swim_intent** (`focus` | `race`), optional **swim_experience**
+ * (`learning` | `steady` | `strong` — wizard / chat), plus preferred_days (long ride/run, swim[], quality_run + easy_run,
  * quality_bike + easy_bike), days_per_week, and top-level **plan_start_date** (YYYY-MM-DD) before Looks right.
  */
 export function arcEventGoalsHaveRequiredTrainingPrefs(payload: ArcSetupPayload | null): boolean {

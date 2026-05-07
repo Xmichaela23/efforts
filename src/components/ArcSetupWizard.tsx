@@ -234,12 +234,16 @@ type WizardRace = {
   priority: 'A' | 'B' | 'C';
 };
 
+/** Persisted as training_prefs.swim_experience — informs coaching + setup chat (engine reads swim_intent). */
+type SwimExperienceTier = 'learning' | 'steady' | 'strong';
+
 type WizardState = {
   // Step 1
   races: WizardRace[];
   // Step 2
   trainingIntent: 'performance' | 'completion' | 'first_race' | null;
   // Step 3 (tri)
+  swimExperience: SwimExperienceTier | null;
   swimIntent: 'focus' | 'race' | null;
   // Step 4 (tri) — fixed external bike anchor only; planner places everything else
   hasGroupRide: boolean | null;
@@ -291,6 +295,7 @@ function blank(): WizardState {
   return {
     races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }],
     trainingIntent: null,
+    swimExperience: null,
     swimIntent: null,
     hasGroupRide: null, groupRideDay: '', groupRideIntensity: null,
     groupRideRouteUrl: '', groupRideRouteSnapshot: null, groupRideRouteFetching: false,
@@ -334,7 +339,7 @@ function inferDays(state: WizardState) {
   const qualityRun  = fixedQualityRun  ?? pick(['thursday', 'tuesday', 'wednesday'].filter(d => d !== qualityBike && d !== easyBike));
   const easyRun     = fixedEasyRun     ?? pick(['friday', 'monday', 'tuesday', 'wednesday'].filter(d => d !== qualityRun && d !== qualityBike));
 
-  const swimCount = state.swimIntent === 'focus' ? 3 : 2;
+  const swimCount = state.swimIntent === 'focus' ? 3 : state.swimIntent === 'race' ? 2 : 0;
   const swimCandidates = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const heavyDays = new Set([state.longRideDay || 'saturday', state.longRunDay || 'sunday']);
   const swimDays: string[] = [];
@@ -408,7 +413,7 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
   const summary = [
     weeksOut != null ? `${weeksOut} weeks to ${primaryRace?.name || 'race day'}.` : '',
     `${intentLabel.charAt(0).toUpperCase() + intentLabel.slice(1)}.`,
-    triPlan && state.swimIntent === 'focus' ? 'Three swims a week.' : triPlan ? 'Two swims a week.' : '',
+    triPlan && state.swimIntent === 'focus' ? 'Three swims a week (~yardage targets vary by week).' : triPlan && state.swimIntent === 'race' ? 'Two swims a week (~yardage targets vary by week).' : '',
     state.strengthIncluded
       ? state.strengthIntent === 'performance' ? 'Two strength days, co-equal goal.' : 'Strength supports tri.'
       : '',
@@ -443,6 +448,7 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     ...(triPlan && state.swimIntent
       ? { swim_intent: state.swimIntent }
       : {}),
+    ...(triPlan && state.swimExperience ? { swim_experience: state.swimExperience } : {}),
     ...(state.anythingUnusual ? { notes: state.anythingUnusual } : {}),
     ...(state.assessmentWeekPreference
       ? { assessment_week_preference: state.assessmentWeekPreference }
@@ -869,6 +875,9 @@ function Step2Intent({
 function Step3Swim({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+  const primary = state.races.find(r => r.priority === 'A') ?? state.races[0];
+  const is703 = String(primary?.distance ?? '').toLowerCase().includes('70.3');
+
   const swimPaceSec: number | null = (() => {
     const pn = arc?.performanceNumbers;
     if (!pn) return null;
@@ -879,31 +888,66 @@ function Step3Swim({
 
   const swimNote = arc
     ? arc.swimSessions28 >= 3
-      ? `You averaged ${arc.swimSessions28} swims/week in the last 4 weeks — swim focus pre-selected.`
+      ? `Last 4 weeks: about ${arc.swimSessions28} swims/week on your log — good rhythm if you want swim focus.`
       : arc.swimSessions28 === 2
-      ? `2 swims/week in the last 4 weeks — race-ready pre-selected.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
+      ? `Last 4 weeks: 2 swims/week on your log.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
       : arc.swimSessions28 === 1
-      ? `1 swim in the last 4 weeks. Race-ready (2×) is a good step up from here.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
+      ? `Last 4 weeks: 1 swim on your log.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
       : swimPaceSec
-        ? `No swims in the last 4 weeks — but your pace (${fmtSwimPace(swimPaceSec)}) is on file. Race-ready (2×) is enough to rebuild.`
-        : `No swims logged in the last 4 weeks. Race-ready (2×) is the minimum to build race fitness — if you're new to swimming, expect the first few weeks to be about finding your rhythm.`
+        ? `No swims in the last 4 weeks on your log — pace on file is ${fmtSwimPace(swimPaceSec)}; weekly yardage still matters for race durability.`
+        : `No swims in the last 4 weeks on your log — early weeks are often about rhythm and feel before chasing pace.`
     : null;
+
+  const title = 'Swimming — experience & weekly yardage';
+  const subtitle = is703
+    ? 'Many beginner-friendly 70.3 builds aim near 5,000–6,000 yards/week in the pool for shoulder durability and open-water margin — split across either two longer sessions or three shorter ones.'
+    : 'Pick how much swimming fits your week. Plans scale yardage with intent — pool totals matter more than session labels alone.';
+
+  const race703Lines =
+    'Two pool days. Typical band when schedule allows: ~2,500–3,000 yd per session (toward ~5k–6k yd/week). Fewer weekdays, longer visits — good when pool time is limited to a couple of blocks.';
+  const focus703Lines =
+    'Three pool days. Typical band when schedule allows: ~1,800–2,000 yd per session (similar weekly total with more feel for the water). Better technique frequency; pulls a bit more from bike/run load.';
+
+  const canContinue = state.swimExperience !== null && state.swimIntent !== null;
 
   return (
     <StepLayout
-      step={step} totalSteps={totalSteps}
-      title="How much do you want to swim?"
-      subtitle="Swim focus builds real fitness. Race-ready keeps it sharp without adding load to bike and run."
-      onBack={onBack} onContinue={onNext} canContinue={state.swimIntent !== null}
+      step={step}
+      totalSteps={totalSteps}
+      title={title}
+      subtitle={subtitle}
+      onBack={onBack}
+      onContinue={onNext}
+      canContinue={canContinue}
     >
       {swimNote && <ArcHint>{swimNote}</ArcHint>}
+
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-white/40 px-1 mb-2 mt-1">Experience</p>
+      <ChoiceBtn active={state.swimExperience === 'learning'} onClick={() => setState({ ...state, swimExperience: 'learning' })}>
+        <span className="block font-semibold text-white">Learning or rebuilding</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Newer to structured laps, stroke still coming together, or long time out of the pool.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.swimExperience === 'steady'} onClick={() => setState({ ...state, swimExperience: 'steady' })}>
+        <span className="block font-semibold text-white">Steady</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Comfortable swimming continuous laps; mostly building fitness and pacing.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.swimExperience === 'strong'} onClick={() => setState({ ...state, swimExperience: 'strong' })}>
+        <span className="block font-semibold text-white">Strong swimmer</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Swim is not my weak leg — maintenance and sharpness are enough.</span>
+      </ChoiceBtn>
+
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-white/40 px-1 mb-2 mt-5">Weekly structure</p>
       <ChoiceBtn active={state.swimIntent === 'race'} onClick={() => setState({ ...state, swimIntent: 'race' })}>
         <span className="block font-semibold text-white">Race-ready — 2 sessions/week</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">One quality, one aerobic. Swim stays sharp without eating into bike/run budget.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">
+          {is703 ? race703Lines : 'One quality-oriented swim and one aerobic swim — keeps the leg sharp while protecting bike and run.'}
+        </span>
       </ChoiceBtn>
       <ChoiceBtn active={state.swimIntent === 'focus'} onClick={() => setState({ ...state, swimIntent: 'focus' })}>
         <span className="block font-semibold text-white">Swim focus — 3 sessions/week</span>
-        <span className="block text-[13px] text-white/55 mt-0.5">Technique, aerobic quality, and threshold. Treat swim as a real limiter this block.</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">
+          {is703 ? focus703Lines : 'Technique, aerobic quality, and threshold work — swim as a development priority this block.'}
+        </span>
       </ChoiceBtn>
     </StepLayout>
   );
@@ -1583,6 +1627,16 @@ function Step9Confirm({
         <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-teal-400/90 mb-2">Your season</p>
         <p className="text-[15px] text-white/80">· {state.races.length > 1 ? state.races.length + ' races' : primaryRace?.name || 'Race'} · {primaryRace?.distance}</p>
         <p className="text-[15px] text-white/80">· {state.trainingIntent === 'performance' ? 'Performance build' : state.trainingIntent === 'first_race' ? 'First-time finish' : 'Strong finish'}</p>
+        {tri && state.swimExperience && (
+          <p className="text-[15px] text-white/80">
+            · Swim experience:{' '}
+            {state.swimExperience === 'learning'
+              ? 'Learning / rebuilding'
+              : state.swimExperience === 'steady'
+                ? 'Steady'
+                : 'Strong swimmer'}
+          </p>
+        )}
         {tri && state.swimIntent && <p className="text-[15px] text-white/80">· {state.swimIntent === 'focus' ? '3 swims/week' : '2 swims/week'}</p>}
         {state.daysPerWeek && <p className="text-[15px] text-white/80">· {state.daysPerWeek} days/week</p>}
         <p className="text-[15px] text-white/80">· {state.strengthIncluded ? state.strengthIntent === 'performance' ? 'Strength co-equal (2×)' : 'Strength support (1–2×)' : 'No strength sessions'}</p>
@@ -1754,9 +1808,13 @@ export default function ArcSetupWizard() {
     setState(prev => {
       const patch: Partial<WizardState> = {};
 
-      // Swim: pre-select frequency based on recent sessions
+      // Swim: pre-select frequency + experience tier from recent sessions (athlete can override)
       if (prev.swimIntent === null && arcCtx.swimSessions28 >= 2) {
         patch.swimIntent = arcCtx.swimSessions28 >= 3 ? 'focus' : 'race';
+      }
+      if (prev.swimExperience === null) {
+        if (arcCtx.swimSessions28 >= 3) patch.swimExperience = 'steady';
+        else if (arcCtx.swimSessions28 === 0) patch.swimExperience = 'learning';
       }
 
       // Strength: pre-select yes if strength equipment is on file
