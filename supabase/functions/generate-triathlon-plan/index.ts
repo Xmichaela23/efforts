@@ -13,6 +13,7 @@ import {
   TRI_RACE_DISTANCES,
   type TriDistance,
 } from './types.ts';
+import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
 import { validateRequest, validatePlanSchema } from './validation.ts';
 import { TriathlonGenerator } from './generators/tri-generator.ts';
 
@@ -36,6 +37,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const request: GenerateTriPlanRequest = await req.json();
+    const persistedTradeOffs: PlanGenerationTradeOff[] = Array.isArray(request.generation_trade_offs)
+      ? request.generation_trade_offs
+      : [];
 
     // ── Validation ─────────────────────────────────────────────────────────
     const validation = validateRequest(request);
@@ -141,6 +145,7 @@ Deno.serve(async (req: Request) => {
         sessions_by_week: plan.sessions_by_week,
         notes_by_week:    {},
         weeks:            [],
+        generation_trade_offs: persistedTradeOffs,
       })
       .select('id')
       .single();

@@ -1471,6 +1471,9 @@ Deno.serve(async (req: Request) => {
     const focusDateStr = new Date().toISOString().slice(0, 10);
     const arcForPlanning = await getArcContext(supabase, user_id, focusDateStr);
 
+    /** Week-optimizer snapshot for standalone tri — combined path uses `buildCombinedPlan` snapshots. */
+    let standaloneTriOptimizerSnapshot: BackfillOptimizerSnapshot | null = null;
+
     if (resolvedGoal) {
       const mergedPrefs = mergeTrainingPrefsWithArcDefaults(
         resolvedGoal.training_prefs as Record<string, unknown>,
@@ -1479,7 +1482,8 @@ Deno.serve(async (req: Request) => {
       );
       const sportForBackfill = String(resolvedGoal.sport || '').toLowerCase();
       if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
-        const { notes } = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
+        const { notes, optimizer_snapshot } = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
+        standaloneTriOptimizerSnapshot = optimizer_snapshot;
         if (notes.length > 0) {
           console.log('[create-goal] training_prefs server backfill:', notes.join(', '));
         }
@@ -1748,6 +1752,16 @@ Deno.serve(async (req: Request) => {
         if (wd.swim)  triGenerateBody.current_weekly_swim_yards  = Math.round(wd.swim / 2);
       }
       if (latestSnap?.acwr != null) triGenerateBody.current_acwr = Number(latestSnap.acwr);
+
+      const triTradeOffGoalId = String(createdGoalId || resolvedBuildId || '');
+      const standalone_generation_trade_offs = buildCombinedPlanGenerationTradeOffs({
+        postRace: postRaceRecovery,
+        optimizerSnapshots: standaloneTriOptimizerSnapshot
+          ? [{ goal_id: triTradeOffGoalId || 'tri', ...standaloneTriOptimizerSnapshot }]
+          : [],
+      });
+      triGenerateBody.generation_trade_offs = standalone_generation_trade_offs;
+      console.log('[create-goal] standalone tri generation_trade_offs:', JSON.stringify(standalone_generation_trade_offs));
 
       const triGenerated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-triathlon-plan', triGenerateBody);
       const triPlanId = triGenerated?.plan_id;

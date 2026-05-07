@@ -1,5 +1,7 @@
 // Type definitions for triathlon plan generation
 
+import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
+
 // ============================================================================
 // REQUEST / RESPONSE
 // ============================================================================
@@ -88,23 +90,8 @@ export interface GenerateTriPlanRequest {
    */
   existing_run_days?: string[];
 
-  /**
-   * Athlete's preferred session-slot days from the setup wizard.
-   * Keys: quality_bike, easy_bike, long_ride, quality_run, easy_run, long_run,
-   *       swim (string[]), strength (string[]).
-   * Values are lowercase day names: 'monday'…'sunday'.
-   * When present the generator maps its default slots to these days.
-   */
-  preferred_days?: {
-    quality_bike?: string;
-    easy_bike?: string;
-    long_ride?: string;
-    quality_run?: string;
-    easy_run?: string;
-    long_run?: string;
-    swim?: string[];
-    strength?: string[];
-  };
+  /** From create-goal week-optimizer + post-race; persisted on `plans.generation_trade_offs`. */
+  generation_trade_offs?: PlanGenerationTradeOff[];
 }
 
 export type TriDistance = 'sprint' | 'olympic' | '70.3' | 'ironman';
