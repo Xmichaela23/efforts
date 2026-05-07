@@ -86,7 +86,8 @@ const corsHeaders: Record<string, string> = {
 /** v31: Coach reads swim_cutoff_pressure_v1 + swim intent guardrails in FACTS. */
 /** v32: 70.3 swim yardage gate → Olympic bridge pivot lines in snapshot longitudinal block + legacy FACTS. */
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
-const COACH_PAYLOAD_VERSION = 33;
+/** v34: Strong swimmer + lean yards → maintenance-vs-survival FACTs; survival benchmark wording for slow cohort. */
+const COACH_PAYLOAD_VERSION = 34;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -333,6 +334,29 @@ function deriveTriSwimIntentForCoach(
   return 'race';
 }
 
+/** Wizard / Arc-setup tier — engine reads intent separately; Coach uses `strong` for maintenance-vs-survival framing. */
+function deriveTriSwimExperienceForCoach(
+  ctx: GoalContext,
+  activePlanGoalId: string | null | undefined,
+): 'learning' | 'steady' | 'strong' | null {
+  const g = activeTriGoalForSwimIntent(ctx, activePlanGoalId);
+  const tp = g?.training_prefs;
+  if (!tp || typeof tp !== 'object') return null;
+  const raw =
+    (tp as Record<string, unknown>).swim_experience ??
+    (tp as Record<string, unknown>).swimExperience;
+  const s = String(raw ?? '').toLowerCase().trim();
+  if (s === 'learning' || s === 'steady' || s === 'strong') return s;
+  return null;
+}
+
+function formatSwimPace100Yd(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
 /** Many coaches use ~5k yd/week swim durability benchmark before prioritizing a half-distance swim leg. */
 const SWIM_YARD_WEEKLY_GATE_703 = 5000;
 /** Olympic-distance pivot copy targets OW survival / cutoff stress — misaligned for fast pool baselines (e.g. sub ~2:00/100 yd). */
@@ -379,6 +403,42 @@ function sumPlannedWeekSwimYards(plannedRows: unknown[]): number | null {
   return meters / 0.9144;
 }
 
+/**
+ * Strong swimmer + fast baseline + deliberate lean yards (`swim_intent` race): frame low volume as maintenance/agency,
+ * not survival failure — optional lever via switching to swim focus (do not force yards).
+ */
+function strong703LeanMaintenanceCoachLines(opts: {
+  primaryTriDistance: string | null | undefined;
+  weeklySwimYards: number | null;
+  swimSecPer100Yd: number | null;
+  swimExperience: 'learning' | 'steady' | 'strong' | null | undefined;
+  swimIntent: 'focus' | 'race' | null;
+}): string[] {
+  const dk = normalizeGoalDistanceKey(opts.primaryTriDistance ?? '');
+  if (dk !== '70.3') return [];
+  if (opts.swimExperience !== 'strong') return [];
+  if (opts.swimIntent !== 'race') return [];
+
+  const belowGate =
+    opts.weeklySwimYards != null &&
+    Number.isFinite(opts.weeklySwimYards) &&
+    opts.weeklySwimYards + 1e-6 < SWIM_YARD_WEEKLY_GATE_703;
+
+  const paceKnownFast =
+    opts.swimSecPer100Yd != null &&
+    Number.isFinite(opts.swimSecPer100Yd) &&
+    opts.swimSecPer100Yd <= SWIM_FAST_BASELINE_SUPPRESS_OLYMPIC_PIVOT_SEC_PER_100YD;
+
+  if (!belowGate || !paceKnownFast || opts.weeklySwimYards == null || opts.swimSecPer100Yd == null) return [];
+
+  const paceStr = formatSwimPace100Yd(opts.swimSecPer100Yd);
+  const ydR = Math.round(opts.weeklySwimYards);
+  return [
+    `SWIM MAINTENANCE vs SURVIVAL (70.3 — strong swimmer): Arc baseline ~${paceStr}/100 yd is well above typical 70.3 cutoff worry; planned ~${ydR} yd this week is maintenance/lean volume, not the ~${SWIM_YARD_WEEKLY_GATE_703}+ yd survival/durability benchmark coaches apply near ~2:30+/100 yd. Treat this as a valid bike/run-protection choice unless OW weakness shows up in execution — one sentence max.`,
+    `SWIM LEVER (optional): If they want swimming as a race lever (not just maintenance), they can adopt swim_intent "focus" in setup — adds third weekly swim + reallocates bike/run TSS; do not prescribe extra yards ad hoc.`,
+  ];
+}
+
 /** Deterministic advisory when 70.3 swim weekly yardage is under common durability benchmarks. */
 function olympic703BridgePivotCoachLines(opts: {
   primaryTriDistance: string | null | undefined;
@@ -416,13 +476,13 @@ function olympic703BridgePivotCoachLines(opts: {
 
   if (belowGate && opts.weeklySwimYards != null) {
     return [
-      `SWIM VOLUME GATE (70.3): Planned swims this week total ~${Math.round(opts.weeklySwimYards)} yd — under the ~${SWIM_YARD_WEEKLY_GATE_703}+ yd/week benchmark many coaches use for half-distance swim durability (shoulders + open-water margin).`,
-      `OLYMPIC BRIDGE (optional pivot): At slow pool paces or tight swim-cutoff margin, holding a 70.3 on chronically sub-${SWIM_YARD_WEEKLY_GATE_703} yd swim weeks raises DNF risk. You may suggest Olympic distance once as a safer progression (~1.5 km swim, lower total weekly load, practice for mass starts and sighting) until swim consistency supports a half — empathetic; athlete chooses the race.`,
+      `SWIM SURVIVAL VOLUME BENCHMARK (70.3): Planned swims this week ~${Math.round(opts.weeklySwimYards)} yd — under the ~${SWIM_YARD_WEEKLY_GATE_703}+ yd/week survival/durability floor many coaches use when pool pace is nearer ~2:30+/100 yd (shoulders + neuromuscular exposure + open-water margin before bike/run).`,
+      `OLYMPIC BRIDGE (optional pivot): For slower swim baselines or tight cutoff margin, holding a 70.3 on chronically sub-${SWIM_YARD_WEEKLY_GATE_703} yd weeks raises DNF risk vs athletes already holding maintenance yards with a fast baseline. You may suggest Olympic distance once (~1.5 km swim, lower weekly load, OW mass-start practice) until swim consistency supports a half — empathetic; athlete chooses.`,
     ];
   }
 
   return [
-    `SWIM VOLUME SIGNAL (70.3): Could not sum yards from planned rows; swim_intent is race (2×), baseline pace is slow (≥~2:30/100 yd), and swim cutoff pressure is elevated — combined signal that Olympic distance may fit better than a 70.3 until weekly swim durability improves — mention once as optional pivot.`,
+    `SWIM SURVIVAL SIGNAL (70.3): Could not sum planned swim yards; swim_intent race (2×), baseline slow (≥~2:30/100 yd), cutoff pressure elevated — survival-margin pattern where Olympic distance may fit better until weekly swim durability improves — optional pivot; mention once.`,
   ];
 }
 
@@ -3218,8 +3278,24 @@ Deno.serve(async (req) => {
             });
             return lines.length ? lines.join('\n') : null;
           })();
+          const swimExp703 = deriveTriSwimExperienceForCoach(goalContext, activePlan?.goal_id ?? null);
+          const strongLean703Block = (() => {
+            const lines = strong703LeanMaintenanceCoachLines({
+              primaryTriDistance: primary703Dist,
+              weeklySwimYards: weeklySwimYds703,
+              swimSecPer100Yd: swimSec703,
+              swimExperience: swimExp703,
+              swimIntent: triSwimIntent,
+            });
+            return lines.length ? lines.join('\n') : null;
+          })();
 
-          const coachingLongitudinalBlock = [adaptationBlock, longitudinalPatternsText.trim() || null, olympic703Block]
+          const coachingLongitudinalBlock = [
+            adaptationBlock,
+            longitudinalPatternsText.trim() || null,
+            olympic703Block,
+            strongLean703Block,
+          ]
             .filter((x): x is string => Boolean(x && String(x).trim()))
             .join('\n\n') || null;
 
@@ -4007,6 +4083,16 @@ Deno.serve(async (req) => {
           swimCutoffPressureV1: swimCutLeg,
           swimIntent: triSwimIntent,
           swimSecPer100Yd: swimSecLeg,
+        })) {
+          narrativeFacts.push(line);
+        }
+        const swimExpLegacy = deriveTriSwimExperienceForCoach(goalContext, activePlan?.goal_id ?? null);
+        for (const line of strong703LeanMaintenanceCoachLines({
+          primaryTriDistance: primaryDistLeg,
+          weeklySwimYards: weeklySwimYdsLegacy,
+          swimSecPer100Yd: swimSecLeg,
+          swimExperience: swimExpLegacy,
+          swimIntent: triSwimIntent,
         })) {
           narrativeFacts.push(line);
         }
