@@ -1309,6 +1309,9 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.group_ride_route_url
         ? { group_ride_route_url: freshCombinedPrefs.group_ride_route_url }
         : {}),
+      ...(freshCombinedPrefs.group_ride_route_snapshot
+        ? { group_ride_route_snapshot: freshCombinedPrefs.group_ride_route_snapshot }
+        : {}),
       strength_protocol: resolvedCombinedStrengthProtocol,
       ...(freshCombinedPrefs.strength_intent
         ? { strength_intent: freshCombinedPrefs.strength_intent }

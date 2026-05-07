@@ -21,8 +21,10 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
+import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
+import { climbNoticeTier, stravaRouteUrlLooksFetchable } from '@/lib/group-ride-route-snapshot';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
 
@@ -203,6 +205,10 @@ type WizardState = {
   groupRideIntensity: 'quality_bike' | 'easy_bike' | null;
   /** Optional HTTPS URL for recurring group ride route (e.g. Strava); stored on training_prefs. */
   groupRideRouteUrl: string;
+  /** Strava API enrichment when linked + routes URL present (wizard fetch-on-save). */
+  groupRideRouteSnapshot: GroupRideRouteSnapshot | null;
+  groupRideRouteFetching: boolean;
+  groupRideRouteFetchError: string | null;
   // Step 5 — fixed external run anchor only; planner places everything else
   hasGroupRun: boolean | null;
   groupRunDay: Day | '';
@@ -242,7 +248,9 @@ function blank(): WizardState {
     races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }],
     trainingIntent: null,
     swimIntent: null,
-    hasGroupRide: null, groupRideDay: '', groupRideIntensity: null, groupRideRouteUrl: '',
+    hasGroupRide: null, groupRideDay: '', groupRideIntensity: null,
+    groupRideRouteUrl: '', groupRideRouteSnapshot: null, groupRideRouteFetching: false,
+    groupRideRouteFetchError: null,
     hasGroupRun: null, groupRunDay: '', groupRunIntensity: null,
     runQualityPlacement: null,
     bikeQualityPlacement: null,
@@ -365,6 +373,12 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
 
   const groupRideRouteStored =
     triPlan && state.hasGroupRide ? sanitizeGroupRideRouteUrl(state.groupRideRouteUrl) : undefined;
+  const snapshotPersist =
+    groupRideRouteStored &&
+    state.groupRideRouteSnapshot &&
+    state.groupRideRouteSnapshot.route_url_normalized === groupRideRouteStored
+      ? state.groupRideRouteSnapshot
+      : undefined;
 
   const trainingPrefs: Record<string, unknown> = {
     training_intent: state.trainingIntent || 'completion',
@@ -378,6 +392,7 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
       ? { bike_quality_label: 'Group Ride' }
       : {}),
     ...(groupRideRouteStored ? { group_ride_route_url: groupRideRouteStored } : {}),
+    ...(snapshotPersist ? { group_ride_route_snapshot: snapshotPersist } : {}),
     ...(state.strengthIncluded && state.strengthIntent
       ? { strength_intent: state.strengthIntent }
       : {}),
@@ -878,11 +893,94 @@ function Step4Bike({
       groupRideIntensity: null,
       runQualityPlacement: null,
       groupRideRouteUrl: hasGroupRide ? state.groupRideRouteUrl : '',
+      groupRideRouteSnapshot: hasGroupRide ? state.groupRideRouteSnapshot : null,
+      groupRideRouteFetching: hasGroupRide ? state.groupRideRouteFetching : false,
+      groupRideRouteFetchError: hasGroupRide ? state.groupRideRouteFetchError : null,
     });
 
   const routeStored = sanitizeGroupRideRouteUrl(state.groupRideRouteUrl);
   const routeInvalidHint =
     state.groupRideRouteUrl.trim().length > 0 && !routeStored;
+
+  useEffect(() => {
+    const norm = sanitizeGroupRideRouteUrl(state.groupRideRouteUrl);
+    if (!norm || !stravaRouteUrlLooksFetchable(norm)) {
+      setState(prev => {
+        if (
+          prev.groupRideRouteSnapshot === null &&
+          !prev.groupRideRouteFetching &&
+          prev.groupRideRouteFetchError === null
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          groupRideRouteSnapshot: null,
+          groupRideRouteFetching: false,
+          groupRideRouteFetchError: null,
+        };
+      });
+      return;
+    }
+
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        if (!getStoredUserId()) return;
+        setState(prev => ({ ...prev, groupRideRouteFetching: true, groupRideRouteFetchError: null }));
+        const { data, error } = await invokeFunction<{
+          success?: boolean;
+          snapshot?: GroupRideRouteSnapshot;
+          error?: string;
+          needs_strava_connect?: boolean;
+        }>('fetch-strava-route', { route_url: norm });
+
+        setState(prev => {
+          const still = sanitizeGroupRideRouteUrl(prev.groupRideRouteUrl) === norm;
+          if (!still) {
+            return { ...prev, groupRideRouteFetching: false };
+          }
+          const base = { ...prev, groupRideRouteFetching: false };
+          if (error) {
+            return {
+              ...base,
+              groupRideRouteSnapshot: null,
+              groupRideRouteFetchError:
+                typeof error.message === 'string' ? error.message : 'Could not reach route service.',
+            };
+          }
+          const body = data as Record<string, unknown> | null;
+          if (!body || body.success !== true || body.snapshot == null) {
+            const needs = body?.needs_strava_connect === true;
+            const msg =
+              typeof body?.error === 'string'
+                ? body.error
+                : needs
+                  ? 'Connect Strava (Integrations) to auto-fill route climbing from this link.'
+                  : 'Could not load route stats.';
+            return {
+              ...base,
+              groupRideRouteSnapshot: null,
+              groupRideRouteFetchError: msg,
+            };
+          }
+          return {
+            ...base,
+            groupRideRouteSnapshot: body.snapshot as GroupRideRouteSnapshot,
+            groupRideRouteFetchError: null,
+          };
+        });
+      })();
+    }, 550);
+
+    return () => window.clearTimeout(handle);
+  }, [state.groupRideRouteUrl]);
+
+  const routeTopoTier =
+    state.groupRideRouteSnapshot &&
+    routeStored &&
+    state.groupRideRouteSnapshot.route_url_normalized === routeStored
+      ? climbNoticeTier(state.groupRideRouteSnapshot)
+      : 'none';
 
   return (
     <StepLayout
@@ -943,6 +1041,28 @@ function Step4Bike({
               <p className="mt-1 text-[11px] text-amber-400/85">
                 That doesn&apos;t look like a valid https URL — fix it or clear the field to continue saving it.
               </p>
+            )}
+            {state.groupRideRouteFetching && (
+              <p className="mt-2 text-[12px] text-teal-200/75 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" aria-hidden />
+                Loading route profile from Strava…
+              </p>
+            )}
+            {state.groupRideRouteFetchError &&
+              !state.groupRideRouteFetching &&
+              routeStored &&
+              stravaRouteUrlLooksFetchable(routeStored) && (
+              <p className="mt-2 text-[12px] text-amber-400/85">{state.groupRideRouteFetchError}</p>
+            )}
+            {routeTopoTier === 'aggressive' && (
+              <ArcHint>
+                Serious climbing on this route. Run intervals stacked right after may need to stay easier — we factor topography into bike stress so recovery stays honest.
+              </ArcHint>
+            )}
+            {routeTopoTier === 'notice' && (
+              <ArcHint>
+                Rolling profile — expect more metabolic cost than a flat ride for the same time on the clock. We apply a modest bike load floor on this anchor when building volume.
+              </ArcHint>
             )}
           </div>
         </>
@@ -1314,11 +1434,20 @@ function Step9Confirm({
 
   if (tri && state.hasGroupRide && state.groupRideDay) {
     const rideRoute = sanitizeGroupRideRouteUrl(state.groupRideRouteUrl);
+    const routeSnap =
+      rideRoute &&
+      state.groupRideRouteSnapshot &&
+      state.groupRideRouteSnapshot.route_url_normalized === rideRoute
+        ? state.groupRideRouteSnapshot
+        : null;
     schedule.push({
       label: 'Group ride',
       value: [
         `${cap(state.groupRideDay)} · ${state.groupRideIntensity === 'quality_bike' ? 'hard (quality)' : 'easy (aerobic)'}`,
         rideRoute ? `Route: ${rideRoute}` : '',
+        routeSnap
+          ? `Strava profile: ~${(routeSnap.distance_m / 1000).toFixed(1)} km, ~${Math.round(routeSnap.elevation_gain_m)} m ↑ (~${routeSnap.climb_density_m_per_km.toFixed(1)} m/km)`
+          : '',
       ].filter(Boolean).join('\n'),
     });
   }

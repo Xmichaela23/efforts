@@ -7,6 +7,8 @@
 import type { PlannedSession, Phase, Intensity, PlannedStrengthExercise } from './types.ts';
 import type { Sport } from './types.ts';
 import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK, type TriRaceDistance } from './science.ts';
+import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
+import { climbNoticeTier, groupRideBikeTssFloor } from '../_shared/group-ride-route-snapshot.ts';
 import type { StrengthProtocol } from '../shared/strength-system/protocols/types.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
@@ -394,6 +396,7 @@ export function groupRideSession(
   goalId: string,
   label = 'Group Ride',
   routeUrl?: string | null,
+  routeSnapshot?: GroupRideRouteSnapshot | null,
 ): PlannedSession {
   const min = Math.max(45, Math.round(hours * 60));
   const phaseLine =
@@ -401,21 +404,52 @@ export function groupRideSession(
       ? 'Keep overall effort aerobic — Z2 with climb surges.'
       : 'This is your quality bike session — give the climbs real effort.';
   const url = typeof routeUrl === 'string' ? routeUrl.trim() : '';
-  const routePara =
-    url.length > 0 ? ` Saved route (open before ride): ${url}` : '';
+
+  const topo =
+    routeSnapshot != null
+      ? (() => {
+          const km = (routeSnapshot.distance_m / 1000).toFixed(1);
+          const elev = Math.round(routeSnapshot.elevation_gain_m);
+          const dens = routeSnapshot.climb_density_m_per_km.toFixed(1);
+          let s = ` Strava route: ~${km} km, ~${elev} m climbing (~${dens} m/km).`;
+          const tier = climbNoticeTier(routeSnapshot);
+          if (tier === 'aggressive') {
+            s +=
+              ' High climbing density — real threshold-like stress even at modest duration; respect recovery the next day.';
+          } else if (tier === 'notice') {
+            s += ' Rolling/hilly profile — pace-by-feel can overshoot flat-road RPE.';
+          }
+          return s;
+        })()
+      : '';
+
+  const routePara = url.length > 0 ? ` Saved route (open before ride): ${url}` : '';
+
+  const inner = session(
+    day,
+    'bike',
+    label,
+    `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}.${topo}${routePara}`,
+    min,
+    'HARD',
+    [],
+    ['quality', 'group_ride', 'anchor'],
+    'Group-ride variable effort',
+    goalId,
+  );
+
+  const floor = groupRideBikeTssFloor(routeSnapshot ?? undefined);
+  let tss = inner.tss;
+  let wtss = inner.weighted_tss;
+  if (floor != null && tss < floor) {
+    tss = floor;
+    wtss = weightedTSS('bike', tss);
+  }
+
   return {
-    ...session(
-      day,
-      'bike',
-      label,
-      `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}.${routePara}`,
-      min,
-      'HARD',
-      [],
-      ['quality', 'group_ride', 'anchor'],
-      'Group-ride variable effort',
-      goalId,
-    ),
+    ...inner,
+    tss,
+    weighted_tss: wtss,
     session_kind: 'quality_bike',
     ...(url ? { route_url: url } : {}),
   };

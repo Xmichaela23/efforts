@@ -5,6 +5,11 @@
  * Convention: 0 = Sunday … 6 = Saturday (matches week-builder long_run_day / rest_days).
  */
 
+import {
+  parseGroupRideRouteSnapshot,
+  type GroupRideRouteSnapshot,
+} from './group-ride-route-snapshot.ts';
+
 const DAY_ALIASES: Record<string, number> = {
   'sun': 0,
   'sunday': 0,
@@ -250,6 +255,8 @@ export interface CombinedSchedulePrefs {
   bike_quality_label?: string;
   /** HTTPS route URL for recurring group ride (e.g. Strava routes); echoed on planned sessions. */
   group_ride_route_url?: string;
+  /** Strava route metrics fetched at wizard save (distance, climbing density). */
+  group_ride_route_snapshot?: GroupRideRouteSnapshot;
   /** Arc-level intent used by scheduling exceptions and progression defaults. */
   training_intent?: TrainingIntentArc;
   rest_days?: number[];
@@ -395,6 +402,10 @@ export function mergeCombinedSchedulePrefs(
     if (ti !== undefined) out.training_intent = ti;
     if (bikeQualityLabel !== undefined) out.bike_quality_label = bikeQualityLabel;
     if (groupRideRouteUrl !== undefined) out.group_ride_route_url = groupRideRouteUrl;
+    const snapParsed = parseGroupRideRouteSnapshot(
+      src.group_ride_route_snapshot ?? src.groupRideRouteSnapshot,
+    );
+    if (snapParsed !== undefined) out.group_ride_route_snapshot = snapParsed;
     if (pdPatch.long_run_day !== undefined) out.long_run_day = pdPatch.long_run_day;
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
     if (pdPatch.swim_easy_day !== undefined) out.swim_easy_day = pdPatch.swim_easy_day;

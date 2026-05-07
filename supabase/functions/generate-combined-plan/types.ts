@@ -2,6 +2,7 @@
 // All type definitions for the multi-sport combined plan engine.
 
 import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
+import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
@@ -74,6 +75,10 @@ export interface AthleteState {
    * Surfaced on planned group-ride sessions when quality bike is anchor-driven.
    */
   group_ride_route_url?: string;
+  /**
+   * Strava-fetched route metrics (wizard save). Drives group-ride topography copy + optional bike TSS floor.
+   */
+  group_ride_route_snapshot?: GroupRideRouteSnapshot;
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */

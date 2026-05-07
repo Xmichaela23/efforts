@@ -1233,7 +1233,15 @@ export function buildWeek(
         if (label) {
           const groupRideHours = resolveGroupRideHours(phase, athleteState);
           bikeQualitySlot!.sessions.push(
-            groupRideSession(bq, groupRideHours, phase, servedGoal, label, athleteState.group_ride_route_url),
+            groupRideSession(
+              bq,
+              groupRideHours,
+              phase,
+              servedGoal,
+              label,
+              athleteState.group_ride_route_url,
+              athleteState.group_ride_route_snapshot,
+            ),
           );
         } else {
           bikeQualitySlot!.sessions.push(groupRideQualityBikeSession(bq, phase, servedGoal));
