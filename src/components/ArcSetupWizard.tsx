@@ -867,12 +867,12 @@ function Step4Bike({
       subtitle="Just the fixed external one — we'll pin your bike week to it. The planner places everything else."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
-      {bikeNote && <ArcHint>{bikeNote}</ArcHint>}
-
       <div className="flex gap-2">
         <ChoiceBtn active={state.hasGroupRide === true} onClick={() => set(true)}>Yes</ChoiceBtn>
         <ChoiceBtn active={state.hasGroupRide === false} onClick={() => set(false)}>No</ChoiceBtn>
       </div>
+
+      {bikeNote && <ArcHint>{bikeNote}</ArcHint>}
 
       {state.hasGroupRide === true && (
         <>
