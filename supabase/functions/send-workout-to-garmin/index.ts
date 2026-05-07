@@ -481,7 +481,9 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     if (!raw) return undefined
     const t = raw.toLowerCase()
     if (/(pull\s*buoy|buoy)/.test(t)) return 'SWIM_PULL_BUOY'
+    // Materialize uses short suffix `board` for kickboard drills; match explicit kickboard first.
     if (/kick\s*board|kickboard/.test(t)) return 'SWIM_KICKBOARD'
+    if (/\bboard\b/.test(t)) return 'SWIM_KICKBOARD'
     if (/paddles?/.test(t)) return 'SWIM_PADDLES'
     if (/fins?/.test(t)) return 'SWIM_FINS'
     if (/snorkel/.test(t)) return 'SWIM_SNORKEL'
@@ -647,6 +649,15 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             if (m) return Number(m[1])
             return undefined
           }
+          const attachSwimMeta = (target: any, stRow: any) => {
+            if (!isSwim || !target || typeof target !== 'object') return
+            const eq = (stRow as any)?.equipment
+            if (eq != null && String(eq).trim() !== '') target.equipment = String(eq).trim()
+            const cue = String((stRow as any)?.cue || '').trim()
+            if (cue) target.cue = cue
+            const stroke = String((stRow as any)?.stroke || '').trim()
+            if (stroke) target.stroke = stroke
+          }
           for (const st of steps) {
             const t = String((st as any)?.type || (st as any)?.kind || '').toLowerCase()
             const isRest = t === 'interval_rest' || t === 'recovery' || /rest/.test(t)
@@ -689,6 +700,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
                 warm.duration = Math.floor(seconds)
               }
+              attachSwimMeta(warm, st)
               warmArr.push(warm)
             } else if (t === 'cooldown') {
               const cool: any = { effortLabel: 'cool down' }
@@ -696,6 +708,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
                 cool.duration = Math.floor(seconds)
               }
+              attachSwimMeta(cool, st)
               coolArr.push(cool)
             } else {
               // For strides, preserve the label so Garmin shows "Stride" not just "interval"
@@ -706,6 +719,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               if (((!isRun) && typeof seconds === 'number' && seconds > 0) || (!(typeof meters === 'number' && meters > 0) && typeof seconds === 'number' && seconds > 0)) {
                 main.duration = Math.floor(seconds)
               }
+              attachSwimMeta(main, st)
               mainArr.push(main)
               const restVal = num((st as any)?.rest_s) ?? num((st as any)?.restSeconds)
               if (typeof restVal === 'number' && restVal > 0) {
