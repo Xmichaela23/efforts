@@ -201,6 +201,8 @@ type WizardState = {
   hasGroupRide: boolean | null;
   groupRideDay: Day | '';
   groupRideIntensity: 'quality_bike' | 'easy_bike' | null;
+  /** Optional HTTPS URL for recurring group ride route (e.g. Strava); stored on training_prefs. */
+  groupRideRouteUrl: string;
   // Step 5 — fixed external run anchor only; planner places everything else
   hasGroupRun: boolean | null;
   groupRunDay: Day | '';
@@ -240,7 +242,7 @@ function blank(): WizardState {
     races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }],
     trainingIntent: null,
     swimIntent: null,
-    hasGroupRide: null, groupRideDay: '', groupRideIntensity: null,
+    hasGroupRide: null, groupRideDay: '', groupRideIntensity: null, groupRideRouteUrl: '',
     hasGroupRun: null, groupRunDay: '', groupRunIntensity: null,
     runQualityPlacement: null,
     bikeQualityPlacement: null,
@@ -293,6 +295,19 @@ function inferDays(state: WizardState) {
 }
 
 // ─── Payload assembly ─────────────────────────────────────────────────────────
+
+/** Normalize optional group-ride route URL for training_prefs (https only after parse). */
+function sanitizeGroupRideRouteUrl(raw: string): string | undefined {
+  const t = raw.trim().slice(0, 512);
+  if (!t) return undefined;
+  try {
+    const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
+    return u.href.slice(0, 512);
+  } catch {
+    return undefined;
+  }
+}
 
 function assemblePayload(state: WizardState): ArcSetupPayload {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0]!;
@@ -348,6 +363,9 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     state.anythingUnusual ? `Note: ${state.anythingUnusual.slice(0, 80)}` : '',
   ].filter(Boolean).join(' ');
 
+  const groupRideRouteStored =
+    triPlan && state.hasGroupRide ? sanitizeGroupRideRouteUrl(state.groupRideRouteUrl) : undefined;
+
   const trainingPrefs: Record<string, unknown> = {
     training_intent: state.trainingIntent || 'completion',
     days_per_week: state.daysPerWeek || 7,
@@ -359,6 +377,7 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     state.groupRideDay
       ? { bike_quality_label: 'Group Ride' }
       : {}),
+    ...(groupRideRouteStored ? { group_ride_route_url: groupRideRouteStored } : {}),
     ...(state.strengthIncluded && state.strengthIntent
       ? { strength_intent: state.strengthIntent }
       : {}),
@@ -858,7 +877,12 @@ function Step4Bike({
       groupRideDay: '',
       groupRideIntensity: null,
       runQualityPlacement: null,
+      groupRideRouteUrl: hasGroupRide ? state.groupRideRouteUrl : '',
     });
+
+  const routeStored = sanitizeGroupRideRouteUrl(state.groupRideRouteUrl);
+  const routeInvalidHint =
+    state.groupRideRouteUrl.trim().length > 0 && !routeStored;
 
   return (
     <StepLayout
@@ -899,6 +923,27 @@ function Step4Bike({
                 <span className="block text-[13px] text-white/55 mt-0.5">Counts as aerobic. The planner adds a separate quality session.</span>
               </ChoiceBtn>
             </div>
+          </div>
+          <div>
+            <p className="text-sm text-white/50 mb-2">Route link <span className="text-white/35">(optional)</span></p>
+            <input
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="https://www.strava.com/routes/…"
+              value={state.groupRideRouteUrl}
+              onChange={e => setState({ ...state, groupRideRouteUrl: e.target.value })}
+              className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
+            />
+            <p className="mt-1.5 text-[11px] text-white/35">
+              Saves on your plan — useful when mid-week run quality stacks with this ride (same day or adjacent). Paste any https route link.
+            </p>
+            {routeInvalidHint && (
+              <p className="mt-1 text-[11px] text-amber-400/85">
+                That doesn&apos;t look like a valid https URL — fix it or clear the field to continue saving it.
+              </p>
+            )}
           </div>
         </>
       )}
@@ -1268,9 +1313,13 @@ function Step9Confirm({
   const schedule: ScheduleRow[] = [];
 
   if (tri && state.hasGroupRide && state.groupRideDay) {
+    const rideRoute = sanitizeGroupRideRouteUrl(state.groupRideRouteUrl);
     schedule.push({
       label: 'Group ride',
-      value: `${cap(state.groupRideDay)} · ${state.groupRideIntensity === 'quality_bike' ? 'hard (quality)' : 'easy (aerobic)'}`,
+      value: [
+        `${cap(state.groupRideDay)} · ${state.groupRideIntensity === 'quality_bike' ? 'hard (quality)' : 'easy (aerobic)'}`,
+        rideRoute ? `Route: ${rideRoute}` : '',
+      ].filter(Boolean).join('\n'),
     });
   }
   if (state.hasGroupRun && state.groupRunDay) {
@@ -1375,7 +1424,7 @@ function Step9Confirm({
             <div key={i}>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-[13px] text-white/45 shrink-0">{row.label}</span>
-                <span className="text-[14px] text-white/80 text-right">{row.value}</span>
+                <span className="text-[14px] text-white/80 text-right whitespace-pre-line">{row.value}</span>
               </div>
               {row.conflict && (
                 <p className="text-[12px] text-amber-400/80 mt-0.5 text-right">{row.conflict}</p>

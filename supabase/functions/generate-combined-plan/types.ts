@@ -69,6 +69,11 @@ export interface AthleteState {
    * When set, the session name surfaces it so the calendar matches the athlete's reality.
    */
   bike_quality_label?: string;
+  /**
+   * Optional Strava route (or other HTTPS URL) for the recurring group ride anchor.
+   * Surfaced on planned group-ride sessions when quality bike is anchor-driven.
+   */
+  group_ride_route_url?: string;
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */
@@ -249,6 +254,8 @@ export interface PlannedSession {
   serves_goal: string;   // goal.id or 'shared'
   zone_targets: string;  // "Z2" | "Z4 intervals" | etc.
   timing?: 'AM' | 'PM';
+  /** External route link for anchor rides (e.g. Strava); optional. */
+  route_url?: string;
   /**
    * Scheduling slot kind aligned with `week-optimizer` / matrix vocabulary (e.g. `quality_bike`).
    * Stable across display copy changes — prefer this over parsing `name` in tests or analytics.

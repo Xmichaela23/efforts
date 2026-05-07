@@ -1204,7 +1204,8 @@ async function buildCombinedPlan(
       freshCombinedPrefs.bike_quality_route_estimated_hours !== undefined ||
       freshCombinedPrefs.bike_quality_route_estimated_minutes !== undefined ||
       freshCombinedPrefs.bike_quality_group_ride_hours !== undefined ||
-      freshCombinedPrefs.bike_quality_group_ride_minutes !== undefined;
+      freshCombinedPrefs.bike_quality_group_ride_minutes !== undefined ||
+      Boolean(String(freshCombinedPrefs.group_ride_route_url ?? '').trim());
     if (inferredLabel) return inferredLabel as string;
     if (hasRouteEstimate && freshCombinedPrefs.bike_quality_day !== undefined) {
       return 'Group Ride';
@@ -1303,6 +1304,9 @@ async function buildCombinedPlan(
         : {}),
       ...(resolvedBikeQualityLabelForCombined
         ? { bike_quality_label: resolvedBikeQualityLabelForCombined }
+        : {}),
+      ...(freshCombinedPrefs.group_ride_route_url
+        ? { group_ride_route_url: freshCombinedPrefs.group_ride_route_url }
         : {}),
       strength_protocol: resolvedCombinedStrengthProtocol,
       ...(freshCombinedPrefs.strength_intent

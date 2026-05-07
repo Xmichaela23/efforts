@@ -248,6 +248,8 @@ export interface CombinedSchedulePrefs {
    * Distinct from structured mid-week quality naming when absent.
    */
   bike_quality_label?: string;
+  /** HTTPS route URL for recurring group ride (e.g. Strava routes); echoed on planned sessions. */
+  group_ride_route_url?: string;
   /** Arc-level intent used by scheduling exceptions and progression defaults. */
   training_intent?: TrainingIntentArc;
   rest_days?: number[];
@@ -327,6 +329,21 @@ export function mergeCombinedSchedulePrefs(
     const bqlRaw = src.bike_quality_label ?? src.bikeQualityLabel;
     const bikeQualityLabel =
       typeof bqlRaw === 'string' && bqlRaw.trim().length > 0 ? bqlRaw.trim() : undefined;
+    const gruRaw = src.group_ride_route_url ?? src.groupRideRouteUrl;
+    let groupRideRouteUrl: string | undefined;
+    if (typeof gruRaw === 'string') {
+      const t = gruRaw.trim();
+      if (t.length > 0) {
+        try {
+          const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`);
+          if (u.protocol === 'http:' || u.protocol === 'https:') {
+            groupRideRouteUrl = u.href.slice(0, 512);
+          }
+        } catch {
+          /* ignore invalid URLs */
+        }
+      }
+    }
     const groupRideHours = pickFinitePositive(src, [
       'bike_quality_group_ride_hours',
       'bikeQualityGroupRideHours',
@@ -377,6 +394,7 @@ export function mergeCombinedSchedulePrefs(
     if (swimLS !== undefined) out.swim_load_source = swimLS;
     if (ti !== undefined) out.training_intent = ti;
     if (bikeQualityLabel !== undefined) out.bike_quality_label = bikeQualityLabel;
+    if (groupRideRouteUrl !== undefined) out.group_ride_route_url = groupRideRouteUrl;
     if (pdPatch.long_run_day !== undefined) out.long_run_day = pdPatch.long_run_day;
     if (pdPatch.long_ride_day !== undefined) out.long_ride_day = pdPatch.long_ride_day;
     if (pdPatch.swim_easy_day !== undefined) out.swim_easy_day = pdPatch.swim_easy_day;

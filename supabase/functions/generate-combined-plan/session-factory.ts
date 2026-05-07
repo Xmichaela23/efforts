@@ -393,18 +393,22 @@ export function groupRideSession(
   phase: Phase,
   goalId: string,
   label = 'Group Ride',
+  routeUrl?: string | null,
 ): PlannedSession {
   const min = Math.max(45, Math.round(hours * 60));
   const phaseLine =
     phase === 'base'
       ? 'Keep overall effort aerobic — Z2 with climb surges.'
       : 'This is your quality bike session — give the climbs real effort.';
+  const url = typeof routeUrl === 'string' ? routeUrl.trim() : '';
+  const routePara =
+    url.length > 0 ? ` Saved route (open before ride): ${url}` : '';
   return {
     ...session(
       day,
       'bike',
       label,
-      `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}`,
+      `${day} group ride — ${hours.toFixed(1)} hr. Ride your own effort. Push on the climbs, recover on the flats. ${phaseLine}.${routePara}`,
       min,
       'HARD',
       [],
@@ -413,6 +417,7 @@ export function groupRideSession(
       goalId,
     ),
     session_kind: 'quality_bike',
+    ...(url ? { route_url: url } : {}),
   };
 }
 

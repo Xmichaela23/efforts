@@ -64,7 +64,8 @@ function qualityBikeAnchorFromState(
     state.bike_quality_route_estimated_hours != null ||
     state.bike_quality_route_estimated_minutes != null ||
     state.bike_quality_group_ride_hours != null ||
-    state.bike_quality_group_ride_minutes != null;
+    state.bike_quality_group_ride_minutes != null ||
+    Boolean(String(state.group_ride_route_url ?? '').trim());
   const lbl = String(state.bike_quality_label ?? '').trim();
   const looksGroupRide =
     hasGroupRideDuration ||
@@ -178,7 +179,8 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     merged.bike_quality_route_estimated_hours != null ||
     merged.bike_quality_route_estimated_minutes != null ||
     merged.bike_quality_group_ride_hours != null ||
-    merged.bike_quality_group_ride_minutes != null;
+    merged.bike_quality_group_ride_minutes != null ||
+    Boolean(String(merged.group_ride_route_url ?? '').trim());
   if (!String(merged.bike_quality_label ?? '').trim() && hasGroupRideDuration) {
     merged.bike_quality_label = 'Group Ride';
   }

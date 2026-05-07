@@ -145,7 +145,9 @@ Deno.serve(async (req: Request) => {
       duration: s.duration,
       steps_preset: s.steps_preset,
       tags: s.tags,
-      timing: s.timing,
+      ...(typeof s.route_url === 'string' && s.route_url.trim()
+        ? { route_url: s.route_url.trim() }
+        : {}),
       intensity_class: s.intensity_class,
       tss: s.tss,
       weighted_tss: s.weighted_tss,
