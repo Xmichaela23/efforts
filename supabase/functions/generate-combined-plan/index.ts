@@ -100,6 +100,8 @@ Deno.serve(async (req: Request) => {
         training_intent: scheduleState.training_intent,
         transition_mode: scheduleState.transition_mode,
         tri_approach: scheduleState.tri_approach,
+        run_quality_placement: scheduleState.run_quality_placement,
+        bike_quality_placement: scheduleState.bike_quality_placement,
       });
     }
 
@@ -194,6 +196,8 @@ Deno.serve(async (req: Request) => {
       run_easy_day: scheduleState.run_easy_day ?? null,
       bike_quality_day: scheduleState.bike_quality_day ?? null,
       bike_easy_day: scheduleState.bike_easy_day ?? null,
+      run_quality_placement: scheduleState.run_quality_placement ?? null,
+      bike_quality_placement: scheduleState.bike_quality_placement ?? null,
       strength_protocol: scheduleState.strength_protocol ?? null,
       strength_intent: scheduleState.strength_intent ?? null,
       training_intent: scheduleState.training_intent ?? null,

@@ -878,6 +878,19 @@ export function buildWeek(
     }
   }
 
+  // Arc wizard: fold mid-week run quality into Sunday long (recovery-first path).
+  const runQualityPlacementBlendEligible =
+    hasTri &&
+    athleteState.run_quality_placement === 'long_run_blend' &&
+    !raceThisWeek &&
+    !isRecovery &&
+    !recoveryRebuildWeek1 &&
+    !recoveryRebuildWeek2EasyRunOnly &&
+    phase !== 'taper';
+  if (runQualityPlacementBlendEligible) {
+    shiftQualityRunToLongRun = true;
+  }
+
   // Third swim (`preferred_days.swim[2]` → swim_third_day): only when swim_intent === 'focus'.
   const swimIntentFocus = String(athleteState.swim_intent ?? '').toLowerCase() === 'focus';
   let swimThirdDay: string | null = null;
@@ -1051,6 +1064,7 @@ export function buildWeek(
   if (
     athleteState.enforce_optimizer_anchor_days !== true &&
     hasTri &&
+    !shiftQualityRunToLongRun &&
     !raceThisWeek &&
     !isRecovery &&
     !recoveryRebuildWeek1 &&
@@ -1062,7 +1076,10 @@ export function buildWeek(
     if (preferredRunQ === dayAfterBike) {
       const qrPref = getPref('quality-run-after-bike');
 
-      if (PREF_KEEP_QUALITY_RUN_ACTIONS.has(qrPref ?? '')) {
+      if (
+        PREF_KEEP_QUALITY_RUN_ACTIONS.has(qrPref ?? '') ||
+        athleteState.run_quality_placement === 'standalone_midweek'
+      ) {
         // Athlete accepted the back-to-back — keep preferred day as-is, no conflict emitted.
 
       } else if (qrPref === 'shift_quality_to_long_run') {

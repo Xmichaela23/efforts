@@ -880,6 +880,35 @@ function combinedTransitionFromPostRace(
   return { structural_load_hint: 'moderate' };
 }
 
+type CombinedPlanGoalMeta = { id: string; priority: 'A' | 'B' | 'C'; event_date: string | null | undefined };
+
+/**
+ * Exactly one goal owns merged skeleton anchors. When multiple rows share priority A (wizard defaults),
+ * the naive `find(A)` followed `workingGoals` order (newest-first) and picked the wrong race —
+ * stale Tuesday QB while the earliest A race had Wednesday pin-restored group ride.
+ */
+function resolveCombinedPlanPrimaryGoalMeta(
+  goals: CombinedPlanGoalMeta[],
+): CombinedPlanGoalMeta | undefined {
+  if (goals.length === 0) return undefined;
+  const aGoals = goals.filter((g) => g.priority === 'A');
+  const pool = aGoals.length > 0 ? aGoals : goals;
+  const dayMs = (d: string | null | undefined) => {
+    if (!d || typeof d !== 'string') return NaN;
+    const t = Date.parse(d.slice(0, 10));
+    return Number.isFinite(t) ? t : NaN;
+  };
+  const sorted = [...pool].sort((x, y) => {
+    const tx = dayMs(x.event_date);
+    const ty = dayMs(y.event_date);
+    if (Number.isFinite(tx) && Number.isFinite(ty) && tx !== ty) return tx - ty;
+    if (Number.isFinite(tx) && !Number.isFinite(ty)) return -1;
+    if (!Number.isFinite(tx) && Number.isFinite(ty)) return 1;
+    return x.id.localeCompare(y.id);
+  });
+  return sorted[0];
+}
+
 // ── Combined plan orchestration ───────────────────────────────────────────────
 //
 // Called when the user clicks "Build combined plan". Gathers all active event
@@ -999,8 +1028,9 @@ async function buildCombinedPlan(
   const combinedStrengthEquipment: string[] = combinedBaseline?.equipment?.strength ?? [];
 
   // Resolve approach for the combined plan.
-  // The primary event goal drives the approach; defaults to the same logic as standalone.
-  const primaryGoal = goalsForCombined.find(g => g.priority === 'A') ?? goalsForCombined[0];
+  // The primary event goal drives the approach; among ties on priority A, earliest race date wins.
+  const primaryGoal =
+    resolveCombinedPlanPrimaryGoalMeta(goalsForCombined) ?? goalsForCombined[0];
   const primaryGoalPrefs = (workingGoals.find(g => g.id === primaryGoal?.id)?.training_prefs as Record<string, any>) ?? {};
   // Extract per-athlete bike split from stored projection (computed by recomputeRaceProjectionsForUser
   // on prior plan saves). Falls back to hardcoded distance estimate when not yet available.
@@ -1159,6 +1189,8 @@ async function buildCombinedPlan(
     swim_quality_day: freshCombinedPrefs.swim_quality_day,
     swim_third_day: freshCombinedPrefs.swim_third_day,
     strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
+    run_quality_placement: freshCombinedPrefs.run_quality_placement,
+    bike_quality_placement: freshCombinedPrefs.bike_quality_placement,
   }));
 
   const combinedPlanStartDate =
@@ -1193,6 +1225,8 @@ async function buildCombinedPlan(
     strength_preferred_days: freshCombinedPrefs.strength_preferred_days,
     bike_quality_label: resolvedBikeQualityLabelForCombined,
     strength_sessions_cap: coEqualProvisional1x ? 1 : undefined,
+    run_quality_placement: freshCombinedPrefs.run_quality_placement,
+    bike_quality_placement: freshCombinedPrefs.bike_quality_placement,
   }));
 
   const postRaceForTradeOffs = findPostRaceRecoveryContext(
@@ -1287,6 +1321,12 @@ async function buildCombinedPlan(
       ...(freshDpw != null ? { days_per_week: freshDpw } : {}),
       ...(freshCombinedPrefs.conflict_preferences && Object.keys(freshCombinedPrefs.conflict_preferences).length > 0
         ? { conflict_preferences: freshCombinedPrefs.conflict_preferences }
+        : {}),
+      ...(freshCombinedPrefs.run_quality_placement
+        ? { run_quality_placement: freshCombinedPrefs.run_quality_placement }
+        : {}),
+      ...(freshCombinedPrefs.bike_quality_placement
+        ? { bike_quality_placement: freshCombinedPrefs.bike_quality_placement }
         : {}),
       // assessment_week_preference is not parsed by mergeCombinedSchedulePrefs —
       // read from the raw goal training_prefs that the arc-setup chat emitted.

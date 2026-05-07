@@ -152,6 +152,17 @@ export interface AthleteState {
    * `session_index` (1 = upper, 0 = lower). Overrides weekday scanning when present.
    */
   strength_optimizer_slots?: { weekday: string; session_index: 0 | 1 }[];
+  /**
+   * Arc wizard / athlete preference when anchored quality bike can force mid-week run intervals
+   * (typically Thu after Wed group ride). `long_run_blend` folds stimulus into the long run instead;
+   * `standalone_midweek` accepts stack-back-to-back (engine keeps adjacent HARD geometry).
+   */
+  run_quality_placement?: 'standalone_midweek' | 'long_run_blend';
+  /**
+   * Mirror knob when anchored quality run constrains bike quality geometry (schedule-level).
+   * Wired through contract; week-builder honors `standalone_midweek` vs relocate when conflicts exist.
+   */
+  bike_quality_placement?: 'standalone_midweek' | 'long_ride_blend';
 }
 
 export interface AthleteMemory {

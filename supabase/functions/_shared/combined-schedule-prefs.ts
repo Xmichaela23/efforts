@@ -269,6 +269,10 @@ export interface CombinedSchedulePrefs {
    * can honour them on regeneration.
    */
   conflict_preferences?: Record<string, string>;
+  /** See `AthleteState.run_quality_placement` (combined tri schedule contract). */
+  run_quality_placement?: 'standalone_midweek' | 'long_run_blend';
+  /** See `AthleteState.bike_quality_placement`. */
+  bike_quality_placement?: 'standalone_midweek' | 'long_ride_blend';
 }
 
 /** Later sources override earlier ones. */
@@ -392,6 +396,14 @@ export function mergeCombinedSchedulePrefs(
     }
     if (pdPatch.strength_preferred_days?.length) {
       out.strength_preferred_days = pdPatch.strength_preferred_days;
+    }
+    const rqp = src.run_quality_placement ?? src.runQualityPlacement;
+    if (rqp === 'standalone_midweek' || rqp === 'long_run_blend') {
+      out.run_quality_placement = rqp;
+    }
+    const bqp = src.bike_quality_placement ?? src.bikeQualityPlacement;
+    if (bqp === 'standalone_midweek' || bqp === 'long_ride_blend') {
+      out.bike_quality_placement = bqp;
     }
     const cpRaw = src.conflict_preferences ?? src.conflictPreferences;
     if (cpRaw && typeof cpRaw === 'object' && !Array.isArray(cpRaw)) {

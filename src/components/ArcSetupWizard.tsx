@@ -139,6 +139,15 @@ type WizardState = {
   hasGroupRun: boolean | null;
   groupRunDay: Day | '';
   groupRunIntensity: 'quality_run' | 'easy_run' | null;
+  /**
+   * After anchored Wed (etc.) quality group ride: stack mid-week run quality vs fold into long run.
+   * Omitted when no step shown — planner keeps legacy adjacency behavior.
+   */
+  runQualityPlacement: 'standalone_midweek' | 'long_run_blend' | null;
+  /**
+   * After anchored quality run club: keep standalone bike quality vs prefer long-ride consolidation (contract; resolver path).
+   */
+  bikeQualityPlacement: 'standalone_midweek' | 'long_ride_blend' | null;
   // Step 6 (tri)
   longRideDay: Day | '';
   longRunDay: Day | '';
@@ -167,6 +176,8 @@ function blank(): WizardState {
     swimIntent: null,
     hasGroupRide: null, groupRideDay: '', groupRideIntensity: null,
     hasGroupRun: null, groupRunDay: '', groupRunIntensity: null,
+    runQualityPlacement: null,
+    bikeQualityPlacement: null,
     longRideDay: '', longRunDay: '',
     daysPerWeek: null,
     strengthIncluded: null, strengthIntent: null,
@@ -291,6 +302,12 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     ...(state.anythingUnusual ? { notes: state.anythingUnusual } : {}),
     ...(state.assessmentWeekPreference
       ? { assessment_week_preference: state.assessmentWeekPreference }
+      : {}),
+    ...(triPlan && state.runQualityPlacement != null
+      ? { run_quality_placement: state.runQualityPlacement }
+      : {}),
+    ...(triPlan && state.bikeQualityPlacement != null
+      ? { bike_quality_placement: state.bikeQualityPlacement }
       : {}),
   };
 
@@ -769,7 +786,13 @@ function Step4Bike({
     : null;
 
   const set = (hasGroupRide: boolean) =>
-    setState({ ...state, hasGroupRide, groupRideDay: '', groupRideIntensity: null });
+    setState({
+      ...state,
+      hasGroupRide,
+      groupRideDay: '',
+      groupRideIntensity: null,
+      runQualityPlacement: null,
+    });
 
   return (
     <StepLayout
@@ -844,7 +867,13 @@ function Step5Run({
     : null;
 
   const set = (hasGroupRun: boolean) =>
-    setState({ ...state, hasGroupRun, groupRunDay: '', groupRunIntensity: null });
+    setState({
+      ...state,
+      hasGroupRun,
+      groupRunDay: '',
+      groupRunIntensity: null,
+      bikeQualityPlacement: null,
+    });
 
   return (
     <StepLayout
@@ -888,6 +917,104 @@ function Step5Run({
           </div>
         </>
       )}
+    </StepLayout>
+  );
+}
+
+/** Tri only — shown after anchored hard group ride (quality bike day pinned). */
+function StepTriRunQualityPlacement({
+  state, setState, onNext, onBack, step, totalSteps,
+}: {
+  state: WizardState;
+  setState: (s: WizardState) => void;
+  onNext: () => void;
+  onBack: () => void;
+  step: number;
+  totalSteps: number;
+}) {
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const ride = state.groupRideDay ? cap(state.groupRideDay) : 'group ride';
+  const canContinue = state.runQualityPlacement !== null;
+
+  return (
+    <StepLayout
+      step={step}
+      totalSteps={totalSteps}
+      title="Run intervals after your quality bike day?"
+      subtitle={`Mid-week run quality often lands the day after ${ride} — hard bike, then hard run. Some athletes handle that well; others fold threshold work into the Sunday long run instead.`}
+      onBack={onBack}
+      onContinue={onNext}
+      canContinue={canContinue}
+    >
+      <div className="space-y-2">
+        <ChoiceBtn
+          active={state.runQualityPlacement === 'standalone_midweek'}
+          onClick={() => setState({ ...state, runQualityPlacement: 'standalone_midweek' })}
+        >
+          <span className="block font-semibold">Standalone mid-week intervals</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">
+            Stack after quality bike when the calendar lands there — for athletes who recover quickly on the run.
+          </span>
+        </ChoiceBtn>
+        <ChoiceBtn
+          active={state.runQualityPlacement === 'long_run_blend'}
+          onClick={() => setState({ ...state, runQualityPlacement: 'long_run_blend' })}
+        >
+          <span className="block font-semibold">Fold quality into Sunday long</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">
+            Skip a separate mid-week quality session; long run carries threshold / race-pace blocks — recovery-first.
+          </span>
+        </ChoiceBtn>
+      </div>
+    </StepLayout>
+  );
+}
+
+/** Tri only — shown after anchored quality run (club / track night). Preference is persisted for bike/run geometry + resolver. */
+function StepTriBikeQualityPlacement({
+  state, setState, onNext, onBack, step, totalSteps,
+}: {
+  state: WizardState;
+  setState: (s: WizardState) => void;
+  onNext: () => void;
+  onBack: () => void;
+  step: number;
+  totalSteps: number;
+}) {
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const rn = state.groupRunDay ? cap(state.groupRunDay) : 'run anchor';
+  const canContinue = state.bikeQualityPlacement !== null;
+
+  return (
+    <StepLayout
+      step={step}
+      totalSteps={totalSteps}
+      title="Bike quality when run club pins a hard day?"
+      subtitle={`Your ${rn} session is fixed. Mid-week bike quality may sit right next to it — some athletes keep both; others prefer structured bike stress folded into the long ride when the week gets cramped.`}
+      onBack={onBack}
+      onContinue={onNext}
+      canContinue={canContinue}
+    >
+      <div className="space-y-2">
+        <ChoiceBtn
+          active={state.bikeQualityPlacement === 'standalone_midweek'}
+          onClick={() => setState({ ...state, bikeQualityPlacement: 'standalone_midweek' })}
+        >
+          <span className="block font-semibold">Keep standalone bike quality</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">
+            Accept adjacent hard bike + hard run geometry when the planner needs it — bike-forward tolerance.
+          </span>
+        </ChoiceBtn>
+        <ChoiceBtn
+          active={state.bikeQualityPlacement === 'long_ride_blend'}
+          onClick={() => setState({ ...state, bikeQualityPlacement: 'long_ride_blend' })}
+        >
+          <span className="block font-semibold">Prefer long-ride bike emphasis</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">
+            When mid-week bike quality fights the run anchor, bias toward endurance + tempo on long ride day — saved on your plan contract.
+          </span>
+        </ChoiceBtn>
+      </div>
     </StepLayout>
   );
 }
@@ -1078,6 +1205,24 @@ function Step9Confirm({
       conflict,
     });
   }
+  if (tri && state.runQualityPlacement) {
+    schedule.push({
+      label: 'Run quality vs bike day',
+      value:
+        state.runQualityPlacement === 'long_run_blend'
+          ? 'Folded into long run (no separate mid-week quality)'
+          : 'Standalone mid-week (stack after quality bike when adjacent)',
+    });
+  }
+  if (tri && state.bikeQualityPlacement) {
+    schedule.push({
+      label: 'Bike quality vs run anchor',
+      value:
+        state.bikeQualityPlacement === 'long_ride_blend'
+          ? 'Prefer long-ride emphasis when mid-week is cramped (contract)'
+          : 'Standalone mid-week bike quality when possible',
+    });
+  }
   if (tri) {
     const longRide = state.longRideDay || 'saturday';
     const longRun = state.longRunDay || 'sunday';
@@ -1258,7 +1403,19 @@ function getSteps(state: WizardState) {
   const tri = isTri(primaryRace?.distance || '70.3');
   const steps = ['races', 'intent'];
   if (tri) steps.push('swim', 'bike');
+  const showRunPlacement =
+    tri &&
+    state.hasGroupRide === true &&
+    state.groupRideIntensity === 'quality_bike' &&
+    !!state.groupRideDay;
+  if (showRunPlacement) steps.push('rq_placement');
   steps.push('run');
+  const showBikePlacement =
+    tri &&
+    state.hasGroupRun === true &&
+    state.groupRunIntensity === 'quality_run' &&
+    !!state.groupRunDay;
+  if (showBikePlacement) steps.push('bq_placement');
   if (tri) steps.push('longdays');
   steps.push('budget');
   if (tri) steps.push('strength');
@@ -1367,8 +1524,14 @@ export default function ArcSetupWizard() {
             {currentStep === 'bike' && (
               <Step4Bike {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
+            {currentStep === 'rq_placement' && (
+              <StepTriRunQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+            )}
             {currentStep === 'run' && (
               <Step5Run {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+            )}
+            {currentStep === 'bq_placement' && (
+              <StepTriBikeQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'longdays' && (
               <Step6LongDays {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
