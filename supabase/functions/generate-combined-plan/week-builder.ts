@@ -1867,7 +1867,7 @@ export function buildWeek(
 }
 
 const CONCENTRATED_LOAD_DAY =
-  'Concentrated load day — your Wednesday group ride anchor required pairing the quality run and lower body session on Thursday. Run first, then lift. This is intentional.';
+  'Concentrated load day — lower-body strength landed the same day as your mid-week quality run (run before lifting when stacked). Intentional pairing around anchors / co-equal spacing.';
 
 /**
  * Wednesday quality-bike anchors often shift quality_run to Thursday; pairing with lower-body

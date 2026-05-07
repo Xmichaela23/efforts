@@ -324,6 +324,7 @@ Deno.serve(async (req: Request) => {
         validation,
         validation_failures: failures,
         sessions_by_week,
+        week_trade_offs: plan_contract_v1.week_trade_offs as Record<string, string[]>,
         plan_contract_v1,
         plan_config,
         conflict_resolutions,
@@ -366,6 +367,7 @@ Deno.serve(async (req: Request) => {
       validation_failures: failures,
       preview: previewSummary,
       sessions_by_week,
+      week_trade_offs: plan_contract_v1.week_trade_offs as Record<string, string[]>,
       generation_trade_offs: persistedTradeOffsEffective,
     });
 

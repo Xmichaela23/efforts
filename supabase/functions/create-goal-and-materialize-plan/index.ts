@@ -27,6 +27,7 @@ import { fixTransposedEasyBikeRunAgainstSwimOrder } from '../_shared/tri-preferr
 import {
   aggregateOptimizerScheduleSignals,
   buildCombinedPlanGenerationTradeOffs,
+  enrichScheduleSignalsWithCombinedPlanTradeOffs,
   stripStaleQualityRunUnplacedFromScheduleSignals,
   type BackfillOptimizerSnapshot,
   type PlanOptimizerSnapshotInput,
@@ -1509,8 +1510,17 @@ async function buildCombinedPlan(
       '[buildCombinedPlan] anchors_honored:',
       JSON.stringify({ ...honoredP, source_week_key: wkP, source: 'preview_response' }),
     );
+    const wtoPrev =
+      (combined as { week_trade_offs?: Record<string, unknown> })?.week_trade_offs ??
+      ((combined?.plan_contract_v1 as Record<string, unknown> | undefined)?.week_trade_offs as
+        | Record<string, unknown>
+        | undefined);
+    const schedule_signals_mid = enrichScheduleSignalsWithCombinedPlanTradeOffs(schedule_signals, {
+      week_trade_offs: wtoPrev,
+      sessions_by_week: sbwPrev,
+    });
     const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
-      schedule_signals,
+      schedule_signals_mid,
       sbwPrev,
     );
     return { preview: true as const, combined_preview: combined as Record<string, unknown>, schedule_signals: schedule_signals_out };
@@ -1586,7 +1596,16 @@ async function buildCombinedPlan(
     JSON.stringify({ ...honoredDb, source_week_key: wkDb, source: 'plan_row_sessions_by_week' }),
   );
 
-  const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(schedule_signals, sbwDb);
+  const wtoDb =
+    (combined as { week_trade_offs?: Record<string, unknown> })?.week_trade_offs ?? undefined;
+  const schedule_signals_mid = enrichScheduleSignalsWithCombinedPlanTradeOffs(schedule_signals, {
+    week_trade_offs: wtoDb,
+    sessions_by_week: sbwDb,
+  });
+  const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
+    schedule_signals_mid,
+    sbwDb,
+  );
 
   return { plan_id: combinedPlanId, preview: false as const, schedule_signals: schedule_signals_out };
 }

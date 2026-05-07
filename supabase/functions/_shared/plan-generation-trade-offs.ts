@@ -262,11 +262,125 @@ function lineLooksLikeQualityRunUnplaced(line: string): boolean {
   return QR_UNPLACED_TRADE_RE.test(s) || QR_UNPLACED_CONFLICT_RE.test(s);
 }
 
+/** Same predicate as weeks-scan below; exported for tests / reuse in Schedule adjustments UX. */
+export function plannedSessionLooksLikeStructuredQualityRun(s: Record<string, unknown>): boolean {
+  if (String(s.type ?? s.discipline ?? '').toLowerCase() !== 'run') return false;
+
+  if (String(s.session_kind ?? '') === 'quality_run') return true;
+
+  const name = String(s.name ?? '').toLowerCase();
+  const tags = Array.isArray(s.tags)
+    ? s.tags.map((t) => String(t).toLowerCase()).join(' ')
+    : '';
+
+  if (/^easy\s+run\b|^recovery\s+run\b|^zone\s*1\b|^z1\b/i.test(String(s.name ?? ''))) return false;
+  if (
+    tags.includes('easy_run') &&
+    !/(interval|tempo|threshold|vo2|quality|hard|race)/.test(tags)
+  ) {
+    return false;
+  }
+
+  if (
+    /interval|tempo|threshold|vo2|vo₂|track|strides|hill\s*repeat|race\s*pace|marathon\s*pace|\bmp\b|\blt\b|\bat\b/i.test(
+      name,
+    )
+  ) {
+    return true;
+  }
+  if (/interval|tempo|threshold|vo2|quality|race_specific|race-pace|hard_session/.test(tags)) {
+    return true;
+  }
+
+  const ic = String(s.intensity_class ?? '');
+  if ((ic === 'HARD' || ic === 'MODERATE') && !/^easy\b/.test(name)) return true;
+  return false;
+}
+
+function sessionIsAnchoredGroupRide(s: Record<string, unknown>): boolean {
+  const tags = Array.isArray(s.tags) ? s.tags.map((t) => String(t).toLowerCase()) : [];
+  if (tags.includes('group_ride')) return true;
+  if (/group\s*ride/i.test(String(s.name ?? ''))) return true;
+  return false;
+}
+
+const WEEKDAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function sortWeekdays(days: Iterable<string>): string[] {
+  return [...new Set([...days].map((d) => d.trim()).filter(Boolean))].sort(
+    (a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b),
+  );
+}
+
 /**
- * True when the built calendar includes run stimulus we treat as "quality" for UX purposes:
- * intervals/tempo/threshold-style work, explicit quality_run kind, or hard/moderate non-easy runs.
- * Used to drop stale optimizer strings that claim quality_run could not be placed.
+ * When the anchored group ride and structured quality run land same weekday — surfaced on Goals
+ * "Schedule adjustments" (optimizer prose alone omitted this).
  */
+export function deriveGroupRideQualityRunSameDayTradeOff(
+  sessions_by_week: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!sessions_by_week || typeof sessions_by_week !== 'object') return null;
+  const daysHit = new Set<string>();
+  for (const weekSessions of Object.values(sessions_by_week)) {
+    if (!Array.isArray(weekSessions)) continue;
+    const byDay = new Map<string, Record<string, unknown>[]>();
+    for (const raw of weekSessions) {
+      if (!raw || typeof raw !== 'object') continue;
+      const s = raw as Record<string, unknown>;
+      const day = String(s.day ?? '').trim();
+      if (!day) continue;
+      const arr = byDay.get(day) ?? [];
+      arr.push(s);
+      byDay.set(day, arr);
+    }
+    for (const [day, arr] of byDay) {
+      const gr = arr.some(sessionIsAnchoredGroupRide);
+      const qr = arr.some((x) => plannedSessionLooksLikeStructuredQualityRun(x));
+      if (gr && qr) daysHit.add(day);
+    }
+  }
+  if (!daysHit.size) return null;
+  const pretty = sortWeekdays(daysHit).join(', ');
+  return `${pretty}: anchored group ride and run intervals (quality run) share the same day — heavy legs; deliberate pairing around your pins.`;
+}
+
+/**
+ * Merge week-builder `week_trade_offs` plus derived calendar facts into Goals-schedule banner lines.
+ * Optimizer-only aggregates omit builder/session truths unless we enrich here.
+ */
+export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
+  signals: ScheduleSignals,
+  opts: {
+    week_trade_offs?: Record<string, unknown> | null;
+    sessions_by_week?: Record<string, unknown> | null;
+  },
+): ScheduleSignals {
+  const seen = new Set(signals.trade_offs.map((t) => String(t).trim()).filter(Boolean));
+  const out = [...signals.trade_offs];
+
+  const wto = opts.week_trade_offs;
+  if (wto && typeof wto === 'object' && !Array.isArray(wto)) {
+    for (const arr of Object.values(wto)) {
+      if (!Array.isArray(arr)) continue;
+      for (const line of arr) {
+        const x = String(line).trim();
+        if (x && !seen.has(x)) {
+          out.push(x);
+          seen.add(x);
+        }
+      }
+    }
+  }
+
+  const derived = deriveGroupRideQualityRunSameDayTradeOff(opts.sessions_by_week ?? null);
+  if (derived && !seen.has(derived)) {
+    out.push(derived);
+    seen.add(derived);
+  }
+
+  return { ...signals, trade_offs: out };
+}
+
 export function sessionsByWeekHasStructuredQualityRun(
   sessions_by_week: Record<string, unknown> | null | undefined,
 ): boolean {
@@ -275,37 +389,7 @@ export function sessionsByWeekHasStructuredQualityRun(
     if (!Array.isArray(weekSessions)) continue;
     for (const raw of weekSessions) {
       if (!raw || typeof raw !== 'object') continue;
-      const s = raw as Record<string, unknown>;
-      if (String(s.type ?? s.discipline ?? '') !== 'run') continue;
-
-      if (String(s.session_kind ?? '') === 'quality_run') return true;
-
-      const name = String(s.name ?? '').toLowerCase();
-      const tags = Array.isArray(s.tags)
-        ? s.tags.map((t) => String(t).toLowerCase()).join(' ')
-        : '';
-
-      if (/^easy\s+run\b|^recovery\s+run\b|^zone\s*1\b|^z1\b/i.test(String(s.name ?? ''))) continue;
-      if (
-        tags.includes('easy_run') &&
-        !/(interval|tempo|threshold|vo2|quality|hard|race)/.test(tags)
-      ) {
-        continue;
-      }
-
-      if (
-        /interval|tempo|threshold|vo2|vo₂|track|strides|hill\s*repeat|race\s*pace|marathon\s*pace|\bmp\b|\blt\b|\bat\b/i.test(
-          name,
-        )
-      ) {
-        return true;
-      }
-      if (/interval|tempo|threshold|vo2|quality|race_specific|race-pace|hard_session/.test(tags)) {
-        return true;
-      }
-
-      const ic = String(s.intensity_class ?? '');
-      if ((ic === 'HARD' || ic === 'MODERATE') && !/^easy\b/.test(name)) return true;
+      if (plannedSessionLooksLikeStructuredQualityRun(raw as Record<string, unknown>)) return true;
     }
   }
   return false;

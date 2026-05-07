@@ -1878,7 +1878,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             </p>
             {(arcScheduleSignals.trade_offs?.length ?? 0) > 0 && (
               <ul className="mt-2 list-disc list-inside text-xs text-amber-100/80 space-y-1">
-                {arcScheduleSignals.trade_offs.slice(0, 4).map((t, i) => (
+                {arcScheduleSignals.trade_offs.slice(0, 6).map((t, i) => (
                   <li key={`to-${i}`}>{t}</li>
                 ))}
               </ul>
