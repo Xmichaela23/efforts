@@ -90,6 +90,7 @@ Deno.serve(async (req: Request) => {
       preferred_days:              request.preferred_days,
       has_cable:                   request.has_cable,
       has_ghd:                     request.has_ghd,
+      swim_equipment:              request.swim_equipment,
     });
 
     const plan = generator.generatePlan();

@@ -19,36 +19,15 @@ import {
   type TrainingIntent,
 } from '../types.ts';
 
-import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../../src/lib/plan-tokens/swim-drill-tokens.ts';
+import {
+  pickSwimDrillInset,
+  swimDrillBlockAthleteCopy,
+  swimSessionPhilosophyLead,
+} from '../../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 
 import { triathlonProtocol } from '../../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../../shared/strength-system/protocols/triathlon_performance.ts';
 import type { ProtocolContext } from '../../shared/strength-system/protocols/types.ts';
-
-/** Mirrors combined `session-factory` drill inset: valid `swim_drills_*` tokens only. */
-const SWIM_DRILL_MAIN_FLOOR_YD = 350;
-
-function triOptionalSwimDrillBlock(
-  totalYards: number,
-  wuYd: number,
-  cdYd: number,
-  planWeek: number,
-  drillSlotSalt: number,
-  phaseName: string,
-  sessionKind: 'easy' | 'css_aerobic' | 'threshold',
-): { mainBudgetYd: number; drillTokens: string[] } {
-  const kindSalt = sessionKind === 'easy' ? 0 : sessionKind === 'css_aerobic' ? 5 : 11;
-  let mainBudgetYd = totalYards - wuYd - cdYd;
-  if (planWeek < 1 || mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
-    return { mainBudgetYd, drillTokens: [] };
-  }
-  const tok = pickSwimDrillTokens(planWeek, drillSlotSalt + kindSalt, 1, phaseName)[0]!;
-  const dy = swimDrillYardsFromToken(tok);
-  if (dy <= 0 || mainBudgetYd - dy < SWIM_DRILL_MAIN_FLOOR_YD) {
-    return { mainBudgetYd, drillTokens: [] };
-  }
-  return { mainBudgetYd: mainBudgetYd - dy, drillTokens: [tok] };
-}
 
 // ============================================================================
 // SWIM VOLUME TABLES (yards/week at peak by distance × fitness)
@@ -838,13 +817,26 @@ export class TriathlonGenerator {
     if (isRecovery || phase.name === 'Base') {
       const wu = 300;
       const cd = 200;
-      const { mainBudgetYd: main, drillTokens } = triOptionalSwimDrillBlock(yd, wu, cd, planWeek, 1, phase.name, 'easy');
+      const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+        totalYards: yd,
+        wuYd: wu,
+        cdYd: cd,
+        planWeek,
+        drillSlotSalt: 1,
+        phase: phase.name,
+        sessionKind: 'easy',
+        swimGearLabels: this.params.swim_equipment,
+      });
       const rep100 = Math.max(1, Math.floor(main / 100));
       const tags = ['aerobic_swim'];
       if (drillTokens.length) tags.push('swim_drills');
+      const drillLead =
+        drillTokens.length > 0
+          ? `${swimSessionPhilosophyLead('easy')}${swimDrillBlockAthleteCopy(drillTokens)} `
+          : '';
       return {
         day, type: 'swim', name: 'Aerobic Swim',
-        description: `${yd} yards. Warm-up 300, technique + aerobic main, cool-down 200. Focus on technique — catch, pull, rotation.`,
+        description: `${yd} yards. ${drillLead}Warm-up 300, technique + aerobic main, cool-down 200. Focus on technique — catch, pull, rotation.`,
         duration: Math.round(yd / 50),
         steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${rep100}x100yd_easy_r15`, 'swim_cooldown_200yd'],
         tags,
@@ -857,13 +849,26 @@ export class TriathlonGenerator {
       if (phase.name === 'Race-Specific') {
         const wu = 300;
         const cd = 200;
-        const { mainBudgetYd: main, drillTokens } = triOptionalSwimDrillBlock(yd, wu, cd, planWeek, 2, phase.name, 'css_aerobic');
+        const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+          totalYards: yd,
+          wuYd: wu,
+          cdYd: cd,
+          planWeek,
+          drillSlotSalt: 2,
+          phase: phase.name,
+          sessionKind: 'css_aerobic',
+          swimGearLabels: this.params.swim_equipment,
+        });
         const sets = Math.max(5, Math.round(main / 100));
         const tags = ['css_aerobic', 'swim_intervals', 'race_specific'];
         if (drillTokens.length) tags.push('swim_drills');
+        const drillLead =
+          drillTokens.length > 0
+            ? `${swimSessionPhilosophyLead('css_aerobic')}${swimDrillBlockAthleteCopy(drillTokens)} `
+            : '';
         return {
           day, type: 'swim', name: 'Race Pace CSS',
-          description: `${yd} yards. Warm-up 300, technique block as prescribed, ${sets}×100 at comfortable race-pace CSS (15s rest) — sustainable, not maximal. Practice sighting between sets. Cool-down 200.`,
+          description: `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at comfortable race-pace CSS (15s rest) — sustainable, not maximal. Practice sighting between sets. Cool-down 200.`,
           duration: Math.round(yd / 46),
           steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_css_${sets}x100yd_r15`, 'swim_cooldown_200yd'],
           tags,
@@ -872,12 +877,24 @@ export class TriathlonGenerator {
       // Build: aerobic 100s + drill (materializable tokens only — no swim_continuous_*).
       const wu = 300;
       const cd = 200;
-      const { mainBudgetYd: contAdj, drillTokens } = triOptionalSwimDrillBlock(yd, wu, cd, planWeek, 3, phase.name, 'css_aerobic');
-      const drillYd = drillTokens.length ? swimDrillYardsFromToken(drillTokens[0]!) : 0;
+      const { mainBudgetYd: contAdj, drillTokens } = pickSwimDrillInset({
+        totalYards: yd,
+        wuYd: wu,
+        cdYd: cd,
+        planWeek,
+        drillSlotSalt: 3,
+        phase: phase.name,
+        sessionKind: 'css_aerobic',
+        swimGearLabels: this.params.swim_equipment,
+      });
       const reps = Math.max(4, Math.floor(contAdj / 100));
+      const drillLead =
+        drillTokens.length > 0
+          ? `${swimSessionPhilosophyLead('css_aerobic')}${swimDrillBlockAthleteCopy(drillTokens)} `
+          : '';
       return {
         day, type: 'swim', name: 'Aerobic Swim + Drills',
-        description: `${yd} yards. Warm-up 300, ${reps}×100 aerobic (build effort in final 200), technique drills (${drillYd} yd), cool-down 200. Endurance and stroke refinement.`,
+        description: `${yd} yards. ${drillLead}Warm-up 300, ${reps}×100 aerobic (build effort in final 200), cool-down 200. Endurance and stroke refinement.`,
         duration: Math.round(yd / 47),
         steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${reps}x100yd_easy_r15`, 'swim_cooldown_200yd'],
         tags: ['aerobic_swim', 'swim_drills', 'endurance'],
@@ -889,13 +906,26 @@ export class TriathlonGenerator {
     if (phase.name === 'Race-Specific') {
       const wu = 300;
       const cd = 200;
-      const { mainBudgetYd: main, drillTokens } = triOptionalSwimDrillBlock(yd, wu, cd, planWeek, 2, phase.name, 'threshold');
+      const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+        totalYards: yd,
+        wuYd: wu,
+        cdYd: cd,
+        planWeek,
+        drillSlotSalt: 2,
+        phase: phase.name,
+        sessionKind: 'threshold',
+        swimGearLabels: this.params.swim_equipment,
+      });
       const sets = Math.max(6, Math.round(main / 100));
       const tags = ['css_threshold', 'swim_intervals', 'hard_swim', 'threshold'];
       if (drillTokens.length) tags.push('swim_drills');
+      const drillLead =
+        drillTokens.length > 0
+          ? `${swimSessionPhilosophyLead('threshold')}${swimDrillBlockAthleteCopy(drillTokens)} `
+          : '';
       return {
         day, type: 'swim', name: 'CSS Threshold Intervals',
-        description: `${yd} yards. Warm-up 300, technique + main sets, ${sets}×100 at CSS pace (10s rest — barely enough), cool-down 200. These should be sustainably hard — if splits blow up, slow down 2 sec/100.`,
+        description: `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at CSS pace (10s rest — barely enough), cool-down 200. These should be sustainably hard — if splits blow up, slow down 2 sec/100.`,
         duration: Math.round(yd / 44),
         steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_threshold_${sets}x100yd_r10`, 'swim_cooldown_200yd'],
         tags,
@@ -904,13 +934,26 @@ export class TriathlonGenerator {
     // Build: aerobic sets with pace progression
     const wu = 300;
     const cd = 200;
-    const { mainBudgetYd: main, drillTokens } = triOptionalSwimDrillBlock(yd, wu, cd, planWeek, 4, phase.name, 'easy');
+    const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+      totalYards: yd,
+      wuYd: wu,
+      cdYd: cd,
+      planWeek,
+      drillSlotSalt: 4,
+      phase: phase.name,
+      sessionKind: 'easy',
+      swimGearLabels: this.params.swim_equipment,
+    });
     const sets = Math.max(4, Math.round(main / 150));
     const tags = ['aerobic_swim', 'swim_build'];
     if (drillTokens.length) tags.push('swim_drills');
+    const drillLead =
+      drillTokens.length > 0
+        ? `${swimSessionPhilosophyLead('easy')}${swimDrillBlockAthleteCopy(drillTokens)} `
+        : '';
     return {
       day, type: 'swim', name: 'Swim Build',
-      description: `${yd} yards. Warm-up 300, technique + ${sets}×150 aerobic building to CSS effort (20s rest), cool-down 200.`,
+      description: `${yd} yards. ${drillLead}Warm-up 300, ${sets}×150 aerobic building to CSS effort (20s rest), cool-down 200.`,
       duration: Math.round(yd / 48),
       steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${sets}x150yd_r20`, 'swim_cooldown_200yd'],
       tags,
@@ -921,13 +964,26 @@ export class TriathlonGenerator {
     const roundedYd = Math.round(yards / 50) * 50;
     const wu = 300;
     const cd = 200;
-    const { mainBudgetYd: main, drillTokens } = triOptionalSwimDrillBlock(roundedYd, wu, cd, planWeek, 6, phase.name, 'easy');
+    const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+      totalYards: roundedYd,
+      wuYd: wu,
+      cdYd: cd,
+      planWeek,
+      drillSlotSalt: 6,
+      phase: phase.name,
+      sessionKind: 'easy',
+      swimGearLabels: this.params.swim_equipment,
+    });
     const reps = Math.max(3, Math.round(main / 100));
     const tags = ['easy_swim'];
     if (drillTokens.length) tags.push('swim_drills');
+    const drillLead =
+      drillTokens.length > 0
+        ? `${swimSessionPhilosophyLead('easy')}${swimDrillBlockAthleteCopy(drillTokens)} `
+        : '';
     return {
       day, type: 'swim', name: 'Easy Swim',
-      description: `${roundedYd} yards easy. Drills + aerobic sets. Active recovery.`,
+      description: `${roundedYd} yards easy. ${drillLead}Drills + aerobic sets. Active recovery.`,
       duration: Math.round(roundedYd / 50),
       steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${reps}x100yd_easy_r20`, 'swim_cooldown_200yd'],
       tags,

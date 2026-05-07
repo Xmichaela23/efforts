@@ -1261,6 +1261,12 @@ async function buildCombinedPlan(
       ...(projectedBikeHours != null ? { projected_bike_hours: projectedBikeHours } : {}),
       tri_approach: triApproach,
       swim_volume_multiplier,
+      ...((): { swim_equipment?: string[] } => {
+        const sw = arcForCombined.equipment?.swimming;
+        if (!Array.isArray(sw) || !sw.length) return {};
+        const labels = sw.map((x) => String(x).trim()).filter(Boolean);
+        return labels.length ? { swim_equipment: labels } : {};
+      })(),
       rest_days: freshCombinedPrefs.rest_days ?? [],
       ...(freshCombinedPrefs.long_run_day !== undefined
         ? { long_run_day: freshCombinedPrefs.long_run_day }

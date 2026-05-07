@@ -134,6 +134,11 @@ export interface AthleteState {
    */
   swim_volume_multiplier?: number;
   /**
+   * Pool gear from `user_baselines.equipment.swimming` (Training Baselines). Drill tokens that
+   * require kickboard, pull buoy, or snorkel are omitted when the athlete has not selected them.
+   */
+  swim_equipment?: string[];
+  /**
    * Athlete-recorded choices from the conflict resolution UI, keyed by `conflict_id`
    * (e.g. `"w3-quality-run-after-bike": "shift_quality_to_long_run"`).
    * `week-builder` reads this at each placement decision so recorded preferences are

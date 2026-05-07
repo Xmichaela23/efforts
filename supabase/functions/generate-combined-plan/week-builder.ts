@@ -1335,14 +1335,14 @@ export function buildWeek(
     const y0 = scaledTemplateYards(t0, 0);
     if (!qualitySwimSlot?.isRest && qualitySwimSlot!.sessions.length < 2) {
       qualitySwimSlot!.sessions.push(
-        swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0),
+        swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0, athleteState.swim_equipment),
       );
       qualitySwimPlaced = true;
     } else {
       const fallSlot = grid.get(swimEasyDay);
       if (!fallSlot?.isRest) {
         fallSlot!.sessions.push(
-          swimSessionFromTemplate(t0, y0, swimEasyDay, weekNum, phase, servedGoal, 4),
+          swimSessionFromTemplate(t0, y0, swimEasyDay, weekNum, phase, servedGoal, 4, athleteState.swim_equipment),
         );
         qualitySwimPlaced = true;
       }
@@ -1375,7 +1375,7 @@ export function buildWeek(
       easySwimSlot!.sessions.push(
         useOpenWater
           ? openWaterPracticeSwim(swimEasyDay, owMin, servedGoal)
-          : swimSessionFromTemplate(t1, y1, swimEasyDay, weekNum, phase, servedGoal, 4),
+          : swimSessionFromTemplate(t1, y1, swimEasyDay, weekNum, phase, servedGoal, 4, athleteState.swim_equipment),
       );
     }
   }
@@ -1387,7 +1387,7 @@ export function buildWeek(
       const t2 = swimTemplates[2]!;
       const y2 = scaledTemplateYards(t2, 2);
       thirdSwimSlot!.sessions.push(
-        swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5),
+        swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5, athleteState.swim_equipment),
       );
     }
   }

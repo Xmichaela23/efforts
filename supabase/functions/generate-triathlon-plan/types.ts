@@ -68,6 +68,9 @@ export interface GenerateTriPlanRequest {
 
   units?: 'imperial' | 'metric';
 
+  /** Pool toys from baselines — standalone tri plans honor the same drill gate as combined-plan. */
+  swim_equipment?: string[];
+
   /**
    * Athlete's preferred session-slot days from the setup wizard (mirrors TriGeneratorParams).
    */
@@ -170,6 +173,9 @@ export interface TriGeneratorParams {
     swim?: string[];
     strength?: string[];
   };
+
+  /** Pool gear labels from baselines `equipment.swimming` — filters drill tokens that need gear the athlete lacks. */
+  swim_equipment?: string[];
 }
 
 export interface TriSession {
