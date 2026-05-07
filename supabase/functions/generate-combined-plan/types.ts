@@ -142,6 +142,16 @@ export interface AthleteState {
    * - `undefined` / not set → treat as `jump_in` (no gate in chat or data was already sufficient).
    */
   assessment_week_preference?: 'assessment_first' | 'jump_in';
+  /**
+   * Combined tri: after `reconcileAthleteStateWithWeekOptimizer`, week-builder must not relocate
+   * optimizer-resolved anchor days (quality bike / quality run geometry vs duplicated heuristics).
+   */
+  enforce_optimizer_anchor_days?: boolean;
+  /**
+   * From `deriveOptimalWeek` preferred_days.strength — maps each weekday to triathlonStrength
+   * `session_index` (1 = upper, 0 = lower). Overrides weekday scanning when present.
+   */
+  strength_optimizer_slots?: { weekday: string; session_index: 0 | 1 }[];
 }
 
 export interface AthleteMemory {

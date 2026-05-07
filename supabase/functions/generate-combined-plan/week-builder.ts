@@ -2,7 +2,10 @@
 // IMPORTANT: This file implements scheduling logic that is also implemented in
 // _shared/week-optimizer.ts. The same-day matrix is shared via
 // schedule-session-constraints.ts but sequential rules and placement logic are
-// duplicated. Any rule change MUST be applied to both files.
+// duplicated. Tri combined plans now reconcile AthleteState via the optimizer at
+// generate-combined-plan entry (`reconcile-athlete-state-week-optimizer.ts`) and set
+// `enforce_optimizer_anchor_days` + `strength_optimizer_slots` so this module does not
+// relocate those anchors. Legacy run-only / unreconciled paths still use placement below.
 // Strength: `week-builder` no longer places lower-body strength on `run_quality_day` for tri;
 // Heavy lower (tri slot 2) also avoids the two calendar days before `longRunActualDay` and before
 // any brick day (48h floor vs long-run / brick leg stress). Mirrors `_shared/week-optimizer.ts`
@@ -993,7 +996,10 @@ export function buildWeek(
   }
 
   const blockedForBikeQual = new Set<string>([longRideDay, longRunActualDay, ...restDayNames]);
-  if (blockedForBikeQual.has(bikeQualityDay)) {
+  if (
+    athleteState.enforce_optimizer_anchor_days !== true &&
+    blockedForBikeQual.has(bikeQualityDay)
+  ) {
     for (let step = 1; step <= 6; step++) {
       const cand = adjDay(bikeQualityDay, step);
       if (!blockedForBikeQual.has(cand)) {
@@ -1023,7 +1029,10 @@ export function buildWeek(
       });
     }
   }
-  if (bikeEasyDay === bikeQualityDay || bikeEasyDay === longRideDay || restDayNames.has(bikeEasyDay)) {
+  if (
+    athleteState.enforce_optimizer_anchor_days !== true &&
+    (bikeEasyDay === bikeQualityDay || bikeEasyDay === longRideDay || restDayNames.has(bikeEasyDay))
+  ) {
     for (let step = 1; step <= 6; step++) {
       const cand = adjDay(bikeEasyDay, step);
       if (cand !== bikeQualityDay && cand !== longRideDay && !restDayNames.has(cand)) {
@@ -1037,6 +1046,7 @@ export function buildWeek(
   // Mirrors `_shared/week-optimizer.ts`: avoid placing HARD quality_run on the calendar
   // day immediately after anchored quality_bike (cross-discipline back-to-back HARD).
   if (
+    athleteState.enforce_optimizer_anchor_days !== true &&
     hasTri &&
     !raceThisWeek &&
     !isRecovery &&
@@ -1347,6 +1357,52 @@ export function buildWeek(
   }
 
   if (strFreq >= 1) {
+    const useOptimizerStrength =
+      hasTri &&
+      Array.isArray(athleteState.strength_optimizer_slots) &&
+      athleteState.strength_optimizer_slots.length > 0;
+
+    if (useOptimizerStrength) {
+      const limiterGoalOpt = goals.find((g) => (g as any).limiter === true)
+        ?? goals.sort((a, b) => (a.priority === 'A' ? -1 : b.priority === 'A' ? 1 : 0)).slice(-1)[0];
+      const limiterSportOpt: 'swim' | 'bike' | 'run' =
+        (['swim', 'bike', 'run'].includes(limiterGoalOpt?.sport ?? '')
+          ? limiterGoalOpt!.sport
+          : 'run') as 'swim' | 'bike' | 'run';
+      const weekInPhaseOpt = options?.phaseBlocks?.length
+        ? weekInPhaseForTimeline(options.phaseBlocks, weekNum, block)
+        : Math.max(1, weekNum - block.startWeek + 1);
+      const planTotalWeeksOpt = Math.max(1, options?.totalWeeks ?? 52);
+      const equipmentTypeOpt = athleteState.equipment_type ?? 'commercial_gym';
+      const hasCableOpt =
+        athleteState.has_cable_machine ??
+        (equipmentTypeOpt === 'commercial_gym' && !athleteState.equipment_type?.includes('home'));
+      const hasGhdOpt = athleteState.has_ghd ?? false;
+      const slotsPlanned = athleteState.strength_optimizer_slots!.slice(0, strFreq);
+      for (const slot of slotsPlanned) {
+        const strSlotOpt = grid.get(slot.weekday);
+        if (!strSlotOpt || strSlotOpt.isRest || strSlotOpt.sessions.length >= 2) continue;
+        strSlotOpt.sessions.push(
+          triathlonStrength(slot.weekday, phase, servedGoal, {
+            weekInPhase: weekInPhaseOpt,
+            weekIndex: weekNum,
+            totalWeeks: planTotalWeeksOpt,
+            isRecovery,
+            limiterSport: limiterSportOpt,
+            sessionIndex: slot.session_index,
+            equipmentType: equipmentTypeOpt,
+            hasCable: hasCableOpt,
+            hasGhd: hasGhdOpt,
+            longRideDayName: longRideDay,
+            longRunDayName: longRunActualDay,
+            qualityBikeDayName: bikeQualityDay,
+            qualityRunDayName: runQualityDay,
+            strengthProtocolId: athleteState.strength_protocol,
+            strengthIntent: athleteState.strength_intent,
+          }),
+        );
+      }
+    } else {
     // Identify brick days in the current grid to pass to the protocol placement
     const brickDaysInGrid = [...grid.values()]
       .filter(s => s.sessions.some(w => w.tags?.includes('brick')))
@@ -1532,6 +1588,7 @@ export function buildWeek(
           }
         }
       }
+    }
     }
   }
 

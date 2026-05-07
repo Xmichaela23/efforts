@@ -16,6 +16,7 @@ import { validatePlan, failedChecks } from './validator.ts';
 import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
+import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-state-week-optimizer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,8 +58,15 @@ Deno.serve(async (req: Request) => {
       rest_days: athlete_state.rest_days ?? [],
     };
 
+    const hasTriGoalForReconcile = goals.some((g) =>
+      ['triathlon', 'tri'].includes(String(g.sport ?? '').toLowerCase()),
+    );
+    const scheduleState: AthleteState = hasTriGoalForReconcile
+      ? reconcileAthleteStateWithWeekOptimizer(state)
+      : state;
+
     // ── Build phase timeline ────────────────────────────────────────────────
-    const { blocks: builtBlocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, state);
+    const { blocks: builtBlocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, scheduleState);
     let blocks = builtBlocks;
     blocks = applyLoadingPattern(blocks, loadingPattern);
 
@@ -72,30 +80,32 @@ Deno.serve(async (req: Request) => {
 
     if (totalWeeks >= 1) {
       console.log('[generate-combined-plan] athleteState before buildWeek:', {
-        bike_quality_day: state.bike_quality_day,
-        bike_easy_day: state.bike_easy_day,
-        bike_quality_label: state.bike_quality_label,
-        run_quality_day: state.run_quality_day,
-        run_easy_day: state.run_easy_day,
-        long_ride_day: state.long_ride_day,
-        long_run_day: state.long_run_day,
-        swim_easy_day: state.swim_easy_day,
-        swim_quality_day: state.swim_quality_day,
-        swim_third_day: state.swim_third_day,
-        strength_preferred_days: state.strength_preferred_days,
-        strength_sessions_cap: state.strength_sessions_cap,
-        strength_intent: state.strength_intent,
-        swim_intent: state.swim_intent,
-        swim_load_source: state.swim_load_source,
-        training_intent: state.training_intent,
-        transition_mode: state.transition_mode,
-        tri_approach: state.tri_approach,
+        bike_quality_day: scheduleState.bike_quality_day,
+        bike_easy_day: scheduleState.bike_easy_day,
+        bike_quality_label: scheduleState.bike_quality_label,
+        run_quality_day: scheduleState.run_quality_day,
+        run_easy_day: scheduleState.run_easy_day,
+        long_ride_day: scheduleState.long_ride_day,
+        long_run_day: scheduleState.long_run_day,
+        swim_easy_day: scheduleState.swim_easy_day,
+        swim_quality_day: scheduleState.swim_quality_day,
+        swim_third_day: scheduleState.swim_third_day,
+        strength_preferred_days: scheduleState.strength_preferred_days,
+        strength_sessions_cap: scheduleState.strength_sessions_cap,
+        strength_intent: scheduleState.strength_intent,
+        strength_optimizer_slots: scheduleState.strength_optimizer_slots,
+        enforce_optimizer_anchor_days: scheduleState.enforce_optimizer_anchor_days,
+        swim_intent: scheduleState.swim_intent,
+        swim_load_source: scheduleState.swim_load_source,
+        training_intent: scheduleState.training_intent,
+        transition_mode: scheduleState.transition_mode,
+        tri_approach: scheduleState.tri_approach,
       });
     }
 
     for (let w = 1; w <= totalWeeks; w++) {
       const block = blockForWeek(blocks, w);
-      const week = buildWeek(w, block, prevWeightedTSS, goals, state, athlete_memory, {
+      const week = buildWeek(w, block, prevWeightedTSS, goals, scheduleState, athlete_memory, {
         totalWeeks,
         raceAnchors,
         phaseBlocks: blocks,
@@ -112,7 +122,7 @@ Deno.serve(async (req: Request) => {
       state.weekly_hours_available,
       loadingPattern,
       hasTriGoal,
-      state.transition_mode,
+      scheduleState.transition_mode,
     );
     const failures = failedChecks(validation);
     if (failures.length > 0) {
@@ -146,7 +156,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // When assessment_first: shift all training weeks +1, prepend assessment as week 1.
-    const includeAssessmentWeek = state.assessment_week_preference === 'assessment_first';
+    const includeAssessmentWeek = scheduleState.assessment_week_preference === 'assessment_first';
     const weekOffset = includeAssessmentWeek ? 1 : 0;
 
     for (const w of generatedWeeks) {
@@ -171,25 +181,25 @@ Deno.serve(async (req: Request) => {
       plan_type: 'multi_sport',
       discipline: 'multi',
       approach: 'combined_80_20',
-      tri_approach: state.tri_approach ?? null,  // 'base_first' | 'race_peak' — read by coach narrative
-      transition_mode: state.transition_mode ?? null,
-      structural_load_hint: state.structural_load_hint ?? null,
-      swim_volume_multiplier: state.swim_volume_multiplier ?? null,
-      long_run_day: state.long_run_day ?? null,
-      long_ride_day: state.long_ride_day ?? null,
-      swim_easy_day: state.swim_easy_day ?? null,
-      swim_quality_day: state.swim_quality_day ?? null,
-      swim_third_day: state.swim_third_day ?? null,
-      run_quality_day: state.run_quality_day ?? null,
-      run_easy_day: state.run_easy_day ?? null,
-      bike_quality_day: state.bike_quality_day ?? null,
-      bike_easy_day: state.bike_easy_day ?? null,
-      strength_protocol: state.strength_protocol ?? null,
-      strength_intent: state.strength_intent ?? null,
-      training_intent: state.training_intent ?? null,
-      strength_preferred_days: state.strength_preferred_days ?? null,
-      strength_sessions_cap: state.strength_sessions_cap ?? null,
-      rest_days: state.rest_days ?? [],
+      tri_approach: scheduleState.tri_approach ?? null,  // 'base_first' | 'race_peak' — read by coach narrative
+      transition_mode: scheduleState.transition_mode ?? null,
+      structural_load_hint: scheduleState.structural_load_hint ?? null,
+      swim_volume_multiplier: scheduleState.swim_volume_multiplier ?? null,
+      long_run_day: scheduleState.long_run_day ?? null,
+      long_ride_day: scheduleState.long_ride_day ?? null,
+      swim_easy_day: scheduleState.swim_easy_day ?? null,
+      swim_quality_day: scheduleState.swim_quality_day ?? null,
+      swim_third_day: scheduleState.swim_third_day ?? null,
+      run_quality_day: scheduleState.run_quality_day ?? null,
+      run_easy_day: scheduleState.run_easy_day ?? null,
+      bike_quality_day: scheduleState.bike_quality_day ?? null,
+      bike_easy_day: scheduleState.bike_easy_day ?? null,
+      strength_protocol: scheduleState.strength_protocol ?? null,
+      strength_intent: scheduleState.strength_intent ?? null,
+      training_intent: scheduleState.training_intent ?? null,
+      strength_preferred_days: scheduleState.strength_preferred_days ?? null,
+      strength_sessions_cap: scheduleState.strength_sessions_cap ?? null,
+      rest_days: scheduleState.rest_days ?? [],
       race_anchors: Array.isArray(raceAnchors) && raceAnchors.length > 0 ? raceAnchors : null,
       goals_served: goals.map(g => g.id),
       goal_names: goals.map(g => ({ id: g.id, name: g.event_name, date: g.event_date, priority: g.priority })),
