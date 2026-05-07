@@ -19,6 +19,7 @@ import UnifiedWorkoutView from './UnifiedWorkoutView';
 import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 // @ts-ignore
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
+import { swimDrillEquipmentFromTokens } from '@/lib/plan-tokens/swim-drill-tokens';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -1673,7 +1674,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           if (typeof w.duration === 'number' && w.duration > 0) meta.push(fmtHM(w.duration));
           lines.push(`- ${w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
           if (w.description) lines.push(`  - ${w.description}`);
-          
+
+          const discExport = String(w.type || w.discipline || '').toLowerCase();
+          const swimDrillToks = Array.isArray(w.steps_preset)
+            ? (w.steps_preset as unknown[]).map((x) => String(x)).filter((t) => t.startsWith('swim_drills_'))
+            : [];
+          if (discExport === 'swim' && swimDrillToks.length > 0) {
+            const eq = swimDrillEquipmentFromTokens(swimDrillToks);
+            const parts: string[] = [];
+            if (eq.required.length) parts.push(`Bring: ${eq.required.join(', ')}`);
+            if (eq.optional.length) parts.push(`Optional: ${eq.optional.join(', ')}`);
+            if (parts.length) lines.push(`  - Pool gear — ${parts.join(' · ')}`);
+          }
+
           // Include materialized strength exercises with calculated weights
           const strengthExercises = w.computed?.steps?.filter((s: any) => s?.kind === 'strength')?.map((s: any) => s.strength) 
             || w.strength_exercises 

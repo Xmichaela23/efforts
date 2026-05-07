@@ -224,7 +224,7 @@ export function pickSwimDrillInset(opts: {
 }): { mainBudgetYd: number; drillTokens: string[] } {
   let mainBudgetYd = opts.totalYards - opts.wuYd - opts.cdYd;
   const planWeek = opts.planWeek;
-  if (planWeek == null || mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
+  if (planWeek == null || mainBudgetYd < 50) {
     return { mainBudgetYd, drillTokens: [] };
   }
 
@@ -233,24 +233,37 @@ export function pickSwimDrillInset(opts: {
   const salt = opts.drillSlotSalt + SWIM_DRILL_KIND_SALT[opts.sessionKind];
 
   if (opts.techniqueDrillEmphasis && opts.sessionKind === 'easy') {
+    // Technique swims must keep drills even when weekly scaling pins totals near the easy floor (~800–900 yd):
+    // legacy gate used MAIN_FLOOR+50 on total main budget, which stripped every drill from typical technique sessions.
+    const techniqueMinMain = SWIM_DRILL_COMPACT_FLOOR_YD + 100;
+    if (mainBudgetYd < techniqueMinMain) {
+      return { mainBudgetYd, drillTokens: [] };
+    }
     const n = eligible.length;
     const start = n ? (planWeek * 3 + salt) % n : 0;
     const rotated = n ? rotatePool(eligible, start) : [];
     const ranked = [...rotated].sort((a, b) => swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b));
     const chosen: string[] = [];
     let budget = mainBudgetYd;
+    const firstRemainderFloor =
+      mainBudgetYd < 520 ? SWIM_DRILL_COMPACT_FLOOR_YD : SWIM_DRILL_MAIN_FLOOR_YD;
     for (const tok of ranked) {
       if (chosen.length >= 3) break;
       const dy = swimDrillYardsFromToken(tok);
       if (dy <= 0) continue;
       const nextFloor =
-        chosen.length === 0 ? SWIM_DRILL_MAIN_FLOOR_YD : SWIM_DRILL_COMPACT_FLOOR_YD;
+        chosen.length === 0 ? firstRemainderFloor : SWIM_DRILL_COMPACT_FLOOR_YD;
       if (budget - dy >= nextFloor) {
         chosen.push(tok);
         budget -= dy;
       }
     }
     if (chosen.length) return { mainBudgetYd: budget, drillTokens: chosen };
+    return { mainBudgetYd, drillTokens: [] };
+  }
+
+  if (mainBudgetYd < SWIM_DRILL_MAIN_FLOOR_YD + 50) {
+    return { mainBudgetYd, drillTokens: [] };
   }
 
   const picked = pickFirstDrillFittingBudget(eligible, planWeek, salt, mainBudgetYd);

@@ -659,7 +659,7 @@ export function buildWeek(
   // Bike: mix of easy + quality → use 62 avg
   const bikeTotalMin = Math.max(60, Math.round((bikeBudget / 62) * 60));
   /** Downscales template `target_yards` when Arc shows limited recent swim exposure. */
-  const swimMult = Math.min(1, Math.max(0.35, athleteState.swim_volume_multiplier ?? 1));
+  const swimMult = Math.min(1, Math.max(0.48, athleteState.swim_volume_multiplier ?? 1));
 
   // Derive long run miles from typical 9:30/mi easy pace
   let longRunMinutes = isRecovery
@@ -1023,7 +1023,7 @@ export function buildWeek(
   // 55 TSS/hr ÷ (1 yd/min ≈ 60 yd/hr at easy pace) → ~0.917 TSS/100yd, but we
   // model it in time: swimBudget (TSS) → minutes at 55 TSS/hr → yards at 30 yd/min.
   // Soft ceiling: if total raw yards exceed budget-implied yards, scale all slots
-  // down proportionally. Minimums (easyLike 800 yd, quality 1000 yd) are still applied.
+  // down proportionally. Minimums (easy 800 yd, technique_aerobic 900 yd, quality 1000 yd) are still applied.
   const SWIM_TSS_PER_HR = 55;
   const SWIM_YDS_PER_MIN = 30; // ~1650 yd/hr, mid-range for tri training
   const swimBudgetMinutes = (swimBudget / SWIM_TSS_PER_HR) * 60;
@@ -1038,7 +1038,9 @@ export function buildWeek(
   const scaledTemplateYards = (t: SwimSlotTemplate, slotIdx: number): number => {
     const budgetCapped = rawSlotYards[slotIdx]! * budgetScale;
     const easyLike = t.session_type === 'easy' || t.session_type === 'technique_aerobic';
-    return Math.max(easyLike ? 800 : 1000, Math.round(budgetCapped));
+    const floorYd =
+      t.session_type === 'technique_aerobic' ? 900 : easyLike ? 800 : 1000;
+    return Math.max(floorYd, Math.round(budgetCapped));
   };
 
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
