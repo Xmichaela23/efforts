@@ -54,15 +54,31 @@ function inferStrengthFrequency(state: AthleteState): 0 | 1 | 2 | 3 {
   return intent === 'performance' ? 2 : 1;
 }
 
+function qualityBikeAnchorFromState(
+  state: AthleteState,
+): { day: DayName; intensity: 'quality' } | undefined {
+  if (state.bike_quality_day != null) {
+    return { day: sunIndexToDayName(state.bike_quality_day), intensity: 'quality' };
+  }
+  const hasGroupRideDuration =
+    state.bike_quality_route_estimated_hours != null ||
+    state.bike_quality_route_estimated_minutes != null ||
+    state.bike_quality_group_ride_hours != null ||
+    state.bike_quality_group_ride_minutes != null;
+  const lbl = String(state.bike_quality_label ?? '').trim();
+  const looksGroupRide =
+    hasGroupRideDuration ||
+    /\b(group|hammer|club)\b/i.test(lbl);
+  if (!looksGroupRide) return undefined;
+  return { day: 'wednesday', intensity: 'quality' };
+}
+
 function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | null {
   const lr = state.long_ride_day != null ? sunIndexToDayName(state.long_ride_day) : undefined;
   const lrun = state.long_run_day != null ? sunIndexToDayName(state.long_run_day) : undefined;
   if (!lr || !lrun) return null;
 
-  const qb =
-    state.bike_quality_day != null
-      ? { day: sunIndexToDayName(state.bike_quality_day), intensity: 'quality' as const }
-      : undefined;
+  const qb = qualityBikeAnchorFromState(state);
   const masters =
     state.swim_easy_day != null
       ? { day: sunIndexToDayName(state.swim_easy_day), intensity: 'easy' as const }
@@ -156,6 +172,15 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
 
   if (optimal.rest_days?.length) {
     merged.rest_days = optimal.rest_days.map(dayNameToSunIndex);
+  }
+
+  const hasGroupRideDuration =
+    merged.bike_quality_route_estimated_hours != null ||
+    merged.bike_quality_route_estimated_minutes != null ||
+    merged.bike_quality_group_ride_hours != null ||
+    merged.bike_quality_group_ride_minutes != null;
+  if (!String(merged.bike_quality_label ?? '').trim() && hasGroupRideDuration) {
+    merged.bike_quality_label = 'Group Ride';
   }
 
   console.log('[generate-combined-plan] reconcileAthleteStateWithWeekOptimizer:', JSON.stringify({

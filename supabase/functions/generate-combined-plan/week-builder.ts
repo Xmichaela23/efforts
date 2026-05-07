@@ -1378,7 +1378,12 @@ export function buildWeek(
         athleteState.has_cable_machine ??
         (equipmentTypeOpt === 'commercial_gym' && !athleteState.equipment_type?.includes('home'));
       const hasGhdOpt = athleteState.has_ghd ?? false;
-      const slotsPlanned = athleteState.strength_optimizer_slots!.slice(0, strFreq);
+      const slotsOrdered =
+        strFreq === 1 &&
+        athleteState.strength_optimizer_slots!.length >= 2
+          ? [...athleteState.strength_optimizer_slots!].sort((a, b) => a.session_index - b.session_index)
+          : athleteState.strength_optimizer_slots!;
+      const slotsPlanned = slotsOrdered.slice(0, strFreq);
       for (const slot of slotsPlanned) {
         const strSlotOpt = grid.get(slot.weekday);
         if (!strSlotOpt || strSlotOpt.isRest || strSlotOpt.sessions.length >= 2) continue;
