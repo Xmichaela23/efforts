@@ -1,0 +1,11 @@
+# Edge Function configuration (project root).
+# Default verify_jwt = true rejects requests without a Supabase JWT; Strava/Garmin webhooks send none → 401 before handler runs.
+# https://supabase.com/docs/guides/functions/function-configuration
+#
+# Per-function supabase/functions/<name>/config.toml is not enough — settings must be declared here for deploy.
+
+[functions.strava-webhook]
+verify_jwt = false
+
+[functions.garmin-webhook-activities]
+verify_jwt = false

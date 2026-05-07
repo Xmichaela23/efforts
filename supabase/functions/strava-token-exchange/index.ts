@@ -94,6 +94,30 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Best-effort: register or attach to the app-wide Strava push subscription and merge webhook_id
+    // into connection_data (does not delete global subs — see strava-webhook-manager).
+    try {
+      const mgrResp = await fetch(`${SUPABASE_URL}/functions/v1/strava-webhook-manager`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'subscribe',
+          userId,
+          accessToken: token.access_token,
+          athleteId: token.athlete?.id != null ? String(token.athlete.id) : undefined,
+        }),
+      });
+      if (!mgrResp.ok) {
+        const t = await mgrResp.text().catch(() => '');
+        console.warn('[strava-token-exchange] webhook-manager subscribe non-OK', mgrResp.status, t.slice(0, 200));
+      }
+    } catch (e) {
+      console.warn('[strava-token-exchange] webhook-manager subscribe failed', e);
+    }
+
     // Best-effort: fetch athlete's HR zones from Strava and store
     try {
       const zonesResp = await fetch('https://www.strava.com/api/v3/athlete/zones', {

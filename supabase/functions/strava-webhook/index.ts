@@ -95,7 +95,7 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     // Find the user in our system by Strava ID
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')
-      .select('user_id, connection_data, access_token, refresh_token, expires_at')
+      .select('user_id, connection_data, access_token, refresh_token, expires_at, webhook_active')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
       .single();
@@ -106,6 +106,11 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     }
 
     const userId = userConnection.user_id;
+
+    if (userConnection.webhook_active === false) {
+      console.log(`⏭️ Skipping Strava activity ${activityId} — webhook_active=false for user ${userId}`);
+      return;
+    }
 
     // Check user's source preference
     const { data: userData } = await supabase
@@ -219,7 +224,7 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     // Find the user connection
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')
-      .select('user_id, connection_data, access_token')
+      .select('user_id, connection_data, access_token, webhook_active')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
       .single();
@@ -230,6 +235,11 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     }
 
     const userId = userConnection.user_id;
+
+    if (userConnection.webhook_active === false) {
+      console.log(`⏭️ Skipping Strava activity update ${activityId} — webhook_active=false for user ${userId}`);
+      return;
+    }
 
     // Check user's source preference
     const { data: userData } = await supabase

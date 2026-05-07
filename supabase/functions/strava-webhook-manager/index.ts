@@ -123,11 +123,15 @@ async function handleWebhookSubscription(userId: string, accessToken: string, at
   }
 }
 
-async function handleWebhookUnsubscription(userId: string, accessToken: string) {
+async function handleWebhookUnsubscription(userId: string, _accessToken: string) {
   try {
-    console.log(`🔄 Unsubscribing Strava webhook for user ${userId}`);
-    
-    // Get the user connection to find the webhook ID
+    console.log(`🔄 Disabling Strava real-time sync preference for user ${userId}`);
+
+    // IMPORTANT: Strava `push_subscriptions` are **one per OAuth application** (callback URL),
+    // shared by every athlete. Calling DELETE here would unregister the app webhook for
+    // **all** Efforts users — not just this account. Per-user "off" is represented by
+    // `device_connections.webhook_active` + early return in `strava-webhook` only.
+
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')
       .select('connection_data, provider_user_id')
@@ -140,44 +144,15 @@ async function handleWebhookUnsubscription(userId: string, accessToken: string) 
       return new Response('No Strava connection found', { status: 404 });
     }
 
-    const connectionData = userConnection.connection_data || {};
-    const webhookId = connectionData.webhook_id;
-
-    if (!webhookId) {
-      console.log(`⚠️ No webhook ID found for user ${userId}`);
-      return new Response('No webhook found', { status: 404 });
-    }
-
-    // Delete the webhook from Strava
-    const deleteResponse = await fetch(`https://www.strava.com/api/v3/push_subscriptions/${webhookId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: Deno.env.get('STRAVA_CLIENT_ID'),
-        client_secret: Deno.env.get('STRAVA_CLIENT_SECRET'),
-      }),
-    });
-
-    if (!deleteResponse.ok) {
-      console.warn(`⚠️ Failed to delete Strava webhook ${webhookId}: ${deleteResponse.status}`);
-      // Continue anyway to clean up our database
-    } else {
-      console.log(`✅ Deleted Strava webhook ${webhookId}`);
-    }
-
-    // Remove webhook info from user connection
     await removeWebhookFromConnection(userId);
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Webhook unsubscribed successfully'
+      message: 'Real-time sync disabled for this account. (App-wide Strava subscription unchanged.)',
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
     console.error(`❌ Error unsubscribing webhook for user ${userId}:`, error);
     return new Response('Internal server error', { status: 500 });
@@ -250,23 +225,34 @@ async function checkExistingWebhook(stravaUserId: number) {
   }
 }
 
-async function updateUserConnection(userId: string, stravaUserId: number, accessToken: string, webhookId: number) {
+async function updateUserConnection(userId: string, stravaUserId: number | string, accessToken: string, webhookId: number) {
   try {
+    const { data: existing } = await supabase
+      .from('device_connections')
+      .select('connection_data')
+      .eq('user_id', userId)
+      .eq('provider', 'strava')
+      .maybeSingle();
+
+    const prev = (existing?.connection_data || {}) as Record<string, unknown>;
+    const mergedConnection = {
+      ...prev,
+      access_token: accessToken,
+      webhook_id: webhookId,
+      subscribed_at: new Date().toISOString(),
+      last_sync: new Date().toISOString(),
+    };
+
     const { error } = await supabase
       .from('device_connections')
-      .upsert({
-        user_id: userId,
-        provider: 'strava',
-        provider_user_id: stravaUserId.toString(),
-        connection_data: {
-          access_token: accessToken,
-          webhook_id: webhookId,
-          subscribed_at: new Date().toISOString(),
-          last_sync: new Date().toISOString()
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id,provider' });
+      .update({
+        provider_user_id: String(stravaUserId),
+        connection_data: mergedConnection,
+        webhook_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('provider', 'strava');
 
     if (error) {
       console.error(`❌ Error updating user connection for ${userId}:`, error);
@@ -276,20 +262,31 @@ async function updateUserConnection(userId: string, stravaUserId: number, access
     console.log(`✅ Updated user connection for ${userId}`);
   } catch (error) {
     console.error(`❌ Error in updateUserConnection for ${userId}:`, error);
-    throw error;
+      throw error;
   }
 }
 
 async function removeWebhookFromConnection(userId: string) {
   try {
+    const { data: existing } = await supabase
+      .from('device_connections')
+      .select('connection_data')
+      .eq('user_id', userId)
+      .eq('provider', 'strava')
+      .maybeSingle();
+
+    const prev = (existing?.connection_data || {}) as Record<string, unknown>;
+    const mergedConnection = {
+      ...prev,
+      webhook_id: null,
+      unsubscribed_at: new Date().toISOString(),
+    };
+
     const { error } = await supabase
       .from('device_connections')
       .update({
-        connection_data: {
-          webhook_id: null,
-          unsubscribed_at: new Date().toISOString()
-        },
-        updated_at: new Date().toISOString()
+        connection_data: mergedConnection,
+        updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
       .eq('provider', 'strava');
@@ -299,7 +296,7 @@ async function removeWebhookFromConnection(userId: string) {
       throw error;
     }
 
-    console.log(`✅ Removed webhook from connection for ${userId}`);
+    console.log(`✅ Removed webhook metadata from connection for ${userId}`);
   } catch (error) {
     console.error(`❌ Error in removeWebhookFromConnection for ${userId}:`, error);
     throw error;
