@@ -844,12 +844,12 @@ function Step5Run({
       subtitle="Just the fixed external one — track night, club run, group tempo. The planner places everything else."
       onBack={onBack} onContinue={onNext} canContinue={canContinue}
     >
-      {runPaceNote && <ArcHint>{runPaceNote}</ArcHint>}
-
       <div className="flex gap-2">
         <ChoiceBtn active={state.hasGroupRun === true} onClick={() => set(true)}>Yes</ChoiceBtn>
         <ChoiceBtn active={state.hasGroupRun === false} onClick={() => set(false)}>No</ChoiceBtn>
       </div>
+
+      {runPaceNote && <ArcHint>{runPaceNote}</ArcHint>}
 
       {state.hasGroupRun === true && (
         <>
