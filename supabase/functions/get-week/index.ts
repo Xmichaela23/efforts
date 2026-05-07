@@ -431,7 +431,7 @@ Deno.serve(async (req)=>{
     let plannedRows = null;
     let pErr = null;
     try {
-      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,workload_planned,units,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+      const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,workload_planned,units,pool_unit,pool_length_m,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
         ascending: true
       }).order('created_at', {
         ascending: true
@@ -444,7 +444,7 @@ Deno.serve(async (req)=>{
       pErr = e1;
       // Fallback for schemas without completed_workout_id or created_at
       try {
-        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,units,route_url,route_snapshot').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+        const { data, error } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,units,pool_unit,pool_length_m,route_url,route_snapshot').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
           ascending: true
         }).order('id', {
           ascending: true
@@ -504,7 +504,7 @@ Deno.serve(async (req)=>{
         });
         // Reload planned rows that were adjusted (best-effort, limited scope) so UI sees cooldown immediately
         try {
-          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,units,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
+          const { data } = await supabase.from('planned_workouts').select('id,name,date,type,workout_status,completed_workout_id,skip_reason,skip_note,computed,steps_preset,strength_exercises,mobility_exercises,export_hints,workout_structure,friendly_summary,rendered_description,description,tags,training_plan_id,total_duration_seconds,units,pool_unit,pool_length_m,route_url,route_snapshot,created_at').eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
             ascending: true
           }).order('created_at', {
             ascending: true

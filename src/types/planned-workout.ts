@@ -49,5 +49,10 @@ export interface PlannedWorkout {
   brick_group_id?: string | null;
   brick_order?: number | null;
   transition_s?: number | null;
+
+  /** Row from activation: `imperial` | `metric` — swim step labels when pool not explicit */
+  units?: string | null;
+  pool_unit?: 'yd' | 'm' | null;
+  pool_length_m?: number | null;
 }
 

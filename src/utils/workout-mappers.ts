@@ -66,6 +66,11 @@ export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
     brick_group_id: planned.brick_group_id ?? null,
     brick_order: planned.brick_order ?? null,
     transition_s: planned.transition_s ?? null,
+
+    // Units / swim pool (must mirror get-week `planned_workout`; mapper is fallback when that blob is absent)
+    units: planned.units ?? null,
+    pool_unit: planned.pool_unit ?? null,
+    pool_length_m: typeof planned.pool_length_m === 'number' ? planned.pool_length_m : null,
   };
 }
 

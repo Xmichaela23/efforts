@@ -75,6 +75,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const [savingPool, setSavingPool] = useState<boolean>(false);
   const [refresh, setRefresh] = useState<number>(0);
   const [autoDefaulted, setAutoDefaulted] = useState<boolean>(false);
+  const [localPool, setLocalPool] = useState<{ unit: 'yd' | 'm' | null; lengthM: number | null } | null>(null);
   useEffect(() => {
     (async () => {
       try {
@@ -85,9 +86,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       } catch {}
     })();
   }, [loadUserBaselines, workout]);
+  useEffect(() => {
+    setLocalPool(null);
+  }, [(workout as any)?.id, (workout as any)?.pool_unit, (workout as any)?.pool_length_m]);
   const pn: any = (workout as any)?.baselines || (workout as any)?.performanceNumbers || ctxPN || {};
-  const poolUnit: 'yd' | 'm' | null = ((workout as any)?.pool_unit ?? null) as any;
-  const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
+  const poolUnit: 'yd' | 'm' | null = ((localPool?.unit ?? (workout as any)?.pool_unit) ?? null) as any;
+  const poolLenM: number | null = (() => {
+    if (localPool && localPool.lengthM != null) return localPool.lengthM;
+    return (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
+  })();
   const lines: string[] = [];
   let totalSecsFromSteps = 0;
   // Strength: rely on server-computed steps only (single source of truth)
@@ -110,10 +117,21 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       // Default: meters (metric users, or unknown).
       const tokensArr: string[] = Array.isArray((workout as any)?.steps_preset) ? ((workout as any).steps_preset as string[]).map(String) : [];
       const tokensJoined = tokensArr.join(' ').toLowerCase();
-      const tokensPreferYd = /\byd\b/.test(tokensJoined);
+      // Tokens use `_300yd`-style suffixes; `\byd\b` alone misses them.
+      const tokensPreferYd = /\byd\b/.test(tokensJoined) || /_\d+yd\b|\d+yd_/i.test(tokensJoined);
       const isSwimType = String((workout as any)?.type||'').toLowerCase()==='swim';
       const planUnitsRaw = String((workout as any)?.units||'').toLowerCase();
-      const displayYards = isSwimType && (poolUnit==='yd' || planUnitsRaw==='imperial' || tokensPreferYd);
+      let displayYards = false;
+      if (isSwimType) {
+        if (poolUnit === 'm') displayYards = false;
+        else if (poolUnit === 'yd') displayYards = true;
+        else {
+          displayYards =
+            planUnitsRaw === 'imperial' ||
+            tokensPreferYd ||
+            (planUnitsRaw !== 'metric' && useImperial === true);
+        }
+      }
       const fmtDist = (m:number)=>{
         const x = Math.max(1, Math.round(Number(m)||0));
         // For swims: use pool_unit preference (yd or m)
@@ -569,6 +587,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         .from('planned_workouts')
         .update({ pool_unit: unit, pool_length_m: lengthM } as any)
         .eq('id', (workout as any)?.id);
+      setLocalPool({ unit: unit, lengthM });
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
     } catch (e) {
       console.error('Failed to set pool:', e);
