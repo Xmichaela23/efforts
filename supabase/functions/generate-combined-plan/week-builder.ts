@@ -1418,6 +1418,8 @@ export function buildWeek(
             totalWeeks: planTotalWeeks,
             isRecovery,
             equipmentType,
+            longRunDayName: longRunActualDay,
+            qualityRunDayName: runQualityDay,
           }));
         }
       }
@@ -1524,6 +1526,8 @@ export function buildWeek(
               totalWeeks: planTotalWeeks,
               isRecovery,
               equipmentType: equipmentType2,
+              longRunDayName: longRunActualDay,
+              qualityRunDayName: runQualityDay,
             }));
           }
         }

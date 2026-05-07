@@ -17,11 +17,17 @@ import { pickSwimDrillTokens, swimDrillYardsFromToken } from '../../../src/lib/p
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
 import type { SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────-
 
 const SWIM_DRILL_MAIN_FLOOR_YD = 350;
 
-/** Separates `pickSwimDrillTokens` rotation so easy / CSS / threshold swims don’t always collide. */
+function shiftWeekday(day: string, delta: number): string {
+  const i = DAYS_OF_WEEK.indexOf(day as (typeof DAYS_OF_WEEK)[number]);
+  const base = i >= 0 ? i : 0;
+  return DAYS_OF_WEEK[(base + delta + 7) % 7]!;
+}
+
+/** Separates `pickSwimDrillTokens` rotation so easy / CSS / threshold swims don't always collide. */
 type SwimDrillSessionKind = 'easy' | 'css_aerobic' | 'threshold';
 
 const SWIM_DRILL_KIND_SALT: Record<SwimDrillSessionKind, number> = {
@@ -1019,15 +1025,24 @@ export function runStrength(day: string, phase: Phase, goalId: string, options?:
   totalWeeks?: number;
   isRecovery?: boolean;
   equipmentType?: 'home_gym' | 'commercial_gym';
+  longRunDayName?: string;
+  qualityRunDayName?: string;
 }): PlannedSession {
   const protocol = getProtocol('durability');
+  const longDay = options?.longRunDayName ?? 'Sunday';
+  const q1 = options?.qualityRunDayName ?? 'Tuesday';
+  const q2 = shiftWeekday(q1, 2);
+  const qualitySessionDays = [...new Set([q1, q2])];
+  const easySessionDays = [...DAYS_OF_WEEK].filter(
+    (d) => d !== longDay && !qualitySessionDays.includes(d),
+  );
   const ctx: ProtocolContext = {
     weekIndex: Math.max(1, options?.weekIndex ?? 1),
     weekInPhase: options?.weekInPhase ?? 1,
     phase: toStrengthPhase(phase),
     totalWeeks: Math.max(1, options?.totalWeeks ?? 20),
     isRecovery: options?.isRecovery ?? false,
-    primarySchedule: { longSessionDays: ['Sunday'], qualitySessionDays: ['Tuesday', 'Thursday'], easySessionDays: ['Monday', 'Wednesday', 'Friday'] },
+    primarySchedule: { longSessionDays: [longDay], qualitySessionDays, easySessionDays },
     userBaselines: { equipment: options?.equipmentType ?? 'commercial_gym' },
     strengthFrequency: 2,
     constraints: {},
