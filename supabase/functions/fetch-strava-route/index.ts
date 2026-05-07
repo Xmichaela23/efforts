@@ -39,8 +39,8 @@ Deno.serve(async (req: Request) => {
       return json({ success: false, error: 'route_url must be a valid https URL.' }, 400);
     }
 
-    const routeId = parseStravaRouteIdFromUrl(normalized);
-    if (routeId == null) {
+    const routeIdDigits = parseStravaRouteIdFromUrl(normalized);
+    if (routeIdDigits == null) {
       return json({
         success: false,
         error: 'Not a Strava routes URL — expected a path like /routes/<numeric id>.',
@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
       }, 200);
     }
 
-    const r = await fetch(`https://www.strava.com/api/v3/routes/${routeId}`, {
+    const r = await fetch(`https://www.strava.com/api/v3/routes/${routeIdDigits}`, {
       headers: { Authorization: `Bearer ${tokenRes.accessToken}` },
     });
 
@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const routeJson = (await r.json()) as Record<string, unknown>;
-    const snapshot = snapshotFromStravaRouteApi(routeJson, normalized);
+    const snapshot = snapshotFromStravaRouteApi(routeJson, normalized, routeIdDigits);
     if (!snapshot) {
       return json({ success: false, error: 'Strava returned an unreadable route payload.' }, 200);
     }

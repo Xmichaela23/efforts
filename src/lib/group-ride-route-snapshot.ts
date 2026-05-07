@@ -7,7 +7,8 @@ export type GroupRideRouteSnapshotSource = 'strava';
 
 export type GroupRideRouteSnapshot = {
   source: GroupRideRouteSnapshotSource;
-  strava_route_id: number;
+  /** Decimal digits — can exceed JS safe integer range */
+  strava_route_id: string;
   route_url_normalized: string;
   route_name?: string;
   distance_m: number;

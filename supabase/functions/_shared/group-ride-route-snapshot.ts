@@ -7,7 +7,10 @@ export type GroupRideRouteSnapshotSource = 'strava';
 
 export type GroupRideRouteSnapshot = {
   source: GroupRideRouteSnapshotSource;
-  strava_route_id: number;
+  /**
+   * Decimal digits only. Strava route IDs can exceed `Number.MAX_SAFE_INTEGER`; never coerce via `Number()`.
+   */
+  strava_route_id: string;
   /** Same normalization as `group_ride_route_url` (https URL, max 512). */
   route_url_normalized: string;
   route_name?: string;
@@ -23,15 +26,16 @@ export const CLIMB_NOTICE_MIN_MK = 12;
 export const CLIMB_AGGRESSIVE_MIN_MK = 16;
 export const CLIMB_AGGRESSIVE_MIN_GAIN_M = 500;
 
-export function parseStravaRouteIdFromUrl(urlStr: string): number | null {
+/** Extract route id digits from a Strava routes URL (preserves full precision). */
+export function parseStravaRouteIdFromUrl(urlStr: string): string | null {
   try {
     const u = new URL(/^https?:\/\//i.test(urlStr) ? urlStr : `https://${urlStr}`);
     const h = u.hostname.toLowerCase();
     if (h !== 'strava.com' && !h.endsWith('.strava.com')) return null;
     const m = u.pathname.match(/\/routes\/(\d+)/i);
-    if (!m) return null;
-    const id = Number(m[1]);
-    return Number.isFinite(id) && id > 0 ? Math.floor(id) : null;
+    if (!m?.[1]) return null;
+    const digits = m[1];
+    return /^\d+$/.test(digits) ? digits : null;
   } catch {
     return null;
   }
@@ -52,10 +56,10 @@ export function normalizeHttpsUrlMax512(raw: string): string | null {
 export function snapshotFromStravaRouteApi(
   routeJson: Record<string, unknown>,
   routeUrlNormalized: string,
+  /** Parsed from the athlete's URL — authoritative id for the API request + storage. */
+  routeIdFromUrl: string,
 ): GroupRideRouteSnapshot | null {
-  const idRaw = routeJson.id ?? routeJson.route_id;
-  const id = typeof idRaw === 'number' ? idRaw : typeof idRaw === 'string' ? Number(idRaw) : NaN;
-  if (!Number.isFinite(id) || id <= 0) return null;
+  if (!/^\d+$/.test(routeIdFromUrl)) return null;
 
   const distance_m = Number(routeJson.distance);
   const elevation_gain_m = Number(routeJson.elevation_gain);
@@ -71,7 +75,7 @@ export function snapshotFromStravaRouteApi(
 
   return {
     source: 'strava',
-    strava_route_id: Math.floor(id),
+    strava_route_id: routeIdFromUrl,
     route_url_normalized: routeUrlNormalized,
     route_name,
     distance_m,
@@ -103,7 +107,21 @@ export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapsho
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const o = raw as Record<string, unknown>;
   if (o.source !== 'strava') return undefined;
-  const id = typeof o.strava_route_id === 'number' ? o.strava_route_id : Number(o.strava_route_id);
+
+  const idRaw = o.strava_route_id;
+  let routeIdStr: string | null = null;
+  if (typeof idRaw === 'string' && /^\d+$/.test(idRaw.trim())) {
+    routeIdStr = idRaw.trim();
+  } else if (
+    typeof idRaw === 'number' &&
+    Number.isFinite(idRaw) &&
+    idRaw > 0 &&
+    idRaw <= Number.MAX_SAFE_INTEGER
+  ) {
+    routeIdStr = String(Math.floor(idRaw));
+  }
+  if (!routeIdStr) return undefined;
+
   const url =
     typeof o.route_url_normalized === 'string' ? o.route_url_normalized.trim().slice(0, 512) : '';
   const dm = typeof o.distance_m === 'number' ? o.distance_m : Number(o.distance_m);
@@ -115,7 +133,6 @@ export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapsho
   const fetched =
     typeof o.fetched_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(o.fetched_at) ? o.fetched_at : '';
 
-  if (!Number.isFinite(id) || id <= 0) return undefined;
   if (!url.startsWith('https://')) return undefined;
   if (!Number.isFinite(dm) || dm <= 0) return undefined;
   if (!Number.isFinite(eg) || eg < 0) return undefined;
@@ -128,7 +145,7 @@ export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapsho
 
   return {
     source: 'strava',
-    strava_route_id: Math.floor(id),
+    strava_route_id: routeIdStr,
     route_url_normalized: url,
     route_name,
     distance_m: dm,
