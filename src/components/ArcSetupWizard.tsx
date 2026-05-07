@@ -294,18 +294,27 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
       : {}),
   };
 
-  const goals: Record<string, unknown>[] = state.races.map((race, i) => ({
-    name: race.name || 'Race',
-    goal_type: 'event',
-    sport: isTri(race.distance) ? 'triathlon' : 'run',
-    distance: race.distance,
-    target_date: race.targetDate,
-    priority: race.priority,
-    // Only the A-race carries full preferred_days; secondary races inherit intent
-    training_prefs: i === 0
-      ? trainingPrefs
-      : { training_intent: state.trainingIntent || 'completion' },
-  }));
+  const primaryRaceRow = state.races.find((r) => r.priority === 'A') ?? state.races[0]!;
+
+  const goals: Record<string, unknown>[] = state.races.map((race) => {
+    const raceTri = isTri(race.distance);
+    const isPrimaryRaceRow = race.id === primaryRaceRow.id;
+    return {
+      name: race.name || 'Race',
+      goal_type: 'event',
+      sport: raceTri ? 'triathlon' : 'run',
+      distance: race.distance,
+      target_date: race.targetDate,
+      priority: race.priority,
+      training_prefs: isPrimaryRaceRow
+        ? trainingPrefs
+        : raceTri
+          // Combined season uses one weekly skeleton — copy anchors (group ride, long days, swim,
+          // strength) onto B/C tri rows so DB merge + create-goal never see a stray default QB day.
+          ? { ...trainingPrefs, training_intent: state.trainingIntent || 'completion' }
+          : { training_intent: state.trainingIntent || 'completion' },
+    };
+  });
 
   const athleteIdentity: Record<string, unknown> = {
     training_intent: state.trainingIntent || 'completion',
