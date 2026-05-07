@@ -38,8 +38,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: CombinedPlanRequest = await req.json();
-    const { user_id, goals, athlete_state, athlete_memory, start_date } = body;
+    const { user_id, goals, athlete_state, athlete_memory, start_date, generation_trade_offs } = body;
     const preview = body.preview === true;
+    const persistedTradeOffs = Array.isArray(generation_trade_offs) ? generation_trade_offs : [];
 
     // ── Input validation ────────────────────────────────────────────────────
     if (!user_id)                         return json({ error: 'user_id required' }, 400);
@@ -290,6 +291,7 @@ Deno.serve(async (req: Request) => {
         plan_config,
         conflict_resolutions,
         preview: previewSummary,
+        generation_trade_offs: persistedTradeOffs,
       });
     }
 
@@ -326,6 +328,7 @@ Deno.serve(async (req: Request) => {
       validation,
       validation_failures: failures,
       preview: previewSummary,
+      generation_trade_offs: persistedTradeOffs,
     });
 
   } catch (e) {

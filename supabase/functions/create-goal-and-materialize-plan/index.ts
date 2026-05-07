@@ -21,6 +21,11 @@ import {
 } from '../_shared/combined-schedule-prefs.ts';
 import { fixTransposedEasyBikeRunAgainstSwimOrder } from '../_shared/tri-preferred-days-sanity.ts';
 import {
+  buildCombinedPlanGenerationTradeOffs,
+  type BackfillOptimizerSnapshot,
+  type PlanOptimizerSnapshotInput,
+} from '../_shared/plan-generation-trade-offs.ts';
+import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
   validatePreferredDays,
@@ -651,12 +656,13 @@ function pickCanonicalWeekSessions(
  *  - If `preferred_days` is present but fails the matrix → re-derive, treating the
  *    user's existing slots as anchors (so we honor the athlete's intent).
  *
- * Mutates `trainingPrefs` in place. Returns human-readable notes for logging.
+ * Mutates `trainingPrefs` in place. Returns human-readable notes for logging
+ * and an optional optimizer snapshot for persisting `plans.generation_trade_offs`.
  */
 function backfillTriTrainingPrefsDefenseInDepth(
   trainingPrefs: Record<string, unknown>,
   arc: ArcContext,
-): string[] {
+): { notes: string[]; optimizer_snapshot: BackfillOptimizerSnapshot | null } {
   const notes: string[] = [];
   const si = trainingPrefs.strength_intent ?? trainingPrefs.strengthIntent;
   if (si !== 'support' && si !== 'performance') {
@@ -766,12 +772,13 @@ function backfillTriTrainingPrefsDefenseInDepth(
   if (validationErrors.length === 0) {
     // User-provided week is matrix-clean; nothing to do.
     delete trainingPrefs.co_equal_strength_provisional_1x;
-    return notes;
+    return { notes, optimizer_snapshot: null };
   }
 
   // Derive a fresh, matrix-valid week (with 1× co-equal recovery if 2× cannot be placed).
   const { week: optimal, used_co_equal_1x_fallback } = deriveOptimalWeekWithCoEqualRecovery(inputs);
   const merged: Record<string, unknown> = { ...optimal.preferred_days };
+  const pinRestoreSkipped: string[] = [];
 
   // Restore user-specified swim days: the optimizer only honors one swim anchor
   // (masters_swim). If the athlete set explicit swim days (e.g. ["tuesday","friday"]),
@@ -798,6 +805,7 @@ function backfillTriTrainingPrefsDefenseInDepth(
       console.log('[preferred_days pin-restore] restored', { keys: Object.keys(pinRestore) });
     } else {
       const skipMsg = pinErrs.join(' | ');
+      pinRestoreSkipped.push(skipMsg);
       notes.push(`preferred_days pin-restore skipped: ${skipMsg}`);
       console.log('[preferred_days pin-restore] skipped:', skipMsg);
     }
@@ -817,7 +825,15 @@ function backfillTriTrainingPrefsDefenseInDepth(
   if (optimal.conflicts.length) {
     notes.push(`conflicts: ${optimal.conflicts.join(' | ')}`);
   }
-  return notes;
+  return {
+    notes,
+    optimizer_snapshot: {
+      trade_offs: [...optimal.trade_offs],
+      conflicts: [...optimal.conflicts],
+      used_co_equal_1x_fallback,
+      pin_restore_skipped: pinRestoreSkipped,
+    },
+  };
 }
 
 /**
@@ -1035,6 +1051,7 @@ async function buildCombinedPlan(
   const arcForCombined = await getArcContext(supabase, user_id, focusForCombined);
 
   const weekOptimizerDerivedGoalIds: string[] = [];
+  const optimizerSnapshotsForTradeOffs: PlanOptimizerSnapshotInput[] = [];
   for (const g of workingGoals) {
     const sp = String(g.sport || '').toLowerCase();
     if (sp !== 'triathlon' && sp !== 'tri') continue;
@@ -1043,7 +1060,10 @@ async function buildCombinedPlan(
       prev && typeof prev === 'object' && !Array.isArray(prev)
         ? { ...(prev as Record<string, unknown>) }
         : {};
-    const notes = backfillTriTrainingPrefsDefenseInDepth(base, arcForCombined);
+    const { notes, optimizer_snapshot } = backfillTriTrainingPrefsDefenseInDepth(base, arcForCombined);
+    if (optimizer_snapshot) {
+      optimizerSnapshotsForTradeOffs.push({ goal_id: g.id, ...optimizer_snapshot });
+    }
     if (notes.some((n) => n.includes('preferred_days→optimizer'))) {
       weekOptimizerDerivedGoalIds.push(g.id);
     }
@@ -1148,11 +1168,22 @@ async function buildCombinedPlan(
     strength_sessions_cap: coEqualProvisional1x ? 1 : undefined,
   }));
 
+  const postRaceForTradeOffs = findPostRaceRecoveryContext(
+    arcForCombined.recent_completed_events,
+    String(newGoal.sport || 'triathlon'),
+  );
+  const generation_trade_offs = buildCombinedPlanGenerationTradeOffs({
+    postRace: postRaceForTradeOffs,
+    optimizerSnapshots: optimizerSnapshotsForTradeOffs,
+  });
+  console.log('[buildCombinedPlan] generation_trade_offs:', JSON.stringify(generation_trade_offs));
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
     goals: goalsForCombined,
     start_date: combinedPlanStartDate,
+    generation_trade_offs,
     athlete_state: {
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,
@@ -1448,9 +1479,9 @@ Deno.serve(async (req: Request) => {
       );
       const sportForBackfill = String(resolvedGoal.sport || '').toLowerCase();
       if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
-        const backfillNotes = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
-        if (backfillNotes.length > 0) {
-          console.log('[create-goal] training_prefs server backfill:', backfillNotes.join(', '));
+        const { notes } = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
+        if (notes.length > 0) {
+          console.log('[create-goal] training_prefs server backfill:', notes.join(', '));
         }
       }
       resolvedGoal = { ...resolvedGoal, training_prefs: mergedPrefs };

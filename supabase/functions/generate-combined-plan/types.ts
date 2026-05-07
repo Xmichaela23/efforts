@@ -1,6 +1,8 @@
 // generate-combined-plan/types.ts
 // All type definitions for the multi-sport combined plan engine.
 
+import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
+
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
 export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery';
@@ -155,6 +157,11 @@ export interface CombinedPlanRequest {
   athlete_state: AthleteState;
   athlete_memory?: AthleteMemory;
   start_date?: string;
+  /**
+   * Persisted on `plans.generation_trade_offs` at insert time (combined path only today).
+   * Plain templates + variables; no LLM.
+   */
+  generation_trade_offs?: PlanGenerationTradeOff[];
   /**
    * When true, build the same plan contract and sessions but do not insert a `plans` row.
    * Response includes `plan_contract_v1`, `sessions_by_week`, and `preview_mode: true`.
