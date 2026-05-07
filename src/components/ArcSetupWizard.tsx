@@ -289,6 +289,9 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
       ? { swim_intent: state.swimIntent }
       : {}),
     ...(state.anythingUnusual ? { notes: state.anythingUnusual } : {}),
+    ...(state.assessmentWeekPreference
+      ? { assessment_week_preference: state.assessmentWeekPreference }
+      : {}),
   };
 
   const goals: Record<string, unknown>[] = state.races.map((race, i) => ({

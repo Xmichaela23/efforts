@@ -133,6 +133,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [showArcSetupNextStep, setShowArcSetupNextStep] = useState(false);
   /** After Arc built the calendar: compact success on Goals. */
   const [arcPlanReady, setArcPlanReady] = useState<{ planId: string | null } | null>(null);
+  /** Optimizer / merge notes worth surfacing after season build (§1.3 honesty). */
+  const [arcScheduleSignals, setArcScheduleSignals] = useState<{
+    conflicts: string[];
+    trade_offs: string[];
+    used_co_equal_1x_fallback?: boolean;
+    pin_restore_skipped?: string[];
+  } | null>(null);
 
   // Hydrate follow-up UI from `/goals` navigation state, then strip it so refresh/back doesn’t re-apply.
   useEffect(() => {
@@ -141,6 +148,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       seasonPlanJustBuilt?: boolean;
       builtPlanId?: string | null;
       needPaceCalibration?: boolean;
+      schedule_signals?: {
+        conflicts?: string[];
+        trade_offs?: string[];
+        used_co_equal_1x_fallback?: boolean;
+        pin_restore_skipped?: string[];
+      };
     } | null;
     if (!st || Object.keys(st).length === 0) return;
 
@@ -151,6 +164,22 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       void refreshGoals();
       setArcPlanReady({ planId: st.builtPlanId ?? null });
       setShowArcSetupNextStep(false);
+      const sig = st.schedule_signals;
+      if (sig && typeof sig === 'object') {
+        const noisy =
+          (sig.conflicts?.length ?? 0) > 0 ||
+          (sig.trade_offs?.length ?? 0) > 0 ||
+          (sig.pin_restore_skipped?.length ?? 0) > 0 ||
+          Boolean(sig.used_co_equal_1x_fallback);
+        if (noisy) {
+          setArcScheduleSignals({
+            conflicts: sig.conflicts ?? [],
+            trade_offs: sig.trade_offs ?? [],
+            used_co_equal_1x_fallback: sig.used_co_equal_1x_fallback,
+            pin_restore_skipped: sig.pin_restore_skipped ?? [],
+          });
+        }
+      }
     } else if (st.fromArcSetup) {
       void refreshGoals();
       setShowArcSetupNextStep(true);
@@ -1761,6 +1790,39 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             <p className="text-xs text-white/55 mt-2 leading-relaxed">
               Combined tri strength routing was updated. Rebuild your season plan so sessions match your strength choice (especially co-equal / performance).
             </p>
+          </div>
+        )}
+        {arcScheduleSignals && (
+          <div className="rounded-2xl border border-amber-500/35 bg-amber-950/35 p-4 mb-4 shrink-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-amber-100/95 leading-snug">Schedule adjustments</p>
+              <button
+                type="button"
+                onClick={() => setArcScheduleSignals(null)}
+                className="rounded-lg p-1 text-white/40 hover:text-white/70 hover:bg-white/10 shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-white/55 mt-2 leading-relaxed">
+              The planner applied trade-offs to fit your anchors and recovery rules. Review your calendar
+              {arcScheduleSignals.used_co_equal_1x_fallback ? ' — strength may be capped some weeks until anchors flex.' : '.'}
+            </p>
+            {(arcScheduleSignals.trade_offs?.length ?? 0) > 0 && (
+              <ul className="mt-2 list-disc list-inside text-xs text-amber-100/80 space-y-1">
+                {arcScheduleSignals.trade_offs.slice(0, 4).map((t, i) => (
+                  <li key={`to-${i}`}>{t}</li>
+                ))}
+              </ul>
+            )}
+            {(arcScheduleSignals.conflicts?.length ?? 0) > 0 && (
+              <ul className="mt-2 list-disc list-inside text-xs text-amber-200/75 space-y-1">
+                {arcScheduleSignals.conflicts.slice(0, 3).map((c, i) => (
+                  <li key={`cf-${i}`}>{c}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
         {arcPlanReady && (

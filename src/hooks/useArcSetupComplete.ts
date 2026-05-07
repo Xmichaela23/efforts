@@ -136,6 +136,14 @@ export function useArcSetupComplete() {
       }
 
       const planId = (data as { plan_id?: string | null }).plan_id ?? null;
+      const scheduleSignals = (data as {
+        schedule_signals?: {
+          conflicts?: string[];
+          trade_offs?: string[];
+          used_co_equal_1x_fallback?: boolean;
+          pin_restore_skipped?: string[];
+        };
+      }).schedule_signals;
       try {
         window.dispatchEvent(new CustomEvent('planned:invalidate'));
         window.dispatchEvent(new CustomEvent('goals:invalidate'));
@@ -144,7 +152,12 @@ export function useArcSetupComplete() {
 
       navigate('/goals', {
         replace: true,
-        state: { fromArcSetup: true, seasonPlanJustBuilt: true, builtPlanId: planId },
+        state: {
+          fromArcSetup: true,
+          seasonPlanJustBuilt: true,
+          builtPlanId: planId,
+          ...(scheduleSignals ? { schedule_signals: scheduleSignals } : {}),
+        },
       });
     },
     [navigate, startLoop],

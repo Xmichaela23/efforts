@@ -22,10 +22,16 @@ import {
 } from '../_shared/combined-schedule-prefs.ts';
 import { fixTransposedEasyBikeRunAgainstSwimOrder } from '../_shared/tri-preferred-days-sanity.ts';
 import {
+  aggregateOptimizerScheduleSignals,
   buildCombinedPlanGenerationTradeOffs,
   type BackfillOptimizerSnapshot,
   type PlanOptimizerSnapshotInput,
+  type ScheduleSignals,
 } from '../_shared/plan-generation-trade-offs.ts';
+import {
+  readStrengthFrequencyForOptimizer,
+  readSwimsPerWeekForOptimizer,
+} from '../_shared/tri-optimizer-prefs.ts';
 import {
   deriveOptimalWeekWithCoEqualRecovery,
   normalizeDayName,
@@ -699,14 +705,8 @@ function backfillTriTrainingPrefsDefenseInDepth(
 
   const dpw = readDaysPerWeekFromPrefs(trainingPrefs) ?? 7;
   const trainingDays = (Math.max(4, Math.min(7, Math.round(dpw))) as 4 | 5 | 6 | 7);
-  const swimsPerWeek = (() => {
-    const n = Math.max(0, Math.min(3, swimDays?.length ?? 2));
-    return n as 0 | 1 | 2 | 3;
-  })();
-  const strengthFreq = (() => {
-    const n = Math.max(0, Math.min(3, strengthDaysIn?.length ?? 2));
-    return n as 0 | 1 | 2 | 3;
-  })();
+  const swimsPerWeek = readSwimsPerWeekForOptimizer(trainingPrefs, swimDays?.length);
+  const strengthFreq = readStrengthFrequencyForOptimizer(trainingPrefs, strengthDaysIn?.length);
   const restDaysIn = pdDays(trainingPrefs as Record<string, unknown>, 'rest_days', 'restDays');
   const rawHardBikeAvoid =
     trainingPrefs.hard_bike_avoid_days ?? trainingPrefs.hardBikeAvoidDays;
@@ -907,8 +907,8 @@ async function buildCombinedPlan(
   /** Dry-run combined generation: no DB plan, no prefs writes, no activate-plan. */
   planPreview?: boolean,
 ): Promise<
-  | { plan_id: string; preview: false }
-  | { preview: true; combined_preview: Record<string, unknown> }
+  | { plan_id: string; preview: false; schedule_signals: ScheduleSignals }
+  | { preview: true; combined_preview: Record<string, unknown>; schedule_signals: ScheduleSignals }
   | null
 > {
 
@@ -1082,6 +1082,8 @@ async function buildCombinedPlan(
       (g as { training_prefs: Record<string, unknown> }).training_prefs = base;
     }
   }
+
+  const schedule_signals = aggregateOptimizerScheduleSignals(optimizerSnapshotsForTradeOffs);
 
   console.log(
     '[buildCombinedPlan] week_optimizer_derived_for_goal_ids:',
@@ -1298,7 +1300,7 @@ async function buildCombinedPlan(
       '[buildCombinedPlan] anchors_honored:',
       JSON.stringify({ ...honoredP, source_week_key: wkP, source: 'preview_response' }),
     );
-    return { preview: true as const, combined_preview: combined as Record<string, unknown> };
+    return { preview: true as const, combined_preview: combined as Record<string, unknown>, schedule_signals };
   }
 
   if (!combined?.plan_id) {
@@ -1351,7 +1353,7 @@ async function buildCombinedPlan(
     JSON.stringify({ ...honoredDb, source_week_key: wkDb, source: 'plan_row_sessions_by_week' }),
   );
 
-  return { plan_id: combinedPlanId, preview: false as const };
+  return { plan_id: combinedPlanId, preview: false as const, schedule_signals };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1637,6 +1639,7 @@ Deno.serve(async (req: Request) => {
                 goal_id: createdGoalId,
                 preview: true,
                 combined_preview: combinedResult.combined_preview,
+                schedule_signals: combinedResult.schedule_signals,
                 sport: 'multi_sport',
                 combined: true,
               }),
@@ -1645,24 +1648,43 @@ Deno.serve(async (req: Request) => {
           }
           createdPlanId = combinedResult.plan_id;
           return new Response(
-            JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id, sport: 'multi_sport', combined: true }),
+            JSON.stringify({
+              success: true,
+              mode,
+              goal_id: createdGoalId,
+              plan_id: combinedResult.plan_id,
+              schedule_signals: combinedResult.schedule_signals,
+              sport: 'multi_sport',
+              combined: true,
+            }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
-      }
-      // ── End combined plan routing ─────────────────────────────────────────
-      // If the caller explicitly requested a combined plan (combine=true) and
-      // buildCombinedPlan returned null (e.g. read-after-write: sibling goal not
-      // yet visible), return an informative error instead of silently falling
-      // through to standalone plan generation. The client can retry without preview.
-      if (combine && bodyPreview) {
-        // During a preview pass, a failed combined plan is not actionable — just
-        // return a no-conflict response so the client skips straight to real save.
+        const combinedUnavailableMsg =
+          'Combined plan could not be built (needs two active event goals on file). Standalone generation was not run — retry shortly or adjust your races.';
+        if (bodyPreview) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              preview: true,
+              combined: true,
+              error_code: 'combined_plan_unavailable',
+              error: combinedUnavailableMsg,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
         return new Response(
-          JSON.stringify({ success: true, mode, preview: true, combined_preview: {}, sport: 'multi_sport', combined: true }),
+          JSON.stringify({
+            success: false,
+            combined: true,
+            error_code: 'combined_plan_unavailable',
+            error: combinedUnavailableMsg,
+          }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+      // ── End combined plan routing ─────────────────────────────────────────
 
       // Detect concurrent run plans to avoid stacking duplicate run sessions.
       // Extract which days of the week the existing run plan places runs on,
@@ -1774,6 +1796,12 @@ Deno.serve(async (req: Request) => {
       triGenerateBody.generation_trade_offs = standalone_generation_trade_offs;
       console.log('[create-goal] standalone tri generation_trade_offs:', JSON.stringify(standalone_generation_trade_offs));
 
+      const triScheduleSignals = aggregateOptimizerScheduleSignals(
+        standaloneTriOptimizerSnapshot
+          ? [{ goal_id: triTradeOffGoalId || 'tri', ...standaloneTriOptimizerSnapshot }]
+          : [],
+      );
+
       const triGenerated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-triathlon-plan', triGenerateBody);
       const triPlanId = triGenerated?.plan_id;
       if (!triPlanId) throw new AppError('plan_generation_failed', triGenerated?.error || 'Triathlon plan generation returned no plan_id');
@@ -1814,7 +1842,15 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(
-        JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: triPlanId, sport: 'triathlon', distance: triDistanceApi }),
+        JSON.stringify({
+          success: true,
+          mode,
+          goal_id: createdGoalId,
+          plan_id: triPlanId,
+          sport: 'triathlon',
+          distance: triDistanceApi,
+          schedule_signals: triScheduleSignals,
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -2038,6 +2074,7 @@ Deno.serve(async (req: Request) => {
               goal_id: createdGoalId,
               preview: true,
               combined_preview: combinedResult.combined_preview,
+              schedule_signals: combinedResult.schedule_signals,
               sport: 'multi_sport',
               combined: true,
             }),
@@ -2046,10 +2083,41 @@ Deno.serve(async (req: Request) => {
         }
         createdPlanId = combinedResult.plan_id;
         return new Response(
-          JSON.stringify({ success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id, sport: 'multi_sport', combined: true }),
+          JSON.stringify({
+            success: true,
+            mode,
+            goal_id: createdGoalId,
+            plan_id: combinedResult.plan_id,
+            schedule_signals: combinedResult.schedule_signals,
+            sport: 'multi_sport',
+            combined: true,
+          }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+      const combinedUnavailableMsg =
+        'Combined plan could not be built (needs two active event goals on file). Standalone generation was not run — retry shortly or adjust your races.';
+      if (bodyPreview) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            preview: true,
+            combined: true,
+            error_code: 'combined_plan_unavailable',
+            error: combinedUnavailableMsg,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          combined: true,
+          error_code: 'combined_plan_unavailable',
+          error: combinedUnavailableMsg,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
     // ── End combined plan routing ─────────────────────────────────────────
 

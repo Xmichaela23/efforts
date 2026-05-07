@@ -39,6 +39,44 @@ export type BackfillOptimizerSnapshot = {
   pin_restore_skipped: string[];
 };
 
+/** Flattened optimizer signals for API responses (§1.3 / §8 surfacing). */
+export type ScheduleSignals = {
+  conflicts: string[];
+  trade_offs: string[];
+  used_co_equal_1x_fallback: boolean;
+  pin_restore_skipped: string[];
+};
+
+export function aggregateOptimizerScheduleSignals(
+  snapshots: PlanOptimizerSnapshotInput[],
+): ScheduleSignals {
+  const conflicts = new Set<string>();
+  const tradeOffs = new Set<string>();
+  const pinSkipped = new Set<string>();
+  let coEqual = false;
+  for (const s of snapshots) {
+    for (const c of s.conflicts ?? []) {
+      const x = String(c).trim();
+      if (x) conflicts.add(x);
+    }
+    for (const t of s.trade_offs ?? []) {
+      const x = String(t).trim();
+      if (x) tradeOffs.add(x);
+    }
+    for (const p of s.pin_restore_skipped ?? []) {
+      const x = String(p).trim();
+      if (x) pinSkipped.add(x);
+    }
+    if (s.used_co_equal_1x_fallback) coEqual = true;
+  }
+  return {
+    conflicts: [...conflicts],
+    trade_offs: [...tradeOffs],
+    used_co_equal_1x_fallback: coEqual,
+    pin_restore_skipped: [...pinSkipped],
+  };
+}
+
 /**
  * Plain-English templates (deterministic). Persist only `message_template_id` + `variables`;
  * clients render with the same map — no LLM.
