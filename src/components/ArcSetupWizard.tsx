@@ -24,7 +24,7 @@ import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
-import { climbNoticeTier, stravaRouteUrlLooksFetchable } from '@/lib/group-ride-route-snapshot';
+import { climbNoticeTier, stravaRouteUrlLooksFetchable, formatGroupRideRouteStatsLine } from '@/lib/group-ride-route-snapshot';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
 
@@ -36,6 +36,8 @@ export type WizardArcContext = {
   learnedFitness: Record<string, unknown> | null;
   equipment: Record<string, unknown> | null;
   performanceNumbers: Record<string, unknown> | null;
+  /** From `user_baselines.units` — drives route stats display in wizard. */
+  units: 'metric' | 'imperial';
   swimSessions28: number;
   swimSessions90: number;
   /** Completed runs in last 28 days (for placement-step hints). */
@@ -56,7 +58,7 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const [baselinesRes, volumeRes] = await Promise.all([
     supabase
       .from('user_baselines')
-      .select('learned_fitness, equipment, performance_numbers')
+      .select('learned_fitness, equipment, performance_numbers, units')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase
@@ -82,6 +84,10 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const pn = baseline?.performance_numbers;
   const performanceNumbers =
     pn && typeof pn === 'object' && !Array.isArray(pn) ? (pn as Record<string, unknown>) : null;
+
+  const rawUnits = baseline?.units;
+  const units: 'metric' | 'imperial' =
+    rawUnits === 'metric' || rawUnits === 'imperial' ? rawUnits : 'imperial';
 
   const volRows = (volumeRes.data ?? []) as {
     date?: string;
@@ -127,6 +133,7 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
     learnedFitness,
     equipment,
     performanceNumbers,
+    units,
     swimSessions28,
     swimSessions90,
     runSessions28,
@@ -1534,7 +1541,7 @@ function Step9Confirm({
         `${cap(state.groupRideDay)} · ${state.groupRideIntensity === 'quality_bike' ? 'hard (quality)' : 'easy (aerobic)'}`,
         rideRoute ? `Route: ${rideRoute}` : '',
         routeSnap
-          ? `Strava profile: ~${(routeSnap.distance_m / 1000).toFixed(1)} km, ~${Math.round(routeSnap.elevation_gain_m)} m climbing (~${routeSnap.climb_density_m_per_km.toFixed(1)} m/km)`
+          ? formatGroupRideRouteStatsLine(routeSnap, arc?.units ?? 'imperial')
           : '',
       ].filter(Boolean).join('\n'),
     });

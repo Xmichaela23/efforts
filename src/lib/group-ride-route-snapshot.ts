@@ -43,6 +43,23 @@ export function stravaRouteUrlLooksFetchable(url: string): boolean {
   }
 }
 
+/** Wizard / UI summaries — compact stats (no climb-tier prose). Matches plan session `formatGroupRideRouteTopoCopy` rounding. */
+export function formatGroupRideRouteStatsLine(
+  snapshot: Pick<GroupRideRouteSnapshot, 'distance_m' | 'elevation_gain_m' | 'climb_density_m_per_km'>,
+  units: 'imperial' | 'metric',
+): string {
+  const distKm = snapshot.distance_m / 1000;
+  const elevM = snapshot.elevation_gain_m;
+  const densMpk = snapshot.climb_density_m_per_km;
+  if (units === 'metric') {
+    return `Strava profile: ~${distKm.toFixed(1)} km, ~${Math.round(elevM)} m climbing (~${densMpk.toFixed(1)} m/km)`;
+  }
+  const mi = distKm * 0.621371192237334;
+  const ft = elevM * 3.280839895013123;
+  const ftPerMi = densMpk * 1.609344 * 3.280839895013123;
+  return `Strava profile: ~${mi.toFixed(1)} mi, ~${Math.round(ft)} ft climbing (~${Math.round(ftPerMi)} ft/mi)`;
+}
+
 /** Validate JSON-safe snapshot (wizard / planned row). */
 export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapshot | undefined {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
