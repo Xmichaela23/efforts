@@ -1446,7 +1446,7 @@ function Step9Confirm({
         `${cap(state.groupRideDay)} · ${state.groupRideIntensity === 'quality_bike' ? 'hard (quality)' : 'easy (aerobic)'}`,
         rideRoute ? `Route: ${rideRoute}` : '',
         routeSnap
-          ? `Strava profile: ~${(routeSnap.distance_m / 1000).toFixed(1)} km, ~${Math.round(routeSnap.elevation_gain_m)} m ↑ (~${routeSnap.climb_density_m_per_km.toFixed(1)} m/km)`
+          ? `Strava profile: ~${(routeSnap.distance_m / 1000).toFixed(1)} km, ~${Math.round(routeSnap.elevation_gain_m)} m climbing (~${routeSnap.climb_density_m_per_km.toFixed(1)} m/km)`
           : '',
       ].filter(Boolean).join('\n'),
     });
