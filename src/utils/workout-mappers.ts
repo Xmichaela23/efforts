@@ -71,6 +71,8 @@ export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
     units: planned.units ?? null,
     pool_unit: planned.pool_unit ?? null,
     pool_length_m: typeof planned.pool_length_m === 'number' ? planned.pool_length_m : null,
+    route_url: typeof planned.route_url === 'string' ? planned.route_url : null,
+    route_snapshot: planned.route_snapshot ?? null,
   };
 }
 

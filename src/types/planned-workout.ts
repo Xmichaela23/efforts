@@ -54,5 +54,8 @@ export interface PlannedWorkout {
   units?: string | null;
   pool_unit?: 'yd' | 'm' | null;
   pool_length_m?: number | null;
+  /** Strava / pinned route for anchored group rides (activation copies snapshot onto row) */
+  route_url?: string | null;
+  route_snapshot?: Record<string, unknown> | null;
 }
 

@@ -718,6 +718,7 @@ Deno.serve(async (req)=>{
           }) : null;
           planned = {
             id: p.id,
+            name: p?.name ?? null,
             steps: processedSteps,
             total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
             description: p?.description || p?.rendered_description || null,
@@ -733,7 +734,12 @@ Deno.serve(async (req)=>{
             brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
             workout_status: p.workout_status ?? null,
             skip_reason: p.skip_reason ?? null,
-            skip_note: p.skip_note ?? null
+            skip_note: p.skip_note ?? null,
+            units: p?.units ?? null,
+            pool_unit: p?.pool_unit ?? null,
+            pool_length_m: typeof p?.pool_length_m === 'number' ? p.pool_length_m : null,
+            route_url: typeof p?.route_url === 'string' ? p.route_url : null,
+            route_snapshot: p?.route_snapshot ?? null,
           };
           if (debug) {
             console.log('get-week: Processed planned data:', {
@@ -1010,7 +1016,12 @@ Deno.serve(async (req)=>{
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
           workout_status: p.workout_status ?? null,
           skip_reason: p.skip_reason ?? null,
-          skip_note: p.skip_note ?? null
+          skip_note: p.skip_note ?? null,
+          units: p?.units ?? null,
+          pool_unit: p?.pool_unit ?? null,
+          pool_length_m: typeof p?.pool_length_m === 'number' ? p.pool_length_m : null,
+          route_url: typeof p?.route_url === 'string' ? p.route_url : null,
+          route_snapshot: p?.route_snapshot ?? null,
         };
         const rowStatus = String(p.workout_status || '').toLowerCase() === 'skipped' ? 'skipped' : 'planned';
         const it = {
@@ -1081,7 +1092,12 @@ Deno.serve(async (req)=>{
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
           workout_status: p.workout_status ?? null,
           skip_reason: p.skip_reason ?? null,
-          skip_note: p.skip_note ?? null
+          skip_note: p.skip_note ?? null,
+          units: p?.units ?? null,
+          pool_unit: p?.pool_unit ?? null,
+          pool_length_m: typeof p?.pool_length_m === 'number' ? p.pool_length_m : null,
+          route_url: typeof p?.route_url === 'string' ? p.route_url : null,
+          route_snapshot: p?.route_snapshot ?? null,
         };
         const rowStatus2 = String(p.workout_status || '').toLowerCase() === 'skipped' ? 'skipped' : 'planned';
         const it = {
@@ -1463,6 +1479,8 @@ Deno.serve(async (req)=>{
         workout_title: p.workout_title ?? null,
         pool_unit: p.pool_unit ?? null,
         pool_length_m: p.pool_length_m ?? null,
+        route_url: typeof p?.route_url === 'string' ? p.route_url : null,
+        route_snapshot: p?.route_snapshot ?? null,
         display_overrides: p.display_overrides ?? null,
         expand_spec: p.expand_spec ?? null,
         pace_annotation: p.pace_annotation ?? null,
