@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { invokeFunction, getStoredUserId } from '@/lib/supabase';
+import { clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import type { NavigateFunction } from 'react-router-dom';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
@@ -128,6 +129,8 @@ export function useConflictResolutionLoop({
     } catch {
       void 0;
     }
+
+    if (userId) clearArcWizardDraft(userId);
 
     navigate('/goals', {
       replace: true,

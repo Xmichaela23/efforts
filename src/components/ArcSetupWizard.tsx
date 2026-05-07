@@ -16,13 +16,14 @@
  * Step 8  — Strength (included + intent)            [tri only]
  * Step 9  — Start date + notes + confirm
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
+import { loadArcWizardDraft, saveArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
 import { climbNoticeTier, stravaRouteUrlLooksFetchable, formatGroupRideRouteStatsLine } from '@/lib/group-ride-route-snapshot';
 
@@ -317,6 +318,29 @@ function blank(): WizardState {
     anythingUnusual: '',
     assessmentWeekPreference: null,
   };
+}
+
+/** Restore local draft (same device); validates minimal shape. */
+function hydrateWizardDraft(raw: Record<string, unknown>): WizardState | null {
+  if (!Array.isArray(raw.races) || raw.races.length === 0) return null;
+  const base = blank();
+  return {
+    ...base,
+    ...raw,
+    races: raw.races as WizardRace[],
+    groupRideRouteFetching: false,
+    groupRideRouteFetchError: null,
+  } as WizardState;
+}
+
+function readInitialWizard(): { state: WizardState; stepIdx: number } {
+  const uid = getStoredUserId();
+  if (!uid) return { state: blank(), stepIdx: 0 };
+  const d = loadArcWizardDraft(uid);
+  if (!d) return { state: blank(), stepIdx: 0 };
+  const h = hydrateWizardDraft(d.state);
+  if (!h) return { state: blank(), stepIdx: 0 };
+  return { state: h, stepIdx: d.stepIdx };
 }
 
 // ─── Inference helpers (fill required fields the wizard didn't explicitly ask) ─
@@ -1794,11 +1818,39 @@ const HEADER_INSET: React.CSSProperties = {
 
 export default function ArcSetupWizard() {
   const navigate = useNavigate();
-  const [state, setState] = useState<WizardState>(blank);
-  const [stepIdx, setStepIdx] = useState(0);
+  const wizardBootstrap = useMemo(() => readInitialWizard(), []);
+  const [state, setState] = useState<WizardState>(() => wizardBootstrap.state);
+  const [stepIdx, setStepIdx] = useState(() => wizardBootstrap.stepIdx);
   const [arcCtx, setArcCtx] = useState<WizardArcContext | null>(null);
   const { complete, saving, error, saveBanner, conflictOverlay, handleConflictChoice } =
     useArcSetupComplete();
+
+  // Persist draft so leaving for Strava / switching apps resumes same step (browser + PWA).
+  useEffect(() => {
+    const uid = getStoredUserId();
+    if (!uid) return;
+    const t = window.setTimeout(() => {
+      saveArcWizardDraft(uid, stepIdx, state as unknown as Record<string, unknown>);
+    }, 320);
+    return () => window.clearTimeout(t);
+  }, [state, stepIdx]);
+
+  useEffect(() => {
+    const uid = getStoredUserId();
+    if (!uid) return;
+    const flush = () => {
+      saveArcWizardDraft(uid, stepIdx, state as unknown as Record<string, unknown>);
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, [state, stepIdx]);
 
   // Load Arc context once at mount
   useEffect(() => {

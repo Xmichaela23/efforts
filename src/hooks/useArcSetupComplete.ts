@@ -16,6 +16,7 @@ import {
   parseArcInvokeError,
   type InsertedGoalRow,
 } from '@/lib/arc-setup-persistence';
+import { clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import {
   useConflictResolutionLoop,
   type ActiveConflict,
@@ -149,6 +150,8 @@ export function useArcSetupComplete() {
         window.dispatchEvent(new CustomEvent('goals:invalidate'));
         window.dispatchEvent(new CustomEvent('plans:refresh'));
       } catch {}
+
+      if (userId) clearArcWizardDraft(userId);
 
       navigate('/goals', {
         replace: true,
