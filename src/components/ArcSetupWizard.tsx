@@ -36,6 +36,10 @@ export type WizardArcContext = {
   performanceNumbers: Record<string, unknown> | null;
   swimSessions28: number;
   swimSessions90: number;
+  /** Completed runs in last 28 days (for placement-step hints). */
+  runSessions28: number;
+  /** Completed rides in last 28 days. */
+  bikeSessions28: number;
 };
 
 async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
@@ -43,7 +47,7 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const start90 = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
   const start28 = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
 
-  const [baselinesRes, swimRes] = await Promise.all([
+  const [baselinesRes, volumeRes] = await Promise.all([
     supabase
       .from('user_baselines')
       .select('learned_fitness, equipment, performance_numbers')
@@ -51,10 +55,10 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
       .maybeSingle(),
     supabase
       .from('workouts')
-      .select('date')
+      .select('date, type')
       .eq('user_id', userId)
       .eq('workout_status', 'completed')
-      .in('type', ['swim', 'swimming'])
+      .in('type', ['swim', 'swimming', 'run', 'ride'])
       .gte('date', start90)
       .lte('date', today),
   ]);
@@ -73,13 +77,75 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const performanceNumbers =
     pn && typeof pn === 'object' && !Array.isArray(pn) ? (pn as Record<string, unknown>) : null;
 
-  const swimRows = (swimRes.data ?? []) as { date?: string }[];
-  const swimSessions28 = swimRows.filter(
-    r => typeof r.date === 'string' && r.date.slice(0, 10) >= start28,
-  ).length;
-  const swimSessions90 = swimRows.length;
+  const volRows = (volumeRes.data ?? []) as { date?: string; type?: string }[];
+  const in28 = (d: string) => typeof d === 'string' && d.slice(0, 10) >= start28;
 
-  return { learnedFitness, equipment, performanceNumbers, swimSessions28, swimSessions90 };
+  let swimSessions28 = 0;
+  let swimSessions90 = 0;
+  let runSessions28 = 0;
+  let bikeSessions28 = 0;
+
+  for (const r of volRows) {
+    const d = typeof r.date === 'string' ? r.date.slice(0, 10) : '';
+    const t = String(r.type ?? '').toLowerCase();
+    const isSwim = t === 'swim' || t === 'swimming';
+    const isRun = t === 'run';
+    const isRide = t === 'ride';
+
+    if (isSwim) swimSessions90 += 1;
+    if (!in28(d)) continue;
+    if (isSwim) swimSessions28 += 1;
+    if (isRun) runSessions28 += 1;
+    if (isRide) bikeSessions28 += 1;
+  }
+
+  return {
+    learnedFitness,
+    equipment,
+    performanceNumbers,
+    swimSessions28,
+    swimSessions90,
+    runSessions28,
+    bikeSessions28,
+  };
+}
+
+/** Recent run volume → Arc hint on tri run-quality placement (after pinned quality bike). */
+function hintRunQualityPlacementFromHistory(arc: WizardArcContext | null): string | null {
+  if (!arc) return null;
+  const n = arc.runSessions28;
+  if (n >= 10) {
+    return `${n} completed runs in the last 4 weeks — strong run rhythm; standalone mid-week intervals after your quality bike day often works if you bounce back quickly on the run.`;
+  }
+  if (n >= 6) {
+    return `${n} runs in the last 4 weeks — you're running regularly; choose standalone if hard days back-to-back have felt fine, or fold into the long run for fewer pinned hard weekdays.`;
+  }
+  if (n >= 3) {
+    return `${n} runs in the last 4 weeks — either pattern can work; blending into the long run is the lower weekday-stress option.`;
+  }
+  if (n >= 1) {
+    return `${n} run${n === 1 ? '' : 's'} in the last 4 weeks — folding quality into the long run often fits while run consistency builds.`;
+  }
+  return `No runs logged in the last 4 weeks — putting threshold blocks on the long run keeps mid-week simpler until running is back in rhythm.`;
+}
+
+/** Recent ride volume → Arc hint on tri bike-quality placement (after pinned quality run). */
+function hintBikeQualityPlacementFromHistory(arc: WizardArcContext | null): string | null {
+  if (!arc) return null;
+  const n = arc.bikeSessions28;
+  if (n >= 10) {
+    return `${n} completed rides in the last 4 weeks — high bike frequency; standalone mid-week bike quality may match what your legs already expect.`;
+  }
+  if (n >= 6) {
+    return `${n} rides in the last 4 weeks — if stacking bike quality beside your hard run day feels like a lot, preferring long-ride emphasis frees mid-week.`;
+  }
+  if (n >= 3) {
+    return `${n} rides in the last 4 weeks — moderate bike volume; either choice is reasonable — long-ride bias helps when the week gets cramped.`;
+  }
+  if (n >= 1) {
+    return `${n} ride${n === 1 ? '' : 's'} in the last 4 weeks — consolidating structured bike into the long ride can spare adjacent hard days.`;
+  }
+  return `No rides logged in the last 4 weeks — biasing bike quality toward the long ride keeps weekday stress lower while cycling consistency returns.`;
 }
 
 /** Format seconds-per-km as "m:ss/mi" (matches app-wide imperial display) */
@@ -923,7 +989,7 @@ function Step5Run({
 
 /** Tri only — shown after anchored hard group ride (quality bike day pinned). */
 function StepTriRunQualityPlacement({
-  state, setState, onNext, onBack, step, totalSteps,
+  state, setState, onNext, onBack, step, totalSteps, arc,
 }: {
   state: WizardState;
   setState: (s: WizardState) => void;
@@ -931,21 +997,24 @@ function StepTriRunQualityPlacement({
   onBack: () => void;
   step: number;
   totalSteps: number;
+  arc: WizardArcContext | null;
 }) {
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const ride = state.groupRideDay ? cap(state.groupRideDay) : 'group ride';
   const canContinue = state.runQualityPlacement !== null;
+  const historyHint = hintRunQualityPlacementFromHistory(arc);
 
   return (
     <StepLayout
       step={step}
       totalSteps={totalSteps}
       title="Run intervals after your quality bike day?"
-      subtitle={`Mid-week run quality often lands the day after ${ride} — hard bike, then hard run. Some athletes handle that well; others fold threshold work into the Sunday long run instead.`}
+      subtitle={`Mid-week run quality often lands the next calendar day after ${ride} (e.g. Wed ride → Thu run). Some athletes handle that well; others fold threshold work into the long run instead.`}
       onBack={onBack}
       onContinue={onNext}
       canContinue={canContinue}
     >
+      {historyHint && <ArcHint>{historyHint}</ArcHint>}
       <div className="space-y-2">
         <ChoiceBtn
           active={state.runQualityPlacement === 'standalone_midweek'}
@@ -966,13 +1035,16 @@ function StepTriRunQualityPlacement({
           </span>
         </ChoiceBtn>
       </div>
+      <p className="text-[11px] text-white/35 px-0.5 pt-1">
+        This saves on your plan contract; you can adjust later if recovery patterns change.
+      </p>
     </StepLayout>
   );
 }
 
 /** Tri only — shown after anchored quality run (club / track night). Preference is persisted for bike/run geometry + resolver. */
 function StepTriBikeQualityPlacement({
-  state, setState, onNext, onBack, step, totalSteps,
+  state, setState, onNext, onBack, step, totalSteps, arc,
 }: {
   state: WizardState;
   setState: (s: WizardState) => void;
@@ -980,21 +1052,24 @@ function StepTriBikeQualityPlacement({
   onBack: () => void;
   step: number;
   totalSteps: number;
+  arc: WizardArcContext | null;
 }) {
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const rn = state.groupRunDay ? cap(state.groupRunDay) : 'run anchor';
   const canContinue = state.bikeQualityPlacement !== null;
+  const historyHint = hintBikeQualityPlacementFromHistory(arc);
 
   return (
     <StepLayout
       step={step}
       totalSteps={totalSteps}
       title="Bike quality when run club pins a hard day?"
-      subtitle={`Your ${rn} session is fixed. Mid-week bike quality may sit right next to it — some athletes keep both; others prefer structured bike stress folded into the long ride when the week gets cramped.`}
+      subtitle={`Your ${rn} session is fixed. Mid-week bike quality may land on an adjacent calendar day — some athletes keep both; others prefer structured bike stress folded into the long ride when the week gets cramped.`}
       onBack={onBack}
       onContinue={onNext}
       canContinue={canContinue}
     >
+      {historyHint && <ArcHint>{historyHint}</ArcHint>}
       <div className="space-y-2">
         <ChoiceBtn
           active={state.bikeQualityPlacement === 'standalone_midweek'}
@@ -1002,7 +1077,7 @@ function StepTriBikeQualityPlacement({
         >
           <span className="block font-semibold">Keep standalone bike quality</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
-            Accept adjacent hard bike + hard run geometry when the planner needs it — bike-forward tolerance.
+            Allow adjacent hard bike and hard run when the planner needs it — for athletes who tolerate stacked quality.
           </span>
         </ChoiceBtn>
         <ChoiceBtn
@@ -1015,6 +1090,9 @@ function StepTriBikeQualityPlacement({
           </span>
         </ChoiceBtn>
       </div>
+      <p className="text-[11px] text-white/35 px-0.5 pt-1">
+        This saves on your plan contract; you can adjust later if recovery patterns change.
+      </p>
     </StepLayout>
   );
 }
@@ -1261,6 +1339,8 @@ function Step9Confirm({
   const threshSec = readPace('run_threshold_pace_sec_per_km');
   const fitnessLines: string[] = [];
   if (arc && arc.swimSessions28 > 0) fitnessLines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
+  if (arc && arc.runSessions28 > 0) fitnessLines.push(`Run: ${arc.runSessions28} sessions in last 4 weeks`);
+  if (arc && arc.bikeSessions28 > 0) fitnessLines.push(`Bike: ${arc.bikeSessions28} sessions in last 4 weeks`);
   if (ftp) fitnessLines.push(`Bike FTP: ~${ftp}w`);
   if (threshSec) fitnessLines.push(`Run threshold: ${fmtPaceKm(threshSec)}`);
 
@@ -1525,13 +1605,13 @@ export default function ArcSetupWizard() {
               <Step4Bike {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'rq_placement' && (
-              <StepTriRunQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <StepTriRunQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'run' && (
               <Step5Run {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'bq_placement' && (
-              <StepTriBikeQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <StepTriBikeQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
             )}
             {currentStep === 'longdays' && (
               <Step6LongDays {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
