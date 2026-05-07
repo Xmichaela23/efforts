@@ -82,7 +82,7 @@ const corsHeaders: Record<string, string> = {
 /** v28: Wire coach to ArcContext + add Arc-aware overall_training_read + weekly_state_v1.empty_state. */
 /** v29: Add last_completed_race.projected_seconds (course-model projection at race time). */
 /** v30: Weekly coach swim_intent posture + longitudinal prompt shaping for tri goals. */
-const COACH_PAYLOAD_VERSION = 30;
+const COACH_PAYLOAD_VERSION = 31;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -310,8 +310,16 @@ function activeTriGoalForSwimIntent(ctx: GoalContext, activePlanGoalId: string |
   return triGoals[0] ?? null;
 }
 
-/** `swim_intent` from the active tri goal's `training_prefs`; null when no tri goal (skip swim-specific coach framing). */
-function deriveTriSwimIntentForCoach(ctx: GoalContext, activePlanGoalId: string | null | undefined): 'focus' | 'race' | null {
+/** `swim_intent` from plan_contract_v1 (effective schedule), else active tri goal's `training_prefs`. */
+function deriveTriSwimIntentForCoach(
+  ctx: GoalContext,
+  activePlanGoalId: string | null | undefined,
+  planConfig: Record<string, unknown> | null | undefined,
+): 'focus' | 'race' | null {
+  const contract = planConfig?.plan_contract_v1 as Record<string, unknown> | undefined;
+  const fromContract = contract?.swim_intent ?? planConfig?.swim_intent;
+  if (fromContract === 'focus' || fromContract === 'race') return fromContract;
+
   const g = activeTriGoalForSwimIntent(ctx, activePlanGoalId);
   if (!g) return null;
   const tp = g.training_prefs;
@@ -319,6 +327,36 @@ function deriveTriSwimIntentForCoach(ctx: GoalContext, activePlanGoalId: string 
   const raw = (tp as Record<string, unknown>).swim_intent ?? (tp as Record<string, unknown>).swimIntent;
   if (raw === 'focus') return 'focus';
   return 'race';
+}
+
+function swimCutoffPressureCoachFacts(planConfig: Record<string, unknown> | null | undefined): string[] {
+  const contract = planConfig?.plan_contract_v1 as Record<string, unknown> | undefined;
+  const p =
+    (contract?.swim_cutoff_pressure_v1 ?? planConfig?.swim_cutoff_pressure_v1) as Record<
+      string,
+      unknown
+    > | null | undefined;
+  if (!p || typeof p !== 'object') return [];
+
+  const lines: string[] = [];
+  const hints = Array.isArray(p.narrative_hints) ? p.narrative_hints : [];
+  for (const h of hints) {
+    if (typeof h === 'string' && h.trim()) lines.push(h.trim());
+  }
+
+  if (p.intent_promoted_to_focus === true && Array.isArray(p.intent_promotion_reasons)) {
+    const rs = (p.intent_promotion_reasons as unknown[])
+      .map((x) => (typeof x === 'string' ? x : ''))
+      .filter(Boolean)
+      .join(', ');
+    if (rs) {
+      lines.push(
+        `SWIM INTENT GUARDRAIL: schedule uses swim_intent "focus" (engine promotion: ${rs}). Name swim as a limiter until pace/cutoff margin clearly improves.`,
+      );
+    }
+  }
+
+  return lines;
 }
 
 function swimPostureFactLine(intent: 'focus' | 'race'): string {
@@ -937,7 +975,7 @@ Deno.serve(async (req) => {
     const planConfig = activePlan?.config || null;
 
     const goalContext = await loadGoalContext(supabaseService, userId, asOfDate, allActivePlans.map(p => p.id));
-    const triSwimIntent = deriveTriSwimIntentForCoach(goalContext, activePlan?.goal_id ?? null);
+    const triSwimIntent = deriveTriSwimIntentForCoach(goalContext, activePlan?.goal_id ?? null, planConfig);
     const methodologyId: MethodologyId = inferMethodologyId(planConfig);
     const weekStartDow: WeekStartDow = resolveWeekStartDow(planConfig);
 
@@ -3830,6 +3868,9 @@ Deno.serve(async (req) => {
           longitudinalSignalsResult?.signals?.length
             ? longitudinalSignalsToPrompt(longitudinalSignalsResult, { swimIntent: triSwimIntent })
             : '';
+        for (const line of swimCutoffPressureCoachFacts(planConfig)) {
+          narrativeFacts.push(line);
+        }
         if (longLegacyBlock.trim()) narrativeFacts.push(longLegacyBlock);
         else if (triSwimIntent != null) narrativeFacts.push(swimPostureFactLine(triSwimIntent));
 

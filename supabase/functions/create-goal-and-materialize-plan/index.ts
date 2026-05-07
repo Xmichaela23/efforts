@@ -13,6 +13,8 @@ import {
   swimVolumeMultiplierFromArcWorkouts,
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
+import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
+import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
 import {
@@ -981,7 +983,7 @@ async function buildCombinedPlan(
       .eq('user_id', user_id)
       .order('week_start', { ascending: false })
       .limit(6),
-    supabase.from('user_baselines').select('equipment, units').eq('user_id', user_id).maybeSingle(),
+    supabase.from('user_baselines').select('equipment, units, birthday, gender').eq('user_id', user_id).maybeSingle(),
   ]);
 
   const planUnitsForCombined: 'imperial' | 'metric' =
@@ -1223,6 +1225,106 @@ async function buildCombinedPlan(
   const combinedPlanStartDate =
     normalizeDateOnlyYmd(explicit_plan_start_date) ?? currentWeekMondayISO();
 
+  let swim_cutoff_pressure_v1: SwimCutoffPressureV1 | null = null;
+  const primarySportLc = String(primaryGoal?.sport || '').toLowerCase();
+  const primaryIsTriA =
+    Boolean(primaryGoal?.priority === 'A') &&
+    (primarySportLc === 'triathlon' || primarySportLc === 'tri');
+  if (primaryIsTriA && primaryGoal) {
+    const raceYmd = String(primaryGoal.event_date || '').slice(0, 10);
+    const weeksRem =
+      /^\d{4}-\d{2}-\d{2}$/.test(combinedPlanStartDate) && /^\d{4}-\d{2}-\d{2}$/.test(raceYmd)
+        ? Math.max(
+          1,
+          Math.ceil(
+            (new Date(raceYmd + 'T12:00:00Z').getTime() -
+              new Date(combinedPlanStartDate + 'T12:00:00Z').getTime()) /
+              (7 * 24 * 60 * 60 * 1000),
+          ),
+        )
+        : 12;
+
+    let swimMin: number | null =
+      typeof primaryGoalProjection?.swim_min === 'number' && Number(primaryGoalProjection.swim_min) > 0
+        ? Number(primaryGoalProjection.swim_min)
+        : null;
+    let projectedSource: 'goal_projection' | 'live_model' = 'goal_projection';
+
+    if (swimMin == null) {
+      const lastSwim = arcForCombined.swim_training_from_workouts?.last_swim_date ?? null;
+      const pbDay =
+        combinedBaseline?.birthday != null ? String(combinedBaseline.birthday).slice(0, 10) : null;
+      const gen =
+        typeof combinedBaseline?.gender === 'string' ? String(combinedBaseline.gender) : null;
+      const proj = projectRaceSplits({
+        learned_fitness: arcForCombined.learned_fitness,
+        athlete_identity: arcForCombined.athlete_identity,
+        performance_numbers: arcForCombined.performance_numbers,
+        profile_birthday: pbDay,
+        profile_gender: gen,
+        goal: {
+          distance: primaryGoal.distance,
+          target_date: primaryGoal.event_date,
+          sport: primaryGoal.sport,
+        },
+        weeks_remaining: weeksRem,
+        last_swim_date: lastSwim,
+        course_data: null,
+      });
+      swimMin = proj.swim_min;
+      projectedSource = 'live_model';
+    }
+
+    const basePressure =
+      swimMin != null
+        ? buildSwimCutoffPressureV1({
+          distance: primaryGoal.distance,
+          projected_swim_min: swimMin,
+          projected_source: projectedSource,
+        })
+        : null;
+
+    const paceSlow = swimSecPer100Yd != null && swimSecPer100Yd >= 150;
+    const cutoffTight = basePressure != null && basePressure.severity !== 'none';
+    const currentIntent = String(freshCombinedPrefs.swim_intent ?? '').toLowerCase();
+    const promote = currentIntent !== 'focus' && (paceSlow || cutoffTight);
+
+    const intent_promotion_reasons: string[] = [];
+    if (promote) {
+      if (paceSlow) intent_promotion_reasons.push('pool_pace_ge_2_30_per_100yd');
+      if (cutoffTight) intent_promotion_reasons.push(`swim_cutoff_${basePressure?.severity ?? 'unknown'}`);
+      freshCombinedPrefs.swim_intent = 'focus';
+      if (!freshCombinedPrefs.swim_load_source) freshCombinedPrefs.swim_load_source = 'split';
+      console.log('[buildCombinedPlan] swim_intent promoted to focus:', intent_promotion_reasons.join(', '));
+    }
+
+    if (basePressure) {
+      swim_cutoff_pressure_v1 = {
+        ...basePressure,
+        intent_promoted_to_focus: promote,
+        intent_promotion_reasons,
+      };
+    } else if (promote && paceSlow && swimMin != null) {
+      const dk = normalizeGoalDistanceKey(primaryGoal.distance) || primaryGoal.distance;
+      swim_cutoff_pressure_v1 = {
+        version: 1,
+        distance_key: dk,
+        projected_swim_min: swimMin,
+        projected_source: projectedSource,
+        swim_cutoff_min: null,
+        margin_vs_cutoff: null,
+        projected_pct_of_cutoff: null,
+        severity: 'none',
+        recommend_third_swim: true,
+        narrative_hints: [
+          'Slow baseline swim pace on file (≥2:30/100 yd) — add a third weekly swim when schedule allows.',
+        ],
+        intent_promoted_to_focus: true,
+        intent_promotion_reasons,
+      };
+    }
+  }
+
   const resolvedBikeQualityLabelForCombined = (() => {
     const fromPrefs = freshCombinedPrefs.bike_quality_label?.trim();
     if (fromPrefs) return fromPrefs;
@@ -1284,6 +1386,7 @@ async function buildCombinedPlan(
       ...(projectedBikeHours != null ? { projected_bike_hours: projectedBikeHours } : {}),
       tri_approach: triApproach,
       swim_volume_multiplier,
+      ...(swim_cutoff_pressure_v1 ? { swim_cutoff_pressure_v1 } : {}),
       ...((): { swim_equipment?: string[] } => {
         const sw = arcForCombined.equipment?.swimming;
         if (!Array.isArray(sw) || !sw.length) return {};
@@ -1408,6 +1511,26 @@ async function buildCombinedPlan(
   }
 
   const combinedPlanId = combined.plan_id;
+
+  if (swim_cutoff_pressure_v1?.intent_promoted_to_focus && primaryGoal?.id) {
+    const wgRow = workingGoals.find((g) => g.id === primaryGoal.id);
+    const prevTp =
+      wgRow?.training_prefs && typeof wgRow.training_prefs === 'object' && !Array.isArray(wgRow.training_prefs)
+        ? (wgRow.training_prefs as Record<string, unknown>)
+        : {};
+    const mergedTp = {
+      ...prevTp,
+      swim_intent: 'focus',
+      swim_load_source: freshCombinedPrefs.swim_load_source ?? 'split',
+    };
+    const { error: swimPromoErr } = await supabase
+      .from('goals')
+      .update({ training_prefs: mergedTp, updated_at: new Date().toISOString() })
+      .eq('id', primaryGoal.id)
+      .eq('user_id', user_id);
+    if (swimPromoErr) console.warn('[buildCombinedPlan] swim intent promo prefs update', swimPromoErr.message);
+    else if (wgRow) (wgRow as { training_prefs: Record<string, unknown> }).training_prefs = mergedTp;
+  }
 
   // Link ALL goals to the combined plan
   for (const g of goalsForCombined) {

@@ -3,6 +3,7 @@
 
 import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
 import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
+import type { SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
@@ -133,6 +134,11 @@ export interface AthleteState {
    * before session placement so returning swimmers are not dropped into full 70.3 swim share.
    */
   swim_volume_multiplier?: number;
+  /**
+   * Tri guardrail: projected swim vs typical cutoff window + optional intent promotion flags.
+   * Goal flow computes; echoed into `plan_contract_v1` for coach / materialize.
+   */
+  swim_cutoff_pressure_v1?: SwimCutoffPressureV1 | null;
   /**
    * Pool gear from `user_baselines.equipment.swimming` (Training Baselines). Drill tokens that
    * require kickboard, pull buoy, or snorkel are omitted when the athlete has not selected them.
