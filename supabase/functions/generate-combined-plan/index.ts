@@ -149,6 +149,14 @@ Deno.serve(async (req: Request) => {
       ...(typeof s.route_url === 'string' && s.route_url.trim()
         ? { route_url: s.route_url.trim() }
         : {}),
+      ...(typeof (s as { group_ride_route_snapshot?: unknown }).group_ride_route_snapshot === 'object' &&
+        (s as { group_ride_route_snapshot?: unknown }).group_ride_route_snapshot !== null &&
+        !Array.isArray((s as { group_ride_route_snapshot?: unknown }).group_ride_route_snapshot)
+        ? {
+          group_ride_route_snapshot: (s as { group_ride_route_snapshot: Record<string, unknown> })
+            .group_ride_route_snapshot,
+        }
+        : {}),
       intensity_class: s.intensity_class,
       tss: s.tss,
       weighted_tss: s.weighted_tss,

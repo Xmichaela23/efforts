@@ -15,6 +15,7 @@ export type GroupRideRouteSnapshot = {
   elevation_gain_m: number;
   climb_density_m_per_km: number;
   fetched_at: string;
+  map_polyline?: string;
 };
 
 export const CLIMB_NOTICE_MIN_MK = 12;
@@ -40,4 +41,65 @@ export function stravaRouteUrlLooksFetchable(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Validate JSON-safe snapshot (wizard / planned row). */
+export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapshot | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  if (o.source !== 'strava') return undefined;
+
+  const idRaw = o.strava_route_id;
+  let routeIdStr: string | null = null;
+  if (typeof idRaw === 'string' && /^\d+$/.test(idRaw.trim())) {
+    routeIdStr = idRaw.trim();
+  } else if (
+    typeof idRaw === 'number' &&
+    Number.isFinite(idRaw) &&
+    idRaw > 0 &&
+    idRaw <= Number.MAX_SAFE_INTEGER
+  ) {
+    routeIdStr = String(Math.floor(idRaw));
+  }
+  if (!routeIdStr) return undefined;
+
+  const url =
+    typeof o.route_url_normalized === 'string' ? o.route_url_normalized.trim().slice(0, 512) : '';
+  const dm = typeof o.distance_m === 'number' ? o.distance_m : Number(o.distance_m);
+  const eg = typeof o.elevation_gain_m === 'number' ? o.elevation_gain_m : Number(o.elevation_gain_m);
+  const dens =
+    typeof o.climb_density_m_per_km === 'number'
+      ? o.climb_density_m_per_km
+      : Number(o.climb_density_m_per_km);
+  const fetched =
+    typeof o.fetched_at === 'string' && /^\d{4}-\d{2}-\d{2}/.test(o.fetched_at) ? o.fetched_at : '';
+
+  if (!url.startsWith('https://')) return undefined;
+  if (!Number.isFinite(dm) || dm <= 0) return undefined;
+  if (!Number.isFinite(eg) || eg < 0) return undefined;
+  if (!Number.isFinite(dens) || dens < 0) return undefined;
+  if (!fetched) return undefined;
+
+  const rn = o.route_name;
+  const route_name =
+    typeof rn === 'string' && rn.trim().length > 0 ? rn.trim().slice(0, 200) : undefined;
+
+  const mpRaw = o.map_polyline;
+  let map_polyline: string | undefined;
+  if (typeof mpRaw === 'string') {
+    const t = mpRaw.trim();
+    if (t.length > 0 && t.length <= 120_000) map_polyline = t;
+  }
+
+  return {
+    source: 'strava',
+    strava_route_id: routeIdStr,
+    route_url_normalized: url,
+    route_name,
+    distance_m: dm,
+    elevation_gain_m: eg,
+    climb_density_m_per_km: dens,
+    fetched_at: fetched,
+    ...(map_polyline ? { map_polyline } : {}),
+  };
 }

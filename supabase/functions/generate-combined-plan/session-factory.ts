@@ -464,6 +464,7 @@ export function groupRideSession(
     weighted_tss: wtss,
     session_kind: 'quality_bike',
     ...(url ? { route_url: url } : {}),
+    ...(routeSnapshot ? { group_ride_route_snapshot: routeSnapshot } : {}),
   };
 }
 

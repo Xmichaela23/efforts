@@ -19,6 +19,8 @@ export type GroupRideRouteSnapshot = {
   /** meters climbed per km route length — principal hilliness signal */
   climb_density_m_per_km: number;
   fetched_at: string;
+  /** Google-encoded polyline from Strava `map.polyline` / `summary_polyline` — for planned workout map preview. */
+  map_polyline?: string;
 };
 
 /** Align with ArcSetup / scheduling hints (see product discussion). */
@@ -73,6 +75,16 @@ export function snapshotFromStravaRouteApi(
   const route_name =
     typeof nameRaw === 'string' && nameRaw.trim().length > 0 ? nameRaw.trim().slice(0, 200) : undefined;
 
+  let map_polyline: string | undefined;
+  const mapRaw = routeJson.map;
+  if (mapRaw && typeof mapRaw === 'object' && !Array.isArray(mapRaw)) {
+    const m = mapRaw as Record<string, unknown>;
+    const pl = typeof m.polyline === 'string' ? m.polyline.trim() : '';
+    const sm = typeof m.summary_polyline === 'string' ? m.summary_polyline.trim() : '';
+    const chosen = pl.length > 0 ? pl : sm;
+    if (chosen.length > 0 && chosen.length <= 120_000) map_polyline = chosen;
+  }
+
   return {
     source: 'strava',
     strava_route_id: routeIdFromUrl,
@@ -82,6 +94,7 @@ export function snapshotFromStravaRouteApi(
     elevation_gain_m,
     climb_density_m_per_km: Math.round(climb_density_m_per_km * 10) / 10,
     fetched_at: new Date().toISOString(),
+    ...(map_polyline ? { map_polyline } : {}),
   };
 }
 
@@ -143,6 +156,13 @@ export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapsho
   const route_name =
     typeof rn === 'string' && rn.trim().length > 0 ? rn.trim().slice(0, 200) : undefined;
 
+  const mpRaw = o.map_polyline;
+  let map_polyline: string | undefined;
+  if (typeof mpRaw === 'string') {
+    const t = mpRaw.trim();
+    if (t.length > 0 && t.length <= 120_000) map_polyline = t;
+  }
+
   return {
     source: 'strava',
     strava_route_id: routeIdStr,
@@ -152,5 +172,6 @@ export function parseGroupRideRouteSnapshot(raw: unknown): GroupRideRouteSnapsho
     elevation_gain_m: eg,
     climb_density_m_per_km: dens,
     fetched_at: fetched,
+    ...(map_polyline ? { map_polyline } : {}),
   };
 }

@@ -39,4 +39,47 @@ export function pointAtDistance(track: LngLat[], cum: number[], targetMeters: nu
   return [lerp(lon0, lon1, r), lerp(lat0, lat1, r)];
 }
 
+/** Decode Google / Strava encoded polyline → [lat, lng] pairs (degrees). */
+export function decodePolylineLatLng(encoded: string, precision = 5): [number, number][] {
+  const coordinates: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const factor = Math.pow(10, precision);
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += deltaLat;
+
+    result = 0;
+    shift = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += deltaLng;
+
+    coordinates.push([lat / factor, lng / factor]);
+  }
+
+  return coordinates;
+}
+
+/** MapLibre / geo helpers expect [lng, lat]. */
+export function decodeEncodedPolylineToLngLat(encoded: string): LngLat[] {
+  const latLng = decodePolylineLatLng(encoded);
+  return latLng.map(([la, ln]) => [ln, la]);
+}
+
 

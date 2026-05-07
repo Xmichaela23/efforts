@@ -9,6 +9,7 @@ import MobileSummary from './MobileSummary';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import StructuredPlannedView from './StructuredPlannedView';
+import PlannedGroupRideRouteMap from './PlannedGroupRideRouteMap';
 import RescheduleValidationPopup from './RescheduleValidationPopup';
 import RescheduleDatePicker from './RescheduleDatePicker';
 // Unified path only; remove legacy planned_workouts hooks
@@ -987,10 +988,26 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="planned" className="flex-1 p-2">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
-                <StructuredPlannedView 
-                  workout={getUnifiedPlannedWorkout(unifiedWorkout, isCompleted, hydratedPlanned, linkedPlanned)}
-                  showHeader={true}
-                />
+                {(() => {
+                  const plannedForView = getUnifiedPlannedWorkout(
+                    unifiedWorkout,
+                    isCompleted,
+                    hydratedPlanned,
+                    linkedPlanned,
+                  );
+                  const disc = String(plannedForView?.type || '').toLowerCase();
+                  return (
+                    <>
+                      <StructuredPlannedView workout={plannedForView} showHeader={true} />
+                      {disc === 'ride' && (
+                        <PlannedGroupRideRouteMap
+                          routeSnapshot={(plannedForView as any)?.route_snapshot}
+                          units={(plannedForView as any)?.units}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
                 {(() => {
                   // Show inline launcher for planned sessions (strength, mobility, and pilates_yoga)
                   const row = isCompleted ? (linkedPlanned || null) : unifiedWorkout;

@@ -266,6 +266,8 @@ export interface PlannedSession {
   timing?: 'AM' | 'PM';
   /** External route link for anchor rides (e.g. Strava); optional. */
   route_url?: string;
+  /** Strava snapshot (distance, climb, polyline) for planned-session map preview. */
+  group_ride_route_snapshot?: GroupRideRouteSnapshot;
   /**
    * Scheduling slot kind aligned with `week-optimizer` / matrix vocabulary (e.g. `quality_bike`).
    * Stable across display copy changes — prefer this over parsing `name` in tests or analytics.

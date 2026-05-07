@@ -538,6 +538,12 @@ Deno.serve(async (req) => {
           // Include authored structured workout when present so server materializer can expand it
           workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
         }
+        const routeUrlRaw = typeof (s as any).route_url === 'string' ? String((s as any).route_url).trim() : '';
+        const routeSnap = (s as any).group_ride_route_snapshot;
+        if (routeUrlRaw) baseRow.route_url = routeUrlRaw.slice(0, 512);
+        if (routeSnap && typeof routeSnap === 'object' && !Array.isArray(routeSnap)) {
+          baseRow.route_snapshot = routeSnap;
+        }
         if (mapped === 'mobility') {
           // Pass through authored mobility exercises as-is (display-time structure)
           const mob = (s as any)?.mobility_exercises
