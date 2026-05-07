@@ -157,7 +157,14 @@ export function plannedSessionToScheduleSlot(s: PlannedSessionLike): ScheduleSlo
   }
 
   if (ty === 'swim') {
-    if (tags.includes('quality') || tags.includes('threshold') || tags.includes('css_aerobic')) return 'quality_swim';
+    if (
+      tags.includes('quality') ||
+      tags.includes('threshold') ||
+      tags.includes('css_aerobic') ||
+      tags.includes('pull_focus_swim')
+    ) {
+      return 'quality_swim';
+    }
     return 'easy_swim';
   }
 
@@ -194,6 +201,17 @@ export function arePlannedSessionsCompatible(
   const t1 = Array.isArray(s1.tags) ? s1.tags : [];
   const t2 = Array.isArray(s2.tags) ? s2.tags : [];
   if (t1.includes('brick') && t2.includes('brick')) return true;
+
+  const tags1 = Array.isArray(s1.tags) ? s1.tags.map((t) => String(t).toLowerCase()) : [];
+  const tags2 = Array.isArray(s2.tags) ? s2.tags.map((t) => String(t).toLowerCase()) : [];
+  const isLongCourseKickSwim = (tags: string[]) => tags.includes('kick_tri_long_course');
+  const isLongRunSession = (s: PlannedSessionLike) => plannedSessionToScheduleSlot(s) === 'long_run';
+  if (
+    (isLongCourseKickSwim(tags1) && isLongRunSession(s2)) ||
+    (isLongCourseKickSwim(tags2) && isLongRunSession(s1))
+  ) {
+    return true;
+  }
 
   const a = plannedSessionToScheduleSlot(s1);
   const b = plannedSessionToScheduleSlot(s2);

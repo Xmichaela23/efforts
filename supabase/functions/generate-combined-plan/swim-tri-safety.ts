@@ -66,6 +66,8 @@ export function promote703SwimIntentForCutoffRisk(goals: GoalInput[], state: Ath
 }
 
 function slotFloorYd(t: SwimSlotTemplate): number {
+  if (t.session_type === 'kick_focused' || t.session_type === 'pull_focused') return 1000;
+  if (t.session_type === 'endurance') return 1200;
   const easyLike = t.session_type === 'easy' || t.session_type === 'technique_aerobic';
   if (t.session_type === 'technique_aerobic') return 900;
   if (easyLike) return 800;
@@ -79,14 +81,24 @@ function impliedDurationMin(sessionType: SwimSlotTemplate['session_type'], yards
     case 'css_aerobic':
     case 'race_specific_aerobic':
       return yards / 42;
+    case 'kick_focused':
+    case 'pull_focused':
+      return yards / 36;
+    case 'endurance':
+      return yards / 34;
     default:
       return yards / 35;
   }
 }
 
 function snapStepUp(sessionType: SwimSlotTemplate['session_type'], y: number): number {
-  const yy = y + (sessionType === 'easy' || sessionType === 'technique_aerobic' ? 50 : 100);
-  if (sessionType === 'easy' || sessionType === 'technique_aerobic') {
+  const smallStep =
+    sessionType === 'easy' ||
+    sessionType === 'technique_aerobic' ||
+    sessionType === 'kick_focused' ||
+    sessionType === 'pull_focused';
+  const yy = y + (smallStep ? 50 : 100);
+  if (smallStep) {
     return Math.round(yy / 50) * 50;
   }
   return Math.round(yy / 100) * 100;

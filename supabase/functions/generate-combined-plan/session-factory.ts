@@ -21,7 +21,8 @@ import {
   swimSessionPhilosophyLead,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
-import type { SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
+import { calculateSwimTss, resolveCssSecPer100Yd } from './swim-protocol-v21.ts';
+import type { SwimDistanceKey, SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────-
 
@@ -627,6 +628,206 @@ export function easySwim(
   );
 }
 
+function patchSwimProtocolTss(
+  ps: PlannedSession,
+  kind: 'kick_focused' | 'endurance' | 'pull_focused',
+  raceDistance: SwimDistanceKey,
+): PlannedSession {
+  const raw = calculateSwimTss(kind, ps.duration, raceDistance);
+  return { ...ps, tss: raw, weighted_tss: weightedTSS('swim', raw) };
+}
+
+/** Distance-specific kick session — sprint/Olympic kickboard vs 70.3/full fins (protocol v2.1). */
+export function kickFocusedSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  raceDistance: SwimDistanceKey,
+  swimThresholdPace?: string | null,
+): PlannedSession {
+  totalYards = snapSwimSessionTotalYdEasy(totalYards);
+  const wu = 300;
+  const cd = 200;
+  const integrationYd = 400;
+  let spare = totalYards - wu - cd - integrationYd;
+  spare = Math.max(400, spare);
+  let kickReps = Math.min(12, Math.max(8, Math.round(spare / 50)));
+  while (kickReps > 8 && kickReps * 50 > spare) kickReps -= 1;
+
+  const longCourse = raceDistance === '70.3' || raceDistance === 'full';
+  const cssSec = resolveCssSecPer100Yd(swimThresholdPace ?? undefined);
+  const paceGuidedMin = Math.round(((totalYards / 100) * cssSec * (longCourse ? 1.28 : 1.15)) / 60);
+  const dur = Math.max(Math.round(totalYards / (longCourse ? 36 : 33)), paceGuidedMin);
+
+  const kickSuffix = longCourse ? 'fins' : 'board';
+  const intensity: Intensity = longCourse ? 'EASY' : 'MODERATE';
+  const gearLine = longCourse
+    ? 'Pool gear — fins required (short blade); kickboard optional.'
+    : 'Pool gear — kickboard required.';
+  const kickCopy = longCourse
+    ? `${kickReps}×50 yd kick with fins at light–moderate effort (20 sec rest). Focus ankle mobility and streamline — small relaxed kick from hips for rotation support (not a sprint kick).`
+    : `${kickReps}×50 yd kick with kickboard at moderate effort (20 sec rest). Narrow kick from hips, toes pointed — quiet legs on the integration lengths.`;
+  const integrateCopy = longCourse
+    ? `4×100 yd full stroke easy aerobic — practice a relaxed 2-beat kick.`
+    : `4×100 yd full stroke easy–moderate — compact, propulsive kick cadence.`;
+
+  const tags: string[] = [
+    longCourse ? 'kick_tri_long_course' : 'kick_tri_short_course',
+    'kick_focus_swim',
+    'easy',
+    'aerobic',
+    'swim',
+    ...(longCourse ? ['req:fins'] : ['req:kickboard']),
+  ];
+
+  const ps = session(
+    day,
+    'swim',
+    `Kick-Focused Swim — ${totalYards} yd`,
+    `Warm up ${wu} yd easy. ${kickCopy} ${integrateCopy} Cool down ${cd} yd. ${gearLine}`,
+    dur,
+    intensity,
+    [
+      `swim_warmup_${wu}yd_easy`,
+      `swim_kick_${kickReps}x50yd_r20_${kickSuffix}`,
+      `swim_aerobic_4x100yd_easy_r15`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    tags,
+    longCourse ? 'Z1–Z2 kick + aerobic' : 'Z2–Z3 kick + aerobic',
+    goalId,
+  );
+  return patchSwimProtocolTss(ps, 'kick_focused', raceDistance);
+}
+
+/** Pull-focused aerobic density — buoy required; optional paddles for intermediate/advanced (protocol v2.1 Z3, IF 0.80). */
+export function pullFocusedSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  raceDistance: SwimDistanceKey,
+  swimThresholdPace?: string | null,
+  athleteFitness: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
+  const wu = 300;
+  const cd = 200;
+  const integrationYd = 400;
+  let spare = totalYards - wu - cd - integrationYd;
+  spare = Math.max(400, spare);
+  let pullReps = Math.min(14, Math.max(6, Math.round(spare / 100)));
+  while (pullReps > 6 && pullReps * 100 > spare) pullReps -= 1;
+
+  const longCourse = raceDistance === '70.3' || raceDistance === 'full';
+  const cssSec = resolveCssSecPer100Yd(swimThresholdPace ?? undefined);
+  const paceGuidedMin = Math.round(((totalYards / 100) * cssSec * (longCourse ? 1.22 : 1.12)) / 60);
+  const dur = Math.max(Math.round(totalYards / (longCourse ? 38 : 35)), paceGuidedMin);
+
+  const paddlesNote =
+    athleteFitness === 'beginner'
+      ? ''
+      : 'Optional — small paddles for upper-body overload if comfortable (skip if shoulders feel tight). ';
+  const gearLine = `Pool gear — pull buoy required. ${paddlesNote}Keep core engaged so hips do not sag.`;
+
+  const tags: string[] = ['quality', 'pull_focus_swim', 'swim', 'moderate', 'req:buoy'];
+
+  const pullCopy = `${pullReps}×100 yd pull with buoy at moderate aerobic rhythm (Z3; sustainable steady turnover). 20 sec rest — high-elbow catch feel without kicking.`;
+  const integrateCopy =
+    '4×100 yd full stroke easy aerobic — reconnect kick and rotation after pull isolation.';
+
+  const ps = session(
+    day,
+    'swim',
+    `Pull-Focused Swim — ${totalYards} yd`,
+    `Warm up ${wu} yd easy. ${pullCopy} ${integrateCopy} Cool down ${cd} yd. ${gearLine}`,
+    dur,
+    'MODERATE',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      `swim_pull_${pullReps}x100yd_r20_buoy`,
+      `swim_aerobic_4x100yd_easy_r15`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    tags,
+    'Z3 pull + aerobic',
+    goalId,
+  );
+  return patchSwimProtocolTss(ps, 'pull_focused', raceDistance);
+}
+
+/** Continuous aerobic endurance swim; optional Full IM advanced over-distance coaching note. */
+export function enduranceSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  athleteFitness: 'beginner' | 'intermediate' | 'advanced',
+  planWeek: number,
+  drillSlotSalt: number,
+  phase: string,
+  swimEquipment?: string[] | null,
+  swimThresholdPace?: string | null,
+  enduranceOverdistanceNote?: boolean,
+): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
+  const wu = 400;
+  const cd = 200;
+  const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+    totalYards,
+    wuYd: wu,
+    cdYd: cd,
+    planWeek,
+    drillSlotSalt,
+    phase,
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: false,
+    swimGearLabels: swimEquipment,
+  });
+  const mainRounded = Math.max(200, Math.round(main / 50) * 50);
+
+  let structure: string;
+  if (athleteFitness === 'beginner') {
+    structure = `1×${mainRounded} yd continuous easy aerobic (Z2).`;
+  } else if (athleteFitness === 'intermediate') {
+    const half = Math.max(100, Math.round(mainRounded / 2 / 50) * 50);
+    structure = `2×${half} yd easy aerobic with 30 sec rest between.`;
+  } else {
+    structure = `1×${mainRounded} yd continuous easy aerobic (Z2).`;
+  }
+  const odNote =
+    enduranceOverdistanceNote && athleteFitness === 'advanced'
+      ? ' Over-distance session: stay purely aerobic — durability and confidence, not pace.'
+      : '';
+  const drillLead =
+    drillTokens.length > 0
+      ? `${swimSessionPhilosophyLead('easy')}${swimDrillBlockAthleteCopy(drillTokens)} `
+      : '';
+  const cssSec = resolveCssSecPer100Yd(swimThresholdPace ?? undefined);
+  const paceGuidedMin = Math.round(((totalYards / 100) * cssSec * 1.25) / 60);
+  const dur = Math.max(Math.round(totalYards / 34), paceGuidedMin);
+
+  const tags: string[] = ['endurance_swim', 'easy', 'aerobic', 'swim'];
+  if (enduranceOverdistanceNote && athleteFitness === 'advanced') tags.push('swim_overdistance');
+
+  const ps = session(
+    day,
+    'swim',
+    `Endurance Swim — ${totalYards} yd`,
+    `Warm up ${wu} yd easy. ${drillLead}Main set — ${structure}${odNote} Cool down ${cd} yd.`,
+    dur,
+    'EASY',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      ...drillTokens,
+      `swim_aerobic_1x${mainRounded}yd_easy`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    tags,
+    'Z2 endurance',
+    goalId,
+  );
+  return patchSwimProtocolTss(ps, 'endurance', 'full');
+}
+
 /** Maps program template rows to concrete swim sessions (combined-plan week-builder). */
 export function swimSessionFromTemplate(
   template: SwimSlotTemplate,
@@ -637,7 +838,14 @@ export function swimSessionFromTemplate(
   goalId: string,
   drillSlotSalt: number,
   swimEquipment?: string[] | null,
+  opts?: {
+    swimRaceDistanceKey?: SwimDistanceKey;
+    athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
+    swimThresholdPace?: string | null;
+    enduranceOverdistanceNote?: boolean;
+  },
 ): PlannedSession {
+  const dk: SwimDistanceKey = opts?.swimRaceDistanceKey ?? '70.3';
   switch (template.session_type) {
     case 'threshold':
       return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
@@ -650,6 +858,30 @@ export function swimSessionFromTemplate(
         raceSupport: true,
         swimEquipment,
       });
+    case 'kick_focused':
+      return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined);
+    case 'pull_focused':
+      return pullFocusedSwim(
+        day,
+        yards,
+        goalId,
+        dk,
+        opts?.swimThresholdPace ?? undefined,
+        opts?.athleteFitness ?? 'intermediate',
+      );
+    case 'endurance':
+      return enduranceSwim(
+        day,
+        yards,
+        goalId,
+        opts?.athleteFitness ?? 'intermediate',
+        planWeek,
+        drillSlotSalt,
+        phase,
+        swimEquipment,
+        opts?.swimThresholdPace ?? undefined,
+        opts?.enduranceOverdistanceNote ?? false,
+      );
     case 'easy':
     default:
       return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);

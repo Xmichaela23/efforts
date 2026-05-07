@@ -2,7 +2,8 @@
  * Swim program templates — pure data for combined-plan swim prescriptions.
  * Consumed by week-builder / session-factory (no I/O, no Supabase).
  *
- * v1: full tables for `70.3` only; other distances reuse 70.3 until spec'd.
+ * v2.1 (revised protocol): slot ladders still anchored on legacy 70.3 ramps, then scaled by
+ * race distance × athlete fitness using midpoint averages from `VOLUME_RANGES` in SWIM-IMPLEMENTATION-FINAL.
  */
 
 export type SwimDistanceKey = 'sprint' | 'olympic' | '70.3' | 'full';
@@ -12,6 +13,9 @@ export type SwimSessionType =
   | 'css_aerobic'
   | 'technique_aerobic'
   | 'race_specific_aerobic'
+  | 'kick_focused'
+  | 'pull_focused'
+  | 'endurance'
   | 'easy';
 
 export interface SwimSlotTemplate {
@@ -23,6 +27,48 @@ export interface SwimSlotTemplate {
 
 /** Canonical phase keys after normalization. */
 type NormalizedPhase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery';
+
+type SwimFitnessKey = 'beginner' | 'intermediate' | 'advanced';
+
+/** Midpoints (yd) from revised protocol volume tables — reference = 70.3 intermediate for each phase. */
+const MID_BASE_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
+  sprint: { beginner: 1250, intermediate: 1600, advanced: 1800 },
+  olympic: { beginner: 1850, intermediate: 2200, advanced: 2700 },
+  '70.3': { beginner: 1650, intermediate: 2200, advanced: 2700 },
+  full: { beginner: 2800, intermediate: 3300, advanced: 3800 },
+};
+
+const MID_BUILD_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
+  sprint: { beginner: 1500, intermediate: 1750, advanced: 2100 },
+  olympic: { beginner: 2200, intermediate: 2500, advanced: 3200 },
+  '70.3': { beginner: 2000, intermediate: 2500, advanced: 3200 },
+  full: { beginner: 3300, intermediate: 3800, advanced: 4400 },
+};
+
+const MID_RACE_SPEC_YD: Record<SwimDistanceKey, Record<SwimFitnessKey, number>> = {
+  sprint: { beginner: 1650, intermediate: 2000, advanced: 2300 },
+  olympic: { beginner: 2400, intermediate: 2750, advanced: 3400 },
+  '70.3': { beginner: 2200, intermediate: 2700, advanced: 3500 },
+  full: { beginner: 3500, intermediate: 4100, advanced: 4800 },
+};
+
+const REF_MID_703_INTERMEDIATE: Record<'base' | 'build' | 'race_specific', number> = {
+  base: MID_BASE_YD['70.3'].intermediate,
+  build: MID_BUILD_YD['70.3'].intermediate,
+  race_specific: MID_RACE_SPEC_YD['70.3'].intermediate,
+};
+
+function protocolMidVolumeMultiplier(
+  phase: NormalizedPhase,
+  distanceKey: SwimDistanceKey,
+  athleteFitness: SwimFitnessKey,
+): number {
+  if (phase === 'taper' || phase === 'recovery') return 1;
+  const fit = athleteFitness;
+  if (phase === 'base') return MID_BASE_YD[distanceKey][fit] / REF_MID_703_INTERMEDIATE.base;
+  if (phase === 'build') return MID_BUILD_YD[distanceKey][fit] / REF_MID_703_INTERMEDIATE.build;
+  return MID_RACE_SPEC_YD[distanceKey][fit] / REF_MID_703_INTERMEDIATE.race_specific;
+}
 
 const BASE_VS_BUILD_YARD_SCALE = 0.8;
 const TAPER_YARD_SCALE = 0.6;
@@ -187,13 +233,13 @@ export function getSwimSlotTemplates(
   phase: string,
   distance: string,
   weekInPhase: number,
+  opts?: { athleteFitness?: 'beginner' | 'intermediate' | 'advanced' },
 ): SwimSlotTemplate[] {
   const ph = normalizePhase(phase);
   if (ph === 'recovery') return [];
 
   const distanceKey = normalizeSwimProgramDistance(distance);
-  // v1: all keys use 70.3 constants; `distanceKey` reserved for per-distance tables later.
-  void distanceKey;
+  const athleteFitness: SwimFitnessKey = opts?.athleteFitness ?? 'intermediate';
 
   if (swimIntent === 'focus') {
     let yards: [number, number, number];
@@ -216,7 +262,58 @@ export function getSwimSlotTemplates(
     } else {
       yards = yardsForFocus70_3Build(weekInPhase);
     }
-    return focusTemplatesFromYards(yards);
+    if (ph === 'base' || ph === 'build' || ph === 'race_specific') {
+      const mult = protocolMidVolumeMultiplier(ph, distanceKey, athleteFitness);
+      yards = yards.map((y) => roundYards(y * mult)) as [number, number, number];
+    }
+    const slots = focusTemplatesFromYards(yards);
+    // Build: pull (even week_in_phase) alternates with kick (odd). Race-specific: ~10% pull — week 2 each RS block plus week_in_phase divisible by 10 for long blocks.
+    if ((ph === 'build' || ph === 'race_specific') && slots[1]) {
+      const rsPullWeek =
+        ph === 'race_specific' && (weekInPhase === 2 || weekInPhase % 10 === 0);
+      if (rsPullWeek) {
+        slots[1] = {
+          ...slots[1]!,
+          session_type: 'pull_focused',
+          drill_emphasis: false,
+          notes:
+            'Pull-focused — buoy-required moderate aerobic density; integrates full-stroke easy aerobic.',
+        };
+      } else if (weekInPhase % 2 === 1) {
+        slots[1] = {
+          ...slots[1]!,
+          session_type: 'kick_focused',
+          drill_emphasis: false,
+          notes:
+            distanceKey === 'sprint' || distanceKey === 'olympic'
+              ? 'Kick-focused — propulsive rhythm with kickboard; integrates full-stroke aerobic.'
+              : 'Kick-focused — ankle mobility / 2-beat support with fins; low leg fatigue for bike/run.',
+        };
+      } else if (ph === 'build') {
+        slots[1] = {
+          ...slots[1]!,
+          session_type: 'pull_focused',
+          drill_emphasis: false,
+          notes:
+            'Pull-focused — buoy-required upper-body rhythm at moderate aerobic intensity; integrates full-stroke easy aerobic.',
+        };
+      }
+    }
+    // Full Ironman advanced: late build + early race-specific endurance slot (over-distance applied in week-builder).
+    if (
+      distanceKey === 'full' &&
+      athleteFitness === 'advanced' &&
+      ((ph === 'build' && weekInPhase >= 4) || (ph === 'race_specific' && weekInPhase <= 2)) &&
+      slots[2]
+    ) {
+      slots[2] = {
+        ...slots[2]!,
+        session_type: 'endurance',
+        drill_emphasis: false,
+        notes: 'Endurance swim — continuous aerobic density; advanced Full IM window may use over-distance.',
+      };
+    }
+    return slots;
   }
 
   // race intent — 2 slots
@@ -238,6 +335,10 @@ export function getSwimSlotTemplates(
     ];
   } else {
     yardsR = yardsForRace70_3Build(weekInPhase);
+  }
+  if (ph === 'base' || ph === 'build' || ph === 'race_specific') {
+    const mult = protocolMidVolumeMultiplier(ph, distanceKey, athleteFitness);
+    yardsR = yardsR.map((y) => roundYards(y * mult)) as [number, number];
   }
   return raceTemplatesFromYards(yardsR);
 }
