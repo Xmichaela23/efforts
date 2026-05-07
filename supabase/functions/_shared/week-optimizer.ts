@@ -370,6 +370,12 @@ function sequentialOk(
     }
   }
 
+  // Day before combined quality_bike + quality_run: no lower-body strength (leg/CNS density vs §6.4).
+  if (kind === 'lower_body_strength') {
+    const nk = (days[dayAfter(day)] ?? []).map((s) => s.kind);
+    if (nk.includes('quality_bike') && nk.includes('quality_run')) return false;
+  }
+
   return true;
 }
 

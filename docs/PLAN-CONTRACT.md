@@ -162,6 +162,7 @@ Rules between consecutive days. These are independent of same-day rules.
 - Lower body strength: minimum 48hr between sessions
 - Upper body strength: minimum 48hr between sessions  
 - Upper and lower can be 24hr apart (different systems)
+- Lower body strength must not fall on the calendar day **immediately before** a day that combines **non-easy bike and non-easy run** (quality-density / recovery buffer before anchored double endurance days).
 
 ---
 
@@ -170,8 +171,9 @@ Rules between consecutive days. These are independent of same-day rules.
 These exceptions to the core rules unlock for specific athlete profiles.
 
 ### 7.1 Performance + co-equal strength athletes
-- May stack quality_run + lower_strength same day (AM/PM split, consolidated hard day)
+- May stack quality_run + lower_strength same day (AM run / PM lift, consolidated hard day)
 - May have quality_bike adjacent to quality_run if athlete-declared (e.g. Wed group ride + Thu intervals)
+- When **quality_bike and quality_run share a calendar day**, default sequencing is **run AM / bike PM** (timing metadata + session order) to manage endurance interference within the day.
 - Get the third strength session if the week supports it
 
 ### 7.2 Returning + first_race athletes

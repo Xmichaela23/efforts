@@ -131,6 +131,56 @@ function heavyLowerBlockedWithin48hOfLongRunOrBrick(
   return false;
 }
 
+/**
+ * Same calendar day hosts both a non-easy bike and a non-easy run (quality-density /
+ * AMPK stacking — plan contract §6.4 extension).
+ */
+function slotHasBikeRunQualityStress(slot: DaySlot | undefined): boolean {
+  if (!slot?.sessions?.length) return false;
+  let bikeStress = false;
+  let runStress = false;
+  for (const w of slot.sessions) {
+    if (w.type === 'bike' && w.intensity_class !== 'EASY') bikeStress = true;
+    if (w.type === 'run' && w.intensity_class !== 'EASY') runStress = true;
+  }
+  return bikeStress && runStress;
+}
+
+/** Lower-body strength cannot sit the day before bike+run quality stress (legs/CNS fresh for anchored doubles). */
+function lowerBlockedImmediatelyBeforeBikeRunQuality(day: string, grid: Map<string, DaySlot>): boolean {
+  return slotHasBikeRunQualityStress(grid.get(adjDay(day, 1)));
+}
+
+/**
+ * Performance + co-equal: same-day non-easy bike + run → run AM / bike PM ordering + timings (§8 / AMPK lens).
+ */
+function applyCoEqualSameDayBikeRunAmpkOrdering(
+  grid: Map<string, DaySlot>,
+  bikeQualityDay: string,
+  runQualityDay: string,
+  athleteState: AthleteState,
+): void {
+  if (bikeQualityDay !== runQualityDay) return;
+  const perf =
+    String(athleteState.training_intent ?? '').toLowerCase() === 'performance' &&
+    String(athleteState.strength_intent ?? '').toLowerCase() === 'performance';
+  if (!perf) return;
+  const slot = grid.get(bikeQualityDay);
+  if (!slot?.sessions.length) return;
+  let bikeIdx = -1;
+  let runIdx = -1;
+  for (let i = 0; i < slot.sessions.length; i++) {
+    const w = slot.sessions[i];
+    if (w.type === 'bike' && w.intensity_class !== 'EASY' && bikeIdx < 0) bikeIdx = i;
+    if (w.type === 'run' && w.intensity_class !== 'EASY' && runIdx < 0) runIdx = i;
+  }
+  if (bikeIdx < 0 || runIdx < 0) return;
+  const bike = { ...slot.sessions[bikeIdx], timing: 'PM' as const };
+  const run = { ...slot.sessions[runIdx], timing: 'AM' as const };
+  const others = slot.sessions.filter((_, i) => i !== bikeIdx && i !== runIdx);
+  slot.sessions = [...others, run, bike];
+}
+
 function conflictDayLo(day: string): string {
   return (day ?? '').toLowerCase();
 }
@@ -1266,6 +1316,8 @@ export function buildWeek(
     }
   } // end else if (!dropQualityRunThisWeek && !runQualitySlot?.isRest)
 
+  applyCoEqualSameDayBikeRunAmpkOrdering(grid, bikeQualityDay, runQualityDay, athleteState);
+
   // ── Tri swims (program templates × swim_volume_multiplier) ────────────────
   let qualitySwimPlaced = false;
   const qualitySwimSlot = grid.get(swimQualityDay);
@@ -1517,24 +1569,35 @@ export function buildWeek(
       const passesHeavyLowerGuard = (d: string) =>
         !heavyLowerBlockedWithin48hOfLongRunOrBrick(d, longRunActualDay, brickDaysSet);
 
-      let pool2 = weekdayOrder.filter((d) => baseLowerDay(d) && passesHeavyLowerGuard(d));
+      let pool2 = weekdayOrder.filter(
+        (d) =>
+          baseLowerDay(d) &&
+          passesHeavyLowerGuard(d) &&
+          !lowerBlockedImmediatelyBeforeBikeRunQuality(d, grid),
+      );
       if (prefSet.size > 0) {
         const preferred2 = pool2.filter((d) => prefSet.has(d));
         if (preferred2.length > 0) pool2 = preferred2;
       }
       let lowerPrefBypassUsed = false;
       if (pool2.length === 0) {
-        pool2 = weekdayOrder.filter((d) => baseLowerDay(d) && passesHeavyLowerGuard(d));
+        pool2 = weekdayOrder.filter(
+          (d) =>
+            baseLowerDay(d) &&
+            passesHeavyLowerGuard(d) &&
+            !lowerBlockedImmediatelyBeforeBikeRunQuality(d, grid),
+        );
         if (pool2.length > 0) {
           lowerPrefBypassUsed = prefSet.size > 0;
           console.warn(
-            '[week-builder] lower-body strength: no preferred weekday satisfies 48h vs long run/brick; using next available.',
+            '[week-builder] lower-body strength: no preferred weekday satisfies constraints; using next available (density + 48h vs long run/brick retained).',
           );
         }
       }
       let lower48hGuardDropped = false;
       if (pool2.length === 0) {
-        pool2 = weekdayOrder.filter((d) => baseLowerDay(d));
+        pool2 = weekdayOrder.filter((d) =>
+          baseLowerDay(d) && !lowerBlockedImmediatelyBeforeBikeRunQuality(d, grid));
         if (prefSet.size > 0) {
           const preferredRelaxed = pool2.filter((d) => prefSet.has(d));
           if (preferredRelaxed.length > 0) pool2 = preferredRelaxed;
@@ -1542,7 +1605,22 @@ export function buildWeek(
         if (pool2.length > 0) {
           lower48hGuardDropped = true;
           console.warn(
-            '[week-builder] lower-body strength: 48h vs long run/brick not satisfiable Mon–Fri with current anchors; placed without guard.',
+            '[week-builder] lower-body strength: 48h vs long run/brick not satisfiable Mon–Fri; kept day-before bike+run density guard.',
+          );
+        }
+      }
+      let lowerDensityGuardDropped = false;
+      if (pool2.length === 0) {
+        pool2 = weekdayOrder.filter((d) => baseLowerDay(d));
+        if (prefSet.size > 0) {
+          const preferredRelaxed = pool2.filter((d) => prefSet.has(d));
+          if (preferredRelaxed.length > 0) pool2 = preferredRelaxed;
+        }
+        if (pool2.length > 0) {
+          lowerDensityGuardDropped = true;
+          lower48hGuardDropped = true;
+          console.warn(
+            '[week-builder] lower-body strength: placed without bike+run density guard (day before combined quality) — Mon–Fri had no clean slot.',
           );
         }
       }
@@ -1564,9 +1642,11 @@ export function buildWeek(
             applied_resolution: {
               type: 'moved',
               to_day: conflictDayLo(strDay2),
-              note: lower48hGuardDropped
-                ? `Lower-body strength placed on ${strDay2} without the 48h long-run/brick clearance row (Mon–Fri density).`
-                : `Lower-body strength on ${strDay2} — preferred strength days skipped while keeping the 48h guard.`,
+              note: lowerDensityGuardDropped
+                ? `Lower-body strength on ${strDay2} — relaxed day-before bike+run quality density (no Mon–Fri slot otherwise).`
+                : lower48hGuardDropped
+                  ? `Lower-body strength placed on ${strDay2} without the 48h long-run/brick clearance row (Mon–Fri density).`
+                  : `Lower-body strength on ${strDay2} — preferred strength days skipped while keeping guards.`,
             },
           });
         }
