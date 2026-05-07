@@ -9,6 +9,7 @@ import {
   computeRunPlanningSignals,
   findPostRaceRecoveryContext,
   type PostRaceRecoveryResult,
+  swimSecPer100YdFromArcSwimInputs,
   swimVolumeMultiplierFromArcWorkouts,
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
@@ -1124,7 +1125,29 @@ async function buildCombinedPlan(
     weekOptimizerDerivedGoalIds.length > 0 ? weekOptimizerDerivedGoalIds.join(',') : '(none)',
   );
 
-  const swim_volume_multiplier = swimVolumeMultiplierFromArcWorkouts(arcForCombined.swim_training_from_workouts);
+  const swimSecPer100Yd = swimSecPer100YdFromArcSwimInputs({
+    performance_numbers: arcForCombined.performance_numbers,
+    learned_fitness: arcForCombined.learned_fitness,
+    units: arcForCombined.units,
+  });
+  const triPrimaryWithSwimLeg = goalsForCombined.some(
+    (g) => (g.sport === 'triathlon' || g.sport === 'tri') && g.priority === 'A',
+  );
+  const swim_volume_multiplier = swimVolumeMultiplierFromArcWorkouts(
+    arcForCombined.swim_training_from_workouts,
+    {
+      swimSecPer100Yd,
+      triPrimaryWithSwimLeg,
+    },
+  );
+  if (triPrimaryWithSwimLeg && swimSecPer100Yd != null) {
+    console.log(
+      '[buildCombinedPlan] swim volume mult:',
+      swim_volume_multiplier,
+      'sec/100yd:',
+      Math.round(swimSecPer100Yd * 10) / 10,
+    );
+  }
 
   const resolvedCombinedStrengthProtocol = resolveCombinedTriStrengthProtocol(
     combinedSchedulePrefs.strength_protocol != null

@@ -215,21 +215,102 @@ export function findPostRaceRecoveryContext(
   };
 }
 
+function parseMmSsToSecondsLocal(s: string | null | undefined): number | null {
+  if (s == null || !String(s).trim()) return null;
+  const parts = String(s)
+    .trim()
+    .split(':')
+    .map((p) => parseInt(p, 10));
+  if (parts.some((x) => !Number.isFinite(x))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+/**
+ * Seconds per **100 yards** (pool) — learned swims win when confident; else Training Baselines
+ * (`swimPace100` mm:ss or numeric sec). Metric baselines store pace per 100m → scaled to 100yd time.
+ */
+export function swimSecPer100YdFromArcSwimInputs(opts: {
+  performance_numbers?: Record<string, unknown> | null;
+  learned_fitness?: Record<string, unknown> | null;
+  units?: string | null;
+}): number | null {
+  const lf = opts.learned_fitness;
+  if (lf && typeof lf === 'object' && !Array.isArray(lf)) {
+    const m = lf['swim_pace_per_100m'];
+    if (m && typeof m === 'object' && !Array.isArray(m)) {
+      const o = m as Record<string, unknown>;
+      const sc = Number(o.sample_count) || 0;
+      const c = String(o.confidence || '').toLowerCase();
+      if (sc >= 3 && !(c === 'low' && sc < 5)) {
+        const v = Number(o.value);
+        if (Number.isFinite(v) && v >= 50 && v <= 600) {
+          return v * (91.44 / 100);
+        }
+      }
+    }
+  }
+
+  const perf = opts.performance_numbers;
+  if (!perf || typeof perf !== 'object') return null;
+
+  for (const k of ['swimPace100', 'swim_pace_100_yd', 'swim_pace_100yd'] as const) {
+    const raw = perf[k];
+    if (raw == null) continue;
+    const sec = parseMmSsToSecondsLocal(typeof raw === 'string' ? raw : String(raw));
+    if (sec != null && sec > 0 && sec <= 600) return sec;
+  }
+
+  const numRaw = perf['swimPacePer100'] ?? perf['swim_pace_per_100_sec'];
+  const n = typeof numRaw === 'number' ? numRaw : Number(numRaw);
+  if (!Number.isFinite(n) || n <= 0 || n > 600) return null;
+  const u = String(opts.units || '').toLowerCase();
+  if (u === 'metric') return n * (91.44 / 100);
+  return n;
+}
+
+export interface SwimVolumeMultiplierOpts {
+  /** Pool pace seconds per 100 yd (see {@link swimSecPer100YdFromArcSwimInputs}). */
+  swimSecPer100Yd?: number | null;
+  /**
+   * When an **A-priority tri** drives the combined block, sparse swim history must not be the only
+   * signal: slow baselines need repetition exposure (yards), not an extra down-scale from zero swims.
+   */
+  triPrimaryWithSwimLeg?: boolean;
+}
+
 /**
  * Down-scale combined-plan swim yards when Arc shows little or no recent pool volume.
  * Without this, swim TSS share × 80 yd/min produces ~3–4k yd main sets for "returning" athletes.
+ *
+ * Optional **pace floors** (tri primary): if baseline/learned pace is slow (≥2:15–2:30/100yd),
+ * history-only multipliers are lifted so lean histories don't compound under-swimming for cutoff-risk athletes.
  */
 export function swimVolumeMultiplierFromArcWorkouts(
   st: SwimTrainingFromWorkouts | null | undefined,
+  opts?: SwimVolumeMultiplierOpts,
 ): number {
-  if (!st) return 0.5;
-  const n90 = st.completed_swim_sessions_last_90_days ?? 0;
-  const n28 = st.completed_swim_sessions_last_28_days ?? 0;
-  if (n90 === 0 && n28 === 0) return 0.42;
-  if (n90 <= 2) return 0.52;
-  if (n90 <= 6) return 0.68;
-  if (n90 <= 14) return 0.85;
-  return 1.0;
+  let m: number;
+  if (!st) m = 0.5;
+  else {
+    const n90 = st.completed_swim_sessions_last_90_days ?? 0;
+    const n28 = st.completed_swim_sessions_last_28_days ?? 0;
+    if (n90 === 0 && n28 === 0) m = 0.42;
+    else if (n90 <= 2) m = 0.52;
+    else if (n90 <= 6) m = 0.68;
+    else if (n90 <= 14) m = 0.85;
+    else m = 1.0;
+  }
+
+  const sec = opts?.swimSecPer100Yd;
+  const tri = opts?.triPrimaryWithSwimLeg === true;
+  if (tri && typeof sec === 'number' && Number.isFinite(sec)) {
+    if (sec >= 150) m = Math.max(m, 0.82);
+    else if (sec >= 135) m = Math.max(m, 0.74);
+  }
+
+  return Math.min(1, m);
 }
 
 /**
