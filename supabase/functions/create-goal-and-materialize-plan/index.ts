@@ -1386,6 +1386,17 @@ async function buildCombinedPlan(
       ...(projectedBikeHours != null ? { projected_bike_hours: projectedBikeHours } : {}),
       tri_approach: triApproach,
       swim_volume_multiplier,
+      ...((): { swim_threshold_pace?: string } => {
+        const sec = swimSecPer100YdFromArcSwimInputs({
+          performance_numbers: arcForCombined.performance_numbers,
+          learned_fitness: arcForCombined.learned_fitness,
+          units: arcForCombined.units,
+        });
+        if (sec == null || !Number.isFinite(sec) || sec <= 0) return {};
+        const m = Math.floor(sec / 60);
+        const r = Math.round(sec % 60);
+        return { swim_threshold_pace: `${m}:${String(r).padStart(2, '0')}` };
+      })(),
       ...(swim_cutoff_pressure_v1 ? { swim_cutoff_pressure_v1 } : {}),
       ...((): { swim_equipment?: string[] } => {
         const sw = arcForCombined.equipment?.swimming;

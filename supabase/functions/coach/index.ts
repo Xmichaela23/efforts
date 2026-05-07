@@ -86,8 +86,8 @@ const corsHeaders: Record<string, string> = {
 /** v31: Coach reads swim_cutoff_pressure_v1 + swim intent guardrails in FACTS. */
 /** v32: 70.3 swim yardage gate → Olympic bridge pivot lines in snapshot longitudinal block + legacy FACTS. */
 /** v33: Suppress Olympic pivot when Arc swim baseline ≤120 s/100 yd (fast pool swimmer). */
-/** v34: Strong swimmer + lean yards → maintenance-vs-survival FACTs; survival benchmark wording for slow cohort. */
-const COACH_PAYLOAD_VERSION = 34;
+/** v35: Strong swimmer → durability FACT without Olympic pivot; 703 swim safety floors + cutoff→focus in generator. */
+const COACH_PAYLOAD_VERSION = 35;
 
 function toISODate(d: Date): string {
   const y = d.getFullYear();
@@ -446,6 +446,7 @@ function olympic703BridgePivotCoachLines(opts: {
   swimCutoffPressureV1: Record<string, unknown> | null | undefined;
   swimIntent: 'focus' | 'race' | null;
   swimSecPer100Yd: number | null;
+  swimExperience?: 'learning' | 'steady' | 'strong' | null;
 }): string[] {
   const dk = normalizeGoalDistanceKey(opts.primaryTriDistance ?? '');
   if (dk !== '70.3') return [];
@@ -470,6 +471,29 @@ function olympic703BridgePivotCoachLines(opts: {
     cutoffRisk;
 
   if (!belowGate && !compoundUnknownVolume) return [];
+
+  // Strong swimmers: surface durability only — never Olympic-bridge FACTs (fast+race+lean is handled by strong703LeanMaintenanceCoachLines).
+  if (opts.swimExperience === 'strong') {
+    if (
+      belowGate &&
+      paceKnownFast &&
+      opts.swimIntent === 'race' &&
+      opts.weeklySwimYards != null
+    ) {
+      return [];
+    }
+    if (belowGate && opts.weeklySwimYards != null) {
+      return [
+        `SWIM DURABILITY (70.3 — strong swimmer): Planned swims ~${Math.round(opts.weeklySwimYards)} yd — under the ~${SWIM_YARD_WEEKLY_GATE_703}+ yd/week durability benchmark many coaches use for half-distance OW volume (shoulders, chop, time on stroke pattern). Do not suggest Olympic distance as a progression bridge.`,
+      ];
+    }
+    if (compoundUnknownVolume) {
+      return [
+        `SWIM DURABILITY SIGNAL (70.3 — strong swimmer): Planned yards unavailable; cutoff pressure elevated — note durability/OW exposure without Olympic-distance pivot language.`,
+      ];
+    }
+    return [];
+  }
 
   // Fast pool swimmers: low weekly yards still miss OW durability, but Olympic-as-"bridge" is the wrong story.
   if (belowGate && paceKnownFast) return [];
@@ -3268,6 +3292,7 @@ Deno.serve(async (req) => {
             learned_fitness: arc.learned_fitness,
             units: arc.units,
           });
+          const swimExp703 = deriveTriSwimExperienceForCoach(goalContext, activePlan?.goal_id ?? null);
           const olympic703Block = (() => {
             const lines = olympic703BridgePivotCoachLines({
               primaryTriDistance: primary703Dist,
@@ -3275,10 +3300,10 @@ Deno.serve(async (req) => {
               swimCutoffPressureV1: swimCut703,
               swimIntent: triSwimIntent,
               swimSecPer100Yd: swimSec703,
+              swimExperience: swimExp703,
             });
             return lines.length ? lines.join('\n') : null;
           })();
-          const swimExp703 = deriveTriSwimExperienceForCoach(goalContext, activePlan?.goal_id ?? null);
           const strongLean703Block = (() => {
             const lines = strong703LeanMaintenanceCoachLines({
               primaryTriDistance: primary703Dist,
@@ -4077,16 +4102,17 @@ Deno.serve(async (req) => {
           learned_fitness: arc.learned_fitness,
           units: arc.units,
         });
+        const swimExpLegacy = deriveTriSwimExperienceForCoach(goalContext, activePlan?.goal_id ?? null);
         for (const line of olympic703BridgePivotCoachLines({
           primaryTriDistance: primaryDistLeg,
           weeklySwimYards: weeklySwimYdsLegacy,
           swimCutoffPressureV1: swimCutLeg,
           swimIntent: triSwimIntent,
           swimSecPer100Yd: swimSecLeg,
+          swimExperience: swimExpLegacy,
         })) {
           narrativeFacts.push(line);
         }
-        const swimExpLegacy = deriveTriSwimExperienceForCoach(goalContext, activePlan?.goal_id ?? null);
         for (const line of strong703LeanMaintenanceCoachLines({
           primaryTriDistance: primaryDistLeg,
           weeklySwimYards: weeklySwimYdsLegacy,

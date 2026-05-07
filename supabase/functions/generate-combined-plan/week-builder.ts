@@ -29,6 +29,9 @@ import {
   type SwimSlotTemplate,
 } from '../_shared/swim-program-templates.ts';
 import {
+  apply703SlowSwimmerWeeklyFloors,
+} from './swim-tri-safety.ts';
+import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS,
@@ -1043,6 +1046,19 @@ export function buildWeek(
     return Math.max(floorYd, Math.round(budgetCapped));
   };
 
+  const swimSlotYards703 = apply703SlowSwimmerWeeklyFloors({
+    templates: swimTemplates,
+    slotYards: swimTemplates.map((t, i) => scaledTemplateYards(t, i)),
+    primaryGoal,
+    athleteState,
+    phase,
+    hasTri,
+    swimSingleRecovery,
+    swimPct,
+    raceThisWeek: Boolean(raceThisWeek),
+    isRecovery,
+    recoveryRebuildWeek1,
+  });
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =
     athleteState.bike_quality_day != null
@@ -1334,7 +1350,7 @@ export function buildWeek(
   const qualitySwimSlot = grid.get(swimQualityDay);
   if (hasTri && swimTemplates.length > 0) {
     const t0 = swimTemplates[0]!;
-    const y0 = scaledTemplateYards(t0, 0);
+    const y0 = swimSlotYards703[0] ?? scaledTemplateYards(t0, 0);
     if (!qualitySwimSlot?.isRest && qualitySwimSlot!.sessions.length < 2) {
       qualitySwimSlot!.sessions.push(
         swimSessionFromTemplate(t0, y0, swimQualityDay, weekNum, phase, servedGoal, 0, athleteState.swim_equipment),
@@ -1364,7 +1380,7 @@ export function buildWeek(
   const easySwimSlot = grid.get(swimEasyDay);
   if (!easySwimSlot?.isRest && hasTri && swimTemplates.length >= 2) {
     const t1 = swimTemplates[1]!;
-    const y1 = scaledTemplateYards(t1, 1);
+    const y1 = swimSlotYards703[1] ?? scaledTemplateYards(t1, 1);
     if ((swimEasyDay !== swimQualityDay || !qualitySwimPlaced) && easySwimSlot!.sessions.length < 2) {
       const useOpenWater =
         t1.session_type === 'easy' &&
@@ -1387,7 +1403,7 @@ export function buildWeek(
     const thirdSwimSlot = grid.get(swimThirdDay);
     if (!thirdSwimSlot?.isRest && thirdSwimSlot!.sessions.length < 2) {
       const t2 = swimTemplates[2]!;
-      const y2 = scaledTemplateYards(t2, 2);
+      const y2 = swimSlotYards703[2] ?? scaledTemplateYards(t2, 2);
       thirdSwimSlot!.sessions.push(
         swimSessionFromTemplate(t2, y2, swimThirdDay, weekNum, phase, servedGoal, 5, athleteState.swim_equipment),
       );

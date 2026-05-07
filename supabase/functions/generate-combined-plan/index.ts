@@ -17,6 +17,7 @@ import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
 import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-state-week-optimizer.ts';
+import { promote703SwimIntentForCutoffRisk } from './swim-tri-safety.ts';
 import { sessionsByWeekHasStructuredQualityRun } from '../_shared/plan-generation-trade-offs.ts';
 
 const corsHeaders = {
@@ -62,9 +63,12 @@ Deno.serve(async (req: Request) => {
     const hasTriGoalForReconcile = goals.some((g) =>
       ['triathlon', 'tri'].includes(String(g.sport ?? '').toLowerCase()),
     );
+
+    const state703Cutoff = promote703SwimIntentForCutoffRisk(goals, state);
+
     const scheduleState: AthleteState = hasTriGoalForReconcile
-      ? reconcileAthleteStateWithWeekOptimizer(state)
-      : state;
+      ? reconcileAthleteStateWithWeekOptimizer(state703Cutoff)
+      : state703Cutoff;
 
     // ── Build phase timeline ────────────────────────────────────────────────
     const { blocks: builtBlocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, scheduleState);
