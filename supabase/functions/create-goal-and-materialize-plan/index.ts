@@ -1114,15 +1114,20 @@ async function buildCombinedPlan(
     newGoal.training_prefs as Record<string, unknown>,
     backfilledPrimaryPrefs as Record<string, unknown>,
   );
-  // A-priority goal wins most anchors, but the goal the athlete just configured in the wizard
-  // (newGoal) must retain explicit group-ride / easy-bike days — otherwise stale primary prefs
-  // silently move quality bike off Wednesday (etc.).
+  // Merge order above lets A-priority backfilled prefs win over the partner goal payload.
+  // Only re-apply wizard bike anchors when this request is for the A skeleton owner: stale DB
+  // primary would otherwise drop group-ride day. If newGoalId is a B/C partner, partner
+  // training_prefs often duplicate anchors badly (e.g. Tuesday QB) — overwriting merged prefs
+  // produced quality_run_unplaced + wrong athlete_state vs pin-restored optimizer output.
   const newGoalBikePatch = parsePreferredDaysPatch(newGoal.training_prefs as Record<string, unknown>);
-  if (newGoalBikePatch.bike_quality_day !== undefined) {
-    freshCombinedPrefs.bike_quality_day = newGoalBikePatch.bike_quality_day;
-  }
-  if (newGoalBikePatch.bike_easy_day !== undefined) {
-    freshCombinedPrefs.bike_easy_day = newGoalBikePatch.bike_easy_day;
+  const newGoalIsPrimarySkeletonOwner = primaryGoal?.id != null && newGoalId === primaryGoal.id;
+  if (newGoalIsPrimarySkeletonOwner) {
+    if (newGoalBikePatch.bike_quality_day !== undefined) {
+      freshCombinedPrefs.bike_quality_day = newGoalBikePatch.bike_quality_day;
+    }
+    if (newGoalBikePatch.bike_easy_day !== undefined) {
+      freshCombinedPrefs.bike_easy_day = newGoalBikePatch.bike_easy_day;
+    }
   }
   const freshDpw =
     readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
