@@ -1334,6 +1334,10 @@ export function buildWeek(
   } else {
     strFreq = 1;
   }
+  // Loading-pattern deload weeks (`isRecovery`) still used phase `build` / `race_specific` with
+  // performance intent → strFreq was 2, but `createWeekSessions` often returns one deload template;
+  // both slots then mapped to the same session (duplicate Mon/Tue). One strength day in deload.
+  if (isRecovery && hasTri) strFreq = Math.min(strFreq, 1);
   if (recoveryRebuildWeek1) strFreq = 0;
 
   const capRaw = athleteState.strength_sessions_cap;
@@ -1402,6 +1406,8 @@ export function buildWeek(
             hasGhd,
             longRideDayName: longRideDay,
             longRunDayName: longRunActualDay,
+            qualityBikeDayName: bikeQualityDay,
+            qualityRunDayName: runQualityDay,
             strengthProtocolId: athleteState.strength_protocol,
             strengthIntent: athleteState.strength_intent,
           }));
@@ -1506,6 +1512,8 @@ export function buildWeek(
               hasGhd: hasGhd2,
               longRideDayName: longRideDay,
               longRunDayName: longRunActualDay,
+              qualityBikeDayName: bikeQualityDay,
+              qualityRunDayName: runQualityDay,
               strengthProtocolId: athleteState.strength_protocol,
               strengthIntent: athleteState.strength_intent,
             }));

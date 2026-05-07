@@ -951,6 +951,9 @@ export function triathlonStrength(
     /** Calendar long sessions — drives strength placement (default Sat/Sun). */
     longRideDayName?: string;
     longRunDayName?: string;
+    /** Actual mid-week quality anchors from athlete_state (not hardcoded Tue/Thu). */
+    qualityBikeDayName?: string;
+    qualityRunDayName?: string;
     /** Protocol id (triathlon, neural_speed, durability, …). Default: triathlon. */
     strengthProtocolId?: string;
     strengthIntent?: 'support' | 'performance';
@@ -959,8 +962,10 @@ export function triathlonStrength(
   const longRide = options?.longRideDayName ?? 'Saturday';
   const longRun = options?.longRunDayName ?? 'Sunday';
   const longSessionDays = [...new Set([longRide, longRun])];
+  const qb = options?.qualityBikeDayName ?? 'Tuesday';
+  const qr = options?.qualityRunDayName ?? 'Thursday';
   const easySessionDays = [...DAYS_OF_WEEK].filter(
-    (d) => !longSessionDays.includes(d) && d !== 'Tuesday',
+    (d) => !longSessionDays.includes(d) && d !== qb,
   );
 
   const ctx: ProtocolContext = {
@@ -971,7 +976,7 @@ export function triathlonStrength(
     isRecovery: options?.isRecovery ?? false,
     primarySchedule: {
       longSessionDays,
-      qualitySessionDays: ['Tuesday', 'Thursday'],
+      qualitySessionDays: [...new Set([qb, qr])],
       easySessionDays,
     },
     userBaselines: {

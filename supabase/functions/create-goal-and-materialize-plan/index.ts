@@ -17,6 +17,7 @@ import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shar
 import {
   deriveRestDaysForBudget,
   mergeCombinedSchedulePrefs,
+  parsePreferredDaysPatch,
   readDaysPerWeekFromPrefs,
 } from '../_shared/combined-schedule-prefs.ts';
 import { fixTransposedEasyBikeRunAgainstSwimOrder } from '../_shared/tri-preferred-days-sanity.ts';
@@ -1111,6 +1112,16 @@ async function buildCombinedPlan(
     newGoal.training_prefs as Record<string, unknown>,
     backfilledPrimaryPrefs as Record<string, unknown>,
   );
+  // A-priority goal wins most anchors, but the goal the athlete just configured in the wizard
+  // (newGoal) must retain explicit group-ride / easy-bike days — otherwise stale primary prefs
+  // silently move quality bike off Wednesday (etc.).
+  const newGoalBikePatch = parsePreferredDaysPatch(newGoal.training_prefs as Record<string, unknown>);
+  if (newGoalBikePatch.bike_quality_day !== undefined) {
+    freshCombinedPrefs.bike_quality_day = newGoalBikePatch.bike_quality_day;
+  }
+  if (newGoalBikePatch.bike_easy_day !== undefined) {
+    freshCombinedPrefs.bike_easy_day = newGoalBikePatch.bike_easy_day;
+  }
   const freshDpw =
     readDaysPerWeekFromPrefs(newGoal.training_prefs as Record<string, unknown>) ??
     readDaysPerWeekFromPrefs(backfilledPrimaryPrefs as Record<string, unknown>);
