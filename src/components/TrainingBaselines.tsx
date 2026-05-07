@@ -7,6 +7,7 @@ import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
@@ -205,6 +206,7 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 const [stravaConnected, setStravaConnected] = useState(false);
 const [stravaMessage, setStravaMessage] = useState('');
 const [accessToken, setAccessToken] = useState<string | null>(null);
+const [routeSnapRefreshBusy, setRouteSnapRefreshBusy] = useState(false);
 
   // Garmin connection state
 const [garminConnected, setGarminConnected] = useState(false);
@@ -275,6 +277,13 @@ useEffect(() => {
       setStravaConnected(true);
       localStorage.setItem('strava_access_token', access_token);
       setStravaMessage('Successfully connected to Strava!');
+      void refreshGroupRideRouteSnapshotsForUser().then((r) => {
+        if (r.goals_updated > 0) {
+          setStravaMessage(
+            `Successfully connected to Strava! Updated climbing stats on ${r.goals_updated} goal(s).`,
+          );
+        }
+      });
     } else if (event.data.type === 'STRAVA_AUTH_ERROR') {
       setStravaMessage(`Error: ${event.data.error}`);
     } else if (event.data.type === 'GARMIN_AUTH_SUCCESS') {
@@ -680,6 +689,28 @@ const disconnectStrava = () => {
   setAccessToken(null);
   localStorage.removeItem('strava_access_token');
   setStravaMessage('Disconnected from Strava');
+};
+
+const refreshGroupRideSnapshotsFromBaselines = async () => {
+  setRouteSnapRefreshBusy(true);
+  try {
+    const r = await refreshGroupRideRouteSnapshotsForUser();
+    if (r.goals_updated > 0) {
+      setStravaMessage(`Updated route climbing stats on ${r.goals_updated} goal(s).`);
+    } else if (r.urls_attempted === 0) {
+      setStravaMessage(
+        'No route snapshots to update — add a Strava `/routes/…` link on your season goal, or stats already match.',
+      );
+    } else if (r.errors.length > 0) {
+      setStravaMessage(r.errors[0] ?? 'Could not refresh route stats.');
+    } else {
+      setStravaMessage('Route stats check finished.');
+    }
+  } catch (e) {
+    setStravaMessage(e instanceof Error ? e.message : 'Could not refresh route stats.');
+  } finally {
+    setRouteSnapRefreshBusy(false);
+  }
 };
 
   // PKCE helper
@@ -1916,6 +1947,21 @@ return (
                         <p className="text-sm text-white/90">{stravaMessage}</p>
                       </div>
                     )}
+
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => void refreshGroupRideSnapshotsFromBaselines()}
+                        disabled={routeSnapRefreshBusy || !getStoredUserId()}
+                        className="w-full px-4 py-2.5 text-sm font-medium text-white/90 bg-white/[0.06] hover:bg-white/[0.1] border border-white/20 rounded-full transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        style={{ fontFamily: 'Inter, sans-serif' }}
+                      >
+                        {routeSnapRefreshBusy ? 'Updating route stats…' : 'Refresh saved Strava route stats'}
+                      </button>
+                      <p className="text-[11px] text-white/40 px-1 leading-snug">
+                        Backfills distance and climbing on goals when you pasted a Strava routes URL before linking Strava (or stats were missing).
+                      </p>
+                    </div>
                   </div>
 
                   {/* Strava Preview */}

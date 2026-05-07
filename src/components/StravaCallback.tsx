@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
 
 const StravaCallback: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -40,6 +41,12 @@ const StravaCallback: React.FC = () => {
 
         // Also keep a local flag so UI can reflect connected state quickly
         localStorage.setItem('strava_connected', 'true');
+
+        try {
+          await refreshGroupRideRouteSnapshotsForUser();
+        } catch (e) {
+          console.warn('[StravaCallback] route snapshot refresh skipped:', e);
+        }
 
         setStatus('success');
         setMessage('Successfully connected to Strava!');
