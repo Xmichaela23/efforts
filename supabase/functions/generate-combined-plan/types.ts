@@ -79,6 +79,11 @@ export interface AthleteState {
    * Strava-fetched route metrics (wizard save). Drives group-ride topography copy + optional bike TSS floor.
    */
   group_ride_route_snapshot?: GroupRideRouteSnapshot;
+  /**
+   * Distance/elevation labeling for baked session prose (e.g. Strava route stats on group rides).
+   * From `user_baselines.units` at materialize; defaults to imperial when omitted.
+   */
+  plan_units?: 'imperial' | 'metric';
   /** Strength system protocol id (e.g. triathlon, neural_speed, durability). */
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */

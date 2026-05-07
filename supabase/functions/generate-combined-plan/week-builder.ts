@@ -1241,6 +1241,7 @@ export function buildWeek(
               label,
               athleteState.group_ride_route_url,
               athleteState.group_ride_route_snapshot,
+              athleteState.plan_units === 'metric' ? 'metric' : 'imperial',
             ),
           );
         } else {

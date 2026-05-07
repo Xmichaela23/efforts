@@ -262,12 +262,13 @@ Deno.serve(async (req: Request) => {
 
     const avgTSS = Math.round(generatedWeeks.reduce((s, w) => s + w.total_raw_tss, 0) / effectiveTotalWeeks);
 
+    const planUnits = state.plan_units === 'metric' ? 'metric' : 'imperial';
     const plan_config = {
       ...plan_contract_v1,
       sport: 'multi_sport',
       race_date: primaryGoal.event_date,
       race_name: primaryGoal.event_name,
-      units: 'imperial',
+      units: planUnits,
       swim_unit: 'yd',
       user_selected_start_date: start_date ?? new Date().toISOString().slice(0, 10),
     };

@@ -129,6 +129,10 @@ function parseStrengthRelocationNote(line: string): string {
   if (m1) {
     return `Upper-body emphasis moved to ${capitalizeDay(m1[1])}.`;
   }
+  const m1b = line.match(/\bmoved to\s+(\w+)/i);
+  if (m1b) {
+    return `Upper-body emphasis moved to ${capitalizeDay(m1b[1])}.`;
+  }
   return 'See your calendar for the exact strength days.';
 }
 
@@ -218,7 +222,7 @@ export function buildCombinedPlanGenerationTradeOffs(opts: {
   }
 
   for (const line of uniqueTradeOffs) {
-    if (line.startsWith('strength: default')) {
+    if (/^strength:/i.test(line.trim())) {
       add({
         kind: 'anchor_adjustment',
         severity: 'info',

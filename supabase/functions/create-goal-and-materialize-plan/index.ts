@@ -980,8 +980,11 @@ async function buildCombinedPlan(
       .eq('user_id', user_id)
       .order('week_start', { ascending: false })
       .limit(6),
-    supabase.from('user_baselines').select('equipment').eq('user_id', user_id).maybeSingle(),
+    supabase.from('user_baselines').select('equipment, units').eq('user_id', user_id).maybeSingle(),
   ]);
+
+  const planUnitsForCombined: 'imperial' | 'metric' =
+    String(combinedBaseline?.units ?? '').toLowerCase() === 'metric' ? 'metric' : 'imperial';
 
   // Derive CTL from recent weekly workload. workload_total is in load points;
   // we scale to approximate TSS/day for the combined plan engine.
@@ -1251,6 +1254,7 @@ async function buildCombinedPlan(
       current_ctl: currentCTL,
       weekly_hours_available: weeklyHours,
       loading_pattern: loadingPattern,
+      plan_units: planUnitsForCombined,
       equipment_type: resolvedEquipmentType,
       has_cable_machine: hasCableForPlan,
       has_ghd: hasGHDForPlan,

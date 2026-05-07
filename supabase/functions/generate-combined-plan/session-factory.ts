@@ -29,6 +29,33 @@ function shiftWeekday(day: string, delta: number): string {
   return DAYS_OF_WEEK[(base + delta + 7) % 7]!;
 }
 
+/** Group-ride route sentence — matches athlete plan units (planned workout body text). */
+export function formatGroupRideRouteTopoCopy(
+  snapshot: GroupRideRouteSnapshot,
+  units: 'imperial' | 'metric',
+): string {
+  const distKm = snapshot.distance_m / 1000;
+  const elevM = snapshot.elevation_gain_m;
+  const densMpk = snapshot.climb_density_m_per_km;
+  let core: string;
+  if (units === 'metric') {
+    core = ` Strava route: ~${distKm.toFixed(1)} km, ~${Math.round(elevM)} m climbing (~${densMpk.toFixed(1)} m/km).`;
+  } else {
+    const mi = distKm * 0.621371192237334;
+    const ft = elevM * 3.280839895013123;
+    const ftPerMi = densMpk * 1.609344 * 3.280839895013123;
+    core = ` Strava route: ~${mi.toFixed(1)} mi, ~${Math.round(ft)} ft climbing (~${Math.round(ftPerMi)} ft/mi).`;
+  }
+  const tier = climbNoticeTier(snapshot);
+  if (tier === 'aggressive') {
+    core +=
+      ' High climbing density — real threshold-like stress even at modest duration; respect recovery the next day.';
+  } else if (tier === 'notice') {
+    core += ' Rolling/hilly profile — pace-by-feel can overshoot flat-road RPE.';
+  }
+  return core;
+}
+
 /** Separates `pickSwimDrillTokens` rotation so easy / CSS / threshold swims don't always collide. */
 type SwimDrillSessionKind = 'easy' | 'css_aerobic' | 'threshold';
 
@@ -397,6 +424,7 @@ export function groupRideSession(
   label = 'Group Ride',
   routeUrl?: string | null,
   routeSnapshot?: GroupRideRouteSnapshot | null,
+  routeUnits: 'imperial' | 'metric' = 'imperial',
 ): PlannedSession {
   const min = Math.max(45, Math.round(hours * 60));
   const phaseLine =
@@ -405,23 +433,7 @@ export function groupRideSession(
       : 'This is your quality bike session — give the climbs real effort.';
   const url = typeof routeUrl === 'string' ? routeUrl.trim() : '';
 
-  const topo =
-    routeSnapshot != null
-      ? (() => {
-          const km = (routeSnapshot.distance_m / 1000).toFixed(1);
-          const elev = Math.round(routeSnapshot.elevation_gain_m);
-          const dens = routeSnapshot.climb_density_m_per_km.toFixed(1);
-          let s = ` Strava route: ~${km} km, ~${elev} m climbing (~${dens} m/km).`;
-          const tier = climbNoticeTier(routeSnapshot);
-          if (tier === 'aggressive') {
-            s +=
-              ' High climbing density — real threshold-like stress even at modest duration; respect recovery the next day.';
-          } else if (tier === 'notice') {
-            s += ' Rolling/hilly profile — pace-by-feel can overshoot flat-road RPE.';
-          }
-          return s;
-        })()
-      : '';
+  const topo = routeSnapshot != null ? formatGroupRideRouteTopoCopy(routeSnapshot, routeUnits) : '';
 
   const routePara = url.length > 0 ? ` Saved route (open before ride): ${url}` : '';
 

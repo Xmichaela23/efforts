@@ -51,6 +51,12 @@ function nDaysAfter(d: DayName, n: number): DayName {
 function dayBefore(d: DayName): DayName { return nDaysAfter(d, -1); }
 function dayAfter(d: DayName): DayName { return nDaysAfter(d, 1); }
 
+/** Title-case weekday for athlete-visible trade-off lines */
+function tfDay(day: DayName | string): string {
+  const s = String(day ?? '').toLowerCase();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
 // ── Public types ────────────────────────────────────────────────────────────
 
 /** Anchor with an optional intensity hint (group ride / run club / masters). */
@@ -476,7 +482,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       qualityBikeDay = tryPlaceQb(false);
       if (qualityBikeDay) {
         trade_offs.push(
-          `quality_bike: hard_bike_avoid_days ruled out all mid-week candidates — placed on ${qualityBikeDay} instead.`,
+          `quality_bike: hard_bike_avoid_days ruled out all mid-week candidates — placed on ${tfDay(qualityBikeDay)} instead.`,
         );
       }
     }
@@ -509,8 +515,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       place(days, preferredQr, 'quality_run');
       if (!sequentialOk(days, preferredQr, 'quality_run', inputs.athlete)) {
         trade_offs.push(
-          `quality_run: placed on ${preferredQr} per athlete preference` +
-          (qualityBikeDay ? ` — back-to-back with quality_bike (${qualityBikeDay}); athlete-declared schedule` : '') +
+          `quality_run: placed on ${tfDay(preferredQr)} per athlete preference` +
+          (qualityBikeDay ? ` — back-to-back with quality_bike (${tfDay(qualityBikeDay)}); athlete-declared schedule` : '') +
           '.',
         );
       }
@@ -555,7 +561,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         qualityRunDay = d;
         consolidatedQrLowerDay = d;
         trade_offs.push(
-          `quality_run + lower_body_strength consolidated on ${d} (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (EXPERIENCE_MODIFIER).`,
+          `quality_run + lower_body_strength consolidated on ${tfDay(d)} (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (EXPERIENCE_MODIFIER).`,
         );
         break;
       }
@@ -652,7 +658,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         // run the day after long run is standard practice, not a trade-off worth surfacing.
         if (!isPerf) {
           trade_offs.push(
-            `easy_run on ${dAfterLongRun} immediately follows long_run (${longRun}) — last resort; prefer swim or rest that day when possible.`,
+            `easy_run on ${tfDay(dAfterLongRun)} immediately follows long_run (${tfDay(longRun)}) — last resort; prefer swim or rest that day when possible.`,
           );
         }
       }
@@ -731,7 +737,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           strengthDays.push(upperDay);
           if (upperDay !== 'monday') {
             trade_offs.push(
-              `strength: default Monday upper relocated to ${upperDay} (minimum spacing vs lower on ${consolidatedQrLowerDay}).`,
+              `Strength: default Monday upper moved to ${tfDay(upperDay)} — spacing vs lower on ${tfDay(consolidatedQrLowerDay)}.`,
             );
           }
           placeThirdStrengthIfNeeded();
@@ -782,16 +788,16 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           strengthDays.push(lowerDay);
           if (stacking) {
             trade_offs.push(
-              `lower_body_strength stacked with quality_run on ${lowerDay} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
+              `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
             );
             if (upperDay !== 'monday' || lowerDay !== 'thursday') {
               trade_offs.push(
-                `strength: default Mon upper / Thu lower not used — upper on ${upperDay}, lower on ${lowerDay} (stacked hard day / anchor layout).`,
+                `Strength: usual Mon upper / Thu lower could not stay — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (heavy lower day stacks with your quality run).`,
               );
             }
           } else if (upperDay !== 'monday' || lowerDay !== 'thursday') {
             trade_offs.push(
-              `strength: default Mon upper / Thu lower relocated — upper on ${upperDay}, lower on ${lowerDay} (anchors or matrix).`,
+              `Strength: usual Mon upper / Thu lower became upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} — moved to stay clear of your pinned rides/runs and recovery spacing.`,
             );
           }
           placeThirdStrengthIfNeeded();
@@ -816,7 +822,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         strengthDays.push(upperDay);
         if (upperDay !== 'monday') {
           trade_offs.push(
-            `strength: default Monday upper relocated to ${upperDay} (support / 1×–2× template).`,
+            `Strength: default Monday upper moved to ${tfDay(upperDay)} (support / 1×–2× template).`,
           );
         }
       } else {
@@ -855,11 +861,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           strengthDays.push(lowerDay);
           if (stacking) {
             trade_offs.push(
-              `lower_body_strength stacked with quality_run on ${lowerDay} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
+              `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
             );
             if (upperDay && (upperDay !== 'monday' || lowerDay !== 'thursday')) {
               trade_offs.push(
-                `strength: typical Mon upper / Thu lower pattern adjusted — upper on ${upperDay}, lower on ${lowerDay}.`,
+                `Strength: typical Mon upper / Thu lower adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)}.`,
               );
             }
           } else if (
@@ -867,7 +873,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             (upperDay !== 'monday' || lowerDay !== 'thursday')
           ) {
             trade_offs.push(
-              `strength: typical Mon upper / Thu lower pattern adjusted — upper on ${upperDay}, lower on ${lowerDay} (schedule constraints).`,
+              `Strength: typical Mon upper / Thu lower adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (schedule constraints).`,
             );
           }
         } else {
@@ -987,7 +993,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         const allLow = slots.every((s) => s.fatigue === 'LOW');
         if (allLow) {
           trade_offs.push(
-            `${c} cleared for rest budget (${trainingDays}-day week); displaced ${slots.map((s) => s.kind).join(' + ')}.`,
+            `${tfDay(c)} cleared for rest budget (${trainingDays}-day week); displaced ${slots.map((s) => s.kind).join(' + ')}.`,
           );
           days[c] = [];
           restDays.add(c);
@@ -1074,7 +1080,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     const wrap = Math.min(gap, 7 - gap);
     if (wrap === 1) {
       trade_offs.push(
-        `ADJACENT_QUALITY: quality_run (${qualityRunDay}) is back-to-back with quality_bike (${qualityBikeDay}). That's your declared schedule with the group ride pinned. Remind the athlete: keep ${qualityBikeDay} controlled and ${qualityRunDay} intervals will land fresh enough to count.`,
+        `ADJACENT_QUALITY: quality_run (${tfDay(qualityRunDay)}) is back-to-back with quality_bike (${tfDay(qualityBikeDay)}). That's your declared schedule with the group ride pinned. Remind the athlete: keep ${tfDay(qualityBikeDay)} controlled and ${tfDay(qualityRunDay)} intervals will land fresh enough to count.`,
       );
     }
   }
