@@ -510,6 +510,51 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       }
     }
 
+    const strengthFreqEarly = inputs.preferences.strength_frequency;
+
+    // Performance + co-equal: try AM quality_run / PM lower on day-after quality_bike BEFORE
+    // standalone prio scan. Otherwise prio prefers Friday (nDaysAfter qb, 2)) / Tuesday and
+    // lands a standalone qr, so consolidated Thu never runs — wrong geometry vs Wed group ride.
+    if (
+      !qualityRunDay &&
+      isPerf &&
+      isCoEq &&
+      strengthFreqEarly >= 2
+    ) {
+      const candidates: DayName[] = [];
+      if (qualityBikeDay) {
+        candidates.push(dayAfter(qualityBikeDay));
+        candidates.push(nDaysAfter(qualityBikeDay, 2));
+      }
+      for (const d of ALL_DAYS) {
+        if (!candidates.includes(d)) candidates.push(d);
+      }
+      for (const d of candidates) {
+        if (d === longRide || d === longRun) continue;
+        if (d === dayBefore(longRide)) continue;
+        if (noLowerBody.has(d)) continue;
+        if (qualityBikeDay && d === qualityBikeDay) continue;
+
+        const trial = cloneDays(days);
+        if (!sequentialOk(trial, d, 'quality_run', inputs.athlete, {
+          quality_run_day_after_qb_with_same_day_lower: true,
+        })) continue;
+        if (!canPlace(trial, d, 'quality_run')) continue;
+        place(trial, d, 'quality_run');
+        if (!canPlaceWithModifier(trial, d, 'lower_body_strength', inputs.athlete)) continue;
+        if (!sequentialOk(trial, d, 'lower_body_strength', inputs.athlete)) continue;
+
+        place(days, d, 'quality_run');
+        place(days, d, 'lower_body_strength', { timing: 'PM' });
+        qualityRunDay = d;
+        consolidatedQrLowerDay = d;
+        trade_offs.push(
+          `quality_run + lower_body_strength consolidated on ${d} (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (EXPERIENCE_MODIFIER).`,
+        );
+        break;
+      }
+    }
+
     if (!qualityRunDay) {
       const prio: DayName[] = [];
       if (qualityBikeDay) {
@@ -530,49 +575,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         place(days, c, 'quality_run');
         break;
       }
-    }
-  }
-
-  // Performance + co-equal: before dropping quality_run, try AM run / PM lower on one day
-  // (often day-after anchored quality_bike) — EXPERIENCE_MODIFIER / same-day matrix exception.
-  const strengthFreqEarly = inputs.preferences.strength_frequency;
-  if (
-    !qualityRunDay &&
-    isPerf &&
-    isCoEq &&
-    strengthFreqEarly >= 2
-  ) {
-    const candidates: DayName[] = [];
-    if (qualityBikeDay) {
-      candidates.push(dayAfter(qualityBikeDay));
-      candidates.push(nDaysAfter(qualityBikeDay, 2));
-    }
-    for (const d of ALL_DAYS) {
-      if (!candidates.includes(d)) candidates.push(d);
-    }
-    for (const d of candidates) {
-      if (d === longRide || d === longRun) continue;
-      if (d === dayBefore(longRide)) continue;
-      if (noLowerBody.has(d)) continue;
-      if (qualityBikeDay && d === qualityBikeDay) continue;
-
-      const trial = cloneDays(days);
-      if (!sequentialOk(trial, d, 'quality_run', inputs.athlete, {
-        quality_run_day_after_qb_with_same_day_lower: true,
-      })) continue;
-      if (!canPlace(trial, d, 'quality_run')) continue;
-      place(trial, d, 'quality_run');
-      if (!canPlaceWithModifier(trial, d, 'lower_body_strength', inputs.athlete)) continue;
-      if (!sequentialOk(trial, d, 'lower_body_strength', inputs.athlete)) continue;
-
-      place(days, d, 'quality_run');
-      place(days, d, 'lower_body_strength', { timing: 'PM' });
-      qualityRunDay = d;
-      consolidatedQrLowerDay = d;
-      trade_offs.push(
-        `quality_run + lower_body_strength consolidated on ${d} (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (EXPERIENCE_MODIFIER).`,
-      );
-      break;
     }
   }
 

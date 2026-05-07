@@ -835,10 +835,13 @@ export function buildWeek(
     runEasyDay = adjDay(runEasyDay, 1);
   }
 
-  /** Same gate as `SameDayCompatContext.allowQualityRunQualitySwimSameDay` — keep in sync. */
+  /** Same gate as `SameDayCompatContext.allowQualityRunQualitySwimSameDay` — keep in sync.
+   * Combined tri plans: never stack threshold swim + quality run without real AM/PM timing in
+   * week-builder — matrix defaults reject the pair; bump swim quality off run day. */
   const allowQualityRunSwimSameDay =
-    String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
-    String(athleteState.strength_intent ?? '').toLowerCase() === 'performance';
+    !hasTri &&
+    (String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
+      String(athleteState.strength_intent ?? '').toLowerCase() === 'performance');
 
   // Completion / support: never place quality swim on the same calendar day as quality run
   // unless performance escape hatch — matrix would reject and tryResolve cannot relocate swim/run.
