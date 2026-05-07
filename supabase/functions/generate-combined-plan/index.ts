@@ -17,6 +17,7 @@ import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
 import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-state-week-optimizer.ts';
+import { sessionsByWeekHasStructuredQualityRun } from '../_shared/plan-generation-trade-offs.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -174,6 +175,10 @@ Deno.serve(async (req: Request) => {
       sessions_by_week['1'] = buildAssessmentWeekSessions(assessmentDisciplines).map(serializeSession);
     }
 
+    const persistedTradeOffsEffective = sessionsByWeekHasStructuredQualityRun(sessions_by_week)
+      ? persistedTradeOffs.filter((t) => t.message_template_id !== 'quality_run_unplaced')
+      : persistedTradeOffs;
+
     // Total duration including any prepended assessment week
     const effectiveTotalWeeks = totalWeeks + weekOffset;
 
@@ -307,7 +312,7 @@ Deno.serve(async (req: Request) => {
         plan_config,
         conflict_resolutions,
         preview: previewSummary,
-        generation_trade_offs: persistedTradeOffs,
+        generation_trade_offs: persistedTradeOffsEffective,
       });
     }
 
@@ -344,7 +349,8 @@ Deno.serve(async (req: Request) => {
       validation,
       validation_failures: failures,
       preview: previewSummary,
-      generation_trade_offs: persistedTradeOffs,
+      sessions_by_week,
+      generation_trade_offs: persistedTradeOffsEffective,
     });
 
   } catch (e) {

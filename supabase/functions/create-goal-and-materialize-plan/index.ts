@@ -24,6 +24,7 @@ import { fixTransposedEasyBikeRunAgainstSwimOrder } from '../_shared/tri-preferr
 import {
   aggregateOptimizerScheduleSignals,
   buildCombinedPlanGenerationTradeOffs,
+  stripStaleQualityRunUnplacedFromScheduleSignals,
   type BackfillOptimizerSnapshot,
   type PlanOptimizerSnapshotInput,
   type ScheduleSignals,
@@ -1358,7 +1359,11 @@ async function buildCombinedPlan(
       '[buildCombinedPlan] anchors_honored:',
       JSON.stringify({ ...honoredP, source_week_key: wkP, source: 'preview_response' }),
     );
-    return { preview: true as const, combined_preview: combined as Record<string, unknown>, schedule_signals };
+    const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
+      schedule_signals,
+      sbwPrev,
+    );
+    return { preview: true as const, combined_preview: combined as Record<string, unknown>, schedule_signals: schedule_signals_out };
   }
 
   if (!combined?.plan_id) {
@@ -1411,7 +1416,9 @@ async function buildCombinedPlan(
     JSON.stringify({ ...honoredDb, source_week_key: wkDb, source: 'plan_row_sessions_by_week' }),
   );
 
-  return { plan_id: combinedPlanId, preview: false as const, schedule_signals };
+  const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(schedule_signals, sbwDb);
+
+  return { plan_id: combinedPlanId, preview: false as const, schedule_signals: schedule_signals_out };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

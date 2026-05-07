@@ -249,3 +249,73 @@ export function buildCombinedPlanGenerationTradeOffs(opts: {
 
   return out;
 }
+
+const QR_UNPLACED_TRADE_RE = /Quality run not placed/i;
+const QR_UNPLACED_CONFLICT_RE = /quality_run:\s*no valid placement/i;
+
+function lineLooksLikeQualityRunUnplaced(line: string): boolean {
+  const s = String(line).trim();
+  return QR_UNPLACED_TRADE_RE.test(s) || QR_UNPLACED_CONFLICT_RE.test(s);
+}
+
+/**
+ * True when the built calendar includes run stimulus we treat as "quality" for UX purposes:
+ * intervals/tempo/threshold-style work, explicit quality_run kind, or hard/moderate non-easy runs.
+ * Used to drop stale optimizer strings that claim quality_run could not be placed.
+ */
+export function sessionsByWeekHasStructuredQualityRun(
+  sessions_by_week: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!sessions_by_week || typeof sessions_by_week !== 'object') return false;
+  for (const weekSessions of Object.values(sessions_by_week)) {
+    if (!Array.isArray(weekSessions)) continue;
+    for (const raw of weekSessions) {
+      if (!raw || typeof raw !== 'object') continue;
+      const s = raw as Record<string, unknown>;
+      if (String(s.type ?? s.discipline ?? '') !== 'run') continue;
+
+      if (String(s.session_kind ?? '') === 'quality_run') return true;
+
+      const name = String(s.name ?? '').toLowerCase();
+      const tags = Array.isArray(s.tags)
+        ? s.tags.map((t) => String(t).toLowerCase()).join(' ')
+        : '';
+
+      if (/^easy\s+run\b|^recovery\s+run\b|^zone\s*1\b|^z1\b/i.test(String(s.name ?? ''))) continue;
+      if (
+        tags.includes('easy_run') &&
+        !/(interval|tempo|threshold|vo2|quality|hard|race)/.test(tags)
+      ) {
+        continue;
+      }
+
+      if (
+        /interval|tempo|threshold|vo2|vo₂|track|strides|hill\s*repeat|race\s*pace|marathon\s*pace|\bmp\b|\blt\b|\bat\b/i.test(
+          name,
+        )
+      ) {
+        return true;
+      }
+      if (/interval|tempo|threshold|vo2|quality|race_specific|race-pace|hard_session/.test(tags)) {
+        return true;
+      }
+
+      const ic = String(s.intensity_class ?? '');
+      if ((ic === 'HARD' || ic === 'MODERATE') && !/^easy\b/.test(name)) return true;
+    }
+  }
+  return false;
+}
+
+/** Remove optimizer QR-unplaced noise when the combined engine actually placed run quality. */
+export function stripStaleQualityRunUnplacedFromScheduleSignals(
+  signals: ScheduleSignals,
+  sessions_by_week: Record<string, unknown> | null | undefined,
+): ScheduleSignals {
+  if (!sessionsByWeekHasStructuredQualityRun(sessions_by_week)) return signals;
+  return {
+    ...signals,
+    trade_offs: signals.trade_offs.filter((t) => !lineLooksLikeQualityRunUnplaced(String(t))),
+    conflicts: signals.conflicts.filter((c) => !lineLooksLikeQualityRunUnplaced(String(c))),
+  };
+}
