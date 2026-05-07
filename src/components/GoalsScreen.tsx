@@ -20,6 +20,63 @@ import { useToast } from '@/components/ui/use-toast';
 // Local alias so existing call-sites inside this file don't need renaming
 const readStoredUserId = getStoredUserId;
 
+/** Survives Goals unmount / revisit after we strip `location.state` (router hygiene). */
+const ARC_SCHEDULE_SIGNALS_STORAGE_KEY = 'efforts_arc_schedule_signals_notice_v1';
+const ARC_SCHEDULE_SIGNALS_TTL_MS = 24 * 60 * 60 * 1000;
+
+type ArcScheduleSignalsState = {
+  conflicts: string[];
+  trade_offs: string[];
+  used_co_equal_1x_fallback?: boolean;
+  pin_restore_skipped?: string[];
+};
+
+function scheduleSignalsNonEmpty(sig: ArcScheduleSignalsState | Record<string, unknown> | undefined | null): boolean {
+  if (!sig || typeof sig !== 'object') return false;
+  const s = sig as Record<string, unknown>;
+  return (
+    ((s.conflicts as unknown[] | undefined)?.length ?? 0) > 0 ||
+    ((s.trade_offs as unknown[] | undefined)?.length ?? 0) > 0 ||
+    ((s.pin_restore_skipped as unknown[] | undefined)?.length ?? 0) > 0 ||
+    Boolean(s.used_co_equal_1x_fallback)
+  );
+}
+
+function persistArcScheduleSignalsNotice(payload: ArcScheduleSignalsState) {
+  try {
+    sessionStorage.setItem(
+      ARC_SCHEDULE_SIGNALS_STORAGE_KEY,
+      JSON.stringify({ savedAt: Date.now(), schedule_signals: payload }),
+    );
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function clearArcScheduleSignalsNoticeStorage() {
+  try {
+    sessionStorage.removeItem(ARC_SCHEDULE_SIGNALS_STORAGE_KEY);
+  } catch {
+    void 0;
+  }
+}
+
+function tryReadArcScheduleSignalsNotice(): ArcScheduleSignalsState | null {
+  try {
+    const raw = sessionStorage.getItem(ARC_SCHEDULE_SIGNALS_STORAGE_KEY);
+    if (!raw) return null;
+    const box = JSON.parse(raw) as { savedAt?: number; schedule_signals?: ArcScheduleSignalsState };
+    if (!box?.schedule_signals || typeof box.savedAt !== 'number') return null;
+    if (Date.now() - box.savedAt > ARC_SCHEDULE_SIGNALS_TTL_MS) {
+      clearArcScheduleSignalsNoticeStorage();
+      return null;
+    }
+    return box.schedule_signals;
+  } catch {
+    return null;
+  }
+}
+
 interface GoalsScreenProps {
   onClose: () => void;
   onSelectPlan?: (planId: string) => void;
@@ -134,12 +191,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   /** After Arc built the calendar: compact success on Goals. */
   const [arcPlanReady, setArcPlanReady] = useState<{ planId: string | null } | null>(null);
   /** Optimizer / merge notes worth surfacing after season build (§1.3 honesty). */
-  const [arcScheduleSignals, setArcScheduleSignals] = useState<{
-    conflicts: string[];
-    trade_offs: string[];
-    used_co_equal_1x_fallback?: boolean;
-    pin_restore_skipped?: string[];
-  } | null>(null);
+  const [arcScheduleSignals, setArcScheduleSignals] = useState<ArcScheduleSignalsState | null>(null);
 
   // Hydrate follow-up UI from `/goals` navigation state, then strip it so refresh/back doesn’t re-apply.
   useEffect(() => {
@@ -155,40 +207,52 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         pin_restore_skipped?: string[];
       };
     } | null;
-    if (!st || Object.keys(st).length === 0) return;
+    const emptyState = !st || Object.keys(st).length === 0;
 
-    if (st.needPaceCalibration) setShowCalibration(true);
+    if (!emptyState) {
+      if (st.needPaceCalibration) setShowCalibration(true);
 
-    if (st.seasonPlanJustBuilt) {
-      void refreshPlans?.();
-      void refreshGoals();
-      setArcPlanReady({ planId: st.builtPlanId ?? null });
-      setShowArcSetupNextStep(false);
-      const sig = st.schedule_signals;
-      if (sig && typeof sig === 'object') {
-        const noisy =
-          (sig.conflicts?.length ?? 0) > 0 ||
-          (sig.trade_offs?.length ?? 0) > 0 ||
-          (sig.pin_restore_skipped?.length ?? 0) > 0 ||
-          Boolean(sig.used_co_equal_1x_fallback);
-        if (noisy) {
-          setArcScheduleSignals({
-            conflicts: sig.conflicts ?? [],
-            trade_offs: sig.trade_offs ?? [],
-            used_co_equal_1x_fallback: sig.used_co_equal_1x_fallback,
-            pin_restore_skipped: sig.pin_restore_skipped ?? [],
-          });
+      if (st.seasonPlanJustBuilt) {
+        void refreshPlans?.();
+        void refreshGoals();
+        setArcPlanReady({ planId: st.builtPlanId ?? null });
+        setShowArcSetupNextStep(false);
+        const sig = st.schedule_signals;
+        if (scheduleSignalsNonEmpty(sig)) {
+          const payload: ArcScheduleSignalsState = {
+            conflicts: sig!.conflicts ?? [],
+            trade_offs: sig!.trade_offs ?? [],
+            used_co_equal_1x_fallback: sig!.used_co_equal_1x_fallback,
+            pin_restore_skipped: sig!.pin_restore_skipped ?? [],
+          };
+          setArcScheduleSignals(payload);
+          persistArcScheduleSignalsNotice(payload);
+        } else {
+          clearArcScheduleSignalsNoticeStorage();
         }
+      } else if (st.fromArcSetup) {
+        void refreshGoals();
+        setShowArcSetupNextStep(true);
       }
-    } else if (st.fromArcSetup) {
-      void refreshGoals();
-      setShowArcSetupNextStep(true);
+
+      try {
+        navigate(location.pathname, { replace: true, state: {} });
+      } catch {
+        void 0;
+      }
+      return;
     }
 
-    try {
-      navigate(location.pathname, { replace: true, state: {} });
-    } catch {
-      void 0;
+    // Router state already stripped (e.g. user opened Calendar then returned) — restore notice from tab storage.
+    const recovered = tryReadArcScheduleSignalsNotice();
+    if (scheduleSignalsNonEmpty(recovered)) {
+      const r = recovered!;
+      setArcScheduleSignals({
+        conflicts: r.conflicts ?? [],
+        trade_offs: r.trade_offs ?? [],
+        used_co_equal_1x_fallback: r.used_co_equal_1x_fallback,
+        pin_restore_skipped: r.pin_restore_skipped ?? [],
+      });
     }
   }, [location.state, location.pathname, navigate, refreshGoals, refreshPlans]);
 
@@ -1798,7 +1862,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               <p className="text-sm font-semibold text-amber-100/95 leading-snug">Schedule adjustments</p>
               <button
                 type="button"
-                onClick={() => setArcScheduleSignals(null)}
+                onClick={() => {
+                  clearArcScheduleSignalsNoticeStorage();
+                  setArcScheduleSignals(null);
+                }}
                 className="rounded-lg p-1 text-white/40 hover:text-white/70 hover:bg-white/10 shrink-0"
                 aria-label="Dismiss"
               >
