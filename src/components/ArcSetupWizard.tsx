@@ -42,6 +42,10 @@ export type WizardArcContext = {
   runSessions28: number;
   /** Completed rides in last 28 days. */
   bikeSessions28: number;
+  /** Longest completed run in last 28 days (km); null if unknown / no runs. */
+  longestRunKm28: number | null;
+  /** Any marathon-length or marathon-labeled completed run in last ~90 days. */
+  recentMarathonLikeRun: boolean;
 };
 
 async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
@@ -57,7 +61,7 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
       .maybeSingle(),
     supabase
       .from('workouts')
-      .select('date, type')
+      .select('date, type, distance, name')
       .eq('user_id', userId)
       .eq('workout_status', 'completed')
       .in('type', ['swim', 'swimming', 'run', 'ride'])
@@ -79,13 +83,20 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const performanceNumbers =
     pn && typeof pn === 'object' && !Array.isArray(pn) ? (pn as Record<string, unknown>) : null;
 
-  const volRows = (volumeRes.data ?? []) as { date?: string; type?: string }[];
+  const volRows = (volumeRes.data ?? []) as {
+    date?: string;
+    type?: string;
+    distance?: number | null;
+    name?: string | null;
+  }[];
   const in28 = (d: string) => typeof d === 'string' && d.slice(0, 10) >= start28;
 
   let swimSessions28 = 0;
   let swimSessions90 = 0;
   let runSessions28 = 0;
   let bikeSessions28 = 0;
+  let longestRunKm28 = 0;
+  let recentMarathonLikeRun = false;
 
   for (const r of volRows) {
     const d = typeof r.date === 'string' ? r.date.slice(0, 10) : '';
@@ -93,6 +104,17 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
     const isSwim = t === 'swim' || t === 'swimming';
     const isRun = t === 'run';
     const isRide = t === 'ride';
+    const distKm =
+      typeof r.distance === 'number' && Number.isFinite(r.distance) && r.distance > 0 ? r.distance : 0;
+    const nm = String(r.name ?? '').toLowerCase();
+
+    if (isRun && d >= start90.slice(0, 10) && d <= today.slice(0, 10)) {
+      if (distKm >= 38) recentMarathonLikeRun = true;
+      if (/marathon|26\.2|42\.195|42k|42\.2|full\s*marathon|fm\b/.test(nm)) {
+        recentMarathonLikeRun = true;
+      }
+      if (in28(d) && distKm > longestRunKm28) longestRunKm28 = distKm;
+    }
 
     if (isSwim) swimSessions90 += 1;
     if (!in28(d)) continue;
@@ -109,6 +131,8 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
     swimSessions90,
     runSessions28,
     bikeSessions28,
+    longestRunKm28: longestRunKm28 > 0 ? Math.round(longestRunKm28 * 10) / 10 : null,
+    recentMarathonLikeRun,
   };
 }
 
@@ -116,19 +140,37 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
 function hintRunQualityPlacementFromHistory(arc: WizardArcContext | null): string | null {
   if (!arc) return null;
   const n = arc.runSessions28;
+
+  const lead: string[] = [];
+  if (arc.recentMarathonLikeRun) {
+    lead.push(
+      'A recent marathon-length run shows in your history — favor folding weekday quality into the long run unless back-to-back hard days already feel easy.',
+    );
+  } else if (arc.longestRunKm28 != null && arc.longestRunKm28 >= 25) {
+    lead.push(
+      `Longest run in the last ~month ~${arc.longestRunKm28} km — strong single-session stimulus; choose standalone only if Thu-style intervals still feel fresh.`,
+    );
+  } else if (arc.longestRunKm28 != null && arc.longestRunKm28 >= 21) {
+    lead.push(
+      `Longest recent run ~${arc.longestRunKm28} km — half-marathon-ish volume on file; blending into the long run stays the lower-risk weekday pattern.`,
+    );
+  }
+
+  let tier: string;
   if (n >= 10) {
-    return `${n} completed runs in the last 4 weeks — strong run rhythm; standalone mid-week intervals after your quality bike day often works if you bounce back quickly on the run.`;
+    tier = `${n} completed runs in the last 4 weeks — strong run rhythm; standalone mid-week intervals after your quality bike day often works if you bounce back quickly on the run.`;
+  } else if (n >= 6) {
+    tier = `${n} runs in the last 4 weeks — you're running regularly; choose standalone if hard days back-to-back have felt fine, or fold into the long run for fewer pinned hard weekdays.`;
+  } else if (n >= 3) {
+    tier = `${n} runs in the last 4 weeks — either pattern can work; blending into the long run is the lower weekday-stress option.`;
+  } else if (n >= 1) {
+    tier = `${n} run${n === 1 ? '' : 's'} in the last 4 weeks — folding quality into the long run often fits while run consistency builds.`;
+  } else {
+    tier = `No runs logged in the last 4 weeks — putting threshold blocks on the long run keeps mid-week simpler until running is back in rhythm.`;
   }
-  if (n >= 6) {
-    return `${n} runs in the last 4 weeks — you're running regularly; choose standalone if hard days back-to-back have felt fine, or fold into the long run for fewer pinned hard weekdays.`;
-  }
-  if (n >= 3) {
-    return `${n} runs in the last 4 weeks — either pattern can work; blending into the long run is the lower weekday-stress option.`;
-  }
-  if (n >= 1) {
-    return `${n} run${n === 1 ? '' : 's'} in the last 4 weeks — folding quality into the long run often fits while run consistency builds.`;
-  }
-  return `No runs logged in the last 4 weeks — putting threshold blocks on the long run keeps mid-week simpler until running is back in rhythm.`;
+
+  const prefix = lead.length > 0 ? `${lead.join(' ')} ` : '';
+  return `${prefix}${tier}`;
 }
 
 /** Recent ride volume → Arc hint on tri bike-quality placement (after pinned quality run). */
@@ -235,6 +277,8 @@ type WizardState = {
   anythingUnusual: string;
   assessmentWeekPreference: 'assessment_first' | 'jump_in' | null;
 };
+
+type WizardSetState = React.Dispatch<React.SetStateAction<WizardState>>;
 
 function blank(): WizardState {
   const nextMonday = (() => {
@@ -576,7 +620,7 @@ type RaceInputPhase = 'input' | 'extracting' | 'confirm';
 
 function Step1Races({
   state, setState, onNext,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void }) {
   const [phase, setPhase] = useState<RaceInputPhase>(
     // If races were already extracted (e.g. back-navigation), start at confirm
     state.races.some(r => r.name.trim() && r.targetDate) ? 'confirm' : 'input',
@@ -796,7 +840,7 @@ function normalizeDistance(raw: string): string {
 
 function Step2Intent({
   state, setState, onNext, onBack,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void }) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
   const raceName = primaryRace?.name || 'your race';
 
@@ -824,7 +868,7 @@ function Step2Intent({
 
 function Step3Swim({
   state, setState, onNext, onBack, step, totalSteps, arc,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const swimPaceSec: number | null = (() => {
     const pn = arc?.performanceNumbers;
     if (!pn) return null;
@@ -867,7 +911,7 @@ function Step3Swim({
 
 function Step4Bike({
   state, setState, onNext, onBack, step, totalSteps, arc,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const canContinue = state.hasGroupRide !== null &&
     (state.hasGroupRide === false || (!!state.groupRideDay && state.groupRideIntensity !== null));
 
@@ -886,17 +930,17 @@ function Step4Bike({
     : null;
 
   const set = (hasGroupRide: boolean) =>
-    setState({
-      ...state,
+    setState(prev => ({
+      ...prev,
       hasGroupRide,
       groupRideDay: '',
       groupRideIntensity: null,
       runQualityPlacement: null,
-      groupRideRouteUrl: hasGroupRide ? state.groupRideRouteUrl : '',
-      groupRideRouteSnapshot: hasGroupRide ? state.groupRideRouteSnapshot : null,
-      groupRideRouteFetching: hasGroupRide ? state.groupRideRouteFetching : false,
-      groupRideRouteFetchError: hasGroupRide ? state.groupRideRouteFetchError : null,
-    });
+      groupRideRouteUrl: hasGroupRide ? prev.groupRideRouteUrl : '',
+      groupRideRouteSnapshot: hasGroupRide ? prev.groupRideRouteSnapshot : null,
+      groupRideRouteFetching: hasGroupRide ? prev.groupRideRouteFetching : false,
+      groupRideRouteFetchError: hasGroupRide ? prev.groupRideRouteFetchError : null,
+    }));
 
   const routeStored = sanitizeGroupRideRouteUrl(state.groupRideRouteUrl);
   const routeInvalidHint =
@@ -1000,7 +1044,7 @@ function Step4Bike({
         <>
           <DayPicker
             value={state.groupRideDay as Day | ''}
-            onChange={d => setState({ ...state, groupRideDay: d })}
+            onChange={d => setState(prev => ({ ...prev, groupRideDay: d }))}
             label="Which day?"
           />
           <div>
@@ -1008,14 +1052,14 @@ function Step4Bike({
             <div className="space-y-2">
               <ChoiceBtn
                 active={state.groupRideIntensity === 'quality_bike'}
-                onClick={() => setState({ ...state, groupRideIntensity: 'quality_bike' })}
+                onClick={() => setState(prev => ({ ...prev, groupRideIntensity: 'quality_bike' }))}
               >
                 <span className="block font-semibold">Hard — competitive pace, real efforts</span>
                 <span className="block text-[13px] text-white/55 mt-0.5">Counts as your quality bike session for the week.</span>
               </ChoiceBtn>
               <ChoiceBtn
                 active={state.groupRideIntensity === 'easy_bike'}
-                onClick={() => setState({ ...state, groupRideIntensity: 'easy_bike' })}
+                onClick={() => setState(prev => ({ ...prev, groupRideIntensity: 'easy_bike' }))}
               >
                 <span className="block font-semibold">Easy — social, conversational pace</span>
                 <span className="block text-[13px] text-white/55 mt-0.5">Counts as aerobic. The planner adds a separate quality session.</span>
@@ -1031,7 +1075,7 @@ function Step4Bike({
               spellCheck={false}
               placeholder="https://www.strava.com/routes/…"
               value={state.groupRideRouteUrl}
-              onChange={e => setState({ ...state, groupRideRouteUrl: e.target.value })}
+              onChange={e => setState(prev => ({ ...prev, groupRideRouteUrl: e.target.value }))}
               className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[15px] px-3.5 py-3 focus:outline-none focus:border-teal-500/50"
             />
             <p className="mt-1.5 text-[11px] text-white/35">
@@ -1073,7 +1117,7 @@ function Step4Bike({
 
 function Step5Run({
   state, setState, onNext, onBack, step, totalSteps, arc,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const canContinue = state.hasGroupRun !== null &&
     (state.hasGroupRun === false || (!!state.groupRunDay && state.groupRunIntensity !== null));
 
@@ -1157,7 +1201,7 @@ function StepTriRunQualityPlacement({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: {
   state: WizardState;
-  setState: (s: WizardState) => void;
+  setState: WizardSetState;
   onNext: () => void;
   onBack: () => void;
   step: number;
@@ -1183,7 +1227,7 @@ function StepTriRunQualityPlacement({
       <div className="space-y-2">
         <ChoiceBtn
           active={state.runQualityPlacement === 'standalone_midweek'}
-          onClick={() => setState({ ...state, runQualityPlacement: 'standalone_midweek' })}
+          onClick={() => setState(prev => ({ ...prev, runQualityPlacement: 'standalone_midweek' }))}
         >
           <span className="block font-semibold">Standalone mid-week intervals</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
@@ -1192,7 +1236,7 @@ function StepTriRunQualityPlacement({
         </ChoiceBtn>
         <ChoiceBtn
           active={state.runQualityPlacement === 'long_run_blend'}
-          onClick={() => setState({ ...state, runQualityPlacement: 'long_run_blend' })}
+          onClick={() => setState(prev => ({ ...prev, runQualityPlacement: 'long_run_blend' }))}
         >
           <span className="block font-semibold">Fold quality into Sunday long</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
@@ -1212,7 +1256,7 @@ function StepTriBikeQualityPlacement({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: {
   state: WizardState;
-  setState: (s: WizardState) => void;
+  setState: WizardSetState;
   onNext: () => void;
   onBack: () => void;
   step: number;
@@ -1264,7 +1308,7 @@ function StepTriBikeQualityPlacement({
 
 function Step6LongDays({
   state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
   const [custom, setCustom] = useState(false);
   const canContinue = !!(state.longRideDay && state.longRunDay);
 
@@ -1320,7 +1364,7 @@ function Step6LongDays({
 
 function Step7Budget({
   state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
@@ -1350,7 +1394,7 @@ function Step7Budget({
 
 function Step8Strength({
   state, setState, onNext, onBack, step, totalSteps, arc,
-}: { state: WizardState; setState: (s: WizardState) => void; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
   const canContinue = state.strengthIncluded !== null &&
     (state.strengthIncluded === false || state.strengthIntent !== null);
 
@@ -1415,7 +1459,7 @@ function Step8Strength({
 function Step9Confirm({
   state, setState, onBack, onConfirm, step, totalSteps, saving, error, arc,
 }: {
-  state: WizardState; setState: (s: WizardState) => void;
+  state: WizardState; setState: WizardSetState;
   onBack: () => void; onConfirm: () => void;
   step: number; totalSteps: number; saving: boolean; error: string | null;
   arc: WizardArcContext | null;
