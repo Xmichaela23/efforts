@@ -5,6 +5,7 @@ import {
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
+import { inferTrainingFitnessLevel } from '../_shared/infer-training-fitness.ts';
 import {
   computeRunPlanningSignals,
   findPostRaceRecoveryContext,
@@ -997,12 +998,9 @@ async function buildCombinedPlan(
     ? recentLoads.reduce((a, b) => a + b, 0) / recentLoads.length
     : 0;
   // Convert load points to approximate CTL (daily TSS equivalent)
-  const currentCTL = avgWeeklyLoad > 0
+  let currentCTL = avgWeeklyLoad > 0
     ? Math.round(Math.min(120, Math.max(15, avgWeeklyLoad / 7)))
     : ({ beginner: 20, intermediate: 40, advanced: 65 }[fitness] ?? 35);
-
-  // Weekly hours estimate from fitness level (can be overridden by actual data later)
-  const weeklyHours = { beginner: 6, intermediate: 10, advanced: 14 }[fitness] ?? 10;
 
   // Normalize distance for the combined plan engine
   function normalizeDistance(sport: string, dist: string | null): string {
@@ -1079,12 +1077,6 @@ async function buildCombinedPlan(
   );
   const hasCableForPlan = hasCableMachine(combinedStrengthEquipment);
   const hasGHDForPlan = hasGHD(combinedStrengthEquipment);
-
-  // base_first always defaults to 2:1 loading (completion-focused, slower recovery).
-  // race_peak defers to fitness level (beginner→2:1, intermediate/advanced→3:1).
-  const loadingPattern = triApproach === 'base_first'
-    ? '2:1'
-    : (fitness === 'beginner' ? '2:1' : '3:1');
 
   const focusForCombined = new Date().toISOString().slice(0, 10);
   const arcForCombined = await getArcContext(supabase, user_id, focusForCombined);
@@ -1370,6 +1362,37 @@ async function buildCombinedPlan(
   });
   console.log('[buildCombinedPlan] generation_trade_offs:', JSON.stringify(generation_trade_offs));
 
+  const trainingFitnessResolution = inferTrainingFitnessLevel({
+    wizardFitnessRaw: fitness,
+    currentCtl: currentCTL,
+    arc: arcForCombined,
+    structuralLoadHint: combinedTransition?.structural_load_hint,
+    trainingIntent:
+      freshCombinedPrefs.training_intent != null ? String(freshCombinedPrefs.training_intent) : undefined,
+  });
+
+  if (recentLoads.length === 0) {
+    currentCTL =
+      { beginner: 20, intermediate: 40, advanced: 65 }[trainingFitnessResolution.level] ?? currentCTL;
+  }
+
+  const weeklyHours =
+    { beginner: 6, intermediate: 10, advanced: 14 }[trainingFitnessResolution.level] ?? 10;
+
+  const loadingPattern =
+    triApproach === 'base_first'
+      ? '2:1'
+      : trainingFitnessResolution.level === 'beginner'
+        ? '2:1'
+        : '3:1';
+
+  console.log(
+    '[buildCombinedPlan] training_fitness:',
+    trainingFitnessResolution.level,
+    trainingFitnessResolution.source,
+    trainingFitnessResolution.reasons.join(', '),
+  );
+
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -1448,6 +1471,7 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.bike_easy_day !== undefined
         ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
         : {}),
+      training_fitness: trainingFitnessResolution.level,
       ...(freshCombinedPrefs.training_intent !== undefined
         ? { training_intent: freshCombinedPrefs.training_intent }
         : {}),
