@@ -1,5 +1,5 @@
 /**
- * ArcSetupWizard — nine-step season setup.
+ * ArcSetupWizard — Arc season setup wizard (races → optional prior race → intent → sport prefs → confirm).
  *
  * Code owns all state and flow. LLM is not involved in navigation or save
  * decisions. Five bounded LLM jobs (intensity classification, coaching note,
@@ -7,14 +7,15 @@
  * triggers with specific outputs — none of them control flow.
  *
  * Step 1  — Races (name, distance, date, A/B)
- * Step 2  — Training intent (performance / completion / first_race)
- * Step 3  — Swim (focus 3× / race-ready 2×)        [tri only]
- * Step 4  — Bike anchors (group ride + solo quality) [tri only]
- * Step 5  — Run anchors (run club + quality run day)
- * Step 6  — Long days (ride + run)                  [tri only]
- * Step 7  — Training budget (days/week)
- * Step 8  — Strength (included + intent)            [tri only]
- * Step 9  — Start date + notes + confirm
+ * Step 2  — Optional prior comparable race (time + continuity — informs calibration & projections)
+ * Step 3  — Training intent (performance / completion / first_race)
+ * Step 4  — Swim (focus 3× / race-ready 2×)        [tri only]
+ * Step 5  — Bike anchors (group ride + solo quality) [tri only]
+ * Step 6  — Run anchors (run club + quality run day)
+ * Step 7  — Long days (ride + run)                  [tri only]
+ * Step 8  — Training budget (days/week)
+ * Step 9  — Strength (included + intent)            [tri only]
+ * Step 10 — Start date + notes + confirm
  */
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +27,7 @@ import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import { loadArcWizardDraft, saveArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
 import { climbNoticeTier, stravaRouteUrlLooksFetchable, formatGroupRideRouteStatsLine } from '@/lib/group-ride-route-snapshot';
+import { parseTimeToSeconds, type RaceDistance } from '@/lib/effort-score';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
 
@@ -232,6 +234,37 @@ function isTri(distance: string) {
   return TRI_DISTANCES.some(d => d.toLowerCase() === distance.toLowerCase());
 }
 
+function mapWizardDistanceToRaceDistance(d: string): RaceDistance | 'tri_clock' {
+  const x = d.toLowerCase().replace(/\s+/g, ' ');
+  if (x === '5k') return '5k';
+  if (x === '10k') return '10k';
+  if (x.includes('half marathon')) return 'half';
+  if (x.includes('marathon')) return 'marathon';
+  return 'tri_clock';
+}
+
+function parseWizardPriorRaceSeconds(distance: string, timeStr: string): number | null {
+  const mode = mapWizardDistanceToRaceDistance(distance);
+  const raw = timeStr.trim();
+  if (!raw) return null;
+  if (mode === 'tri_clock') {
+    const parts = raw.split(':').map((p) => parseInt(p.trim(), 10));
+    if (parts.some((n) => !Number.isFinite(n))) return null;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 3600 + parts[1] * 60;
+    return null;
+  }
+  return parseTimeToSeconds(raw, mode);
+}
+
+function fmtHMS(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 // ─── State shape ─────────────────────────────────────────────────────────────
 
 type WizardRace = {
@@ -288,7 +321,51 @@ type WizardState = {
   planStartDate: string;
   anythingUnusual: string;
   assessmentWeekPreference: 'assessment_first' | 'jump_in' | null;
+  /** Step after races — optional prior comparable race for pacing context */
+  priorRaceSkipped: boolean;
+  /** User chose "I'll add a finish" */
+  priorRaceHasEntry: boolean;
+  priorRaceDistance: string;
+  /** yyyy-mm-dd */
+  priorRaceDate: string;
+  /** Clock finish — hh:mm:ss for triathlon/long races; run shorts may use mm:ss */
+  priorRaceTimeStr: string;
+  priorRaceContinuity: 'steady' | 'spotty' | 'long_break' | null;
 };
+
+function priorSimilarRaceTrainingPrefs(state: WizardState): Record<string, unknown> {
+  if (state.priorRaceSkipped) {
+    return {
+      prior_similar_race: { skipped: true, captured_at: new Date().toISOString() },
+    };
+  }
+  if (!state.priorRaceHasEntry) return {};
+  const sec = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
+  if (sec == null || sec <= 0 || !state.priorRaceDate.trim() || !state.priorRaceContinuity) return {};
+  return {
+    prior_similar_race: {
+      skipped: false,
+      distance: state.priorRaceDistance.trim(),
+      event_date: state.priorRaceDate.trim().slice(0, 10),
+      finish_seconds: sec,
+      continuity: state.priorRaceContinuity,
+      captured_at: new Date().toISOString(),
+    },
+  };
+}
+
+function priorSimilarRaceSummaryLine(state: WizardState): string {
+  if (state.priorRaceSkipped || !state.priorRaceHasEntry) return '';
+  const sec = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
+  if (sec == null || sec <= 0 || !state.priorRaceDate.trim() || !state.priorRaceContinuity) return '';
+  const cont =
+    state.priorRaceContinuity === 'steady'
+      ? 'steady training since'
+      : state.priorRaceContinuity === 'spotty'
+        ? 'spotty training since'
+        : 'long break since';
+  return `Prior ${state.priorRaceDistance} finish ${fmtHMS(sec)} on ${state.priorRaceDate.trim().slice(0, 10)} (${cont}).`;
+}
 
 type WizardSetState = React.Dispatch<React.SetStateAction<WizardState>>;
 
@@ -317,6 +394,12 @@ function blank(): WizardState {
     planStartDate: nextMonday,
     anythingUnusual: '',
     assessmentWeekPreference: null,
+    priorRaceSkipped: true,
+    priorRaceHasEntry: false,
+    priorRaceDistance: '70.3',
+    priorRaceDate: '',
+    priorRaceTimeStr: '',
+    priorRaceContinuity: null,
   };
 }
 
@@ -324,13 +407,29 @@ function blank(): WizardState {
 function hydrateWizardDraft(raw: Record<string, unknown>): WizardState | null {
   if (!Array.isArray(raw.races) || raw.races.length === 0) return null;
   const base = blank();
+  const merged = { ...base, ...raw } as WizardState;
+  const draftHadPriorKeys = 'priorRaceSkipped' in raw || 'priorRaceHasEntry' in raw;
+  const cr =
+    merged.priorRaceContinuity === 'steady' ||
+    merged.priorRaceContinuity === 'spotty' ||
+    merged.priorRaceContinuity === 'long_break'
+      ? merged.priorRaceContinuity
+      : null;
   return {
-    ...base,
-    ...raw,
+    ...merged,
     races: raw.races as WizardRace[],
     groupRideRouteFetching: false,
     groupRideRouteFetchError: null,
-  } as WizardState;
+    priorRaceSkipped: draftHadPriorKeys ? Boolean(merged.priorRaceSkipped) : true,
+    priorRaceHasEntry: draftHadPriorKeys ? Boolean(merged.priorRaceHasEntry) : false,
+    priorRaceDistance:
+      typeof merged.priorRaceDistance === 'string' && merged.priorRaceDistance.trim()
+        ? merged.priorRaceDistance
+        : base.priorRaceDistance,
+    priorRaceDate: typeof merged.priorRaceDate === 'string' ? merged.priorRaceDate : '',
+    priorRaceTimeStr: typeof merged.priorRaceTimeStr === 'string' ? merged.priorRaceTimeStr : '',
+    priorRaceContinuity: cr,
+  };
 }
 
 function readInitialWizard(): { state: WizardState; stepIdx: number } {
@@ -444,6 +543,7 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
   const summary = [
     weeksOut != null ? `${weeksOut} weeks to ${primaryRace?.name || 'race day'}.` : '',
     `${intentLabel.charAt(0).toUpperCase() + intentLabel.slice(1)}.`,
+    priorSimilarRaceSummaryLine(state),
     triPlan && state.swimIntent === 'focus' ? 'Three swims a week (~yardage targets vary by week).' : triPlan && state.swimIntent === 'race' ? 'Two swims a week (~yardage targets vary by week).' : '',
     state.strengthIncluded
       ? state.strengthIntent === 'performance' ? 'Two strength days, co-equal goal.' : 'Strength supports tri.'
@@ -490,6 +590,7 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     ...(triPlan && state.bikeQualityPlacement != null
       ? { bike_quality_placement: state.bikeQualityPlacement }
       : {}),
+    ...priorSimilarRaceTrainingPrefs(state),
   };
 
   const primaryRaceRow = state.races.find((r) => r.priority === 'A') ?? state.races[0]!;
@@ -656,8 +757,8 @@ function StepLayout({
 type RaceInputPhase = 'input' | 'extracting' | 'confirm';
 
 function Step1Races({
-  state, setState, onNext,
-}: { state: WizardState; setState: WizardSetState; onNext: () => void }) {
+  state, setState, onNext, wizardStep, wizardTotalSteps,
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; wizardStep: number; wizardTotalSteps: number }) {
   const [phase, setPhase] = useState<RaceInputPhase>(
     // If races were already extracted (e.g. back-navigation), start at confirm
     state.races.some(r => r.name.trim() && r.targetDate) ? 'confirm' : 'input',
@@ -736,7 +837,7 @@ function Step1Races({
   if (phase === 'input' || phase === 'extracting') {
     return (
       <StepLayout
-        step={1} totalSteps={9}
+        step={wizardStep} totalSteps={wizardTotalSteps}
         title="What does your season look like?"
         subtitle="Describe your race or races — we'll look up the dates and details."
         onContinue={extract}
@@ -775,7 +876,7 @@ function Step1Races({
   // ── Confirm phase ──────────────────────────────────────────────────────────
   return (
     <StepLayout
-      step={1} totalSteps={9}
+      step={wizardStep} totalSteps={wizardTotalSteps}
       title="Do these look right?"
       subtitle="Adjust anything before continuing."
       onContinue={onNext}
@@ -874,6 +975,151 @@ function Step1Races({
   );
 }
 
+function StepPriorRace({
+  state,
+  setState,
+  onNext,
+  onBack,
+  step,
+  totalSteps,
+}: {
+  state: WizardState;
+  setState: WizardSetState;
+  onNext: () => void;
+  onBack: () => void;
+  step: number;
+  totalSteps: number;
+}) {
+  const primary = state.races.find((r) => r.priority === 'A') ?? state.races[0];
+  const primaryDist = primary?.distance?.trim() || '70.3';
+
+  const chooseSkip = () => {
+    setState({
+      ...state,
+      priorRaceSkipped: true,
+      priorRaceHasEntry: false,
+      priorRaceDate: '',
+      priorRaceTimeStr: '',
+      priorRaceContinuity: null,
+    });
+  };
+
+  const chooseAdd = () => {
+    setState({
+      ...state,
+      priorRaceSkipped: false,
+      priorRaceHasEntry: true,
+      priorRaceDistance: state.priorRaceDistance.trim() || primaryDist,
+    });
+  };
+
+  const secOk = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
+  const canContinue =
+    state.priorRaceSkipped ||
+    (state.priorRaceHasEntry &&
+      Boolean(state.priorRaceDistance.trim()) &&
+      Boolean(state.priorRaceDate.trim()) &&
+      secOk != null &&
+      secOk > 0 &&
+      state.priorRaceContinuity != null);
+
+  const triHint =
+    mapWizardDistanceToRaceDistance(state.priorRaceDistance) === 'tri_clock'
+      ? 'Use hh:mm:ss (e.g. 5:42:15) or h:mm for hours + minutes only.'
+      : 'Half / marathon: h:mm or hh:mm:ss. Shorter races: mm:ss.';
+
+  return (
+    <StepLayout
+      step={step}
+      totalSteps={totalSteps}
+      title="Recent comparable race?"
+      subtitle="Optional — a finish at this distance (or close) plus how training has gone since helps calibrate expectations. Skip anytime."
+      onBack={onBack}
+      onContinue={onNext}
+      canContinue={canContinue}
+    >
+      <ArcHint>
+        Strongest signal within ~6 months; still useful up to ~12 months if training stayed steady.
+      </ArcHint>
+
+      <ChoiceBtn active={state.priorRaceSkipped} onClick={chooseSkip}>
+        <span className="block font-semibold text-white">Skip — first time or nothing recent</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">No comparable finish to share — we’ll lean on your logs and baselines.</span>
+      </ChoiceBtn>
+      <ChoiceBtn active={state.priorRaceHasEntry} onClick={chooseAdd}>
+        <span className="block font-semibold text-white">Add a recent finish</span>
+        <span className="block text-[13px] text-white/55 mt-0.5">Same distance or similar event — rough time is fine.</span>
+      </ChoiceBtn>
+
+      {state.priorRaceHasEntry && (
+        <div className="space-y-3 pt-1">
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">Event distance</p>
+            <select
+              value={state.priorRaceDistance}
+              onChange={(e) => setState({ ...state, priorRaceDistance: e.target.value })}
+              className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            >
+              {ALL_DISTANCES.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">Race date</p>
+            <input
+              type="date"
+              value={state.priorRaceDate}
+              onChange={(e) => setState({ ...state, priorRaceDate: e.target.value })}
+              className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">Finish time</p>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="e.g. 5:42:15 or 3:45:30"
+              value={state.priorRaceTimeStr}
+              onChange={(e) => setState({ ...state, priorRaceTimeStr: e.target.value })}
+              className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            />
+            <p className="text-[11px] text-white/35 mt-1">{triHint}</p>
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">Training since that race</p>
+            <div className="flex flex-col gap-2">
+              <ChoiceBtn
+                active={state.priorRaceContinuity === 'steady'}
+                onClick={() => setState({ ...state, priorRaceContinuity: 'steady' })}
+              >
+                <span className="block font-semibold text-white">Pretty steady</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Kept training consistently.</span>
+              </ChoiceBtn>
+              <ChoiceBtn
+                active={state.priorRaceContinuity === 'spotty'}
+                onClick={() => setState({ ...state, priorRaceContinuity: 'spotty' })}
+              >
+                <span className="block font-semibold text-white">On and off</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Some breaks or inconsistent weeks.</span>
+              </ChoiceBtn>
+              <ChoiceBtn
+                active={state.priorRaceContinuity === 'long_break'}
+                onClick={() => setState({ ...state, priorRaceContinuity: 'long_break' })}
+              >
+                <span className="block font-semibold text-white">Long break</span>
+                <span className="block text-[13px] text-white/55 mt-0.5">Months away or mostly inactive.</span>
+              </ChoiceBtn>
+            </div>
+          </div>
+        </div>
+      )}
+    </StepLayout>
+  );
+}
+
 /** Map LLM distance strings to the canonical display values used by the wizard. */
 function normalizeDistance(raw: string): string {
   const s = raw.toLowerCase().trim();
@@ -889,14 +1135,15 @@ function normalizeDistance(raw: string): string {
 }
 
 function Step2Intent({
-  state, setState, onNext, onBack,
-}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void }) {
+  state, setState, onNext, onBack, step, totalSteps,
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
   const raceName = primaryRace?.name || 'your race';
 
   return (
     <StepLayout
-      step={2} totalSteps={9}
+      step={step}
+      totalSteps={totalSteps}
       title={`What's the goal for ${raceName}?`}
       onBack={onBack} onContinue={onNext} canContinue={state.trainingIntent !== null}
     >
@@ -1801,7 +2048,7 @@ function ConflictCard({
 function getSteps(state: WizardState) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
   const tri = isTri(primaryRace?.distance || '70.3');
-  const steps = ['races', 'intent'];
+  const steps = ['races', 'prior_race', 'intent'];
   if (tri) steps.push('swim', 'bike');
   const showRunPlacement =
     tri &&
@@ -1945,10 +2192,13 @@ export default function ArcSetupWizard() {
         ) : (
           <>
             {currentStep === 'races' && (
-              <Step1Races {...sharedProps} onNext={next} />
+              <Step1Races {...sharedProps} onNext={next} wizardStep={visualStep} wizardTotalSteps={totalSteps} />
+            )}
+            {currentStep === 'prior_race' && (
+              <StepPriorRace {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'intent' && (
-              <Step2Intent {...sharedProps} onNext={next} onBack={back} />
+              <Step2Intent {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'swim' && (
               <Step3Swim {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />

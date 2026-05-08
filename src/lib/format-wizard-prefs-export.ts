@@ -86,6 +86,7 @@ const KEY_ORDER = [
   'days_per_week',
   'strength_frequency',
   'preferred_days',
+  'prior_similar_race',
   'swim_intent',
   'swim_experience',
   'strength_intent',
@@ -98,6 +99,20 @@ const KEY_ORDER = [
   'combine',
   'notes',
 ] as const;
+
+function fmtRaceClock(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.round(sec % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+const PRIOR_CONTINUITY_LABELS: Record<string, string> = {
+  steady: 'steady training since',
+  spotty: 'on/off training since',
+  long_break: 'long break since',
+};
 
 /**
  * Builds markdown bullet lines from a linked goal row (wizard preferences live in training_prefs).
@@ -152,6 +167,23 @@ export function formatWizardPrefsMarkdownLines(goal: {
       if (sub.length) {
         out.push(`- **Preferred days:**`);
         sub.forEach((l) => out.push(l));
+      }
+      continue;
+    }
+    if (key === 'prior_similar_race') {
+      used.add(key);
+      const p = val as Record<string, unknown>;
+      if (p?.skipped === true) {
+        out.push('- **Prior comparable race:** Not provided');
+        continue;
+      }
+      const dist = String(p?.distance ?? '').trim();
+      const dt = String(p?.event_date ?? '').trim();
+      const sec = Number(p?.finish_seconds);
+      const cont = String(p?.continuity ?? '');
+      const contHuman = PRIOR_CONTINUITY_LABELS[cont] ?? cont;
+      if (dist && dt && Number.isFinite(sec) && sec > 0) {
+        out.push(`- **Prior comparable race:** ${dist} — ${fmtRaceClock(sec)} on ${dt} (${contHuman})`);
       }
       continue;
     }
