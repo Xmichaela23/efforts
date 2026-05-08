@@ -348,14 +348,15 @@ export function swimGearLabelForDisplay(raw: string): string {
 }
 
 /**
- * Pool gear for planned swim rows: drill-token requirements + materializer `swim_equipment_suggested`
- * + explicit `computed.steps[].equipment` (so threshold/CSS sessions still show chips).
+ * Pool gear for planned swim rows: drill-token requirements + materializer tag-derived hints
+ * + explicit step.equipment. Does NOT mirror athlete baseline inventory (that's Training Baselines, not prescription).
  */
 export function swimPlannedEquipmentFromWorkout(workout: {
   type?: string;
   steps_preset?: unknown[];
   computed?: {
     swim_equipment_suggested?: string[];
+    swim_equipment_optional_suggested?: string[];
     steps?: Array<{ equipment?: string; kind?: string }>;
   };
 }): DrillEquipment | null {
@@ -389,6 +390,11 @@ export function swimPlannedEquipmentFromWorkout(workout: {
   const suggested = workout?.computed?.swim_equipment_suggested;
   if (Array.isArray(suggested)) {
     for (const x of suggested) addRequired(String(x));
+  }
+
+  const suggestedOpt = workout?.computed?.swim_equipment_optional_suggested;
+  if (Array.isArray(suggestedOpt)) {
+    for (const x of suggestedOpt) addOptional(String(x));
   }
 
   const steps = workout?.computed?.steps;

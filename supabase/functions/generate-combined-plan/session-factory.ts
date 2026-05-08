@@ -832,6 +832,7 @@ export function pullFocusedSwim(
   const gearLine = `Pool gear — pull buoy required. ${paddlesNote}Keep core engaged so hips do not sag.`;
 
   const tags: string[] = ['quality', 'pull_focus_swim', 'swim', 'moderate', 'req:buoy'];
+  if (athleteFitness !== 'beginner') tags.push('optional:paddles');
 
   const pullCopy = `${pullReps}×100 yd pull with buoy at moderate aerobic rhythm (Z3; sustainable steady turnover). 20 sec rest — high-elbow catch feel without kicking.`;
   const integrateCopy =

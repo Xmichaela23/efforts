@@ -1311,54 +1311,49 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   return out;
 }
 
-/** Tags + session copy + pool baseline gear → structured hints for Garmin / UI (never blocked by empty tags). */
-function inferSwimEquipmentPack(
-  row: any,
-  baselines: Baselines,
-): { sessionEquip: string | null; suggested: string[] } {
-  const suggested: string[] = [];
-  const add = (s: string) => {
-    if (!suggested.includes(s)) suggested.push(s);
+/** Session gear hints from planner tags only (`req:*`, `optional:*`). Never mirrors athlete baseline inventory — that caused bogus full gear lists on CSS/threshold/easy swims. */
+function inferSwimEquipmentPack(row: any): {
+  suggestedRequired: string[];
+  suggestedOptional: string[];
+} {
+  const required: string[] = [];
+  const optional: string[] = [];
+  const addR = (s: string) => {
+    if (!required.includes(s)) required.push(s);
+  };
+  const addO = (s: string) => {
+    const lr = s.toLowerCase();
+    if (required.some((x) => x.toLowerCase() === lr)) return;
+    if (!optional.includes(s)) optional.push(s);
   };
   try {
     const tags: string[] = Array.isArray((row as any)?.tags)
       ? (row as any).tags.map((t: any) => String(t).toLowerCase())
       : [];
-    const desc = String((row as any)?.description || '').toLowerCase();
-    const name = String((row as any)?.name || '').toLowerCase();
-    const blob = `${desc} ${name}`;
 
     for (const t of tags) {
-      if (/req:board|req:kickboard|\bkickboard\b/.test(t)) add('board');
-      if (/req:fins|\bfins\b/.test(t)) add('fins');
-      if (/req:buoy|\bbuoy\b/.test(t)) add('buoy');
-      if (/req:snorkel|\bsnorkel\b/.test(t)) add('snorkel');
-      if (/req:paddles|\bpaddles\b/.test(t)) add('paddles');
-    }
-
-    if (/\bkick\s*board\b|\bkickboard\b|\bwith\s+board\b/.test(blob)) add('board');
-    if (/\bfins\b/.test(blob)) add('fins');
-    if (/\bpull\s+buoy\b/.test(blob)) add('buoy');
-    else if (/\bbuoy\b/.test(blob)) add('buoy');
-    if (/\bsnorkel\b/.test(blob)) add('snorkel');
-    if (/\bpaddles\b/.test(blob)) add('paddles');
-
-    const swArr = baselines?.equipment?.swimming;
-    if (Array.isArray(swArr)) {
-      for (const raw of swArr) {
-        const x = String(raw).toLowerCase();
-        if (/pull|buoy/.test(x)) add('buoy');
-        else if (/fin/.test(x)) add('fins');
-        else if (/kick|board/.test(x)) add('board');
-        else if (/snorkel/.test(x)) add('snorkel');
-        else if (/paddle/.test(x)) add('paddles');
-        else if (/goggle/.test(x)) add('goggles');
+      if (t === 'optional:paddles') {
+        addO('paddles');
+        continue;
       }
+      if (t === 'optional:snorkel') {
+        addO('snorkel');
+        continue;
+      }
+      if (t === 'optional:fins') {
+        addO('fins');
+        continue;
+      }
+      if (/req:board|req:kickboard/.test(t)) addR('board');
+      if (/req:fins/.test(t)) addR('fins');
+      if (/req:buoy/.test(t)) addR('buoy');
+      if (/req:snorkel/.test(t)) addR('snorkel');
+      if (/req:paddles/.test(t)) addR('paddles');
     }
 
-    return { sessionEquip: suggested.length ? suggested[0]! : null, suggested };
+    return { suggestedRequired: required, suggestedOptional: optional };
   } catch {
-    return { sessionEquip: null, suggested: [] };
+    return { suggestedRequired: [], suggestedOptional: [] };
   }
 }
 
@@ -1368,14 +1363,15 @@ function expandTokensForRow(
   adjustments: PlanAdjustment[] = [],
   strengthIntent: StrengthIntentMat = null,
   planWeekNumber: number | null = null,
-): { steps: any[]; total_s: number; swim_equipment_suggested?: string[] } {
+): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
   const workoutDate = row?.date || new Date().toISOString().split('T')[0];
   const steps: any[] = [];
   const swimEquipPack =
-    discipline === 'swim' ? inferSwimEquipmentPack(row, baselines) : { sessionEquip: null as string | null, suggested: [] as string[] };
-  const sessionEquip = swimEquipPack.sessionEquip;
+    discipline === 'swim'
+      ? inferSwimEquipmentPack(row)
+      : { suggestedRequired: [] as string[], suggestedOptional: [] as string[] };
 
   // Early path: Strength without tokens → expand from strength_exercises so computed is written
   if (discipline === 'strength' && tokens.length === 0) {
@@ -1785,7 +1781,7 @@ function expandTokensForRow(
         const dist=parseInt(m[3],10); 
         const unit=m[4]; 
         const rest=parseInt(m[5]||'0',10); 
-        const eq=m[6]|| sessionEquip || (kind==='pull'?'buoy': (kind==='kick'?'board':null)); 
+        const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null)); 
         const distM=unit==='yd'? ydToM(dist):dist; 
         console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${eq}`);
         for(let i=0;i<reps;i++){ 
@@ -2025,23 +2021,12 @@ function expandTokensForRow(
     } catch {}
   }
 
-  if (discipline === 'swim' && sessionEquip) {
-    for (const st of steps) {
-      const k = String((st as any)?.kind || '').toLowerCase();
-      if ((k === 'work' || k === 'drill') && !(st as any).equipment) {
-        const lbl = String((st as any)?.label || '').toLowerCase();
-        // CSS aerobic 100s: pacing/splits focus — never inherit baseline pool gear onto every repeat
-        // (would read as “14×100 with paddles” and overload shoulders).
-        if (k === 'work' && lbl === 'css') continue;
-        (st as any).equipment = sessionEquip;
-      }
-    }
-  }
-
   const total_s = steps.reduce((s,st)=> s + (Number(st.duration_s)||0), 0);
   const swim_equipment_suggested =
-    discipline === 'swim' && swimEquipPack.suggested.length ? swimEquipPack.suggested : undefined;
-  return { steps, total_s, swim_equipment_suggested };
+    discipline === 'swim' && swimEquipPack.suggestedRequired.length ? swimEquipPack.suggestedRequired : undefined;
+  const swim_equipment_optional_suggested =
+    discipline === 'swim' && swimEquipPack.suggestedOptional.length ? swimEquipPack.suggestedOptional : undefined;
+  return { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested };
 }
 
 Deno.env.get; // keep Deno type active
@@ -2427,7 +2412,7 @@ Deno.serve(async (req) => {
           typeof row?.week_number === 'number' && Number.isFinite(row.week_number)
             ? row.week_number
             : null;
-        const { steps, total_s, swim_equipment_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum);
+        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist
@@ -2459,6 +2444,9 @@ Deno.serve(async (req) => {
               total_duration_seconds: finalTotalSeconds,
               ...(Array.isArray(swim_equipment_suggested) && swim_equipment_suggested.length > 0
                 ? { swim_equipment_suggested }
+                : {}),
+              ...(Array.isArray(swim_equipment_optional_suggested) && swim_equipment_optional_suggested.length > 0
+                ? { swim_equipment_optional_suggested }
                 : {}),
             },
             total_duration_seconds: finalTotalSeconds,
