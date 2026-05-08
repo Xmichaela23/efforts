@@ -5,7 +5,7 @@ import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
-import { swimDrillEquipmentFromTokens } from '@/lib/plan-tokens/swim-drill-tokens';
+import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -657,17 +657,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const workoutType = String(workout.type || workout.workout_type || '').toLowerCase();
   const disciplineColor = getDisciplinePhosphorCore(workoutType);
 
-  const swimEquipment = (() => {
-    if (workoutType !== 'swim') return null;
-    const toks: string[] = Array.isArray((workout as any)?.steps_preset)
-      ? (workout as any).steps_preset.map((t: unknown) => String(t))
-      : [];
-    const drillToks = toks.filter((t) => t.startsWith('swim_drills_'));
-    if (!drillToks.length) return null;
-    const eq = swimDrillEquipmentFromTokens(drillToks);
-    if (!eq.required.length && !eq.optional.length) return null;
-    return eq;
-  })();
+  const swimEquipment =
+    workoutType === 'swim' ? swimPlannedEquipmentFromWorkout(workout as any) : null;
   
   return (
     <div className="flex items-start justify-between gap-3">

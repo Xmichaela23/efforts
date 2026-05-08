@@ -1311,36 +1311,71 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   return out;
 }
 
+/** Tags + session copy + pool baseline gear → structured hints for Garmin / UI (never blocked by empty tags). */
+function inferSwimEquipmentPack(
+  row: any,
+  baselines: Baselines,
+): { sessionEquip: string | null; suggested: string[] } {
+  const suggested: string[] = [];
+  const add = (s: string) => {
+    if (!suggested.includes(s)) suggested.push(s);
+  };
+  try {
+    const tags: string[] = Array.isArray((row as any)?.tags)
+      ? (row as any).tags.map((t: any) => String(t).toLowerCase())
+      : [];
+    const desc = String((row as any)?.description || '').toLowerCase();
+    const name = String((row as any)?.name || '').toLowerCase();
+    const blob = `${desc} ${name}`;
+
+    for (const t of tags) {
+      if (/req:board|req:kickboard|\bkickboard\b/.test(t)) add('board');
+      if (/req:fins|\bfins\b/.test(t)) add('fins');
+      if (/req:buoy|\bbuoy\b/.test(t)) add('buoy');
+      if (/req:snorkel|\bsnorkel\b/.test(t)) add('snorkel');
+      if (/req:paddles|\bpaddles\b/.test(t)) add('paddles');
+    }
+
+    if (/\bkick\s*board\b|\bkickboard\b|\bwith\s+board\b/.test(blob)) add('board');
+    if (/\bfins\b/.test(blob)) add('fins');
+    if (/\bpull\s+buoy\b/.test(blob)) add('buoy');
+    else if (/\bbuoy\b/.test(blob)) add('buoy');
+    if (/\bsnorkel\b/.test(blob)) add('snorkel');
+    if (/\bpaddles\b/.test(blob)) add('paddles');
+
+    const swArr = baselines?.equipment?.swimming;
+    if (Array.isArray(swArr)) {
+      for (const raw of swArr) {
+        const x = String(raw).toLowerCase();
+        if (/pull|buoy/.test(x)) add('buoy');
+        else if (/fin/.test(x)) add('fins');
+        else if (/kick|board/.test(x)) add('board');
+        else if (/snorkel/.test(x)) add('snorkel');
+        else if (/paddle/.test(x)) add('paddles');
+        else if (/goggle/.test(x)) add('goggles');
+      }
+    }
+
+    return { sessionEquip: suggested.length ? suggested[0]! : null, suggested };
+  } catch {
+    return { sessionEquip: null, suggested: [] };
+  }
+}
+
 function expandTokensForRow(
   row: any,
   baselines: Baselines,
   adjustments: PlanAdjustment[] = [],
   strengthIntent: StrengthIntentMat = null,
   planWeekNumber: number | null = null,
-): { steps: any[]; total_s: number } {
+): { steps: any[]; total_s: number; swim_equipment_suggested?: string[] } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   const discipline = String(row?.type||'').toLowerCase();
   const workoutDate = row?.date || new Date().toISOString().split('T')[0];
   const steps: any[] = [];
-  // Infer session-level swim equipment from tags (e.g., req:board, req:fins, req:buoy, req:snorkel)
-  const inferEquipFromTagsOrDesc = (): string | null => {
-    try {
-      const tags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t:any)=>String(t).toLowerCase()) : [];
-      const desc: string = String((row as any)?.description || '').toLowerCase();
-      if (!tags.length) return null;
-      if (tags.some(t=>/req:board|\bboard\b/.test(t))) return 'board';
-      if (tags.some(t=>/req:fins|\bfins\b/.test(t))) return 'fins';
-      if (tags.some(t=>/req:buoy|\bbuoy\b/.test(t))) return 'buoy';
-      if (tags.some(t=>/req:snorkel|\bsnorkel\b/.test(t))) return 'snorkel';
-      // Fallback: infer from description keywords
-      if (/\bwith\s+board\b|\bkick\s+board\b/.test(desc)) return 'board';
-      if (/\bfins\b/.test(desc)) return 'fins';
-      if (/\bpull\s+buoy\b|\bbuoy\b/.test(desc)) return 'buoy';
-      if (/\bsnorkel\b/.test(desc)) return 'snorkel';
-      return null;
-    } catch { return null }
-  };
-  const sessionEquip = inferEquipFromTagsOrDesc();
+  const swimEquipPack =
+    discipline === 'swim' ? inferSwimEquipmentPack(row, baselines) : { sessionEquip: null as string | null, suggested: [] as string[] };
+  const sessionEquip = swimEquipPack.sessionEquip;
 
   // Early path: Strength without tokens → expand from strength_exercises so computed is written
   if (discipline === 'strength' && tokens.length === 0) {
@@ -1989,9 +2024,20 @@ function expandTokensForRow(
       }
     } catch {}
   }
-  
+
+  if (discipline === 'swim' && sessionEquip) {
+    for (const st of steps) {
+      const k = String((st as any)?.kind || '').toLowerCase();
+      if ((k === 'work' || k === 'drill') && !(st as any).equipment) {
+        (st as any).equipment = sessionEquip;
+      }
+    }
+  }
+
   const total_s = steps.reduce((s,st)=> s + (Number(st.duration_s)||0), 0);
-  return { steps, total_s };
+  const swim_equipment_suggested =
+    discipline === 'swim' && swimEquipPack.suggested.length ? swimEquipPack.suggested : undefined;
+  return { steps, total_s, swim_equipment_suggested };
 }
 
 Deno.env.get; // keep Deno type active
@@ -2362,7 +2408,11 @@ Deno.serve(async (req) => {
             const originalDuration = typeof row.duration === 'number' && row.duration > 0 ? row.duration : 0;
             const finalTotalSeconds = actualTotal > 0 ? actualTotal : (originalDuration * 60);
             const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
-            const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds }, total_duration_seconds: finalTotalSeconds, duration: Math.max(1, finalDuration) };
+            const update: any = {
+              computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds },
+              total_duration_seconds: finalTotalSeconds,
+              duration: Math.max(1, finalDuration),
+            };
             await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
             count++;
             continue;
@@ -2373,7 +2423,7 @@ Deno.serve(async (req) => {
           typeof row?.week_number === 'number' && Number.isFinite(row.week_number)
             ? row.week_number
             : null;
-        const { steps, total_s } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum);
+        const { steps, total_s, swim_equipment_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist
@@ -2398,7 +2448,18 @@ Deno.serve(async (req) => {
           const originalDuration = typeof row.duration === 'number' && row.duration > 0 ? row.duration : 0;
           const finalTotalSeconds = actualTotal > 0 ? actualTotal : (originalDuration * 60);
           const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
-          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds }, total_duration_seconds: finalTotalSeconds, duration: Math.max(1, finalDuration) };
+          const update: any = {
+            computed: {
+              normalization_version: 'v3',
+              steps: v3,
+              total_duration_seconds: finalTotalSeconds,
+              ...(Array.isArray(swim_equipment_suggested) && swim_equipment_suggested.length > 0
+                ? { swim_equipment_suggested }
+                : {}),
+            },
+            total_duration_seconds: finalTotalSeconds,
+            duration: Math.max(1, finalDuration),
+          };
           
           // Update race day description to match actual pace used in computed steps
           const isRaceDay = (() => {

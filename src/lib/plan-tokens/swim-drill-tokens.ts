@@ -334,6 +334,79 @@ export function swimDrillEquipmentFromTokens(tokens: string[]): DrillEquipment {
   return { required: [...required], optional: [...optional] };
 }
 
+/** Normalize token / baseline key / step.equipment to a single display chip label (dedupe by lowercase). */
+export function swimGearLabelForDisplay(raw: string): string {
+  const t = String(raw).trim().toLowerCase();
+  if (!t || t === 'none') return '';
+  if (t === 'buoy' || t === 'pull buoy' || (t.includes('pull') && t.includes('buoy'))) return 'Pull buoy';
+  if (t === 'board' || t === 'kickboard' || t.includes('kickboard')) return 'Kickboard';
+  if (t === 'fins' || /\bfins?\b/.test(t)) return 'Fins';
+  if (t.includes('snorkel')) return 'Snorkel';
+  if (t.includes('paddle')) return 'Paddles';
+  if (t.includes('goggle')) return 'Goggles';
+  return String(raw).trim();
+}
+
+/**
+ * Pool gear for planned swim rows: drill-token requirements + materializer `swim_equipment_suggested`
+ * + explicit `computed.steps[].equipment` (so threshold/CSS sessions still show chips).
+ */
+export function swimPlannedEquipmentFromWorkout(workout: {
+  type?: string;
+  steps_preset?: unknown[];
+  computed?: {
+    swim_equipment_suggested?: string[];
+    steps?: Array<{ equipment?: string; kind?: string }>;
+  };
+}): DrillEquipment | null {
+  const workoutType = String(workout?.type ?? '').toLowerCase();
+  if (workoutType !== 'swim') return null;
+
+  const requiredByKey = new Map<string, string>();
+  const optionalByKey = new Map<string, string>();
+
+  const addRequired = (raw: string) => {
+    const label = swimGearLabelForDisplay(raw);
+    if (!label) return;
+    requiredByKey.set(label.toLowerCase(), label);
+  };
+  const addOptional = (raw: string) => {
+    const label = swimGearLabelForDisplay(raw);
+    if (!label) return;
+    const k = label.toLowerCase();
+    if (requiredByKey.has(k)) return;
+    optionalByKey.set(k, label);
+  };
+
+  const toks: string[] = Array.isArray(workout?.steps_preset)
+    ? workout.steps_preset.map((t: unknown) => String(t))
+    : [];
+  const drillToks = toks.filter((t) => t.startsWith('swim_drills_'));
+  const drillEq = swimDrillEquipmentFromTokens(drillToks);
+  for (const r of drillEq.required) addRequired(r);
+  for (const o of drillEq.optional) addOptional(o);
+
+  const suggested = workout?.computed?.swim_equipment_suggested;
+  if (Array.isArray(suggested)) {
+    for (const x of suggested) addRequired(String(x));
+  }
+
+  const steps = workout?.computed?.steps;
+  if (Array.isArray(steps)) {
+    for (const st of steps) {
+      const kind = String(st?.kind ?? '').toLowerCase();
+      if (kind !== 'work' && kind !== 'drill') continue;
+      const eq = st?.equipment;
+      if (typeof eq === 'string' && eq.trim()) addRequired(eq);
+    }
+  }
+
+  const required = [...requiredByKey.values()];
+  const optional = [...optionalByKey.values()];
+  if (!required.length && !optional.length) return null;
+  return { required, optional };
+}
+
 /**
  * Deterministic drill selection for plan weeks (no randomness in edge).
  * @param planWeek 1-based week index from buildWeek
