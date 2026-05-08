@@ -61,6 +61,7 @@ import {
   type SameDayCompatContext,
 } from '../_shared/schedule-session-constraints.ts';
 import { blockForWeek } from './phase-structure.ts';
+import { tryApplyScheduleCollisionsToGrid } from './apply-schedule-collisions.ts';
 
 /**
  * Timeline rows are one week each (`pushBlockRange`: startWeek === endWeek). Using
@@ -1951,10 +1952,17 @@ export function buildWeek(
     }
   }
 
+  // ── Coarse pillar collision pass (optimizer doctrine); mutates session days in grid ──
+  const mergedTradeOffs = [...swimVolTradeOffs, ...week8020TradeOffs, ...qrLbTradeOffStrings];
+  tryApplyScheduleCollisionsToGrid(grid, {
+    weekNum,
+    conflictEvents,
+    weekTradeOffs: mergedTradeOffs,
+  });
+
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 
   const allSessions = gridSessions(grid);
-  const mergedTradeOffs = [...swimVolTradeOffs, ...week8020TradeOffs, ...qrLbTradeOffStrings];
   return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs, conflictEvents);
 }
 
