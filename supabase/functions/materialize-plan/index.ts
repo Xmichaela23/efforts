@@ -2029,6 +2029,10 @@ function expandTokensForRow(
     for (const st of steps) {
       const k = String((st as any)?.kind || '').toLowerCase();
       if ((k === 'work' || k === 'drill') && !(st as any).equipment) {
+        const lbl = String((st as any)?.label || '').toLowerCase();
+        // CSS aerobic 100s: pacing/splits focus — never inherit baseline pool gear onto every repeat
+        // (would read as “14×100 with paddles” and overload shoulders).
+        if (k === 'work' && lbl === 'css') continue;
         (st as any).equipment = sessionEquip;
       }
     }

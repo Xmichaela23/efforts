@@ -644,8 +644,8 @@ export function cssAerobicSwim(
     ? `Race-Specific Aerobic Swim — ${totalYards} yd`
     : `CSS Aerobic Swim — ${totalYards} yd`;
   const mainSet = raceSupport
-    ? `${reps}×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare.`
-    : `${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits.`;
+    ? `${reps}×100 yd at sustainable race-swim rhythm (15 sec rest). Where the lane allows, merge into longer unbroken 200–400 yd pieces. Sight every 6–8 strokes; practice breathing to both sides for chop or sun glare. Swim these repeats hands-only by default; paddles optional for a few repeats only if shoulders feel good—not the entire main set.`
+    : `${reps}×100 yd at comfortable CSS pace (15 sec rest — sustainable, not maximal). Focus on consistent splits. Hands-only by default; paddles optional for occasional repeats only (not the full set)—protects shoulders on high-volume CSS blocks.`;
   return session(
     day, 'swim',
     name,
