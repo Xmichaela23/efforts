@@ -21,6 +21,7 @@ import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
+import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -1607,9 +1608,28 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     return String(a?.name || '').localeCompare(String(b?.name || ''));
   };
 
-  // Export selected plan to Markdown (all weeks)
-  const exportPlanToMarkdown = (plan: any) => {
+  // Export selected plan to Markdown (all weeks); includes Arc wizard prefs from linked goal when present.
+  const exportPlanToMarkdown = async (plan: any) => {
     if (!plan) return;
+
+    let wizardMdLines: string[] = [];
+    try {
+      const gid = plan.goal_id;
+      if (gid && typeof gid === 'string') {
+        const { data: goal } = await supabase
+          .from('goals')
+          .select('name, distance, target_date, priority, sport, training_prefs, notes')
+          .eq('id', gid)
+          .maybeSingle();
+        if (goal) wizardMdLines = formatWizardPrefsMarkdownLines(goal as any);
+      }
+      if (!wizardMdLines.length) {
+        wizardMdLines = formatPlanConfigPrefsMarkdownLines(plan.config);
+      }
+    } catch {
+      wizardMdLines = formatPlanConfigPrefsMarkdownLines(plan.config);
+    }
+
     const fmtHM = (m: number) => {
       const h = Math.floor((m || 0) / 60);
       const md = (m || 0) % 60;
@@ -1640,6 +1660,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const duration = plan.duration || plan.duration_weeks || (plan.weeks ? plan.weeks.length : undefined);
       if (duration) lines.push(`**Duration:** ${duration} weeks\n`);
     }
+
+    if (wizardMdLines.length) {
+      lines.push('## Athlete preferences (Arc / wizard)');
+      lines.push('');
+      wizardMdLines.forEach((ln) => lines.push(ln));
+      lines.push('');
+    }
+
     lines.push('---');
     lines.push('');
 
@@ -1803,7 +1831,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return null;
             })()}
 
-            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden sm:block px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm">
+            <button
+              type="button"
+              onClick={() => void exportPlanToMarkdown(selectedPlanDetail)}
+              className="hidden sm:block px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm"
+            >
               Download
             </button>
             <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="px-3 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-md border border-white/20 text-white/80 hover:bg-white/[0.12] hover:text-white transition-colors text-sm sm:hidden">
