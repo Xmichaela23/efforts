@@ -2182,7 +2182,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
     const payload = await req.json();
-    const planId: string | null = payload?.plan_id ?? null;
+    // adapt-plan and some callers send `training_plan_id`; activate-plan uses `plan_id`.
+    const planId: string | null = payload?.plan_id ?? payload?.training_plan_id ?? null;
     const plannedRowId: string | null = payload?.planned_workout_id ?? null;
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
