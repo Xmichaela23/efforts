@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
+import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 
 type StructuredPlannedViewProps = {
   workout: any;
@@ -387,7 +388,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Legacy swim fallback removed: rely on computed.v3 exclusively
   let handledByComputed = lines.length > 0;
-  let totalYdFromComputed: number | undefined = undefined;
   let totalYdFromStruct: number | undefined = undefined;
   // Brick session: render stacked segments
   if (!handledByComputed && type==='brick_session') {
@@ -667,10 +667,19 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
                 return name;
               }
             }
+            if (t === 'swim') return plannedSwimSessionLabel(workout as any);
             return String(ws?.title || (workout as any)?.title || (workout as any)?.name || '') || 'Planned';
           })()}</div>
           <div className="text-sm text-gray-500 flex items-center gap-3">
-            {parentDisc==='swim' && ((typeof totalYdFromComputed==='number' && totalYdFromComputed>0) || (typeof totalYdFromStruct==='number' && totalYdFromStruct>0)) ? <span>{`${(totalYdFromComputed||0)+(totalYdFromStruct||0)} yd`}</span> : null}
+            {(() => {
+              if (parentDisc !== 'swim') return null;
+              const chip = formatPlannedSwimDistanceChip(workout as any);
+              if (chip) return <span>{chip}</span>;
+              if (typeof totalYdFromStruct === 'number' && totalYdFromStruct > 0) {
+                return <span>{`${Math.round(totalYdFromStruct)} yd`}</span>;
+              }
+              return null;
+            })()}
             {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}
           </div>
         </div>

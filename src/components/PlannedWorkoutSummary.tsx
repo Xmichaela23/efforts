@@ -9,6 +9,7 @@ import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-to
 import {
   categorizeSwimTokensForDisplay,
   formatSwimSubtitleFromBuckets,
+  stripTrailingSwimDistanceFromTitle,
   sumSwimYardsFromStepsPresetTokens,
 } from '@/utils/swimPlanTokens';
 
@@ -55,8 +56,13 @@ function getTitle(workout: any): string {
     return nm || 'Run';
   }
   if (t === 'swim') {
-    if (tags.includes('opt_kind:technique') || /drills|technique/.test(lower)) return 'Swim — Technique';
-    return nm || 'Swim — Endurance';
+    const wsTit = String((workout as any)?.workout_structure?.title || '').trim();
+    const primary = wsTit || nm;
+    const base = stripTrailingSwimDistanceFromTitle(primary);
+    if (tags.includes('opt_kind:technique') || /drills|technique/.test(lower)) {
+      return base || 'Swim — Technique';
+    }
+    return base || 'Swim — Endurance';
   }
   if (t === 'strength') return nm || 'Strength';
   if (t === 'mobility') return nm || 'Mobility';

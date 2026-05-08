@@ -8,6 +8,7 @@ import { Calendar, Clock, Dumbbell, Activity, X } from 'lucide-react';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
+import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
@@ -1481,8 +1482,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     return 'Ride';
                   }
                   if (type === 'swim') {
-                    if (/drill|technique|swim_drills_|swim_technique_/.test(desc)) return 'Swim — Drills';
-                    return 'Swim';
+                    const joined = steps.join(' ').toLowerCase();
+                    const label = plannedSwimSessionLabel(workout as any);
+                    const drillLike = /drill|technique|swim_drills_|swim_technique_/.test(desc + joined);
+                    if (drillLike && !/drill|technique/i.test(label)) return 'Swim — Drills';
+                    return label;
                   }
                   if (type === 'pilates_yoga') {
                     const nameLower = String(workout.name || '').toLowerCase();
@@ -1600,15 +1604,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       {/* Right side: planned duration OR import attribution (completed) */}
                       {isPlannedRow ? (() => {
                         const sec = resolveMovingSeconds(workout);
-                        if (Number.isFinite(sec as any) && (sec as number) > 0) {
-                          const mins = Math.round((sec as number) / 60);
-                          return (
-                            <span className="text-xs font-light tabular-nums" style={{ color: 'rgba(255,255,255,0.70)' }}>
-                              {mins}:00
-                            </span>
-                          );
-                        }
-                        return null;
+                        const swimChip =
+                          String(workout.type || '').toLowerCase() === 'swim'
+                            ? formatPlannedSwimDistanceChip(workout as any)
+                            : null;
+                        const durOk = Number.isFinite(sec as any) && (sec as number) > 0;
+                        if (!durOk && !swimChip) return null;
+                        const mins = durOk ? Math.round((sec as number) / 60) : null;
+                        return (
+                          <span
+                            className="flex items-center gap-2 text-xs font-light tabular-nums flex-shrink-0"
+                            style={{ color: 'rgba(255,255,255,0.70)' }}
+                          >
+                            {mins != null ? <span>{mins}:00</span> : null}
+                            {swimChip ? (
+                              <span className="rounded-md border border-blue-400/35 bg-blue-500/18 px-2 py-0.5 text-[11px] text-blue-200/95">
+                                {swimChip}
+                              </span>
+                            ) : null}
+                          </span>
+                        );
                       })() : showImportAttribution ? (
                         <div
                           className="flex items-center gap-1.5 flex-shrink-0"
