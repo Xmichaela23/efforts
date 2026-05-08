@@ -418,16 +418,9 @@ export function resolveSwimSlotYardsWithBudget(opts: {
   const anchorSlots = opts.swim_anchor_slot_count ?? 0;
   const protectAllSlots = templates.length > 0 && anchorSlots >= templates.length;
 
-  /** Single summary line per week (avoid stacked duplicate copy in schedule adjustments UI). */
-  let pinnedBudgetRaiseTotalYd = 0;
-  const accumulatePinnedRaise = (deficitYd: number): void => {
-    if (deficitYd > 0) pinnedBudgetRaiseTotalYd += deficitYd;
-  };
-
   if (protectAllSlots) {
     const floorSum = sum(floorsFor());
     if (floorSum > swimBudgetYards) {
-      accumulatePinnedRaise(floorSum - swimBudgetYards);
       swimBudgetYards = floorSum;
     }
   }
@@ -440,7 +433,6 @@ export function resolveSwimSlotYardsWithBudget(opts: {
     if (protectAllSlots) {
       const total = sum(yards);
       if (total > swimBudgetYards) {
-        accumulatePinnedRaise(total - swimBudgetYards);
         swimBudgetYards = total;
       }
       break;
@@ -466,12 +458,6 @@ export function resolveSwimSlotYardsWithBudget(opts: {
       `Swim "${droppedType}" dropped — weekly swim yard budget could not satisfy protocol floors after discretionary scaling (lower-priority slot removed).`,
     );
     clampAll();
-  }
-
-  if (pinnedBudgetRaiseTotalYd > 0 && anchorSlots > 0) {
-    tradeOffs.push(
-      `Swim budget raised by ${Math.round(pinnedBudgetRaiseTotalYd)} yd total to honor ${anchorSlots} pinned swim days.`,
-    );
   }
 
   return { templates, yards, tradeOffs };

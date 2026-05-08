@@ -31,12 +31,22 @@ type ArcScheduleSignalsState = {
   pin_restore_skipped?: string[];
 };
 
+/** Old planner strings — internal accounting, not actionable; strip from UI and emptiness checks. */
+const SWIM_PINNED_BUDGET_TRADE_OFF_RE =
+  /^Swim budget raised by \d+ yd total to honor \d+ pinned swim days\.?$/i;
+
+function tradeOffsForScheduleNoticeDisplay(tradeOffs: string[] | undefined): string[] {
+  if (!Array.isArray(tradeOffs)) return [];
+  return tradeOffs.filter((t) => typeof t === 'string' && !SWIM_PINNED_BUDGET_TRADE_OFF_RE.test(t.trim()));
+}
+
 function scheduleSignalsNonEmpty(sig: ArcScheduleSignalsState | Record<string, unknown> | undefined | null): boolean {
   if (!sig || typeof sig !== 'object') return false;
   const s = sig as Record<string, unknown>;
+  const tradeLen = tradeOffsForScheduleNoticeDisplay((s.trade_offs as string[] | undefined) ?? []).length;
   return (
     ((s.conflicts as unknown[] | undefined)?.length ?? 0) > 0 ||
-    ((s.trade_offs as unknown[] | undefined)?.length ?? 0) > 0 ||
+    tradeLen > 0 ||
     ((s.pin_restore_skipped as unknown[] | undefined)?.length ?? 0) > 0 ||
     Boolean(s.used_co_equal_1x_fallback)
   );
@@ -1876,9 +1886,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               The planner applied trade-offs to fit your anchors and recovery rules. Review your calendar
               {arcScheduleSignals.used_co_equal_1x_fallback ? ' — strength may be capped some weeks until anchors flex.' : '.'}
             </p>
-            {(arcScheduleSignals.trade_offs?.length ?? 0) > 0 && (
+            {(tradeOffsForScheduleNoticeDisplay(arcScheduleSignals.trade_offs).length ?? 0) > 0 && (
               <ul className="mt-2 list-disc list-inside text-xs text-amber-100/80 space-y-1">
-                {arcScheduleSignals.trade_offs.slice(0, 6).map((t, i) => (
+                {tradeOffsForScheduleNoticeDisplay(arcScheduleSignals.trade_offs).slice(0, 6).map((t, i) => (
                   <li key={`to-${i}`}>{t}</li>
                 ))}
               </ul>
