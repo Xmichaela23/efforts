@@ -257,6 +257,16 @@ function parseWizardPriorRaceSeconds(distance: string, timeStr: string): number 
   return parseTimeToSeconds(raw, mode);
 }
 
+/** Empty string allowed; otherwise exactly one calendar year 1990–2100. */
+function parseWizardPriorRaceYear(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  if (!/^\d{4}$/.test(t)) return null;
+  const y = Number(t);
+  if (!Number.isFinite(y) || y < 1990 || y > 2100) return null;
+  return y;
+}
+
 function fmtHMS(sec: number): string {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -326,6 +336,10 @@ type WizardState = {
   /** User chose "I'll add a finish" */
   priorRaceHasEntry: boolean;
   priorRaceDistance: string;
+  /** Optional — helps coach/context recognize the event */
+  priorRaceName: string;
+  /** Optional calendar year (4 digits), e.g. 2024 — stored alongside full race date */
+  priorRaceYear: string;
   /** yyyy-mm-dd */
   priorRaceDate: string;
   /** Clock finish — hh:mm:ss for triathlon/long races; run shorts may use mm:ss */
@@ -342,10 +356,14 @@ function priorSimilarRaceTrainingPrefs(state: WizardState): Record<string, unkno
   if (!state.priorRaceHasEntry) return {};
   const sec = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
   if (sec == null || sec <= 0 || !state.priorRaceDate.trim() || !state.priorRaceContinuity) return {};
+  const yr = parseWizardPriorRaceYear(state.priorRaceYear);
+  const name = state.priorRaceName.trim();
   return {
     prior_similar_race: {
       skipped: false,
       distance: state.priorRaceDistance.trim(),
+      ...(name ? { event_name: name } : {}),
+      ...(yr != null ? { event_year: yr } : {}),
       event_date: state.priorRaceDate.trim().slice(0, 10),
       finish_seconds: sec,
       continuity: state.priorRaceContinuity,
@@ -364,7 +382,18 @@ function priorSimilarRaceSummaryLine(state: WizardState): string {
       : state.priorRaceContinuity === 'spotty'
         ? 'spotty training since'
         : 'long break since';
-  return `Prior ${state.priorRaceDistance} finish ${fmtHMS(sec)} on ${state.priorRaceDate.trim().slice(0, 10)} (${cont}).`;
+  const yr = parseWizardPriorRaceYear(state.priorRaceYear);
+  const name = state.priorRaceName.trim();
+  const label =
+    name && yr != null
+      ? `${name} (${yr})`
+      : name
+        ? name
+        : yr != null
+          ? `(${yr})`
+          : '';
+  const prefix = label ? `${label}: prior ${state.priorRaceDistance}` : `Prior ${state.priorRaceDistance}`;
+  return `${prefix} finish ${fmtHMS(sec)} on ${state.priorRaceDate.trim().slice(0, 10)} (${cont}).`;
 }
 
 type WizardSetState = React.Dispatch<React.SetStateAction<WizardState>>;
@@ -397,6 +426,8 @@ function blank(): WizardState {
     priorRaceSkipped: true,
     priorRaceHasEntry: false,
     priorRaceDistance: '70.3',
+    priorRaceName: '',
+    priorRaceYear: '',
     priorRaceDate: '',
     priorRaceTimeStr: '',
     priorRaceContinuity: null,
@@ -426,6 +457,8 @@ function hydrateWizardDraft(raw: Record<string, unknown>): WizardState | null {
       typeof merged.priorRaceDistance === 'string' && merged.priorRaceDistance.trim()
         ? merged.priorRaceDistance
         : base.priorRaceDistance,
+    priorRaceName: typeof merged.priorRaceName === 'string' ? merged.priorRaceName : '',
+    priorRaceYear: typeof merged.priorRaceYear === 'string' ? merged.priorRaceYear : '',
     priorRaceDate: typeof merged.priorRaceDate === 'string' ? merged.priorRaceDate : '',
     priorRaceTimeStr: typeof merged.priorRaceTimeStr === 'string' ? merged.priorRaceTimeStr : '',
     priorRaceContinuity: cr,
@@ -998,6 +1031,8 @@ function StepPriorRace({
       ...state,
       priorRaceSkipped: true,
       priorRaceHasEntry: false,
+      priorRaceName: '',
+      priorRaceYear: '',
       priorRaceDate: '',
       priorRaceTimeStr: '',
       priorRaceContinuity: null,
@@ -1014,6 +1049,12 @@ function StepPriorRace({
   };
 
   const secOk = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
+  const dateYmd = state.priorRaceDate.trim().slice(0, 10);
+  const yrParsed = parseWizardPriorRaceYear(state.priorRaceYear);
+  const yearFieldOk =
+    state.priorRaceYear.trim() === '' ||
+    (yrParsed != null &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(dateYmd) || yrParsed === Number(dateYmd.slice(0, 4))));
   const canContinue =
     state.priorRaceSkipped ||
     (state.priorRaceHasEntry &&
@@ -1021,7 +1062,8 @@ function StepPriorRace({
       Boolean(state.priorRaceDate.trim()) &&
       secOk != null &&
       secOk > 0 &&
-      state.priorRaceContinuity != null);
+      state.priorRaceContinuity != null &&
+      yearFieldOk);
 
   const triHint =
     mapWizardDistanceToRaceDistance(state.priorRaceDistance) === 'tri_clock'
@@ -1066,6 +1108,32 @@ function StepPriorRace({
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">Race name <span className="text-white/25">(optional)</span></p>
+            <input
+              type="text"
+              placeholder="e.g. Ironman 70.3 Santa Cruz"
+              value={state.priorRaceName}
+              onChange={(e) => setState({ ...state, priorRaceName: e.target.value })}
+              className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1.5">Year <span className="text-white/25">(optional)</span></p>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="e.g. 2024"
+              autoComplete="off"
+              maxLength={4}
+              value={state.priorRaceYear}
+              onChange={(e) => setState({ ...state, priorRaceYear: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+              className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
+            />
+            <p className="text-[11px] text-white/35 mt-1">
+              If you enter a year, it must match the calendar year of the race date.
+            </p>
           </div>
           <div>
             <p className="text-[11px] text-white/40 mb-1.5">Race date</p>

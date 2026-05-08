@@ -8,6 +8,10 @@ export type PriorSimilarRaceCoachFacts = {
   event_date: string;
   finish_seconds: number;
   continuity: string;
+  /** Optional human label for the event */
+  event_name?: string;
+  /** Optional calendar year of the finish (may match event_date) */
+  event_year?: number;
   /** Months between event_date and as-of focus day; null if unparseable */
   months_before_focus: number | null;
 };
@@ -51,7 +55,24 @@ export function normalizePriorSimilarRaceRecord(raw: unknown): Omit<PriorSimilar
   if (!Number.isFinite(finish_seconds) || finish_seconds <= 0) return null;
   if (!continuity || !CONTINUITY_PHRASE[continuity]) return null;
 
-  return { distance, event_date, finish_seconds, continuity };
+  const ename = typeof o.event_name === 'string' ? o.event_name.trim() : '';
+  const yRaw = o.event_year;
+  let event_year: number | undefined;
+  if (typeof yRaw === 'number' && Number.isFinite(yRaw) && yRaw >= 1990 && yRaw <= 2100) {
+    event_year = Math.round(yRaw);
+  } else if (typeof yRaw === 'string' && /^\d{4}$/.test(yRaw.trim())) {
+    const y = Number(yRaw.trim());
+    if (y >= 1990 && y <= 2100) event_year = y;
+  }
+
+  return {
+    distance,
+    event_date,
+    finish_seconds,
+    continuity,
+    ...(ename ? { event_name: ename } : {}),
+    ...(event_year != null ? { event_year } : {}),
+  };
 }
 
 function monthsBetweenUtc(startYmd: string, endYmd: string): number | null {
@@ -137,6 +158,8 @@ export function priorSimilarRaceFactsJson(facts: PriorSimilarRaceCoachFacts): st
     {
       distance: facts.distance,
       event_date: facts.event_date,
+      ...(facts.event_name ? { event_name: facts.event_name } : {}),
+      ...(facts.event_year != null ? { event_year: facts.event_year } : {}),
       finish_clock: fmtRaceClockSec(facts.finish_seconds),
       finish_seconds: facts.finish_seconds,
       continuity: facts.continuity,
@@ -159,8 +182,17 @@ export function formatPriorComparableRaceSnapshotBlock(facts: PriorSimilarRaceCo
       ? `${facts.months_before_focus} month(s) before this snapshot`
       : 'recency vs snapshot unknown';
   const cont = CONTINUITY_PHRASE[facts.continuity] ?? facts.continuity;
+  const who =
+    facts.event_name && facts.event_year != null
+      ? `${facts.event_name} (${facts.event_year})`
+      : facts.event_name
+        ? facts.event_name
+        : facts.event_year != null
+          ? `Year ${facts.event_year}`
+          : null;
   return [
     '=== PRIOR COMPARABLE RACE (athlete-reported; narrative empathy only — never derive paces/zones/splits) ===',
+    ...(who ? [`Event: ${who}`] : []),
     `Distance: ${facts.distance}`,
     `Prior event date: ${facts.event_date}`,
     `Their finish time (context only, not a training prescription): ${fmtRaceClockSec(facts.finish_seconds)}`,
@@ -189,7 +221,15 @@ export function coachLegacyPriorRaceLine(goals: GoalLike[], focusYmd: string): s
 export function formatPriorComparableRaceLegacyFactLine(facts: PriorSimilarRaceCoachFacts): string {
   const cont = CONTINUITY_PHRASE[facts.continuity] ?? facts.continuity;
   const clock = fmtRaceClockSec(facts.finish_seconds);
+  const who =
+    facts.event_name && facts.event_year != null
+      ? `${facts.event_name} (${facts.event_year}), `
+      : facts.event_name
+        ? `${facts.event_name}, `
+        : facts.event_year != null
+          ? `${facts.event_year} — `
+          : '';
   return (
-    `PRIOR COMPARABLE RACE (narrative-only — do not prescribe paces from this): ${facts.distance} on ${facts.event_date}, finish ${clock}, ${cont}.`
+    `PRIOR COMPARABLE RACE (narrative-only — do not prescribe paces from this): ${who}${facts.distance} on ${facts.event_date}, finish ${clock}, ${cont}.`
   );
 }

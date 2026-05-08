@@ -179,11 +179,21 @@ export function formatWizardPrefsMarkdownLines(goal: {
       }
       const dist = String(p?.distance ?? '').trim();
       const dt = String(p?.event_date ?? '').trim();
+      const nm = String(p?.event_name ?? '').trim();
+      const eyRaw = p?.event_year;
+      const ey =
+        typeof eyRaw === 'number' && Number.isFinite(eyRaw)
+          ? eyRaw
+          : typeof eyRaw === 'string' && /^\d{4}$/.test(eyRaw.trim())
+            ? Number(eyRaw.trim())
+            : null;
       const sec = Number(p?.finish_seconds);
       const cont = String(p?.continuity ?? '');
       const contHuman = PRIOR_CONTINUITY_LABELS[cont] ?? cont;
       if (dist && dt && Number.isFinite(sec) && sec > 0) {
-        out.push(`- **Prior comparable race:** ${dist} — ${fmtRaceClock(sec)} on ${dt} (${contHuman})`);
+        const labelParts = [nm || null, ey != null && Number.isFinite(ey) ? String(Math.round(ey)) : null].filter(Boolean);
+        const label = labelParts.length ? `${labelParts.join(' · ')} — ` : '';
+        out.push(`- **Prior comparable race:** ${label}${dist} — ${fmtRaceClock(sec)} on ${dt} (${contHuman})`);
       }
       continue;
     }
