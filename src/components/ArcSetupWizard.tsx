@@ -704,10 +704,19 @@ function Step1Races({
   };
 
   const removeRace = (id: string) => {
-    if (state.races.length <= 1) return;
+    if (state.races.length <= 1) {
+      setState({
+        ...state,
+        races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }],
+      });
+      return;
+    }
     const remaining = state.races.filter(r => r.id !== id);
-    if (!remaining.find(r => r.priority === 'A')) remaining[0]!.priority = 'A';
-    setState({ ...state, races: remaining });
+    let racesOut = remaining;
+    if (!remaining.some(r => r.priority === 'A') && remaining.length > 0) {
+      racesOut = remaining.map((r, i) => (i === 0 ? { ...r, priority: 'A' as const } : r));
+    }
+    setState({ ...state, races: racesOut });
   };
 
   const addRace = () => {
@@ -778,11 +787,15 @@ function Step1Races({
             <span className="text-xs font-semibold uppercase tracking-wider text-teal-400/80">
               {race.priority}-Race
             </span>
-            {state.races.length > 1 && (
-              <button type="button" onClick={() => removeRace(race.id)} className="text-white/30 hover:text-white/60">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
+            <button
+              type="button"
+              title={state.races.length > 1 ? 'Remove race' : 'Clear race (start over)'}
+              aria-label={state.races.length > 1 ? 'Remove race' : 'Clear race and start over'}
+              onClick={() => removeRace(race.id)}
+              className="text-white/30 hover:text-white/60"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
 
           <input
