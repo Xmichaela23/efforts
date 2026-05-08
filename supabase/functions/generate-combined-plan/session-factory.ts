@@ -590,6 +590,19 @@ export function thresholdSwim(
  * Not maximal CSS threshold — just sustainable race pace.
  * Develops comfort at finish-line speed without lactate stress.
  */
+/** Caps ×100 main-set reps when yards/main budget are large (slow-swimmer bumps, ceilings). */
+export function cssHundredsRepHardCap(
+  athleteFitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
+  planWeek: number | undefined,
+): number {
+  const fit = athleteFitness ?? 'intermediate';
+  const pw = Math.max(1, planWeek ?? 1);
+  const steps = Math.floor((pw - 1) / 2);
+  if (fit === 'beginner') return Math.min(14, 10 + steps);
+  if (fit === 'intermediate') return Math.min(24, 14 + steps);
+  return Math.min(34, 20 + steps);
+}
+
 export function cssAerobicSwim(
   day: string,
   totalYards: number,
@@ -597,7 +610,11 @@ export function cssAerobicSwim(
   planWeek?: number,
   drillSlotSalt: number = 0,
   phase?: string,
-  options?: { raceSupport?: boolean; swimEquipment?: string[] | null },
+  options?: {
+    raceSupport?: boolean;
+    swimEquipment?: string[] | null;
+    athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
+  },
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -613,7 +630,8 @@ export function cssAerobicSwim(
     swimGearLabels: options?.swimEquipment,
   });
   const raceSupport = options?.raceSupport ?? false;
-  const reps = Math.max(5, Math.round(main / 100));
+  const repCap = cssHundredsRepHardCap(options?.athleteFitness, planWeek);
+  const reps = Math.max(5, Math.min(repCap, Math.round(main / 100)));
   const dur = Math.round(totalYards / 42); // slightly faster than easy, slower than threshold
   const drillLead =
     drillTokens.length > 0
@@ -908,13 +926,17 @@ export function swimSessionFromTemplate(
     case 'threshold':
       return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
     case 'css_aerobic':
-      return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, { swimEquipment });
+      return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
+        swimEquipment,
+        athleteFitness: opts?.athleteFitness,
+      });
     case 'technique_aerobic':
       return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment);
     case 'race_specific_aerobic':
       return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
         raceSupport: true,
         swimEquipment,
+        athleteFitness: opts?.athleteFitness,
       });
     case 'speed':
       return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);

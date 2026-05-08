@@ -1056,6 +1056,7 @@ export function buildWeek(
     primaryGoal,
     athleteState,
     phase,
+    weekInPhase: weekInBlock,
     hasTri,
     swimSingleRecovery,
     swimPct,

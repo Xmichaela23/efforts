@@ -5,8 +5,11 @@
  */
 
 import { normalizeGoalDistanceKey } from '../_shared/race-projections.ts';
+import { normalizeSwimProgramDistance } from '../_shared/swim-program-templates.ts';
 import type { SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
 import type { AthleteState, GoalInput, Phase } from './types.ts';
+import { getProtocolCeiling } from './swim-protocol-volumes.ts';
+import { normalizeSwimTrainingFitness } from './swim-protocol-v21.ts';
 
 /** Pace at or slower than 2:30/100 yd — ability signal for swim-load floors. */
 export const SWIM_SLOW_BASELINE_SEC_PER_100YD = 150;
@@ -140,6 +143,8 @@ export function apply703SlowSwimmerWeeklyFloors(opts: {
   primaryGoal: GoalInput;
   athleteState: AthleteState;
   phase: Phase;
+  /** Drives {@link getProtocolCeiling} clamp after yard bumps. */
+  weekInPhase?: number;
   hasTri: boolean;
   swimSingleRecovery: boolean;
   swimPct: number;
@@ -201,6 +206,15 @@ export function apply703SlowSwimmerWeeklyFloors(opts: {
   }
 
   bumpToward(SWIM_703_ABILITY_WEEK_MIN_YD);
+
+  const dk = normalizeSwimProgramDistance(opts.primaryGoal.distance ?? '70.3');
+  const fit = normalizeSwimTrainingFitness(opts.athleteState.training_fitness);
+  const weekInPhase = opts.weekInPhase ?? 1;
+  for (let i = 0; i < n; i++) {
+    const t = templates[i]!;
+    const ceil = getProtocolCeiling(dk, fit, opts.phase, t.session_type, { weekInPhase });
+    out[i] = Math.min(ceil, out[i]!);
+  }
 
   return out;
 }

@@ -127,6 +127,8 @@ export interface AthleteState {
    * `normal` = default.
    */
   structural_load_hint?: 'low' | 'moderate' | 'normal';
+  /** Goal / Arc swim tier — drives template scaling and swim session caps. */
+  training_fitness?: 'beginner' | 'intermediate' | 'advanced';
   /** Echo of training_prefs days_per_week (4–7) for diagnostics; optional. */
   days_per_week?: number;
   /**
