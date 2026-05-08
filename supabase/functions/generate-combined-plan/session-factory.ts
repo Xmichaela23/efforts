@@ -948,56 +948,70 @@ export function swimSessionFromTemplate(
   },
 ): PlannedSession {
   const dk: SwimDistanceKey = opts?.swimRaceDistanceKey ?? '70.3';
-  switch (template.session_type) {
-    case 'threshold':
-      return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
-    case 'css_aerobic':
-      return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
-        swimEquipment,
-        athleteFitness: opts?.athleteFitness,
-      });
-    case 'technique_aerobic':
-      return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment);
-    case 'race_specific_aerobic':
-      return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
-        raceSupport: true,
-        swimEquipment,
-        athleteFitness: opts?.athleteFitness,
-      });
-    case 'speed':
-      return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
-    case 'kick_focused':
-      return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined);
-    case 'pull_focused':
-      return pullFocusedSwim(
-        day,
-        yards,
-        goalId,
-        dk,
-        opts?.swimThresholdPace ?? undefined,
-        opts?.athleteFitness ?? 'intermediate',
-      );
-    case 'endurance':
-      return enduranceSwim(
-        day,
-        yards,
-        goalId,
-        opts?.athleteFitness ?? 'intermediate',
-        planWeek,
-        drillSlotSalt,
-        phase,
-        swimEquipment,
-        opts?.swimThresholdPace ?? undefined,
-        opts?.enduranceOverdistanceNote ?? false,
-      );
-    case 'easy':
-      if (template.recovery_learner_easy_structure) {
-        return recoveryEasySwim(day, yards, goalId);
-      }
-      return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
-    default:
-      return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
-  }
+  console.log('[session-factory] creating swim session', {
+    plan_week: planWeek,
+    day,
+    session_type: template.session_type,
+    resolved_yards: yards,
+    target_yards_template: template.target_yards,
+  });
+  const created: PlannedSession = ((): PlannedSession => {
+    switch (template.session_type) {
+      case 'threshold':
+        return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
+      case 'css_aerobic':
+        return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
+          swimEquipment,
+          athleteFitness: opts?.athleteFitness,
+        });
+      case 'technique_aerobic':
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment);
+      case 'race_specific_aerobic':
+        return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
+          raceSupport: true,
+          swimEquipment,
+          athleteFitness: opts?.athleteFitness,
+        });
+      case 'speed':
+        return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
+      case 'kick_focused':
+        return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined);
+      case 'pull_focused':
+        return pullFocusedSwim(
+          day,
+          yards,
+          goalId,
+          dk,
+          opts?.swimThresholdPace ?? undefined,
+          opts?.athleteFitness ?? 'intermediate',
+        );
+      case 'endurance':
+        return enduranceSwim(
+          day,
+          yards,
+          goalId,
+          opts?.athleteFitness ?? 'intermediate',
+          planWeek,
+          drillSlotSalt,
+          phase,
+          swimEquipment,
+          opts?.swimThresholdPace ?? undefined,
+          opts?.enduranceOverdistanceNote ?? false,
+        );
+      case 'easy':
+        if (template.recovery_learner_easy_structure) {
+          return recoveryEasySwim(day, yards, goalId);
+        }
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
+      default:
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
+    }
+  })();
+  console.log('[session-factory] created swim session', {
+    session_type: template.session_type,
+    created_name: created.name,
+  });
+  return created;
 }
 
 /** Open water skills practice — ocean/lake chop, sighting, wetsuit comfort (tri-specific). */

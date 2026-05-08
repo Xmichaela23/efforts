@@ -1044,16 +1044,31 @@ export function buildWeek(
     swimSingleRecovery &&
     shouldMaintainTwoSwimsInRecovery(athleteState.swim_experience, trainFitness, swimAnchorSlots);
 
-  let swimTemplates: SwimSlotTemplate[] = !hasTri
-    ? []
-    : recoveryLearnerTwoSwimMaintained
-      ? getTwoSlotRecoveryLearnerSwimTemplates(swimDistance)
-      : swimSingleRecovery
-        ? [getRecoverySwimTemplate()]
-        : getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, weekInBlock, {
-            athleteFitness: trainFitness,
-            planWeekNumber: weekNum,
-          });
+  let swimTemplates: SwimSlotTemplate[];
+  if (!hasTri) {
+    swimTemplates = [];
+  } else if (recoveryLearnerTwoSwimMaintained) {
+    swimTemplates = getTwoSlotRecoveryLearnerSwimTemplates(swimDistance);
+  } else if (swimSingleRecovery) {
+    swimTemplates = [getRecoverySwimTemplate()];
+  } else {
+    swimTemplates = getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, weekInBlock, {
+      athleteFitness: trainFitness,
+      planWeekNumber: weekNum,
+    });
+    console.log('[buildWeek] swim templates selected', weekNum, {
+      swimIntent: swimTemplatesIntent,
+      phase,
+      swimDistance,
+      weekInBlock,
+      swimAnchorSlots,
+      swimProgramAnchorSlots,
+      athlete_swim_intent_raw: athleteState.swim_intent,
+      template_types: swimTemplates.map((t) => t.session_type),
+      template_target_yards: swimTemplates.map((t) => t.target_yards),
+      template_count: swimTemplates.length,
+    });
+  }
   if (hasTri && swimPct === 0 && !swimSingleRecovery && swimTemplates.length > 0) {
     swimTemplates = swimTemplates.map((t) => ({
       session_type: 'easy',
