@@ -82,7 +82,13 @@ export type SessionInterpretationForPrompt = {
 
 export function snapshotToPrompt(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
-  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null; suppressRunLoadSpike?: boolean },
+  opts?: {
+    sessionInterpretations?: SessionInterpretationForPrompt[];
+    longitudinalBlock?: string | null;
+    suppressRunLoadSpike?: boolean;
+    /** Athlete-reported prior comparable race — narrative empathy only in model instructions */
+    priorComparableRaceBlock?: string | null;
+  },
 ): string {
   const lines: string[] = [];
   const { identity: id, plan_position: pp, daily_ledger: ledger, body_response: br, upcoming } = snapshot;
@@ -105,6 +111,12 @@ export function snapshotToPrompt(
   }
   if (nums.length > 0) lines.push(`Key numbers: ${nums.join(', ')}.`);
   lines.push(`Units: ${id.unit_preference}.`);
+
+  const priorRace = opts?.priorComparableRaceBlock?.trim();
+  if (priorRace) {
+    lines.push('');
+    lines.push(priorRace);
+  }
 
   // --- PLAN ---
   lines.push('');
@@ -355,7 +367,9 @@ CRITICAL — ACCURACY:
 - If any data section mentions session counts, do NOT repeat raw "X of Y" numbers. Describe qualitatively.
 - For STRENGTH: compare planned RIR vs actual RIR when both are available. Round to whole numbers: "plan called for 2 RIR, you averaged 4" is good. "1.7 reps in reserve" in isolation is not — always compare.
 - For RPE: say "felt harder than usual" not "RPE 7/10." The user doesn't think in RPE numbers.
-- Never output percentage numbers for weights (like "78% target" or "80% 1RM"). The user thinks in actual weight: "the plan called for heavy triples and you hit them." Only reference percentages if the plan prescription literally uses them AND it helps the user understand.`;
+- Never output percentage numbers for weights (like "78% target" or "80% 1RM"). The user thinks in actual weight: "the plan called for heavy triples and you hit them." Only reference percentages if the plan prescription literally uses them AND it helps the user understand.
+
+PRIOR COMPARABLE RACE — When that section appears in the athlete snapshot: use it only for empathy and continuity framing (e.g. returning to the distance, durability after time off). Never prescribe paces, HR zones, power targets, or race splits from the reported finish time.`;
 
 // ---------------------------------------------------------------------------
 // Call the LLM and parse the response
@@ -364,7 +378,12 @@ CRITICAL — ACCURACY:
 export async function generateCoaching(
   snapshot: Omit<AthleteSnapshot, 'coaching'>,
   _anthropicKey?: string,
-  opts?: { sessionInterpretations?: SessionInterpretationForPrompt[]; longitudinalBlock?: string | null; suppressRunLoadSpike?: boolean },
+  opts?: {
+    sessionInterpretations?: SessionInterpretationForPrompt[];
+    longitudinalBlock?: string | null;
+    suppressRunLoadSpike?: boolean;
+    priorComparableRaceBlock?: string | null;
+  },
 ): Promise<Coaching> {
   const prompt = snapshotToPrompt(snapshot, opts);
 

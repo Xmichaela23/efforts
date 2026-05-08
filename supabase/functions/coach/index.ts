@@ -38,6 +38,7 @@ import {
 } from '../_shared/response-model/index.ts';
 import { resolveProfile, getTargetRir } from '../_shared/strength-profiles.ts';
 import { loadGoalContext, resolveRunGoalIdForRaceProjection, type GoalContext, type GoalLite } from '../_shared/goal-context.ts';
+import { coachLegacyPriorRaceLine, coachPromptPriorRaceBlock } from '../_shared/prior-similar-race-coach.ts';
 import { runGoalPredictor, responseModelToWeeklyInput } from '../_shared/goal-predictor/index.ts';
 import { computeRaceReadiness, type RaceReadinessV1 } from '../_shared/race-readiness/index.ts';
 import { buildRaceProjectionDisplay } from '../_shared/race-readiness/projection-facts.ts';
@@ -3328,6 +3329,7 @@ Deno.serve(async (req) => {
             sessionInterpretations,
             longitudinalBlock: coachingLongitudinalBlock,
             suppressRunLoadSpike: earlyRunAdherenceArtifact && !hasRealLoadConcerns,
+            priorComparableRaceBlock: coachPromptPriorRaceBlock(goalRows, asOfDate) ?? undefined,
           });
         } catch (llmErr: any) {
           console.warn('[coach] snapshot coaching generation failed:', llmErr?.message || llmErr);
@@ -3455,6 +3457,9 @@ Deno.serve(async (req) => {
         if (athleteContextStr) {
           narrativeFacts.unshift(`ATHLETE SAYS (use this, do not guess): ${athleteContextStr}`);
         }
+
+        const legacyPriorRaceLine = coachLegacyPriorRaceLine(goalContext?.goals || [], asOfDate);
+        if (legacyPriorRaceLine) narrativeFacts.push(legacyPriorRaceLine);
 
         // Plan context
         if (activePlan) {

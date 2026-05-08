@@ -1,5 +1,10 @@
 import type { ArcContext } from './arc-context.ts';
 import { SCHEDULE_RULES } from './arc-setup-schedule-rules.ts';
+import {
+  PRIOR_SIMILAR_RACE_NARRATIVE_ONLY_RULE,
+  priorSimilarRaceFactsJson,
+  resolvePriorSimilarRaceFacts,
+} from './prior-similar-race-coach.ts';
 
 const SCOPE_SEASON_ONLY = `
 ## SCOPE — SEASON SETUP ONLY
@@ -131,6 +136,16 @@ Infer **months since race** from \`race_date\` / thread / \`last_im_distance_rac
 - **Over 24 months:** **Do not** treat the old time as a projection anchor. Say something like: *You've done the distance before — that experience counts. We'll build the projection from where your fitness is now.* You may still mention the old time **briefly** if it helps coach confidence, without implying it drives the clock.
 
 **Banned phrasing without qualification:** **"Solid baseline"** (or equivalent) for a result **older than 12 months** unless you **also** name what may have changed since (e.g. run up, swim dormant, bike flat) in the **same** short beat. For 12–24 months, prefer **reference point** / **sanity check** language from **PROJECTION_FINISH** and **race-projections** behavior, not "this is the number we build from."
+`.trim();
+
+const PRIOR_COMPARABLE_RACE_SETUP = `
+## PRIOR COMPARABLE RACE — WIZARD / DRAFT CAPTURE (narrative only)
+
+When \`## PRIOR_COMPARABLE_RACE_FACTS\` appears in the **dynamic** section of this prompt, the athlete supplied a prior comparable distance finish in Arc setup (saved on \`training_prefs.prior_similar_race\` or echoed from the draft).
+
+${PRIOR_SIMILAR_RACE_NARRATIVE_ONLY_RULE}
+
+Use \`continuity\` (steady vs on-and-off vs long break) for tone and early-season framing — not for silently changing intensities. Never quote finish time as a target pace or watt band.
 `.trim();
 
 const EXPERIENCE_DETECTION = `
@@ -731,6 +746,15 @@ The athlete turned on **clean slate** testing. Omitted from the context JSON on 
 
 `
     : '';
+  const priorFacts = resolvePriorSimilarRaceFacts({
+    draftArcSetup: opts?.draftArcSetup,
+    arcActiveGoals: arc.active_goals,
+    focusYmd: todayStr,
+  });
+  const priorComparableRaceBlock = priorFacts
+    ? `## PRIOR_COMPARABLE_RACE_FACTS\nAthlete-reported — **narrative empathy only** (see **PRIOR COMPARABLE RACE — WIZARD / DRAFT CAPTURE**). Never derive prescriptions from these numbers.\n\`\`\`json\n${priorSimilarRaceFactsJson(priorFacts)}\n\`\`\``
+    : '';
+
   const arcJson = JSON.stringify(
     {
       athlete_identity: arc.athlete_identity,
@@ -796,12 +820,11 @@ When presenting to the athlete: translate day-by-day into plain English (e.g. "M
 
 ` : '';
 
-  // ── Dynamic suffix: these two blocks change every turn as the draft evolves.
-  // Kept separate so the large static prefix can be Anthropic-cached.
+  // ── Dynamic suffix: changes each turn (today, prior comparable race facts, optimizer, draft lock-in).
   const todayBlock = `TODAY: ${todayStr}
 Use this date for all recency calculations.
 Do not estimate or infer the current date.`;
-  const dynamicPart = [todayBlock.trim(), optimizerBlock.trim(), confirmedBlock.trim()]
+  const dynamicPart = [todayBlock.trim(), priorComparableRaceBlock.trim(), optimizerBlock.trim(), confirmedBlock.trim()]
     .filter(Boolean)
     .join('\n\n');
 
@@ -820,6 +843,8 @@ ${SCHEDULE_RULES}
 ${PRIOR_70_3_RACE_HISTORY}
 
 ${PRIOR_RESULT_FRAMING_BY_AGE}
+
+${PRIOR_COMPARABLE_RACE_SETUP}
 
 ${EXPERIENCE_DETECTION}
 
