@@ -11,7 +11,7 @@ const corsHeaders: Record<string, string> = {
   Vary: 'Origin',
 };
 
-const SYSTEM_PROMPT = `You extract race details from an athlete's text and return ONLY valid JSON.
+const SYSTEM_PROMPT_UPCOMING = `You extract race details from an athlete's text and return ONLY valid JSON.
 
 Return this exact structure — no other text, no markdown fences:
 {"races":[{"name":"...","distance":"...","date":"YYYY-MM-DD","priority":"A"}]}
@@ -26,6 +26,20 @@ Rules:
 - Include the race even if you cannot find the date — just omit the date field
 - Use the full official event name (e.g. "IRONMAN 70.3 Santa Cruz" not "Santa Cruz iron man")
 - Return races sorted by date ascending`;
+
+/** Past edition lookup — used by Arc wizard "prior comparable race" step */
+const SYSTEM_PROMPT_PRIOR_FINISH = `You resolve ONE race the athlete already finished (historical). Return ONLY valid JSON:
+{"races":[{"name":"...","distance":"...","date":"YYYY-MM-DD","priority":"A"}]}
+
+Distance must be exactly one of: sprint, olympic, 70.3, ironman, marathon, half marathon, 5k, 10k
+
+Rules:
+- Use web search for authoritative schedules/results/listings for that named event.
+- If the user's message specifies a calendar year for that finish, the returned date MUST fall in that year unless sources prove the event did not run that year — then omit date.
+- If no year is specified, return the date of the most recent edition strictly BEFORE today's date (never a future or upcoming race date).
+- Never substitute "next year's" or upcoming race dates when resolving a past finish.
+- Use the full official event name when known.
+- Return exactly one object in "races". Omit date only if you cannot verify from sources after search.`;
 
 const WEB_SEARCH_TOOL = {
   type: 'web_search_20250305',
@@ -44,7 +58,12 @@ function extractText(content: unknown): string {
     .trim();
 }
 
-async function callWithWebSearch(apiKey: string, userText: string, today: string): Promise<string | null> {
+async function callWithWebSearch(
+  apiKey: string,
+  userText: string,
+  today: string,
+  systemPrompt: string,
+): Promise<string | null> {
   let messages: { role: 'user' | 'assistant'; content: string | unknown[] }[] = [
     { role: 'user', content: `Today is ${today}.\n\n${userText}` },
   ];
@@ -65,7 +84,7 @@ async function callWithWebSearch(apiKey: string, userText: string, today: string
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         messages,
         max_tokens: 1024,
         temperature: 0,
@@ -127,8 +146,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = (await req.json().catch(() => ({}))) as { text?: string };
+    const body = (await req.json().catch(() => ({}))) as { text?: string; prior_finish?: boolean };
     const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const priorFinish = body.prior_finish === true;
     if (!text) {
       return new Response(JSON.stringify({ error: 'text is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -143,7 +163,8 @@ Deno.serve(async (req) => {
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const raw = await callWithWebSearch(apiKey, text, today);
+    const systemPrompt = priorFinish ? SYSTEM_PROMPT_PRIOR_FINISH : SYSTEM_PROMPT_UPCOMING;
+    const raw = await callWithWebSearch(apiKey, text, today, systemPrompt);
 
     if (!raw) {
       return new Response(JSON.stringify({ races: [], error: 'No LLM response' }), {

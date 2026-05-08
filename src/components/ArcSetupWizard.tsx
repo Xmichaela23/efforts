@@ -17,7 +17,7 @@
  * Step 9  — Strength (included + intent)            [tri only]
  * Step 10 — Start date + notes + confirm
  */
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, Trash2, ChevronLeft } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
@@ -1026,6 +1026,98 @@ function StepPriorRace({
   const primary = state.races.find((r) => r.priority === 'A') ?? state.races[0];
   const primaryDist = primary?.distance?.trim() || '70.3';
 
+  const priorDateLookupRunRef = useRef(0);
+  const [priorDateLookupUi, setPriorDateLookupUi] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [priorDateLookupHint, setPriorDateLookupHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!state.priorRaceHasEntry) {
+      setPriorDateLookupUi('idle');
+      setPriorDateLookupHint(null);
+      return;
+    }
+
+    const name = state.priorRaceName.trim();
+    const yr = parseWizardPriorRaceYear(state.priorRaceYear);
+    const dist = state.priorRaceDistance.trim();
+    const dateStr = state.priorRaceDate.trim();
+
+    if (dateStr) {
+      setPriorDateLookupUi('idle');
+      setPriorDateLookupHint(null);
+      return;
+    }
+
+    if (name.length < 3 || yr == null || !dist) {
+      setPriorDateLookupUi('idle');
+      setPriorDateLookupHint(null);
+      return;
+    }
+
+    const runId = ++priorDateLookupRunRef.current;
+    const timer = window.setTimeout(() => {
+      if (runId !== priorDateLookupRunRef.current) return;
+      void (async () => {
+        if (runId !== priorDateLookupRunRef.current) return;
+        setPriorDateLookupUi('loading');
+        setPriorDateLookupHint(null);
+        try {
+          const text = `${name} — ${dist} — The athlete already finished this event in calendar year ${yr}. Find that year's official race date only (YYYY-MM-DD), not a future edition.`;
+          const { data, error } = await supabase.functions.invoke('extract-races', {
+            body: { text, prior_finish: true },
+          });
+          if (runId !== priorDateLookupRunRef.current) return;
+          if (error) throw new Error((error as { message?: string }).message || 'Lookup failed');
+          const races = (data as { races?: unknown[] })?.races;
+          if (!Array.isArray(races) || races.length === 0) {
+            setPriorDateLookupUi('error');
+            setPriorDateLookupHint("Couldn't find that race date — choose it on the calendar.");
+            return;
+          }
+          const firstWithDate = races.find((r) => {
+            const ro = r as { date?: string };
+            return typeof ro.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ro.date);
+          }) as { date?: string; name?: string } | undefined;
+          const found = firstWithDate?.date;
+          if (!found) {
+            setPriorDateLookupUi('error');
+            setPriorDateLookupHint("Couldn't find that race date — choose it on the calendar.");
+            return;
+          }
+          if (Number(found.slice(0, 4)) !== yr) {
+            setPriorDateLookupUi('error');
+            setPriorDateLookupHint("Lookup didn't match that year — set the date manually.");
+            return;
+          }
+          const official = typeof firstWithDate.name === 'string' ? firstWithDate.name.trim() : '';
+          setState((prev) => ({
+            ...prev,
+            priorRaceDate: found,
+            ...(official.length > name.length ? { priorRaceName: official } : {}),
+          }));
+          setPriorDateLookupUi('idle');
+          setPriorDateLookupHint(null);
+        } catch {
+          if (runId !== priorDateLookupRunRef.current) return;
+          setPriorDateLookupUi('error');
+          setPriorDateLookupHint("Couldn't look up the date — enter it manually.");
+        }
+      })();
+    }, 650);
+
+    return () => {
+      priorDateLookupRunRef.current += 1;
+      window.clearTimeout(timer);
+    };
+  }, [
+    state.priorRaceHasEntry,
+    state.priorRaceName,
+    state.priorRaceYear,
+    state.priorRaceDistance,
+    state.priorRaceDate,
+    setState,
+  ]);
+
   const chooseSkip = () => {
     setState({
       ...state,
@@ -1132,11 +1224,21 @@ function StepPriorRace({
               className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
             />
             <p className="text-[11px] text-white/35 mt-1">
-              If you enter a year, it must match the calendar year of the race date.
+              If you enter a year, it must match the calendar year of the race date. With name and year filled in,
+              we look up the date for you (same service as &quot;Find my races&quot; on the season step).
             </p>
           </div>
           <div>
             <p className="text-[11px] text-white/40 mb-1.5">Race date</p>
+            {priorDateLookupUi === 'loading' && (
+              <div className="flex items-center gap-2 text-[11px] text-white/45 mb-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                Looking up race date…
+              </div>
+            )}
+            {priorDateLookupUi === 'error' && priorDateLookupHint && (
+              <p className="text-[11px] text-amber-200/85 mb-1.5">{priorDateLookupHint}</p>
+            )}
             <input
               type="date"
               value={state.priorRaceDate}
