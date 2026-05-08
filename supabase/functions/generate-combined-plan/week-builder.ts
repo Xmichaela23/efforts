@@ -1019,6 +1019,7 @@ export function buildWeek(
       ? [getRecoverySwimTemplate()]
       : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock, {
           athleteFitness: trainFitness,
+          planWeekNumber: weekNum,
         });
   if (hasTri && swimPct === 0 && !swimSingleRecovery && swimTemplates.length > 0) {
     swimTemplates = swimTemplates.map((t) => ({

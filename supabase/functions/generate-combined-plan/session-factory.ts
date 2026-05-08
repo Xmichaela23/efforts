@@ -485,6 +485,64 @@ export function bikeOpeners(day: string, goalId: string): PlannedSession {
 
 // ── Swim sessions ─────────────────────────────────────────────────────────────
 
+/**
+ * Short fast 50s + easy aerobic flush — neuromuscular speed without stacked threshold density.
+ * Tokens reuse `swim_threshold_*` shape so materialize-plan expands reps like threshold sets.
+ */
+export function speedSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+  phase?: string,
+  swimEquipment?: string[] | null,
+): PlannedSession {
+  totalYards = snapSwimSessionTotalYdInterval100(totalYards);
+  const wu = 300;
+  const cd = 200;
+  const { mainBudgetYd: main, drillTokens } = pickSwimDrillInset({
+    totalYards,
+    wuYd: wu,
+    cdYd: cd,
+    planWeek,
+    drillSlotSalt,
+    phase,
+    sessionKind: 'threshold',
+    swimGearLabels: swimEquipment,
+  });
+  const fastBudget = Math.round(main * 0.58);
+  let fastReps = Math.min(22, Math.max(10, Math.round(fastBudget / 50)));
+  while (fastReps > 10 && fastReps * 50 > fastBudget) fastReps -= 1;
+  const remainder = Math.max(200, main - fastReps * 50);
+  const aeroReps = Math.max(3, Math.round(remainder / 150));
+  const dur = Math.round(totalYards / 38);
+  const drillLead =
+    drillTokens.length > 0
+      ? `${swimSessionPhilosophyLead('threshold')}${swimDrillBlockAthleteCopy(drillTokens)} `
+      : '';
+  const tags: string[] = ['quality', 'speed_swim', 'swim'];
+  if (drillTokens.length) tags.push('swim_drills');
+  return session(
+    day,
+    'swim',
+    `Swim Speed / Turnover — ${totalYards} yd`,
+    `Warm up ${wu} yd easy. ${drillLead}${fastReps}×50 yd strong smooth speed (≈90–95% effort — crisp turnover, not all-out sprint) with 45 sec easy jog/walk rest. ${aeroReps}×150 yd easy aerobic to flush lactate. Cool down ${cd} yd.`,
+    dur,
+    'HARD',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      ...drillTokens,
+      `swim_threshold_${fastReps}x50yd_r45`,
+      `swim_aerobic_${aeroReps}x150yd_easy_r20`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    tags,
+    'Z4 speed / turnover',
+    goalId,
+  );
+}
+
 export function thresholdSwim(
   day: string,
   totalYards: number,
@@ -858,6 +916,8 @@ export function swimSessionFromTemplate(
         raceSupport: true,
         swimEquipment,
       });
+    case 'speed':
+      return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
     case 'kick_focused':
       return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined);
     case 'pull_focused':

@@ -139,6 +139,7 @@ export function getProtocolVolumeBand(
 function snapProtocolYards(y: number, sessionType: SwimSessionType): number {
   const coarse =
     sessionType === 'threshold' ||
+    sessionType === 'speed' ||
     sessionType === 'css_aerobic' ||
     sessionType === 'race_specific_aerobic' ||
     sessionType === 'endurance';
@@ -149,6 +150,7 @@ function snapProtocolYards(y: number, sessionType: SwimSessionType): number {
 function fallbackFloor(sessionType: SwimSessionType): number {
   switch (sessionType) {
     case 'threshold':
+    case 'speed':
     case 'race_specific_aerobic':
       return 1000;
     case 'css_aerobic':
@@ -188,6 +190,7 @@ export function getProtocolFloor(
     const bmin = band.min;
     switch (sessionType) {
       case 'threshold':
+      case 'speed':
       case 'race_specific_aerobic':
         floor = snapProtocolYards(Math.max(1000, bmin), sessionType);
         break;
@@ -214,6 +217,7 @@ export function getProtocolFloor(
   if (scale < 1) {
     const minimumAfterScale: Partial<Record<SwimSessionType, number>> = {
       threshold: 900,
+      speed: 900,
       css_aerobic: 900,
       race_specific_aerobic: 900,
       endurance: 900,
@@ -265,6 +269,7 @@ export function getProtocolCeiling(
     case 'kick_focused':
     case 'pull_focused':
     case 'threshold':
+    case 'speed':
     case 'css_aerobic':
     case 'race_specific_aerobic':
     default:
@@ -287,6 +292,8 @@ function swimSlotDropTier(st: SwimSessionType): number {
       return 5;
     case 'endurance':
       return 6;
+    case 'speed':
+      return 9;
     case 'threshold':
       return 10;
     default:

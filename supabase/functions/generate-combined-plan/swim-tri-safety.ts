@@ -78,6 +78,8 @@ function impliedDurationMin(sessionType: SwimSlotTemplate['session_type'], yards
   switch (sessionType) {
     case 'threshold':
       return yards / 40;
+    case 'speed':
+      return yards / 38;
     case 'css_aerobic':
     case 'race_specific_aerobic':
       return yards / 42;

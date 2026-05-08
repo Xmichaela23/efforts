@@ -13,6 +13,8 @@ export type SwimSessionType =
   | 'css_aerobic'
   | 'technique_aerobic'
   | 'race_specific_aerobic'
+  /** Short reps / turnover — paired with threshold in 2-swim race-intent rotation. */
+  | 'speed'
   | 'kick_focused'
   | 'pull_focused'
   | 'endurance'
@@ -192,11 +194,66 @@ function focusTemplatesFromYards(yards: [number, number, number]): SwimSlotTempl
   }));
 }
 
-function raceTemplatesFromYards(yards: [number, number]): SwimSlotTemplate[] {
-  return RACE_70_3_SLOT_META.map((meta, i) => ({
-    ...meta,
+function raceTemplatesFromMeta(
+  meta: Omit<SwimSlotTemplate, 'target_yards'>[],
+  yards: [number, number],
+): SwimSlotTemplate[] {
+  return meta.map((m, i) => ({
+    ...m,
     target_yards: yards[i]!,
   }));
+}
+
+function raceTemplatesFromYards(yards: [number, number]): SwimSlotTemplate[] {
+  return raceTemplatesFromMeta(RACE_70_3_SLOT_META, yards);
+}
+
+/**
+ * 2-swim (race intent) — rotate stimulus across plan weeks (repeats every 4 weeks).
+ * Slot 0 → swim_quality_day, slot 1 → swim_easy_day in week-builder.
+ *
+ * Week 1 % 4 === 1: threshold + race-specific aerobic
+ * Week 2 % 4 === 2: threshold + pull
+ * Week 3 % 4 === 3: technique + race-specific aerobic
+ * Week 4 % 4 === 0: threshold + speed (turnover)
+ */
+export function raceTwoSwimRotationSlotMeta(planWeek: number): Omit<SwimSlotTemplate, 'target_yards'>[] {
+  const c = ((Math.floor(planWeek) % 4) + 4) % 4;
+  if (c === 1) {
+    return [
+      RACE_70_3_SLOT_META[0]!,
+      RACE_70_3_SLOT_META[1]!,
+    ];
+  }
+  if (c === 2) {
+    return [
+      RACE_70_3_SLOT_META[0]!,
+      {
+        session_type: 'pull_focused',
+        drill_emphasis: false,
+        notes:
+          'Pull-focused — buoy-required moderate aerobic density; integrates full-stroke easy aerobic (rotation week).',
+      },
+    ];
+  }
+  if (c === 3) {
+    return [
+      {
+        session_type: 'technique_aerobic',
+        drill_emphasis: true,
+        notes: 'Technique-forward aerobic — drills + steady volume before race-rhythm day (rotation week).',
+      },
+      RACE_70_3_SLOT_META[1]!,
+    ];
+  }
+  return [
+    RACE_70_3_SLOT_META[0]!,
+    {
+      session_type: 'speed',
+      drill_emphasis: false,
+      notes: 'Speed / turnover — short fast reps with full recovery; neuromuscular sharpness without threshold density.',
+    },
+  ];
 }
 
 function applyTaperScale(slots: SwimSlotTemplate[]): SwimSlotTemplate[] {
@@ -225,6 +282,7 @@ export function getRecoverySwimTemplate(): SwimSlotTemplate {
  * @param phase `base` | `build` | `race_specific` | `taper` | `recovery` (aliases normalized).
  * @param distance goal distance string; normalized — v1 only 70.3 differs; others mirror 70.3.
  * @param weekInPhase 1-based week index within the current phase block (drives ramp).
+ * @param opts.planWeekNumber Absolute plan week (1-based). Used for **race** intent 4-week session rotation; falls back to `weekInPhase` when omitted.
  *
  * Returns **[]** for `recovery` — use {@link getRecoverySwimTemplate} instead so recovery stays explicit.
  */
@@ -233,7 +291,7 @@ export function getSwimSlotTemplates(
   phase: string,
   distance: string,
   weekInPhase: number,
-  opts?: { athleteFitness?: 'beginner' | 'intermediate' | 'advanced' },
+  opts?: { athleteFitness?: 'beginner' | 'intermediate' | 'advanced'; planWeekNumber?: number },
 ): SwimSlotTemplate[] {
   const ph = normalizePhase(phase);
   if (ph === 'recovery') return [];
@@ -340,5 +398,7 @@ export function getSwimSlotTemplates(
     const mult = protocolMidVolumeMultiplier(ph, distanceKey, athleteFitness);
     yardsR = yardsR.map((y) => roundYards(y * mult)) as [number, number];
   }
-  return raceTemplatesFromYards(yardsR);
+  const rotationWeek = opts?.planWeekNumber ?? weekInPhase;
+  const meta = raceTwoSwimRotationSlotMeta(rotationWeek);
+  return raceTemplatesFromMeta(meta, yardsR);
 }
