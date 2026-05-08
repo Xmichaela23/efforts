@@ -622,10 +622,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             ) : null}
             {(workout as any)?.workload_planned ? (
               <span
-                className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300"
                 title="Approximate planned training stress (TSS-style workload points)"
               >
-                {(workout as any).workload_planned}
+                <span className="text-white/45 font-normal">Workload</span>
+                <span className="text-gray-200 tabular-nums">{Math.round(Number((workout as any).workload_planned))}</span>
               </span>
             ) : null}
           </span>
