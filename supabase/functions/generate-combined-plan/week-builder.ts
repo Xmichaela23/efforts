@@ -25,6 +25,9 @@ import type { Sport, Intensity } from './types.ts';
 import {
   getSwimSlotTemplates,
   getRecoverySwimTemplate,
+  getTwoSlotRecoveryLearnerSwimTemplates,
+  shouldMaintainTwoSwimsInRecovery,
+  countSwimAnchorSlotsForRecovery,
   normalizeSwimProgramDistance,
   type SwimSlotTemplate,
 } from '../_shared/swim-program-templates.ts';
@@ -1013,14 +1016,29 @@ export function buildWeek(
   const swimDistance = normalizeSwimProgramDistance(primaryGoal.distance);
   const trainFitness = athleteState.training_fitness ?? 'intermediate';
   const swimSingleRecovery = hasTri && (isRecovery || recoveryRebuildWeek1);
+  const swimTrainingPrefs = primaryGoal.training_prefs ?? null;
+  const swimAnchorSlots = countSwimAnchorSlotsForRecovery(
+    {
+      swim_easy_day: athleteState.swim_easy_day,
+      swim_quality_day: athleteState.swim_quality_day,
+      swim_third_day: athleteState.swim_third_day,
+    },
+    swimTrainingPrefs,
+  );
+  const recoveryLearnerTwoSwimMaintained =
+    swimSingleRecovery &&
+    shouldMaintainTwoSwimsInRecovery(athleteState.swim_experience, trainFitness, swimAnchorSlots);
+
   let swimTemplates: SwimSlotTemplate[] = !hasTri
     ? []
-    : swimSingleRecovery
-      ? [getRecoverySwimTemplate()]
-      : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock, {
-          athleteFitness: trainFitness,
-          planWeekNumber: weekNum,
-        });
+    : recoveryLearnerTwoSwimMaintained
+      ? getTwoSlotRecoveryLearnerSwimTemplates(swimDistance)
+      : swimSingleRecovery
+        ? [getRecoverySwimTemplate()]
+        : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock, {
+            athleteFitness: trainFitness,
+            planWeekNumber: weekNum,
+          });
   if (hasTri && swimPct === 0 && !swimSingleRecovery && swimTemplates.length > 0) {
     swimTemplates = swimTemplates.map((t) => ({
       session_type: 'easy',
@@ -1034,9 +1052,16 @@ export function buildWeek(
   const SWIM_TSS_PER_HR = 55;
   const SWIM_YDS_PER_MIN = 30; // ~1650 yd/hr, mid-range for tri training
   const swimBudgetMinutes = (swimBudget / SWIM_TSS_PER_HR) * 60;
-  const swimBudgetYards   = swimBudgetMinutes * SWIM_YDS_PER_MIN;
+  let swimBudgetYards = swimBudgetMinutes * SWIM_YDS_PER_MIN;
 
   const preliminarySwimYards = swimTemplates.map((t) => Math.round(t.target_yards * swimMult));
+  if (recoveryLearnerTwoSwimMaintained && preliminarySwimYards.length === 2) {
+    swimBudgetYards = Math.max(
+      swimBudgetYards,
+      preliminarySwimYards.reduce((a, b) => a + b, 0) + 400,
+    );
+  }
+
   const swimResolved = resolveSwimSlotYardsWithBudget({
     templates: swimTemplates,
     preliminaryYards: preliminarySwimYards,
@@ -1045,7 +1070,9 @@ export function buildWeek(
     fitness: trainFitness,
     phase,
     weekInPhase: weekInBlock,
-    ...(athleteState.structural_load_hint === 'low' ? { recoveryFloorScale: 0.7 as const } : {}),
+    ...(athleteState.structural_load_hint === 'low' && !recoveryLearnerTwoSwimMaintained
+      ? { recoveryFloorScale: 0.7 as const }
+      : {}),
   });
   swimTemplates = swimResolved.templates;
   swimVolTradeOffs.push(...swimResolved.tradeOffs);

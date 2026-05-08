@@ -657,6 +657,32 @@ export function cssAerobicSwim(
   );
 }
 
+/** Learning-swimmer recovery: compact Z1–Z2 100s (no drill inset — keeps session short). */
+export function recoveryEasySwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+): PlannedSession {
+  totalYards = Math.max(650, Math.min(1200, snapSwimSessionTotalYdEasy(totalYards)));
+  const wu = 200;
+  const cd = 200;
+  const mainBudget = Math.max(250, totalYards - wu - cd);
+  const reps = Math.max(3, Math.min(8, Math.round(mainBudget / 100)));
+  const dur = Math.round(totalYards / 34);
+  return session(
+    day,
+    'swim',
+    `Recovery Swim — ${totalYards} yd`,
+    `Warm up ${wu} yd easy. ${reps}×100 yd at easy aerobic Z1–Z2 (20 sec rest). Cool down ${cd} yd.`,
+    dur,
+    'EASY',
+    [`swim_warmup_${wu}yd_easy`, `swim_aerobic_${reps}x100yd_easy_r20`, `swim_cooldown_${cd}yd`],
+    ['easy', 'aerobic', 'swim', 'recovery_swim'],
+    'Z1–Z2',
+    goalId,
+  );
+}
+
 export function easySwim(
   day: string,
   totalYards: number,
@@ -965,6 +991,10 @@ export function swimSessionFromTemplate(
         opts?.enduranceOverdistanceNote ?? false,
       );
     case 'easy':
+      if (template.recovery_learner_easy_structure) {
+        return recoveryEasySwim(day, yards, goalId);
+      }
+      return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
     default:
       return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
   }

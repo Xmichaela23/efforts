@@ -20,6 +20,8 @@ export interface GoalInput {
   distance: string;        // "sprint" | "olympic" | "70.3" | "ironman" | "marathon" | "half_marathon" | ...
   sport: string;           // "triathlon" | "run" | "cycling" | ...
   priority: Priority;
+  /** Merged wizard prefs when goals carry embedded metadata into combined-plan. */
+  training_prefs?: Record<string, unknown>;
 }
 
 export interface AthleteState {
@@ -127,6 +129,8 @@ export interface AthleteState {
    * `normal` = default.
    */
   structural_load_hint?: 'low' | 'moderate' | 'normal';
+  /** Wizard / Arc swim background (`learning` | `steady` | `strong`). */
+  swim_experience?: string;
   /** Goal / Arc swim tier — drives template scaling and swim session caps. */
   training_fitness?: 'beginner' | 'intermediate' | 'advanced';
   /** Echo of training_prefs days_per_week (4–7) for diagnostics; optional. */

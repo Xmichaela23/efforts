@@ -1506,6 +1506,14 @@ async function buildCombinedPlan(
         : {}),
       ...(freshCombinedPrefs.swim_intent ? { swim_intent: freshCombinedPrefs.swim_intent } : {}),
       ...(freshCombinedPrefs.swim_load_source ? { swim_load_source: freshCombinedPrefs.swim_load_source } : {}),
+      ...((): { swim_experience?: string } => {
+        const raw =
+          (newGoal.training_prefs as Record<string, unknown> | undefined)?.swim_experience ??
+          primaryGoalPrefs?.swim_experience;
+        if (raw == null) return {};
+        const s = String(raw).trim();
+        return s ? { swim_experience: s } : {};
+      })(),
       ...(freshCombinedPrefs.strength_preferred_days?.length
         ? { strength_preferred_days: freshCombinedPrefs.strength_preferred_days }
         : {}),

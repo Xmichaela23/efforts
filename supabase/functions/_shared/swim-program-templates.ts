@@ -6,6 +6,8 @@
  * race distance × athlete fitness using midpoint averages from `VOLUME_RANGES` in SWIM-IMPLEMENTATION-FINAL.
  */
 
+import { preferredDaysSwimSlotCount } from './combined-schedule-prefs.ts';
+
 export type SwimDistanceKey = 'sprint' | 'olympic' | '70.3' | 'full';
 
 export type SwimSessionType =
@@ -25,6 +27,8 @@ export interface SwimSlotTemplate {
   target_yards: number;
   drill_emphasis: boolean;
   notes?: string;
+  /** Compact recovery main set — {@link recoveryEasySwim} in session-factory (easy slot only). */
+  recovery_learner_easy_structure?: boolean;
 }
 
 /** Canonical phase keys after normalization. */
@@ -273,6 +277,61 @@ export function getRecoverySwimTemplate(): SwimSlotTemplate {
     drill_emphasis: false,
     notes: 'Recovery: one easy aerobic swim — frequency without structural load.',
   };
+}
+
+/** Max of preferred_days.swim length and distinct swim_*_day pins — recovery rule needs ≥2 anchors. */
+export function countSwimAnchorSlotsForRecovery(
+  pins: {
+    swim_easy_day?: number | null;
+    swim_quality_day?: number | null;
+    swim_third_day?: number | null;
+  },
+  trainingPrefs?: Record<string, unknown> | null,
+): number {
+  const fromPrefs = preferredDaysSwimSlotCount(trainingPrefs ?? undefined);
+  const d = new Set<number>();
+  if (pins.swim_easy_day != null) d.add(pins.swim_easy_day);
+  if (pins.swim_quality_day != null) d.add(pins.swim_quality_day);
+  if (pins.swim_third_day != null) d.add(pins.swim_third_day);
+  return Math.max(fromPrefs, d.size);
+}
+
+/** Learning / beginner swimmers keep frequency through recovery when two swim days exist. */
+export function shouldMaintainTwoSwimsInRecovery(
+  swimExperience: string | undefined,
+  trainingFitness: string | undefined,
+  swimAnchorSlots: number,
+): boolean {
+  if (swimAnchorSlots < 2) return false;
+  const se = String(swimExperience ?? '').trim().toLowerCase();
+  const tf = String(trainingFitness ?? '').trim().toLowerCase();
+  if (se === 'learning' || se === 'beginner') return true;
+  if (tf === 'beginner') return true;
+  return false;
+}
+
+/**
+ * Two short swims for recovery / rebuild weeks — technique continuity for learners.
+ * Full IM uses slightly higher yard targets.
+ */
+export function getTwoSlotRecoveryLearnerSwimTemplates(distanceKey: SwimDistanceKey): SwimSlotTemplate[] {
+  const isFull = distanceKey === 'full';
+  const y = isFull ? 1000 : 800;
+  return [
+    {
+      session_type: 'easy',
+      target_yards: y,
+      drill_emphasis: false,
+      recovery_learner_easy_structure: true,
+      notes: 'Active recovery — maintain feel for water without fatigue.',
+    },
+    {
+      session_type: 'technique_aerobic',
+      target_yards: y,
+      drill_emphasis: true,
+      notes: 'Light technique — reinforce mechanics from prior training block.',
+    },
+  ];
 }
 
 /**
