@@ -63,11 +63,37 @@ Deno.test('Rule 3: relocates swim away from overcrowded day and prefers lighter 
     base({ id: 'eb', type: 'easy_bike', day: 'wednesday', intensity: 'Z2', isWeightBearing: false }),
     base({ id: 'erw', type: 'easy_run', day: 'wednesday', intensity: 'Z2', isWeightBearing: true }),
   ];
-  const out = resolveScheduleRules(sessions);
+  // Olympic tier: max 2 sessions/day before swim relocation (stricter than 70.3).
+  const out = resolveScheduleRules(sessions, 'olympic');
   const swim = out.find((s) => s.type === 'swim')!;
   assertEquals(swim.day === 'tuesday', false);
   // Thursday has one session (quality_bike); Wednesday has two — lowest effective load wins before rest inflation (50).
   assertEquals(swim.day, 'thursday');
+});
+
+Deno.test('Rule 1.5: 70.3 separates long_run from long_ride when stacked', () => {
+  const sessions: PlannedSession[] = [
+    base({ id: 'lr', type: 'long_ride', day: 'saturday', intensity: 'Z2', isWeightBearing: false }),
+    base({ id: 'ln', type: 'long_run', day: 'saturday', intensity: 'Z2', isWeightBearing: true }),
+    base({ id: 'qb', type: 'quality_bike', day: 'wednesday', intensity: 'Z4', isWeightBearing: false }),
+    base({ id: 'qr', type: 'quality_run', day: 'thursday', intensity: 'Z4', isWeightBearing: true }),
+    base({ id: 'lb', type: 'lower_body_lift', day: 'friday', intensity: 'Z3', isWeightBearing: false }),
+  ];
+  const out = resolveScheduleRules(sessions, '70.3');
+  assertEquals(out.find((s) => s.type === 'long_ride')!.day, 'saturday');
+  assertEquals(out.find((s) => s.type === 'long_run')!.day, 'monday');
+});
+
+Deno.test('sprint keeps long_ride and long_run on same day when allowLongStack', () => {
+  const sessions: PlannedSession[] = [
+    base({ id: 'lr', type: 'long_ride', day: 'sunday', intensity: 'Z2', isWeightBearing: false }),
+    base({ id: 'ln', type: 'long_run', day: 'sunday', intensity: 'Z2', isWeightBearing: true }),
+    base({ id: 'qb', type: 'quality_bike', day: 'tuesday', intensity: 'Z4', isWeightBearing: false }),
+    base({ id: 'qr', type: 'quality_run', day: 'thursday', intensity: 'Z4', isWeightBearing: true }),
+  ];
+  const out = resolveScheduleRules(sessions, 'sprint');
+  assertEquals(out.find((s) => s.type === 'long_ride')!.day, 'sunday');
+  assertEquals(out.find((s) => s.type === 'long_run')!.day, 'sunday');
 });
 
 Deno.test('validateScheduleCollisionInvariants throws SCHEDULE_GRIDLOCK_LOWER_BODY', () => {

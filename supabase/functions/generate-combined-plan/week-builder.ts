@@ -62,6 +62,7 @@ import {
 } from '../_shared/schedule-session-constraints.ts';
 import { blockForWeek } from './phase-structure.ts';
 import { tryApplyScheduleCollisionsToGrid } from './apply-schedule-collisions.ts';
+import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
 
 /**
  * Timeline rows are one week each (`pushBlockRange`: startWeek === endWeek). Using
@@ -1958,6 +1959,7 @@ export function buildWeek(
     weekNum,
     conflictEvents,
     weekTradeOffs: mergedTradeOffs,
+    triDistance: normalizeGoalDistanceToTriCollisionDistance(primaryGoal?.distance),
   });
 
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────

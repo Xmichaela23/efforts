@@ -16,6 +16,7 @@ import {
   type PlannedSession as CollisionPlannedSession,
   type PlannedSessionType,
   type PlannedIntensityZone,
+  type TriathlonDistance,
 } from '../_shared/resolve-schedule-collisions.ts';
 
 export type ScheduleCollisionGridSlot = { sessions: GenPlannedSession[] };
@@ -171,11 +172,18 @@ function recordCollisionFailure(args: {
 }): void {
   const { weekNum, seq, err, conflictEvents, weekTradeOffs } = args;
   const isQuality = err.code === 'SCHEDULE_GRIDLOCK_QUALITY_COLLISION';
+  const isLong = err.code === 'SCHEDULE_GRIDLOCK_LONG_COLLISION';
+  const conflict_type = isQuality
+    ? 'quality_bike_blocked'
+    : isLong
+      ? 'long_stack_blocked'
+      : 'heavy_lower_blocked';
+  const session_kind = isQuality ? 'quality_run' : isLong ? 'long_run' : 'lower_body_strength';
   conflictEvents.push({
     conflict_id: `w${weekNum}-collision-pass-${seq}`,
-    conflict_type: isQuality ? 'quality_bike_blocked' : 'heavy_lower_blocked',
+    conflict_type,
     blocked_intent: {
-      session_kind: isQuality ? 'quality_run' : 'lower_body_strength',
+      session_kind,
       intensity_class: 'HARD',
     },
     blocking_reasons: ['anchor_conflict'],
@@ -188,7 +196,9 @@ function recordCollisionFailure(args: {
   weekTradeOffs.push(
     isQuality
       ? 'Weekly schedule collision pass skipped: quality bike and quality run anchors could not be separated automatically — review hard sessions.'
-      : 'Weekly schedule collision pass skipped: lower-body strength could not be moved off heavy endurance days without breaking constraints.',
+      : isLong
+        ? 'Weekly schedule collision pass skipped: long ride and long run could not be separated on the calendar — review weekend anchors.'
+        : 'Weekly schedule collision pass skipped: lower-body strength could not be moved off heavy endurance days without breaking constraints.',
   );
 }
 
@@ -202,9 +212,11 @@ export function tryApplyScheduleCollisionsToGrid(
     weekNum: number;
     conflictEvents: ConflictEvent[];
     weekTradeOffs: string[];
+    /** Goal distance key (sprint / olympic / 70.3 / ironman) → collision tier. */
+    triDistance?: TriathlonDistance;
   },
 ): void {
-  const { weekNum, conflictEvents, weekTradeOffs } = ctx;
+  const { weekNum, conflictEvents, weekTradeOffs, triDistance = '70.3' } = ctx;
   let attempt = 0;
   const maxAttempts = 2;
 
@@ -214,7 +226,7 @@ export function tryApplyScheduleCollisionsToGrid(
     if (extracted.payload.length === 0) return;
 
     try {
-      const resolved = resolveScheduleRules(extracted.payload);
+      const resolved = resolveScheduleRules(extracted.payload, triDistance);
       applyResolvedCollisionDays(flat, extracted, resolved);
       if (attempt > 0) {
         weekTradeOffs.push(

@@ -52,6 +52,7 @@ import {
   validateCombinedSchedulePrefsCollision,
   validateTrainingPrefsScheduleCollision,
 } from '../_shared/prefs-to-collision-model.ts';
+import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
 import {
   hasBarbellCapability,
   hasCableMachine,
@@ -1103,7 +1104,10 @@ async function buildCombinedPlan(
     primaryGoalPrefs as Record<string, unknown>,
   );
   if (strictSchedulePrefs) {
-    const vc = validateCombinedSchedulePrefsCollision(combinedSchedulePrefs);
+    const vc = validateCombinedSchedulePrefsCollision(
+      combinedSchedulePrefs,
+      normalizeGoalDistanceToTriCollisionDistance(newGoal.distance),
+    );
     if (!vc.ok) {
       throw new AppError(vc.code, vc.message, 409);
     }
@@ -1854,7 +1858,10 @@ Deno.serve(async (req: Request) => {
       const sportForBackfill = String(resolvedGoal.sport || '').toLowerCase();
       if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
         if (strictSchedulePrefs) {
-          const vc = validateTrainingPrefsScheduleCollision(mergedPrefs);
+          const vc = validateTrainingPrefsScheduleCollision(
+            mergedPrefs,
+            normalizeGoalDistanceToTriCollisionDistance(resolvedGoal?.distance),
+          );
           if (!vc.ok) {
             throw new AppError(vc.code, vc.message, 409);
           }

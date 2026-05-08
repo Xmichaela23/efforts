@@ -7,6 +7,7 @@ import type { CombinedSchedulePrefs } from './combined-schedule-prefs.ts';
 import { mergeCombinedSchedulePrefs, parseSunFirstDayIndex } from './combined-schedule-prefs.ts';
 import { normalizeDayName } from './week-optimizer.ts';
 import {
+  normalizeGoalDistanceToTriCollisionDistance,
   resolveScheduleRules,
   ScheduleCollisionError,
   type DayOfWeek,
@@ -14,9 +15,23 @@ import {
   type PlannedSession,
   type PlannedSessionType,
   type ScheduleCollisionCode,
+  type TriathlonDistance,
 } from './resolve-schedule-collisions.ts';
 
-export type { ScheduleCollisionCode };
+export type { ScheduleCollisionCode, TriathlonDistance };
+
+function triDistanceFromPrefs(
+  trainingPrefs: Record<string, unknown>,
+  override?: TriathlonDistance,
+): TriathlonDistance {
+  if (override) return override;
+  const raw =
+    trainingPrefs.distance ??
+    trainingPrefs.event_distance ??
+    trainingPrefs.eventDistance ??
+    trainingPrefs.goal_distance;
+  return normalizeGoalDistanceToTriCollisionDistance(raw);
+}
 
 const SUN_IX: DayOfWeek[] = [
   'sunday',
@@ -217,7 +232,10 @@ function mergeCollisionByTypePreferFirst(primary: PlannedSession[], secondary: P
 }
 
 /** Returns ok:false only when resolver throws — rare; used with `strict_schedule_prefs`. */
-export function validateTrainingPrefsScheduleCollision(trainingPrefs: Record<string, unknown> | null | undefined): {
+export function validateTrainingPrefsScheduleCollision(
+  trainingPrefs: Record<string, unknown> | null | undefined,
+  triDistance?: TriathlonDistance,
+): {
   ok: true;
 } | { ok: false; code: ScheduleCollisionCode; message: string } {
   if (!trainingPrefs || typeof trainingPrefs !== 'object' || Array.isArray(trainingPrefs)) {
@@ -226,7 +244,7 @@ export function validateTrainingPrefsScheduleCollision(trainingPrefs: Record<str
   const sessions = trainingPrefsToCollisionSessions(trainingPrefs);
   if (sessions.length === 0) return { ok: true };
   try {
-    resolveScheduleRules(sessions);
+    resolveScheduleRules(sessions, triDistanceFromPrefs(trainingPrefs, triDistance));
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleCollisionError) {
@@ -236,13 +254,16 @@ export function validateTrainingPrefsScheduleCollision(trainingPrefs: Record<str
   }
 }
 
-export function validateCombinedSchedulePrefsCollision(prefs: CombinedSchedulePrefs): {
+export function validateCombinedSchedulePrefsCollision(
+  prefs: CombinedSchedulePrefs,
+  triDistance?: TriathlonDistance,
+): {
   ok: true;
 } | { ok: false; code: ScheduleCollisionCode; message: string } {
   const sessions = combinedSchedulePrefsToCollisionSessions(prefs);
   if (sessions.length === 0) return { ok: true };
   try {
-    resolveScheduleRules(sessions);
+    resolveScheduleRules(sessions, triDistance ?? '70.3');
     return { ok: true };
   } catch (e) {
     if (e instanceof ScheduleCollisionError) {

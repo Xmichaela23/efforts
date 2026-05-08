@@ -301,7 +301,9 @@ export type ConflictType =
   | 'quality_bike_blocked'
   | 'heavy_lower_blocked'
   | 'brick_blocked'
-  | 'third_swim_blocked';
+  | 'third_swim_blocked'
+  /** Long ride + long run could not be separated (coarse collision pass, 70.3/140.6). */
+  | 'long_stack_blocked';
 
 export type WeekStateReason =
   | 'consecutive_same_discipline'
