@@ -3,7 +3,43 @@
  *   deno test supabase/functions/generate-combined-plan/swim-slot-templates.test.ts --allow-read
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { getSwimSlotTemplates } from '../_shared/swim-program-templates.ts';
+import {
+  countSwimAnchorSlotsForProgramTemplates,
+  getSwimSlotTemplates,
+  swimProgramIntentForAnchorSlots,
+} from '../_shared/swim-program-templates.ts';
+
+Deno.test('swimProgramIntentForAnchorSlots — focus requires three swim anchors', () => {
+  assertEquals(swimProgramIntentForAnchorSlots('focus', 2), 'race');
+  assertEquals(swimProgramIntentForAnchorSlots('focus', 3), 'focus');
+  assertEquals(swimProgramIntentForAnchorSlots('race', 2), 'race');
+  assertEquals(swimProgramIntentForAnchorSlots('Focus', 3), 'focus');
+});
+
+Deno.test('focus + three-entry prefs but two pins → race rotation week 2 (no css slot)', () => {
+  const slots = countSwimAnchorSlotsForProgramTemplates(
+    { swim_easy_day: 1, swim_quality_day: 4 },
+    { preferred_days: { swim: ['monday', 'tuesday', 'wednesday'] } },
+  );
+  assertEquals(slots, 2);
+  const intent = swimProgramIntentForAnchorSlots('focus', slots);
+  assertEquals(intent, 'race');
+  const w2 = getSwimSlotTemplates(intent, 'build', '70.3', 1, {
+    athleteFitness: 'intermediate',
+    planWeekNumber: 2,
+  });
+  assertEquals(w2.map((s) => s.session_type), ['threshold', 'pull_focused']);
+});
+
+Deno.test('focus with two anchors uses race rotation — quality swim stays threshold week 2', () => {
+  const intent = swimProgramIntentForAnchorSlots('focus', 2);
+  assertEquals(intent, 'race');
+  const w2 = getSwimSlotTemplates(intent, 'build', '70.3', 1, {
+    athleteFitness: 'intermediate',
+    planWeekNumber: 2,
+  });
+  assertEquals(w2.map((s) => s.session_type), ['threshold', 'pull_focused']);
+});
 
 Deno.test('getSwimSlotTemplates — build alternates pull (even) and kick (odd) on slot 1', () => {
   const even = getSwimSlotTemplates('focus', 'build', '70.3', 2, { athleteFitness: 'intermediate' });

@@ -28,7 +28,9 @@ import {
   getTwoSlotRecoveryLearnerSwimTemplates,
   shouldMaintainTwoSwimsInRecovery,
   countSwimAnchorSlotsForRecovery,
+  countSwimAnchorSlotsForProgramTemplates,
   normalizeSwimProgramDistance,
+  swimProgramIntentForAnchorSlots,
   type SwimSlotTemplate,
 } from '../_shared/swim-program-templates.ts';
 import {
@@ -1025,6 +1027,19 @@ export function buildWeek(
     },
     swimTrainingPrefs,
   );
+  /** Conservative count for 2- vs 3-slot swim programs (focus vs race). See countSwimAnchorSlotsForProgramTemplates. */
+  const swimProgramAnchorSlots = countSwimAnchorSlotsForProgramTemplates(
+    {
+      swim_easy_day: athleteState.swim_easy_day,
+      swim_quality_day: athleteState.swim_quality_day,
+      swim_third_day: athleteState.swim_third_day,
+    },
+    swimTrainingPrefs,
+  );
+  const swimTemplatesIntent = swimProgramIntentForAnchorSlots(
+    athleteState.swim_intent,
+    swimProgramAnchorSlots,
+  );
   const recoveryLearnerTwoSwimMaintained =
     swimSingleRecovery &&
     shouldMaintainTwoSwimsInRecovery(athleteState.swim_experience, trainFitness, swimAnchorSlots);
@@ -1035,7 +1050,7 @@ export function buildWeek(
       ? getTwoSlotRecoveryLearnerSwimTemplates(swimDistance)
       : swimSingleRecovery
         ? [getRecoverySwimTemplate()]
-        : getSwimSlotTemplates(athleteState.swim_intent ?? 'race', phase, swimDistance, weekInBlock, {
+        : getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, weekInBlock, {
             athleteFitness: trainFitness,
             planWeekNumber: weekNum,
           });
@@ -1077,6 +1092,16 @@ export function buildWeek(
   });
   swimTemplates = swimResolved.templates;
   swimVolTradeOffs.push(...swimResolved.tradeOffs);
+
+  if (hasTri && swimTemplates.length > 0) {
+    console.log('[buildWeek] swim anchors vs templates', weekNum, {
+      swim_anchor_slots_recovery: swimAnchorSlots,
+      swim_anchor_slots_program: swimProgramAnchorSlots,
+      athlete_swim_intent: athleteState.swim_intent,
+      resolved_templates_intent: swimTemplatesIntent,
+      template_session_types: swimTemplates.map((t) => t.session_type),
+    });
+  }
 
   const swimSlotYards703 = apply703SlowSwimmerWeeklyFloors({
     templates: swimTemplates,

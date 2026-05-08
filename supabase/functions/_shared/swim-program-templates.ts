@@ -279,6 +279,19 @@ export function getRecoverySwimTemplate(): SwimSlotTemplate {
   };
 }
 
+/** Distinct calendar days from `swim_easy_day` / `swim_quality_day` / `swim_third_day` (0=Sun … 6=Sat). */
+export function distinctSwimPinDayCount(pins: {
+  swim_easy_day?: number | null;
+  swim_quality_day?: number | null;
+  swim_third_day?: number | null;
+}): number {
+  const d = new Set<number>();
+  if (pins.swim_easy_day != null) d.add(pins.swim_easy_day);
+  if (pins.swim_quality_day != null) d.add(pins.swim_quality_day);
+  if (pins.swim_third_day != null) d.add(pins.swim_third_day);
+  return d.size;
+}
+
 /** Max of preferred_days.swim length and distinct swim_*_day pins — recovery rule needs ≥2 anchors. */
 export function countSwimAnchorSlotsForRecovery(
   pins: {
@@ -289,11 +302,30 @@ export function countSwimAnchorSlotsForRecovery(
   trainingPrefs?: Record<string, unknown> | null,
 ): number {
   const fromPrefs = preferredDaysSwimSlotCount(trainingPrefs ?? undefined);
-  const d = new Set<number>();
-  if (pins.swim_easy_day != null) d.add(pins.swim_easy_day);
-  if (pins.swim_quality_day != null) d.add(pins.swim_quality_day);
-  if (pins.swim_third_day != null) d.add(pins.swim_third_day);
-  return Math.max(fromPrefs, d.size);
+  const pinN = distinctSwimPinDayCount(pins);
+  return Math.max(fromPrefs, pinN);
+}
+
+/**
+ * Slots used for **focus vs race swim template** selection.
+ *
+ * When Arc still lists three weekdays in `preferred_days.swim` but only two `swim_*_day` pins exist,
+ * {@link countSwimAnchorSlotsForRecovery} returns 3 (max) — wrongly unlocking focus 3-slot templates.
+ * Here we take **min** when both prefs and pins exist so template rows match schedulable anchors.
+ */
+export function countSwimAnchorSlotsForProgramTemplates(
+  pins: {
+    swim_easy_day?: number | null;
+    swim_quality_day?: number | null;
+    swim_third_day?: number | null;
+  },
+  trainingPrefs?: Record<string, unknown> | null,
+): number {
+  const prefsLen = preferredDaysSwimSlotCount(trainingPrefs ?? undefined);
+  const pinN = distinctSwimPinDayCount(pins);
+  if (prefsLen >= 1 && pinN >= 1) return Math.min(prefsLen, pinN);
+  if (prefsLen >= 1) return prefsLen;
+  return pinN;
 }
 
 /** Learning / beginner swimmers keep frequency through recovery when two swim days exist. */
@@ -332,6 +364,22 @@ export function getTwoSlotRecoveryLearnerSwimTemplates(distanceKey: SwimDistance
       notes: 'Light technique — reinforce mechanics from prior training block.',
     },
   ];
+}
+
+/**
+ * Focus programs include a third template (`css_aerobic`). With only **two** pinned swim days,
+ * week-builder places slots 0–1; budget resolution can drop slot 1 (`technique_aerobic`, low drop tier)
+ * before slot 2, producing `[threshold, css_aerobic]` — the easy day wrongly becomes “CSS Aerobic.”
+ * Use **race** 2-slot rotation until the athlete has three swim anchors **by program-slot count**
+ * ({@link countSwimAnchorSlotsForProgramTemplates}), not the generous recovery max.
+ */
+export function swimProgramIntentForAnchorSlots(
+  swimIntent: string | undefined,
+  swimAnchorSlots: number,
+): 'focus' | 'race' {
+  const raw = String(swimIntent ?? 'race').trim().toLowerCase();
+  if (raw !== 'focus') return 'race';
+  return swimAnchorSlots >= 3 ? 'focus' : 'race';
 }
 
 /**

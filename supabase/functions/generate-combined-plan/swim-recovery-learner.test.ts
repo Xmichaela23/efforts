@@ -5,9 +5,40 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   countSwimAnchorSlotsForRecovery,
+  countSwimAnchorSlotsForProgramTemplates,
   getTwoSlotRecoveryLearnerSwimTemplates,
   shouldMaintainTwoSwimsInRecovery,
 } from '../_shared/swim-program-templates.ts';
+
+Deno.test('countSwimAnchorSlotsForProgramTemplates — min when prefs list three days but two pins', () => {
+  assertEquals(
+    countSwimAnchorSlotsForProgramTemplates(
+      { swim_easy_day: 1, swim_quality_day: 4 },
+      { preferred_days: { swim: ['monday', 'tuesday', 'wednesday'] } },
+    ),
+    2,
+  );
+});
+
+Deno.test('countSwimAnchorSlotsForProgramTemplates — matches prefs when pins absent', () => {
+  assertEquals(
+    countSwimAnchorSlotsForProgramTemplates(
+      {},
+      { preferred_days: { swim: ['monday', 'thursday'] } },
+    ),
+    2,
+  );
+});
+
+Deno.test('countSwimAnchorSlotsForProgramTemplates — pins only when prefs empty', () => {
+  assertEquals(
+    countSwimAnchorSlotsForProgramTemplates(
+      { swim_easy_day: 1, swim_quality_day: 4, swim_third_day: 3 },
+      {},
+    ),
+    3,
+  );
+});
 
 Deno.test('shouldMaintainTwoSwimsInRecovery — learning + 2 anchors', () => {
   assertEquals(shouldMaintainTwoSwimsInRecovery('learning', 'intermediate', 2), true);
