@@ -101,7 +101,37 @@ function matrixRowForSlot(k: ScheduleSlotKind): MatrixSessionKind {
  */
 export type SameDayCompatContext = {
   allowQualityRunQualitySwimSameDay?: boolean;
+  /**
+   * From `run_quality_placement === 'standalone_midweek'`: disallow stacking **quality_run**
+   * with easy aerobic swim or easy bike on the same calendar day (matrix alone allows those pairs).
+   */
+  strictStandaloneQualityRun?: boolean;
+  /**
+   * Athlete `swim_experience` (e.g. `new`). When `plannedSessionToScheduleSlot` resolves yards,
+   * heavy singles for newer swimmers map to `quality_swim` for matrix pairing (volume-as-quality).
+   */
+  swimExperienceForMatrix?: string;
 };
+
+/** Yards above this for `new`-tier swimmers → treat session as quality_swim for same-day matrix. */
+export const LEARNER_HEAVY_SWIM_YARDS = 1500;
+
+export function learnerSwimExperience(exp: string | undefined): boolean {
+  const s = String(exp ?? '').trim().toLowerCase();
+  return s === 'new' || s === 'beginner' || s === 'learning';
+}
+
+function extractSwimYardsFromPlanned(s: PlannedSessionLike): number | undefined {
+  const ty = typeof (s as { target_yards?: unknown }).target_yards;
+  if (typeof ty === 'number' && Number.isFinite(ty) && ty > 0) return ty;
+  const text = `${s.name} ${s.description ?? ''}`;
+  const m = text.match(/([\d,]+)\s*yd\b/i);
+  if (m?.[1]) {
+    const n = Number(String(m[1]).replace(/,/g, ''));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return undefined;
+}
 
 /** Pairwise same-day check for engine + arc (includes `quality_swim` row + race). */
 export function areScheduleSlotsCompatible(
@@ -114,6 +144,15 @@ export function areScheduleSlotsCompatible(
 
   const ma = matrixRowForSlot(a);
   const mb = matrixRowForSlot(b);
+
+  if (
+    ctx?.strictStandaloneQualityRun &&
+    ((ma === 'quality_run' && (mb === 'easy_swim' || mb === 'easy_bike')) ||
+      (mb === 'quality_run' && (ma === 'easy_swim' || ma === 'easy_bike')))
+  ) {
+    return false;
+  }
+
   if (!!SAME_DAY_COMPATIBLE[ma]?.[mb]) return true;
 
   if (
@@ -138,7 +177,10 @@ export type PlannedSessionLike = {
  * still mapped via bike/run rules for cross-session checks; **both** tagged `brick` is
  * whitelisted in `arePlannedSessionsCompatible`.
  */
-export function plannedSessionToScheduleSlot(s: PlannedSessionLike): ScheduleSlotKind {
+export function plannedSessionToScheduleSlot(
+  s: PlannedSessionLike,
+  ctx?: Pick<SameDayCompatContext, 'swimExperienceForMatrix'>,
+): ScheduleSlotKind {
   const tags = Array.isArray(s.tags) ? s.tags.map((t) => String(t).toLowerCase()) : [];
   const n = `${s.name} ${s.description ?? ''}`.toLowerCase();
   const ty = String(s.type || '').toLowerCase();
@@ -162,6 +204,14 @@ export function plannedSessionToScheduleSlot(s: PlannedSessionLike): ScheduleSlo
       tags.includes('threshold') ||
       tags.includes('css_aerobic') ||
       tags.includes('pull_focus_swim')
+    ) {
+      return 'quality_swim';
+    }
+    const yards = extractSwimYardsFromPlanned(s);
+    if (
+      learnerSwimExperience(ctx?.swimExperienceForMatrix) &&
+      yards != null &&
+      yards > LEARNER_HEAVY_SWIM_YARDS
     ) {
       return 'quality_swim';
     }
@@ -202,10 +252,12 @@ export function arePlannedSessionsCompatible(
   const t2 = Array.isArray(s2.tags) ? s2.tags : [];
   if (t1.includes('brick') && t2.includes('brick')) return true;
 
+  const slotCtx = ctx ? { swimExperienceForMatrix: ctx.swimExperienceForMatrix } : undefined;
   const tags1 = Array.isArray(s1.tags) ? s1.tags.map((t) => String(t).toLowerCase()) : [];
   const tags2 = Array.isArray(s2.tags) ? s2.tags.map((t) => String(t).toLowerCase()) : [];
   const isLongCourseKickSwim = (tags: string[]) => tags.includes('kick_tri_long_course');
-  const isLongRunSession = (s: PlannedSessionLike) => plannedSessionToScheduleSlot(s) === 'long_run';
+  const isLongRunSession = (s: PlannedSessionLike) =>
+    plannedSessionToScheduleSlot(s, slotCtx) === 'long_run';
   if (
     (isLongCourseKickSwim(tags1) && isLongRunSession(s2)) ||
     (isLongCourseKickSwim(tags2) && isLongRunSession(s1))
@@ -213,8 +265,8 @@ export function arePlannedSessionsCompatible(
     return true;
   }
 
-  const a = plannedSessionToScheduleSlot(s1);
-  const b = plannedSessionToScheduleSlot(s2);
+  const a = plannedSessionToScheduleSlot(s1, slotCtx);
+  const b = plannedSessionToScheduleSlot(s2, slotCtx);
   if ((t1.includes('brick') || t2.includes('brick')) && t1.includes('brick') !== t2.includes('brick')) {
     return true;
   }

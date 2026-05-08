@@ -28,6 +28,20 @@ export const CLIMB_NOTICE_MIN_MK = 12;
 export const CLIMB_AGGRESSIVE_MIN_MK = 16;
 export const CLIMB_AGGRESSIVE_MIN_GAIN_M = 500;
 
+/** Imperial density — routes above this behave like sustained climbing stress for scheduling/copy. */
+export const GROUP_RIDE_HIGH_CLIMB_FT_PER_MI = 80;
+
+/** True when vertical gain per mile exceeds `GROUP_RIDE_HIGH_CLIMB_FT_PER_MI` (wizard route snapshot). */
+export function groupRideRouteHighVerticalStress(
+  snapshot: GroupRideRouteSnapshot | null | undefined,
+): boolean {
+  if (!snapshot) return false;
+  const mi = snapshot.distance_m / 1609.344;
+  if (!(mi > 0)) return false;
+  const ft = snapshot.elevation_gain_m * 3.28084;
+  return ft / mi > GROUP_RIDE_HIGH_CLIMB_FT_PER_MI;
+}
+
 /** Extract route id digits from a Strava routes URL (preserves full precision). */
 export function parseStravaRouteIdFromUrl(urlStr: string): string | null {
   try {

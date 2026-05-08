@@ -186,8 +186,10 @@ export interface AthleteState {
   strength_optimizer_slots?: { weekday: string; session_index: 0 | 1 }[];
   /**
    * Arc wizard / athlete preference when anchored quality bike can force mid-week run intervals
-   * (typically Thu after Wed group ride). `long_run_blend` folds stimulus into the long run instead;
-   * `standalone_midweek` accepts stack-back-to-back (engine keeps adjacent HARD geometry).
+   * (typically Thu after Wed group ride). `long_run_blend` folds stimulus into the long run instead.
+   * `standalone_midweek`: engine may keep adjacent HARD bike→run geometry; additionally enables
+   * **strict same-day pairing** (no easy swim / easy bike stacked with quality_run) and bumps quality run
+   * off the swim-easy anchor day when possible.
    */
   run_quality_placement?: 'standalone_midweek' | 'long_run_blend';
   /**
@@ -290,6 +292,8 @@ export interface PlannedSession {
    * Stable across display copy changes — prefer this over parsing `name` in tests or analytics.
    */
   session_kind?: string;
+  /** Resolved swim distance for pairing-matrix fatigue rules (newer swimmers). */
+  target_yards?: number;
   /** When set (e.g. neural_speed / triathlon protocol), activate-plan persists this and materialize uses it instead of token-derived exercises. */
   strength_exercises?: PlannedStrengthExercise[];
 }

@@ -8,7 +8,11 @@ import type { PlannedSession, Phase, Intensity, PlannedStrengthExercise } from '
 import type { Sport } from './types.ts';
 import { estimateSessionTSS, weightedTSS, DAYS_OF_WEEK, type TriRaceDistance } from './science.ts';
 import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
-import { climbNoticeTier, groupRideBikeTssFloor } from '../_shared/group-ride-route-snapshot.ts';
+import {
+  climbNoticeTier,
+  groupRideBikeTssFloor,
+  groupRideRouteHighVerticalStress,
+} from '../_shared/group-ride-route-snapshot.ts';
 import type { StrengthProtocol } from '../shared/strength-system/protocols/types.ts';
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
@@ -383,9 +387,13 @@ export function groupRideSession(
   routeUnits: 'imperial' | 'metric' = 'imperial',
 ): PlannedSession {
   const min = Math.max(45, Math.round(hours * 60));
+  const highVertical = routeSnapshot != null && groupRideRouteHighVerticalStress(routeSnapshot);
+  const tier = routeSnapshot != null ? climbNoticeTier(routeSnapshot) : 'none';
   const phaseLine =
     phase === 'base'
-      ? 'Keep overall effort aerobic — Z2 with climb surges.'
+      ? highVertical || tier !== 'none'
+        ? 'Route has sustained climbing — expect threshold-like surges on hills; keep flats easy and fuel.'
+        : 'Keep overall effort aerobic — Z2 with climb surges.'
       : 'This is your quality bike session — give the climbs real effort.';
   const url = typeof routeUrl === 'string' ? routeUrl.trim() : '';
 
@@ -1012,7 +1020,7 @@ export function swimSessionFromTemplate(
     session_type: template.session_type,
     created_name: created.name,
   });
-  return created;
+  return { ...created, target_yards: yards };
 }
 
 /** Open water skills practice — ocean/lake chop, sighting, wetsuit comfort (tri-specific). */

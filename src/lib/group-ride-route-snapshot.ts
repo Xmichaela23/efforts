@@ -22,6 +22,17 @@ export const CLIMB_NOTICE_MIN_MK = 12;
 export const CLIMB_AGGRESSIVE_MIN_MK = 16;
 export const CLIMB_AGGRESSIVE_MIN_GAIN_M = 500;
 
+/** Imperial density — server `groupRideRouteHighVerticalStress` uses same threshold. */
+export const GROUP_RIDE_HIGH_CLIMB_FT_PER_MI = 80;
+
+export function groupRideRouteHighVerticalStress(snapshot: GroupRideRouteSnapshot | null | undefined): boolean {
+  if (!snapshot) return false;
+  const mi = snapshot.distance_m / 1609.344;
+  if (!(mi > 0)) return false;
+  const ft = snapshot.elevation_gain_m * 3.28084;
+  return ft / mi > GROUP_RIDE_HIGH_CLIMB_FT_PER_MI;
+}
+
 export function climbNoticeTier(
   snapshot: GroupRideRouteSnapshot,
 ): 'none' | 'notice' | 'aggressive' {

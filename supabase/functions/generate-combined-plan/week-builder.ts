@@ -58,8 +58,11 @@ import {
 import {
   arePlannedSessionsCompatible,
   plannedSessionToScheduleSlot,
+  LEARNER_HEAVY_SWIM_YARDS,
+  learnerSwimExperience,
   type SameDayCompatContext,
 } from '../_shared/schedule-session-constraints.ts';
+import { groupRideRouteHighVerticalStress } from '../_shared/group-ride-route-snapshot.ts';
 import { blockForWeek } from './phase-structure.ts';
 import { tryApplyScheduleCollisionsToGrid } from './apply-schedule-collisions.ts';
 import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
@@ -433,8 +436,12 @@ function tryResolveSameDayMatrixConflicts(
           // Performance exception: quality_run AM + lower_body_strength PM is an allowed
           // consolidated hard day for co-equal strength athletes (EXPERIENCE_MODIFIER rule).
           if (isPerformanceCoequal) {
-            const kindI = plannedSessionToScheduleSlot(list[i]);
-            const kindJ = plannedSessionToScheduleSlot(list[j]);
+            const kindI = plannedSessionToScheduleSlot(list[i], {
+              swimExperienceForMatrix: ctx?.swimExperienceForMatrix,
+            });
+            const kindJ = plannedSessionToScheduleSlot(list[j], {
+              swimExperienceForMatrix: ctx?.swimExperienceForMatrix,
+            });
             const isQrLb =
               (kindI === 'quality_run' && kindJ === 'lower_body_strength') ||
               (kindI === 'lower_body_strength' && kindJ === 'quality_run');
@@ -451,7 +458,9 @@ function tryResolveSameDayMatrixConflicts(
               conflict_id: mkConflictId(weekNum, `matrix-drop-${day}-${actions.length}`),
               conflict_type: inferConflictTypeFromPair(rm, other),
               blocked_intent: {
-                session_kind: plannedSessionToScheduleSlot(rm),
+                session_kind: plannedSessionToScheduleSlot(rm, {
+                  swimExperienceForMatrix: ctx?.swimExperienceForMatrix,
+                }),
                 preferred_day: conflictDayLo(day),
                 intensity_class: rm.intensity_class,
               },
@@ -473,7 +482,9 @@ function tryResolveSameDayMatrixConflicts(
               conflict_id: mkConflictId(weekNum, `matrix-drop-${day}-${actions.length}`),
               conflict_type: inferConflictTypeFromPair(rm, other),
               blocked_intent: {
-                session_kind: plannedSessionToScheduleSlot(rm),
+                session_kind: plannedSessionToScheduleSlot(rm, {
+                  swimExperienceForMatrix: ctx?.swimExperienceForMatrix,
+                }),
                 preferred_day: conflictDayLo(day),
                 intensity_class: rm.intensity_class,
               },
@@ -1329,6 +1340,122 @@ export function buildWeek(
     }
   }
 
+  // ── Standalone mid-week quality run: do not share the swim-easy anchor day (matrix allows QR + easy_swim). ──
+  if (
+    athleteState.enforce_optimizer_anchor_days !== true &&
+    hasTri &&
+    athleteState.run_quality_placement === 'standalone_midweek' &&
+    !shiftQualityRunToLongRun &&
+    !dropQualityRunThisWeek &&
+    !raceThisWeek &&
+    !isRecovery &&
+    phase !== 'taper' &&
+    runQualityDay === swimEasyDay
+  ) {
+    const preferredRunQ = runQualityDay;
+    const blockedStandaloneQr = new Set<string>([
+      longRideDay,
+      longRunActualDay,
+      ...restDayNames,
+      ...brickDaysSetForQr,
+      bikeQualityDay,
+      adjDay(bikeQualityDay, -1),
+      adjDay(bikeQualityDay, 1),
+      swimEasyDay,
+    ]);
+    if (!allowQualityRunSwimSameDay) blockedStandaloneQr.add(swimQualityDay);
+
+    const prio: string[] = ['Thursday', adjDay(bikeQualityDay, 2), adjDay(bikeQualityDay, -1)];
+    for (const d of DAYS_OF_WEEK) {
+      if (!prio.includes(d)) prio.push(d);
+    }
+
+    let movedTo: string | null = null;
+    for (const cand of prio) {
+      if (blockedStandaloneQr.has(cand)) continue;
+      if (adjDay(bikeQualityDay, 1) === cand) continue;
+      movedTo = cand;
+      break;
+    }
+
+    if (movedTo != null && movedTo !== preferredRunQ) {
+      runQualityDay = movedTo as (typeof DAYS_OF_WEEK)[number];
+      conflictEvents.push({
+        conflict_id: mkConflictId(weekNum, 'standalone-run-off-swim-easy-day'),
+        conflict_type: 'quality_run_blocked',
+        blocked_intent: {
+          session_kind: 'quality_run',
+          preferred_day: conflictDayLo(preferredRunQ),
+          intensity_class: 'HARD',
+        },
+        blocking_reasons: uniqReasons(['anchor_conflict']),
+        anchors_involved: [swimEasyDay],
+        applied_resolution: {
+          type: 'moved',
+          to_day: conflictDayLo(runQualityDay),
+          note: `Moved quality run off ${preferredRunQ} — standalone mid-week cannot share the anchored swim-easy day (${swimEasyDay}).`,
+        },
+      });
+    }
+  }
+
+  // Group ride with high climb density: keep quality swim off the calendar day after quality bike (recovery buffer).
+  const routeSnapGr = athleteState.group_ride_route_snapshot;
+  const groupRideHighStress =
+    hasTri &&
+    Boolean(String(athleteState.bike_quality_label ?? '').trim()) &&
+    routeSnapGr != null &&
+    groupRideRouteHighVerticalStress(routeSnapGr);
+  if (
+    athleteState.enforce_optimizer_anchor_days !== true &&
+    groupRideHighStress &&
+    !raceThisWeek
+  ) {
+    const dayAfterBikeGr = adjDay(bikeQualityDay, 1);
+    if (swimQualityDay === dayAfterBikeGr) {
+      const swimBumpBlockedGr = new Set<string>([...qualitySwimBlocked, runQualityDay, swimEasyDay]);
+      const startIdxGr = Math.max(0, DAYS_OF_WEEK.indexOf(swimQualityDay));
+      const beforeSq = swimQualityDay;
+      for (let s = 1; s < 7; s++) {
+        const d = DAYS_OF_WEEK[(startIdxGr + s) % 7]!;
+        if (swimBumpBlockedGr.has(d)) continue;
+        if (!allowQualityRunSwimSameDay && d === runQualityDay) continue;
+        swimQualityDay = d;
+        break;
+      }
+      if (swimQualityDay !== beforeSq) {
+        conflictEvents.push({
+          conflict_id: mkConflictId(weekNum, 'swim-quality-group-ride-recovery-buffer'),
+          conflict_type: 'quality_swim_blocked',
+          blocked_intent: {
+            session_kind: 'quality_swim',
+            preferred_day: conflictDayLo(beforeSq),
+          },
+          blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline']),
+          anchors_involved: [bikeQualityDay],
+          applied_resolution: {
+            type: 'moved',
+            to_day: conflictDayLo(swimQualityDay),
+            note: `Moved quality swim off ${beforeSq} — high-climb group ride on ${bikeQualityDay} loads the next day; spacing swim quality for recovery.`,
+          },
+        });
+      }
+    }
+  }
+
+  // If quality run day moved after swim anchors were resolved, keep threshold swim off quality run when required.
+  if (!allowQualityRunSwimSameDay && swimQualityDay === runQualityDay) {
+    const swimBumpBlocked2 = new Set<string>([...qualitySwimBlocked, runQualityDay, swimEasyDay]);
+    const startIdx2 = Math.max(0, DAYS_OF_WEEK.indexOf(swimQualityDay));
+    for (let s = 0; s < 7; s++) {
+      const d = DAYS_OF_WEEK[(startIdx2 + s) % 7]!;
+      if (!swimBumpBlocked2.has(d) && d !== runQualityDay) {
+        swimQualityDay = d;
+        break;
+      }
+    }
+  }
+
   const bikeQualitySlot = grid.get(bikeQualityDay);
   if (!bikeQualitySlot?.isRest && hasTri) {
     if (recoveryRebuildWeek1) {
@@ -1441,6 +1568,56 @@ export function buildWeek(
   } // end else if (!dropQualityRunThisWeek && !runQualitySlot?.isRest)
 
   applyCoEqualSameDayBikeRunAmpkOrdering(grid, bikeQualityDay, runQualityDay, athleteState);
+
+  // Newer swimmers: long aerobic swims exceed completion "easy" pairing vs quality_run — separate days.
+  if (
+    hasTri &&
+    learnerSwimExperience(athleteState.swim_experience) &&
+    swimTemplates.length >= 2 &&
+    swimEasyDay === runQualityDay &&
+    !shiftQualityRunToLongRun &&
+    !dropQualityRunThisWeek
+  ) {
+    const yEasy =
+      swimSlotYardsFinal[1] ??
+      swimResolved.yards[1] ??
+      Math.round(swimTemplates[1]!.target_yards * swimMult);
+    if (yEasy > LEARNER_HEAVY_SWIM_YARDS) {
+      const beforeEasy = swimEasyDay;
+      const blockedEasy = new Set<string>([
+        longRideDay,
+        longRunActualDay,
+        ...restDayNames,
+        runQualityDay,
+        swimQualityDay,
+      ]);
+      const startEasy = Math.max(0, DAYS_OF_WEEK.indexOf(swimEasyDay));
+      for (let s = 1; s < 7; s++) {
+        const d = DAYS_OF_WEEK[(startEasy + s) % 7]!;
+        if (!blockedEasy.has(d)) {
+          swimEasyDay = d;
+          break;
+        }
+      }
+      if (swimEasyDay !== beforeEasy) {
+        conflictEvents.push({
+          conflict_id: mkConflictId(weekNum, 'learner-heavy-swim-off-quality-run'),
+          conflict_type: 'quality_swim_blocked',
+          blocked_intent: {
+            session_kind: 'easy_swim',
+            preferred_day: conflictDayLo(beforeEasy),
+          },
+          blocking_reasons: uniqReasons(['anchor_conflict']),
+          anchors_involved: [runQualityDay],
+          applied_resolution: {
+            type: 'moved',
+            to_day: conflictDayLo(swimEasyDay),
+            note: `Moved heavy aerobic swim off ${beforeEasy} — newer swimmer volume stacks like quality work vs mid-week quality run.`,
+          },
+        });
+      }
+    }
+  }
 
   // ── Tri swims (program templates × swim_volume_multiplier) ────────────────
   let qualitySwimPlaced = false;
@@ -1895,6 +2072,9 @@ export function buildWeek(
   const isPerformanceCoequal = performanceStrength;
   const sameDayCompatCtx: SameDayCompatContext = {
     allowQualityRunQualitySwimSameDay: allowQualityRunSwimSameDay,
+    strictStandaloneQualityRun:
+      hasTri && athleteState.run_quality_placement === 'standalone_midweek',
+    swimExperienceForMatrix: athleteState.swim_experience,
   };
   const sameDayPre = validateWeekGridSameDayMatrix(grid, sameDayCompatCtx);
   if (!sameDayPre.valid) {
@@ -1906,7 +2086,9 @@ export function buildWeek(
         conflict_id: mkConflictId(weekNum, `matrix-pre-${matrixPreSeq}`),
         conflict_type: inferConflictTypeFromPair(p.a, p.b),
         blocked_intent: {
-          session_kind: plannedSessionToScheduleSlot(p.a),
+          session_kind: plannedSessionToScheduleSlot(p.a, {
+            swimExperienceForMatrix: sameDayCompatCtx.swimExperienceForMatrix,
+          }),
           preferred_day: conflictDayLo(p.day),
           intensity_class: p.a.intensity_class,
         },
@@ -1938,7 +2120,9 @@ export function buildWeek(
           conflict_id: mkConflictId(weekNum, `matrix-post-${matrixPostSeq}`),
           conflict_type: inferConflictTypeFromPair(p.a, p.b),
           blocked_intent: {
-            session_kind: plannedSessionToScheduleSlot(p.a),
+            session_kind: plannedSessionToScheduleSlot(p.a, {
+              swimExperienceForMatrix: sameDayCompatCtx.swimExperienceForMatrix,
+            }),
             preferred_day: conflictDayLo(p.day),
             intensity_class: p.a.intensity_class,
           },
