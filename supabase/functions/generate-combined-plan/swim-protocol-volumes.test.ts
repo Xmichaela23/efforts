@@ -122,7 +122,9 @@ Deno.test('resolveSwimSlotYardsWithBudget — pinned anchors preserve two slots 
     swim_anchor_slot_count: 2,
   });
   assertEquals(pinned.templates.length, 2);
-  assertEquals(pinned.tradeOffs.some((t) => t.includes('pinned swim days')), true);
+  assertEquals(pinned.tradeOffs.length, 1);
+  assertEquals(pinned.tradeOffs[0]?.includes('total'), true);
+  assertEquals(pinned.tradeOffs[0]?.includes('pinned swim days'), true);
 });
 
 Deno.test('resolveSwimSlotYardsWithBudget — drops lowest-priority slot when floors exceed budget', () => {
