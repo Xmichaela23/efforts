@@ -544,6 +544,7 @@ export function buildWeek(
   athleteMemory?: AthleteMemory,
   options?: { totalWeeks?: number; raceAnchors?: RaceAnchor[]; phaseBlocks?: PhaseBlock[] },
 ): GeneratedWeek {
+  console.log('[buildWeek] ===== FUNCTION ENTRY ===== week', weekNum);
 
   const phase = block.phase;
   const isRecovery = block.isRecovery;

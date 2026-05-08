@@ -455,6 +455,39 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
   return payload;
 }
 
+/** Swim rows from generate-combined-plan — log here so they appear on create-goal-and-materialize-plan (the HTTP caller). Downstream buildWeek logs only appear under function `generate-combined-plan`. */
+function logSwimSessionsMirrorFromCombined(
+  combined: Record<string, unknown> | null | undefined,
+  invokeKind: 'preview' | 'full',
+): void {
+  try {
+    if (!combined || typeof combined !== 'object') return;
+    const sbw = combined.sessions_by_week as Record<string, unknown> | undefined;
+    if (!sbw || typeof sbw !== 'object') return;
+    let swim_sessions_logged = 0;
+    for (const [wk, sess] of Object.entries(sbw)) {
+      if (!Array.isArray(sess)) continue;
+      for (const raw of sess) {
+        if (!raw || typeof raw !== 'object') continue;
+        const s = raw as Record<string, unknown>;
+        const type = String(s.type ?? s.discipline ?? '').toLowerCase();
+        if (type !== 'swim') continue;
+        swim_sessions_logged += 1;
+        console.log('[SWIM-DEBUG] creating session', {
+          invokeKind,
+          week_key: wk,
+          day: s.day,
+          name: s.name,
+          session_kind: s.session_kind ?? null,
+        });
+      }
+    }
+    console.log('[SWIM-DEBUG] swim session mirror summary', { invokeKind, swim_sessions_logged });
+  } catch (e) {
+    console.warn('[SWIM-DEBUG] mirror failed', e);
+  }
+}
+
 function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
   const swim = arc.swim_training_from_workouts;
   if (swim && swim.completed_swim_sessions_last_90_days === 0) return 'swim';
@@ -1409,6 +1442,9 @@ async function buildCombinedPlan(
     trainingFitnessResolution.reasons.join(', '),
   );
 
+  console.log(
+    '[buildCombinedPlan] invoking HTTP edge function generate-combined-plan — filter Supabase logs by function name **generate-combined-plan** to see [buildWeek] / [session-factory] lines from that separate execution.',
+  );
   // Call the combined plan engine
   const combined = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-combined-plan', {
     user_id,
@@ -1545,6 +1581,8 @@ async function buildCombinedPlan(
       ...(planPreview ? { preview: true } : {}),
     },
   });
+
+  logSwimSessionsMirrorFromCombined(combined as Record<string, unknown>, planPreview ? 'preview' : 'full');
 
   if (planPreview) {
     if (!combined?.success || combined.preview_mode !== true) {

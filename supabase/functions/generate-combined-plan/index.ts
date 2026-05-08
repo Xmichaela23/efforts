@@ -45,6 +45,12 @@ Deno.serve(async (req: Request) => {
     const preview = body.preview === true;
     const persistedTradeOffs = Array.isArray(generation_trade_offs) ? generation_trade_offs : [];
 
+    console.log('[generate-combined-plan] ===== HANDLER ENTRY =====', {
+      preview,
+      goal_count: goals.length,
+      swim_intent: athlete_state?.swim_intent ?? null,
+    });
+
     // ── Input validation ────────────────────────────────────────────────────
     if (!user_id)                         return json({ error: 'user_id required' }, 400);
     if (!Array.isArray(goals) || goals.length < 1) return json({ error: 'At least one goal required' }, 400);
