@@ -6,6 +6,11 @@ import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
+import {
+  categorizeSwimTokensForDisplay,
+  formatSwimSubtitleFromBuckets,
+  sumSwimYardsFromStepsPresetTokens,
+} from '@/utils/swimPlanTokens';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -152,22 +157,11 @@ function computeMinutes(workout: any, baselines?: Baselines, exportHints?: Expor
 function computeSwimYards(workout: any): number | null {
   const type = String((workout as any)?.type || '').toLowerCase();
   if (type !== 'swim') return null;
-  // Prefer tokens (authoring unit is yd) to avoid yd→m→yd drift
+  // Prefer tokens (authoring unit is yd) — includes swim_aerobic_css_* main sets
   try {
     const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
     if (toks.length) {
-      const toYd = (n: number, unit: string) => unit.toLowerCase() === 'm' ? Math.round(n / 0.9144) : n;
-      let sum = 0;
-      toks.forEach((t) => {
-        const s = String(t).toLowerCase();
-        let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10), m[2]); return; }
-        m = s.match(/swim_drill_[a-z0-9_]+_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
-        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
-        m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[2], 10) * parseInt(m[3], 10), m[4]); return; }
-        m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]); return; }
-        m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1],10) * parseInt(m[2],10), m[3]); return; }
-        m = s.match(/swim_interval_(\d+)x(\d+)(yd|m)/i); if (m) { sum += toYd(parseInt(m[1],10) * parseInt(m[2],10), m[3]); return; }
-      });
+      const sum = sumSwimYardsFromStepsPresetTokens(toks);
       return sum > 0 ? sum : null;
     }
   } catch {}
@@ -258,35 +252,10 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
         if (desc) return desc;
       }
       if (disc === 'swim') {
-        const parts: string[] = [];
         const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
         if (stepsTok.length) {
-          let wu: string | null = null, cd: string | null = null;
-          const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
-          stepsTok.forEach((t) => {
-            const s = String(t).toLowerCase();
-            let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
-            if (m) { const txt = `${parseInt(m[1], 10)} ${m[2].toLowerCase()}`; if (/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
-            m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const name = m[1].replace(/_/g, ' '); const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
-            m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
-            if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const name = m[4].replace(/_/g, ' '); drills.push(`${name} ${reps}x${dist}`); return; }
-            m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; (m[1] === 'pull' ? pulls : kicks).push(`${reps}x${dist}${r}`); return; }
-            m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`${reps}x${dist}${r}`); return; }
-            m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`threshold ${reps}x${dist}${r}`); return; }
-            m = s.match(/swim_interval_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`interval ${reps}x${dist}${r}`); return; }
-          });
-          if (wu) parts.push(wu);
-          if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
-          if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-          if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-          if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-          if (cd) parts.push(cd);
-          if (parts.length) return parts.join(' • ');
+          const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(stepsTok), ' • ');
+          if (line) return line;
         }
       }
     } catch {}
@@ -378,31 +347,10 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
       if (desc) return desc;
     }
     if (disc === 'swim') {
-      const parts: string[] = [];
       const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
       if (stepsTok.length) {
-        let wu: string | null = null, cd: string | null = null;
-        const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
-        stepsTok.forEach((t) => {
-          const s = String(t).toLowerCase();
-          let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
-          if (m) { const txt = `${parseInt(m[1], 10)} ${m[2].toLowerCase()}`; if (/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
-          m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-          if (m) { const name = m[1].replace(/_/g, ' '); const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
-          m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
-          if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const name = m[4].replace(/_/g, ' '); drills.push(`${name} ${reps}x${dist}`); return; }
-          m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-          if (m) { const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; (m[1] === 'pull' ? pulls : kicks).push(`${reps}x${dist}${r}`); return; }
-          m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-          if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`${reps}x${dist}${r}`); return; }
-        });
-        if (wu) parts.push(wu);
-        if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
-        if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-        if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-        if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-        if (cd) parts.push(cd);
-        if (parts.length) return parts.join(' • ');
+        const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(stepsTok), ' • ');
+        if (line) return line;
       }
     }
     const structured = (workout as any)?.workout_structure;
@@ -673,7 +621,12 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
               <span className="px-2 py-0.5 text-xs rounded-lg bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 text-blue-300">{yards} yd</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
-              <span className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300">{(workout as any).workload_planned}</span>
+              <span
+                className="px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300"
+                title="Approximate planned training stress (TSS-style workload points)"
+              >
+                {(workout as any).workload_planned}
+              </span>
             ) : null}
           </span>
         </div>

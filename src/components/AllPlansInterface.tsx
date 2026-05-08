@@ -20,6 +20,7 @@ import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 // @ts-ignore
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
+import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -398,21 +399,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           try {
             const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
             if (toks.length) {
-              let wu: string | null = null, cd: string | null = null; const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
-              toks.forEach((t)=>{
-                const s = String(t).toLowerCase();
-                let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `Warm‑up ${txt}`; else cd = `Cool‑down ${txt}`; return; }
-                m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const name=m[1].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[2],10)}x${parseInt(m[3],10)}`); return; }
-                m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { const name=m[4].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[1],10)}x${parseInt(m[2],10)}`); return; }
-                m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const kind=m[1]==='pull'?'Pull':'Kick'; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}`); return; }
-                m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); aerobics.push(`${reps}x${dist}`); return; }
-              });
-              if (wu) out.push(`1 × ${wu}`);
-              if (drills.length) out.push(`Drills ${Array.from(new Set(drills)).join(', ')}`);
-              if (pulls.length) out.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-              if (kicks.length) out.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-              if (aerobics.length) out.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-              if (cd) out.push(`1 × ${cd}`);
+              const b = categorizeSwimTokensForDisplay(toks);
+              if (b.wu) out.push(`1 × ${b.wu.replace(/^WU\s+/i, 'Warm‑up ')}`);
+              if (b.drills.length) out.push(`Drills ${Array.from(new Set(b.drills)).join(', ')}`);
+              if (b.pulls.length) out.push(`Pull ${Array.from(new Set(b.pulls)).join(', ')}`);
+              if (b.kicks.length) out.push(`Kick ${Array.from(new Set(b.kicks)).join(', ')}`);
+              if (b.aerobics.length) out.push(`Aerobic ${Array.from(new Set(b.aerobics)).join(', ')}`);
+              if (b.cd) out.push(`1 × ${b.cd.replace(/^CD\s+/i, 'Cool‑down ')}`);
             }
           } catch {}
         }
