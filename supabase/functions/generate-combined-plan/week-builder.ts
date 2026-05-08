@@ -1070,6 +1070,7 @@ export function buildWeek(
     fitness: trainFitness,
     phase,
     weekInPhase: weekInBlock,
+    swim_anchor_slot_count: swimAnchorSlots,
     ...(athleteState.structural_load_hint === 'low' && !recoveryLearnerTwoSwimMaintained
       ? { recoveryFloorScale: 0.7 as const }
       : {}),

@@ -327,6 +327,9 @@ function sum(ns: number[]): number {
 
 /**
  * Clamp → discretionary scale toward swimBudgetYards → drop lowest-priority slot (never slot 0 threshold).
+ *
+ * When `swim_anchor_slot_count >= templates.length`, slots are never dropped: budget is raised so pinned
+ * swim days (Arc preferred_days / swim_* pins) always receive a session.
  */
 export function resolveSwimSlotYardsWithBudget(opts: {
   templates: SwimSlotTemplate[];
@@ -338,10 +341,13 @@ export function resolveSwimSlotYardsWithBudget(opts: {
   weekInPhase: number;
   /** Post–big-race / structural low weeks — scales protocol floors (default 1). */
   recoveryFloorScale?: number;
+  /** Preferred swim anchor count; when ≥ slot count, never drop swims — budget rises instead. */
+  swim_anchor_slot_count?: number;
 }): { templates: SwimSlotTemplate[]; yards: number[]; tradeOffs: string[] } {
   const tradeOffs: string[] = [];
   let templates = [...opts.templates];
   let yards = opts.preliminaryYards.map((y) => Math.round(y));
+  let swimBudgetYards = opts.swimBudgetYards;
 
   const floorOpts =
     opts.recoveryFloorScale != null &&
@@ -385,14 +391,14 @@ export function resolveSwimSlotYardsWithBudget(opts: {
     const floorArr = floorsFor();
     const ceilArr = ceilsFor();
     const sumF = sum(floorArr);
-    if (sum(yards) <= opts.swimBudgetYards) return true;
-    if (sumF > opts.swimBudgetYards) return false;
+    if (sum(yards) <= swimBudgetYards) return true;
+    if (sumF > swimBudgetYards) return false;
 
     const disc = yards.map((y, i) => Math.max(0, y - floorArr[i]!));
     const sumD = sum(disc);
     if (sumD <= 1e-6) return false;
 
-    let alpha = Math.min(1, (opts.swimBudgetYards - sumF) / sumD);
+    let alpha = Math.min(1, (swimBudgetYards - sumF) / sumD);
     for (let attempt = 0; attempt < 22; attempt++) {
       yards = floorArr.map((f, i) => {
         const raw = f + disc[i]! * alpha;
@@ -401,18 +407,44 @@ export function resolveSwimSlotYardsWithBudget(opts: {
         v = Math.min(ceilArr[i]!, Math.max(floorArr[i]!, v));
         return v;
       });
-      if (sum(yards) <= opts.swimBudgetYards) return true;
+      if (sum(yards) <= swimBudgetYards) return true;
       alpha *= 0.9;
     }
-    return sum(yards) <= opts.swimBudgetYards;
+    return sum(yards) <= swimBudgetYards;
   };
 
   clampAll();
 
+  const anchorSlots = opts.swim_anchor_slot_count ?? 0;
+  const protectAllSlots = templates.length > 0 && anchorSlots >= templates.length;
+
+  const pushPinnedBudgetRaise = (deficitYd: number): void => {
+    tradeOffs.push(
+      `Swim budget raised by ${Math.round(deficitYd)} yd to honor ${anchorSlots} pinned swim days.`,
+    );
+  };
+
+  if (protectAllSlots) {
+    const floorSum = sum(floorsFor());
+    if (floorSum > swimBudgetYards) {
+      pushPinnedBudgetRaise(floorSum - swimBudgetYards);
+      swimBudgetYards = floorSum;
+    }
+  }
+
   let guard = 0;
-  while (sum(yards) > opts.swimBudgetYards && guard < 8) {
+  while (sum(yards) > swimBudgetYards && guard < 8) {
     guard++;
     if (shrinkDiscretionary()) break;
+
+    if (protectAllSlots) {
+      const total = sum(yards);
+      if (total > swimBudgetYards) {
+        pushPinnedBudgetRaise(total - swimBudgetYards);
+        swimBudgetYards = total;
+      }
+      break;
+    }
 
     if (templates.length <= 1) break;
 

@@ -95,14 +95,47 @@ Deno.test('resolveSwimSlotYardsWithBudget — two race swims keep both slots whe
   assertEquals(out.tradeOffs.length, 0);
 });
 
+Deno.test('resolveSwimSlotYardsWithBudget — pinned anchors preserve two slots when budget tight', () => {
+  const templates: SwimSlotTemplate[] = [
+    { session_type: 'threshold', target_yards: 3500, drill_emphasis: false },
+    { session_type: 'race_specific_aerobic', target_yards: 3500, drill_emphasis: false },
+  ];
+  const noPins = resolveSwimSlotYardsWithBudget({
+    templates,
+    preliminaryYards: [3500, 3500],
+    swimBudgetYards: 1200,
+    distance: '70.3',
+    fitness: 'intermediate',
+    phase: 'build',
+    weekInPhase: 3,
+  });
+  assertEquals(noPins.templates.length === 1, true);
+
+  const pinned = resolveSwimSlotYardsWithBudget({
+    templates: [...templates],
+    preliminaryYards: [3500, 3500],
+    swimBudgetYards: 1200,
+    distance: '70.3',
+    fitness: 'intermediate',
+    phase: 'build',
+    weekInPhase: 3,
+    swim_anchor_slot_count: 2,
+  });
+  assertEquals(pinned.templates.length, 2);
+  assertEquals(pinned.tradeOffs.some((t) => t.includes('pinned swim days')), true);
+});
+
 Deno.test('resolveSwimSlotYardsWithBudget — drops lowest-priority slot when floors exceed budget', () => {
   const templates: SwimSlotTemplate[] = [
     { session_type: 'threshold', target_yards: 5000, drill_emphasis: false },
     { session_type: 'easy', target_yards: 5000, drill_emphasis: false },
     { session_type: 'technique_aerobic', target_yards: 5000, drill_emphasis: true },
   ];
-  const floors = templates.map((t) =>
-    getProtocolFloor('sprint', 'beginner', 'build', t.session_type),
+  const floors = templates.map((t, i) =>
+    getProtocolFloor('sprint', 'beginner', 'build', t.session_type, {
+      swimSlotCount: templates.length,
+      swimSlotIndex: i,
+    }),
   );
   const sumFloors = floors.reduce((a, b) => a + b, 0);
   const out = resolveSwimSlotYardsWithBudget({
