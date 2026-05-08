@@ -89,20 +89,11 @@ export function formatPlannedSwimDistanceChip(workout: {
   const preferMetric =
     poolUnit === 'm' || (poolUnit !== 'yd' && !poolUnit && userUnits === 'metric');
 
-  let metersTotal = 0;
-  const steps = Array.isArray(workout?.computed?.steps) ? workout!.computed!.steps! : [];
-  for (const st of steps) {
-    const d = Number((st as { distanceMeters?: number })?.distanceMeters);
-    if (Number.isFinite(d) && d > 0) metersTotal += d;
-  }
-
-  if (metersTotal > 0) {
-    if (preferMetric) return `${Math.round(metersTotal)} m`;
-    return `${Math.round(metersTotal / 0.9144)} yd`;
-  }
-
   const toks = Array.isArray(workout?.steps_preset) ? workout.steps_preset : [];
   const yardsFromTokens = sumSwimYardsFromStepsPresetTokens(toks);
+  // Prefer token totals (plan DSL is authored in yd/m per repeat) — matches PlannedWorkoutSummary.
+  // Summing computed distanceMeters first produced odd conversions (e.g. 1099 yd) and partial totals
+  // when only some steps carried distance_m after materialize.
   if (yardsFromTokens > 0) {
     if (preferMetric) return `${Math.round(yardsFromTokens * 0.9144)} m`;
     return `${yardsFromTokens} yd`;
@@ -119,8 +110,20 @@ export function formatPlannedSwimDistanceChip(workout: {
   }
   const mm = name.match(/(\d[\d,]*)\s*m\b/i);
   if (mm && preferMetric) {
-    const m = parseInt(mm[1].replace(/,/g, ''), 10);
-    if (Number.isFinite(m) && m > 0) return `${m} m`;
+    const mVal = parseInt(mm[1].replace(/,/g, ''), 10);
+    if (Number.isFinite(mVal) && mVal > 0) return `${mVal} m`;
+  }
+
+  let metersTotal = 0;
+  const steps = Array.isArray(workout?.computed?.steps) ? workout!.computed!.steps! : [];
+  for (const st of steps) {
+    const d = Number((st as { distanceMeters?: number })?.distanceMeters);
+    if (Number.isFinite(d) && d > 0) metersTotal += d;
+  }
+
+  if (metersTotal > 0) {
+    if (preferMetric) return `${Math.round(metersTotal)} m`;
+    return `${Math.round(metersTotal / 0.9144)} yd`;
   }
 
   return null;
