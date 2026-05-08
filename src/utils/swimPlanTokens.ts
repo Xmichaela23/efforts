@@ -70,6 +70,62 @@ export function sumSwimYardsFromStepsPresetTokens(tokens: string[] | undefined |
   return sum;
 }
 
+/**
+ * Compact distance for calendar chips — respects pool_unit then athlete units (planned row fields).
+ */
+export function formatPlannedSwimDistanceChip(workout: {
+  type?: string;
+  units?: string | null;
+  pool_unit?: string | null;
+  steps_preset?: string[] | null;
+  computed?: { steps?: Array<{ distanceMeters?: number }> | null } | null;
+  name?: string | null;
+}): string | null {
+  const type = String(workout?.type ?? '').toLowerCase();
+  if (type !== 'swim') return null;
+
+  const poolUnit = String(workout?.pool_unit || '').toLowerCase();
+  const userUnits = String(workout?.units || '').toLowerCase();
+  const preferMetric =
+    poolUnit === 'm' || (poolUnit !== 'yd' && !poolUnit && userUnits === 'metric');
+
+  let metersTotal = 0;
+  const steps = Array.isArray(workout?.computed?.steps) ? workout!.computed!.steps! : [];
+  for (const st of steps) {
+    const d = Number((st as { distanceMeters?: number })?.distanceMeters);
+    if (Number.isFinite(d) && d > 0) metersTotal += d;
+  }
+
+  if (metersTotal > 0) {
+    if (preferMetric) return `${Math.round(metersTotal)} m`;
+    return `${Math.round(metersTotal / 0.9144)} yd`;
+  }
+
+  const toks = Array.isArray(workout?.steps_preset) ? workout.steps_preset : [];
+  const yardsFromTokens = sumSwimYardsFromStepsPresetTokens(toks);
+  if (yardsFromTokens > 0) {
+    if (preferMetric) return `${Math.round(yardsFromTokens * 0.9144)} m`;
+    return `${yardsFromTokens} yd`;
+  }
+
+  const name = String(workout?.name || '');
+  const ydm = name.match(/(\d[\d,]*)\s*yd\b/i);
+  if (ydm) {
+    const yd = parseInt(ydm[1].replace(/,/g, ''), 10);
+    if (Number.isFinite(yd) && yd > 0) {
+      if (preferMetric) return `${Math.round(yd * 0.9144)} m`;
+      return `${yd} yd`;
+    }
+  }
+  const mm = name.match(/(\d[\d,]*)\s*m\b/i);
+  if (mm && preferMetric) {
+    const m = parseInt(mm[1].replace(/,/g, ''), 10);
+    if (Number.isFinite(m) && m > 0) return `${m} m`;
+  }
+
+  return null;
+}
+
 export function categorizeSwimTokensForDisplay(tokens: string[]): SwimTokenBuckets {
   const drills: string[] = [];
   const pulls: string[] = [];

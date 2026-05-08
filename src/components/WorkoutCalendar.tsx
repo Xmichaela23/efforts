@@ -15,6 +15,7 @@ import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import LoadBar from '@/components/LoadBar';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
+import { formatPlannedSwimDistanceChip } from '@/utils/swimPlanTokens';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -178,16 +179,19 @@ function derivePlannedCellLabel(w: any): string | null {
       return label;
     }
 
-    // SWIM - Always show duration
+    // SWIM — duration + yards/meters (pool_unit / units on planned row)
     if (type === 'swim') {
+      const dist = formatPlannedSwimDistanceChip(w);
+      const distPart = dist ? ` ${dist}` : '';
       // For optional swims, just show "OPT SM" with duration
       if (isOptional) {
-        return durStr ? `OPT SM ${durStr}`.trim() : 'OPT SM';
+        return durStr ? `OPT SM ${durStr}${distPart}`.trim() : dist ? `OPT SM${distPart}`.trim() : 'OPT SM';
       }
       let label = '';
-      if (has(/swim_intervals_/i)) label = durStr ? `SM-INT ${durStr}`.trim() : 'SM-INT';
-      else if (has(/technique|drill|drills|swim_drills_/i)) label = durStr ? `SM-DRL ${durStr}`.trim() : 'SM-DRL';
-      else label = durStr ? `SM ${durStr}`.trim() : 'SM';
+      if (has(/swim_intervals_/i)) label = durStr ? `SM-INT ${durStr}${distPart}`.trim() : `SM-INT${distPart}`.trim();
+      else if (has(/technique|drill|drills|swim_drills_/i))
+        label = durStr ? `SM-DRL ${durStr}${distPart}`.trim() : `SM-DRL${distPart}`.trim();
+      else label = durStr ? `SM ${durStr}${distPart}`.trim() : `SM${distPart}`.trim();
       return label;
     }
 
@@ -693,8 +697,10 @@ export default function WorkoutCalendar({
           const type = String(w?.type || '').toLowerCase();
           const isPlanned = String(w?.workout_status||'').toLowerCase() === 'planned';
           if (isPlanned && (type === 'ride' || type === 'bike' || type === 'swim')) {
-            // Check if label already has duration (contains "m" or "min")
-            const hasDuration = /\d+m|\d+\s*min/i.test(labelBase);
+            // Already has duration: explicit min text, or clock mm:ss / h:mm:ss (planned chips use "28:00")
+            const hasDuration =
+              /\d+m\b|\d+\s*min\b/i.test(labelBase) ||
+              /\b\d{1,4}:\d{2}\b/.test(labelBase);
             if (!hasDuration) {
               // Use single source of truth for duration calculation
               const secs = resolveMovingSeconds(w);
