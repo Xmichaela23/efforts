@@ -12,6 +12,20 @@ import {
   SWIM_VOLUME_RANGES,
 } from './swim-protocol-volumes.ts';
 
+Deno.test('getProtocolFloor splits weekly minimum across two swim slots', () => {
+  const f0 = getProtocolFloor('70.3', 'intermediate', 'build', 'threshold', {
+    swimSlotCount: 2,
+    swimSlotIndex: 0,
+  });
+  const f1 = getProtocolFloor('70.3', 'intermediate', 'build', 'race_specific_aerobic', {
+    swimSlotCount: 2,
+    swimSlotIndex: 1,
+  });
+  assertEquals(f0 >= 1100 && f0 <= 1400, true);
+  assertEquals(f1 >= 1000 && f1 <= 1300, true);
+  assertEquals(f0 + f1 <= 2500, true);
+});
+
 Deno.test('getProtocolFloor respects band and session role', () => {
   const fl = getProtocolFloor('70.3', 'intermediate', 'build', 'threshold');
   assertEquals(fl >= 2200, true);
@@ -61,6 +75,24 @@ Deno.test('resolveSwimSlotYardsWithBudget — discretionary shrink', () => {
   assertEquals(out.tradeOffs.length, 0);
   const sum = out.yards.reduce((a, b) => a + b, 0);
   assertEquals(sum <= 4000, true);
+});
+
+Deno.test('resolveSwimSlotYardsWithBudget — two race swims keep both slots when budget fits split floors', () => {
+  const templates: SwimSlotTemplate[] = [
+    { session_type: 'threshold', target_yards: 2600, drill_emphasis: false },
+    { session_type: 'race_specific_aerobic', target_yards: 2400, drill_emphasis: false },
+  ];
+  const out = resolveSwimSlotYardsWithBudget({
+    templates,
+    preliminaryYards: [2600, 2400],
+    swimBudgetYards: 2400,
+    distance: '70.3',
+    fitness: 'intermediate',
+    phase: 'build',
+    weekInPhase: 3,
+  });
+  assertEquals(out.templates.length, 2);
+  assertEquals(out.tradeOffs.length, 0);
 });
 
 Deno.test('resolveSwimSlotYardsWithBudget — drops lowest-priority slot when floors exceed budget', () => {
