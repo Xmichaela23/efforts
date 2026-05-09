@@ -180,6 +180,8 @@ export function validateTrainingFloors(
     if (prev.weekNum === 1) continue;
     // Recovery week suppresses volume; the following week legitimately rebounds — do not treat as a ramp violation.
     if (prev.isRecovery) continue;
+    // Taper weeks intentionally suppress volume; the week after rebounds toward race/load — prior raw TSS is not a fair baseline.
+    if (prev.phase === 'taper') continue;
     // Phase boundaries (e.g. base→build) intentionally swap swim templates and intensity mix — WoW total can move
     // more than 15% without matching "weekly overload" in one discipline (tri swim ramp is the usual spike).
     if (prev.phase !== cur.phase) continue;

@@ -1764,6 +1764,33 @@ Deno.serve(async (req: Request) => {
     const strictSchedulePrefs = raw.strict_schedule_prefs === true;
 
     if (!user_id) throw new AppError('missing_user_id', 'user_id required');
+
+    /** Align with ingest/delete-plan: coach + block caches must refresh after persisted plan changes. */
+    const bustTrainingCachesAfterPlanChange = async (reason: string) => {
+      try {
+        await invalidateUserTrainingCache(supabase, user_id, `create-goal-and-materialize-plan:${reason}`);
+      } catch (e) {
+        console.warn('[create-goal-and-materialize-plan] training cache bust failed:', e);
+      }
+    };
+
+    /** Combined engine declined (e.g. need two goals): response returns without throwing — catch{} rollback never runs. */
+    const rollbackCombinedPlanUnavailable = async (): Promise<void> => {
+      try {
+        await invalidateUserTrainingCache(supabase, user_id, 'create-goal-and-materialize-plan:combined_unavailable');
+      } catch (e) {
+        console.warn('[create-goal-and-materialize-plan] combined unavailable cache bust:', e);
+      }
+      if (mode === 'create' && createdGoalId) {
+        try {
+          const { error: delErr } = await supabase.from('goals').delete().eq('id', createdGoalId).eq('user_id', user_id);
+          if (delErr) console.warn('[create-goal-and-materialize-plan] combined unavailable goal delete:', delErr.message);
+        } catch (e) {
+          console.warn('[create-goal-and-materialize-plan] combined unavailable goal rollback', e);
+        }
+      }
+    };
+
     if (!['create', 'build_existing', 'link_existing'].includes(mode)) throw new AppError('invalid_mode', 'mode must be create, build_existing, or link_existing');
     if (mode === 'link_existing') {
       if (!existing_goal_id || !plan_id) throw new AppError('missing_link_params', 'existing_goal_id and plan_id are required');
@@ -1782,6 +1809,8 @@ Deno.serve(async (req: Request) => {
         .eq('id', plan_id)
         .eq('user_id', user_id);
       if (planLinkErr) throw new AppError('plan_link_failed', planLinkErr.message);
+
+      await bustTrainingCachesAfterPlanChange('link_existing');
 
       return new Response(
         JSON.stringify({ success: true, mode: 'link_existing', goal_id: existing_goal_id, plan_id }),
@@ -2023,6 +2052,7 @@ Deno.serve(async (req: Request) => {
             );
           }
           createdPlanId = combinedResult.plan_id;
+          await bustTrainingCachesAfterPlanChange('combined_plan');
           return new Response(
             JSON.stringify({
               success: true,
@@ -2036,6 +2066,7 @@ Deno.serve(async (req: Request) => {
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
           );
         }
+        await rollbackCombinedPlanUnavailable();
         const combinedUnavailableMsg =
           'Combined plan could not be built (needs two active event goals on file). Standalone generation was not run — retry shortly or adjust your races.';
         if (bodyPreview) {
@@ -2216,6 +2247,8 @@ Deno.serve(async (req: Request) => {
           console.warn('[create-goal-and-materialize-plan] recompute projection', e);
         }
       }
+
+      await bustTrainingCachesAfterPlanChange('triathlon_plan');
 
       return new Response(
         JSON.stringify({
@@ -2459,6 +2492,7 @@ Deno.serve(async (req: Request) => {
           );
         }
         createdPlanId = combinedResult.plan_id;
+        await bustTrainingCachesAfterPlanChange('combined_plan');
         return new Response(
           JSON.stringify({
             success: true,
@@ -2472,6 +2506,7 @@ Deno.serve(async (req: Request) => {
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+      await rollbackCombinedPlanUnavailable();
       const combinedUnavailableMsg =
         'Combined plan could not be built (needs two active event goals on file). Standalone generation was not run — retry shortly or adjust your races.';
       if (bodyPreview) {
@@ -2625,6 +2660,8 @@ Deno.serve(async (req: Request) => {
         console.warn('[create-goal-and-materialize-plan] recompute projection', e);
       }
     }
+
+    await bustTrainingCachesAfterPlanChange('run_plan');
 
     return new Response(
       JSON.stringify({

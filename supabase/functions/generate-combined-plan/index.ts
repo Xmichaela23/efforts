@@ -32,6 +32,7 @@ import {
   WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
   WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI,
 } from './validate-training-floors.ts';
+import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -181,6 +182,12 @@ Deno.serve(async (req: Request) => {
           : v0?.code === 'WEEK_OVER_WEEK_TSS_RAMP'
             ? ' Try a gentler loading pattern or shorter mesocycle.'
             : '';
+      try {
+        const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        await invalidateUserTrainingCache(sb, user_id, 'generate-combined-plan:physiological_floors');
+      } catch (e) {
+        console.warn('[generate-combined-plan] cache bust after floor failure:', e);
+      }
       return json(
         {
           success: false,
