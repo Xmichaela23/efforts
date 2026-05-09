@@ -126,7 +126,12 @@ export function useArcSetupComplete() {
       if ('error' in ctxOrErr) {
         setSaving(false);
         const rbFail = await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
-        resetWizardClientState(userId);
+        try {
+          window.dispatchEvent(new CustomEvent('goals:invalidate'));
+          window.dispatchEvent(new CustomEvent('plans:invalidate'));
+        } catch {
+          /* ignore */
+        }
         if (rbFail) setError(ROLLBACK_CLEANUP_MSG);
         navigate('/goals', { replace: true, state: { fromArcSetup: true } });
         return;
@@ -161,7 +166,12 @@ export function useArcSetupComplete() {
       if (fnErr || !data || (data as { success?: boolean }).success !== true) {
         const parsed = await parseArcInvokeError(fnErr, data, 'Unable to build training plan');
         const rbFail = await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
-        resetWizardClientState(userId);
+        try {
+          window.dispatchEvent(new CustomEvent('goals:invalidate'));
+          window.dispatchEvent(new CustomEvent('plans:invalidate'));
+        } catch {
+          /* ignore */
+        }
         if (parsed.code === 'missing_pace_benchmark') {
           if (rbFail) setError(ROLLBACK_CLEANUP_MSG);
           navigate('/goals', { replace: true, state: { fromArcSetup: true, needPaceCalibration: true } });
