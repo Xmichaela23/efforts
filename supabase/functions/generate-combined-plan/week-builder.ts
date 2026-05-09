@@ -45,7 +45,10 @@ import {
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
   type TriRaceDistance,
 } from './science.ts';
-import { FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET } from './validate-training-floors.ts';
+import {
+  FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET,
+  FLOOR_REBUILD_DEEP_LONG_RUN_SHARE_OF_BUDGET,
+} from './validate-training-floors.ts';
 import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
@@ -565,6 +568,8 @@ export function buildWeek(
      * does not change long-run % of week or WoW ratios — this applies asymmetric caps.
      */
     physiologicalFloorRebuild?: boolean;
+    /** Final compressor — tighter LR share + weekly budget after repeated rebuild failures. */
+    physiologicalFloorRebuildDeep?: boolean;
   },
 ): GeneratedWeek {
   console.log('[buildWeek] ===== FUNCTION ENTRY ===== week', weekNum);
@@ -647,6 +652,9 @@ export function buildWeek(
       Math.round(weeklyTSSBudget * 0.91),
       Math.round(Math.min(baseTSS, maxSafeTSS) * 0.55),
     );
+    if (options?.physiologicalFloorRebuildDeep) {
+      weeklyTSSBudget = Math.max(Math.round(weeklyTSSBudget * 0.88), Math.round(Math.min(baseTSS, maxSafeTSS) * 0.5));
+    }
   }
 
   // Convert rest_days (0=Sun…6=Sat) to day-name set.
@@ -745,7 +753,10 @@ export function buildWeek(
     // for floor rebuild — cap miles vs budget proxy (matches `validateTrainingFloors`).
     const lrIntensity: Intensity = phase === 'race_specific' ? 'MODERATE' : 'EASY';
     const tssPerMin = TSS_PER_HOUR.run[lrIntensity] / 60;
-    const maxLongRunTss = FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET * Math.max(1, weeklyTSSBudget);
+    const lrShareCap = options?.physiologicalFloorRebuildDeep
+      ? FLOOR_REBUILD_DEEP_LONG_RUN_SHARE_OF_BUDGET
+      : FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET;
+    const maxLongRunTss = lrShareCap * Math.max(1, weeklyTSSBudget);
     const maxLongRunMiles = maxLongRunTss / tssPerMin / 9.5;
     longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(maxLongRunMiles * 10) / 10));
     longRunMinutes = Math.round(longRunMiles * 9.5);
@@ -1605,7 +1616,8 @@ export function buildWeek(
       const lrUseStructuredRacePace =
         phase === 'race_specific' && !isRecovery && !triRaceNextPlanWeek && weeksToRace > 3;
       if (lrRunIdx >= 0 && !lrUseStructuredRacePace) {
-        const rpMiles = Math.max(4, Math.round(longRunMiles * 0.65));
+        const rpBlendFrac = phase === 'race_specific' ? 0.65 : phase === 'build' ? 0.48 : 0.47;
+        const rpMiles = Math.max(4, Math.round(longRunMiles * rpBlendFrac));
         lrSlotForQuality.sessions[lrRunIdx] = hasTri
           ? racePaceRun(longRunActualDay, rpMiles, primaryGoal.distance as TriRaceDistance, servedGoal)
           : marathonPaceRun(longRunActualDay, rpMiles, servedGoal);

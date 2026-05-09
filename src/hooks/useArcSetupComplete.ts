@@ -9,7 +9,7 @@
  */
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getStoredUserId, invokeFunction } from '@/lib/supabase';
+import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import {
   persistArcSetup,
   buildCompleteContext,
@@ -68,6 +68,21 @@ export function useArcSetupComplete() {
     [_handleConflictChoice],
   );
 
+  const rollbackInsertedGoals = useCallback(async (inserted: InsertedGoalRow[] | undefined) => {
+    const userId = getStoredUserId();
+    if (!userId || !inserted?.length) return;
+    for (const g of inserted) {
+      try {
+        const { error: delErr } = await supabase.functions.invoke('delete-goal', {
+          body: { goal_id: g.id, user_id: userId },
+        });
+        if (delErr) console.warn('[useArcSetupComplete] rollback delete-goal', g.id, delErr);
+      } catch (e) {
+        console.warn('[useArcSetupComplete] rollback goal', g.id, e);
+      }
+    }
+  }, []);
+
   const complete = useCallback(
     async (payload: ArcSetupPayload) => {
       setSaving(true);
@@ -96,6 +111,7 @@ export function useArcSetupComplete() {
 
       if ('error' in ctxOrErr) {
         setSaving(false);
+        await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
         navigate('/goals', { replace: true, state: { fromArcSetup: true } });
         return;
       }
@@ -128,6 +144,7 @@ export function useArcSetupComplete() {
 
       if (fnErr || !data || (data as { success?: boolean }).success !== true) {
         const parsed = await parseArcInvokeError(fnErr, data, 'Unable to build training plan');
+        await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
         if (parsed.code === 'missing_pace_benchmark') {
           navigate('/goals', { replace: true, state: { fromArcSetup: true, needPaceCalibration: true } });
           return;
@@ -163,7 +180,7 @@ export function useArcSetupComplete() {
         },
       });
     },
-    [navigate, startLoop],
+    [navigate, startLoop, rollbackInsertedGoals],
   );
 
   return { complete, saving, error, saveBanner, conflictOverlay, handleConflictChoice };

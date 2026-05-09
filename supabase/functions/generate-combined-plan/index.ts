@@ -23,6 +23,8 @@ import {
   validateTrainingFloors,
   tightenPhaseBlocksForFloorRebuild,
   LONG_RUN_TSS_SHARE_MAX,
+  LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE,
+  LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK,
   WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
 } from './validate-training-floors.ts';
 
@@ -121,7 +123,10 @@ Deno.serve(async (req: Request) => {
     // ── Generate each week ─────────────────────────────────────────────────
     type GeneratedWeekFromBuilder = ReturnType<typeof buildWeek>;
 
-    const generateAllWeeks = (blocksArg: typeof blocks, physiologicalFloorRebuild = false): GeneratedWeekFromBuilder[] => {
+    const generateAllWeeks = (
+      blocksArg: typeof blocks,
+      rebuild: false | 'normal' | 'deep' = false,
+    ): GeneratedWeekFromBuilder[] => {
       const out: GeneratedWeekFromBuilder[] = [];
       let prevWeightedTSS = state.current_ctl * 7;
       for (let w = 1; w <= totalWeeks; w++) {
@@ -130,7 +135,11 @@ Deno.serve(async (req: Request) => {
           totalWeeks,
           raceAnchors,
           phaseBlocks: blocksArg,
-          ...(physiologicalFloorRebuild ? { physiologicalFloorRebuild: true } : {}),
+          ...(rebuild === 'deep'
+            ? { physiologicalFloorRebuild: true, physiologicalFloorRebuildDeep: true }
+            : rebuild === 'normal'
+              ? { physiologicalFloorRebuild: true }
+              : {}),
         });
         out.push(week);
         prevWeightedTSS = week.total_weighted_tss;
@@ -140,22 +149,35 @@ Deno.serve(async (req: Request) => {
 
     let generatedWeeks = generateAllWeeks(blocks);
     let physiologicalFloorRebuiltOnce = false;
-    let floors = validateTrainingFloors(generatedWeeks);
-    const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 10;
+    const floorOpts = { hasTri: hasTriGoalForReconcile };
+    let floors = validateTrainingFloors(generatedWeeks, floorOpts);
+    const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 12;
     let floorPass = 0;
     while (!floors.ok && floorPass < MAX_PHYSIOLOGICAL_FLOOR_PASSES) {
       blocks = tightenPhaseBlocksForFloorRebuild(blocks);
       physiologicalFloorRebuiltOnce = true;
       floorPass += 1;
-      generatedWeeks = generateAllWeeks(blocks, true);
-      floors = validateTrainingFloors(generatedWeeks);
+      generatedWeeks = generateAllWeeks(blocks, 'normal');
+      floors = validateTrainingFloors(generatedWeeks, floorOpts);
     }
     if (!floors.ok) {
+      physiologicalFloorRebuiltOnce = true;
+      generatedWeeks = generateAllWeeks(blocks, 'deep');
+      floors = validateTrainingFloors(generatedWeeks, floorOpts);
+      floorPass += 1;
+    }
+    if (!floors.ok) {
+      const v0 = floors.violations[0];
+      const hint =
+        v0?.code === 'LONG_RUN_TSS_SHARE'
+          ? ' Try lowering performance intent, weekly hours, or run quality folded into the long run.'
+          : v0?.code === 'WEEK_OVER_WEEK_TSS_RAMP'
+            ? ' Try a gentler loading pattern or shorter mesocycle.'
+            : '';
       return json(
         {
           success: false,
-          error:
-            'Physiological training floors violated after automatic rebuild. Reduce weekly volume, intensity intent, or training days per week.',
+          error: `Training load limits could not be met: ${v0?.message ?? 'constraints violated after rebuild.'}${hint}`,
           physiological_floor_violations: floors.violations,
           physiological_floor_rebuilt_once: physiologicalFloorRebuiltOnce,
           physiological_floor_passes_attempted: floorPass,
@@ -298,7 +320,9 @@ Deno.serve(async (req: Request) => {
       validation,
       validation_failures: failures,
       physiological_floors: {
-        long_run_tss_share_max: LONG_RUN_TSS_SHARE_MAX,
+        long_run_tss_share_max_single_sport: LONG_RUN_TSS_SHARE_MAX,
+        tri_long_run_share_of_run_discipline_max: LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE,
+        tri_long_run_share_of_total_week_fallback_max: LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK,
         week_over_week_raw_tss_ramp_max: WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
         rebuilt_once: physiologicalFloorRebuiltOnce,
         rebuild_passes: floorPass,

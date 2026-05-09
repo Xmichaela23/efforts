@@ -10,15 +10,32 @@
 import type { GeneratedWeek, AthleteState } from './types.ts';
 import { DAYS_OF_WEEK } from './science.ts';
 
-/** Max fraction of weekly **raw** TSS that may come from the long-run session(s). */
+/**
+ * Single-sport / marathon plans: long-run raw TSS vs **weekly total** raw TSS (Daniels-style weekly load).
+ */
 export const LONG_RUN_TSS_SHARE_MAX = 0.3;
+
+/**
+ * Multi-sport (tri): long-run vs **run-discipline** weekly raw TSS — bike/swim dominate total TSS; comparing LR
+ * to whole-week total is a category error (see combined-plan notes).
+ */
+export const LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE = 0.3;
+
+/** Tri fallback when weekly run TSS is too small to ratio meaningfully: LR vs total weekly raw TSS. */
+export const LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK = 0.4;
+
+/** Minimum weekly run raw TSS before we trust run-discipline share (else use tri total-week fallback). */
+export const TRI_RUN_DISCIPLINE_SHARE_MIN_RUN_TSS = 40;
 
 /**
  * Stricter ceiling used only during `physiologicalFloorRebuild`: realized weekly raw TSS often
  * lands slightly above `weeklyTSSBudget` (pinned anchors, swim floors), so an LR cap tied to 30%
  * of budget alone can still fail validation at exactly 30%.
  */
-export const FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET = 0.22;
+export const FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET = 0.17;
+
+/** Last-resort rebuild pass — LR share vs realized weekly total (still validated at 30% of raw week). */
+export const FLOOR_REBUILD_DEEP_LONG_RUN_SHARE_OF_BUDGET = 0.14;
 
 /** Max week-over-week increase in **total_raw_tss** (WoW ramp). */
 export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX = 0.15;
@@ -26,7 +43,8 @@ export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX = 0.15;
 /** Applied to each phase block `tssMultiplier` on the automatic rebuild pass. */
 export const FLOOR_REBUILD_TSS_MULTIPLIER_FACTOR = 0.87;
 
-export const FLOOR_REBUILD_MIN_MULTIPLIER = 0.45;
+/** Allow continued tightening past early rebuild stops — weekly volume must be able to compress further. */
+export const FLOOR_REBUILD_MIN_MULTIPLIER = 0.30;
 
 export type PhysiologicalFloorCode = 'LONG_RUN_TSS_SHARE' | 'WEEK_OVER_WEEK_TSS_RAMP';
 
@@ -67,35 +85,70 @@ export type TrainingFloorsResult = {
   violations: PhysiologicalFloorViolation[];
 };
 
+export type ValidateTrainingFloorsOpts = {
+  /** When true, long-run share is measured vs run-sport TSS (not whole-week TSS). */
+  hasTri?: boolean;
+};
+
 /**
- * Validates raw-TSS concentration and weekly ramp. Uses **total_raw_tss** on each week and
- * **long_run** tags — aligned with `GeneratedWeek` totals from `buildWeek`.
+ * Validates raw-TSS concentration and weekly ramp. Uses **long_run** tags — aligned with `GeneratedWeek` from `buildWeek`.
+ * Tri plans: LR share vs **run** raw TSS (not vs swim+bike+run total).
  */
-export function validateTrainingFloors(weeks: GeneratedWeek[]): TrainingFloorsResult {
+export function validateTrainingFloors(
+  weeks: GeneratedWeek[],
+  opts?: ValidateTrainingFloorsOpts,
+): TrainingFloorsResult {
   const violations: PhysiologicalFloorViolation[] = [];
+  const hasTri = opts?.hasTri === true;
 
   for (const w of weeks) {
+    // Deload / recovery weeks intentionally preserve the long aerobic anchor while cutting bike/swim/strength —
+    // do not apply whole-week LR concentration gates here.
+    if (w.isRecovery) continue;
+
     const total = Math.max(0, w.total_raw_tss);
     if (total <= 0) continue;
     const lr = longRunRawTssFromWeek(w);
-    const share = lr / total;
-    if (share > LONG_RUN_TSS_SHARE_MAX + 1e-9) {
+    if (lr <= 0) continue;
+
+    const runRaw = Math.max(0, w.sport_raw_tss?.run ?? 0);
+    let share: number;
+    let limit: number;
+    let basis: string;
+
+    if (hasTri && runRaw >= TRI_RUN_DISCIPLINE_SHARE_MIN_RUN_TSS) {
+      share = lr / runRaw;
+      limit = LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE;
+      basis = 'weekly run-discipline raw TSS';
+    } else if (hasTri) {
+      share = lr / total;
+      limit = LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK;
+      basis = 'weekly total raw TSS (tri fallback — low run volume week)';
+    } else {
+      share = lr / total;
+      limit = LONG_RUN_TSS_SHARE_MAX;
+      basis = 'weekly total raw TSS';
+    }
+
+    if (share > limit + 1e-9) {
       violations.push({
         code: 'LONG_RUN_TSS_SHARE',
         severity: 'fatal',
-        message: `Week ${w.weekNum}: long-run raw TSS is ${(share * 100).toFixed(1)}% of weekly total (limit ${(LONG_RUN_TSS_SHARE_MAX * 100).toFixed(0)}%).`,
+        message: `Week ${w.weekNum}: long-run raw TSS is ${(share * 100).toFixed(1)}% of ${basis} (limit ${(limit * 100).toFixed(0)}%).`,
         week_num: w.weekNum,
         metrics: [
           {
-            name: 'long_run_share',
+            name: hasTri && runRaw >= TRI_RUN_DISCIPLINE_SHARE_MIN_RUN_TSS ? 'long_run_share_of_run_tss' : 'long_run_share',
             observed: round4(share),
-            limit: LONG_RUN_TSS_SHARE_MAX,
+            limit,
             unit: 'ratio',
           },
           {
             name: 'long_run_tss',
             observed: Math.round(lr),
-            limit: Math.round(total * LONG_RUN_TSS_SHARE_MAX),
+            limit: Math.round(
+              (hasTri && runRaw >= TRI_RUN_DISCIPLINE_SHARE_MIN_RUN_TSS ? runRaw : total) * limit,
+            ),
             unit: 'tss',
           },
         ],
@@ -111,6 +164,8 @@ export function validateTrainingFloors(weeks: GeneratedWeek[]): TrainingFloorsRe
     if (prev.isRecovery) continue;
     const p = Math.max(0, prev.total_raw_tss);
     if (p < 1) continue;
+    // Very low prior-week totals (partial deloads not flagged `isRecovery`) — skip ramp vs noise.
+    if (p < 120) continue;
     const ramp = (cur.total_raw_tss - p) / p;
     if (ramp > WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX + 1e-9) {
       violations.push({
