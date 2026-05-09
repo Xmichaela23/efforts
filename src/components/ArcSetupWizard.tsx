@@ -24,7 +24,7 @@ import { MobileHeader } from '@/components/MobileHeader';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
 import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
-import { loadArcWizardDraft, saveArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
+import { loadArcWizardDraft, saveArcWizardDraft, clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
 import { climbNoticeTier, stravaRouteUrlLooksFetchable, formatGroupRideRouteStatsLine } from '@/lib/group-ride-route-snapshot';
 import { parseTimeToSeconds, type RaceDistance } from '@/lib/effort-score';
@@ -2281,6 +2281,17 @@ export default function ArcSetupWizard() {
       window.removeEventListener('pagehide', flush);
     };
   }, [state, stepIdx]);
+
+  useEffect(() => {
+    const onReset = () => {
+      const uid = getStoredUserId();
+      if (uid) clearArcWizardDraft(uid);
+      setState(blank());
+      setStepIdx(0);
+    };
+    window.addEventListener('arc-wizard:reset', onReset);
+    return () => window.removeEventListener('arc-wizard:reset', onReset);
+  }, []);
 
   // Load Arc context once at mount
   useEffect(() => {

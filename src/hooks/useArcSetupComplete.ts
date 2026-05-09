@@ -10,13 +10,13 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, getStoredUserId, invokeFunction } from '@/lib/supabase';
+import { resetWizardClientState } from '@/lib/reset-wizard-client-state';
 import {
   persistArcSetup,
   buildCompleteContext,
   parseArcInvokeError,
   type InsertedGoalRow,
 } from '@/lib/arc-setup-persistence';
-import { clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import {
   useConflictResolutionLoop,
   type ActiveConflict,
@@ -30,6 +30,9 @@ export type ConflictOverlay = {
   conflict: ActiveConflict;
   description: string;
 };
+
+const ROLLBACK_CLEANUP_MSG =
+  'Goals were saved but plan setup failed. Some goals could not be removed automatically — open Goals and delete any duplicates.';
 
 export function useArcSetupComplete() {
   const navigate = useNavigate();
@@ -68,19 +71,30 @@ export function useArcSetupComplete() {
     [_handleConflictChoice],
   );
 
-  const rollbackInsertedGoals = useCallback(async (inserted: InsertedGoalRow[] | undefined) => {
+  const rollbackInsertedGoals = useCallback(async (inserted: InsertedGoalRow[] | undefined): Promise<boolean> => {
     const userId = getStoredUserId();
-    if (!userId || !inserted?.length) return;
-    for (const g of inserted) {
-      try {
-        const { error: delErr } = await supabase.functions.invoke('delete-goal', {
+    if (!userId || !inserted?.length) return false;
+    const results = await Promise.allSettled(
+      inserted.map((g) =>
+        supabase.functions.invoke('delete-goal', {
           body: { goal_id: g.id, user_id: userId },
-        });
-        if (delErr) console.warn('[useArcSetupComplete] rollback delete-goal', g.id, delErr);
-      } catch (e) {
-        console.warn('[useArcSetupComplete] rollback goal', g.id, e);
+        }),
+      ),
+    );
+    let hadFailure = false;
+    results.forEach((r, i) => {
+      const gid = inserted[i]?.id;
+      if (r.status === 'rejected') {
+        hadFailure = true;
+        console.warn('[useArcSetupComplete] rollback delete-goal', gid, r.reason);
+        return;
       }
-    }
+      if (r.value.error) {
+        hadFailure = true;
+        console.warn('[useArcSetupComplete] rollback delete-goal', gid, r.value.error);
+      }
+    });
+    return hadFailure;
   }, []);
 
   const complete = useCallback(
@@ -111,7 +125,9 @@ export function useArcSetupComplete() {
 
       if ('error' in ctxOrErr) {
         setSaving(false);
-        await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
+        const rbFail = await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
+        resetWizardClientState(userId);
+        if (rbFail) setError(ROLLBACK_CLEANUP_MSG);
         navigate('/goals', { replace: true, state: { fromArcSetup: true } });
         return;
       }
@@ -144,12 +160,14 @@ export function useArcSetupComplete() {
 
       if (fnErr || !data || (data as { success?: boolean }).success !== true) {
         const parsed = await parseArcInvokeError(fnErr, data, 'Unable to build training plan');
-        await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
+        const rbFail = await rollbackInsertedGoals((insertedGoals || []) as InsertedGoalRow[]);
+        resetWizardClientState(userId);
         if (parsed.code === 'missing_pace_benchmark') {
+          if (rbFail) setError(ROLLBACK_CLEANUP_MSG);
           navigate('/goals', { replace: true, state: { fromArcSetup: true, needPaceCalibration: true } });
           return;
         }
-        setError(parsed.message);
+        setError(rbFail ? `${parsed.message} ${ROLLBACK_CLEANUP_MSG}` : parsed.message);
         return;
       }
 
@@ -168,7 +186,7 @@ export function useArcSetupComplete() {
         window.dispatchEvent(new CustomEvent('plans:refresh'));
       } catch {}
 
-      if (userId) clearArcWizardDraft(userId);
+      if (userId) resetWizardClientState(userId);
 
       navigate('/goals', {
         replace: true,
