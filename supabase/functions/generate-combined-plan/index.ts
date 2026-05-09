@@ -20,6 +20,7 @@ import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-stat
 import { promote703SwimIntentForCutoffRisk } from './swim-tri-safety.ts';
 import {
   buildQualityRunWeekBuilderFallbackTradeOff,
+  humanizeScheduleTradeOffLine,
   plannedSessionLooksLikeStructuredQualityRun,
   sessionsByWeekHasStructuredQualityRun,
 } from '../_shared/plan-generation-trade-offs.ts';
@@ -367,7 +368,10 @@ Deno.serve(async (req: Request) => {
       week_trade_offs: Object.fromEntries(
         generatedWeeks
           .filter((w) => Array.isArray(w.week_trade_offs) && w.week_trade_offs.length > 0)
-          .map((w) => [String(w.weekNum), w.week_trade_offs as string[]]),
+          .map((w) => [
+            String(w.weekNum),
+            (w.week_trade_offs as string[]).map((t) => humanizeScheduleTradeOffLine(t)),
+          ]),
       ),
       conflict_events: Object.fromEntries(
         generatedWeeks

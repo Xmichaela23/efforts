@@ -602,10 +602,16 @@ export function buildWeek(
 
   // recoveryRebuildWeek2EasyRunOnly: swaps quality run for easy run in week 2.
   // Only for standalone run plans — tri plans have quality sessions from week 2 onward.
+  /** Post-marathon / full recovery rebuild stops shaping the calendar after week 3 (§cap — was bleeding ~9wk via structural hints). */
+  const RECOVERY_REBUILD_CALENDAR_WEEKS = 3;
+  const inRecoveryRebuildTransition =
+    athleteState.transition_mode === 'recovery_rebuild' &&
+    weekNum <= RECOVERY_REBUILD_CALENDAR_WEEKS;
+
   const recoveryRebuildWeek2EasyRunOnly =
     !hasTri &&
     weekNum === 2 &&
-    athleteState.transition_mode === 'recovery_rebuild';
+    inRecoveryRebuildTransition;
 
   // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier)
   const baseTSS = scaledWeeklyTSS(phase, athleteState.current_ctl, athleteState.weekly_hours_available, block.tssMultiplier);
@@ -784,7 +790,10 @@ export function buildWeek(
   ) ? 'build'   // Z2 run leg (brick fn uses build → easy Z2 run)
     : phase;
 
+  // Alternate “long endurance ride only” vs brick on odd week-in-block — base_first only.
+  // race_peak / default tri needs weekly bricks in build per §4.12 (was skipping half of build weeks).
   const preferStandaloneBikeEndurance =
+    triApproach === 'base_first' &&
     phase === 'build' &&
     hasTri &&
     !isRecovery &&
@@ -1038,7 +1047,9 @@ export function buildWeek(
     phase,
     weekInPhase: weekInBlock,
     swim_anchor_slot_count: swimAnchorSlots,
-    ...(athleteState.structural_load_hint === 'low' && !recoveryLearnerTwoSwimMaintained
+    ...(athleteState.structural_load_hint === 'low' &&
+      inRecoveryRebuildTransition &&
+      !recoveryLearnerTwoSwimMaintained
       ? { recoveryFloorScale: 0.7 as const }
       : {}),
   });
@@ -1115,10 +1126,10 @@ export function buildWeek(
       if (phase === 'taper') {
         bikeQualitySlot!.sessions.push(bikeOpeners(bq, servedGoal));
       } else {
-        const label = athleteState.bike_quality_label;
+        const grLabel = groupRideAnchorDisplayLabel(athleteState);
         // Anchor-driven override: when quality-bike day is a recurring group ride,
         // describe it honestly as a group ride (no structured interval prescription).
-        if (label) {
+        if (grLabel) {
           const groupRideHours = resolveGroupRideHours(phase, athleteState);
           bikeQualitySlot!.sessions.push(
             groupRideSession(
@@ -1126,7 +1137,7 @@ export function buildWeek(
               groupRideHours,
               phase,
               servedGoal,
-              label,
+              grLabel,
               athleteState.group_ride_route_url,
               athleteState.group_ride_route_snapshot,
               athleteState.plan_units === 'metric' ? 'metric' : 'imperial',
@@ -1791,6 +1802,19 @@ function weeklyTSSForRamp(currentCTL: number, targetWeeklyRamp: number): number 
   const alpha = 1 - Math.exp(-1 / 42);
   const dailyDelta = targetWeeklyRamp / 7;
   return Math.round((currentCTL + dailyDelta / alpha) * 7);
+}
+
+/** Match reconciler: treat pinned quality bike as group ride when label or duration/route hints exist. */
+function groupRideAnchorDisplayLabel(athleteState: AthleteState): string | null {
+  const trimmed = String(athleteState.bike_quality_label ?? '').trim();
+  if (trimmed) return trimmed;
+  const hasDur =
+    athleteState.bike_quality_route_estimated_hours != null ||
+    athleteState.bike_quality_route_estimated_minutes != null ||
+    athleteState.bike_quality_group_ride_hours != null ||
+    athleteState.bike_quality_group_ride_minutes != null ||
+    Boolean(String(athleteState.group_ride_route_url ?? '').trim());
+  return hasDur ? 'Group Ride' : null;
 }
 
 function resolveGroupRideHours(

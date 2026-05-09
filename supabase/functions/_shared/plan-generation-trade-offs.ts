@@ -47,6 +47,51 @@ export type ScheduleSignals = {
   pin_restore_skipped: string[];
 };
 
+/**
+ * Athlete-facing copy for optimizer / reconciler trade-off lines (docs/SCHEDULING-RULES.md §7).
+ * Internal codes stay in source strings; this runs at the API boundary.
+ */
+export function humanizeScheduleTradeOffLine(raw: string): string {
+  let s = String(raw).trim();
+  if (!s) return s;
+  s = s.replace(/\s*Do not describe[^.]*\./gi, '').trim();
+  s = s.replace(/\bthe athlete must choose:\s*/gi, 'You can ');
+  s = s.replace(/\bThe athlete must choose:\s*/g, 'You can ');
+  s = s.replace(/\bthe athlete\b/gi, 'you');
+  s = s.replace(/\bThe athlete\b/g, 'You');
+  s = s.replace(/\bathlete-declared\b/gi, 'your chosen');
+  s = s.replace(/\bprovisional\b/gi, 'temporary');
+
+  const recoveryRetry = /\s*1× retry still has CONFLICTS[\s\S]*$/i;
+  if (recoveryRetry.test(s)) {
+    s = s.replace(recoveryRetry, '').trim();
+    if (/CO_EQUAL_STRENGTH/i.test(s)) {
+      return `${humanizeScheduleTradeOffLine(s)} If you need two strength days, adjust pinned long or group-ride days first.`;
+    }
+  }
+
+  const coEq = /^CO_EQUAL_STRENGTH\s*\(recovery\):\s*(.+)$/is.exec(s);
+  if (coEq) {
+    return (
+      'We kept strength to one session this week because two full-body strength days could not fit with your current anchors and recovery rules. ' +
+      'To add a second day, move a fixed ride, long run, or swim block — or stay on one strength day until the schedule has room.'
+    );
+  }
+
+  s = s.replace(/^CO_EQUAL_STRENGTH:\s*/i, '');
+  s = s.replace(/\bEXPERIENCE_MODIFIER\b/g, 'intentional same-day pairing');
+
+  const pref = /^(\w+):\s*/.exec(s);
+  if (pref && ['quality_bike', 'quality_run', 'easy_bike', 'easy_run'].includes(pref[1])) {
+    const key = pref[1].replace(/_/g, ' ');
+    const rest = s.slice(pref[0].length).trim();
+    const prettyKey = key.charAt(0).toUpperCase() + key.slice(1);
+    return `${prettyKey}: ${rest}`;
+  }
+
+  return s.trim();
+}
+
 export function aggregateOptimizerScheduleSignals(
   snapshots: PlanOptimizerSnapshotInput[],
 ): ScheduleSignals {
@@ -71,7 +116,7 @@ export function aggregateOptimizerScheduleSignals(
   }
   return {
     conflicts: [...conflicts],
-    trade_offs: [...tradeOffs],
+    trade_offs: [...tradeOffs].map((t) => humanizeScheduleTradeOffLine(t)),
     used_co_equal_1x_fallback: coEqual,
     pin_restore_skipped: [...pinSkipped],
   };
@@ -459,7 +504,10 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
     seen.add(derived);
   }
 
-  return { ...signals, trade_offs: out };
+  return {
+    ...signals,
+    trade_offs: out.map((t) => humanizeScheduleTradeOffLine(String(t))),
+  };
 }
 
 export function sessionsByWeekHasStructuredQualityRun(

@@ -336,7 +336,7 @@ function sequentialOk(
   days: Record<DayName, SessionSlot[]>,
   day: DayName,
   kind: SessionKind,
-  _athlete: WeekOptimizerInputs['athlete'],
+  athlete: WeekOptimizerInputs['athlete'],
   relax?: SequentialRelax,
 ): boolean {
   const prevSlots = days[dayBefore(day)] ?? [];
@@ -390,26 +390,34 @@ function sequentialOk(
   if (nextKinds.includes('quality_bike') && kind === 'quality_run') return false;
   if (nextKinds.includes('quality_run') && kind === 'quality_bike') return false;
 
-  // 48h gap before next lower-leg-heavy work after lower_body_strength.
-  // Per docs/SCHEDULING-RULES.md §4.4: heavy lower must precede quality_bike by ≥48h
-  // (cycling power output at threshold/VO2 is impaired 24-48h post-heavy-lower; the
-  // quality stimulus is wasted if power output is impaired).
-  if (kind === 'lower_body_strength' || kind === 'long_run' || kind === 'quality_bike') {
-    const twoBackKinds = (days[nDaysAfter(day, -2)] ?? []).map((s) => s.kind);
+  const perfIntent = athlete.training_intent === 'performance';
+  const twoBackKinds = (days[nDaysAfter(day, -2)] ?? []).map((s) => s.kind);
+
+  // Gap after lower_body_strength before hard leg/CNS days (§4.2–4.4).
+  // §5.1 [derived]: performance intent → 24h vs quality_bike only (still 48h vs long_run).
+  if (kind === 'long_run') {
+    if (prevKinds.includes('lower_body_strength')) return false;
+    if (twoBackKinds.includes('lower_body_strength')) return false;
+  }
+  if (kind === 'quality_bike') {
+    if (prevKinds.includes('lower_body_strength')) return false;
+    if (!perfIntent && twoBackKinds.includes('lower_body_strength')) return false;
+  }
+  if (kind === 'lower_body_strength') {
     if (prevKinds.includes('lower_body_strength')) return false;
     if (twoBackKinds.includes('lower_body_strength')) return false;
   }
 
-  // 48h gap BEFORE sovereign / power-quality days: lower_body_strength cannot fall in the
-  // two calendar days before long_ride, long_run, or quality_bike (§4.4).
+  // Lower_body cannot fall in the two calendar days before long_ride / long_run;
+  // before quality_bike require two days unless §5.1 performance relaxation (second day only).
   if (kind === 'lower_body_strength') {
     for (const delta of [1, 2] as const) {
       const slots = days[nDaysAfter(day, delta)] ?? [];
-      if (slots.some((s) =>
-        s.kind === 'long_ride' || s.kind === 'long_run' || s.kind === 'quality_bike',
-      )) {
-        return false;
-      }
+      const hasLong = slots.some((s) => s.kind === 'long_ride' || s.kind === 'long_run');
+      const hasQb = slots.some((s) => s.kind === 'quality_bike');
+      if (!hasLong && !hasQb) continue;
+      if (perfIntent && delta === 2 && hasQb && !hasLong) continue;
+      return false;
     }
   }
 

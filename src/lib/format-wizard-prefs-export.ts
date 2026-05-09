@@ -17,6 +17,31 @@ function fmtPrefScalar(val: unknown): string {
   return '';
 }
 
+/** Strength slot objects from optimizer export / Arc — avoid "[object Object]" in markdown. */
+function formatStrengthOrDayToken(x: unknown): string {
+  if (x === null || x === undefined) return '';
+  if (typeof x === 'string' || typeof x === 'number') return String(x);
+  if (typeof x === 'object' && !Array.isArray(x)) {
+    const o = x as Record<string, unknown>;
+    const day = String(o.weekday ?? o.day ?? '').trim();
+    const kind = String(o.kind ?? '').trim();
+    const idx = o.session_index;
+    if (day && kind) {
+      const short = kind.includes('upper')
+        ? 'upper body'
+        : kind.includes('lower')
+          ? 'lower body'
+          : kind.replace(/_/g, ' ');
+      return `${day} (${short})`;
+    }
+    if (day && typeof idx === 'number' && Number.isFinite(idx)) {
+      return `${day} (session ${idx + 1})`;
+    }
+    if (day) return day;
+  }
+  return fmtPrefScalar(x);
+}
+
 /** Preferred-day anchors from wizard (`preferred_days`). */
 function formatPreferredDays(pd: unknown): string[] {
   if (!pd || typeof pd !== 'object') return [];
@@ -39,7 +64,8 @@ function formatPreferredDays(pd: unknown): string[] {
     const v = o[k];
     const label = titleCaseKey(k);
     if (Array.isArray(v)) {
-      lines.push(`  - **${label}:** ${v.map((x) => String(x)).join(', ')}`);
+      const parts = v.map((x) => formatStrengthOrDayToken(x)).filter(Boolean);
+      if (parts.length) lines.push(`  - **${label}:** ${parts.join(', ')}`);
     } else {
       const s = fmtPrefScalar(v);
       if (s) lines.push(`  - **${label}:** ${s}`);
@@ -50,7 +76,8 @@ function formatPreferredDays(pd: unknown): string[] {
     const v = o[k];
     const label = titleCaseKey(k);
     if (Array.isArray(v)) {
-      lines.push(`  - **${label}:** ${v.map((x) => String(x)).join(', ')}`);
+      const parts = v.map((x) => formatStrengthOrDayToken(x)).filter(Boolean);
+      if (parts.length) lines.push(`  - **${label}:** ${parts.join(', ')}`);
     } else {
       const s = fmtPrefScalar(v);
       if (s) lines.push(`  - **${label}:** ${s}`);
@@ -86,6 +113,7 @@ const KEY_ORDER = [
   'days_per_week',
   'strength_frequency',
   'preferred_days',
+  'strength_preferred_days',
   'prior_similar_race',
   'swim_intent',
   'swim_experience',
@@ -146,6 +174,11 @@ export function formatWizardPrefsMarkdownLines(goal: {
     if (raw === undefined || raw === null || raw === '') return;
     used.add(key);
     const label = labelOverride ?? titleCaseKey(key);
+    if (Array.isArray(raw)) {
+      const parts = raw.map((x) => formatStrengthOrDayToken(x)).filter(Boolean);
+      if (parts.length) out.push(`- **${label}:** ${parts.join('; ')}`);
+      return;
+    }
     let display = fmtPrefScalar(raw);
     if (key === 'training_intent') display = TRAINING_INTENT_LABELS[String(raw)] ?? display;
     if (key === 'swim_intent') display = SWIM_INTENT_LABELS[String(raw)] ?? display;
