@@ -355,27 +355,33 @@ function priorSimilarRaceTrainingPrefs(state: WizardState): Record<string, unkno
   }
   if (!state.priorRaceHasEntry) return {};
   const sec = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
-  if (sec == null || sec <= 0 || !state.priorRaceDate.trim() || !state.priorRaceContinuity) return {};
+  const timeTouched = state.priorRaceTimeStr.trim() !== '';
+  if (!state.priorRaceDistance.trim() || !state.priorRaceDate.trim() || !state.priorRaceContinuity) return {};
+  // Allow omitting finish time; if they typed something, it must parse.
+  if (timeTouched && (sec == null || sec <= 0)) return {};
   const yr = parseWizardPriorRaceYear(state.priorRaceYear);
   const name = state.priorRaceName.trim();
+  const rec: Record<string, unknown> = {
+    skipped: false,
+    distance: state.priorRaceDistance.trim(),
+    ...(name ? { event_name: name } : {}),
+    ...(yr != null ? { event_year: yr } : {}),
+    event_date: state.priorRaceDate.trim().slice(0, 10),
+    continuity: state.priorRaceContinuity,
+    captured_at: new Date().toISOString(),
+  };
+  if (sec != null && sec > 0) rec.finish_seconds = Math.round(sec);
   return {
-    prior_similar_race: {
-      skipped: false,
-      distance: state.priorRaceDistance.trim(),
-      ...(name ? { event_name: name } : {}),
-      ...(yr != null ? { event_year: yr } : {}),
-      event_date: state.priorRaceDate.trim().slice(0, 10),
-      finish_seconds: sec,
-      continuity: state.priorRaceContinuity,
-      captured_at: new Date().toISOString(),
-    },
+    prior_similar_race: rec,
   };
 }
 
 function priorSimilarRaceSummaryLine(state: WizardState): string {
   if (state.priorRaceSkipped || !state.priorRaceHasEntry) return '';
   const sec = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
-  if (sec == null || sec <= 0 || !state.priorRaceDate.trim() || !state.priorRaceContinuity) return '';
+  const timeTouched = state.priorRaceTimeStr.trim() !== '';
+  if (!state.priorRaceDate.trim() || !state.priorRaceContinuity) return '';
+  if (timeTouched && (sec == null || sec <= 0)) return '';
   const cont =
     state.priorRaceContinuity === 'steady'
       ? 'steady training since'
@@ -393,7 +399,9 @@ function priorSimilarRaceSummaryLine(state: WizardState): string {
           ? `(${yr})`
           : '';
   const prefix = label ? `${label}: prior ${state.priorRaceDistance}` : `Prior ${state.priorRaceDistance}`;
-  return `${prefix} finish ${fmtHMS(sec)} on ${state.priorRaceDate.trim().slice(0, 10)} (${cont}).`;
+  const finishPhrase =
+    sec != null && sec > 0 ? `finish ${fmtHMS(sec)}` : 'finish time not entered';
+  return `${prefix} ${finishPhrase} on ${state.priorRaceDate.trim().slice(0, 10)} (${cont}).`;
 }
 
 type WizardSetState = React.Dispatch<React.SetStateAction<WizardState>>;
@@ -1141,6 +1149,9 @@ function StepPriorRace({
   };
 
   const secOk = parseWizardPriorRaceSeconds(state.priorRaceDistance, state.priorRaceTimeStr);
+  const timeTouched = state.priorRaceTimeStr.trim() !== '';
+  /** Empty finish field is OK (optional). Non-empty must parse. */
+  const finishFieldOk = !timeTouched || (secOk != null && secOk > 0);
   const dateYmd = state.priorRaceDate.trim().slice(0, 10);
   const yrParsed = parseWizardPriorRaceYear(state.priorRaceYear);
   const yearFieldOk =
@@ -1152,8 +1163,7 @@ function StepPriorRace({
     (state.priorRaceHasEntry &&
       Boolean(state.priorRaceDistance.trim()) &&
       Boolean(state.priorRaceDate.trim()) &&
-      secOk != null &&
-      secOk > 0 &&
+      finishFieldOk &&
       state.priorRaceContinuity != null &&
       yearFieldOk);
 
@@ -1247,7 +1257,9 @@ function StepPriorRace({
             />
           </div>
           <div>
-            <p className="text-[11px] text-white/40 mb-1.5">Finish time</p>
+            <p className="text-[11px] text-white/40 mb-1.5">
+              Finish time <span className="text-white/25">(optional)</span>
+            </p>
             <input
               type="text"
               inputMode="numeric"

@@ -6,7 +6,8 @@
 export type PriorSimilarRaceCoachFacts = {
   distance: string;
   event_date: string;
-  finish_seconds: number;
+  /** Present when the athlete entered a finish; null when date/continuity only. */
+  finish_seconds: number | null;
   continuity: string;
   /** Optional human label for the event */
   event_name?: string;
@@ -17,7 +18,7 @@ export type PriorSimilarRaceCoachFacts = {
 };
 
 /** Static guardrail for Arc setup + weekly coaching system/user prompts */
-export const PRIOR_SIMILAR_RACE_NARRATIVE_ONLY_RULE = `PRIOR COMPARABLE RACE (when present): The athlete reported a past finish at a similar distance. Use it only for narrative empathy and continuity framing (e.g. returning to the distance, durability early on if they had a long layoff). Do NOT invent target paces, power, HR zones, split predictions, or race projections from finish_seconds or distance. Threshold/CSS/FTP and easy paces come from workout-derived context or explicit baselines — not from this finish.`;
+export const PRIOR_SIMILAR_RACE_NARRATIVE_ONLY_RULE = `PRIOR COMPARABLE RACE (when present): The athlete reported a similar-distance race (finish time may be omitted). Use it only for narrative empathy and continuity framing (e.g. returning to the distance, durability early on if they had a long layoff). Do NOT invent target paces, power, HR zones, split predictions, or race projections from finish_seconds or distance. Threshold/CSS/FTP and easy paces come from workout-derived context or explicit baselines — not from this finish.`;
 
 function fmtRaceClockSec(sec: number): string {
   const t = Math.round(Math.max(0, sec));
@@ -43,16 +44,16 @@ export function normalizePriorSimilarRaceRecord(raw: unknown): Omit<PriorSimilar
   const distance = typeof o.distance === 'string' ? o.distance.trim() : '';
   const event_date = typeof o.event_date === 'string' ? o.event_date.trim().slice(0, 10) : '';
   const fsRaw = o.finish_seconds;
-  const finish_seconds =
-    typeof fsRaw === 'number' && Number.isFinite(fsRaw)
-      ? fsRaw
-      : typeof fsRaw === 'string' && /^\d+$/.test(fsRaw.trim())
-        ? Number(fsRaw.trim())
-        : NaN;
+  let finish_seconds: number | null = null;
+  if (typeof fsRaw === 'number' && Number.isFinite(fsRaw) && fsRaw > 0) {
+    finish_seconds = fsRaw;
+  } else if (typeof fsRaw === 'string' && /^\d+$/.test(fsRaw.trim())) {
+    const n = Number(fsRaw.trim());
+    if (Number.isFinite(n) && n > 0) finish_seconds = n;
+  }
   const continuity = typeof o.continuity === 'string' ? o.continuity.trim() : '';
 
   if (!distance || !/^\d{4}-\d{2}-\d{2}$/.test(event_date)) return null;
-  if (!Number.isFinite(finish_seconds) || finish_seconds <= 0) return null;
   if (!continuity || !CONTINUITY_PHRASE[continuity]) return null;
 
   const ename = typeof o.event_name === 'string' ? o.event_name.trim() : '';
@@ -154,14 +155,22 @@ export function priorSimilarRaceFromGoals(goals: GoalLike[]): Omit<PriorSimilarR
 
 /** Compact JSON for Arc setup dynamic prompt */
 export function priorSimilarRaceFactsJson(facts: PriorSimilarRaceCoachFacts): string {
+  const hasFinish =
+    facts.finish_seconds != null &&
+    Number.isFinite(facts.finish_seconds) &&
+    facts.finish_seconds > 0;
   return JSON.stringify(
     {
       distance: facts.distance,
       event_date: facts.event_date,
       ...(facts.event_name ? { event_name: facts.event_name } : {}),
       ...(facts.event_year != null ? { event_year: facts.event_year } : {}),
-      finish_clock: fmtRaceClockSec(facts.finish_seconds),
-      finish_seconds: facts.finish_seconds,
+      ...(hasFinish
+        ? {
+          finish_clock: fmtRaceClockSec(facts.finish_seconds!),
+          finish_seconds: facts.finish_seconds,
+        }
+        : { finish_clock: null, finish_seconds: null, finish_note: 'not_recorded' }),
       continuity: facts.continuity,
       continuity_for_coach: CONTINUITY_PHRASE[facts.continuity] ?? facts.continuity,
       months_before_focus_date: facts.months_before_focus,
@@ -195,7 +204,11 @@ export function formatPriorComparableRaceSnapshotBlock(facts: PriorSimilarRaceCo
     ...(who ? [`Event: ${who}`] : []),
     `Distance: ${facts.distance}`,
     `Prior event date: ${facts.event_date}`,
-    `Their finish time (context only, not a training prescription): ${fmtRaceClockSec(facts.finish_seconds)}`,
+    ...(facts.finish_seconds != null && facts.finish_seconds > 0
+      ? [
+        `Their finish time (context only, not a training prescription): ${fmtRaceClockSec(facts.finish_seconds)}`,
+      ]
+      : [`Finish time: not recorded — use event date and training continuity for empathy only.`]),
     `Training continuity since that race: ${cont}`,
     `Recency: ${mo}. Strongest framing value is usually within ~6–12 months; stays valid as background when older.`,
     '',
@@ -220,7 +233,10 @@ export function coachLegacyPriorRaceLine(goals: GoalLike[], focusYmd: string): s
 /** One line for legacy coach FACTS list */
 export function formatPriorComparableRaceLegacyFactLine(facts: PriorSimilarRaceCoachFacts): string {
   const cont = CONTINUITY_PHRASE[facts.continuity] ?? facts.continuity;
-  const clock = fmtRaceClockSec(facts.finish_seconds);
+  const clock =
+    facts.finish_seconds != null && facts.finish_seconds > 0
+      ? fmtRaceClockSec(facts.finish_seconds)
+      : 'finish time not recorded';
   const who =
     facts.event_name && facts.event_year != null
       ? `${facts.event_name} (${facts.event_year}), `

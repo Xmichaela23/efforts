@@ -187,13 +187,21 @@ export function formatWizardPrefsMarkdownLines(goal: {
           : typeof eyRaw === 'string' && /^\d{4}$/.test(eyRaw.trim())
             ? Number(eyRaw.trim())
             : null;
-      const sec = Number(p?.finish_seconds);
+      const secRaw = p?.finish_seconds;
+      const sec =
+        typeof secRaw === 'number' && Number.isFinite(secRaw) && secRaw > 0
+          ? secRaw
+          : typeof secRaw === 'string' && /^\d+$/.test(secRaw.trim())
+            ? Number(secRaw.trim())
+            : NaN;
       const cont = String(p?.continuity ?? '');
       const contHuman = PRIOR_CONTINUITY_LABELS[cont] ?? cont;
-      if (dist && dt && Number.isFinite(sec) && sec > 0) {
+      if (dist && dt && cont) {
         const labelParts = [nm || null, ey != null && Number.isFinite(ey) ? String(Math.round(ey)) : null].filter(Boolean);
         const label = labelParts.length ? `${labelParts.join(' · ')} — ` : '';
-        out.push(`- **Prior comparable race:** ${label}${dist} — ${fmtRaceClock(sec)} on ${dt} (${contHuman})`);
+        const clock =
+          Number.isFinite(sec) && sec > 0 ? `${fmtRaceClock(sec)} on ${dt}` : `date ${dt} (finish time not recorded)`;
+        out.push(`- **Prior comparable race:** ${label}${dist} — ${clock} (${contHuman})`);
       }
       continue;
     }
