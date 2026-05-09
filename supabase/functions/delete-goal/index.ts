@@ -17,7 +17,7 @@
 // `training_prefs`, `target_time`, `name`, `target_date` on remaining goals are
 // athlete intent and are NEVER touched here. The torn-down `delete-plan` edge
 // function handles `goals.race_readiness_projection`, `goals.projection`, and
-// the `coach_cache` invalidation for the deleted plan(s).
+// the training caches (`coach_cache`, `block_adaptation_cache`) for the deleted plan(s).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
     }
 
     // 4) Tear down each linked plan via delete-plan (handles its own goal-projection
-    //    + coach_cache cleanup for the served goals).
+    //    + coach_cache / block_adaptation_cache cleanup for the served goals).
     const deletedPlanIds: string[] = []
     const planErrors: string[] = []
     for (const p of allPlans) {

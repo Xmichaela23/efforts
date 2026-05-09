@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import {
   getLatestAthleteMemory,
   resolveAdaptiveMarathonDecisionFromMemory,
@@ -1738,10 +1739,13 @@ Deno.serve(async (req: Request) => {
 
   let createdGoalId: string | null = null;
   let createdPlanId: string | null = null;
+  /** Set once auth resolves; used in catch for cache invalidation after rollback (plan deleted mid-build). */
+  let resolvedUserId: string | null = null;
 
   try {
     const raw = ((await req.json()) as CreateGoalRequest) || ({} as CreateGoalRequest);
     const user_id = requireUserIdFromRequest(req, raw.user_id);
+    resolvedUserId = user_id;
     const mode = String(raw.mode ?? 'create').trim() as RequestMode;
     const action = raw.action;
     const existing_goal_id = trimId(raw.existing_goal_id);
@@ -2657,6 +2661,13 @@ Deno.serve(async (req: Request) => {
         await supabase.from('goals').delete().eq('id', createdGoalId);
       } catch {
         // no-op
+      }
+    }
+    if (resolvedUserId && (createdPlanId || createdGoalId)) {
+      try {
+        await invalidateUserTrainingCache(supabase, resolvedUserId, 'create-goal-and-materialize-plan rollback');
+      } catch {
+        // best-effort — same caches as ingest after partial plan/goal teardown
       }
     }
     return new Response(

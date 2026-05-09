@@ -4,6 +4,7 @@
 // Method: POST
 // Body: { userId: string, provider: 'strava'|'garmin', activity: any }
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY'));
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -1451,25 +1452,7 @@ Deno.serve(async (req)=>{
           console.error('[ingest-activity] compute-facts error:', factsErr);
         }
 
-        // Invalidate server-side block cache (24h TTL, safe to delete all for user)
-        try {
-          await supabase
-            .from('block_adaptation_cache')
-            .delete()
-            .eq('user_id', userId);
-        } catch (cacheErr) {
-          console.error('[ingest-activity] Failed to invalidate block cache:', cacheErr);
-        }
-
-        // Invalidate coach cache so next State tab open triggers a fresh pipeline run
-        try {
-          await supabase
-            .from('coach_cache')
-            .update({ invalidated_at: new Date().toISOString() })
-            .eq('user_id', userId);
-        } catch (coachCacheErr) {
-          console.error('[ingest-activity] Failed to invalidate coach cache:', coachCacheErr);
-        }
+        await invalidateUserTrainingCache(supabase, userId, 'ingest-activity');
 
         // Generate details chat/context for completed workouts (fire-and-forget background processing)
         // Note: analyze-running-workout will now have planned_id available (deterministic ordering)

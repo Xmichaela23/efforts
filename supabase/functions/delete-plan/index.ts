@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts'
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts'
 
 /** Combined plans store every served goal on `config.plan_contract_v1.goals_served`; `plans.goal_id` is only the primary. */
@@ -73,16 +74,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Coach cache holds plan-week reactions and a snapshotted plan_contract; force revalidate
+    // Same invalidation as ingest-activity: plan deletion changes training context
     if (userId) {
-      try {
-        await supabase
-          .from('coach_cache')
-          .update({ invalidated_at: new Date().toISOString() })
-          .eq('user_id', userId)
-      } catch (e) {
-        console.warn('[delete-plan] coach_cache invalidate:', e)
-      }
+      await invalidateUserTrainingCache(supabase, userId, 'delete-plan')
     }
 
     return new Response(JSON.stringify({ success: true, deleted_plan_id: planId }), { headers: { ...cors, 'Content-Type':'application/json' } })
