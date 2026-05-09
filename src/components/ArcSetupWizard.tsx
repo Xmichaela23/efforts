@@ -1617,7 +1617,10 @@ function Step4Bike({
             )}
             {routeTopoTier === 'aggressive' && (
               <ArcHint>
-                Serious climbing on this route. Run intervals stacked right after may need to stay easier — we factor topography into bike stress so recovery stays honest.
+                Serious climbing on this route — expect higher bike stress than the hours alone suggest.
+                If your plan puts quality running on the very next day (for example Thursday after a Wednesday ride),
+                we may ease that session slightly for recovery. That reflects how we stack sessions in the week,
+                not an assumption that you “run intervals.”
               </ArcHint>
             )}
             {routeTopoTier === 'notice' && (
