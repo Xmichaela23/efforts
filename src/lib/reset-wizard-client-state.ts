@@ -2,9 +2,9 @@ import { clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 
 /**
  * Clears persisted Arc wizard draft and notifies listeners (`arc-wizard:reset`).
- * Use **only** after a successful wizard completion or explicit “start over” —
- * not on plan/goal delete (that would wipe in-progress setup while the athlete
- * is still on the wizard).
+ * Call after successful completion, explicit “start over”, or **materialize failure**
+ * so local draft races do not survive a broken plan build. Do not use on unrelated
+ * plan/goal deletes while the athlete may still be mid-wizard.
  */
 export function resetWizardClientState(userId: string | null): void {
   if (userId) {

@@ -1978,11 +1978,11 @@ function Step8Strength({
 }
 
 function Step9Confirm({
-  state, setState, onBack, onConfirm, step, totalSteps, saving, error, arc,
+  state, setState, onBack, onConfirm, step, totalSteps, saving, arc,
 }: {
   state: WizardState; setState: WizardSetState;
   onBack: () => void; onConfirm: () => void;
-  step: number; totalSteps: number; saving: boolean; error: string | null;
+  step: number; totalSteps: number; saving: boolean;
   arc: WizardArcContext | null;
 }) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
@@ -2173,10 +2173,6 @@ function Step9Confirm({
         />
         <p className="mt-1 text-[11px] text-white/30">The plan engine reads this and adjusts where needed.</p>
       </div>
-
-      {error && (
-        <p className="text-sm text-red-300/90 break-words">{error}</p>
-      )}
     </StepLayout>
   );
 }
@@ -2381,6 +2377,9 @@ export default function ArcSetupWizard() {
           <p className="text-center text-lg font-semibold text-white/95 px-4 py-2.5 tracking-tight">
             {saveBanner || 'Plan my season'}
           </p>
+          {error && (
+            <p className="text-center text-sm text-red-300/90 px-4 pb-2.5 break-words">{error}</p>
+          )}
         </div>
 
         {/* Conflict overlay (post-save, combined plans) */}
@@ -2429,7 +2428,6 @@ export default function ArcSetupWizard() {
                 step={visualStep}
                 totalSteps={totalSteps}
                 saving={saving}
-                error={error}
                 arc={arcCtx}
               />
             )}
