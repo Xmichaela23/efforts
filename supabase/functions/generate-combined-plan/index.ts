@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
     let generatedWeeks = generateAllWeeks(blocks);
     let physiologicalFloorRebuiltOnce = false;
     let floors = validateTrainingFloors(generatedWeeks);
-    const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 6;
+    const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 10;
     let floorPass = 0;
     while (!floors.ok && floorPass < MAX_PHYSIOLOGICAL_FLOOR_PASSES) {
       blocks = tightenPhaseBlocksForFloorRebuild(blocks);

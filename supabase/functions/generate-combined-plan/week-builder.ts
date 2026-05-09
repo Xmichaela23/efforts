@@ -45,7 +45,7 @@ import {
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
   type TriRaceDistance,
 } from './science.ts';
-import { LONG_RUN_TSS_SHARE_MAX } from './validate-training-floors.ts';
+import { FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET } from './validate-training-floors.ts';
 import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
@@ -745,7 +745,7 @@ export function buildWeek(
     // for floor rebuild — cap miles vs budget proxy (matches `validateTrainingFloors`).
     const lrIntensity: Intensity = phase === 'race_specific' ? 'MODERATE' : 'EASY';
     const tssPerMin = TSS_PER_HOUR.run[lrIntensity] / 60;
-    const maxLongRunTss = LONG_RUN_TSS_SHARE_MAX * Math.max(1, weeklyTSSBudget);
+    const maxLongRunTss = FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET * Math.max(1, weeklyTSSBudget);
     const maxLongRunMiles = maxLongRunTss / tssPerMin / 9.5;
     longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(maxLongRunMiles * 10) / 10));
     longRunMinutes = Math.round(longRunMiles * 9.5);

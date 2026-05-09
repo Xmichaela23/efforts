@@ -1,6 +1,10 @@
 /**
  * Post-build physiological guardrails — orthogonal to the same-day 10×10 matrix.
  * Rejects "paperclip" weeks where raw TSS piles onto one anchor or ramps too fast.
+ *
+ * Rebuild path (`generate-combined-plan`): uniform phase `tssMultiplier` tightening alone does **not**
+ * change long-run share or WoW ratios — the second pass uses `physiologicalFloorRebuild` in `buildWeek`
+ * (lower weekly budget + shrink long-run miles).
  */
 
 import type { GeneratedWeek, AthleteState } from './types.ts';
@@ -8,6 +12,13 @@ import { DAYS_OF_WEEK } from './science.ts';
 
 /** Max fraction of weekly **raw** TSS that may come from the long-run session(s). */
 export const LONG_RUN_TSS_SHARE_MAX = 0.3;
+
+/**
+ * Stricter ceiling used only during `physiologicalFloorRebuild`: realized weekly raw TSS often
+ * lands slightly above `weeklyTSSBudget` (pinned anchors, swim floors), so an LR cap tied to 30%
+ * of budget alone can still fail validation at exactly 30%.
+ */
+export const FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET = 0.22;
 
 /** Max week-over-week increase in **total_raw_tss** (WoW ramp). */
 export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX = 0.15;
@@ -96,6 +107,8 @@ export function validateTrainingFloors(weeks: GeneratedWeek[]): TrainingFloorsRe
     const prev = weeks[i - 1]!;
     const cur = weeks[i]!;
     if (prev.weekNum === 1) continue;
+    // Recovery week suppresses volume; the following week legitimately rebounds — do not treat as a ramp violation.
+    if (prev.isRecovery) continue;
     const p = Math.max(0, prev.total_raw_tss);
     if (p < 1) continue;
     const ramp = (cur.total_raw_tss - p) / p;
