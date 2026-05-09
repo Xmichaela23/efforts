@@ -1,6 +1,8 @@
 /**
- * Item 9 — scheduling authority: derive combined-plan anchor geometry once via the shared
+ * Scheduling authority for the combined-plan engine: derive anchor geometry once via the shared
  * week optimizer and merge into AthleteState so week-builder stops silently relocating sessions.
+ * Runs for ALL combined-plan invocations (tri and single-sport). Short-circuits if the AthleteState
+ * lacks a `long_run_day` anchor — that case keeps the original state and skips reconciliation.
  */
 
 import type { AthleteState } from './types.ts';
@@ -75,10 +77,24 @@ function qualityBikeAnchorFromState(
   return { day: 'wednesday', intensity: 'quality' };
 }
 
+/** Convert AthleteState `strength_preferred_days` (mixed-case strings) to lowercase DayName[]. */
+function normalizeStrengthPreferredDays(state: AthleteState): DayName[] | undefined {
+  const raw = state.strength_preferred_days;
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const valid = new Set<DayName>(SUN_DAY_NAMES);
+  const normalized: DayName[] = [];
+  for (const d of raw) {
+    const lower = String(d ?? '').trim().toLowerCase();
+    if (valid.has(lower as DayName)) normalized.push(lower as DayName);
+  }
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | null {
   const lr = state.long_ride_day != null ? sunIndexToDayName(state.long_ride_day) : undefined;
   const lrun = state.long_run_day != null ? sunIndexToDayName(state.long_run_day) : undefined;
-  if (!lr || !lrun) return null;
+  // Task 7: long_run is the minimum anchor; long_ride is optional (run-only plans).
+  if (!lrun) return null;
 
   const qb = qualityBikeAnchorFromState(state);
   const masters =
@@ -95,16 +111,18 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
     Math.min(7, Math.round(state.days_per_week ?? 6)),
   ) as 4 | 5 | 6 | 7;
 
-  let strengthFreq = inferStrengthFrequency(state);
+  const strengthFreq = inferStrengthFrequency(state);
 
   const trainingIntent = state.training_intent;
   let strengthIntent: 'performance' | 'support' =
     state.strength_intent === 'performance' ? 'performance' : 'support';
   if (strengthFreq >= 2) strengthIntent = 'performance';
 
+  const strengthPreferredDays = normalizeStrengthPreferredDays(state);
+
   const inputs: WeekOptimizerInputs = {
     anchors: {
-      long_ride: lr,
+      ...(lr ? { long_ride: lr } : {}),
       long_run: lrun,
       ...(qb ? { quality_bike: qb } : {}),
       ...(masters ? { masters_swim: masters } : {}),
@@ -115,6 +133,7 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
       training_days: trainingDays,
       ...(restDays.length ? { rest_days: restDays } : {}),
       ...(qr ? { quality_run: qr } : {}),
+      ...(strengthPreferredDays ? { strength_preferred_days: strengthPreferredDays } : {}),
     },
     athlete: {
       ...(trainingIntent ? { training_intent: trainingIntent } : {}),
@@ -127,7 +146,11 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
   return inputs;
 }
 
-/** Combined tri entry — mutates a shallow copy of athlete_state with optimizer truth + placement hints. */
+/**
+ * Combined-plan entry — mutates a shallow copy of `athlete_state` with optimizer truth +
+ * placement hints. Returns state unchanged when no `long_run_day` anchor is present (e.g.
+ * bike-only / swim-only configurations the optimizer can't anchor).
+ */
 export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): AthleteState {
   const inputs = buildWeekOptimizerInputs(state);
   if (!inputs) return state;
@@ -190,12 +213,21 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     !pd.quality_run &&
     [...optimal.conflicts, ...optimal.trade_offs].some((x) => lineLooksLikeQualityRunUnplaced(String(x)));
 
+  // §6.3: surface §4.15 strength_preferred_days rejections in the telemetry path so
+  // callers see when the athlete's stated preference couldn't be honored.
+  const strengthPrefRejections = optimal.conflicts.filter((c) =>
+    c.startsWith('strength_preferred_days:'),
+  );
+
   console.log('[generate-combined-plan] reconcileAthleteStateWithWeekOptimizer:', JSON.stringify({
     preferred_days_keys: Object.keys(pd),
     strength_slots,
     quality_run_in_optimizer_output: Boolean(pd.quality_run),
     trade_off_sample: optimal.trade_offs.slice(0, 4),
     conflict_sample: optimal.conflicts.slice(0, 4),
+    ...(strengthPrefRejections.length > 0
+      ? { strength_preferred_days_rejections: strengthPrefRejections }
+      : {}),
     ...(qrUnplacedNoise
       ? {
         note:

@@ -19,6 +19,7 @@
 import { assert, assertEquals, assertExists } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   deriveOptimalWeek,
+  deriveOptimalWeekWithCoEqualRecovery,
   validatePreferredDays,
   type DayName,
   type PreferredDaysOut,
@@ -208,10 +209,24 @@ Deno.test({
   },
 });
 
-// ── Fixture 04: co-equal 2× strength + Wednesday QB anchor ─────────────────────────────
+// ── Fixture 04: §4.4 conservative 48h gap reduces 2× co-equal to 1× via recovery wrapper ─────
 
+/**
+ * §4.4 says heavy lower must precede AND follow `quality_bike` by ≥48h. With Sat long_ride
+ * + Sun long_run + Wed quality_bike, every weekday is blocked for lower-body:
+ *   - Mon (2d before Wed QB) ✗   - Tue (1d before Wed QB) ✗
+ *   - Wed (matrix lower×QB ✗)    - Thu (1d after Wed QB) ✗   - Fri (2d after Wed QB) ✗
+ *
+ * Raw `deriveOptimalWeek` correctly surfaces a `CO_EQUAL_STRENGTH` conflict for 2×.
+ * Production calls `deriveOptimalWeekWithCoEqualRecovery`, which retries at 1× and ships a
+ * workable week with a non-vague recovery trade-off explaining the constraint.
+ *
+ * Override 5.1 (≥24h for trained cyclists) is the explicit escape hatch and is out of scope
+ * for this pass — when added, this test should split: a 5.1-eligible profile keeps 2×;
+ * everyone else continues to reduce to 1× per the conservative §4.4 default.
+ */
 Deno.test({
-  name: '04 co-equal performance: 2 strength slots + anchored quality_bike validate clean',
+  name: '04 §4.4: 2× co-equal + mid-week QB reduces to 1× via co-equal recovery wrapper',
   fn() {
     const inputs: WeekOptimizerInputs = {
       anchors: {
@@ -219,18 +234,50 @@ Deno.test({
         long_run: 'sunday',
         quality_bike: { day: 'wednesday', intensity: 'quality' },
       },
-      preferences: basePreferences({ strength_frequency: 2 }),
+      // `quality_run: thursday` is athlete-declared so the optimizer honors it via
+      // canPlace-only — keeps QR placement out of the failure path and isolates this fixture
+      // to the §4.4 strength-reduction behavior we're asserting.
+      preferences: basePreferences({ strength_frequency: 2, quality_run: 'thursday' }),
       athlete: baseAthlete({
         training_intent: 'performance',
         strength_intent: 'performance',
       }),
     };
-    const week = deriveOptimalWeek(inputs);
+
+    // Production path: recovery wrapper produces a 1× plan rather than a hard failure.
+    const { week, used_co_equal_1x_fallback } = deriveOptimalWeekWithCoEqualRecovery(inputs);
+
+    assertEquals(used_co_equal_1x_fallback, true, '2× co-equal should fall back to 1× under §4.4');
     assertEquals(week.preferred_days.quality_bike, 'wednesday');
+
+    // Strength frequency reduced from requested 2× to 1×.
     assertEquals(Array.isArray(week.preferred_days.strength), true);
-    assertEquals(week.preferred_days.strength!.length >= 2, true);
+    assertEquals(
+      week.preferred_days.strength!.length,
+      1,
+      `expected 1× strength under §4.4 reduction; got ${week.preferred_days.strength!.length}`,
+    );
+
+    // §6.3: trade_offs must name the constraint and the reduction.
+    const recoveryHit = week.trade_offs.some((t) =>
+      /CO_EQUAL_STRENGTH \(recovery\)/i.test(t) &&
+      /1× strength/i.test(t),
+    );
+    assert(
+      recoveryHit,
+      `expected recovery trade-off naming reduction to 1× strength; got: ${JSON.stringify(week.trade_offs)}`,
+    );
+
     assertPreferredDaysMatchGraph(week);
-    assertEquals(validatePreferredDays(week.preferred_days, inputs.athlete, inputs.preferences).length, 0);
+    // After reduction, the 1× week itself validates cleanly — anchors compatible with 1× strength.
+    assertEquals(week.conflicts.length, 0, `1× retry should clear conflicts; got: ${JSON.stringify(week.conflicts)}`);
+    assertEquals(
+      validatePreferredDays(week.preferred_days, inputs.athlete, {
+        ...inputs.preferences,
+        strength_frequency: 1,
+      }).length,
+      0,
+    );
   },
 });
 

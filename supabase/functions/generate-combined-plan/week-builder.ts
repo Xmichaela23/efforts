@@ -1,20 +1,26 @@
 // generate-combined-plan/week-builder.ts
-// IMPORTANT: This file implements scheduling logic that is also implemented in
-// _shared/week-optimizer.ts. The same-day matrix is shared via
-// schedule-session-constraints.ts but sequential rules and placement logic are
-// duplicated. Tri combined plans now reconcile AthleteState via the optimizer at
-// generate-combined-plan entry (`reconcile-athlete-state-week-optimizer.ts`) and set
-// `enforce_optimizer_anchor_days` + `strength_optimizer_slots` so this module does not
-// relocate those anchors. Legacy run-only / unreconciled paths still use placement below.
-// Strength: `week-builder` no longer places lower-body strength on `run_quality_day` for tri;
-// Heavy lower (tri slot 2) also avoids the two calendar days before `longRunActualDay` and before
-// any brick day (48h floor vs long-run / brick leg stress). Mirrors `_shared/week-optimizer.ts`
-// `sequentialOk` for `lower_body_strength`. Co-equal stacking: see schedule-session-constraints.
-// See: supabase/functions/_shared/schedule-session-constraints.ts
 //
-// Implements §8 Week Construction Algorithm — all 7 steps.
-// This is the core of the engine. All hard/easy constraints, 80/20 enforcement,
-// TSS budgeting, ramp rate validation, and brick placement happen here.
+// SCHEDULING IS OWNED BY THE OPTIMIZER. This module is responsible for session content —
+// intervals, paces, durations, flavor by phase, brick targets, swim templates, TSS budgeting,
+// hard/easy enforcement, 80/20 enforcement. It does NOT decide what calendar day a session
+// goes on. Day assignments arrive in AthleteState fields populated by the reconciler chain:
+//
+//   generate-combined-plan/index.ts
+//     → reconcile-athlete-state-week-optimizer.ts
+//       → _shared/week-optimizer.ts (deriveOptimalWeek + canPlaceWithModifier + sequentialOk)
+//
+// The reconciler runs for ALL combined-plan invocations (tri and single-sport). It short-circuits
+// only when the AthleteState lacks a `long_run_day` anchor — in which case this module's legacy
+// strength fallback at the bottom of the strength-placement block picks the first matrix-clean
+// weekday and surfaces "no slot" as a trade-off rather than dropping safety guards.
+//
+// Scheduling rule sources of truth:
+//   - Same-day matrix: _shared/schedule-session-constraints.ts (`ROWS`)
+//   - Sequential rules (48h floors, after-long, after-quality, lower↔quality_bike): _shared/week-optimizer.ts (`sequentialOk`)
+//   - Anchor placement, strength preferred days: _shared/week-optimizer.ts (`deriveOptimalWeek`)
+//
+// Implements §8 Week Construction Algorithm steps 3-7 (steps 1-2 are anchor placement,
+// owned by the optimizer above).
 
 import type {
   PlannedSession, GeneratedWeek, Phase, PhaseBlock, GoalInput,
@@ -66,7 +72,6 @@ import {
   learnerSwimExperience,
   type SameDayCompatContext,
 } from '../_shared/schedule-session-constraints.ts';
-import { groupRideRouteHighVerticalStress } from '../_shared/group-ride-route-snapshot.ts';
 import { blockForWeek } from './phase-structure.ts';
 import { tryApplyScheduleCollisionsToGrid } from './apply-schedule-collisions.ts';
 import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
@@ -135,39 +140,6 @@ function hasConsolidatedQualityRunWithLowerBody(slot: DaySlot): boolean {
 function adjDay(day: string, delta: number): DayOfWeek {
   const idx = DAY_INDEX[day] ?? 0;
   return DAYS_OF_WEEK[(idx + delta + 7) % 7];
-}
-
-/** Lower-body barbell day cannot fall in the 48h window before long run or brick (discrete: next two calendar days). */
-function heavyLowerBlockedWithin48hOfLongRunOrBrick(
-  day: string,
-  longRunDay: string,
-  brickDays: ReadonlySet<string>,
-): boolean {
-  const d1 = adjDay(day, 1);
-  const d2 = adjDay(day, 2);
-  if (longRunDay === d1 || longRunDay === d2) return true;
-  if (brickDays.has(d1) || brickDays.has(d2)) return true;
-  return false;
-}
-
-/**
- * Same calendar day hosts both a non-easy bike and a non-easy run (quality-density /
- * AMPK stacking — plan contract §6.4 extension).
- */
-function slotHasBikeRunQualityStress(slot: DaySlot | undefined): boolean {
-  if (!slot?.sessions?.length) return false;
-  let bikeStress = false;
-  let runStress = false;
-  for (const w of slot.sessions) {
-    if (w.type === 'bike' && w.intensity_class !== 'EASY') bikeStress = true;
-    if (w.type === 'run' && w.intensity_class !== 'EASY') runStress = true;
-  }
-  return bikeStress && runStress;
-}
-
-/** Lower-body strength cannot sit the day before bike+run quality stress (legs/CNS fresh for anchored doubles). */
-function lowerBlockedImmediatelyBeforeBikeRunQuality(day: string, grid: Map<string, DaySlot>): boolean {
-  return slotHasBikeRunQualityStress(grid.get(adjDay(day, 1)));
 }
 
 /**
@@ -247,13 +219,6 @@ const PREF_DROP_ACTIONS = new Set<string>([
   'trim_peer_sessions_retry',
   'drop_third_swim_week',
   'accept_drop_third_swim',
-]);
-
-/** Action strings that mean "keep the quality run on its preferred day despite the anchor conflict." */
-const PREF_KEEP_QUALITY_RUN_ACTIONS = new Set<string>([
-  'keep_quality_run_preferred_day',
-  'keep_quality_run_thursday',
-  'keep_quality_run_same_day',
 ]);
 
 function uniqReasons(r: WeekStateReason[]): WeekStateReason[] {
@@ -598,6 +563,8 @@ export function buildWeek(
   const servedGoal = 'shared'; // all sessions serve multiple goals in combined plan
   const conflictEvents: ConflictEvent[] = [];
   const swimVolTradeOffs: string[] = [];
+  /** Strength-reduction trade-offs from the legacy placement fallback (no-long-run path). */
+  const strengthReducedTradeOffs: string[] = [];
 
   // ── Conflict-preference helpers ──────────────────────────────────────────
   const conflictPrefs: Record<string, string> = athleteState.conflict_preferences ?? {};
@@ -606,7 +573,7 @@ export function buildWeek(
 
   // Flags set during conflict detection; consumed at placement sites later.
   let shiftQualityRunToLongRun = false;
-  let dropQualityRunThisWeek = false;
+  const dropQualityRunThisWeek = false;
   let dropThirdSwimThisWeek = false;
 
   // Diagnostic: log all day-preference state for every week so we can trace preferred_days flow.
@@ -883,13 +850,6 @@ export function buildWeek(
     }
   }
 
-  /** Brick-tagged days already on the grid (used for quality-run / swim blocking). */
-  const brickDaysSetForQr = new Set(
-    [...grid.values()]
-      .filter((s) => s.sessions.some((w) => w.tags?.includes('brick')))
-      .map((s) => s.day),
-  );
-
   // ── Swim calendar (defaults: easy Mon, quality Thu; avoids long ride/run days) ──
   const swimEasyIdx =
     athleteState.swim_easy_day != null ? (athleteState.swim_easy_day + 6) % 7 : DAYS_OF_WEEK.indexOf('Monday');
@@ -897,51 +857,16 @@ export function buildWeek(
     athleteState.swim_quality_day != null
       ? (athleteState.swim_quality_day + 6) % 7
       : DAYS_OF_WEEK.indexOf('Thursday');
+  // `swimEasyDay` is mutated by the newer-swimmer heavy-aerobic guard below (content-aware,
+  // not anchor placement — depends on resolved swim yards). `swimQualityDay` is read-only.
   let swimEasyDay = DAYS_OF_WEEK[swimEasyIdx] ?? 'Monday';
-  let swimQualityDay = DAYS_OF_WEEK[swimQualityIdx] ?? 'Thursday';
-  if (swimEasyDay === swimQualityDay) swimQualityDay = 'Thursday';
-  const qualitySwimBlocked = new Set<string>([longRideDay, longRunActualDay, ...restDayNames]);
-  const swimQualityBeforeLongAnchor = swimQualityDay;
-  if (qualitySwimBlocked.has(swimQualityDay)) {
-    for (let step = 1; step <= 6; step++) {
-      const cand = adjDay(swimQualityDay, step);
-      if (!qualitySwimBlocked.has(cand)) {
-        swimQualityDay = cand;
-        break;
-      }
-    }
-  }
-  if (swimQualityDay !== swimQualityBeforeLongAnchor) {
-    const swLongPref = getPref('swim-quality-long-anchor');
-    if (!PREF_ACCEPT_ACTIONS.has(swLongPref ?? '') && !PREF_DROP_ACTIONS.has(swLongPref ?? '')) {
-      const reasons: WeekStateReason[] = uniqReasons([
-        'anchor_conflict',
-        ...(isRecovery ? (['recovery_week'] as const) : []),
-      ]);
-      const swimAnchorHits: string[] = [];
-      if (longRideDay === swimQualityBeforeLongAnchor) swimAnchorHits.push(longRideDay);
-      if (longRunActualDay === swimQualityBeforeLongAnchor) swimAnchorHits.push(longRunActualDay);
-      if (restDayNames.has(swimQualityBeforeLongAnchor)) swimAnchorHits.push('Rest day');
-      conflictEvents.push({
-        conflict_id: mkConflictId(weekNum, 'swim-quality-long-anchor'),
-        conflict_type: 'quality_swim_blocked',
-        blocked_intent: { session_kind: 'quality_swim', preferred_day: conflictDayLo(swimQualityBeforeLongAnchor) },
-        blocking_reasons: reasons,
-        anchors_involved: swimAnchorHits,
-        applied_resolution: {
-          type: 'moved',
-          to_day: conflictDayLo(swimQualityDay),
-          note: `Quality swim moved from ${swimQualityBeforeLongAnchor} to ${swimQualityDay} (long ride / long run / rest anchors).`,
-        },
-      });
-    }
-  }
+  const swimQualityDay = DAYS_OF_WEEK[swimQualityIdx] ?? 'Thursday';
 
   const runQualityIdx =
     athleteState.run_quality_day != null
       ? (athleteState.run_quality_day + 6) % 7
       : DAYS_OF_WEEK.indexOf('Wednesday');
-  let runQualityDay = DAYS_OF_WEEK[runQualityIdx] ?? 'Wednesday';
+  const runQualityDay = DAYS_OF_WEEK[runQualityIdx] ?? 'Wednesday';
   const runEasyIdx =
     athleteState.run_easy_day != null
       ? (athleteState.run_easy_day + 6) % 7
@@ -949,49 +874,6 @@ export function buildWeek(
   let runEasyDay = DAYS_OF_WEEK[runEasyIdx] ?? 'Friday';
   if (runQualityDay === runEasyDay) {
     runEasyDay = adjDay(runEasyDay, 1);
-  }
-
-  /** Same gate as `SameDayCompatContext.allowQualityRunQualitySwimSameDay` — keep in sync.
-   * Combined tri plans: never stack threshold swim + quality run without real AM/PM timing in
-   * week-builder — matrix defaults reject the pair; bump swim quality off run day. */
-  const allowQualityRunSwimSameDay =
-    !hasTri &&
-    (String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
-      String(athleteState.strength_intent ?? '').toLowerCase() === 'performance');
-
-  // Completion / support: never place quality swim on the same calendar day as quality run
-  // unless performance escape hatch — matrix would reject and tryResolve cannot relocate swim/run.
-  const swimQualityBeforeRunSwimMatrix = swimQualityDay;
-  if (!allowQualityRunSwimSameDay && swimQualityDay === runQualityDay) {
-    const swimBumpBlocked = new Set<string>([...qualitySwimBlocked, runQualityDay, swimEasyDay]);
-    const startIdx = Math.max(0, DAYS_OF_WEEK.indexOf(swimQualityDay));
-    for (let s = 0; s < 7; s++) {
-      const d = DAYS_OF_WEEK[(startIdx + s) % 7]!;
-      if (!swimBumpBlocked.has(d) && d !== runQualityDay) {
-        swimQualityDay = d;
-        break;
-      }
-    }
-  }
-  if (swimQualityDay !== swimQualityBeforeRunSwimMatrix) {
-    const swRunMatrixPref = getPref('swim-quality-run-matrix');
-    if (!PREF_ACCEPT_ACTIONS.has(swRunMatrixPref ?? '') && !PREF_DROP_ACTIONS.has(swRunMatrixPref ?? '')) {
-      conflictEvents.push({
-        conflict_id: mkConflictId(weekNum, 'swim-quality-run-matrix'),
-        conflict_type: 'quality_swim_blocked',
-        blocked_intent: {
-          session_kind: 'quality_swim',
-          preferred_day: conflictDayLo(swimQualityBeforeRunSwimMatrix),
-        },
-        blocking_reasons: uniqReasons(['consecutive_cross_discipline', 'anchor_conflict']),
-        anchors_involved: [runQualityDay],
-        applied_resolution: {
-          type: 'moved',
-          to_day: conflictDayLo(swimQualityDay),
-          note: `Quality swim moved off ${swimQualityBeforeRunSwimMatrix} so quality run can stay on ${runQualityDay} (completion/support matrix).`,
-        },
-      });
-    }
   }
 
   // Arc wizard: fold mid-week run quality into Sunday long (recovery-first path).
@@ -1213,351 +1095,12 @@ export function buildWeek(
     athleteState.bike_quality_day != null
       ? (athleteState.bike_quality_day + 6) % 7
       : DAYS_OF_WEEK.indexOf('Tuesday');
-  let bikeQualityDay = DAYS_OF_WEEK[bikeQualIdxBase] ?? 'Tuesday';
-  const bikeQualityPreferredDay = bikeQualityDay;
+  const bikeQualityDay = DAYS_OF_WEEK[bikeQualIdxBase] ?? 'Tuesday';
   const bikeEasyIdxBase =
     athleteState.bike_easy_day != null
       ? (athleteState.bike_easy_day + 6) % 7
       : DAYS_OF_WEEK.indexOf('Wednesday');
-  let bikeEasyDay = DAYS_OF_WEEK[bikeEasyIdxBase] ?? 'Wednesday';
-
-  // If quality-bike day is explicitly pinned but easy-bike day is not, bias easy bike
-  // to the day before quality (e.g. Wed quality → Tue easy) to preserve the expected
-  // tri rhythm and avoid drifting to Thu when defaults collide.
-  if (athleteState.bike_quality_day != null && athleteState.bike_easy_day == null) {
-    bikeEasyDay = adjDay(bikeQualityDay, -1);
-  }
-
-  const blockedForBikeQual = new Set<string>([longRideDay, longRunActualDay, ...restDayNames]);
-  if (
-    athleteState.enforce_optimizer_anchor_days !== true &&
-    blockedForBikeQual.has(bikeQualityDay)
-  ) {
-    for (let step = 1; step <= 6; step++) {
-      const cand = adjDay(bikeQualityDay, step);
-      if (!blockedForBikeQual.has(cand)) {
-        bikeQualityDay = cand;
-        break;
-      }
-    }
-  }
-  if (bikeQualityDay !== bikeQualityPreferredDay) {
-    const bikeAnchorPref = getPref('bike-quality-anchor');
-    if (!PREF_ACCEPT_ACTIONS.has(bikeAnchorPref ?? '') && !PREF_DROP_ACTIONS.has(bikeAnchorPref ?? '')) {
-      const bikeAnchorHits: string[] = [];
-      if (longRideDay === bikeQualityPreferredDay) bikeAnchorHits.push(longRideDay);
-      if (longRunActualDay === bikeQualityPreferredDay) bikeAnchorHits.push(longRunActualDay);
-      if (restDayNames.has(bikeQualityPreferredDay)) bikeAnchorHits.push('Rest day');
-      conflictEvents.push({
-        conflict_id: mkConflictId(weekNum, 'bike-quality-anchor'),
-        conflict_type: 'quality_bike_blocked',
-        blocked_intent: { session_kind: 'quality_bike', preferred_day: conflictDayLo(bikeQualityPreferredDay) },
-        blocking_reasons: uniqReasons(['anchor_conflict', ...(isRecovery ? (['recovery_week'] as const) : [])]),
-        anchors_involved: bikeAnchorHits.length > 0 ? bikeAnchorHits : [longRideDay, longRunActualDay],
-        applied_resolution: {
-          type: 'moved',
-          to_day: conflictDayLo(bikeQualityDay),
-          note: `Quality bike moved from ${bikeQualityPreferredDay} to ${bikeQualityDay} (long ride / long run / rest collision).`,
-        },
-      });
-    }
-  }
-  if (
-    athleteState.enforce_optimizer_anchor_days !== true &&
-    (bikeEasyDay === bikeQualityDay || bikeEasyDay === longRideDay || restDayNames.has(bikeEasyDay))
-  ) {
-    for (let step = 1; step <= 6; step++) {
-      const cand = adjDay(bikeEasyDay, step);
-      if (cand !== bikeQualityDay && cand !== longRideDay && !restDayNames.has(cand)) {
-        bikeEasyDay = cand;
-        break;
-      }
-    }
-  }
-
-  // ── Quality run vs quality bike (same calendar day): matrix forbids QR + QB ──
-  // Optimizer may omit `run_quality_day` while pinning `bike_quality_day`; defaults collide (both Wed).
-  if (
-    hasTri &&
-    runQualityDay === bikeQualityDay &&
-    !shiftQualityRunToLongRun &&
-    !dropQualityRunThisWeek
-  ) {
-    const preferredQr = runQualityDay;
-    const blockedQrVsBike = new Set<string>([
-      longRideDay,
-      longRunActualDay,
-      ...restDayNames,
-      bikeQualityDay,
-      ...brickDaysSetForQr,
-    ]);
-    if (!allowQualityRunSwimSameDay) blockedQrVsBike.add(swimQualityDay);
-
-    const prio: string[] = [];
-    const pushUniq = (d: string) => {
-      if (!prio.includes(d)) prio.push(d);
-    };
-    pushUniq('Thursday');
-    pushUniq('Friday');
-    pushUniq('Tuesday');
-    pushUniq('Monday');
-    pushUniq(adjDay(bikeQualityDay, 2));
-    pushUniq(adjDay(bikeQualityDay, -2));
-    for (const d of DAYS_OF_WEEK) pushUniq(d);
-
-    let movedQr: string | null = null;
-    for (const cand of prio) {
-      if (blockedQrVsBike.has(cand)) continue;
-      if (cand === bikeQualityDay) continue;
-      movedQr = cand;
-      break;
-    }
-
-    if (movedQr != null && movedQr !== preferredQr) {
-      runQualityDay = movedQr as (typeof DAYS_OF_WEEK)[number];
-      if (runQualityDay === runEasyDay) {
-        runEasyDay = adjDay(runEasyDay, 1);
-      }
-      conflictEvents.push({
-        conflict_id: mkConflictId(weekNum, 'quality-run-off-quality-bike'),
-        conflict_type: 'quality_run_blocked',
-        blocked_intent: {
-          session_kind: 'quality_run',
-          preferred_day: conflictDayLo(preferredQr),
-          intensity_class: 'HARD',
-        },
-        blocking_reasons: uniqReasons(['anchor_conflict']),
-        anchors_involved: [bikeQualityDay],
-        applied_resolution: {
-          type: 'moved',
-          to_day: conflictDayLo(runQualityDay),
-          note: `Moved quality run off ${preferredQr} — same-day matrix forbids quality_run + quality_bike (${bikeQualityDay} group ride / anchor).`,
-        },
-      });
-    }
-  }
-
-  // ── Quality run vs next-day quality bike (sequential HARD geometry) ───────
-  // Mirrors `_shared/week-optimizer.ts`: avoid placing HARD quality_run on the calendar
-  // day immediately after anchored quality_bike (cross-discipline back-to-back HARD).
-  if (
-    athleteState.enforce_optimizer_anchor_days !== true &&
-    hasTri &&
-    !shiftQualityRunToLongRun &&
-    !raceThisWeek &&
-    !isRecovery &&
-    !recoveryRebuildWeek1 &&
-    !recoveryRebuildWeek2EasyRunOnly &&
-    phase !== 'taper'
-  ) {
-    const preferredRunQ = runQualityDay;
-    const dayAfterBike = adjDay(bikeQualityDay, 1);
-    if (preferredRunQ === dayAfterBike) {
-      const qrPref = getPref('quality-run-after-bike');
-
-      if (
-        PREF_KEEP_QUALITY_RUN_ACTIONS.has(qrPref ?? '') ||
-        athleteState.run_quality_placement === 'standalone_midweek'
-      ) {
-        // Athlete accepted the back-to-back — keep preferred day as-is, no conflict emitted.
-
-      } else if (qrPref === 'shift_quality_to_long_run') {
-        // Drop mid-week quality run; long run will carry race-pace quality work.
-        shiftQualityRunToLongRun = true;
-
-      } else if (PREF_DROP_ACTIONS.has(qrPref ?? '')) {
-        dropQualityRunThisWeek = true;
-
-      } else {
-        // Default path (no preference or a silent-accept preference):
-        // compute the best alternate day, optionally bump, optionally emit.
-        const blockedQr = new Set<string>([
-          longRideDay,
-          longRunActualDay,
-          ...restDayNames,
-          ...brickDaysSetForQr,
-          bikeQualityDay,
-          adjDay(bikeQualityDay, -1),
-          adjDay(bikeQualityDay, 1),
-        ]);
-        if (!allowQualityRunSwimSameDay) blockedQr.add(swimQualityDay);
-
-        const prio: string[] = [];
-        prio.push(adjDay(bikeQualityDay, 2));
-        prio.push(adjDay(bikeQualityDay, -1));
-        for (const d of DAYS_OF_WEEK) {
-          if (!prio.includes(d)) prio.push(d);
-        }
-
-        const anchorLabel = (athleteState.bike_quality_label ?? '').trim() || 'Group ride';
-        let movedTo: string | null = null;
-        for (const cand of prio) {
-          if (blockedQr.has(cand)) continue;
-          if (adjDay(bikeQualityDay, 1) === cand) continue;
-          movedTo = cand;
-          break;
-        }
-
-        // Silent-accept: engine's chosen day is accepted; no conflict event.
-        const silentAccept = PREF_ACCEPT_ACTIONS.has(qrPref ?? '');
-
-        if (movedTo != null && movedTo !== preferredRunQ) {
-          runQualityDay = movedTo as (typeof DAYS_OF_WEEK)[number];
-          if (!silentAccept) {
-            conflictEvents.push({
-              conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
-              conflict_type: 'quality_run_blocked',
-              blocked_intent: {
-                session_kind: 'quality_run',
-                preferred_day: conflictDayLo(preferredRunQ),
-                intensity_class: 'HARD',
-              },
-              blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline']),
-              anchors_involved: [anchorLabel],
-              applied_resolution: {
-                type: 'moved',
-                to_day: conflictDayLo(movedTo),
-                note: `Moved quality run off ${preferredRunQ} to avoid HARD the day after ${bikeQualityDay} (${anchorLabel}).`,
-              },
-            });
-          }
-        } else if (movedTo == null && !silentAccept) {
-          conflictEvents.push({
-            conflict_id: mkConflictId(weekNum, 'quality-run-after-bike'),
-            conflict_type: 'quality_run_blocked',
-            blocked_intent: {
-              session_kind: 'quality_run',
-              preferred_day: conflictDayLo(preferredRunQ),
-              intensity_class: 'HARD',
-            },
-            blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline', 'no_clean_day']),
-            anchors_involved: [anchorLabel],
-            applied_resolution: {
-              type: 'none',
-              note:
-                'Quality run stayed adjacent to anchored quality bike; no cleaner weekday in this scan (hard/easy pass may still moderate intensity).',
-            },
-          });
-        }
-      }
-    }
-  }
-
-  // ── Standalone mid-week quality run: do not share the swim-easy anchor day (matrix allows QR + easy_swim). ──
-  if (
-    athleteState.enforce_optimizer_anchor_days !== true &&
-    hasTri &&
-    athleteState.run_quality_placement === 'standalone_midweek' &&
-    !shiftQualityRunToLongRun &&
-    !dropQualityRunThisWeek &&
-    !raceThisWeek &&
-    !isRecovery &&
-    phase !== 'taper' &&
-    runQualityDay === swimEasyDay
-  ) {
-    const preferredRunQ = runQualityDay;
-    const blockedStandaloneQr = new Set<string>([
-      longRideDay,
-      longRunActualDay,
-      ...restDayNames,
-      ...brickDaysSetForQr,
-      bikeQualityDay,
-      adjDay(bikeQualityDay, -1),
-      adjDay(bikeQualityDay, 1),
-      swimEasyDay,
-    ]);
-    if (!allowQualityRunSwimSameDay) blockedStandaloneQr.add(swimQualityDay);
-
-    const prio: string[] = ['Thursday', adjDay(bikeQualityDay, 2), adjDay(bikeQualityDay, -1)];
-    for (const d of DAYS_OF_WEEK) {
-      if (!prio.includes(d)) prio.push(d);
-    }
-
-    let movedTo: string | null = null;
-    for (const cand of prio) {
-      if (blockedStandaloneQr.has(cand)) continue;
-      if (adjDay(bikeQualityDay, 1) === cand) continue;
-      movedTo = cand;
-      break;
-    }
-
-    if (movedTo != null && movedTo !== preferredRunQ) {
-      runQualityDay = movedTo as (typeof DAYS_OF_WEEK)[number];
-      conflictEvents.push({
-        conflict_id: mkConflictId(weekNum, 'standalone-run-off-swim-easy-day'),
-        conflict_type: 'quality_run_blocked',
-        blocked_intent: {
-          session_kind: 'quality_run',
-          preferred_day: conflictDayLo(preferredRunQ),
-          intensity_class: 'HARD',
-        },
-        blocking_reasons: uniqReasons(['anchor_conflict']),
-        anchors_involved: [swimEasyDay],
-        applied_resolution: {
-          type: 'moved',
-          to_day: conflictDayLo(runQualityDay),
-          note: `Moved quality run off ${preferredRunQ} — standalone mid-week cannot share the anchored swim-easy day (${swimEasyDay}).`,
-        },
-      });
-    }
-  }
-
-  // Group ride with high climb density: keep quality swim off the calendar day after quality bike (recovery buffer).
-  const routeSnapGr = athleteState.group_ride_route_snapshot;
-  const groupRideHighStress =
-    hasTri &&
-    Boolean(String(athleteState.bike_quality_label ?? '').trim()) &&
-    routeSnapGr != null &&
-    groupRideRouteHighVerticalStress(routeSnapGr);
-  if (
-    athleteState.enforce_optimizer_anchor_days !== true &&
-    groupRideHighStress &&
-    !raceThisWeek
-  ) {
-    const dayAfterBikeGr = adjDay(bikeQualityDay, 1);
-    if (swimQualityDay === dayAfterBikeGr) {
-      const swimBumpBlockedGr = new Set<string>([...qualitySwimBlocked, runQualityDay, swimEasyDay]);
-      const startIdxGr = Math.max(0, DAYS_OF_WEEK.indexOf(swimQualityDay));
-      const beforeSq = swimQualityDay;
-      for (let s = 1; s < 7; s++) {
-        const d = DAYS_OF_WEEK[(startIdxGr + s) % 7]!;
-        if (swimBumpBlockedGr.has(d)) continue;
-        if (!allowQualityRunSwimSameDay && d === runQualityDay) continue;
-        swimQualityDay = d;
-        break;
-      }
-      if (swimQualityDay !== beforeSq) {
-        conflictEvents.push({
-          conflict_id: mkConflictId(weekNum, 'swim-quality-group-ride-recovery-buffer'),
-          conflict_type: 'quality_swim_blocked',
-          blocked_intent: {
-            session_kind: 'quality_swim',
-            preferred_day: conflictDayLo(beforeSq),
-          },
-          blocking_reasons: uniqReasons(['anchor_conflict', 'consecutive_cross_discipline']),
-          anchors_involved: [bikeQualityDay],
-          applied_resolution: {
-            type: 'moved',
-            to_day: conflictDayLo(swimQualityDay),
-            note: `Moved quality swim off ${beforeSq} — high-climb group ride on ${bikeQualityDay} loads the next day; spacing swim quality for recovery.`,
-          },
-        });
-      }
-    }
-  }
-
-  // If quality run day moved after swim anchors were resolved, keep threshold swim off quality run when required.
-  if (!allowQualityRunSwimSameDay && swimQualityDay === runQualityDay) {
-    const swimBumpBlocked2 = new Set<string>([...qualitySwimBlocked, runQualityDay, swimEasyDay]);
-    const startIdx2 = Math.max(0, DAYS_OF_WEEK.indexOf(swimQualityDay));
-    for (let s = 0; s < 7; s++) {
-      const d = DAYS_OF_WEEK[(startIdx2 + s) % 7]!;
-      if (!swimBumpBlocked2.has(d) && d !== runQualityDay) {
-        swimQualityDay = d;
-        break;
-      }
-    }
-  }
+  const bikeEasyDay = DAYS_OF_WEEK[bikeEasyIdxBase] ?? 'Wednesday';
 
   const bikeQualitySlot = grid.get(bikeQualityDay);
   if (!bikeQualitySlot?.isRest && hasTri) {
@@ -1843,8 +1386,10 @@ export function buildWeek(
   }
 
   if (strFreq >= 1) {
+    // Optimizer-derived strength slots (the only path when reconciler ran). Drops the legacy
+    // hasTri gate — non-tri plans now also reconcile (Task 7) and use these slots, with the
+    // session-content function (`triathlonStrength` vs `runStrength`) chosen by goal mix.
     const useOptimizerStrength =
-      hasTri &&
       Array.isArray(athleteState.strength_optimizer_slots) &&
       athleteState.strength_optimizer_slots.length > 0;
 
@@ -1873,32 +1418,45 @@ export function buildWeek(
       for (const slot of slotsPlanned) {
         const strSlotOpt = grid.get(slot.weekday);
         if (!strSlotOpt || strSlotOpt.isRest || strSlotOpt.sessions.length >= 2) continue;
-        strSlotOpt.sessions.push(
-          triathlonStrength(slot.weekday, phase, servedGoal, {
-            weekInPhase: weekInPhaseOpt,
-            weekIndex: weekNum,
-            totalWeeks: planTotalWeeksOpt,
-            isRecovery,
-            limiterSport: limiterSportOpt,
-            sessionIndex: slot.session_index,
-            equipmentType: equipmentTypeOpt,
-            hasCable: hasCableOpt,
-            hasGhd: hasGhdOpt,
-            longRideDayName: longRideDay,
-            longRunDayName: longRunActualDay,
-            qualityBikeDayName: bikeQualityDay,
-            qualityRunDayName: runQualityDay,
-            strengthProtocolId: athleteState.strength_protocol,
-            strengthIntent: athleteState.strength_intent,
-          }),
-        );
+        if (hasTri) {
+          strSlotOpt.sessions.push(
+            triathlonStrength(slot.weekday, phase, servedGoal, {
+              weekInPhase: weekInPhaseOpt,
+              weekIndex: weekNum,
+              totalWeeks: planTotalWeeksOpt,
+              isRecovery,
+              limiterSport: limiterSportOpt,
+              sessionIndex: slot.session_index,
+              equipmentType: equipmentTypeOpt,
+              hasCable: hasCableOpt,
+              hasGhd: hasGhdOpt,
+              longRideDayName: longRideDay,
+              longRunDayName: longRunActualDay,
+              qualityBikeDayName: bikeQualityDay,
+              qualityRunDayName: runQualityDay,
+              strengthProtocolId: athleteState.strength_protocol,
+              strengthIntent: athleteState.strength_intent,
+            }),
+          );
+        } else {
+          strSlotOpt.sessions.push(
+            runStrength(slot.weekday, phase, servedGoal, {
+              weekInPhase: weekInPhaseOpt,
+              weekIndex: weekNum,
+              totalWeeks: planTotalWeeksOpt,
+              isRecovery,
+              equipmentType: equipmentTypeOpt,
+              longRunDayName: longRunActualDay,
+              qualityRunDayName: runQualityDay,
+            }),
+          );
+        }
       }
     } else {
     // Identify brick days in the current grid to pass to the protocol placement
     const brickDaysInGrid = [...grid.values()]
       .filter(s => s.sessions.some(w => w.tags?.includes('brick')))
       .map(s => s.day);
-    const brickDaysSet = new Set(brickDaysInGrid);
 
     // Identify HARD endurance days (for AMPK/mTOR 6-h interference warning)
     const hardEnduranceDaysInGrid = [...grid.values()]
@@ -1919,17 +1477,10 @@ export function buildWeek(
       : Math.max(1, weekNum - block.startWeek + 1);
     const planTotalWeeks = Math.max(1, options?.totalWeeks ?? 52);
 
-    const prefStrength = (athleteState.strength_preferred_days ?? [])
-      .map((d) => d.charAt(0).toUpperCase() + d.slice(1).toLowerCase())
-      .filter(Boolean);
-    const prefSet = new Set(prefStrength);
-
-    // Slot 1: first non-blocked day starting Monday (honor preferred strength days when possible)
-    let candidates1 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d));
-    if (prefSet.size > 0) {
-      const preferred = candidates1.filter(d => prefSet.has(d));
-      if (preferred.length > 0) candidates1 = preferred;
-    }
+    // Legacy fallback path (reconciler bailed because long_run is missing) — pick the first
+    // matrix-clean weekday. Preferred-day handling and 48h/density guards live in the optimizer
+    // (§4.4 / §4.15); this branch only runs when the optimizer couldn't anchor the week.
+    const candidates1 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].filter(d => !blocked.has(d));
     const strDay = candidates1[0];
     if (strDay) {
       const strSlot = grid.get(strDay);
@@ -1980,90 +1531,19 @@ export function buildWeek(
       const allowLowerOnQualityRunDay = athleteState.strength_intent === 'performance';
       const baseLowerDay = (d: string) =>
         !blocked.has(d) && d !== strDay && (!hasTri || allowLowerOnQualityRunDay || d !== runQualityDay);
-      const passesHeavyLowerGuard = (d: string) =>
-        !heavyLowerBlockedWithin48hOfLongRunOrBrick(d, longRunActualDay, brickDaysSet);
 
-      let pool2 = weekdayOrder.filter(
-        (d) =>
-          baseLowerDay(d) &&
-          passesHeavyLowerGuard(d) &&
-          !lowerBlockedImmediatelyBeforeBikeRunQuality(d, grid),
-      );
-      if (prefSet.size > 0) {
-        const preferred2 = pool2.filter((d) => prefSet.has(d));
-        if (preferred2.length > 0) pool2 = preferred2;
-      }
-      let lowerPrefBypassUsed = false;
-      if (pool2.length === 0) {
-        pool2 = weekdayOrder.filter(
-          (d) =>
-            baseLowerDay(d) &&
-            passesHeavyLowerGuard(d) &&
-            !lowerBlockedImmediatelyBeforeBikeRunQuality(d, grid),
-        );
-        if (pool2.length > 0) {
-          lowerPrefBypassUsed = prefSet.size > 0;
-          console.warn(
-            '[week-builder] lower-body strength: no preferred weekday satisfies constraints; using next available (density + 48h vs long run/brick retained).',
-          );
-        }
-      }
-      let lower48hGuardDropped = false;
-      if (pool2.length === 0) {
-        pool2 = weekdayOrder.filter((d) =>
-          baseLowerDay(d) && !lowerBlockedImmediatelyBeforeBikeRunQuality(d, grid));
-        if (prefSet.size > 0) {
-          const preferredRelaxed = pool2.filter((d) => prefSet.has(d));
-          if (preferredRelaxed.length > 0) pool2 = preferredRelaxed;
-        }
-        if (pool2.length > 0) {
-          lower48hGuardDropped = true;
-          console.warn(
-            '[week-builder] lower-body strength: 48h vs long run/brick not satisfiable Mon–Fri; kept day-before bike+run density guard.',
-          );
-        }
-      }
-      let lowerDensityGuardDropped = false;
-      if (pool2.length === 0) {
-        pool2 = weekdayOrder.filter((d) => baseLowerDay(d));
-        if (prefSet.size > 0) {
-          const preferredRelaxed = pool2.filter((d) => prefSet.has(d));
-          if (preferredRelaxed.length > 0) pool2 = preferredRelaxed;
-        }
-        if (pool2.length > 0) {
-          lowerDensityGuardDropped = true;
-          lower48hGuardDropped = true;
-          console.warn(
-            '[week-builder] lower-body strength: placed without bike+run density guard (day before combined quality) — Mon–Fri had no clean slot.',
-          );
-        }
-      }
+      // Single-pass pool. The optimizer (when reconciled) owns 48h + density guards via
+      // _shared/schedule-session-constraints.ts sequentialOk; this fallback path runs only
+      // when reconciliation was skipped (no long_run anchor) and therefore has nothing to
+      // be 48h from.
+      const pool2 = weekdayOrder.filter(baseLowerDay);
       const strDay2 = pool2[0];
-      if (strDay2 && hasTri && (lowerPrefBypassUsed || lower48hGuardDropped)) {
-        const heavyLowerPref = getPref(`heavy-lower-${strDay2}`);
-        if (!PREF_ACCEPT_ACTIONS.has(heavyLowerPref ?? '') && !PREF_DROP_ACTIONS.has(heavyLowerPref ?? '')) {
-          const reasons: WeekStateReason[] = [];
-          if (lowerPrefBypassUsed) reasons.push('anchor_conflict');
-          if (lower48hGuardDropped) {
-            reasons.push('pre_long_run_48h', 'pre_brick_48h', 'no_clean_day');
-          }
-          conflictEvents.push({
-            conflict_id: mkConflictId(weekNum, `heavy-lower-${strDay2}`),
-            conflict_type: 'heavy_lower_blocked',
-            blocked_intent: { session_kind: 'lower_body_strength', intensity_class: 'HARD' },
-            blocking_reasons: uniqReasons(reasons),
-            anchors_involved: [...brickDaysInGrid, longRunActualDay],
-            applied_resolution: {
-              type: 'moved',
-              to_day: conflictDayLo(strDay2),
-              note: lowerDensityGuardDropped
-                ? `Lower-body strength on ${strDay2} — relaxed day-before bike+run quality density (no Mon–Fri slot otherwise).`
-                : lower48hGuardDropped
-                  ? `Lower-body strength placed on ${strDay2} without the 48h long-run/brick clearance row (Mon–Fri density).`
-                  : `Lower-body strength on ${strDay2} — preferred strength days skipped while keeping guards.`,
-            },
-          });
-        }
+      if (!strDay2) {
+        // §6.3: no slot found → don't place; surface as trade-off (do not drop guards and
+        // place anyway — that produced silent junk training in the prior implementation).
+        strengthReducedTradeOffs.push(
+          `Strength frequency reduced from ${strFreq}× to 1× — no compatible Mon–Fri slot for lower-body session 2 in this week.`,
+        );
       }
       if (strDay2) {
         const strSlot2 = grid.get(strDay2);
@@ -2183,8 +1663,14 @@ export function buildWeek(
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
   // strength_intent === 'performance' is the co-equal flag (see AthleteState type + EXPERIENCE_MODIFIER_TEXT).
   const isPerformanceCoequal = performanceStrength;
+  // §4.11: matrix-validator gate for QR + QS same-day. Intent-based; does not include the
+  // optimizer's next-day-long check because the validator runs on already-placed sessions and
+  // never sees a same-day combo the optimizer rejected.
+  const allowQrQsForMatrix =
+    String(athleteState.training_intent ?? '').toLowerCase() === 'performance' ||
+    String(athleteState.strength_intent ?? '').toLowerCase() === 'performance';
   const sameDayCompatCtx: SameDayCompatContext = {
-    allowQualityRunQualitySwimSameDay: allowQualityRunSwimSameDay,
+    allowQualityRunQualitySwimSameDay: allowQrQsForMatrix,
     strictStandaloneQualityRun:
       hasTri && athleteState.run_quality_placement === 'standalone_midweek',
     swimExperienceForMatrix: athleteState.swim_experience,
@@ -2251,7 +1737,12 @@ export function buildWeek(
   }
 
   // ── Coarse pillar collision pass (optimizer doctrine); mutates session days in grid ──
-  const mergedTradeOffs = [...swimVolTradeOffs, ...week8020TradeOffs, ...qrLbTradeOffStrings];
+  const mergedTradeOffs = [
+    ...swimVolTradeOffs,
+    ...week8020TradeOffs,
+    ...qrLbTradeOffStrings,
+    ...strengthReducedTradeOffs,
+  ];
   tryApplyScheduleCollisionsToGrid(grid, {
     weekNum,
     conflictEvents,

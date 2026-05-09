@@ -57,6 +57,17 @@ function tfDay(day: DayName | string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 }
 
+/**
+ * §4.15: bias a candidate order toward an athlete-preferred day. Returns the base order
+ * with `preferred` moved to the front (deduped). When `preferred` is missing or not in
+ * `base`, returns `base` unchanged. The placement loop still applies hard / sequential
+ * rule checks — preferred is a hint, not an override.
+ */
+function biasOrderForPreferredDay(base: DayName[], preferred: DayName | undefined): DayName[] {
+  if (!preferred || !base.includes(preferred)) return base;
+  return [preferred, ...base.filter((d) => d !== preferred)];
+}
+
 // ── Public types ────────────────────────────────────────────────────────────
 
 /** Anchor with an optional intensity hint (group ride / run club / masters). */
@@ -99,6 +110,13 @@ export interface WeekOptimizerInputs {
      * priority list.
      */
     quality_run?: DayName;
+    /**
+     * Athlete-stated preferred days for strength sessions (§4.15). Index 0 = upper slot,
+     * index 1 = lower slot. The optimizer biases its candidate order toward these days
+     * but falls back to the standard priority list when a preferred day violates hard or
+     * sequential rules. When fallback fires, the rejected day is appended to `conflicts`.
+     */
+    strength_preferred_days?: DayName[];
   };
   athlete: {
     training_intent?: 'performance' | 'completion' | 'first_race' | 'comeback';
@@ -275,8 +293,14 @@ function canPlaceWithModifier(
   if (!existing || existing.length !== 1) return false;
   const there = existing[0].kind;
 
+  // §4.11: QR + QS same-day allowed when training_intent=performance OR strength_intent=co-equal
+  // AND the next day is not a long anchor. Stacking quality before a long-day compounds fatigue
+  // into the long day. Override 5.3 (always-stack for qualifying profiles) is out of scope.
+  const nextKinds = (days[dayAfter(day)] ?? []).map((s) => s.kind);
+  const nextDayIsLong = nextKinds.includes('long_ride') || nextKinds.includes('long_run');
   const allowQrQs =
-    athlete.training_intent === 'performance' || athlete.strength_intent === 'performance';
+    (athlete.training_intent === 'performance' || athlete.strength_intent === 'performance') &&
+    !nextDayIsLong;
   if (areScheduleSlotsCompatible(there, kind, { allowQualityRunQualitySwimSameDay: allowQrQs })) {
     return true;
   }
@@ -339,14 +363,21 @@ function sequentialOk(
     if (kind !== 'long_ride' && isHigh(kind)) return false;
   }
 
-  // Prev day was quality_bike → today: no quality_bike, no quality_run — except
-  // consolidated hard day (performance + co-equal): QR + lower same day (EXPERIENCE_MODIFIER).
+  // Prev day was quality_bike → today cannot be HIGH (§4.7: long_ride, long_run,
+  // quality_bike, quality_run, lower_body_strength all blocked). Quality_bike depletes
+  // glycogen and creates CNS fatigue; stacking another HIGH stimulus the next day produces
+  // a junk session.
+  // Exception: consolidated hard day (performance + co-equal) allows QR + lower same day,
+  // signaled via the relax flag — see EXPERIENCE_MODIFIER §5.2.
   if (prevKinds.includes('quality_bike')) {
-    if (kind === 'quality_bike') return false;
     if (kind === 'quality_run') {
       if (relax?.quality_run_day_after_qb_with_same_day_lower) return true;
       return false;
     }
+    if (kind === 'quality_bike') return false;
+    if (kind === 'long_ride') return false;
+    if (kind === 'long_run') return false;
+    if (kind === 'lower_body_strength') return false;
   }
   // Prev day was quality_run → today: no quality_bike, no quality_run.
   if (prevKinds.includes('quality_run')) {
@@ -360,19 +391,25 @@ function sequentialOk(
   if (nextKinds.includes('quality_run') && kind === 'quality_bike') return false;
 
   // 48h gap before next lower-leg-heavy work after lower_body_strength.
-  if (kind === 'lower_body_strength' || kind === 'long_run') {
+  // Per docs/SCHEDULING-RULES.md §4.4: heavy lower must precede quality_bike by ≥48h
+  // (cycling power output at threshold/VO2 is impaired 24-48h post-heavy-lower; the
+  // quality stimulus is wasted if power output is impaired).
+  if (kind === 'lower_body_strength' || kind === 'long_run' || kind === 'quality_bike') {
     const twoBackKinds = (days[nDaysAfter(day, -2)] ?? []).map((s) => s.kind);
     if (prevKinds.includes('lower_body_strength')) return false;
     if (twoBackKinds.includes('lower_body_strength')) return false;
   }
 
-  // 48h gap BEFORE sovereign days: lower_body_strength cannot fall in the two calendar
-  // days before long_ride or long_run (same discrete rule as generate-combined-plan week-builder
-  // vs long run + brick tags).
+  // 48h gap BEFORE sovereign / power-quality days: lower_body_strength cannot fall in the
+  // two calendar days before long_ride, long_run, or quality_bike (§4.4).
   if (kind === 'lower_body_strength') {
     for (const delta of [1, 2] as const) {
       const slots = days[nDaysAfter(day, delta)] ?? [];
-      if (slots.some((s) => s.kind === 'long_ride' || s.kind === 'long_run')) return false;
+      if (slots.some((s) =>
+        s.kind === 'long_ride' || s.kind === 'long_run' || s.kind === 'quality_bike',
+      )) {
+        return false;
+      }
     }
   }
 
@@ -717,7 +754,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
   if (strengthFreq >= 1) {
     if (strengthFreq >= 2 && isCoEq) {
-      const upperOrder: DayName[] = ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'];
+      // §4.15: bias toward athlete-preferred days when given. Index 0 = upper, 1 = lower.
+      const preferredUpperDay = inputs.preferences.strength_preferred_days?.[0];
+      const preferredLowerDay = inputs.preferences.strength_preferred_days?.[1];
+      const upperOrder: DayName[] = biasOrderForPreferredDay(
+        ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'],
+        preferredUpperDay,
+      );
 
       if (consolidatedQrLowerDay) {
         let upperDay: DayName | undefined;
@@ -735,6 +778,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         if (upperDay) {
           place(days, upperDay, 'upper_body_strength');
           strengthDays.push(upperDay);
+          if (preferredUpperDay && upperDay !== preferredUpperDay) {
+            conflicts.push(
+              `strength_preferred_days: ${tfDay(preferredUpperDay)} (upper) rejected — placement rules excluded it; placed ${tfDay(upperDay)} instead.`,
+            );
+          }
           if (upperDay !== 'monday') {
             trade_offs.push(
               `Strength: default Monday upper moved to ${tfDay(upperDay)} — spacing vs lower on ${tfDay(consolidatedQrLowerDay)}.`,
@@ -747,9 +795,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           );
         }
       } else {
-        const lowerCandidatesBase: DayName[] = isPerf && qualityRunDay
-          ? [qualityRunDay, 'thursday', 'friday', 'tuesday', 'wednesday', 'monday']
-          : ['thursday', 'friday', 'tuesday', 'wednesday', 'monday'];
+        const lowerCandidatesBase: DayName[] = biasOrderForPreferredDay(
+          isPerf && qualityRunDay
+            ? [qualityRunDay, 'thursday', 'friday', 'tuesday', 'wednesday', 'monday']
+            : ['thursday', 'friday', 'tuesday', 'wednesday', 'monday'],
+          preferredLowerDay,
+        );
 
         let upperDay: DayName | undefined;
         let lowerDay: DayName | undefined;
@@ -786,6 +837,16 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           const stacking = qualityRunDay === lowerDay && isPerf && isCoEq;
           place(days, lowerDay, 'lower_body_strength', stacking ? { timing: 'PM' } : {});
           strengthDays.push(lowerDay);
+          if (preferredUpperDay && upperDay !== preferredUpperDay) {
+            conflicts.push(
+              `strength_preferred_days: ${tfDay(preferredUpperDay)} (upper) rejected — placement rules excluded it; placed ${tfDay(upperDay)} instead.`,
+            );
+          }
+          if (preferredLowerDay && lowerDay !== preferredLowerDay) {
+            conflicts.push(
+              `strength_preferred_days: ${tfDay(preferredLowerDay)} (lower) rejected — placement rules excluded it; placed ${tfDay(lowerDay)} instead.`,
+            );
+          }
           if (stacking) {
             trade_offs.push(
               `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
@@ -808,8 +869,15 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         }
       }
     } else {
+      // §4.15: bias toward athlete-preferred days when given. Index 0 = upper, 1 = lower.
+      const preferredUpperDayNc = inputs.preferences.strength_preferred_days?.[0];
+      const preferredLowerDayNc = inputs.preferences.strength_preferred_days?.[1];
+      const nonCoeqUpperOrder: DayName[] = biasOrderForPreferredDay(
+        ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'],
+        preferredUpperDayNc,
+      );
       let upperDay: DayName | undefined;
-      for (const c of ['monday', 'thursday', 'tuesday', 'wednesday', 'friday'] as DayName[]) {
+      for (const c of nonCoeqUpperOrder) {
         if (c === longRide || c === longRun) continue;
         if (days[c].length >= 2) continue;
         if (!canPlace(days, c, 'upper_body_strength')) continue;
@@ -820,6 +888,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       if (upperDay) {
         place(days, upperDay, 'upper_body_strength');
         strengthDays.push(upperDay);
+        if (preferredUpperDayNc && upperDay !== preferredUpperDayNc) {
+          conflicts.push(
+            `strength_preferred_days: ${tfDay(preferredUpperDayNc)} (upper) rejected — placement rules excluded it; placed ${tfDay(upperDay)} instead.`,
+          );
+        }
         if (upperDay !== 'monday') {
           trade_offs.push(
             `Strength: default Monday upper moved to ${tfDay(upperDay)} (support / 1×–2× template).`,
@@ -835,9 +908,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       }
 
       if (strengthFreq >= 2) {
-        const lowerCandidates: DayName[] = isPerf && qualityRunDay
-          ? [qualityRunDay, 'thursday', 'friday', 'tuesday']
-          : ['thursday', 'friday', 'tuesday', 'wednesday'];
+        const lowerCandidates: DayName[] = biasOrderForPreferredDay(
+          isPerf && qualityRunDay
+            ? [qualityRunDay, 'thursday', 'friday', 'tuesday']
+            : ['thursday', 'friday', 'tuesday', 'wednesday'],
+          preferredLowerDayNc,
+        );
 
         let lowerDay: DayName | undefined;
         for (const c of lowerCandidates) {
@@ -859,6 +935,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           const stacking = qualityRunDay === lowerDay && isPerf && isCoEq;
           place(days, lowerDay, 'lower_body_strength', stacking ? { timing: 'PM' } : {});
           strengthDays.push(lowerDay);
+          if (preferredLowerDayNc && lowerDay !== preferredLowerDayNc) {
+            conflicts.push(
+              `strength_preferred_days: ${tfDay(preferredLowerDayNc)} (lower) rejected — placement rules excluded it; placed ${tfDay(lowerDay)} instead.`,
+            );
+          }
           if (stacking) {
             trade_offs.push(
               `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,

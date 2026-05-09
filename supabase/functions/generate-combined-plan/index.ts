@@ -30,6 +30,7 @@ import {
   LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE,
   LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK,
   WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
+  WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI,
 } from './validate-training-floors.ts';
 
 const corsHeaders = {
@@ -78,15 +79,17 @@ Deno.serve(async (req: Request) => {
       rest_days: athlete_state.rest_days ?? [],
     };
 
-    const hasTriGoalForReconcile = goals.some((g) =>
+    const state703Cutoff = promote703SwimIntentForCutoffRisk(goals, state);
+
+    // Used downstream for floor caps, quality_run rescue, and ramp-cap reporting.
+    const hasTriGoal = goals.some((g) =>
       ['triathlon', 'tri'].includes(String(g.sport ?? '').toLowerCase()),
     );
 
-    const state703Cutoff = promote703SwimIntentForCutoffRisk(goals, state);
-
-    const scheduleState: AthleteState = hasTriGoalForReconcile
-      ? reconcileAthleteStateWithWeekOptimizer(state703Cutoff)
-      : state703Cutoff;
+    // Task 7 (consolidation): scheduling is the optimizer's responsibility for ALL combined-plan
+    // entrypoints. The reconciler internally short-circuits (returns state unchanged) for AthleteStates
+    // that cannot be optimized — e.g. when long_run_day is missing — so it is safe to call unconditionally.
+    const scheduleState: AthleteState = reconcileAthleteStateWithWeekOptimizer(state703Cutoff);
 
     // ── Build phase timeline ────────────────────────────────────────────────
     const { blocks: builtBlocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, scheduleState);
@@ -153,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
     let generatedWeeks = generateAllWeeks(blocks);
     let physiologicalFloorRebuiltOnce = false;
-    const floorOpts = { hasTri: hasTriGoalForReconcile };
+    const floorOpts = { hasTri: hasTriGoal };
     let floors = validateTrainingFloors(generatedWeeks, floorOpts);
     const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 12;
     let floorPass = 0;
@@ -191,7 +194,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Validate ───────────────────────────────────────────────────────────
-    const hasTriGoal = goals.some(g => ['triathlon', 'tri'].includes((g.sport ?? '').toLowerCase()));
     const validation = validatePlan(
       generatedWeeks, blocks,
       state.current_ctl,
@@ -247,7 +249,7 @@ Deno.serve(async (req: Request) => {
 
     // Optimizer micro-grid can report "quality_run not placed" while week-builder still lands
     // structured quality from Arc defaults + anchor bumps. Surface what actually shipped.
-    if (hasTriGoalForReconcile && scheduleState.run_quality_day == null) {
+    if (hasTriGoal && scheduleState.run_quality_day == null) {
       for (const gw of generatedWeeks) {
         const qrSession = gw.sessions.find((s) =>
           plannedSessionLooksLikeStructuredQualityRun(s as unknown as Record<string, unknown>),
@@ -347,7 +349,9 @@ Deno.serve(async (req: Request) => {
         long_run_tss_share_max_single_sport: LONG_RUN_TSS_SHARE_MAX,
         tri_long_run_share_of_run_discipline_max: LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE,
         tri_long_run_share_of_total_week_fallback_max: LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK,
-        week_over_week_raw_tss_ramp_max: WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
+        week_over_week_raw_tss_ramp_max: hasTriGoal
+          ? WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI
+          : WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
         rebuilt_once: physiologicalFloorRebuiltOnce,
         rebuild_passes: floorPass,
         passed: true,

@@ -37,8 +37,15 @@ export const FLOOR_REBUILD_LONG_RUN_SHARE_OF_BUDGET = 0.17;
 /** Last-resort rebuild pass — LR share vs realized weekly total (still validated at 30% of raw week). */
 export const FLOOR_REBUILD_DEEP_LONG_RUN_SHARE_OF_BUDGET = 0.14;
 
-/** Max week-over-week increase in **total_raw_tss** (WoW ramp). */
+/** Max week-over-week increase in **total_raw_tss** (WoW ramp) — single-sport / run-heavy weeks. */
 export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX = 0.15;
+
+/**
+ * Tri / combined multi-sport: weekly total raw TSS aggregates swim + bike + run + strength.
+ * Template churn within the **same phase** (swim slot mix, threshold yards) routinely moves the
+ * composite week by slightly more than single-sport ramp guidance without implying overload.
+ */
+export const WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI = 0.2;
 
 /** Applied to each phase block `tssMultiplier` on the automatic rebuild pass. */
 export const FLOOR_REBUILD_TSS_MULTIPLIER_FACTOR = 0.87;
@@ -88,6 +95,8 @@ export type TrainingFloorsResult = {
 export type ValidateTrainingFloorsOpts = {
   /** When true, long-run share is measured vs run-sport TSS (not whole-week TSS). */
   hasTri?: boolean;
+  /** Override WoW ramp cap (optional — defaults use single-sport vs tri constants). */
+  weekOverWeekRampMax?: number;
 };
 
 /**
@@ -100,6 +109,15 @@ export function validateTrainingFloors(
 ): TrainingFloorsResult {
   const violations: PhysiologicalFloorViolation[] = [];
   const hasTri = opts?.hasTri === true;
+  const wowMax =
+    typeof opts?.weekOverWeekRampMax === 'number' &&
+    Number.isFinite(opts.weekOverWeekRampMax) &&
+    opts.weekOverWeekRampMax > 0 &&
+    opts.weekOverWeekRampMax < 1
+      ? opts.weekOverWeekRampMax
+      : hasTri
+        ? WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI
+        : WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX;
 
   for (const w of weeks) {
     // Deload / recovery weeks intentionally preserve the long aerobic anchor while cutting bike/swim/strength —
@@ -170,23 +188,23 @@ export function validateTrainingFloors(
     // Very low prior-week totals (partial deloads not flagged `isRecovery`) — skip ramp vs noise.
     if (p < 120) continue;
     const ramp = (cur.total_raw_tss - p) / p;
-    if (ramp > WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX + 1e-9) {
+    if (ramp > wowMax + 1e-9) {
       violations.push({
         code: 'WEEK_OVER_WEEK_TSS_RAMP',
         severity: 'fatal',
-        message: `Week ${cur.weekNum}: weekly raw TSS increased ${(ramp * 100).toFixed(1)}% vs prior week (limit ${(WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX * 100).toFixed(0)}%).`,
+        message: `Week ${cur.weekNum}: weekly raw TSS increased ${(ramp * 100).toFixed(1)}% vs prior week (limit ${(wowMax * 100).toFixed(0)}%).`,
         week_num: cur.weekNum,
         metrics: [
           {
             name: 'wow_raw_tss_ramp',
             observed: round4(ramp),
-            limit: WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
+            limit: wowMax,
             unit: 'ratio',
           },
           {
             name: 'weekly_raw_tss',
             observed: Math.round(cur.total_raw_tss),
-            limit: Math.round(p * (1 + WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX)),
+            limit: Math.round(p * (1 + wowMax)),
             unit: 'tss',
           },
         ],
