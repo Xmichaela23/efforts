@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
     // ── Generate each week ─────────────────────────────────────────────────
     type GeneratedWeekFromBuilder = ReturnType<typeof buildWeek>;
 
-    const generateAllWeeks = (blocksArg: typeof blocks): GeneratedWeekFromBuilder[] => {
+    const generateAllWeeks = (blocksArg: typeof blocks, physiologicalFloorRebuild = false): GeneratedWeekFromBuilder[] => {
       const out: GeneratedWeekFromBuilder[] = [];
       let prevWeightedTSS = state.current_ctl * 7;
       for (let w = 1; w <= totalWeeks; w++) {
@@ -130,6 +130,7 @@ Deno.serve(async (req: Request) => {
           totalWeeks,
           raceAnchors,
           phaseBlocks: blocksArg,
+          ...(physiologicalFloorRebuild ? { physiologicalFloorRebuild: true } : {}),
         });
         out.push(week);
         prevWeightedTSS = week.total_weighted_tss;
@@ -140,10 +141,13 @@ Deno.serve(async (req: Request) => {
     let generatedWeeks = generateAllWeeks(blocks);
     let physiologicalFloorRebuiltOnce = false;
     let floors = validateTrainingFloors(generatedWeeks);
-    if (!floors.ok) {
+    const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 6;
+    let floorPass = 0;
+    while (!floors.ok && floorPass < MAX_PHYSIOLOGICAL_FLOOR_PASSES) {
       blocks = tightenPhaseBlocksForFloorRebuild(blocks);
       physiologicalFloorRebuiltOnce = true;
-      generatedWeeks = generateAllWeeks(blocks);
+      floorPass += 1;
+      generatedWeeks = generateAllWeeks(blocks, true);
       floors = validateTrainingFloors(generatedWeeks);
     }
     if (!floors.ok) {
@@ -154,6 +158,7 @@ Deno.serve(async (req: Request) => {
             'Physiological training floors violated after automatic rebuild. Reduce weekly volume, intensity intent, or training days per week.',
           physiological_floor_violations: floors.violations,
           physiological_floor_rebuilt_once: physiologicalFloorRebuiltOnce,
+          physiological_floor_passes_attempted: floorPass,
         },
         400,
       );
@@ -296,6 +301,7 @@ Deno.serve(async (req: Request) => {
         long_run_tss_share_max: LONG_RUN_TSS_SHARE_MAX,
         week_over_week_raw_tss_ramp_max: WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
         rebuilt_once: physiologicalFloorRebuiltOnce,
+        rebuild_passes: floorPass,
         passed: true,
       },
       week_start_dow: 'Monday',

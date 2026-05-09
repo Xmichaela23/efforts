@@ -41,10 +41,11 @@ import { resolveSwimSlotYardsWithBudget } from './swim-protocol-volumes.ts';
 import {
   DAYS_OF_WEEK, DAY_INDEX, BRICKS_PER_WEEK,
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
-  rampThresholds, estimateSessionTSS, weightedTSS,
+  rampThresholds, estimateSessionTSS, weightedTSS, TSS_PER_HOUR,
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
   type TriRaceDistance,
 } from './science.ts';
+import { LONG_RUN_TSS_SHARE_MAX } from './validate-training-floors.ts';
 import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
@@ -739,6 +740,14 @@ export function buildWeek(
   if (options?.physiologicalFloorRebuild && !raceThisWeek) {
     const floorMi = hasTri ? longRunFloorMiles(primaryGoal.distance, phase) : 3;
     longRunMiles = Math.max(floorMi, Math.round(longRunMiles * 0.86));
+    longRunMinutes = Math.round(longRunMiles * 9.5);
+    // Tri long-run floors can exceed 30% of weekly raw TSS when the whole week is scaled down
+    // for floor rebuild — cap miles vs budget proxy (matches `validateTrainingFloors`).
+    const lrIntensity: Intensity = phase === 'race_specific' ? 'MODERATE' : 'EASY';
+    const tssPerMin = TSS_PER_HOUR.run[lrIntensity] / 60;
+    const maxLongRunTss = LONG_RUN_TSS_SHARE_MAX * Math.max(1, weeklyTSSBudget);
+    const maxLongRunMiles = maxLongRunTss / tssPerMin / 9.5;
+    longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(maxLongRunMiles * 10) / 10));
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 
