@@ -6,7 +6,6 @@ import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
-import { resetWizardClientState } from '@/lib/reset-wizard-client-state';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
@@ -675,8 +674,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Server function: delete planned rows and the plan atomically
       const { error } = await supabase.functions.invoke('delete-plan', { body: { plan_id: String(planId) } }) as any;
       if (error) throw error as any;
-      const uid = getStoredUserId();
-      resetWizardClientState(uid);
+      try {
+        window.dispatchEvent(new CustomEvent('plans:invalidate'));
+        window.dispatchEvent(new CustomEvent('goals:invalidate'));
+      } catch {
+        /* ignore */
+      }
       await loadPlans();
       try {
         window.dispatchEvent(new CustomEvent('planned:invalidate'));

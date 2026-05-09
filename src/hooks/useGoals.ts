@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { resetWizardClientState } from '@/lib/reset-wizard-client-state';
 
 export interface Goal {
   id: string;
@@ -131,7 +130,12 @@ export function useGoals() {
         return { ok: false, message: String(payload.error || 'Delete failed.') };
       }
       setGoals((prev) => prev.filter((g) => g.id !== id));
-      resetWizardClientState(userId);
+      try {
+        window.dispatchEvent(new CustomEvent('plans:invalidate'));
+        window.dispatchEvent(new CustomEvent('goals:invalidate'));
+      } catch {
+        /* ignore */
+      }
       return { ok: true, message: String(payload.message || 'Goal removed.') };
     } catch (err) {
       console.error('Error deleting goal:', err);

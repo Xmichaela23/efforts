@@ -1,7 +1,10 @@
 import { clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 
 /**
- * Single client-side cleanup for Arc wizard draft + list invalidations after delete / rollback.
+ * Clears persisted Arc wizard draft and notifies listeners (`arc-wizard:reset`).
+ * Use **only** after a successful wizard completion or explicit “start over” —
+ * not on plan/goal delete (that would wipe in-progress setup while the athlete
+ * is still on the wizard).
  */
 export function resetWizardClientState(userId: string | null): void {
   if (userId) {
