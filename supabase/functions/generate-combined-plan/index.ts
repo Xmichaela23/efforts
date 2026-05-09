@@ -18,7 +18,11 @@ import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
 import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-state-week-optimizer.ts';
 import { promote703SwimIntentForCutoffRisk } from './swim-tri-safety.ts';
-import { sessionsByWeekHasStructuredQualityRun } from '../_shared/plan-generation-trade-offs.ts';
+import {
+  buildQualityRunWeekBuilderFallbackTradeOff,
+  plannedSessionLooksLikeStructuredQualityRun,
+  sessionsByWeekHasStructuredQualityRun,
+} from '../_shared/plan-generation-trade-offs.ts';
 import {
   validateTrainingFloors,
   tightenPhaseBlocksForFloorRebuild,
@@ -240,6 +244,26 @@ Deno.serve(async (req: Request) => {
     // When assessment_first: shift all training weeks +1, prepend assessment as week 1.
     const includeAssessmentWeek = scheduleState.assessment_week_preference === 'assessment_first';
     const weekOffset = includeAssessmentWeek ? 1 : 0;
+
+    // Optimizer micro-grid can report "quality_run not placed" while week-builder still lands
+    // structured quality from Arc defaults + anchor bumps. Surface what actually shipped.
+    if (hasTriGoalForReconcile && scheduleState.run_quality_day == null) {
+      for (const gw of generatedWeeks) {
+        const qrSession = gw.sessions.find((s) =>
+          plannedSessionLooksLikeStructuredQualityRun(s as unknown as Record<string, unknown>),
+        );
+        if (!qrSession) continue;
+        const dayPretty = String(qrSession.day ?? '').trim() || 'mid-week';
+        const note = buildQualityRunWeekBuilderFallbackTradeOff(dayPretty, {
+          bike_quality_day: scheduleState.bike_quality_day,
+          long_ride_day: scheduleState.long_ride_day,
+          long_run_day: scheduleState.long_run_day,
+          swim_quality_day: scheduleState.swim_quality_day,
+        });
+        gw.week_trade_offs = [...(gw.week_trade_offs ?? []), note];
+        break;
+      }
+    }
 
     for (const w of generatedWeeks) {
       sessions_by_week[String(w.weekNum + weekOffset)] = w.sessions.map(serializeSession);

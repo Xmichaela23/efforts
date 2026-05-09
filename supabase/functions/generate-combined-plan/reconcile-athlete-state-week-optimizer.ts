@@ -6,6 +6,7 @@
 import type { AthleteState } from './types.ts';
 import type { DayName, StrengthPreferredSlot, WeekOptimizerInputs } from '../_shared/week-optimizer.ts';
 import { deriveOptimalWeekWithCoEqualRecovery } from '../_shared/week-optimizer.ts';
+import { lineLooksLikeQualityRunUnplaced } from '../_shared/plan-generation-trade-offs.ts';
 
 const SUN_DAY_NAMES: DayName[] = [
   'sunday',
@@ -185,11 +186,22 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     merged.bike_quality_label = 'Group Ride';
   }
 
+  const qrUnplacedNoise =
+    !pd.quality_run &&
+    [...optimal.conflicts, ...optimal.trade_offs].some((x) => lineLooksLikeQualityRunUnplaced(String(x)));
+
   console.log('[generate-combined-plan] reconcileAthleteStateWithWeekOptimizer:', JSON.stringify({
     preferred_days_keys: Object.keys(pd),
     strength_slots,
+    quality_run_in_optimizer_output: Boolean(pd.quality_run),
     trade_off_sample: optimal.trade_offs.slice(0, 4),
     conflict_sample: optimal.conflicts.slice(0, 4),
+    ...(qrUnplacedNoise
+      ? {
+        note:
+          'Optimizer reported quality_run unplaced on its micro-grid; combined week-builder may still place structured quality from Arc defaults — see week_trade_offs after buildWeek.',
+      }
+      : {}),
   }));
 
   return merged;

@@ -179,14 +179,17 @@ export function buildCombinedPlanGenerationTradeOffs(opts: {
   }
 
   const tradeOffLines: string[] = [];
+  const conflictLines: string[] = [];
   const pinSkipped: string[] = [];
   let anyCoEqual = false;
   for (const s of opts.optimizerSnapshots) {
     tradeOffLines.push(...s.trade_offs);
+    conflictLines.push(...(s.conflicts ?? []));
     pinSkipped.push(...s.pin_restore_skipped);
     if (s.used_co_equal_1x_fallback) anyCoEqual = true;
   }
   const uniqueTradeOffs = [...new Set(tradeOffLines)];
+  const uniqueConflicts = [...new Set(conflictLines)];
   const uniquePinSkips = [...new Set(pinSkipped)];
 
   if (anyCoEqual) {
@@ -203,10 +206,12 @@ export function buildCombinedPlanGenerationTradeOffs(opts: {
     });
   }
 
-  const qualityUnplaced = uniqueTradeOffs.some(
-    (line) =>
-      line.includes('quality_run: no valid placement') || line.includes('Quality run not placed'),
-  );
+  const qualityUnplaced =
+    uniqueTradeOffs.some(
+      (line) =>
+        line.includes('quality_run: no valid placement') || line.includes('Quality run not placed'),
+    ) ||
+    uniqueConflicts.some((line) => line.includes('quality_run: no valid placement'));
   if (qualityUnplaced) {
     add({
       kind: 'conflict_warning',
@@ -257,9 +262,85 @@ export function buildCombinedPlanGenerationTradeOffs(opts: {
 const QR_UNPLACED_TRADE_RE = /Quality run not placed/i;
 const QR_UNPLACED_CONFLICT_RE = /quality_run:\s*no valid placement/i;
 
-function lineLooksLikeQualityRunUnplaced(line: string): boolean {
+/** Optimizer / upstream lines that claim QR could not be placed (may be stale after week-builder). */
+export function lineLooksLikeQualityRunUnplaced(line: string): boolean {
   const s = String(line).trim();
   return QR_UNPLACED_TRADE_RE.test(s) || QR_UNPLACED_CONFLICT_RE.test(s);
+}
+
+const SUN_FIRST_DAY_LABEL = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const;
+
+function sunFirstIndexToDayLabel(idx: number): string {
+  const i = ((idx % 7) + 7) % 7;
+  return SUN_FIRST_DAY_LABEL[i] ?? 'that day';
+}
+
+export type QualityRunAnchorPins = {
+  bike_quality_day?: number | null;
+  long_ride_day?: number | null;
+  long_run_day?: number | null;
+  swim_quality_day?: number | null;
+};
+
+/** Short clause listing pinned weekdays (Arc sun-first indices) for QR fallback messaging. */
+export function formatQualityRunAnchorPinsSummary(pins: QualityRunAnchorPins): string {
+  const bits: string[] = [];
+  if (pins.bike_quality_day != null) {
+    bits.push(`group ride ${sunFirstIndexToDayLabel(pins.bike_quality_day)}`);
+  }
+  if (pins.long_ride_day != null) {
+    bits.push(`long ride ${sunFirstIndexToDayLabel(pins.long_ride_day)}`);
+  }
+  if (pins.long_run_day != null) {
+    bits.push(`long run ${sunFirstIndexToDayLabel(pins.long_run_day)}`);
+  }
+  if (pins.swim_quality_day != null) {
+    bits.push(`quality swim ${sunFirstIndexToDayLabel(pins.swim_quality_day)}`);
+  }
+  return bits.length ? bits.join(', ') : 'your pinned anchors';
+}
+
+/**
+ * First calendar weekday (session `day` string) where a structured quality run appears.
+ */
+export function inferFirstStructuredQualityRunWeekdayFromSessionsByWeek(
+  sessions_by_week: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!sessions_by_week || typeof sessions_by_week !== 'object') return null;
+  const keys = Object.keys(sessions_by_week).sort((a, b) => Number(a) - Number(b));
+  for (const k of keys) {
+    const weekSessions = sessions_by_week[k];
+    if (!Array.isArray(weekSessions)) continue;
+    for (const raw of weekSessions) {
+      if (!raw || typeof raw !== 'object') continue;
+      const s = raw as Record<string, unknown>;
+      if (!plannedSessionLooksLikeStructuredQualityRun(s)) continue;
+      const day = String(s.day ?? '').trim();
+      if (day) return day;
+    }
+  }
+  return null;
+}
+
+/**
+ * Week-builder placed structured quality while the week optimizer had no `preferred_days.quality_run`.
+ */
+export function buildQualityRunWeekBuilderFallbackTradeOff(
+  placedDayPretty: string,
+  pins: QualityRunAnchorPins,
+): string {
+  const anchors = formatQualityRunAnchorPinsSummary(pins);
+  return (
+    `Quality run placed on ${placedDayPretty} — week-builder resolved it after the week optimizer could not slot quality_run on its micro-grid (${anchors}).`
+  );
 }
 
 /** Same predicate as weeks-scan below; exported for tests / reuse in Schedule adjustments UX. */
