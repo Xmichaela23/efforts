@@ -19,6 +19,12 @@ import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-
 import { reconcileAthleteStateWithWeekOptimizer } from './reconcile-athlete-state-week-optimizer.ts';
 import { promote703SwimIntentForCutoffRisk } from './swim-tri-safety.ts';
 import { sessionsByWeekHasStructuredQualityRun } from '../_shared/plan-generation-trade-offs.ts';
+import {
+  validateTrainingFloors,
+  tightenPhaseBlocksForFloorRebuild,
+  LONG_RUN_TSS_SHARE_MAX,
+  WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
+} from './validate-training-floors.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,10 +91,6 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Not enough time before earliest event to build a meaningful plan' }, 400);
     }
 
-    // ── Generate each week ─────────────────────────────────────────────────
-    const generatedWeeks = [];
-    let prevWeightedTSS = state.current_ctl * 7; // baseline = CTL * 7
-
     if (totalWeeks >= 1) {
       console.log('[generate-combined-plan] athleteState before buildWeek:', {
         bike_quality_day: scheduleState.bike_quality_day,
@@ -116,15 +118,45 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    for (let w = 1; w <= totalWeeks; w++) {
-      const block = blockForWeek(blocks, w);
-      const week = buildWeek(w, block, prevWeightedTSS, goals, scheduleState, athlete_memory, {
-        totalWeeks,
-        raceAnchors,
-        phaseBlocks: blocks,
-      });
-      generatedWeeks.push(week);
-      prevWeightedTSS = week.total_weighted_tss;
+    // ── Generate each week ─────────────────────────────────────────────────
+    type GeneratedWeekFromBuilder = ReturnType<typeof buildWeek>;
+
+    const generateAllWeeks = (blocksArg: typeof blocks): GeneratedWeekFromBuilder[] => {
+      const out: GeneratedWeekFromBuilder[] = [];
+      let prevWeightedTSS = state.current_ctl * 7;
+      for (let w = 1; w <= totalWeeks; w++) {
+        const block = blockForWeek(blocksArg, w);
+        const week = buildWeek(w, block, prevWeightedTSS, goals, scheduleState, athlete_memory, {
+          totalWeeks,
+          raceAnchors,
+          phaseBlocks: blocksArg,
+        });
+        out.push(week);
+        prevWeightedTSS = week.total_weighted_tss;
+      }
+      return out;
+    };
+
+    let generatedWeeks = generateAllWeeks(blocks);
+    let physiologicalFloorRebuiltOnce = false;
+    let floors = validateTrainingFloors(generatedWeeks);
+    if (!floors.ok) {
+      blocks = tightenPhaseBlocksForFloorRebuild(blocks);
+      physiologicalFloorRebuiltOnce = true;
+      generatedWeeks = generateAllWeeks(blocks);
+      floors = validateTrainingFloors(generatedWeeks);
+    }
+    if (!floors.ok) {
+      return json(
+        {
+          success: false,
+          error:
+            'Physiological training floors violated after automatic rebuild. Reduce weekly volume, intensity intent, or training days per week.',
+          physiological_floor_violations: floors.violations,
+          physiological_floor_rebuilt_once: physiologicalFloorRebuiltOnce,
+        },
+        400,
+      );
     }
 
     // ── Validate ───────────────────────────────────────────────────────────
@@ -260,6 +292,12 @@ Deno.serve(async (req: Request) => {
       },
       validation,
       validation_failures: failures,
+      physiological_floors: {
+        long_run_tss_share_max: LONG_RUN_TSS_SHARE_MAX,
+        week_over_week_raw_tss_ramp_max: WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX,
+        rebuilt_once: physiologicalFloorRebuiltOnce,
+        passed: true,
+      },
       week_start_dow: 'Monday',
       week_trade_offs: Object.fromEntries(
         generatedWeeks
