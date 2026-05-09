@@ -20,6 +20,11 @@ import { useToast } from '@/components/ui/use-toast';
 // Local alias so existing call-sites inside this file don't need renaming
 const readStoredUserId = getStoredUserId;
 
+/** `goals.sport` must be string — tolerate legacy/json quirks without crashing `.toLowerCase()`. */
+function goalSportLower(s: unknown): string {
+  return typeof s === 'string' ? s.trim().toLowerCase() : '';
+}
+
 /** Survives Goals unmount / revisit after we strip `location.state` (router hygiene). */
 const ARC_SCHEDULE_SIGNALS_STORAGE_KEY = 'efforts_arc_schedule_signals_notice_v1';
 const ARC_SCHEDULE_SIGNALS_TTL_MS = 24 * 60 * 60 * 1000;
@@ -295,7 +300,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       (g) =>
         g.status === 'active' &&
         g.goal_type === 'event' &&
-        (g.sport || '').toLowerCase() === 'run',
+        goalSportLower(g.sport) === 'run',
     );
     if (runEvent) setExpandedGoalId(runEvent.id);
   }, [expandRunEventForCourseNonce, goals]);
@@ -532,7 +537,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const coachPred =
       rr &&
       String(goal.name) === String(rr.goal.name) &&
-      (goal.sport || '').toLowerCase() === 'run' &&
+      goalSportLower(goal.sport) === 'run' &&
       Number.isFinite(rr.predicted_finish_time_seconds) &&
       rr.predicted_finish_time_seconds > 0
         ? rr.predicted_finish_time_seconds
@@ -621,7 +626,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
     const date = (goal.target_date || '').slice(0, 10);
     if (!date) return { ok: false, reason: 'no_workout' };
-    const sport = (goal.sport || 'run').toLowerCase();
+    const sport = goalSportLower(goal.sport) || 'run';
     const types = sport === 'ride' ? ['ride'] : sport === 'swim' ? ['swim'] : ['run'];
     const { data: rows, error: wErr } = await supabase
       .from('workouts')
@@ -1132,10 +1137,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     setGoalFlowError(null);
 
     const sameSportGoal = activeGoals.find(
-      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === String(eventSport ?? '').toLowerCase()
+      g => g.goal_type === 'event' && goalSportLower(g.sport) === String(eventSport ?? '').toLowerCase()
     );
     const crossSportGoal = !sameSportGoal
-      ? activeGoals.find(g => g.goal_type === 'event' && g.sport && (g.sport || '').toLowerCase() !== String(eventSport ?? '').toLowerCase())
+      ? activeGoals.find(g => g.goal_type === 'event' && goalSportLower(g.sport) && goalSportLower(g.sport) !== String(eventSport ?? '').toLowerCase())
       : null;
 
     const conflictGoal = sameSportGoal ?? crossSportGoal ?? null;
@@ -1230,7 +1235,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const coachPredCard =
       rrCard &&
       String(goal.name) === String(rrCard.goal.name) &&
-      (goal.sport || '').toLowerCase() === 'run' &&
+      goalSportLower(goal.sport) === 'run' &&
       Number.isFinite(rrCard.predicted_finish_time_seconds) &&
       rrCard.predicted_finish_time_seconds > 0
         ? rrCard.predicted_finish_time_seconds
@@ -1491,7 +1496,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           {buildError?.goalId === goal.id && <p className="mt-1 text-xs text-red-400/70">{buildError.message}</p>}
         </div>
 
-        {!isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
+        {!isExpanded && goal.goal_type === 'event' && goalSportLower(goal.sport) === 'run' && (
           (() => {
             const hasCourse = !!courseByGoal[goal.id];
             const isActive = goal.status === 'active';
@@ -1527,7 +1532,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           })()
         )}
 
-        {isExpanded && goal.goal_type === 'event' && (goal.sport || '').toLowerCase() === 'run' && (
+        {isExpanded && goal.goal_type === 'event' && goalSportLower(goal.sport) === 'run' && (
           <div className="mt-3 ml-[44px] border-t border-white/[0.06] pt-3 space-y-2">
             <span className="text-[10px] font-semibold tracking-[0.12em] text-white/45 uppercase">Course</span>
             {paceTargetSec == null ? (
@@ -1720,7 +1725,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
       {/* Existing goal prompt */}
       {existingGoalPrompt && !existingGoalPrompt.action && (() => {
-        const isCrossSport = (existingGoalPrompt.existing.sport || '').toLowerCase() !== String(eventSport ?? '').toLowerCase();
+        const isCrossSport = goalSportLower(existingGoalPrompt.existing.sport) !== String(eventSport ?? '').toLowerCase();
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
             <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b0b0c]/95 p-5 shadow-2xl">
@@ -2152,7 +2157,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   function renderEventForm() {
     const hasSameSportActiveGoal = activeGoals.some(
-      g => g.goal_type === 'event' && (g.sport || '').toLowerCase() === String(eventSport ?? '').toLowerCase()
+      g => g.goal_type === 'event' && goalSportLower(g.sport) === String(eventSport ?? '').toLowerCase()
     );
     const requiresDistance = Boolean(DISTANCE_OPTIONS[eventSport]);
 

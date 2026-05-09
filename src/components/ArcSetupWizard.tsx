@@ -1303,8 +1303,9 @@ function StepPriorRace({
 }
 
 /** Map LLM distance strings to the canonical display values used by the wizard. */
-function normalizeDistance(raw: string): string {
-  const s = raw.toLowerCase().trim();
+function normalizeDistance(raw: unknown): string {
+  const r = typeof raw === 'string' ? raw : String(raw ?? '');
+  const s = r.toLowerCase().trim();
   if (s === 'ironman' || s === 'full' || s === 'full ironman') return 'Ironman';
   if (s === '70.3' || s === 'half ironman' || s === 'half-ironman') return '70.3';
   if (s === 'olympic') return 'Olympic';
@@ -1313,7 +1314,7 @@ function normalizeDistance(raw: string): string {
   if (s === 'half marathon' || s === 'half-marathon') return 'Half Marathon';
   if (s === '10k' || s === '10km') return '10K';
   if (s === '5k' || s === '5km') return '5K';
-  return raw; // pass through if unrecognized
+  return r; // pass through if unrecognized
 }
 
 function Step2Intent({
