@@ -555,7 +555,16 @@ export function buildWeek(
   goals: GoalInput[],
   athleteState: AthleteState,
   athleteMemory?: AthleteMemory,
-  options?: { totalWeeks?: number; raceAnchors?: RaceAnchor[]; phaseBlocks?: PhaseBlock[] },
+  options?: {
+    totalWeeks?: number;
+    raceAnchors?: RaceAnchor[];
+    phaseBlocks?: PhaseBlock[];
+    /**
+     * Second pass after `validate-training-floors` fails: uniformly scaling `tssMultiplier`
+     * does not change long-run % of week or WoW ratios — this applies asymmetric caps.
+     */
+    physiologicalFloorRebuild?: boolean;
+  },
 ): GeneratedWeek {
   console.log('[buildWeek] ===== FUNCTION ENTRY ===== week', weekNum);
 
@@ -631,7 +640,13 @@ export function buildWeek(
   // §1.3 ramp rate check: ensure budget doesn't spike CTL dangerously
   const { moderate: moderateRamp } = rampThresholds(athleteState.current_ctl);
   const maxSafeTSS = weeklyTSSForRamp(athleteState.current_ctl, moderateRamp);
-  const weeklyTSSBudget = Math.min(baseTSS, maxSafeTSS);
+  let weeklyTSSBudget = Math.min(baseTSS, maxSafeTSS);
+  if (options?.physiologicalFloorRebuild) {
+    weeklyTSSBudget = Math.max(
+      Math.round(weeklyTSSBudget * 0.91),
+      Math.round(Math.min(baseTSS, maxSafeTSS) * 0.55),
+    );
+  }
 
   // Convert rest_days (0=Sun…6=Sat) to day-name set.
   // Our DAYS_OF_WEEK is Mon-indexed, rest_days uses 0=Sun.
@@ -718,6 +733,12 @@ export function buildWeek(
   // Final week before A-race (taper): cap Sunday long-run miles so volume drops with neurologic freshness.
   if (phase === 'taper' && hasTri && !raceThisWeek) {
     longRunMiles = Math.min(longRunMiles, 5);
+    longRunMinutes = Math.round(longRunMiles * 9.5);
+  }
+
+  if (options?.physiologicalFloorRebuild && !raceThisWeek) {
+    const floorMi = hasTri ? longRunFloorMiles(primaryGoal.distance, phase) : 3;
+    longRunMiles = Math.max(floorMi, Math.round(longRunMiles * 0.86));
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 
@@ -1231,6 +1252,68 @@ export function buildWeek(
         bikeEasyDay = cand;
         break;
       }
+    }
+  }
+
+  // ── Quality run vs quality bike (same calendar day): matrix forbids QR + QB ──
+  // Optimizer may omit `run_quality_day` while pinning `bike_quality_day`; defaults collide (both Wed).
+  if (
+    hasTri &&
+    runQualityDay === bikeQualityDay &&
+    !shiftQualityRunToLongRun &&
+    !dropQualityRunThisWeek
+  ) {
+    const preferredQr = runQualityDay;
+    const blockedQrVsBike = new Set<string>([
+      longRideDay,
+      longRunActualDay,
+      ...restDayNames,
+      bikeQualityDay,
+      ...brickDaysSetForQr,
+    ]);
+    if (!allowQualityRunSwimSameDay) blockedQrVsBike.add(swimQualityDay);
+
+    const prio: string[] = [];
+    const pushUniq = (d: string) => {
+      if (!prio.includes(d)) prio.push(d);
+    };
+    pushUniq('Thursday');
+    pushUniq('Friday');
+    pushUniq('Tuesday');
+    pushUniq('Monday');
+    pushUniq(adjDay(bikeQualityDay, 2));
+    pushUniq(adjDay(bikeQualityDay, -2));
+    for (const d of DAYS_OF_WEEK) pushUniq(d);
+
+    let movedQr: string | null = null;
+    for (const cand of prio) {
+      if (blockedQrVsBike.has(cand)) continue;
+      if (cand === bikeQualityDay) continue;
+      movedQr = cand;
+      break;
+    }
+
+    if (movedQr != null && movedQr !== preferredQr) {
+      runQualityDay = movedQr as (typeof DAYS_OF_WEEK)[number];
+      if (runQualityDay === runEasyDay) {
+        runEasyDay = adjDay(runEasyDay, 1);
+      }
+      conflictEvents.push({
+        conflict_id: mkConflictId(weekNum, 'quality-run-off-quality-bike'),
+        conflict_type: 'quality_run_blocked',
+        blocked_intent: {
+          session_kind: 'quality_run',
+          preferred_day: conflictDayLo(preferredQr),
+          intensity_class: 'HARD',
+        },
+        blocking_reasons: uniqReasons(['anchor_conflict']),
+        anchors_involved: [bikeQualityDay],
+        applied_resolution: {
+          type: 'moved',
+          to_day: conflictDayLo(runQualityDay),
+          note: `Moved quality run off ${preferredQr} — same-day matrix forbids quality_run + quality_bike (${bikeQualityDay} group ride / anchor).`,
+        },
+      });
     }
   }
 
