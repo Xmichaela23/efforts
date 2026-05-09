@@ -281,6 +281,32 @@ Deno.test({
   },
 });
 
+// ── Fixture 07: Wed group ride — QR may land Friday before Sat long_ride (§4.10 run-only pre-long) ─
+
+Deno.test({
+  name: '07 Wednesday quality_bike: algorithmic quality_run prefers Friday (day before long_ride allowed)',
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: {
+        long_ride: 'saturday',
+        long_run: 'sunday',
+        quality_bike: { day: 'wednesday', intensity: 'quality' },
+      },
+      preferences: basePreferences({ strength_frequency: 1 }),
+      athlete: baseAthlete({ strength_intent: 'support' }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    assertEquals(week.preferred_days.quality_bike, 'wednesday');
+    assertEquals(
+      week.preferred_days.quality_run,
+      'friday',
+      'prio is day+2 after Wed QB; Friday must not be blocked as day-before long_ride for run quality',
+    );
+    assertPreferredDaysMatchGraph(week);
+    assertEquals(validatePreferredDays(week.preferred_days, inputs.athlete, inputs.preferences).length, 0);
+  },
+});
+
 // ── Fixture 05: stated quality_run preference with Wed QB (declared adjacent OK) ─────
 
 Deno.test({

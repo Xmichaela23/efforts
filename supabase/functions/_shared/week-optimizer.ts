@@ -533,8 +533,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   let consolidatedQrLowerDay: DayName | undefined;
 
   if (!qualityRunDay) {
-    /** Hard-banned days for quality_run (never day before long_ride; never bracketing anchored quality_bike). */
-    const blockedQr = new Set<DayName>([longRide, longRun, dayBefore(longRide)]);
+    /**
+     * Hard-banned days for quality_run: not on long_ride / long_run days; not the calendar day before
+     * **long_run** (§4.10 same-discipline — legs fresh for the long run). Day before **long_ride** is allowed
+     * (bike vs run). Bracket anchored quality_bike (cannot share QB day or adjacent calendar days).
+     */
+    const blockedQr = new Set<DayName>([longRide, longRun, dayBefore(longRun)]);
     if (qualityBikeDay) {
       blockedQr.add(qualityBikeDay);
       blockedQr.add(dayBefore(qualityBikeDay));
@@ -580,7 +584,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       }
       for (const d of candidates) {
         if (d === longRide || d === longRun) continue;
-        if (d === dayBefore(longRide)) continue;
+        if (d === dayBefore(longRun)) continue;
         if (noLowerBody.has(d)) continue;
         if (qualityBikeDay && d === qualityBikeDay) continue;
 
