@@ -607,8 +607,8 @@ export function buildWeek(
   console.log('[buildWeek] week', weekNum, {
     days_per_week: athleteState.days_per_week,
     rest_days: athleteState.rest_days,
-    bikeQualityDay: athleteState.bike_quality_day,
-    runQualityDay: athleteState.run_quality_day,
+    bike_quality_day_raw: athleteState.bike_quality_day,
+    quality_run_day_raw: athleteState.run_quality_day, // sun-first index; undefined => derived in build
     longRideDay: athleteState.long_ride_day,
     longRunDay: athleteState.long_run_day,
     strengthPreferredDays: athleteState.strength_preferred_days,
@@ -1575,6 +1575,15 @@ export function buildWeek(
       }
     }
   }
+
+  console.log('[buildWeek] anchor weekdays resolved', weekNum, {
+    bike_quality_day: bikeQualityDay,
+    bike_easy_day: bikeEasyDay,
+    quality_run_day: runQualityDay,
+    swim_easy_day: swimEasyDay,
+    swim_quality_day: swimQualityDay,
+    long_run_actual_day: longRunActualDay,
+  });
 
   // ── Run quality (default Wednesday; from Arc `preferred_days.quality_run`) ──
   const runQualitySlot = grid.get(runQualityDay);
