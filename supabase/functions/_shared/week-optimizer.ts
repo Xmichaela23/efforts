@@ -68,6 +68,52 @@ function biasOrderForPreferredDay(base: DayName[], preferred: DayName | undefine
   return [preferred, ...base.filter((d) => d !== preferred)];
 }
 
+/**
+ * Minimum circular weekday distance from `day` to any anchor swim day. Larger gap =
+ * better spread when placing additional swims (prefer Mon+Thu over Mon+Tue).
+ */
+function swimSpreadGap(day: DayName, occupiedSwimDays: DayName[]): number {
+  if (occupiedSwimDays.length === 0) return 99;
+  let minGap = 7;
+  for (const o of occupiedSwimDays) {
+    const g = Math.abs(DAY_INDEX[day] - DAY_INDEX[o]);
+    const wrap = Math.min(g, 7 - g);
+    minGap = Math.min(minGap, wrap);
+  }
+  return minGap;
+}
+
+/** Penalize easy_run on calendar days touching quality_run or long_run (hard quality / long stimulus neighbors). */
+function easyRunAnchorAdjacencyPenalty(
+  d: DayName,
+  qualityRunDay: DayName | undefined,
+  longRun: DayName,
+): number {
+  let p = 0;
+  if (qualityRunDay) {
+    if (dayBefore(qualityRunDay) === d || dayAfter(qualityRunDay) === d) p += 4;
+  }
+  if (dayBefore(longRun) === d || dayAfter(longRun) === d) p += 4;
+  return p;
+}
+
+/** Larger = more separation from quality_run and long_run on the calendar (breaks ties after penalty). */
+function easyRunHardAnchorMinGap(
+  d: DayName,
+  qualityRunDay: DayName | undefined,
+  longRun: DayName,
+): number {
+  const anchors: DayName[] = [longRun];
+  if (qualityRunDay) anchors.push(qualityRunDay);
+  let minGap = 7;
+  for (const a of anchors) {
+    const g = Math.abs(DAY_INDEX[d] - DAY_INDEX[a]);
+    const wrap = Math.min(g, 7 - g);
+    minGap = Math.min(minGap, wrap);
+  }
+  return minGap;
+}
+
 // ── Public types ────────────────────────────────────────────────────────────
 
 /** Anchor with an optional intensity hint (group ride / run club / masters). */
@@ -654,7 +700,9 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
   // ── easy_bike (mid-week) ─────────────────────────────────────────────────
   let easyBikeDay: DayName | undefined;
-  for (const c of ['wednesday', 'tuesday', 'thursday', 'monday', 'friday'] as DayName[]) {
+  // Prefer Monday when open so easy_bike shares a day with later upper/strength (MODERATE)
+  // rather than sitting alone as LOW-only mid-week — avoids rest-budget pass wiping an isolated easy_bike day.
+  for (const c of ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'] as DayName[]) {
     if (c === longRide || c === longRun) continue;
     if (qualityBikeDay && c === qualityBikeDay) continue;
     if (qualityRunDay && c === qualityRunDay) continue;
@@ -680,7 +728,18 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   let easyRunDay: DayName | undefined;
 
   const placeEasyRun = (): void => {
-    const easyRunOrder: DayName[] = ['friday', 'monday', 'tuesday', 'wednesday', 'thursday'];
+    const easyRunTiebreak: DayName[] = ['tuesday', 'thursday', 'monday', 'wednesday', 'friday'];
+    const easyRunOrder: DayName[] = (
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as DayName[]
+    ).slice().sort((a, b) => {
+      const pa = easyRunAnchorAdjacencyPenalty(a, qualityRunDay, longRun);
+      const pb = easyRunAnchorAdjacencyPenalty(b, qualityRunDay, longRun);
+      if (pa !== pb) return pa - pb;
+      const ga = easyRunHardAnchorMinGap(a, qualityRunDay, longRun);
+      const gb = easyRunHardAnchorMinGap(b, qualityRunDay, longRun);
+      if (ga !== gb) return gb - ga;
+      return easyRunTiebreak.indexOf(a) - easyRunTiebreak.indexOf(b);
+    });
     const dAfterLongRun = dayAfter(longRun);
     let picked: DayName | undefined;
     for (const c of easyRunOrder) {
@@ -1019,9 +1078,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     const isLast = i === remainingSwims - 1;
     const kind: SessionKind = (isLast && promoteQuality) ? 'quality_swim' : 'easy_swim';
 
-    // Base ordering: Tuesday → Thursday → Friday → Wednesday → Monday → weekend.
-    // Then bias: less-loaded days first, never stack onto quality+strength days.
-    const baseOrder: DayName[] = ['tuesday', 'thursday', 'friday', 'wednesday', 'monday', 'sunday', 'saturday'];
+    // Base ordering: Mon/Thu-first weekday spread, then remaining weekdays → weekend.
+    // Sort by (1) minimum gap vs swims already placed — avoids Mon+Tue clustering when
+    // Mon/Tue/Thu/Fri are open — then (2) day load, then (3) base tiebreak.
+    const baseOrder: DayName[] = [
+      'monday', 'thursday', 'tuesday', 'friday', 'wednesday', 'sunday', 'saturday',
+    ];
+    const occupiedSwimDays = swimSlots.map((s) => s.day);
     const dayLoad = (d: DayName): number => {
       const slots = days[d];
       let load = slots.length;
@@ -1031,7 +1094,14 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     };
     const ordered = baseOrder
       .filter((c) => !swimSlots.some((s) => s.day === c))
-      .sort((a, b) => dayLoad(a) - dayLoad(b));
+      .sort((a, b) => {
+        const gapA = swimSpreadGap(a, occupiedSwimDays);
+        const gapB = swimSpreadGap(b, occupiedSwimDays);
+        if (gapA !== gapB) return gapB - gapA;
+        const loadDiff = dayLoad(a) - dayLoad(b);
+        if (loadDiff !== 0) return loadDiff;
+        return baseOrder.indexOf(a) - baseOrder.indexOf(b);
+      });
 
     // If the athlete stated a quality_run preference, protect that day from swim
     // placement — quality_run must be placed there later and cannot share with any swim kind.
