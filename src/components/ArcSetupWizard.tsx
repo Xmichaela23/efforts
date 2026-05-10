@@ -2045,12 +2045,63 @@ function Step7BHours({
 function Step8Strength({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
-  const canContinue = state.strengthIncluded !== null &&
-    (state.strengthIncluded === false || state.strengthIntent !== null);
+  // Gate acknowledgment for the spec §2 trade-off (performance intent without barbell or DBs).
+  // Reset whenever the athlete leaves performance intent so the warning always re-prompts.
+  const [gateAcknowledged, setGateAcknowledged] = useState(false);
+  useEffect(() => {
+    if (state.strengthIntent !== 'performance') setGateAcknowledged(false);
+  }, [state.strengthIntent]);
 
   const equipList = Array.isArray(arc?.equipment?.strength)
     ? (arc.equipment.strength as string[]).filter(Boolean)
     : [];
+
+  // Equipment detection mirrors `_shared/strength-equipment-tier.ts` (kept inline because edge
+  // helpers can't be imported by the Vite bundle). Conservative checks; barbell-or-DB unlocks
+  // performance protocol per docs/STRENGTH-PROTOCOL.md §2.
+  const equipLower = equipList.map((s) => String(s).toLowerCase());
+  const hasBarbellChip = equipLower.some(
+    (s) => s.includes('barbell') || s.includes('rack') || s.includes('cage') || s.includes('commercial gym'),
+  );
+  const hasDumbbellChip = equipLower.some((s) => s.includes('dumbbell') || /\bdb\b/.test(s));
+  const tier3IsBwBands = !hasBarbellChip && !hasDumbbellChip;
+
+  // §5 1RM presence — any compound entry unlocks accurate loading.
+  const pn = arc?.performanceNumbers ?? null;
+  const has1RM = (() => {
+    if (!pn) return false;
+    const num = (v: unknown): boolean => {
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0;
+    };
+    return (
+      num((pn as Record<string, unknown>).squat) ||
+      num((pn as Record<string, unknown>).squat1RM) ||
+      num((pn as Record<string, unknown>).squat_1rm) ||
+      num((pn as Record<string, unknown>).deadlift) ||
+      num((pn as Record<string, unknown>).dead_lift) ||
+      num((pn as Record<string, unknown>).bench) ||
+      num((pn as Record<string, unknown>).bench_press) ||
+      num((pn as Record<string, unknown>).benchPress) ||
+      num((pn as Record<string, unknown>).ohp) ||
+      num((pn as Record<string, unknown>).overhead_press) ||
+      num((pn as Record<string, unknown>).overhead) ||
+      num((pn as Record<string, unknown>).overheadPress1RM)
+    );
+  })();
+
+  const showGateWarning = state.strengthIncluded === true &&
+    state.strengthIntent === 'performance' &&
+    tier3IsBwBands;
+  const show1RMWarning = state.strengthIncluded === true &&
+    state.strengthIntent === 'performance' &&
+    !showGateWarning &&
+    !has1RM;
+
+  const canContinue =
+    state.strengthIncluded !== null &&
+    (state.strengthIncluded === false || state.strengthIntent !== null) &&
+    (!showGateWarning || gateAcknowledged);
 
   return (
     <StepLayout
@@ -2079,7 +2130,8 @@ function Step8Strength({
           Yes
         </ChoiceBtn>
         <ChoiceBtn active={state.strengthIncluded === false} onClick={() => setState({ ...state, strengthIncluded: false, strengthIntent: null })}>
-          No
+          <span className="block font-semibold">None</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">Skip strength entirely.</span>
         </ChoiceBtn>
       </div>
 
@@ -2087,19 +2139,53 @@ function Step8Strength({
         <div className="space-y-2 pt-1">
           <p className="text-sm text-white/55">What role does strength play this season?</p>
           <ChoiceBtn
-            active={state.strengthIntent === 'support'}
-            onClick={() => setState({ ...state, strengthIntent: 'support' })}
-          >
-            <span className="block font-semibold">Backs up tri</span>
-            <span className="block text-[13px] text-white/55 mt-0.5">1–2 sessions/week. Durability-focused, modest loads. Keeps you injury-free and strong on the run.</span>
-          </ChoiceBtn>
-          <ChoiceBtn
             active={state.strengthIntent === 'performance'}
             onClick={() => setState({ ...state, strengthIntent: 'performance' })}
           >
-            <span className="block font-semibold">Real goal — co-equal</span>
-            <span className="block text-[13px] text-white/55 mt-0.5">2 sessions/week, compound work, progressive loading. Getting stronger is a primary objective alongside triathlon.</span>
+            <span className="block font-semibold">Co-equal</span>
+            <span className="block text-[13px] text-white/55 mt-0.5">Real strength training alongside endurance. 2×/week, compound lifts, progressive loading. You'll keep getting stronger.</span>
           </ChoiceBtn>
+          <ChoiceBtn
+            active={state.strengthIntent === 'support'}
+            onClick={() => setState({ ...state, strengthIntent: 'support' })}
+          >
+            <span className="block font-semibold">Support</span>
+            <span className="block text-[13px] text-white/55 mt-0.5">Strength to support endurance and prevent injury. 1×/week, lighter loads, full-body. Race fitness comes first.</span>
+          </ChoiceBtn>
+        </div>
+      )}
+
+      {showGateWarning && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5 text-[13px] leading-snug text-amber-100/90">
+          <p className="font-semibold text-amber-200/95 mb-1">Equipment doesn't support performance protocol</p>
+          <p className="mb-2">
+            Performance strength requires barbell or dumbbell access for progressive loading. With your
+            current equipment, we'll deliver durability protocol instead (high-rep tissue work,
+            lighter loads). Add equipment in your profile to unlock performance.
+          </p>
+          <label className="flex items-start gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={gateAcknowledged}
+              onChange={(e) => setGateAcknowledged(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-amber-500/40 bg-amber-950/40 accent-amber-400"
+            />
+            <span className="text-amber-100/85">
+              I understand — generate the durability protocol with my current equipment.
+            </span>
+          </label>
+        </div>
+      )}
+
+      {show1RMWarning && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5 text-[13px] leading-snug text-amber-100/90">
+          <p className="font-semibold text-amber-200/95 mb-1">No 1RM data on file</p>
+          <p>
+            Performance loads use your 1RM. Without it, we'll start with conservative bodyweight-based
+            defaults (squat 1.0×BW, deadlift 1.25×BW, bench 0.75×BW, OHP 0.5×BW) that may be light.
+            Tap a Baseline Test (Lower Body / Upper Body) or enter your 1RM under Baselines to unlock
+            accurate loading.
+          </p>
         </div>
       )}
     </StepLayout>
