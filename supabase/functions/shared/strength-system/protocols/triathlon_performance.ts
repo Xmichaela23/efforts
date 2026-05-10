@@ -114,7 +114,8 @@ function createPerfRecoverySession(tier: EquipmentTier, hasCable: boolean): Inte
 
 function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number, hasGHD?: boolean): IntentSession {
   const wip = Math.max(1, weekInPhase);
-  const sets = 3;
+  // Spec §3.1: Hypertrophy = 3-4 sets/lift. Mid/late weeks step up to 4 to drive volume progression.
+  const sets = wip <= 2 ? 3 : 4;
   const rir = 3;
   const ex: StrengthExercise[] = [];
 
@@ -204,7 +205,8 @@ function perfBaseLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
 
 function perfBaseUpper(tier: EquipmentTier, hasCable: boolean, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
-  const sets = 3;
+  // Spec §3.1: Hypertrophy = 3-4 sets/lift. Mid/late weeks step to 4.
+  const sets = wip <= 2 ? 3 : 4;
   const rir = 3;
   const ex: StrengthExercise[] = [];
 
@@ -305,7 +307,9 @@ function perfBaseUpper(tier: EquipmentTier, hasCable: boolean, limiter: LimiterS
 // ── Build: strength (≈78–82% 1RM) ──────────────────────────────────────────
 
 function perfBuildLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
-  const mainSets = 3;
+  const wip = Math.max(1, weekInPhase);
+  // Spec §3.1: Strength Build = 3-4 sets/lift. Step to 4 mid/late phase.
+  const mainSets = wip <= 2 ? 3 : 4;
   const rir = 2;
   const ex: StrengthExercise[] = [];
 
@@ -451,17 +455,19 @@ function perfBuildUpper(tier: EquipmentTier, hasCable: boolean, limiter: Limiter
 
 function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
   const wip = Math.max(1, weekInPhase);
-  const rir = 1;
+  // Spec §3.1: Maintenance + Power = RIR 2 (not RIR 1). Express strength as power, not max load.
+  const rir = 2;
   const ex: StrengthExercise[] = [];
 
+  // Spec §3.1 Maintenance + Power: 3-5 reps lift @ 70-75% 1RM, RIR 2, 2-3 sets/lift, with plyo paired.
   if (tier === 'commercial_gym') {
     ex.push({
       name: 'Trap Bar Deadlift',
       sets: 3,
-      reps: '2-3',
-      weight: '87% 1RM — explosive intent',
+      reps: '4-5',
+      weight: '72% 1RM — fast intent, controlled descent',
       target_rir: rir,
-      notes: 'Reset each rep — quality speed',
+      notes: 'Reset each rep — express strength as power, not max load',
     });
     ex.push({
       name: 'Box Jumps',
@@ -484,7 +490,7 @@ function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
     name: 'Hip Thrusts (Fast Concentric)',
     sets: 3,
     reps: 5,
-    weight: tier === 'commercial_gym' ? 'Heavy barbell' : 'Backpack',
+    weight: tier === 'commercial_gym' ? 'Moderate barbell — explosive intent' : 'Backpack',
     target_rir: rir,
     notes: 'Explosive hip extension',
   });
@@ -511,8 +517,8 @@ function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
   return {
     intent: 'LOWER_DURABILITY',
     priority: 'required',
-    name: 'Tri Performance — Neural Power (Lower)',
-    description: `Race-prep Week ${planWeekLabel} — Low reps, high intent (~85–87% on bar). Express strength as power; minimal fatigue.`,
+    name: 'Tri Performance — Maintenance + Power (Lower)',
+    description: `Race-prep Week ${planWeekLabel} — Power-focused: 3-5 reps lift @ 70-75% 1RM, RIR 2, paired with plyo. Express strength as power; minimal fatigue.`,
     duration: 50,
     exercises: ex,
     repProfile: 'strength',
@@ -591,34 +597,28 @@ function perfRaceUpper(tier: EquipmentTier, hasCable: boolean, limiter: LimiterS
 // ── Taper: neural priming — light, fast, minimal soreness ───────────────────
 
 function perfTaperSession(tier: EquipmentTier, hasCable: boolean): IntentSession {
+  // Spec §3.1 Taper Priming: 3-4 reps fast bar speed @ 50-60% 1RM, RIR 3+, 2 sets, 1× (skip-optional).
   const ex: StrengthExercise[] = [
     {
       name: tier === 'commercial_gym' ? 'Conventional Deadlift' : 'Single-Leg RDL',
       sets: 2,
-      reps: 4,
-      weight: tier === 'commercial_gym' ? '75% 1RM — move fast, no grind' : 'Light',
+      reps: '3-4',
+      weight: tier === 'commercial_gym' ? '55% 1RM — fast bar speed, full reset between reps' : 'Light',
       target_rir: 4,
       notes: 'Velocity intent — not fatigue',
     },
     {
       name: 'Hip Thrusts',
       sets: 2,
-      reps: 5,
-      weight: tier === 'commercial_gym' ? 'Light–moderate barbell — explosive' : 'Bodyweight',
+      reps: '3-4',
+      weight: tier === 'commercial_gym' ? '55% 1RM — explosive concentric' : 'Bodyweight',
       target_rir: 4,
-    },
-    {
-      name: 'Calf Raises (Bilateral)',
-      sets: 2,
-      reps: 12,
-      weight: 'Bodyweight or light',
-      notes: 'Ankle stiffness — no soreness',
     },
     {
       name: 'Band Pull-Aparts',
       sets: 2,
-      reps: 20,
-      weight: 'Light band',
+      reps: 15,
+      weight: 'Light band — activation only',
     },
     {
       name: 'Face Pulls',
@@ -633,7 +633,9 @@ function perfTaperSession(tier: EquipmentTier, hasCable: boolean): IntentSession
     priority: 'optional',
     name: 'Tri Performance — Taper Priming',
     description:
-      'Taper: one short session — light loads moved fast, shoulders activated. Skip entirely in final race week if preferred.',
+      'Race week — Wednesday only, ~25 min. 1 lower compound + 1 upper compound at 50-60% 1RM ' +
+      'for 2×3-4 fast reps, plus 2 light-band activation accessories. No plyometrics. Skip-optional ' +
+      'if you feel sharp. Goal is neural drive, not fatigue.',
     duration: 25,
     exercises: ex,
     repProfile: 'strength',

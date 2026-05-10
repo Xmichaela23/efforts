@@ -1466,6 +1466,13 @@ export function triathlonStrength(
     strengthIntent?: 'support' | 'performance';
     /** Three-tier equipment classification (docs/STRENGTH-PROTOCOL.md §8). When omitted, derived from `equipmentType`. */
     equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+    /**
+     * Athlete's `user_baselines.performance_numbers` (lifted 1RMs etc.). When 1RMs are missing
+     * and `strengthIntent === 'performance'`, the spec §5 trade-off is prepended to the session
+     * description. Materialize-plan resolves "% 1RM" prescriptions against these values; the
+     * trade-off warns the athlete that loads will be conservative until they log 1RMs.
+     */
+    performanceNumbers?: Record<string, unknown>;
   },
 ): PlannedSession {
   const longRide = options?.longRideDayName ?? 'Saturday';
@@ -1501,6 +1508,24 @@ export function triathlonStrength(
       equipmentTier: equipmentTier3,
       hasCable: options?.hasCable ?? (options?.equipmentType !== 'home_gym'),
       hasGHD: options?.hasGhd ?? false,
+      ...((): { squat1RM?: number; deadlift1RM?: number; bench1RM?: number; overhead1RM?: number } => {
+        const pn = options?.performanceNumbers;
+        if (!pn || typeof pn !== 'object') return {};
+        const num = (v: unknown): number | undefined => {
+          const n = Number(v);
+          return Number.isFinite(n) && n > 0 ? n : undefined;
+        };
+        const out: Record<string, number> = {};
+        const sq = num(pn.squat ?? pn.squat1RM ?? pn.squat_1rm);
+        const dl = num(pn.deadlift ?? pn.dead_lift);
+        const bp = num(pn.bench ?? pn.bench_press ?? pn.benchPress);
+        const op = num(pn.overheadPress1RM ?? pn.ohp ?? pn.overhead_press ?? pn.overhead);
+        if (sq != null) out.squat1RM = sq;
+        if (dl != null) out.deadlift1RM = dl;
+        if (bp != null) out.bench1RM = bp;
+        if (op != null) out.overhead1RM = op;
+        return out;
+      })(),
     },
     strengthFrequency: 2,
     constraints: {},
@@ -1548,6 +1573,30 @@ export function triathlonStrength(
     chosen.description = `${note} ${chosen.description}`;
     chosen.tags = [...(chosen.tags ?? []), 'gate:performance_downgraded_no_loadable_resistance'];
   }
+
+  // §5 missing-1RM trade-off: when the athlete asked for performance strength but no compound 1RM
+  // is on file, the materializer falls back to bodyweight-based estimates (squat 1.0×BW, DL 1.25×BW,
+  // bench 0.75×BW, OHP 0.5×BW). Surface that explicitly so the athlete knows why prescriptions
+  // are conservative.
+  const wantedPerf =
+    options?.strengthIntent === 'performance' || options?.strengthProtocolId === 'triathlon_performance';
+  if (wantedPerf && !gateDowngraded) {
+    const have = ctx.userBaselines;
+    const anyCompound1RM =
+      typeof have.squat1RM === 'number' ||
+      typeof have.deadlift1RM === 'number' ||
+      typeof have.bench1RM === 'number' ||
+      typeof have.overhead1RM === 'number';
+    if (!anyCompound1RM) {
+      const note =
+        'Loads will be conservative (bodyweight-based defaults: squat 1.0×BW, deadlift 1.25×BW, ' +
+        "bench 0.75×BW, OHP 0.5×BW) until you complete a baseline test or enter your 1RM. " +
+        'Log a 1RM in your profile to unlock progressive loading.';
+      chosen.description = `${note} ${chosen.description}`;
+      chosen.tags = [...(chosen.tags ?? []), 'gate:no_1rm_data_conservative_defaults'];
+    }
+  }
+
   return intentToPlanned(chosen, day, phase, goalId);
 }
 

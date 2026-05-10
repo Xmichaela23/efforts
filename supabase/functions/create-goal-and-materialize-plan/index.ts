@@ -1505,6 +1505,16 @@ async function buildCombinedPlan(
       loading_pattern: loadingPattern,
       plan_units: planUnitsForCombined,
       equipment_type: resolvedEquipmentType,
+      equipment_tier: resolveStrengthEquipmentTier3(
+        resolvedEquipmentType,
+        Array.isArray(arcForCombined.equipment?.strength) ? arcForCombined.equipment.strength : [],
+        arcForCombined.performance_numbers,
+      ),
+      // 1RMs + bodyweight feed the spec §5 missing-data trade-off and the materializer's
+      // BW-fallback weight resolution.
+      ...(arcForCombined.performance_numbers
+        ? { performance_numbers: arcForCombined.performance_numbers }
+        : {}),
       has_cable_machine: hasCableForPlan,
       has_ghd: hasGHDForPlan,
       ...(projectedBikeHours != null ? { projected_bike_hours: projectedBikeHours } : {}),

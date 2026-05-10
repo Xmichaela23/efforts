@@ -109,6 +109,16 @@ export interface AthleteState {
    * how many strength sessions `buildWeek` places per week (applied after phase default).
    */
   strength_sessions_cap?: number;
+  /**
+   * Compound-lift 1RMs (lb) read from `user_baselines.performance_numbers` so
+   * `triathlonStrength` can detect missing 1RM data and surface the spec §5
+   * trade-off ("Loads will be conservative until you complete a baseline test").
+   * The protocol still emits "% 1RM" prescription strings — materialize-plan
+   * resolves them to absolute weights (or falls back to BW-based estimates).
+   */
+  performance_numbers?: Record<string, unknown>;
+  /** Athlete bodyweight in pounds (for spec §5 conservative-default 1RM fallback). */
+  bodyweight_lb?: number;
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**
