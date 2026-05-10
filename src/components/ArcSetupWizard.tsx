@@ -27,6 +27,12 @@ import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import { loadArcWizardDraft, saveArcWizardDraft, clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
 import { climbNoticeTier, stravaRouteUrlLooksFetchable, formatGroupRideRouteStatsLine } from '@/lib/group-ride-route-snapshot';
+import {
+  computeSessionFrequencyDefaults,
+  type LimiterSport,
+  type SwimFreqIntent,
+  type StrengthFreqIntent,
+} from '@/lib/session-frequency-defaults';
 import { parseTimeToSeconds, type RaceDistance } from '@/lib/effort-score';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
@@ -324,6 +330,13 @@ type WizardState = {
   longRunDay: Day | '';
   // Step 7
   daysPerWeek: number | null;
+  /**
+   * Step 7B — weekly hours available. Tier midpoint values: 6, 9, 11, 13, 15
+   * (corresponding to §SESSION-FREQUENCY-DEFAULTS tiers 5-7 / 8-10 / 10-12 / 12-14 / 14+).
+   * Replaces the hardcoded {beginner:6, intermediate:10, advanced:14} mapping in
+   * create-goal-and-materialize-plan/index.ts.
+   */
+  weeklyHours: number | null;
   // Step 8 (tri)
   strengthIncluded: boolean | null;
   strengthIntent: 'performance' | 'support' | null;
@@ -427,6 +440,7 @@ function blank(): WizardState {
     bikeQualityPlacement: null,
     longRideDay: '', longRunDay: '',
     daysPerWeek: null,
+    weeklyHours: null,
     strengthIncluded: null, strengthIntent: null,
     planStartDate: nextMonday,
     anythingUnusual: '',
@@ -601,9 +615,34 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
       ? state.groupRideRouteSnapshot
       : undefined;
 
+  // §SESSION-FREQUENCY-DEFAULTS — derive per-discipline session counts from athlete-supplied
+  // weekly hours (Step 7B). Fallback to tier-2 midpoint (9hr) when the athlete bypasses the
+  // step somehow — keeps the engine receiving a sane value rather than NaN.
+  const weeklyHoursValue = typeof state.weeklyHours === 'number' && Number.isFinite(state.weeklyHours)
+    ? state.weeklyHours
+    : 9;
+  const swimIntentForFreq: SwimFreqIntent | undefined =
+    triPlan && (state.swimIntent === 'focus' || state.swimIntent === 'race') ? state.swimIntent : undefined;
+  const strengthIntentForFreq: StrengthFreqIntent =
+    !state.strengthIncluded
+      ? 'none'
+      : state.strengthIntent === 'performance'
+        ? 'performance'
+        : 'support';
+  const sessionFrequencyDefaults = computeSessionFrequencyDefaults({
+    weekly_hours_available: weeklyHoursValue,
+    ...(swimIntentForFreq ? { swim_intent: swimIntentForFreq } : {}),
+    strength_intent: strengthIntentForFreq,
+    // limiter_sport is inferred server-side from Arc context (see
+    // create-goal-and-materialize-plan/inferLimiterSportFromArc); the wizard doesn't ask.
+    // The §4 limiter shift will fire there once the goal is persisted with limiter_sport set.
+  });
+
   const trainingPrefs: Record<string, unknown> = {
     training_intent: state.trainingIntent || 'completion',
     days_per_week: state.daysPerWeek || 7,
+    weekly_hours_available: weeklyHoursValue,
+    session_frequency_defaults: sessionFrequencyDefaults,
     preferred_days: preferredDays,
     strength_frequency: strengthFreq,
     ...(triPlan &&
@@ -1913,6 +1952,51 @@ function Step7Budget({
   );
 }
 
+/**
+ * Step 7B — weekly hours available.
+ * Five tier buttons mapping to midpoints (6 / 9 / 11 / 13 / 15) per
+ * §SESSION-FREQUENCY-DEFAULTS §2 tier table. Replaces the hardcoded
+ * {beginner:6, intermediate:10, advanced:14} mapping that drove
+ * `weekly_hours_available` for everyone in the same fitness bucket.
+ */
+const HOURS_TIERS: Array<{ label: string; value: number }> = [
+  { label: '5–7 hrs', value: 6 },
+  { label: '8–10 hrs', value: 9 },
+  { label: '10–12 hrs', value: 11 },
+  { label: '12–14 hrs', value: 13 },
+  { label: '14+ hrs', value: 15 },
+];
+
+function Step7BHours({
+  state, setState, onNext, onBack, step, totalSteps,
+}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  return (
+    <StepLayout
+      step={step} totalSteps={totalSteps}
+      title="How many hours a week can you train?"
+      subtitle="Drives session count per discipline. Beginners through 7 hr/wk get 2 swims, 2 bikes, 2 runs; 12 hr/wk and up shifts to 3+3+3."
+      onBack={onBack} onContinue={onNext} canContinue={state.weeklyHours !== null}
+    >
+      <div className="grid grid-cols-1 gap-2">
+        {HOURS_TIERS.map(({ label, value }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setState({ ...state, weeklyHours: value })}
+            className={`h-14 rounded-xl border text-base font-semibold transition-colors
+              ${state.weeklyHours === value
+                ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
+                : 'border-white/15 bg-white/[0.05] text-white/70 hover:border-white/30'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-white/35 px-1">Be honest — undershooting locks you into a smaller plan; overshooting bakes in skipped workouts.</p>
+    </StepLayout>
+  );
+}
+
 function Step8Strength({
   state, setState, onNext, onBack, step, totalSteps, arc,
 }: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
@@ -2116,6 +2200,11 @@ function Step9Confirm({
         )}
         {tri && state.swimIntent && <p className="text-[15px] text-white/80">· {state.swimIntent === 'focus' ? '3 swims/week' : '2 swims/week'}</p>}
         {state.daysPerWeek && <p className="text-[15px] text-white/80">· {state.daysPerWeek} days/week</p>}
+        {state.weeklyHours != null && (
+          <p className="text-[15px] text-white/80">
+            · {HOURS_TIERS.find((t) => t.value === state.weeklyHours)?.label ?? `${state.weeklyHours} hrs`}
+          </p>
+        )}
         <p className="text-[15px] text-white/80">· {state.strengthIncluded ? state.strengthIntent === 'performance' ? 'Strength co-equal (2×)' : 'Strength support (1–2×)' : 'No strength sessions'}</p>
         {weeksOut != null && <p className="text-[15px] text-white/80">· {weeksOut} weeks to race</p>}
       </div>
@@ -2247,6 +2336,7 @@ function getSteps(state: WizardState) {
   if (showBikePlacement) steps.push('bq_placement');
   if (tri) steps.push('longdays');
   steps.push('budget');
+  steps.push('hours');
   if (tri) steps.push('strength');
   steps.push('confirm');
   return steps;
@@ -2416,6 +2506,9 @@ export default function ArcSetupWizard() {
             )}
             {currentStep === 'budget' && (
               <Step7Budget {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+            )}
+            {currentStep === 'hours' && (
+              <Step7BHours {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'strength' && (
               <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />

@@ -1447,8 +1447,21 @@ async function buildCombinedPlan(
       { beginner: 20, intermediate: 40, advanced: 65 }[trainingFitnessResolution.level] ?? currentCTL;
   }
 
+  // §SESSION-FREQUENCY-DEFAULTS Phase B: athlete-supplied weekly_hours_available from the
+  // Arc wizard wins over the legacy fitness-bucket mapping. The wizard captures hours via the
+  // 5-tier picker (5-7 / 8-10 / 10-12 / 12-14 / 14+) and persists tier midpoints (6/9/11/13/15)
+  // to training_prefs.weekly_hours_available. Legacy mapping is the fallback for goals that
+  // pre-date the wizard step or were created via Arc chat without an explicit hours answer.
+  const wizardSuppliedHours = (() => {
+    const raw =
+      (newGoal.training_prefs as Record<string, unknown> | undefined)?.weekly_hours_available ??
+      (primaryGoalPrefs as Record<string, unknown>)?.weekly_hours_available;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
   const weeklyHours =
-    { beginner: 6, intermediate: 10, advanced: 14 }[trainingFitnessResolution.level] ?? 10;
+    wizardSuppliedHours
+      ?? ({ beginner: 6, intermediate: 10, advanced: 14 }[trainingFitnessResolution.level] ?? 10);
 
   const loadingPattern =
     triApproach === 'base_first'
@@ -1581,6 +1594,18 @@ async function buildCombinedPlan(
         ? { structural_load_hint: combinedTransition.structural_load_hint }
         : {}),
       ...(freshDpw != null ? { days_per_week: freshDpw } : {}),
+      // §SESSION-FREQUENCY-DEFAULTS §4 / sport-distribution shift in phase-structure.ts:
+      // limiter_sport lives on goal.training_prefs (set via Arc chat or inferLimiterSportFromArc
+      // enrichment at line 567-568). Promote it onto AthleteState so the reconciler's §4 limiter
+      // logic and getBaseDistribution()'s +0.07 share shift can actually fire — both were
+      // dead code prior to this promotion.
+      ...((): { limiter_sport?: 'swim' | 'bike' | 'run' } => {
+        const raw =
+          (newGoal.training_prefs as Record<string, unknown> | undefined)?.limiter_sport ??
+          (primaryGoalPrefs as Record<string, unknown>)?.limiter_sport;
+        const v = String(raw ?? '').trim().toLowerCase();
+        return v === 'swim' || v === 'bike' || v === 'run' ? { limiter_sport: v } : {};
+      })(),
       ...(freshCombinedPrefs.conflict_preferences && Object.keys(freshCombinedPrefs.conflict_preferences).length > 0
         ? { conflict_preferences: freshCombinedPrefs.conflict_preferences }
         : {}),
