@@ -132,20 +132,34 @@ export interface AthleteState {
    * Mirrors the existing `swim_equipment` field.
    */
   strength_equipment?: string[];
-  /** Whether the athlete has commercial gym access — drives strength exercise selection. */
+  /**
+   * Athlete's literal location choice from the wizard (home_gym | commercial_gym). Preserved as
+   * the source of truth for "where do you train" — separate from the inferred capability tier.
+   * Plan exports show this as "Equipment Location"; protocols don't read it (capability is what
+   * drives prescription).
+   */
+  equipment_location?: 'home_gym' | 'commercial_gym';
+  /**
+   * Legacy 2-tier "equipment type" — historically conflated location with capability. Some
+   * upstream code paths still write this field; new code should read `equipment_location`
+   * (literal) and `equipment_tier` (capability) separately.
+   */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**
-   * Three-tier equipment classification per docs/STRENGTH-PROTOCOL.md §8. Computed alongside
-   * `equipment_type` in `create-goal-and-materialize-plan` from the athlete's strength chips:
-   * - `commercial_gym` — full barbell + rack + bench
-   * - `dumbbell_based` — DBs + (usually) bench, no barbell
+   * Three-tier equipment **capability** classification per docs/STRENGTH-PROTOCOL.md §8.
+   * Computed in `create-goal-and-materialize-plan` from the athlete's strength chips:
+   * - `full_barbell`     — barbell + rack + bench (regardless of training location)
+   * - `dumbbell_based`   — DBs + (usually) bench, no barbell
    * - `bodyweight_bands` — bands only, possibly pull-up bar
    *
    * Drives the performance-without-loadable-resistance gate in
    * `gateStrengthIntentByTier`: performance intent at `bodyweight_bands` tier downgrades
    * to durability with a trade-off message (§2).
+   *
+   * Renamed 2025-12: previously `commercial_gym`. Existing plans normalize via
+   * {@link normalizeEquipmentTier3}.
    */
-  equipment_tier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+  equipment_tier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
   /**
    * Training methodology for triathlon goals. Derived from the primary goal's
    * `goal` field when absent: 'complete' → 'base_first', 'performance' → 'race_peak'.

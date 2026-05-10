@@ -108,6 +108,46 @@ const STRENGTH_INTENT_LABELS: Record<string, string> = {
   support: 'Strength supports triathlon',
 };
 
+/**
+ * Display labels for keys where title-casing the key isn't enough.
+ * "Equipment Location" and "Capability Tier" are spec §8 — distinct concepts that the title-case
+ * default would conflate into "Equipment Tier" / "Equipment Type".
+ */
+const KEY_DISPLAY_LABELS: Record<string, string> = {
+  equipment_location: 'Equipment Location',
+  equipment_tier: 'Capability Tier',
+  db_max_lb: 'Heaviest DB pair (lb per hand)',
+};
+
+/**
+ * Display values for capability-tier strings. Renamed 2025-12: legacy `commercial_gym` value now
+ * displays as "Full barbell + rack + bench" to make the location/capability split obvious. Old
+ * stored data still passes through (legacy mapping in `normalizeEquipmentTier3`).
+ */
+const EQUIPMENT_TIER_DISPLAY: Record<string, string> = {
+  full_barbell: 'Full barbell + rack + bench',
+  commercial_gym: 'Full barbell + rack + bench', // legacy value, same meaning
+  dumbbell_based: 'Dumbbell-based',
+  bodyweight_bands: 'Bodyweight + bands',
+};
+
+const EQUIPMENT_LOCATION_DISPLAY: Record<string, string> = {
+  home_gym: 'Home gym',
+  commercial_gym: 'Commercial gym',
+};
+
+/**
+ * Keys that are export-suppressed: stale, redundant, or run-only fields that shouldn't appear in
+ * tri exports. The "Strength Protocol: durability" mislabel came from `strength_protocol` (a
+ * run-side field) bleeding into tri exports via the catch-all loop.
+ */
+const SUPPRESSED_EXPORT_KEYS = new Set<string>([
+  'equipment_type',     // legacy redundant — equipment_location is the canonical literal
+  'strength_protocol',  // run-only protocol id; tri uses strength_intent instead
+  'strength_focus',     // upstream signal that derives strength_protocol; not athlete-facing
+  'co_equal_strength_provisional_1x', // optimizer fallback flag, not athlete-facing
+]);
+
 const KEY_ORDER = [
   'training_intent',
   'days_per_week',
@@ -118,6 +158,9 @@ const KEY_ORDER = [
   'swim_intent',
   'swim_experience',
   'strength_intent',
+  'equipment_location',
+  'equipment_tier',
+  'db_max_lb',
   'assessment_week_preference',
   'run_quality_placement',
   'bike_quality_placement',
@@ -162,18 +205,33 @@ export function formatWizardPrefsMarkdownLines(goal: {
   if (goal.priority) out.push(`- **Priority:** ${goal.priority}`);
   if (goal.sport) out.push(`- **Sport:** ${goal.sport}`);
 
-  const prefs = goal.training_prefs;
-  if (!prefs || typeof prefs !== 'object') {
+  const rawPrefs = goal.training_prefs;
+  if (!rawPrefs || typeof rawPrefs !== 'object') {
     if (goal.notes && String(goal.notes).trim()) out.push(`- **Goal notes:** ${fmtPrefScalar(goal.notes)}`);
     return out;
+  }
+
+  // Backfill `equipment_location` from legacy `equipment_type` for plans saved before the
+  // location/capability split. Display-only — doesn't mutate the stored prefs.
+  const prefs: Record<string, unknown> = { ...rawPrefs };
+  if (
+    !prefs.equipment_location &&
+    typeof prefs.equipment_type === 'string' &&
+    prefs.equipment_type
+  ) {
+    prefs.equipment_location = prefs.equipment_type;
   }
 
   const used = new Set<string>();
 
   const emitScalar = (key: string, raw: unknown, labelOverride?: string) => {
     if (raw === undefined || raw === null || raw === '') return;
+    if (SUPPRESSED_EXPORT_KEYS.has(key)) {
+      used.add(key);
+      return;
+    }
     used.add(key);
-    const label = labelOverride ?? titleCaseKey(key);
+    const label = labelOverride ?? KEY_DISPLAY_LABELS[key] ?? titleCaseKey(key);
     if (Array.isArray(raw)) {
       const parts = raw.map((x) => formatStrengthOrDayToken(x)).filter(Boolean);
       if (parts.length) out.push(`- **${label}:** ${parts.join('; ')}`);
@@ -184,8 +242,13 @@ export function formatWizardPrefsMarkdownLines(goal: {
     if (key === 'swim_intent') display = SWIM_INTENT_LABELS[String(raw)] ?? display;
     if (key === 'swim_experience') display = SWIM_EXPERIENCE_LABELS[String(raw)] ?? display;
     if (key === 'strength_intent') display = STRENGTH_INTENT_LABELS[String(raw)] ?? display;
+    if (key === 'equipment_location') display = EQUIPMENT_LOCATION_DISPLAY[String(raw)] ?? display;
+    if (key === 'equipment_tier') display = EQUIPMENT_TIER_DISPLAY[String(raw)] ?? display;
     if (key === 'strength_frequency' && typeof raw === 'number') {
       display = raw === 0 ? 'None' : `${raw}×/week`;
+    }
+    if (key === 'db_max_lb' && typeof raw === 'number') {
+      display = `${raw} lb`;
     }
     if (!display && typeof raw === 'object') return;
     if (display) out.push(`- **${label}:** ${display}`);
@@ -248,19 +311,21 @@ export function formatWizardPrefsMarkdownLines(goal: {
 
   for (const key of Object.keys(prefs)) {
     if (used.has(key)) continue;
+    if (SUPPRESSED_EXPORT_KEYS.has(key)) continue;
     const val = prefs[key];
+    const label = KEY_DISPLAY_LABELS[key] ?? titleCaseKey(key);
     if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
       const sub = formatPreferredDays(val);
       if (sub.length) {
-        out.push(`- **${titleCaseKey(key)}:**`);
+        out.push(`- **${label}:**`);
         sub.forEach((l) => out.push(l));
       } else {
         try {
           const compact = JSON.stringify(val);
           const s = compact.length > 400 ? `${compact.slice(0, 397)}…` : compact;
-          out.push(`- **${titleCaseKey(key)}:** ${s}`);
+          out.push(`- **${label}:** ${s}`);
         } catch {
-          out.push(`- **${titleCaseKey(key)}:** _(complex)_`);
+          out.push(`- **${label}:** _(complex)_`);
         }
       }
       continue;

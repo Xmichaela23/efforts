@@ -1,7 +1,13 @@
 /**
- * Strength "equipment type" for protocol selection.
- * `commercial_gym` in generate-combined-plan / triathlon.ts means barbell-access tier
- * (commercial membership OR well-equipped home with barbell + rack).
+ * Strength equipment helpers. Two distinct concepts:
+ * - **Equipment location** (literal): `home_gym | commercial_gym` — athlete's choice from the wizard.
+ *   Preserved on AthleteState as `equipment_location`. Never overwritten by capability inference.
+ * - **Equipment tier** (capability): `full_barbell | dumbbell_based | bodyweight_bands` — derived from
+ *   chips + 1RM signals via {@link resolveStrengthEquipmentTier3}. Drives protocol prescription.
+ *
+ * The legacy 2-tier `equipment_type` (`home_gym | commercial_gym`) historically conflated these;
+ * `resolveStrengthEquipmentTypeForPlan` is retained for backward compat with stored data, but new
+ * code should read `equipment_location` (literal) and `equipment_tier` (capability) separately.
  */
 
 export function normStrengthEquipmentStrings(strengthEquipment: unknown): string[] {
@@ -136,21 +142,41 @@ export function hasBox(strengthEquipment: string[]): boolean {
 }
 
 /**
- * Three-tier equipment classification per spec §8.
- * - `commercial_gym` — full barbell + rack + bench (covers spec's "Full barbell tier")
- * - `dumbbell_based` — DBs + (usually) bench, no barbell
+ * Three-tier equipment **capability** classification per spec §8. Distinct from
+ * `equipment_location` (the athlete's literal home_gym | commercial_gym choice).
+ * - `full_barbell`     — barbell + rack + bench for full progressive loading (regardless of where the athlete trains)
+ * - `dumbbell_based`   — DBs + (usually) bench, no barbell
  * - `bodyweight_bands` — bands only, possibly pull-up bar
+ *
+ * Renamed 2025-12: previously the `full_barbell` tier was called `commercial_gym`,
+ * which conflated capability with location. Existing data with the old value is
+ * normalized via {@link normalizeEquipmentTier3}.
  */
-export type StrengthEquipmentTier3 = 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+export type StrengthEquipmentTier3 = 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
 
 /**
- * Resolve to 3-tier classification. Strict precedence:
- *   barbell signals → commercial_gym (matches `resolveStrengthEquipmentTypeForPlan`)
- *   DBs detected   → dumbbell_based
- *   else           → bodyweight_bands
+ * Map raw / legacy values to the canonical capability tier. Existing plans + AthleteState rows
+ * may carry the old `commercial_gym` value — normalize on read.
+ */
+export function normalizeEquipmentTier3(raw: unknown): StrengthEquipmentTier3 {
+  const s = String(raw ?? '').trim();
+  if (s === 'full_barbell' || s === 'commercial_gym') return 'full_barbell';
+  if (s === 'dumbbell_based') return 'dumbbell_based';
+  if (s === 'bodyweight_bands') return 'bodyweight_bands';
+  return 'dumbbell_based';
+}
+
+/**
+ * Resolve to 3-tier capability classification. Strict precedence:
+ *   barbell signals → full_barbell
+ *   DBs detected    → dumbbell_based
+ *   else            → bodyweight_bands
  *
- * `performanceNumbers` only upgrades to commercial_gym (consistent with the 2-tier resolver):
- * an athlete with logged compound 1RMs probably has barbell access even if the chip list is stale.
+ * `performanceNumbers` upgrades to full_barbell (an athlete with logged compound 1RMs almost
+ * always has barbell access even if the chip list is stale).
+ *
+ * NOTE: The athlete's literal location choice (home_gym | commercial_gym) is preserved
+ * separately as `equipment_location` — this resolver classifies CAPABILITY only.
  */
 export function resolveStrengthEquipmentTier3(
   explicitEquipmentType: unknown,
@@ -158,15 +184,16 @@ export function resolveStrengthEquipmentTier3(
   performanceNumbers: unknown,
 ): StrengthEquipmentTier3 {
   if (hasBarbellCapability(strengthEquipment) || hasCompound1RMSignals(performanceNumbers)) {
-    return 'commercial_gym';
+    return 'full_barbell';
   }
   if (hasDumbbells(strengthEquipment)) {
     return 'dumbbell_based';
   }
   // Honor an explicit "commercial_gym" tag if the user typed it manually but their chip list
-  // is otherwise sparse — treat as commercial_gym (matches 2-tier behavior).
+  // is otherwise sparse — even though location ≠ capability, the explicit tag is a strong hint
+  // that gear is available. Same legacy behavior preserved.
   const ex = String(explicitEquipmentType ?? '').trim().toLowerCase();
-  if (ex === 'commercial_gym') return 'commercial_gym';
+  if (ex === 'commercial_gym') return 'full_barbell';
   return 'bodyweight_bands';
 }
 

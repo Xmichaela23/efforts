@@ -37,7 +37,7 @@ import {
 
 type LimiterSport = 'swim' | 'bike' | 'run';
 type EquipmentTier = 'commercial_gym' | 'home_gym';
-type EquipmentTier3 = 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+type EquipmentTier3 = 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
 
 export const triathlonProtocol: StrengthProtocol = {
   id: 'triathlon',
@@ -63,8 +63,8 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   // the wizard hasn't specified — bodyweight_bands is opt-in via the 3-tier resolver.
   const tier3: EquipmentTier3 =
     context.userBaselines.equipmentTier ??
-    (context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'dumbbell_based');
-  const tier: EquipmentTier = tier3 === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
+    (context.userBaselines.equipment === 'commercial_gym' ? 'full_barbell' : 'dumbbell_based');
+  const tier: EquipmentTier = tier3 === 'full_barbell' ? 'commercial_gym' : 'home_gym';
   const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
   const hasPullUpBar: boolean = context.userBaselines.hasPullUpBar ?? (tier === 'commercial_gym');
   // Part 3 exercise-level gating: hasBench + hasBox. Default to commercial_gym tier when chip
@@ -133,7 +133,7 @@ function createAASession(
   weekInPhase: number,
   planWeekLabel: number,
   variantIndex: number,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   hasPullUpBar: boolean = tier === 'commercial_gym',
   hasBench: boolean = tier === 'commercial_gym',
   hasBox: boolean = tier === 'commercial_gym',
@@ -330,7 +330,7 @@ function createMSSession(
   limiter: LimiterSport,
   planWeekLabel: number,
   variantIndex: number,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   hasPullUpBar: boolean = tier === 'commercial_gym',
   hasBench: boolean = tier === 'commercial_gym',
   hasBox: boolean = tier === 'commercial_gym',
@@ -487,7 +487,7 @@ function createSMSession(
   planWeekLabel: number,
   variantIndex: number,
   reducedVolume: boolean,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   hasPullUpBar: boolean = tier === 'commercial_gym',
   hasBench: boolean = tier === 'commercial_gym',
   hasBox: boolean = tier === 'commercial_gym',
@@ -612,7 +612,7 @@ function createTaperSession(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   hasPullUpBar: boolean = tier === 'commercial_gym',
   hasBench: boolean = tier === 'commercial_gym',
   hasBox: boolean = tier === 'commercial_gym',
@@ -620,7 +620,7 @@ function createTaperSession(
   // Existing taper is already mostly bodyweight — only the squat line picks DB/KB or BW. The
   // BW+bands tier uses pure BW (no KB option) for the squat compound.
   const exercises: StrengthExercise[] = [];
-  if (tier3 === 'commercial_gym' || tier3 === 'dumbbell_based') {
+  if (tier3 === 'full_barbell' || tier3 === 'dumbbell_based') {
     exercises.push({
       name: 'Goblet Squat or Bodyweight Squat',
       sets: 2, reps: '8-10',
@@ -689,12 +689,12 @@ function createRecoverySession(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   hasPullUpBar: boolean = tier === 'commercial_gym',
   hasBench: boolean = tier === 'commercial_gym',
   hasBox: boolean = tier === 'commercial_gym',
 ): IntentSession {
-  const useDb = tier3 === 'commercial_gym' || tier3 === 'dumbbell_based';
+  const useDb = tier3 === 'full_barbell' || tier3 === 'dumbbell_based';
   return {
     intent: 'FULLBODY_MAINTENANCE',
     priority: 'preferred',

@@ -55,7 +55,6 @@ import {
 } from '../_shared/prefs-to-collision-model.ts';
 import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-schedule-collisions.ts';
 import {
-  hasBarbellCapability,
   hasCableMachine,
   hasGHD,
   resolveStrengthEquipmentTier3,
@@ -556,18 +555,21 @@ function mergeTrainingPrefsWithArcDefaults(
     if (tp.strength_frequency == null || Number.isNaN(Number(tp.strength_frequency))) {
       tp.strength_frequency = 2;
     }
-    if (!String(tp.equipment_type ?? '').trim()) {
-      const raw = arc.equipment as { strength?: string[] } | null | undefined;
-      const arr = Array.isArray(raw?.strength) ? raw.strength : [];
-      tp.equipment_type = hasBarbellCapability(arr) ? 'commercial_gym' : 'home_gym';
-    } else if (String(tp.equipment_type).trim().toLowerCase() === 'home_gym') {
-      const raw = arc.equipment as { strength?: string[] } | null | undefined;
-      const arr = Array.isArray(raw?.strength) ? raw.strength : [];
-      if (hasBarbellCapability(arr)) tp.equipment_type = 'commercial_gym';
+    // Preserve the athlete's literal location choice on `equipment_location`. Capability lives
+    // separately on `equipment_tier` (3-tier per spec §8). The legacy `equipment_type` overwrite
+    // (which conflated location with capability and silently flipped home_gym → commercial_gym)
+    // is gone — `equipment_type` now mirrors `equipment_location` for backward compat with
+    // downstream consumers that haven't been updated yet.
+    {
+      const literal = String(tp.equipment_type ?? (tp as { equipment_location?: unknown }).equipment_location ?? '').trim().toLowerCase();
+      const resolvedLocation: 'home_gym' | 'commercial_gym' =
+        literal === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
+      (tp as { equipment_location?: string }).equipment_location = resolvedLocation;
+      tp.equipment_type = resolvedLocation;
     }
-    // Three-tier equipment classification per docs/STRENGTH-PROTOCOL.md §8. Drives the
+    // Three-tier capability classification per docs/STRENGTH-PROTOCOL.md §8. Drives the
     // performance-without-loadable-resistance gate — bodyweight_bands tier downgrades
-    // performance intent to durability with a trade-off (§2).
+    // performance intent to durability with a trade-off (§2). Independent of location.
     {
       const raw = arc.equipment as { strength?: string[] } | null | undefined;
       const arr = Array.isArray(raw?.strength) ? raw.strength : [];
@@ -1136,14 +1138,16 @@ async function buildCombinedPlan(
     combinedSchedulePrefs.long_ride_day,
   );
   combinedSchedulePrefs.rest_days = resolvedRestDays;
+  // Athlete's literal location choice — preserved exactly as the wizard saved it. Never
+  // overwritten by capability inference (which lives on equipment_tier).
   const explicitEquipmentType =
     (newGoal.training_prefs as Record<string, unknown>)?.equipment_type
-    ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_type;
-  const resolvedEquipmentType = resolveStrengthEquipmentTypeForPlan(
-    explicitEquipmentType,
-    combinedStrengthEquipment,
-    combinedBaseline?.performance_numbers,
-  );
+    ?? (newGoal.training_prefs as Record<string, unknown>)?.equipment_location
+    ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_type
+    ?? (primaryGoalPrefs as Record<string, unknown>)?.equipment_location;
+  const literalLocation = String(explicitEquipmentType ?? '').trim().toLowerCase();
+  const resolvedEquipmentType: 'home_gym' | 'commercial_gym' =
+    literalLocation === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
   const hasCableForPlan = hasCableMachine(combinedStrengthEquipment);
   const hasGHDForPlan = hasGHD(combinedStrengthEquipment);
 
@@ -1504,7 +1508,11 @@ async function buildCombinedPlan(
       weekly_hours_available: weeklyHours,
       loading_pattern: loadingPattern,
       plan_units: planUnitsForCombined,
+      // Literal location (athlete's home_gym | commercial_gym choice — never overwritten by
+      // capability inference). Mirror onto legacy `equipment_type` for backward compat.
+      equipment_location: resolvedEquipmentType,
       equipment_type: resolvedEquipmentType,
+      // Capability tier — separate concern, derived from chips + 1RM signals.
       equipment_tier: resolveStrengthEquipmentTier3(
         resolvedEquipmentType,
         Array.isArray(arcForCombined.equipment?.strength) ? arcForCombined.equipment.strength : [],

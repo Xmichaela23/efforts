@@ -765,6 +765,9 @@ export default function PlanWizard() {
         days_per_week: state.daysPerWeek,
         strength_frequency: state.strengthFrequency,
         strength_tier: state.strengthTier,
+        // Athlete's literal location choice — preserved on equipment_location. equipment_type is
+        // kept as a backward-compat alias; capability lives separately on equipment_tier.
+        equipment_location: state.equipmentType,
         equipment_type: state.equipmentType,
       };
 

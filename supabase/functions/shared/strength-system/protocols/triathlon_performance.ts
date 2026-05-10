@@ -20,7 +20,7 @@ import {
 
 type LimiterSport = 'swim' | 'bike' | 'run';
 type EquipmentTier = 'commercial_gym' | 'home_gym';
-type EquipmentTier3 = 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+type EquipmentTier3 = 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
 
 /** Bundled DB-tier inputs threaded into phase functions (spec §8.2). */
 type DbCtx = {
@@ -72,8 +72,8 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   // upstream — when it lands here unexpectedly, fall through to dumbbell_based path.
   const tier3: EquipmentTier3 =
     context.userBaselines.equipmentTier ??
-    (context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'dumbbell_based');
-  const tier: EquipmentTier = tier3 === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
+    (context.userBaselines.equipment === 'commercial_gym' ? 'full_barbell' : 'dumbbell_based');
+  const tier: EquipmentTier = tier3 === 'full_barbell' ? 'commercial_gym' : 'home_gym';
   // hasCable / hasGHD / hasKettlebell / hasPullUpBar are explicit when threaded from Arc equipment
   // list; fall back to safe defaults.
   const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
@@ -184,7 +184,7 @@ function perfBaseLower(
   weekInPhase: number,
   planWeekLabel: number,
   hasGHD?: boolean,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
@@ -194,7 +194,7 @@ function perfBaseLower(
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Conventional Deadlift',
       sets,
@@ -294,7 +294,7 @@ function perfBaseUpper(
   limiter: LimiterSport,
   weekInPhase: number,
   planWeekLabel: number,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
@@ -304,7 +304,7 @@ function perfBaseUpper(
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Barbell Row',
       sets,
@@ -431,7 +431,7 @@ function perfBuildLower(
   limiter: LimiterSport,
   weekInPhase: number,
   planWeekLabel: number,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
@@ -441,7 +441,7 @@ function perfBuildLower(
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Conventional Deadlift',
       sets: mainSets,
@@ -511,7 +511,7 @@ function perfBuildUpper(
   limiter: LimiterSport,
   weekInPhase: number,
   planWeekLabel: number,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
@@ -520,7 +520,7 @@ function perfBuildUpper(
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Barbell Row',
       sets,
@@ -628,7 +628,7 @@ function perfRaceLower(
   weekInPhase: number,
   planWeekLabel: number,
   hasKettlebell?: boolean,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
@@ -642,7 +642,7 @@ function perfRaceLower(
   // Olympic lifts are explicitly excluded by spec (technical debt outweighs benefits for triathletes).
   const powerExercise: StrengthExercise = (() => {
     const rotation: Array<'push_press' | 'box_jumps' | 'broad_jumps' | 'kb_swings'> =
-      tier3 === 'commercial_gym'
+      tier3 === 'full_barbell'
         ? hasKettlebell
           ? ['push_press', 'box_jumps', 'broad_jumps', 'kb_swings']
           : ['push_press', 'box_jumps', 'broad_jumps']
@@ -652,7 +652,7 @@ function perfRaceLower(
     const pick = rotation[(wip - 1) % rotation.length];
     switch (pick) {
       case 'push_press':
-        if (tier3 === 'commercial_gym') {
+        if (tier3 === 'full_barbell') {
           return {
             name: 'Push Press',
             sets: 3,
@@ -722,7 +722,7 @@ function perfRaceLower(
   ex.push(powerExercise);
 
   // Primary compound — Trap Bar Deadlift (commercial_gym) or DB RDL / Jump Squats (DB tier).
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Trap Bar Deadlift',
       sets: 3,
@@ -763,7 +763,7 @@ function perfRaceLower(
       name: 'Hip Thrusts (Fast Concentric)',
       sets: 3,
       reps: 5,
-      weight: tier3 === 'commercial_gym' ? 'Moderate barbell — explosive intent' : 'Two heavy DBs across hips',
+      weight: tier3 === 'full_barbell' ? 'Moderate barbell — explosive intent' : 'Two heavy DBs across hips',
       target_rir: rir,
       notes: 'Explosive hip extension',
     });
@@ -784,7 +784,7 @@ function perfRaceLower(
       name: 'Explosive Step-ups',
       sets: 3,
       reps: '4/leg',
-      weight: tier3 === 'commercial_gym' ? 'Light DBs' : 'Bodyweight or light DBs',
+      weight: tier3 === 'full_barbell' ? 'Light DBs' : 'Bodyweight or light DBs',
       target_rir: rir,
     });
   } else {
@@ -792,7 +792,7 @@ function perfRaceLower(
       name: 'Reverse Lunge',
       sets: 3,
       reps: '6/leg',
-      weight: tier3 === 'commercial_gym' ? 'Light DBs' : 'Bodyweight',
+      weight: tier3 === 'full_barbell' ? 'Light DBs' : 'Bodyweight',
       target_rir: rir,
       notes: 'No box — reverse lunge substitute; controlled descent, drive through front heel',
     });
@@ -828,13 +828,13 @@ function perfRaceUpper(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Barbell Row',
       sets: 3,
@@ -931,14 +931,14 @@ function perfRaceUpper(
 function perfTaperSession(
   tier: EquipmentTier,
   hasCable: boolean,
-  tier3: EquipmentTier3 = 'commercial_gym',
+  tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   // Spec §3.1 Taper Priming: 3-4 reps fast bar speed @ 50-60% 1RM, RIR 3+, 2 sets, 1× (skip-optional).
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
-  if (tier3 === 'commercial_gym') {
+  if (tier3 === 'full_barbell') {
     ex.push({
       name: 'Conventional Deadlift',
       sets: 2,

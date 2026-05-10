@@ -115,7 +115,7 @@ export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
 export function resolveProtocolIdForCombinedTriPlan(
   rawProtocol: string | undefined,
   strengthIntent: string | undefined,
-  equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands',
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands',
 ): 'triathlon' | 'triathlon_performance' {
   const p = String(rawProtocol ?? '').trim();
   const intent = String(strengthIntent ?? '').trim().toLowerCase();

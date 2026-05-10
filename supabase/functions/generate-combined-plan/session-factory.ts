@@ -1283,7 +1283,7 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
 function resolveTriCombinedStrengthProtocol(options: {
   strengthProtocolId?: string;
   strengthIntent?: 'support' | 'performance';
-  equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
 }): {
   protocol: StrengthProtocol;
   /** True when the equipment-tier gate downgraded the requested protocol to durability. */
@@ -1472,7 +1472,7 @@ export function triathlonStrength(
     strengthProtocolId?: string;
     strengthIntent?: 'support' | 'performance';
     /** Three-tier equipment classification (docs/STRENGTH-PROTOCOL.md §8). When omitted, derived from `equipmentType`. */
-    equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+    equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
     /**
      * Athlete's `user_baselines.performance_numbers` (lifted 1RMs etc.). When 1RMs are missing
      * and `strengthIntent === 'performance'`, the spec §5 trade-off is prepended to the session
@@ -1499,9 +1499,9 @@ export function triathlonStrength(
   // (commercial_gym → commercial_gym; home_gym → dumbbell_based as a safe default that still gates
   // performance correctly when DBs are present and downgrades only when the upstream resolver
   // already classified bodyweight_bands).
-  const equipmentTier3: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands' =
+  const equipmentTier3: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands' =
     options?.equipmentTier ??
-    (options?.equipmentType === 'commercial_gym' ? 'commercial_gym' : 'dumbbell_based');
+    (options?.equipmentType === 'commercial_gym' ? 'full_barbell' : 'dumbbell_based');
 
   const ctx: ProtocolContext = {
     weekIndex: Math.max(1, options?.weekIndex ?? 1),

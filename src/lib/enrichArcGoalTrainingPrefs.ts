@@ -2,14 +2,6 @@ import type { GoalInsert } from '@/hooks/useGoals';
 import type { ArcContextPayload } from '@/lib/fetch-arc-context';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
 
-function hasBarbellCapability(strengthEquipment: string[]): boolean {
-  return (
-    strengthEquipment.includes('Commercial gym') ||
-    strengthEquipment.includes('Barbell + plates') ||
-    strengthEquipment.includes('Squat rack / Power cage')
-  );
-}
-
 function inferLimiterFromArc(arc: ArcContextPayload): 'swim' | 'bike' | 'run' {
   const swim = arc.swim_training_from_workouts as
     | { completed_swim_sessions_last_90_days?: number }
@@ -64,10 +56,21 @@ export function enrichGoalInsertWithArcContext(row: GoalInsert, arc: ArcContextP
     if (tp.strength_frequency == null || Number.isNaN(Number(tp.strength_frequency))) {
       tp.strength_frequency = 2;
     }
+    // Preserve the athlete's literal location choice on `equipment_location`. The legacy
+    // `equipment_type` overwrite (which inferred capability and stomped the literal) is removed —
+    // capability lives on `equipment_tier` per spec §8 separation.
+    if (!String((tp as { equipment_location?: unknown }).equipment_location ?? '').trim()) {
+      const literal = String(tp.equipment_type ?? '').trim().toLowerCase();
+      if (literal === 'home_gym' || literal === 'commercial_gym') {
+        (tp as { equipment_location?: string }).equipment_location = literal;
+      }
+    }
     if (!String(tp.equipment_type ?? '').trim()) {
-      const equipment = arc.equipment as { strength?: string[] } | undefined;
-      const arr = Array.isArray(equipment?.strength) ? equipment.strength : [];
-      tp.equipment_type = hasBarbellCapability(arr) ? 'commercial_gym' : 'home_gym';
+      // Default literal: when athlete didn't pick yet, assume home_gym (safer for the gate).
+      tp.equipment_type = 'home_gym';
+      if (!String((tp as { equipment_location?: unknown }).equipment_location ?? '').trim()) {
+        (tp as { equipment_location?: string }).equipment_location = 'home_gym';
+      }
     }
     if (!String(tp.limiter_sport ?? '').trim()) {
       tp.limiter_sport = inferLimiterFromArc(arc);
