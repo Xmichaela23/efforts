@@ -49,6 +49,7 @@ import {
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS, TSS_PER_HOUR,
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
+  PHASE_TSS_RANGES,
   type TriRaceDistance,
 } from './science.ts';
 import {
@@ -630,6 +631,37 @@ export function buildWeek(
     }
   }
 
+  if (weekNum === 1) {
+    const ctl = athleteState.current_ctl;
+    const wh = athleteState.weekly_hours_available;
+    const ctlFactor = Math.min(1.5, Math.max(0.5, ctl / 60));
+    const hourFactor = Math.min(1.5, Math.max(0.5, wh / 10));
+    const { min: phaseTssMin, max: phaseTssMax } = PHASE_TSS_RANGES[phase];
+    const phaseMid = (phaseTssMin + phaseTssMax) / 2;
+    const clampedBeforeMult = Math.max(
+      phaseTssMin,
+      Math.min(phaseTssMax, phaseMid * ctlFactor * hourFactor),
+    );
+    console.log('[buildWeek] week 1 load diagnostics', {
+      transition_mode: athleteState.transition_mode,
+      structural_load_hint: athleteState.structural_load_hint,
+      ctlFactor,
+      hourFactor,
+      current_ctl: ctl,
+      weekly_hours_available: wh,
+      phase,
+      phaseTssRange: { min: phaseTssMin, max: phaseTssMax },
+      scaledWeeklyTSS_beforeTssMultiplier: clampedBeforeMult,
+      scaledWeeklyTSS_afterTssMultiplier: baseTSS,
+      tssMultiplier: block.tssMultiplier,
+      rampThresholdModeratePtsPerWeek: moderateRamp,
+      maxSafeTSS,
+      weeklyTSSBudget_afterRampCap: weeklyTSSBudget,
+      physiologicalFloorRebuild: !!options?.physiologicalFloorRebuild,
+      physiologicalFloorRebuildDeep: !!options?.physiologicalFloorRebuildDeep,
+    });
+  }
+
   // Convert rest_days (0=Sun…6=Sat) to day-name set.
   // Our DAYS_OF_WEEK is Mon-indexed, rest_days uses 0=Sun.
   const restDayNames = new Set<string>(
@@ -774,6 +806,24 @@ export function buildWeek(
     longRunMiles = Math.max(2, Math.min(longRunMiles, Math.round(longRunMinutes / 9.5)));
     longRideMinutes = Math.min(longRideMinutes, 90);
     longRideHours = Math.max(0.75, Math.round(longRideMinutes / 15) * 0.25);
+  }
+
+  if (weekNum === 1) {
+    console.log('[buildWeek] week 1 long session computed', {
+      longRunMiles,
+      longRunMinutes,
+      longRideHours,
+      longRideMinutes,
+      runTotalMin,
+      bikeTotalMin,
+      weeklyTSSBudget,
+      baseTSS,
+      maxSafeTSS,
+      recoveryRebuildWeek1,
+      isRecovery,
+      raceThisWeek: !!raceThisWeek,
+      physiologicalFloorRebuild: !!options?.physiologicalFloorRebuild,
+    });
   }
 
   // ── BRICK / LONG RIDE ─────────────────────────────────────────────────────
