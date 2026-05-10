@@ -26,6 +26,7 @@ import {
   swimDrillBlockAthleteCopy,
   swimSessionPhilosophyLead,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
+import { buildStrengthEquipmentLine } from '../_shared/strength-equipment-tier.ts';
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
 import {
   calculateSwimTss,
@@ -1473,6 +1474,8 @@ export function triathlonStrength(
      * trade-off warns the athlete that loads will be conservative until they log 1RMs.
      */
     performanceNumbers?: Record<string, unknown>;
+    /** Athlete strength equipment chips (`user_baselines.equipment.strength`). Drives spec §9.3 line. */
+    strengthEquipment?: string[];
   },
 ): PlannedSession {
   const longRide = options?.longRideDayName ?? 'Saturday';
@@ -1595,6 +1598,16 @@ export function triathlonStrength(
       chosen.description = `${note} ${chosen.description}`;
       chosen.tags = [...(chosen.tags ?? []), 'gate:no_1rm_data_conservative_defaults'];
     }
+  }
+
+  // §9.3 equipment summary line — mirror of the swim Pool-gear pattern.
+  const exerciseNames = (chosen.exercises ?? []).map((e) => e.name);
+  const equipmentLine = buildStrengthEquipmentLine({
+    exerciseNames,
+    athleteEquipment: options?.strengthEquipment ?? [],
+  });
+  if (equipmentLine) {
+    chosen.description = `${chosen.description} ${equipmentLine}`;
   }
 
   return intentToPlanned(chosen, day, phase, goalId);

@@ -119,6 +119,12 @@ export interface AthleteState {
   performance_numbers?: Record<string, unknown>;
   /** Athlete bodyweight in pounds (for spec §5 conservative-default 1RM fallback). */
   bodyweight_lb?: number;
+  /**
+   * Strength equipment chips from `user_baselines.equipment.strength` — used by
+   * `buildStrengthEquipmentLine` (spec §9.3) to filter optional gear to athlete inventory.
+   * Mirrors the existing `swim_equipment` field.
+   */
+  strength_equipment?: string[];
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**

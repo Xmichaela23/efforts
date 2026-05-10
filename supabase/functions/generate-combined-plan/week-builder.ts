@@ -1555,6 +1555,7 @@ export function buildWeek(
               strengthIntent: athleteState.strength_intent,
               equipmentTier: athleteState.equipment_tier,
               performanceNumbers: athleteState.performance_numbers,
+              strengthEquipment: athleteState.strength_equipment,
             }),
           );
         } else {
@@ -1629,6 +1630,7 @@ export function buildWeek(
             strengthIntent: athleteState.strength_intent,
             equipmentTier: athleteState.equipment_tier,
             performanceNumbers: athleteState.performance_numbers,
+            strengthEquipment: athleteState.strength_equipment,
           }));
         } else {
           strSlot.sessions.push(runStrength(strDay, phase, servedGoal, {

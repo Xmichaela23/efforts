@@ -1538,6 +1538,12 @@ async function buildCombinedPlan(
         const labels = sw.map((x) => String(x).trim()).filter(Boolean);
         return labels.length ? { swim_equipment: labels } : {};
       })(),
+      ...((): { strength_equipment?: string[] } => {
+        const st = arcForCombined.equipment?.strength;
+        if (!Array.isArray(st) || !st.length) return {};
+        const labels = st.map((x) => String(x).trim()).filter(Boolean);
+        return labels.length ? { strength_equipment: labels } : {};
+      })(),
       rest_days: freshCombinedPrefs.rest_days ?? [],
       ...(freshCombinedPrefs.long_run_day !== undefined
         ? { long_run_day: freshCombinedPrefs.long_run_day }

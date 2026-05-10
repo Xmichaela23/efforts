@@ -142,6 +142,167 @@ export function resolveStrengthEquipmentTier3(
  * a downgrade message when an athlete asked for performance but lacks barbell AND DBs —
  * progressive loading isn't possible at the bodyweight_bands tier.
  */
+// ── Strength equipment summary line (docs/STRENGTH-PROTOCOL.md §9.3) ───────-
+//
+// Mirror of the swim Pool-gear pattern. Generated from the session's exercise list
+// (canonical name patterns → equipment labels) intersected with the athlete's
+// inventory for the "Optional" half. Returns null when nothing required and no
+// owned optional applies.
+
+const STRENGTH_GEAR_LABEL: Record<string, string> = {
+  barbell: 'Barbell',
+  rack: 'Rack',
+  bench: 'Bench',
+  dumbbells: 'Dumbbells',
+  kettlebell: 'Kettlebell',
+  bands: 'Bands',
+  cable: 'Cable',
+  pull_up_bar: 'Pull-up Bar',
+  box: 'Box',
+  rings: 'Rings',
+};
+
+/**
+ * Map a single strength exercise name → set of canonical equipment keys it requires.
+ * Order doesn't matter; the formatter de-dupes and rendering uses {@link STRENGTH_GEAR_LABEL}.
+ */
+function exerciseRequiredGearKeys(name: string): string[] {
+  const n = String(name ?? '').toLowerCase();
+  if (!n) return [];
+  // Barbell-anchored compounds — rack required for back squat / OHP / standing press.
+  if (/barbell\s+back\s+squat|back\s+squat\s*\(barbell/.test(n)) return ['barbell', 'rack'];
+  if (/standing\s+barbell\s+overhead\s+press|standing\s+ohp|barbell\s+ohp|push\s+press/.test(n)) {
+    return ['barbell', 'rack'];
+  }
+  if (/conventional\s+deadlift|trap\s+bar\s+deadlift/.test(n)) return ['barbell'];
+  if (/^bench\s+press$|^bench\s+press\s+\(barbell/.test(n)) return ['barbell', 'rack', 'bench'];
+  if (/barbell\s+row/.test(n)) return ['barbell'];
+  if (/hip\s+thrusts?\b/.test(n)) {
+    // Performance protocol uses Heavy/Moderate barbell hip thrusts. DB tier uses backpack/BW.
+    return /barbell|moderate|heavy|fast\s+concentric/.test(n) ? ['barbell', 'bench'] : ['bench'];
+  }
+  // Dumbbell-anchored compounds.
+  if (/db\s+bench\s+press|dumbbell\s+bench/.test(n)) return ['dumbbells', 'bench'];
+  if (/db\s+shoulder\s+press|db\s+ohp/.test(n)) return ['dumbbells'];
+  if (/db\s+row|chest-supported\s+row/.test(n)) return ['dumbbells', 'bench'];
+  if (/db\s+romanian\s+deadlift|dumbbell\s+rdl/.test(n)) return ['dumbbells'];
+  if (/single-leg\s+rdl\s*\(heavy\s*db|single-leg\s+rdl\s*\(.*db/.test(n)) return ['dumbbells'];
+  if (/goblet\s+squat/.test(n)) return ['dumbbells']; // KB also works — counted via optional pool
+  // Cable / pulley.
+  if (/lat\s*pull-?down/.test(n)) return ['cable'];
+  // Pull-up patterns.
+  if (/^pull-?ups?\b|^pull-?ups\s+\(explosive/.test(n)) return ['pull_up_bar'];
+  if (/band-?assisted\s+pull-?up/.test(n)) return ['pull_up_bar', 'bands'];
+  if (/inverted\s+(ring\s+)?rows?|ring\s+rows?/.test(n)) return ['rings'];
+  // Plyo / power.
+  if (/box\s+jumps?/.test(n)) return ['box'];
+  // Kettlebell-specific.
+  if (/^kb\s+swings?|^kettlebell\s+swings?/.test(n)) return ['kettlebell'];
+  // Bands.
+  if (/band\s+pull-?aparts?|band\s+pull-?down|band\s+lateral\s+walks|band\s+overhead\s+press|band\s+row/.test(n)) {
+    return ['bands'];
+  }
+  if (/face\s+pulls?/.test(n)) {
+    // Cable when available, band otherwise — depends on prescription text.
+    return /cable/.test(n) ? ['cable'] : ['bands'];
+  }
+  if (/external\s+rotation/.test(n)) return ['bands'];
+  // Step-ups / lunges land on a bench-class platform; box jumps already handled.
+  if (/step-?ups?/.test(n)) return ['bench'];
+  // Bodyweight-only patterns: push-ups, plank variants, bird dog, dead bug, glute bridges,
+  // calf raises, BW squat, single-leg RDL (BW), broad jumps, jump squats, plyo.
+  return [];
+}
+
+/** Optional gear the athlete might own that this session benefits from (without strict need). */
+function exerciseSuggestedOptionalGearKeys(name: string): string[] {
+  const n = String(name ?? '').toLowerCase();
+  if (!n) return [];
+  // Hip Thrusts: bench is required (above); KB or DB add load on BW/BB tiers.
+  if (/hip\s+thrusts?\b/.test(n) && !/barbell|heavy|moderate/.test(n)) return ['kettlebell', 'dumbbells'];
+  // Calf raises: optional DB load.
+  if (/calf\s+raises?/.test(n)) return ['dumbbells'];
+  // Goblet squat: KB also works (DBs already required above).
+  if (/goblet\s+squat/.test(n)) return ['kettlebell'];
+  return [];
+}
+
+/** Athlete equipment chip → canonical key (for matching against session needs). */
+function athleteEquipmentToKeys(strengthEquipment: string[]): Set<string> {
+  const out = new Set<string>();
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  for (const s of n) {
+    if (s.includes('barbell') || s.includes('plate')) out.add('barbell');
+    if (s.includes('rack') || s.includes('cage')) out.add('rack');
+    if (s.includes('bench')) out.add('bench');
+    if (s.includes('dumbbell') || /\bdb\b/.test(s)) out.add('dumbbells');
+    if (s.includes('kettlebell') || /\bkb\b/.test(s)) out.add('kettlebell');
+    if (s.includes('band')) out.add('bands');
+    if (s.includes('cable')) out.add('cable');
+    if (s.includes('pull-up bar') || s.includes('pull up bar') || s.includes('chin-up')) out.add('pull_up_bar');
+    if (s.includes('box') || s.includes('plyo box')) out.add('box');
+    if (s.includes('ring')) out.add('rings');
+    // Commercial gym implies most fixed equipment is on hand.
+    if (s.includes('commercial gym')) {
+      out.add('barbell');
+      out.add('rack');
+      out.add('bench');
+      out.add('dumbbells');
+      out.add('cable');
+      out.add('pull_up_bar');
+    }
+  }
+  return out;
+}
+
+export type StrengthSessionGearLineOpts = {
+  /** Exercise names from the session (intent.exercises[].name). */
+  exerciseNames: string[];
+  /** Athlete inventory chips from baselines.equipment.strength. */
+  athleteEquipment: string[];
+};
+
+/**
+ * Athlete-facing equipment summary for a strength session. Mirror of the swim
+ * `buildSwimGearLine` pattern.
+ *
+ * Format examples (spec §9.3):
+ * - `Equipment — Required: Barbell, Rack, Bench. Optional: Kettlebell.`
+ * - `Equipment — Required: Dumbbells, Bench.`
+ * - `Equipment — Required: Bands.`
+ *
+ * Returns null when no required gear and no athlete-owned optional gear applies.
+ */
+export function buildStrengthEquipmentLine(opts: StrengthSessionGearLineOpts): string | null {
+  const required = new Set<string>();
+  const optionalPool = new Set<string>();
+  for (const n of opts.exerciseNames ?? []) {
+    for (const k of exerciseRequiredGearKeys(n)) required.add(k);
+    for (const k of exerciseSuggestedOptionalGearKeys(n)) optionalPool.add(k);
+  }
+
+  const owned = athleteEquipmentToKeys(opts.athleteEquipment ?? []);
+  const optional = new Set<string>();
+  for (const k of optionalPool) {
+    if (required.has(k)) continue;
+    if (!owned.has(k)) continue;
+    optional.add(k);
+  }
+
+  // Render in a stable order — keeps the output deterministic and easier to test/eyeball.
+  const orderRequired = ['barbell', 'rack', 'bench', 'dumbbells', 'kettlebell', 'cable', 'pull_up_bar', 'box', 'rings', 'bands'];
+  const orderOptional = orderRequired;
+  const reqLabels = orderRequired.filter((k) => required.has(k)).map((k) => STRENGTH_GEAR_LABEL[k]);
+  const optLabels = orderOptional.filter((k) => optional.has(k)).map((k) => STRENGTH_GEAR_LABEL[k]);
+
+  if (reqLabels.length === 0 && optLabels.length === 0) return null;
+
+  const parts: string[] = [];
+  if (reqLabels.length > 0) parts.push(`Required: ${reqLabels.join(', ')}.`);
+  if (optLabels.length > 0) parts.push(`Optional: ${optLabels.join(', ')}.`);
+  return `Equipment — ${parts.join(' ')}`;
+}
+
 export function gateStrengthIntentByTier(
   intent: 'performance' | 'support' | 'none' | 'co-equal' | string | null | undefined,
   tier3: StrengthEquipmentTier3,
