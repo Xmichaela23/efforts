@@ -488,6 +488,360 @@ function lowerBodyBlockedDays(longRide: DayName, longRun: DayName): Set<DayName>
   return new Set<DayName>([longRide, longRun, dayBefore(longRide), dayBefore(longRun)]);
 }
 
+// ── Post-placement load + layout balancer (§6.2 soft-move ordering) ─────────
+
+/** Kinds the balancer may relocate — cheapest / least disruptive first (docs §6.2). */
+const BALANCER_RELOCATABLE_KINDS: readonly SessionKind[] = [
+  'easy_swim',
+  'easy_run',
+  'easy_bike',
+  'upper_body_strength',
+];
+
+const BALANCER_LOAD_THRESHOLD_HIGH = 5;
+const BALANCER_LOAD_THRESHOLD_LOW = 1;
+const BALANCER_MAX_ITER = 48;
+
+/** Same sport on consecutive calendar days (incl. Sun↔Mon wrap). */
+const ADJ_SAME_SPORT_EDGE = 4;
+/** Extra cost when easy_bike sits the day before quality_bike (recovery buffer overlap). */
+const ADJ_EASY_BIKE_BEFORE_QUALITY_BIKE = 3;
+
+type SportFamily = 'swim' | 'bike' | 'run' | 'strength';
+
+type BalancerContext = {
+  athlete: WeekOptimizerInputs['athlete'];
+  longRide: DayName;
+  longRun: DayName;
+  mastersSwim?: { day: DayName; kind: SessionKind };
+  groupRunAnchor?: { day: DayName; kind: SessionKind };
+};
+
+function balancerFatigueWeight(f: SessionSlot['fatigue']): number {
+  if (f === 'HIGH') return 3;
+  if (f === 'MODERATE') return 2;
+  return 1;
+}
+
+function dayFatigueLoadScore(slots: SessionSlot[]): number {
+  return slots.reduce((sum, s) => sum + balancerFatigueWeight(s.fatigue), 0);
+}
+
+function balancerMovePriority(kind: SessionKind): number {
+  const i = BALANCER_RELOCATABLE_KINDS.indexOf(kind);
+  return i === -1 ? 999 : i;
+}
+
+function sportFamilyOf(kind: SessionKind): SportFamily | undefined {
+  if (kind === 'easy_swim' || kind === 'quality_swim') return 'swim';
+  if (kind === 'easy_bike' || kind === 'quality_bike' || kind === 'long_ride') return 'bike';
+  if (kind === 'easy_run' || kind === 'quality_run' || kind === 'long_run') return 'run';
+  if (kind === 'upper_body_strength' || kind === 'lower_body_strength') return 'strength';
+  return undefined;
+}
+
+function sportsPresentOnDay(slots: SessionSlot[]): Set<SportFamily> {
+  const s = new Set<SportFamily>();
+  for (const slot of slots) {
+    const f = sportFamilyOf(slot.kind);
+    if (f) s.add(f);
+  }
+  return s;
+}
+
+/**
+ * Penalize same-sport sessions on consecutive days (all sports). Extra weight when
+ * easy_bike is immediately before quality_bike (wasted recovery buffer).
+ */
+function adjacencyPenalty(
+  days: Record<DayName, SessionSlot[]>,
+  _longRide: DayName,
+  _longRun: DayName,
+): number {
+  let p = 0;
+  for (let i = 0; i < ALL_DAYS.length; i++) {
+    const d = ALL_DAYS[i];
+    const nd = ALL_DAYS[(i + 1) % ALL_DAYS.length];
+    const sd = sportsPresentOnDay(days[d]);
+    const snd = sportsPresentOnDay(days[nd]);
+    for (const fam of sd) {
+      if (snd.has(fam)) p += ADJ_SAME_SPORT_EDGE;
+    }
+    const easyBeforeQb =
+      days[d].some((s) => s.kind === 'easy_bike') &&
+      days[nd].some((s) => s.kind === 'quality_bike');
+    if (easyBeforeQb) p += ADJ_EASY_BIKE_BEFORE_QUALITY_BIKE;
+  }
+  return p;
+}
+
+/** Pairwise same-day validity including EXPERIENCE_MODIFIER stacks (matches `canPlaceWithModifier`). */
+function sameDaySlotsLegitimate(
+  slots: SessionSlot[],
+  day: DayName,
+  days: Record<DayName, SessionSlot[]>,
+  athlete: WeekOptimizerInputs['athlete'],
+): boolean {
+  if (slots.length <= 1) return true;
+  const nextKinds = (days[dayAfter(day)] ?? []).map((s) => s.kind);
+  const nextDayIsLong = nextKinds.includes('long_ride') || nextKinds.includes('long_run');
+  const allowQrQs =
+    (athlete.training_intent === 'performance' || athlete.strength_intent === 'performance') &&
+    !nextDayIsLong;
+  const isPerf = athlete.training_intent === 'performance';
+  const isCoEq = athlete.strength_intent === 'performance';
+
+  for (let i = 0; i < slots.length; i++) {
+    for (let j = i + 1; j < slots.length; j++) {
+      const a = slots[i].kind;
+      const b = slots[j].kind;
+      if (areScheduleSlotsCompatible(a, b, { allowQualityRunQualitySwimSameDay: allowQrQs })) continue;
+      if (
+        isPerf &&
+        isCoEq &&
+        ((a === 'lower_body_strength' && b === 'quality_run') ||
+          (b === 'lower_body_strength' && a === 'quality_run'))
+      ) {
+        continue;
+      }
+      return false;
+    }
+  }
+  return true;
+}
+
+function isMovableBalancerSlot(day: DayName, slot: SessionSlot, ctx: BalancerContext): boolean {
+  if (balancerMovePriority(slot.kind) >= 999) return false;
+  if (ctx.mastersSwim && ctx.mastersSwim.day === day && slot.kind === ctx.mastersSwim.kind) {
+    return false;
+  }
+  if (ctx.groupRunAnchor && ctx.groupRunAnchor.day === day && slot.kind === ctx.groupRunAnchor.kind) {
+    return false;
+  }
+  return true;
+}
+
+function sequentialRelaxForBalancerMove(
+  kind: SessionKind,
+  toDay: DayName,
+  longRun: DayName,
+): SequentialRelax | undefined {
+  if (kind === 'easy_run' && toDay === dayAfter(longRun)) {
+    return { allow_easy_run_after_long_run: true };
+  }
+  return undefined;
+}
+
+/** Applies move in-place on `trial`. Returns false if illegal. */
+function mutatingBalancerMove(
+  trial: Record<DayName, SessionSlot[]>,
+  fromDay: DayName,
+  idx: number,
+  toDay: DayName,
+  ctx: BalancerContext,
+): boolean {
+  const src = trial[fromDay];
+  if (idx < 0 || idx >= src.length) return false;
+  const [removed] = src.splice(idx, 1);
+  if (!sameDaySlotsLegitimate(src, fromDay, trial, ctx.athlete)) {
+    src.splice(idx, 0, removed);
+    return false;
+  }
+  // Optimizer templates keep at most two sessions per weekday.
+  if (trial[toDay].length >= 2) {
+    src.splice(idx, 0, removed);
+    return false;
+  }
+  if (!canPlaceWithModifier(trial, toDay, removed.kind, ctx.athlete)) {
+    src.splice(idx, 0, removed);
+    return false;
+  }
+  const relax = sequentialRelaxForBalancerMove(removed.kind, toDay, ctx.longRun);
+  if (!sequentialOk(trial, toDay, removed.kind, ctx.athlete, relax)) {
+    src.splice(idx, 0, removed);
+    return false;
+  }
+  trial[toDay].push(removed);
+  if (!sameDaySlotsLegitimate(trial[toDay], toDay, trial, ctx.athlete)) {
+    trial[toDay].pop();
+    src.splice(idx, 0, removed);
+    return false;
+  }
+  return true;
+}
+
+function loadDispersionSumSq(days: Record<DayName, SessionSlot[]>): number {
+  let sum = 0;
+  for (const d of ALL_DAYS) {
+    const s = dayFatigueLoadScore(days[d]);
+    sum += s * s;
+  }
+  return sum;
+}
+
+function applyBalancerMoveFromClone(
+  days: Record<DayName, SessionSlot[]>,
+  trial: Record<DayName, SessionSlot[]>,
+): void {
+  for (const d of ALL_DAYS) days[d] = trial[d];
+}
+
+function findDayWithKind(
+  days: Record<DayName, SessionSlot[]>,
+  kind: SessionKind,
+): DayName | undefined {
+  for (const d of ALL_DAYS) {
+    if (days[d].some((s) => s.kind === kind)) return d;
+  }
+  return undefined;
+}
+
+function rebuildSwimSlotsFromDays(
+  days: Record<DayName, SessionSlot[]>,
+): { day: DayName; kind: SessionKind }[] {
+  const out: { day: DayName; kind: SessionKind }[] = [];
+  for (const d of ALL_DAYS) {
+    for (const s of days[d]) {
+      if (s.kind === 'easy_swim' || s.kind === 'quality_swim') {
+        out.push({ day: d, kind: s.kind });
+      }
+    }
+  }
+  out.sort((a, b) => {
+    const aQ = a.kind === 'quality_swim' ? 1 : 0;
+    const bQ = b.kind === 'quality_swim' ? 1 : 0;
+    return aQ - bQ;
+  });
+  return out;
+}
+
+function rebuildStrengthDaysFromDays(days: Record<DayName, SessionSlot[]>): DayName[] {
+  const out: DayName[] = [];
+  for (const d of ALL_DAYS) {
+    if (days[d].some((s) => s.kind === 'upper_body_strength' || s.kind === 'lower_body_strength')) {
+      out.push(d);
+    }
+  }
+  out.sort((a, b) => DAY_INDEX[a] - DAY_INDEX[b]);
+  return out;
+}
+
+/**
+ * After full placement, rebalance daily fatigue load and reduce same-sport adjacency.
+ * Does not move anchored or structural sessions (long/quality/lower strength).
+ */
+function balanceWeeklySessionLoad(
+  days: Record<DayName, SessionSlot[]>,
+  trade_offs: string[],
+  ctx: BalancerContext,
+): void {
+  const isPerfAthlete = ctx.athlete.training_intent === 'performance';
+
+  const maybeNoteEasyRunAfterLong = (kind: SessionKind, toDay: DayName): void => {
+    if (
+      kind === 'easy_run' &&
+      toDay === dayAfter(ctx.longRun) &&
+      !isPerfAthlete
+    ) {
+      trade_offs.push(
+        `easy_run on ${tfDay(toDay)} immediately follows long_run (${tfDay(ctx.longRun)}) — load balancer move; prefer swim or rest that day when possible.`,
+      );
+    }
+  };
+
+  // Phase 1 — daily fatigue score: redistribute away from ≥5 when another day is ≤1.
+  let iter = 0;
+  while (iter++ < BALANCER_MAX_ITER) {
+    const scored = ALL_DAYS.map((d) => ({ d, s: dayFatigueLoadScore(days[d]) }));
+    const over = scored.filter((x) => x.s >= BALANCER_LOAD_THRESHOLD_HIGH);
+    const under = scored.filter((x) => x.s <= BALANCER_LOAD_THRESHOLD_LOW);
+    if (!over.length || !under.length) break;
+
+    over.sort((a, b) => b.s - a.s);
+    under.sort((a, b) => a.s - b.s);
+
+    let moved = false;
+    outer:
+    for (const od of over) {
+      for (const ud of under) {
+        if (od.d === ud.d) continue;
+        const candidates = days[od.d]
+          .map((slot, idx) => ({ slot, idx }))
+          .filter(({ slot }) => isMovableBalancerSlot(od.d, slot, ctx))
+          .sort((a, b) => balancerMovePriority(a.slot.kind) - balancerMovePriority(b.slot.kind));
+
+        for (const { slot, idx } of candidates) {
+          const trial = cloneDays(days);
+          if (!mutatingBalancerMove(trial, od.d, idx, ud.d, ctx)) continue;
+          applyBalancerMoveFromClone(days, trial);
+          trade_offs.push(
+            `Weekly load balance: moved ${slot.kind} from ${tfDay(od.d)} to ${tfDay(ud.d)} — spread fatigue across the week.`,
+          );
+          maybeNoteEasyRunAfterLong(slot.kind, ud.d);
+          moved = true;
+          break outer;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  // Phase 2 — reduce same-sport adjacency without worsening load dispersion (Σ score²).
+  const baseDispersion = loadDispersionSumSq(days);
+  let baseAdj = adjacencyPenalty(days, ctx.longRide, ctx.longRun);
+
+  iter = 0;
+  while (iter++ < BALANCER_MAX_ITER) {
+    let best: {
+      fromDay: DayName;
+      idx: number;
+      toDay: DayName;
+      newAdj: number;
+      newDisp: number;
+      kind: SessionKind;
+    } | undefined;
+
+    for (const fromDay of ALL_DAYS) {
+      const movable = days[fromDay]
+        .map((slot, idx) => ({ slot, idx }))
+        .filter(({ slot }) => isMovableBalancerSlot(fromDay, slot, ctx));
+
+      for (const { slot, idx } of movable) {
+        for (const toDay of ALL_DAYS) {
+          if (toDay === fromDay) continue;
+          const trial = cloneDays(days);
+          if (!mutatingBalancerMove(trial, fromDay, idx, toDay, ctx)) continue;
+          const newAdj = adjacencyPenalty(trial, ctx.longRide, ctx.longRun);
+          const newDisp = loadDispersionSumSq(trial);
+          if (newAdj >= baseAdj) continue;
+          if (newDisp > baseDispersion + 1e-6) continue;
+
+          if (
+            !best ||
+            newAdj < best.newAdj ||
+            (newAdj === best.newAdj && newDisp < best.newDisp)
+          ) {
+            best = { fromDay, idx, toDay, newAdj, newDisp, kind: slot.kind };
+          }
+        }
+      }
+    }
+
+    if (!best) break;
+
+    const trial = cloneDays(days);
+    mutatingBalancerMove(trial, best.fromDay, best.idx, best.toDay, ctx);
+    applyBalancerMoveFromClone(days, trial);
+
+    trade_offs.push(
+      `Weekly layout: moved ${best.kind} from ${tfDay(best.fromDay)} to ${tfDay(best.toDay)} — fewer same-sport days back-to-back.`,
+    );
+    maybeNoteEasyRunAfterLong(best.kind, best.toDay);
+
+    baseAdj = adjacencyPenalty(days, ctx.longRide, ctx.longRun);
+  }
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 
 /**
@@ -533,6 +887,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     }
   }
 
+  let groupRunAnchor: { day: DayName; kind: SessionKind } | undefined;
   if (groupRun) {
     const intensity = groupRun.intensity ?? 'easy';
     const kind: SessionKind =
@@ -541,6 +896,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     if (!(intensity === 'long' && groupRun.day === longRun)) {
       if (canPlace(days, groupRun.day, kind)) {
         place(days, groupRun.day, kind, { note: groupRun.note });
+        groupRunAnchor = { day: groupRun.day, kind };
       } else {
         conflicts.push(
           `group_run anchor (${kind}) on ${groupRun.day} doesn't pass the same-day matrix.`,
@@ -549,10 +905,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     }
   }
 
+  let mastersSwimAnchor: { day: DayName; kind: SessionKind } | undefined;
   if (mastersSwim) {
     const kind: SessionKind = mastersSwim.intensity === 'easy' ? 'easy_swim' : 'quality_swim';
     if (canPlace(days, mastersSwim.day, kind)) {
       place(days, mastersSwim.day, kind, { note: mastersSwim.note });
+      mastersSwimAnchor = { day: mastersSwim.day, kind };
     } else {
       conflicts.push(
         `masters_swim anchor (${kind}) on ${mastersSwim.day} doesn't pass the same-day matrix.`,
@@ -726,7 +1084,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   const strengthFreq = inputs.preferences.strength_frequency;
   /** Co-equal 2–3×: place gym before easy_run so Mon is not stolen by easy_run before lower can land. */
   const placeStrengthBeforeEasyRun = strengthFreq >= 2 && isCoEq;
-  const strengthDays: DayName[] = [];
+  let strengthDays: DayName[] = [];
   if (consolidatedQrLowerDay) {
     strengthDays.push(consolidatedQrLowerDay);
   }
@@ -1064,7 +1422,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   // ── Swims ───────────────────────────────────────────────────────────────
   // Order: easy first, quality second (matches combined-schedule-prefs.ts parser).
   const swimsPerWeek = inputs.preferences.swims_per_week;
-  const swimSlots: { day: DayName; kind: SessionKind }[] = [];
+  let swimSlots: { day: DayName; kind: SessionKind }[] = [];
 
   if (mastersSwim) {
     const kind: SessionKind = mastersSwim.intensity === 'easy' ? 'easy_swim' : 'quality_swim';
@@ -1149,6 +1507,19 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     const bQ = b.kind === 'quality_swim' ? 1 : 0;
     return aQ - bQ;
   });
+
+  balanceWeeklySessionLoad(days, trade_offs, {
+    athlete: inputs.athlete,
+    longRide,
+    longRun,
+    ...(mastersSwimAnchor ? { mastersSwim: mastersSwimAnchor } : {}),
+    ...(groupRunAnchor ? { groupRunAnchor } : {}),
+  });
+
+  swimSlots = rebuildSwimSlotsFromDays(days);
+  strengthDays = rebuildStrengthDaysFromDays(days);
+  easyBikeDay = findDayWithKind(days, 'easy_bike');
+  easyRunDay = findDayWithKind(days, 'easy_run');
 
   // ── Rest days from training-day budget ──────────────────────────────────
   const trainingDays = inputs.preferences.training_days;
