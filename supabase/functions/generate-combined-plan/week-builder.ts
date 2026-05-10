@@ -689,9 +689,15 @@ export function buildWeek(
   const longRideDay = DAYS_OF_WEEK[longRideDayIdx] ?? 'Saturday';
 
   // Loading-pattern recovery weeks keep the mesocycle phase (build / RS) but must not inherit
-  // brick frequency from that phase — otherwise “recovery” weeks become the hardest weekends.
-  const bricksThisWeek =
-    recoveryRebuildWeek1 || isRecovery ? 0 : BRICKS_PER_WEEK[phase];
+  // brick frequency from that phase — otherwise "recovery" weeks become the hardest weekends.
+  // §SESSION-FREQUENCY-DEFAULTS §9: when the reconciler populated session_frequency_defaults,
+  // its tier-aware `bricks_per_week_by_phase` is the cap (e.g. 5-7 tier = 0 in all phases;
+  // 14+ tier = 2 in race_specific). Take the min of phase-default and tier-cap. When the
+  // defaults aren't populated (legacy / no-long-run path), fall back to BRICKS_PER_WEEK[phase].
+  const phaseBrickDefault = BRICKS_PER_WEEK[phase];
+  const tierBrickCap = athleteState.session_frequency_defaults?.bricks_per_week_by_phase?.[phase];
+  const baseBricks = tierBrickCap != null ? Math.min(phaseBrickDefault, tierBrickCap) : phaseBrickDefault;
+  const bricksThisWeek = recoveryRebuildWeek1 || isRecovery ? 0 : baseBricks;
   // Race week: no brick stress; all load is the event itself
   const effectiveBricks = raceThisWeek ? 0 : bricksThisWeek;
 
@@ -948,10 +954,14 @@ export function buildWeek(
     shiftQualityRunToLongRun = true;
   }
 
-  // Third swim (`preferred_days.swim[2]` → swim_third_day): only when swim_intent === 'focus'.
+  // Third swim (`preferred_days.swim[2]` → swim_third_day): fires when swim_intent === 'focus'
+  // (athlete-driven floor) OR session_frequency_defaults.swims_per_week >= 3 (hours-driven, per
+  // SESSION-FREQUENCY-DEFAULTS §2: 12-14hr and 14+ tiers always get 3 swims regardless of intent).
   const swimIntentFocus = String(athleteState.swim_intent ?? '').toLowerCase() === 'focus';
+  const swimsBudget = athleteState.session_frequency_defaults?.swims_per_week ?? 0;
+  const wantThirdSwim = swimIntentFocus || swimsBudget >= 3;
   let swimThirdDay: string | null = null;
-  if (swimIntentFocus && hasTri) {
+  if (wantThirdSwim && hasTri) {
     const thirdHardBlocked = new Set<string>([
       longRideDay,
       longRunActualDay,
@@ -1032,8 +1042,16 @@ export function buildWeek(
     },
     swimTrainingPrefs,
   );
+  // §SESSION-FREQUENCY-DEFAULTS §2: 12-14hr and 14+ tiers have swims_per_week=3 regardless of
+  // swim_intent. The 3-slot focus templates are the right shape for these athletes; when the
+  // hours-derived budget calls for 3 swims, treat as 'focus' for template selection even if the
+  // athlete declared swim_intent='race'.
+  const effectiveSwimIntent =
+    swimsBudget >= 3 && swimProgramAnchorSlots >= 3
+      ? 'focus'
+      : athleteState.swim_intent;
   const swimTemplatesIntent = swimProgramIntentForAnchorSlots(
-    athleteState.swim_intent,
+    effectiveSwimIntent,
     swimProgramAnchorSlots,
   );
   const recoveryLearnerTwoSwimMaintained =
@@ -1392,9 +1410,13 @@ export function buildWeek(
     }
   }
 
+  // §SESSION-FREQUENCY-DEFAULTS §2: budgets for easy_run / easy_bike (gates both the tri
+  // and run-only easy-session paths below). Defaults to 3 (existing behavior preserved
+  // when reconciler hasn't populated session_frequency_defaults).
+  const runsBudget = athleteState.session_frequency_defaults?.runs_per_week ?? 3;
   // Run-only: mid-week easy run (fixed Thursday — not tied to swim prefs)
   const thursdayRunSlot = grid.get('Thursday');
-  if (!hasTri && !thursdayRunSlot?.isRest) {
+  if (runsBudget >= 3 && !hasTri && !thursdayRunSlot?.isRest) {
     const easyMi = isRecovery
       ? Math.max(2, Math.round(longRunMiles * 0.30))
       : Math.max(4, Math.round(longRunMiles * 0.40));
@@ -1436,10 +1458,10 @@ export function buildWeek(
   }
 
   // ── Mid-week easy run (default Friday; from Arc `preferred_days.easy_run`) ─
-  // In recovery weeks: shorter shake-out run (~25% of long-run mileage) to keep
-  // the running pattern without adding fatigue.
+  // §SESSION-FREQUENCY-DEFAULTS §2: when runs_per_week < 3, easy_run is dropped
+  // (long_run + quality_run only). `runsBudget` declared earlier (above run-only path).
   const runEasySlot = grid.get(runEasyDay);
-  if (!runEasySlot?.isRest && !['taper'].includes(phase)) {
+  if (runsBudget >= 3 && !runEasySlot?.isRest && !['taper'].includes(phase)) {
     if (isRecovery) {
       const recMi = Math.max(2, Math.round(longRunMiles * 0.25));
       runEasySlot!.sessions.push(easyRun(runEasyDay, recMi, servedGoal));
@@ -1695,8 +1717,11 @@ export function buildWeek(
   // has ≤1 session (TSS gate is waived — the athlete asked for it). For unset/default days,
   // still require remaining TSS > 50 so we don't pad thin weeks with junk miles.
   // Recovery weeks: place a short (~45 min) shake-out spin to preserve frequency.
+  // §SESSION-FREQUENCY-DEFAULTS §2: when bikes_per_week < 3, easy_bike is dropped entirely
+  // (long_ride + quality_bike only). Reads from session_frequency_defaults populated by reconciler.
+  const bikesBudget = athleteState.session_frequency_defaults?.bikes_per_week ?? 3;
   const hasExplicitBikeEasyPref = athleteState.bike_easy_day != null;
-  if (hasTri && !raceThisWeek) {
+  if (bikesBudget >= 3 && hasTri && !raceThisWeek) {
     const midRideSlot = grid.get(bikeEasyDay);
     if (midRideSlot && !midRideSlot.isRest) {
       const slotFree = midRideSlot.sessions.length < 2;

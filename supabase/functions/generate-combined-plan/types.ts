@@ -4,6 +4,7 @@
 import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
 import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
 import type { SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
+import type { SessionFrequencyDefaults } from '../_shared/session-frequency-defaults.ts';
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
@@ -184,6 +185,12 @@ export interface AthleteState {
    * `session_index` (1 = upper, 0 = lower). Overrides weekday scanning when present.
    */
   strength_optimizer_slots?: { weekday: string; session_index: 0 | 1 }[];
+  /**
+   * Per-discipline session counts derived from `weekly_hours_available` + limiter + intent.
+   * See `_shared/session-frequency-defaults.ts` and `docs/SESSION-FREQUENCY-DEFAULTS.md`.
+   * Wizard-supplied (athlete override) takes precedence over reconciler-computed.
+   */
+  session_frequency_defaults?: SessionFrequencyDefaults;
   /**
    * Arc wizard / athlete preference when anchored quality bike can force mid-week run intervals
    * (typically Thu after Wed group ride). `long_run_blend` folds stimulus into the long run instead.

@@ -158,6 +158,19 @@ export interface WeekOptimizerInputs {
     swims_per_week: 0 | 1 | 2 | 3;
     strength_frequency: 0 | 1 | 2 | 3;
     training_days: 4 | 5 | 6 | 7;
+    /**
+     * Per `docs/SESSION-FREQUENCY-DEFAULTS.md`: total bike sessions per week (long_ride +
+     * quality_bike + optional easy_bike). When &lt; 3, easy_bike is skipped entirely.
+     * Optional — when undefined, defaults to 3 (existing behavior preserved for callers
+     * that don't yet supply this).
+     */
+    bikes_per_week?: 1 | 2 | 3;
+    /**
+     * Per `docs/SESSION-FREQUENCY-DEFAULTS.md`: total run sessions per week (long_run +
+     * quality_run + optional easy_run). When &lt; 3, easy_run is skipped entirely.
+     * Optional — when undefined, defaults to 3.
+     */
+    runs_per_week?: 2 | 3 | 4;
     /** Optional explicit rest days (Sun-first day names). Server fills the rest. */
     rest_days?: DayName[];
     /**
@@ -1070,32 +1083,41 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
   }
 
   // ── easy_bike (mid-week) ─────────────────────────────────────────────────
+  // §SESSION-FREQUENCY-DEFAULTS §2: when bikes_per_week < 3, only long_ride + quality_bike are
+  // budgeted for the week; easy_bike is dropped entirely (not flagged as conflict — intentional).
+  const bikesPerWeek = inputs.preferences.bikes_per_week ?? 3;
   let easyBikeDay: DayName | undefined;
-  const ebPref = inputs.preferences.easy_bike;
-  const ebBase: DayName[] = ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'];
-  const easyBikeCandidates = ebPref ? biasOrderForPreferredDay(ebBase, ebPref) : ebBase;
-  // Prefer Monday when open so easy_bike shares a day with later upper/strength (MODERATE)
-  // rather than sitting alone as LOW-only mid-week — avoids rest-budget pass wiping an isolated easy_bike day.
-  for (const c of easyBikeCandidates) {
-    if (c === longRide || c === longRun) continue;
-    if (qualityBikeDay && c === qualityBikeDay) continue;
-    if (qualityRunDay && c === qualityRunDay) continue;
-    if (!canPlace(days, c, 'easy_bike')) continue;
-    easyBikeDay = c;
-    place(days, c, 'easy_bike');
-    break;
-  }
-  if (!easyBikeDay) {
-    if (ebPref) {
-      conflicts.push(
-        `easy_bike: could not place athlete preference (${tfDay(ebPref)}) — same-day matrix full or incompatible with quality_run / quality_bike.`,
-      );
-    } else {
-      conflicts.push(
-        'easy_bike: no matrix-clean weekday available — try freeing up a quality day or trimming swim/strength frequency.',
-      );
+  if (bikesPerWeek < 3) {
+    trade_offs.push(
+      `easy_bike skipped — frequency budget is ${bikesPerWeek} bike sessions/week (long_ride + quality_bike only).`,
+    );
+  } else {
+    const ebPref = inputs.preferences.easy_bike;
+    const ebBase: DayName[] = ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'];
+    const easyBikeCandidates = ebPref ? biasOrderForPreferredDay(ebBase, ebPref) : ebBase;
+    // Prefer Monday when open so easy_bike shares a day with later upper/strength (MODERATE)
+    // rather than sitting alone as LOW-only mid-week — avoids rest-budget pass wiping an isolated easy_bike day.
+    for (const c of easyBikeCandidates) {
+      if (c === longRide || c === longRun) continue;
+      if (qualityBikeDay && c === qualityBikeDay) continue;
+      if (qualityRunDay && c === qualityRunDay) continue;
+      if (!canPlace(days, c, 'easy_bike')) continue;
+      easyBikeDay = c;
+      place(days, c, 'easy_bike');
+      break;
     }
-    trade_offs.push('Mid-week easy bike dropped — schedule too dense.');
+    if (!easyBikeDay) {
+      if (ebPref) {
+        conflicts.push(
+          `easy_bike: could not place athlete preference (${tfDay(ebPref)}) — same-day matrix full or incompatible with quality_run / quality_bike.`,
+        );
+      } else {
+        conflicts.push(
+          'easy_bike: no matrix-clean weekday available — try freeing up a quality day or trimming swim/strength frequency.',
+        );
+      }
+      trade_offs.push('Mid-week easy bike dropped — schedule too dense.');
+    }
   }
 
   const strengthFreq = inputs.preferences.strength_frequency;
@@ -1106,8 +1128,18 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     strengthDays.push(consolidatedQrLowerDay);
   }
   let easyRunDay: DayName | undefined;
+  // §SESSION-FREQUENCY-DEFAULTS §2: when runs_per_week < 3, only long_run + quality_run are
+  // budgeted for the week; easy_run is dropped entirely. The placeEasyRun closure short-circuits.
+  const runsPerWeek = inputs.preferences.runs_per_week ?? 3;
+  const skipEasyRun = runsPerWeek < 3;
 
   const placeEasyRun = (): void => {
+    if (skipEasyRun) {
+      trade_offs.push(
+        `easy_run skipped — frequency budget is ${runsPerWeek} run sessions/week (long_run + quality_run only).`,
+      );
+      return;
+    }
     const easyRunTiebreak: DayName[] = ['tuesday', 'thursday', 'monday', 'wednesday', 'friday'];
     const scored = (
       ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as DayName[]
@@ -1691,7 +1723,15 @@ export function deriveOptimalWeekWithCoEqualRecovery(
   const recoveryLine =
     'CO_EQUAL_STRENGTH (recovery): 2× co-equal strength could not fit these anchors — this output is a provisional 1× strength week. The athlete must choose: move a fixed day (long ride, group bike, run club, or swim block), or explicitly accept 1× strength until the schedule fits. Do not describe this as a vague “small adjustment”; name the constraint.';
 
-  if (retry.conflicts.length > 0) {
+  // §4.15 transparency lines (`strength_preferred_days: <day> rejected ...`) are informational —
+  // they tell the caller that the athlete's preferred day couldn't be honored, but the optimizer
+  // still produced a valid placement. They must NOT cause the recovery wrapper to discard retry's
+  // grid, otherwise the 1× retry's correctly-placed sessions (e.g. 3rd swim) get lost.
+  const blockingRetryConflicts = retry.conflicts.filter(
+    (c) => !c.startsWith('strength_preferred_days:'),
+  );
+
+  if (blockingRetryConflicts.length > 0) {
     return {
       week: {
         ...first,

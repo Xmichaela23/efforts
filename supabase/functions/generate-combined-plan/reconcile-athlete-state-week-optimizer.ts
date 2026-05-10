@@ -9,6 +9,11 @@ import type { AthleteState } from './types.ts';
 import type { DayName, StrengthPreferredSlot, WeekOptimizerInputs } from '../_shared/week-optimizer.ts';
 import { deriveOptimalWeekWithCoEqualRecovery } from '../_shared/week-optimizer.ts';
 import { lineLooksLikeQualityRunUnplaced } from '../_shared/plan-generation-trade-offs.ts';
+import {
+  computeSessionFrequencyDefaults,
+  type SessionFrequencyDefaults,
+  type SessionFrequencyInputs,
+} from '../_shared/session-frequency-defaults.ts';
 
 const SUN_DAY_NAMES: DayName[] = [
   'sunday',
@@ -90,6 +95,32 @@ function normalizeStrengthPreferredDays(state: AthleteState): DayName[] | undefi
   return normalized.length > 0 ? normalized : undefined;
 }
 
+/**
+ * Resolve session frequency defaults: wizard-supplied (athlete override) wins over
+ * reconciler-computed. Maps AthleteState fields to the helper's input shape; treats
+ * `strength_sessions_cap === 0` as `strength_intent: 'none'` per Phase A spec decision.
+ */
+function resolveSessionFrequencyDefaults(state: AthleteState): SessionFrequencyDefaults {
+  if (state.session_frequency_defaults) {
+    return { ...state.session_frequency_defaults, source: 'override' };
+  }
+  const inputs: SessionFrequencyInputs = {
+    weekly_hours_available: state.weekly_hours_available,
+    ...(state.limiter_sport === 'swim' || state.limiter_sport === 'bike' || state.limiter_sport === 'run'
+      ? { limiter_sport: state.limiter_sport }
+      : {}),
+    ...(state.swim_intent ? { swim_intent: state.swim_intent } : {}),
+    ...(state.strength_sessions_cap === 0
+      ? { strength_intent: 'none' as const }
+      : state.strength_intent === 'performance'
+        ? { strength_intent: 'performance' as const }
+        : state.strength_intent === 'support'
+          ? { strength_intent: 'support' as const }
+          : {}),
+  };
+  return computeSessionFrequencyDefaults(inputs);
+}
+
 function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | null {
   const lr = state.long_ride_day != null ? sunIndexToDayName(state.long_ride_day) : undefined;
   const lrun = state.long_run_day != null ? sunIndexToDayName(state.long_run_day) : undefined;
@@ -116,7 +147,17 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
     Math.min(7, Math.round(state.days_per_week ?? 6)),
   ) as 4 | 5 | 6 | 7;
 
-  const strengthFreq = inferStrengthFrequency(state);
+  // Frequency defaults: hours-derived (or athlete override). Drives swim/bike/run/strength counts.
+  const freq = resolveSessionFrequencyDefaults(state);
+
+  // For frequencies derived from hours, the athlete-pinned anchor count is a *floor* (athlete's
+  // explicit choice wins when they pinned MORE days than the default), not a ceiling. Without
+  // pinned days, `inferSwimsPerWeek` returns 2 even at 12hr/wk — that's the legacy default; we
+  // shouldn't let it cap the freq-derived 3.
+  const inferredStrengthFreq = inferStrengthFrequency(state);
+  const strengthFreq = Math.max(inferredStrengthFreq, freq.strength_per_week) as 0 | 1 | 2 | 3;
+  const inferredSwims = inferSwimsPerWeek(state);
+  const swimsPerWeek = Math.max(inferredSwims, freq.swims_per_week) as 0 | 1 | 2 | 3;
 
   const trainingIntent = state.training_intent;
   let strengthIntent: 'performance' | 'support' =
@@ -133,9 +174,11 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
       ...(masters ? { masters_swim: masters } : {}),
     },
     preferences: {
-      swims_per_week: inferSwimsPerWeek(state),
+      swims_per_week: swimsPerWeek,
       strength_frequency: strengthFreq,
       training_days: trainingDays,
+      bikes_per_week: freq.bikes_per_week,
+      runs_per_week: freq.runs_per_week,
       ...(restDays.length ? { rest_days: restDays } : {}),
       ...(qr ? { quality_run: qr } : {}),
       ...(state.run_easy_day != null ? { easy_run: sunIndexToDayName(state.run_easy_day) } : {}),
@@ -197,9 +240,15 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     }
   }
 
+  // Recompute frequency defaults from input state so the builder sees the same numbers
+  // the optimizer was given. (Helper is pure — recomputing is cheaper than threading
+  // the value down through buildWeekOptimizerInputs's return.)
+  const freqOut = resolveSessionFrequencyDefaults(state);
+
   const merged: AthleteState = {
     ...state,
     enforce_optimizer_anchor_days: true,
+    session_frequency_defaults: freqOut,
     ...(strength_slots.length ? { strength_optimizer_slots: strength_slots } : {}),
     ...(pd.long_ride ? { long_ride_day: dayNameToSunIndex(pd.long_ride) } : {}),
     ...(pd.long_run ? { long_run_day: dayNameToSunIndex(pd.long_run) } : {}),
