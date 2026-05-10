@@ -9,6 +9,8 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  effectiveLongRideFloorHours,
+  effectiveLongRunFloorMiles,
   enforceLongDayFloors,
   evaluateLongDayVolumeFloors,
   type LongDayFloorWarning,
@@ -91,39 +93,39 @@ function week(opts: {
 
 // ── §1 longRideFloorHours: peak × phase multiplier ──────────────────────────
 
-Deno.test('longRideFloorHours: 70.3 base = 1.5h (3h peak × 0.50)', () => {
-  assertEquals(longRideFloorHours('70.3', 'base'), 1.5);
+Deno.test('longRideFloorHours: 70.3 base = 2.25h (3h peak × 0.75)', () => {
+  assertEquals(longRideFloorHours('70.3', 'base'), 2.25);
 });
 
-Deno.test('longRideFloorHours: 70.3 build = 2.0h (3h × 0.67, quarter-hour quantized)', () => {
-  // 3 × 0.67 = 2.01 → rounds to 2.0
-  assertEquals(longRideFloorHours('70.3', 'build'), 2.0);
+Deno.test('longRideFloorHours: 70.3 build = 2.5h (3h × 0.85, quarter-hour quantized)', () => {
+  // 3 × 0.85 = 2.55 → round(10.2)/4 = 2.5
+  assertEquals(longRideFloorHours('70.3', 'build'), 2.5);
 });
 
-Deno.test('longRideFloorHours: 70.3 race_specific = 2.5h (3h × 0.83)', () => {
-  // 3 × 0.83 = 2.49 → rounds to 2.5
-  assertEquals(longRideFloorHours('70.3', 'race_specific'), 2.5);
+Deno.test('longRideFloorHours: 70.3 race_specific = 3.0h (3h × 1.00)', () => {
+  assertEquals(longRideFloorHours('70.3', 'race_specific'), 3.0);
 });
 
-Deno.test('longRideFloorHours: ironman base = 3.0h (6h × 0.50)', () => {
-  assertEquals(longRideFloorHours('ironman', 'base'), 3.0);
+Deno.test('longRideFloorHours: ironman base = 4.5h (6h × 0.75)', () => {
+  assertEquals(longRideFloorHours('ironman', 'base'), 4.5);
 });
 
-Deno.test('longRideFloorHours: ironman build = 4.0h (6h × 0.67)', () => {
-  // 6 × 0.67 = 4.02 → 4.0
-  assertEquals(longRideFloorHours('ironman', 'build'), 4.0);
+Deno.test('longRideFloorHours: ironman build = 5.0h (6h × 0.85, quarter-hour quantized)', () => {
+  // 6 × 0.85 = 5.10 → round(20.4)/4 = 5.0
+  assertEquals(longRideFloorHours('ironman', 'build'), 5.0);
 });
 
-Deno.test('longRideFloorHours: ironman race_specific = 5.0h (6h × 0.83)', () => {
-  assertEquals(longRideFloorHours('ironman', 'race_specific'), 5.0);
+Deno.test('longRideFloorHours: ironman race_specific = 6.0h (6h × 1.00)', () => {
+  assertEquals(longRideFloorHours('ironman', 'race_specific'), 6.0);
 });
 
-Deno.test('longRideFloorHours: olympic base = 0.75h (1.5h × 0.50)', () => {
-  assertEquals(longRideFloorHours('olympic', 'base'), 0.75);
+Deno.test('longRideFloorHours: olympic base = 1.25h (1.5h × 0.75)', () => {
+  // 1.5 × 0.75 = 1.125 → round(4.5)/4 = 1.25
+  assertEquals(longRideFloorHours('olympic', 'base'), 1.25);
 });
 
-Deno.test('longRideFloorHours: sprint base = 0.5h (1h × 0.50)', () => {
-  assertEquals(longRideFloorHours('sprint', 'base'), 0.5);
+Deno.test('longRideFloorHours: sprint base = 0.75h (1h × 0.75)', () => {
+  assertEquals(longRideFloorHours('sprint', 'base'), 0.75);
 });
 
 Deno.test('longRideFloorHours: taper returns 0 (validator skips)', () => {
@@ -136,44 +138,44 @@ Deno.test('longRideFloorHours: recovery returns 0 (validator skips)', () => {
 
 // ── §2 evaluator basics: long ride below floor → warning ────────────────────
 
-Deno.test('long_ride at 60min in 70.3 base (floor 1.5h) → warning', () => {
+Deno.test('long_ride at 60min in 70.3 base (floor 2.25h) → warning', () => {
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 3,
       phase: 'base',
       sessions: [
         session({ type: 'bike', tags: ['long_ride'], durationMin: 60 }),
-        session({ type: 'run', tags: ['long_run'], durationMin: 60 }),
+        session({ type: 'run', tags: ['long_run'], durationMin: 90 }),
       ],
     }),
   ];
   const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
-  // long_ride: 1.0h < 1.5h floor → warning. long_run: 60/9.5 = 6.3mi vs 5.5 floor → no warning.
+  // long_ride: 1.0h < 2.25h floor → warning. long_run: 90/9.5 = 9.5mi vs 8.5 floor → no warning.
   assertEquals(out.length, 1);
   assertEquals(out[0].discipline, 'long_ride');
   assertEquals(out[0].weekNum, 3);
   assertEquals(out[0].metrics.observed, 1.0);
-  assertEquals(out[0].metrics.floor, 1.5);
+  assertEquals(out[0].metrics.floor, 2.25);
 });
 
-Deno.test('long_ride at 90min in 70.3 base (floor 1.5h) → no warning (exactly at floor)', () => {
+Deno.test('long_ride at 135min in 70.3 base (floor 2.25h) → no warning (exactly at floor)', () => {
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 4,
       phase: 'base',
       sessions: [
-        session({ type: 'bike', tags: ['long_ride'], durationMin: 90 }),
-        session({ type: 'run', tags: ['long_run'], durationMin: 60 }),
+        session({ type: 'bike', tags: ['long_ride'], durationMin: 135 }),
+        session({ type: 'run', tags: ['long_run'], durationMin: 90 }),
       ],
     }),
   ];
   const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
-  // 90/60 = 1.5h, equals floor — not below.
+  // 135/60 = 2.25h, equals floor — not below.
   assertEquals(out.filter((w) => w.discipline === 'long_ride').length, 0);
 });
 
-Deno.test('long_run below floor in 70.3 build (floor 8.5mi)', () => {
-  // longRunFloorMiles('70.3','build') = 11 × 0.75 = 8.25 → rounds to 8.5 (peak*mult*2)/2 = 16.5/2 = 8.25 → 8.5? Let me trust the function.
+Deno.test('long_run below floor in 70.3 build (floor 9.5mi)', () => {
+  // longRunFloorMiles('70.3','build') = 11 × 0.85 = 9.35 → round(18.7)/2 = 9.5
   const expectedFloor = longRunFloorMiles('70.3', 'build');
   // 60min @ 9.5min/mi = 6.3mi
   const weeks: GeneratedWeek[] = [
@@ -362,7 +364,7 @@ Deno.test('warning message includes phase label and observed/floor numbers', () 
   // Race-specific phase label uses hyphenated form per phaseLabel().
   assert(lrideWarn.message.includes('race-specific'));
   assert(lrideWarn.message.includes('1h')); // observed
-  assert(lrideWarn.message.includes('2.5h')); // floor
+  assert(lrideWarn.message.includes('3h')); // floor (3.0 → "3" via JS number stringification)
 });
 
 Deno.test('week with both disciplines below floor → 2 warnings, both addressed', () => {
@@ -391,16 +393,16 @@ Deno.test('multiple weeks evaluated independently', () => {
       weekNum: 1,
       phase: 'base',
       sessions: [
-        session({ type: 'bike', tags: ['long_ride'], durationMin: 90 }), // 1.5h = base floor → ok
-        session({ type: 'run', tags: ['long_run'], durationMin: 60 }), // 6.3mi vs 5.5 floor → ok
+        session({ type: 'bike', tags: ['long_ride'], durationMin: 135 }), // 2.25h = base floor → ok
+        session({ type: 'run', tags: ['long_run'], durationMin: 90 }), // 9.5mi vs 8.5 floor → ok
       ],
     }),
     week({
       weekNum: 2,
       phase: 'base',
       sessions: [
-        session({ type: 'bike', tags: ['long_ride'], durationMin: 60 }), // 1h < 1.5 floor → warn
-        session({ type: 'run', tags: ['long_run'], durationMin: 60 }),
+        session({ type: 'bike', tags: ['long_ride'], durationMin: 60 }), // 1h < 2.25 floor → warn
+        session({ type: 'run', tags: ['long_run'], durationMin: 90 }),
       ],
     }),
     week({
@@ -418,36 +420,36 @@ Deno.test('multiple weeks evaluated independently', () => {
 
 // ── §9 enforceLongDayFloors: bumps below-floor sessions back up ─────────────
 
-Deno.test('enforce: long_ride below floor in 70.3 base bumped to 1.5h (90min)', () => {
+Deno.test('enforce: long_ride below floor in 70.3 base bumped to 2.25h (135min)', () => {
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 1,
       phase: 'base',
       sessions: [
-        session({ type: 'bike', tags: ['long_ride'], durationMin: 45 }), // 0.75h < 1.5h floor
+        session({ type: 'bike', tags: ['long_ride'], durationMin: 45 }), // 0.75h < 2.25h floor
       ],
     }),
   ];
   enforceLongDayFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
   const lride = weeks[0].sessions.find((s) => s.tags.includes('long_ride'))!;
-  assertEquals(lride.duration, 90);
-  assertEquals(lride.name, 'Long Ride — 1.5 hr');
-  assertEquals(lride.steps_preset, ['bike_endurance_90min_Z2']);
+  assertEquals(lride.duration, 135);
+  assertEquals(lride.name, 'Long Ride — 2.3 hr'); // (2.25).toFixed(1) → "2.3"
+  assertEquals(lride.steps_preset, ['bike_endurance_135min_Z2']);
 });
 
-Deno.test('enforce: long_ride at floor (90min) is not touched', () => {
+Deno.test('enforce: long_ride at floor (135min) is not touched', () => {
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 1,
       phase: 'base',
       sessions: [
-        session({ type: 'bike', tags: ['long_ride'], durationMin: 90 }),
+        session({ type: 'bike', tags: ['long_ride'], durationMin: 135 }),
       ],
     }),
   ];
   enforceLongDayFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
   const lride = weeks[0].sessions.find((s) => s.tags.includes('long_ride'))!;
-  assertEquals(lride.duration, 90);
+  assertEquals(lride.duration, 135);
   assertEquals(lride.name, 'bike session'); // helper-default name preserved when not bumped
 });
 
@@ -466,8 +468,8 @@ Deno.test('enforce: long_ride above floor is not compressed', () => {
   assertEquals(lride.duration, 180);
 });
 
-Deno.test('enforce: long_run below floor in 70.3 build bumped (8.5mi → 9mi int rounding)', () => {
-  // build floor = 8.5 mi; round to 9 for token compatibility.
+Deno.test('enforce: long_run below floor in 70.3 build bumped (9.5mi → 10mi int rounding)', () => {
+  // build floor = 11 × 0.85 = 9.35 → round half = 9.5; round to int = 10 for token compatibility.
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 8,
@@ -479,10 +481,10 @@ Deno.test('enforce: long_run below floor in 70.3 build bumped (8.5mi → 9mi int
   ];
   enforceLongDayFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
   const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
-  // Math.round(8.5) → 9; duration = round(9 × 9.5) = 86
-  assertEquals(lrun.duration, 86);
-  assertEquals(lrun.name, 'Long Run — 9 mi');
-  assertEquals(lrun.steps_preset, ['longrun_9mi_easypace']);
+  // Math.round(9.5) → 10; duration = round(10 × 9.5) = 95
+  assertEquals(lrun.duration, 95);
+  assertEquals(lrun.name, 'Long Run — 10 mi');
+  assertEquals(lrun.steps_preset, ['longrun_10mi_easypace']);
 });
 
 Deno.test('enforce: long_run race_specific picks _mp_finish token', () => {
@@ -545,14 +547,15 @@ Deno.test('enforce: run-only plan does not enforce long_ride', () => {
     }),
   ];
   enforceLongDayFloors(weeks, { hasTri: false, primaryDistance: 'marathon' });
-  // Long_run still enforced. Marathon build floor = 18 × 0.75 = 13.5 → round to 14 mi → 133 min.
+  // Long_run still enforced. Marathon build floor = 18 × 0.85 = 15.3 → 15.5 (half-mi);
+  // round to 16 mi → 152 min.
   const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
-  assertEquals(lrun.duration, 133);
-  assertEquals(lrun.steps_preset, ['longrun_14mi_easypace']);
+  assertEquals(lrun.duration, 152);
+  assertEquals(lrun.steps_preset, ['longrun_16mi_easypace']);
 });
 
 Deno.test('enforce: week aggregates updated when long_ride bumped', () => {
-  // Single long_ride at 45min/EASY. After bump to 90min, week TSS doubles (proportional to duration).
+  // Single long_ride at 45min/EASY. After bump to 135min (2.25h base floor), week TSS triples.
   const lride = session({ type: 'bike', tags: ['long_ride'], durationMin: 45 });
   const weeks: GeneratedWeek[] = [
     week({ weekNum: 1, phase: 'base', sessions: [lride] }),
@@ -562,12 +565,12 @@ Deno.test('enforce: week aggregates updated when long_ride bumped', () => {
   const oldBike = w.sport_raw_tss.bike;
   const oldZ12 = w.zone1_2_minutes;
   enforceLongDayFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
-  // Bumped to 90 min EASY bike: tss = round(90 × 50/60 × 1) = 75 (estimateSessionTSS)
-  const newBikeTss = estimateSessionTSS('bike', 'EASY', 90);
+  // Bumped to 135 min EASY bike: estimateSessionTSS('bike','EASY',135).
+  const newBikeTss = estimateSessionTSS('bike', 'EASY', 135);
   assertEquals(w.sport_raw_tss.bike, newBikeTss);
   assertEquals(w.total_raw_tss, newBikeTss);
-  // EASY long_ride is fully Z1-2; z12 should grow by the duration delta (90 - 45 = 45).
-  assertEquals(w.zone1_2_minutes - oldZ12, 45);
+  // EASY long_ride is fully Z1-2; z12 should grow by the duration delta (135 - 45 = 90).
+  assertEquals(w.zone1_2_minutes - oldZ12, 90);
   assertEquals(w.zone3_plus_minutes, 0);
   // sanity: the deltas applied — not the originals
   assert(w.total_raw_tss > oldTotal);
@@ -606,4 +609,118 @@ Deno.test('enforce + evaluate composition: after enforcement, soft warnings disa
   // After: both at/above floor → 0 warnings.
   const after = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
   assertEquals(after.length, 0);
+});
+
+// ── §10 history-aware effective floor ───────────────────────────────────────
+
+Deno.test('effective floor: no history → spec floor wins (run)', () => {
+  // 70.3 base spec = 8.5; recent = 0 → 0.5 × 0 = 0; max = 8.5.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 0), 8.5);
+});
+
+Deno.test('effective floor: low recent volume → spec floor wins (run)', () => {
+  // 70.3 base spec = 8.5; recent = 10 → 5.0; max = 8.5.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 10), 8.5);
+});
+
+Deno.test('effective floor: high recent volume → recent×0.5 wins (run)', () => {
+  // 70.3 base spec = 8.5; recent = 20 → 10.0; max = 10.0.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 20), 10);
+});
+
+Deno.test('effective floor: ride mirrors run formula', () => {
+  // 70.3 base spec = 2.25h; recent = 5h → 2.5; max = 2.5.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 5), 2.5);
+  // recent = 0 → spec wins.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 0), 2.25);
+});
+
+Deno.test('effective floor: ride taper/recovery returns 0 even with high recent', () => {
+  // Spec floor in taper/recovery is 0 (validators skip). Function preserves the 0 sentinel
+  // so callers know this phase is exempt regardless of recent volume.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'taper', 6), 0);
+  assertEquals(effectiveLongRideFloorHours('70.3', 'recovery', 6), 0);
+});
+
+Deno.test('enforce: history-aware floor lifts long_run above spec for high-volume athletes', () => {
+  // Athlete with recent_longest_run = 20mi → effective floor = 10mi (vs spec 8.5).
+  // Long_run currently at 30min (3.2mi). After enforcement: bumped to 10mi → 95min.
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 3,
+      phase: 'base',
+      sessions: [session({ type: 'run', tags: ['long_run', 'base'], durationMin: 30 })],
+    }),
+  ];
+  enforceLongDayFloors(weeks, {
+    hasTri: true,
+    primaryDistance: '70.3',
+    recentLongestRunMi: 20,
+  });
+  const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
+  // Math.round(10) → 10; duration = 95
+  assertEquals(lrun.duration, 95);
+  assertEquals(lrun.steps_preset, ['longrun_10mi_easypace']);
+});
+
+Deno.test('enforce: history-aware floor lifts long_ride above spec for high-volume athletes', () => {
+  // Athlete with recent_longest_ride = 5h → effective floor = 2.5h (vs spec 2.25h).
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 3,
+      phase: 'base',
+      sessions: [session({ type: 'bike', tags: ['long_ride'], durationMin: 45 })],
+    }),
+  ];
+  enforceLongDayFloors(weeks, {
+    hasTri: true,
+    primaryDistance: '70.3',
+    recentLongestRideHr: 5,
+  });
+  const lride = weeks[0].sessions.find((s) => s.tags.includes('long_ride'))!;
+  // 2.5h × 60 = 150min
+  assertEquals(lride.duration, 150);
+  assertEquals(lride.name, 'Long Ride — 2.5 hr');
+  assertEquals(lride.steps_preset, ['bike_endurance_150min_Z2']);
+});
+
+Deno.test('enforce: low-recent-volume athlete still gets spec floor (history doesn\'t lower it)', () => {
+  // Athlete with recent_longest_run = 5mi (low) — formula gives 2.5mi from history. Spec base
+  // floor is 8.5mi; max wins → effective floor = 8.5mi. History does not REDUCE the floor.
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 1,
+      phase: 'base',
+      sessions: [session({ type: 'run', tags: ['long_run', 'base'], durationMin: 30 })],
+    }),
+  ];
+  enforceLongDayFloors(weeks, {
+    hasTri: true,
+    primaryDistance: '70.3',
+    recentLongestRunMi: 5,
+  });
+  const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
+  // Spec floor 8.5 → round to 9 → duration 86. History (5×0.5=2.5) doesn't lower this.
+  assertEquals(lrun.duration, 86);
+  assertEquals(lrun.steps_preset, ['longrun_9mi_easypace']);
+});
+
+Deno.test('evaluate: history-aware floor surfaces the same effective threshold', () => {
+  // Athlete with recent_longest_run = 20mi → effective floor 10mi. Long run at 9mi (85.5min)
+  // is below effective floor → warning, even though above spec floor (8.5mi).
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 2,
+      phase: 'base',
+      sessions: [session({ type: 'run', tags: ['long_run', 'base'], durationMin: 86 })],
+    }),
+  ];
+  const out = evaluateLongDayVolumeFloors(weeks, {
+    hasTri: true,
+    primaryDistance: '70.3',
+    recentLongestRunMi: 20,
+  });
+  const lrWarn = out.find((w) => w.discipline === 'long_run');
+  assert(lrWarn, 'expected warning when below history-aware floor');
+  assertEquals(lrWarn.metrics.floor, 10);
 });

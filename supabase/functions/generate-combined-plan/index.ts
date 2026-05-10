@@ -83,6 +83,57 @@ Deno.serve(async (req: Request) => {
       rest_days: athlete_state.rest_days ?? [],
     };
 
+    // History-aware long-day floors: read the longest run / ride from the last 30 days so the
+    // physiological floor enforcement (`enforceLongDayFloors`) can scale up to match the athlete's
+    // recent volume — `effectiveFloor = max(specFloor, recent × 0.5)`. New users / no-history
+    // → 0, spec floor wins. Failure to read (no service role, network) → 0; soft fallback so
+    // plan generation never blocks on telemetry.
+    {
+      const sbUrl = Deno.env.get('SUPABASE_URL');
+      const sbKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      let recentRunMi = 0;
+      let recentRideHr = 0;
+      if (sbUrl && sbKey) {
+        try {
+          const sb = createClient(sbUrl, sbKey);
+          const cutoffISO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10);
+          const { data, error } = await sb
+            .from('workouts')
+            .select('type,distance,duration,date')
+            .eq('user_id', user_id)
+            .in('type', ['run', 'ride'])
+            .gte('date', cutoffISO);
+          if (error) {
+            console.warn('[generate-combined-plan] recent_longest read failed:', error.message);
+          } else if (Array.isArray(data)) {
+            for (const w of data) {
+              const t = String(w?.type ?? '').toLowerCase();
+              if (t === 'run') {
+                const mi = Number(w?.distance);
+                if (Number.isFinite(mi) && mi > recentRunMi) recentRunMi = mi;
+              } else if (t === 'ride') {
+                const min = Number(w?.duration);
+                if (Number.isFinite(min) && min > 0) {
+                  const hr = min / 60;
+                  if (hr > recentRideHr) recentRideHr = hr;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[generate-combined-plan] recent_longest exception:', e);
+        }
+      }
+      state.recent_longest_run_mi = recentRunMi;
+      state.recent_longest_ride_hr = recentRideHr;
+      console.log('[generate-combined-plan] history-aware floor inputs:', {
+        recent_longest_run_mi: recentRunMi,
+        recent_longest_ride_hr: recentRideHr,
+      });
+    }
+
     const state703Cutoff = promote703SwimIntentForCutoffRisk(goals, state);
 
     console.log('[generate-combined-plan] athleteState before reconcile:', {
@@ -174,10 +225,14 @@ Deno.serve(async (req: Request) => {
     // Long-day anchors are hard floors — re-enforce them after each compression pass so the
     // 0.87× tightening shrinks quality / easy / swim but never compresses long_ride / long_run
     // below their physiological minimums (`longRideFloorHours` / `longRunFloorMiles`).
+    // The effective floor is history-aware: `max(specFloor, recent_longest × 0.5)` so athletes
+    // who already log longer sessions don't get capped to the generic spec floor.
     const longDayFloorOpts = {
       hasTri: hasTriGoal,
       primaryDistance: (goals.find((g) => g.priority === 'A') ?? goals[0]).distance,
       raceWeekNums: raceAnchors.map((a) => a.planWeek),
+      recentLongestRunMi: state.recent_longest_run_mi ?? 0,
+      recentLongestRideHr: state.recent_longest_ride_hr ?? 0,
     };
     let floors = validateTrainingFloors(generatedWeeks, floorOpts);
     const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 12;
@@ -227,12 +282,16 @@ Deno.serve(async (req: Request) => {
     // Surfaces under-volume long_ride / long_run weeks as athlete-facing trade-offs. Distinct
     // from the hard floor-rebuild loop above (which addresses *over-concentration*). Skips
     // recovery, taper, and race weeks — those phases intentionally suppress long-day volume.
+    // Uses the same history-aware effective floor as the hard enforcer so warnings and
+    // enforcement stay in lockstep.
     {
       const primaryGoalForFloors = goals.find((g) => g.priority === 'A') ?? goals[0];
       const longDayWarnings = evaluateLongDayVolumeFloors(generatedWeeks, {
         hasTri: hasTriGoal,
         primaryDistance: primaryGoalForFloors.distance,
         raceWeekNums: raceAnchors.map((a) => a.planWeek),
+        recentLongestRunMi: state.recent_longest_run_mi ?? 0,
+        recentLongestRideHr: state.recent_longest_ride_hr ?? 0,
       });
       if (longDayWarnings.length > 0) {
         console.warn(

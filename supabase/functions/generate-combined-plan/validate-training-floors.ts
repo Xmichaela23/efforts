@@ -52,10 +52,10 @@ export const LONG_RUN_TSS_SHARE_MAX_BY_PHASE: Record<
   'base' | 'build' | 'race_specific' | 'taper',
   number
 > = {
-  base: 0.30,
-  build: 0.32,
-  race_specific: 0.35,
-  taper: 0.40,
+  base: 0.40,
+  build: 0.42,
+  race_specific: 0.45,
+  taper: 0.50,
 };
 
 /** Minimum weekly run raw TSS before we trust run-discipline share (else use tri total-week fallback). */
@@ -307,7 +307,43 @@ export type EvaluateLongDayFloorsOpts = {
   hasTri: boolean;
   /** Primary A-race distance — feeds {@link longRunFloorMiles} / {@link longRideFloorHours}. */
   primaryDistance: TriRaceDistance;
+  /**
+   * Longest run distance (miles) in the last 30 days. The effective floor is
+   * `max(longRunFloorMiles(distance, phase), recent × 0.5)` — history-aware so athletes already
+   * running long miles don't get warned at the generic spec floor. Defaults to 0 (spec floor wins).
+   */
+  recentLongestRunMi?: number;
+  /** Longest ride duration (hours) in the last 30 days. Same logic for the cycling side. */
+  recentLongestRideHr?: number;
 };
+
+/**
+ * Effective long-run floor. History-aware: `max(longRunFloorMiles(distance, phase), recent × 0.5)`.
+ * New users (recent = 0) get the spec floor; experienced athletes recently logging > 2 × spec floor
+ * get a higher effective floor so the rebuild doesn't compress their long_run below half of what
+ * they've recently demonstrated.
+ */
+export function effectiveLongRunFloorMiles(
+  distance: TriRaceDistance,
+  phase: Phase,
+  recentLongestRunMi: number,
+): number {
+  const spec = longRunFloorMiles(distance, phase);
+  const fromRecent = Math.max(0, recentLongestRunMi) * 0.5;
+  return Math.max(spec, fromRecent);
+}
+
+/** Effective long-ride floor. Mirror of {@link effectiveLongRunFloorMiles} for cycling. */
+export function effectiveLongRideFloorHours(
+  distance: TriRaceDistance,
+  phase: Phase,
+  recentLongestRideHr: number,
+): number {
+  const spec = longRideFloorHours(distance, phase);
+  if (spec <= 0) return 0; // taper / recovery — skipped by validators anyway
+  const fromRecent = Math.max(0, recentLongestRideHr) * 0.5;
+  return Math.max(spec, fromRecent);
+}
 
 function maxLongRunMinutes(week: GeneratedWeek): number {
   let best = 0;
@@ -359,7 +395,11 @@ export function evaluateLongDayVolumeFloors(
     if (raceWeeks.has(w.weekNum)) continue;
 
     // Long run — applies to both single-sport (run) and tri.
-    const lrFloorMi = longRunFloorMiles(opts.primaryDistance, w.phase);
+    const lrFloorMi = effectiveLongRunFloorMiles(
+      opts.primaryDistance,
+      w.phase,
+      opts.recentLongestRunMi ?? 0,
+    );
     if (lrFloorMi > 0) {
       const lrMin = maxLongRunMinutes(w);
       const lrMi = Math.round((lrMin / LONG_RUN_PACE_MIN_PER_MI) * 10) / 10;
@@ -377,7 +417,11 @@ export function evaluateLongDayVolumeFloors(
 
     // Long ride — tri only. Run-only plans don't ship long_ride sessions.
     if (opts.hasTri) {
-      const lrideFloorH = longRideFloorHours(opts.primaryDistance, w.phase);
+      const lrideFloorH = effectiveLongRideFloorHours(
+        opts.primaryDistance,
+        w.phase,
+        opts.recentLongestRideHr ?? 0,
+      );
       if (lrideFloorH > 0) {
         const lrideMin = maxLongRideMinutes(w);
         const lrideH = Math.round((lrideMin / 60) * 100) / 100;
@@ -529,6 +573,10 @@ export type EnforceLongDayFloorsOpts = {
   primaryDistance: TriRaceDistance;
   /** Race anchor week numbers (1-indexed). Skipped — race week has its own caps. */
   raceWeekNums?: number[];
+  /** Longest run distance (miles) in the last 30 days. See {@link effectiveLongRunFloorMiles}. */
+  recentLongestRunMi?: number;
+  /** Longest ride duration (hours) in the last 30 days. See {@link effectiveLongRideFloorHours}. */
+  recentLongestRideHr?: number;
 };
 
 /**
@@ -551,7 +599,11 @@ export function enforceLongDayFloors(
     if (raceWeeks.has(w.weekNum)) continue;
 
     // Long run — applies to both single-sport (run) and tri.
-    const lrFloorMi = longRunFloorMiles(opts.primaryDistance, w.phase);
+    const lrFloorMi = effectiveLongRunFloorMiles(
+      opts.primaryDistance,
+      w.phase,
+      opts.recentLongestRunMi ?? 0,
+    );
     if (lrFloorMi > 0) {
       const lrSession = findLongRunSessionInWeek(w);
       if (lrSession) {
@@ -564,7 +616,11 @@ export function enforceLongDayFloors(
 
     // Long ride — tri only. Run-only plans never schedule long_ride.
     if (opts.hasTri) {
-      const lrideFloorH = longRideFloorHours(opts.primaryDistance, w.phase);
+      const lrideFloorH = effectiveLongRideFloorHours(
+        opts.primaryDistance,
+        w.phase,
+        opts.recentLongestRideHr ?? 0,
+      );
       if (lrideFloorH > 0) {
         const lrideSession = findLongRideSessionInWeek(w);
         if (lrideSession) {

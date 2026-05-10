@@ -192,6 +192,18 @@ export interface AthleteState {
    */
   session_frequency_defaults?: SessionFrequencyDefaults;
   /**
+   * Longest single-activity run distance (miles) in the last 30 days. Computed at plan generation
+   * time from the `workouts` table; 0 when no history exists. Drives the history-aware adjustment
+   * in `enforceLongDayFloors` so athletes who recently logged long runs don't get capped to the
+   * generic spec floor: `effectiveLongRunFloor = max(longRunFloorMiles(distance, phase), recent × 0.5)`.
+   */
+  recent_longest_run_mi?: number;
+  /**
+   * Longest single-activity ride duration (hours) in the last 30 days. Same logic as
+   * {@link recent_longest_run_mi} for the cycling side.
+   */
+  recent_longest_ride_hr?: number;
+  /**
    * Arc wizard / athlete preference when anchored quality bike can force mid-week run intervals
    * (typically Thu after Wed group ride). `long_run_blend` folds stimulus into the long run instead.
    * `standalone_midweek`: engine may keep adjacent HARD bike→run geometry; additionally enables

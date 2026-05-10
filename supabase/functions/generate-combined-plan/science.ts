@@ -168,13 +168,13 @@ export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): numb
 
   const multiplier = (() => {
     switch (phase) {
-      case 'base': return 0.50;
-      case 'build': return 0.75;
+      case 'base': return 0.75;
+      case 'build': return 0.85;
       case 'race_specific': return 1.00;
       // Taper long-run floor: keep pre–A-race Sunday run conservative (e.g. 70.3 ≈ 5 mi, not 6+).
       case 'taper': return 0.45;
       case 'recovery': return 0.40;
-      default: return 0.50;
+      default: return 0.75;
     }
   })();
 
@@ -184,19 +184,20 @@ export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): numb
 /**
  * Minimum long-ride hours by race distance and calendar phase. Mirror of {@link longRunFloorMiles}
  * for the cycling side; consumed by `validate-training-floors.ts#evaluateLongDayVolumeFloors` as a
- * **soft** trade-off (logged + surfaced in `week_trade_offs`, never blocks the build).
+ * **soft** trade-off (logged + surfaced in `week_trade_offs`, never blocks the build) and by
+ * `enforceLongDayFloors` (hard — survives the rebuild loop's TSS compression).
  *
- * Peak target reuses {@link expectedBikeDurationHours} so a 70.3 in race-specific lands at ~2.5h
- * (3.0h × 0.83) and a full at ~5.0h (6.0h × 0.83). Taper / recovery return 0 — those phases are
+ * Peak target reuses {@link expectedBikeDurationHours} so a 70.3 in race-specific lands at 3.0h
+ * (3.0h × 1.00) and a full at 6.0h (6.0h × 1.00). Taper / recovery return 0 — those phases are
  * skipped by the validator so the value is moot, but 0 makes the "no floor here" semantics explicit.
  */
 export function longRideFloorHours(distance: TriRaceDistance, phase: Phase): number {
   const peak = expectedBikeDurationHours(distance);
   const multiplier = (() => {
     switch (phase) {
-      case 'base': return 0.50;
-      case 'build': return 0.67;
-      case 'race_specific': return 0.83;
+      case 'base': return 0.75;
+      case 'build': return 0.85;
+      case 'race_specific': return 1.00;
       case 'taper': return 0;
       case 'recovery': return 0;
       default: return 0;
