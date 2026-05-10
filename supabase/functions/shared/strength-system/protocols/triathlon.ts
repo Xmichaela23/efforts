@@ -1,22 +1,31 @@
 // ============================================================================
-// TRIATHLON STRENGTH PROTOCOL
+// TRIATHLON STRENGTH PROTOCOL — Durability (Norwegian / Friel AA-MS-SM)
 //
-// Variable Mechanical Specificity: exercise selection shifts based on phase,
-// limiter sport, and week discipline emphasis.
+// Per docs/STRENGTH-PROTOCOL.md §4. Strength SUPPORTS endurance: injury
+// prevention, tissue tolerance, posture. Selected when `strength_intent` is
+// `support` (or default for non-performance tri).
 //
-// Science grounding:
-//   - Mujika & Padilla 2003: taper = maintain intensity, cut volume
-//   - Yamamoto et al. 2010: posterior chain power transfers directly to cycling economy
-//   - Pontzer et al. 2018 / Cholewa et al. 2017: swim shoulder health requires
-//     consistent scapular stabiliser volume throughout the season
-//   - Rønnestad & Mujika 2014: concurrent training order matters —
-//     strength AFTER endurance → AMPK/mTOR conflict; strength BEFORE or 6h+ after → fine
+// Phase model:
+//   Anatomical Adaptation (AA)  — 20-30 reps @ 40-60% 1RM or BW, 2-3 sets, 2-3/wk
+//   Maximum Strength (MS)       — 6-10 reps @ 75-85% 1RM,  2-3 sets, 1-2/wk
+//   Strength Maintenance (SM)   — 8-12 reps @ 65-75% 1RM,  2 sets,    1/wk
+//   Taper                       — 1 light session early week, 30 min, BW or 40%
 //
-// Phase → exercise family matrix:
-//   Base         3×8–12   hypertrophy/force  foundation that supports all three sports
-//   Build        4×4–6    neural drive        explosive / single-leg / sport-specific power
-//   Race-Specific 2×12–15 durability          maintain adaptations, zero new fatigue debt
-//   Taper        1–2×3–5  neural priming      keep the snap, sub-15 min total
+// Mapping combined-plan endurance → strength phase (spec §4.2):
+//   base, weekInPhase ≤ 6  → AA
+//   base, weekInPhase > 6  → MS
+//   build                  → SM
+//   race_specific (speed)  → SM (volume reduced)
+//   taper                  → 1 light session
+//   recovery               → []  (handled upstream)
+//
+// All sessions are FULL-BODY. No upper/lower split — frequency is too low to
+// justify it (spec §4.6). NO explosive / power work (spec §4.5) — power
+// belongs to the performance protocol.
+//
+// Sport-agnostic by design. Limiter sport is recorded in tags for telemetry
+// but does not branch exercise selection — durability is the same prescription
+// regardless of swim/bike/run weakness.
 // ============================================================================
 
 import {
@@ -26,619 +35,639 @@ import {
   StrengthExercise,
 } from './types.ts';
 
-// ─── Limiter-sport type pulled from ProtocolContext.triathlonContext ──────────
 type LimiterSport = 'swim' | 'bike' | 'run';
 type EquipmentTier = 'commercial_gym' | 'home_gym';
 
-// ============================================================================
-// PROTOCOL DEFINITION
-// ============================================================================
-
 export const triathlonProtocol: StrengthProtocol = {
   id: 'triathlon',
-  name: 'Triathlon Multi-Sport',
+  name: 'Triathlon Multi-Sport (Durability)',
   description:
-    'Phase-aware strength that shifts emphasis based on your limiter sport and race calendar. ' +
-    'Swim-heavy weeks prioritise scapular stability and lat power. Bike-heavy weeks load the ' +
-    'posterior chain and open the thoracic spine. Run durability (single-leg stability) is always ' +
-    'the floor. Volume drops to near-zero on taper while intensity is preserved for neural priming.',
+    'Norwegian / Friel AA-MS-SM model: high-rep tissue work in early base, heavy ' +
+    'maximum strength in late base, light maintenance through build and race-specific. ' +
+    'Full-body sessions only — frequency is too low to justify upper/lower split. No power ' +
+    'phase: durability is for injury prevention and tissue tolerance, not performance gains.',
   tradeoffs: [
-    'More nuanced than a pure-run plan — requires knowing your limiter sport',
-    'Build phase is genuinely hard: explosive step-ups and power cleans need focus',
-    'No upper-body hypertrophy work — shoulder volume targets function, not aesthetics',
+    'No heavy compounds in early base — high-rep tissue work feels easy but builds resilience',
+    'No explosive / power work — switch to Performance protocol if you want power development',
+    'Race-specific volume is intentionally low — preserves adaptations without adding fatigue',
   ],
   createWeekSessions,
 };
 
-// ============================================================================
-// MAIN ENTRY POINT
-// ============================================================================
-
 function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const { phase, weekInPhase, isRecovery, strengthFrequency } = context;
-  /** User-facing week count across phase boundaries (avoids "Week 1" resetting each block). */
   const planWeekLabel = Math.max(1, Number.isFinite(context.weekIndex) ? context.weekIndex : weekInPhase);
   const tier: EquipmentTier =
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
   const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
-  const freq = strengthFrequency ?? 2;
-  const strengthIntent = context.triathlonContext?.strengthIntent;
+  const freq = Math.max(1, strengthFrequency ?? 2);
 
   const phaseName = String(phase?.name ?? '').toLowerCase();
 
-  // Recovery weeks: one light full-body, no intensity
   if (isRecovery) {
-    return [createRecoverySession(tier, hasCable, weekInPhase)];
+    return [createRecoverySession(tier, hasCable, limiter)];
   }
 
-  // Taper: neural priming only, ≤ 1 session regardless of freq setting
-  if (phaseName === 'taper') {
-    return [createTaperPrimingSession(tier)];
-  }
-
-  // Race / post-race: skip entirely (handled upstream by strFreq=0)
   if (phaseName === 'recovery') {
     return [];
   }
 
+  if (phaseName === 'taper') {
+    // Spec §7.2: 1 light session early week, then skip. Skip-optional.
+    return [createTaperSession(tier, hasCable, limiter)];
+  }
+
   if (phaseName === 'base') {
-    return freq >= 2
-      ? [
-        createBasePosteriorChain(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
-        createBaseUpperSwim(tier, hasCable, limiter, weekInPhase, planWeekLabel, strengthIntent),
-      ]
-      : [createBasePosteriorChain(tier, limiter, weekInPhase, planWeekLabel, strengthIntent)];
+    // Spec §4.2: AA covers early base; MS covers late base. AA = 6 weeks per
+    // spec §4.1, so weekInPhase > 6 transitions to MS.
+    const wip = Math.max(1, weekInPhase);
+    const useMS = wip > 6;
+    const sessions: IntentSession[] = [];
+    const sessionCount = Math.min(freq, useMS ? 2 : 3);
+    for (let i = 0; i < sessionCount; i++) {
+      sessions.push(
+        useMS
+          ? createMSSession(tier, hasCable, limiter, planWeekLabel, i)
+          : createAASession(tier, hasCable, limiter, wip, planWeekLabel, i),
+      );
+    }
+    return sessions;
   }
 
-  if (phaseName === 'build') {
-    return freq >= 2
-      ? [
-        createBuildExplosiveLower(tier, limiter, weekInPhase, planWeekLabel, strengthIntent),
-        createBuildSwimPower(tier, hasCable, limiter, weekInPhase, planWeekLabel),
-      ]
-      : [createBuildExplosiveLower(tier, limiter, weekInPhase, planWeekLabel, strengthIntent)];
+  if (phaseName === 'build' || phaseName === 'speed') {
+    // Spec §4.2: build → SM; race-specific → SM with reduced volume.
+    const reducedVolume = phaseName === 'speed';
+    const sessions: IntentSession[] = [];
+    const sessionCount = Math.min(freq, 2);
+    for (let i = 0; i < sessionCount; i++) {
+      sessions.push(createSMSession(tier, hasCable, limiter, planWeekLabel, i, reducedVolume));
+    }
+    return sessions;
   }
 
-  // race_specific — maintenance only, single session
-  return [createRaceSpecificMaintenance(tier, hasCable, limiter)];
+  // Default: AA (safe — early-base equivalent prescription).
+  return [createAASession(tier, hasCable, limiter, 1, planWeekLabel, 0)];
 }
 
-// ============================================================================
-// BASE PHASE — foundational load (3×8–12)
-// ============================================================================
+// ── Anatomical Adaptation (AA) — high-rep tissue work, 40-60% 1RM or BW ─────
+//
+// Spec §4.1: 20-30 reps, 2-3 sets, 2-3 sessions/week. Goal is tissue
+// tolerance, posture, joint mobility. Loads stay light deliberately.
 
-function createBasePosteriorChain(
-  tier: EquipmentTier,
-  limiter: LimiterSport,
-  weekInPhase: number,
-  planWeekLabel: number,
-  strengthIntent?: 'support' | 'performance',
-): IntentSession {
-  const wip   = Math.max(1, weekInPhase);
-  const early = wip <= 2;
-  const sets  = early ? 3 : 4;
-  const rir   = early ? 3 : 2;
-
-  const exercises: StrengthExercise[] = [];
-
-  // ── Primary hinge ────────────────────────────────────────────────────────
-  if (tier === 'commercial_gym') {
-    exercises.push({
-      name: early ? 'Romanian Deadlift' : 'Trap Bar Deadlift',
-      sets, reps: early ? 10 : 8,
-      weight: early ? 'DBs (moderate, RIR 3)' : '70% 1RM',
-      target_rir: rir,
-      notes: 'Hinge at hips — keep neutral spine',
-    });
-  } else {
-    exercises.push({
-      name: 'Single-Leg RDL',
-      sets, reps: '10/leg',
-      weight: 'Heaviest available', target_rir: rir,
-      notes: '2s lowering, touch-and-go',
-    });
-  }
-
-  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
-    exercises.splice(1, 0, {
-      name: 'Barbell Back Squat',
-      sets,
-      reps: early ? 8 : 6,
-      weight: early ? '68% 1RM' : '72% 1RM',
-      target_rir: rir,
-      notes: 'Own the depth — stay braced',
-    });
-  }
-
-  // ── Hip drive ─────────────────────────────────────────────────────────────
-  exercises.push({
-    name: 'Hip Thrusts',
-    sets, reps: 12,
-    weight: tier === 'commercial_gym' ? 'Barbell (moderate)' : 'Load hips with backpack',
-    target_rir: rir,
-    notes: 'Full hip extension at top — pause 1s',
-  });
-
-  // ── Single-leg stability (run durability floor) ───────────────────────────
-  exercises.push({
-    name: 'Step-ups',
-    sets, reps: '10/leg',
-    weight: tier === 'commercial_gym' ? 'DBs (light-moderate)' : 'Bodyweight + backpack',
-    target_rir: rir,
-    notes: '2-1-2 tempo — drive through heel',
-  });
-
-  // ── Bike-limiter addition: extra posterior chain + thoracic opener ─────────
-  if (limiter === 'bike') {
-    exercises.push({
-      name: 'Prone Y/T/W Raises',
-      sets: 2, reps: 10,
-      weight: 'Very light DBs (3–5 lb)',
-      notes: 'Thoracic extension + scapular retraction — key for aero position',
-    });
-  }
-
-  // ── Calf eccentrics (run durability floor) ────────────────────────────────
-  exercises.push({
-    name: early ? 'Calf Raises (Bilateral)' : 'Single-Leg Calf Raises',
-    sets: 3, reps: 12,
-    weight: early ? 'Bodyweight' : tier === 'commercial_gym' ? 'Hold DB for load' : 'Bodyweight',
-    notes: '3s eccentric (lower slowly)',
-  });
-
-  // ── Core ──────────────────────────────────────────────────────────────────
-  exercises.push({ name: 'Dead Bug', sets: 3, reps: '8/side', weight: 'Bodyweight', notes: 'Press lower back into floor' });
-  exercises.push({ name: 'Copenhagen Plank', sets: 2, reps: early ? '20s/side' : '30s/side', weight: 'Bodyweight' });
-
-  const description = limiter === 'bike'
-    ? `Base Week ${planWeekLabel} — Posterior chain priority for cycling power. Trap bar / RDL + hip thrusts dominate. Thoracic mobility work included.`
-    : limiter === 'swim'
-    ? `Base Week ${planWeekLabel} — Foundation lower body. Single-leg stability is the run floor; upper session covers swim shoulder work.`
-    : `Base Week ${planWeekLabel} — Foundational posterior chain and run durability. Target RIR ${rir}.`;
-
-  return {
-    intent: 'LOWER_DURABILITY',
-    priority: 'required',
-    name: `Tri Strength — Base Posterior Chain${limiter === 'bike' ? ' (Bike Power)' : ''}`,
-    description,
-    duration: early ? 45 : 55,
-    exercises,
-    repProfile: 'hypertrophy',
-    tags: ['strength', 'lower_body', 'phase:base', `limiter:${limiter}`, 'triathlon'],
-  };
-}
-
-function createBaseUpperSwim(
+function createAASession(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
   weekInPhase: number,
   planWeekLabel: number,
-  strengthIntent?: 'support' | 'performance',
+  variantIndex: number,
 ): IntentSession {
-  const wip   = Math.max(1, weekInPhase);
-  const sets  = wip <= 2 ? 3 : 4;
-  const rir   = wip <= 2 ? 3 : 2;
-
   const exercises: StrengthExercise[] = [];
 
-  // ── Primary pulling (EVF muscles — Early Vertical Forearm) ───────────────
-  if (tier === 'commercial_gym') {
-    if (hasCable) {
+  // Variant A: knee-dominant + horizontal push + horizontal pull
+  // Variant B: hinge-dominant + vertical push + vertical pull
+  const variant: 'A' | 'B' = variantIndex % 2 === 0 ? 'A' : 'B';
+
+  // ── Compound 1: squat or hinge ──────────────────────────────────────────
+  if (variant === 'A') {
+    if (tier === 'commercial_gym') {
       exercises.push({
-        name: 'Lat Pull-Down',
-        sets, reps: 10,
-        weight: 'Moderate cable — full range', target_rir: rir,
-        notes: 'Initiate with scapular depression before elbow drive',
-      });
-      exercises.push({
-        name: 'Seated Cable Row',
-        sets, reps: 10,
-        weight: 'Moderate — squeeze between shoulder blades', target_rir: rir,
+        name: 'Goblet Squat',
+        sets: 3, reps: '20-25',
+        weight: 'Light DB/KB — 40-50% of usual goblet weight',
+        target_rir: 4,
+        notes: 'Tissue work — 3-second descent, full ROM',
       });
     } else {
       exercises.push({
-        name: 'Pull-ups / Assisted Pull-ups',
-        sets, reps: limiter === 'swim' ? 6 : 8,
-        weight: 'Bodyweight (use band if needed)', target_rir: rir,
-        notes: 'Full hang, retract scapulae before pulling',
-      });
-      exercises.push({
-        name: 'Barbell Row',
-        sets, reps: 10,
-        weight: '65% 1RM — retract scapulae', target_rir: rir,
+        name: 'Bodyweight Squat',
+        sets: 3, reps: '20-25',
+        weight: 'Bodyweight — 3-second descent',
+        target_rir: 4,
+        notes: 'Slow eccentric builds tendon resilience',
       });
     }
   } else {
-    exercises.push({
-      name: 'Pull-ups / Assisted Pull-ups',
-      sets, reps: limiter === 'swim' ? 6 : 8,
-      weight: 'Bodyweight (use band if needed)', target_rir: rir,
-      notes: 'Full hang, retract scapulae before pulling',
-    });
-    exercises.push({
-      name: 'Inverted Rows',
-      sets, reps: 10,
-      weight: 'Feet elevated', target_rir: rir,
-    });
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'DB Romanian Deadlift',
+        sets: 3, reps: '20-25',
+        weight: 'Light-moderate DBs',
+        target_rir: 4,
+        notes: 'Hinge mechanics — slow lower, soft knees',
+      });
+    } else {
+      exercises.push({
+        name: 'Single-Leg RDL (Bodyweight)',
+        sets: 2, reps: '15/leg',
+        weight: 'Bodyweight — controlled tempo',
+        target_rir: 4,
+      });
+    }
   }
 
-  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
-    exercises.push({
-      name: 'Barbell Bench Press',
-      sets: 3,
-      reps: 8,
-      weight: '65% 1RM',
-      target_rir: rir,
-      notes: 'Touch and drive — scapulae pinned',
-    });
+  // ── Compound 2: push pattern ────────────────────────────────────────────
+  if (variant === 'A') {
+    // Horizontal push
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'DB Bench Press (Light)',
+        sets: 3, reps: '20-25',
+        weight: 'Light DBs — full ROM, controlled',
+        target_rir: 4,
+      });
+    } else {
+      exercises.push({
+        name: 'Push-ups',
+        sets: 3, reps: '15-20',
+        weight: 'Bodyweight (incline if needed for form)',
+        target_rir: 3,
+      });
+    }
+  } else {
+    // Vertical push
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'DB Shoulder Press (Light)',
+        sets: 3, reps: '20',
+        weight: 'Light DBs',
+        target_rir: 4,
+      });
+    } else {
+      exercises.push({
+        name: 'Band Overhead Press',
+        sets: 3, reps: '20',
+        weight: 'Light-medium band',
+        target_rir: 4,
+      });
+    }
   }
 
-  // ── Scapular stability (critical for all disciplines) ────────────────────
-  exercises.push({
-    name: 'Face Pulls',
-    sets: 3, reps: 15,
-    weight: hasCable ? 'Light cable (rope attachment)' : 'Band',
-    notes: 'Elbows high, external rotation at end range',
-  });
-  exercises.push({
-    name: 'Band Pull-Aparts',
-    sets: 3, reps: 20,
-    weight: 'Light-moderate band',
-    notes: 'Keep arms straight, pull to chest height',
-  });
-
-  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
-    exercises.push({
-      name: 'Standing Barbell Overhead Press',
-      sets: 3,
-      reps: 8,
-      weight: '62% 1RM',
-      target_rir: rir,
-      notes: 'Glutes tight — press in a slight arc',
-    });
+  // ── Compound 3: pull pattern ────────────────────────────────────────────
+  if (variant === 'A') {
+    // Horizontal pull
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'DB Row (Chest-Supported)',
+        sets: 3, reps: '20-25',
+        weight: 'Light-moderate DBs',
+        target_rir: 4,
+        notes: 'Squeeze scaps; full ROM beats heavier load',
+      });
+    } else {
+      exercises.push({
+        name: 'Inverted Ring Row or Band Row',
+        sets: 3, reps: '15-20',
+        weight: 'Bodyweight (feet adjusted for difficulty)',
+        target_rir: 3,
+      });
+    }
+  } else {
+    // Vertical pull
+    if (tier === 'commercial_gym' && hasCable) {
+      exercises.push({
+        name: 'Lat Pull-Down (Light)',
+        sets: 3, reps: '20',
+        weight: 'Light cable — full ROM',
+        target_rir: 4,
+      });
+    } else if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'Band-Assisted Pull-up',
+        sets: 3, reps: '8-12',
+        weight: 'Heavy assistance band',
+        target_rir: 3,
+      });
+    } else {
+      exercises.push({
+        name: 'Band Pull-Down',
+        sets: 3, reps: '20',
+        weight: 'Medium band',
+        target_rir: 4,
+      });
+    }
   }
 
-  // ── Swim-limiter: extra shoulder health work ───────────────────────────────
-  if (limiter === 'swim') {
-    exercises.push({
-      name: 'External Rotation (Side-Lying or Band)',
-      sets: 3, reps: '15/side',
-      weight: 'Very light (2–5 lb or light band)',
-      notes: 'Rotator cuff health — slow, controlled range of motion',
-    });
-    exercises.push({
-      name: 'Prone Y/T/W Raises',
-      sets: 2, reps: 10,
-      weight: 'Bodyweight / 3 lb DBs',
-      notes: 'Lower trap and mid-back activation for high elbow catch',
-    });
+  // ── Stability + mobility accessories (spec §4.4) ───────────────────────
+  if (variant === 'A') {
+    exercises.push({ name: 'Plank Hold', sets: 2, reps: '30-45s', weight: 'Bodyweight' });
+    exercises.push({ name: 'Glute Bridges', sets: 2, reps: '15-20', weight: 'Bodyweight' });
+  } else {
+    exercises.push({ name: 'Side Plank', sets: 2, reps: '30s/side', weight: 'Bodyweight' });
+    exercises.push({ name: 'Bird Dog', sets: 2, reps: '10/side', weight: 'Bodyweight — slow' });
   }
 
-  // ── Anti-rotation core ────────────────────────────────────────────────────
-  exercises.push({
-    name: 'Pallof Press',
-    sets: 3, reps: '10/side',
-    weight: hasCable ? 'Light cable' : 'Band anchor',
-    notes: 'Resist rotation — brace and breathe',
-  });
-
-  const description = limiter === 'swim'
-    ? `Base Week ${planWeekLabel} — Swim priority: scapular stability, lat power, and rotator cuff health. High-elbow catch strength built here.`
-    : `Base Week ${planWeekLabel} — Upper pulling and scapular stability. Supports all three disciplines' postural demands.`;
-
-  return {
-    intent: 'UPPER_POSTURE',
-    priority: 'required',
-    name: `Tri Strength — Base Upper${limiter === 'swim' ? ' (Swim Power)' : ''}`,
-    description,
-    duration: 40,
-    exercises,
-    repProfile: 'hypertrophy',
-    tags: ['strength', 'upper_body', 'phase:base', `limiter:${limiter}`, 'triathlon'],
-  };
-}
-
-// ============================================================================
-// BUILD PHASE — explosive / neural drive (4×4–6)
-// ============================================================================
-//
-// Placement (combined tri weeks): `generate-combined-plan/week-builder` picks the
-// lower-body weekday Mon–Fri away from brick / long ride / long run on the same day,
-// and enforces a discrete 48h-style buffer (no lower session on days whose next two
-// calendar days host the actual long run or a brick). Explosive prescriptions assume
-// that slot — pair only with easy aerobic same-day when the planner stacks sessions.
-//
-// ============================================================================
-
-function createBuildExplosiveLower(
-  tier: EquipmentTier,
-  limiter: LimiterSport,
-  weekInPhase: number,
-  planWeekLabel: number,
-  strengthIntent?: 'support' | 'performance',
-): IntentSession {
-  const sets = 4;
-  const rir  = 1; // working hard in Build
-
-  const exercises: StrengthExercise[] = [];
-
-  // ── Explosive primary ─────────────────────────────────────────────────────
-  exercises.push({
-    name: tier === 'commercial_gym' ? 'Box Jumps' : 'Jump Squats',
-    sets, reps: 5,
-    weight: 'Bodyweight — max intent, land softly',
-    target_rir: rir,
-    notes: 'Reset fully between reps — quality over speed',
-  });
-
-  if (strengthIntent === 'performance' && tier === 'commercial_gym') {
-    exercises.push({
-      name: 'Conventional Deadlift',
-      sets: 3,
-      reps: 5,
-      weight: '75% 1RM',
-      target_rir: rir,
-      notes: 'Hinge — reset tension each rep',
-    });
-  }
-
-  // ── Single-leg power ──────────────────────────────────────────────────────
-  exercises.push({
-    name: 'Explosive Step-ups',
-    sets, reps: '5/leg',
-    weight: tier === 'commercial_gym' ? 'Light DBs (drive through heel explosively)' : 'Bodyweight',
-    target_rir: rir,
-    notes: 'Push through heel and fully extend hip at top',
-  });
-
-  // ── Hip drive — cycling and run stride power ───────────────────────────────
-  exercises.push({
-    name: 'Hip Thrusts (Fast Concentric)',
-    sets, reps: 6,
-    weight: tier === 'commercial_gym' ? 'Heavy barbell' : 'Load with backpack — explode up',
-    target_rir: rir,
-    notes: 'Lower under control (3s), then drive hips up explosively',
-  });
-
-  // ── Bike-limiter: heavier posterior chain compound ────────────────────────
-  if (limiter === 'bike') {
-    exercises.push({
-      name: tier === 'commercial_gym' ? 'Bulgarian Split Squat' : 'Rear-Foot Elevated Split Squat',
-      sets, reps: '6/leg',
-      weight: tier === 'commercial_gym' ? 'DBs (challenging RIR 1)' : 'Bodyweight + backpack',
-      target_rir: rir,
-      notes: 'Loaded unilateral — hip flexor stretch + glute drive',
-    });
-  }
-
-  // ── Run-limiter: eccentric calf load ──────────────────────────────────────
   if (limiter === 'run') {
     exercises.push({
-      name: 'Weighted Single-Leg Calf Raises',
-      sets: 3, reps: 8,
-      weight: tier === 'commercial_gym' ? 'Hold heavy DB' : 'Use step edge + backpack',
-      notes: '4s eccentric — Alfredson-inspired load for Achilles resilience',
+      name: 'Calf Raises (Bilateral)',
+      sets: 2, reps: '15-20',
+      weight: 'Bodyweight — 3s eccentric',
+      notes: 'Achilles + plantar fascia resilience for run volume',
+    });
+  } else {
+    exercises.push({
+      name: 'Band Lateral Walks',
+      sets: 2, reps: '12/side',
+      weight: 'Light-medium band',
+      notes: 'Glute medius — hip stability for bike + run',
     });
   }
 
-  // ── Core ──────────────────────────────────────────────────────────────────
-  exercises.push({ name: 'Plank with Shoulder Tap', sets: 3, reps: '10/side', weight: 'Bodyweight' });
-
+  const variantLabel = variant === 'A' ? 'A (Knee/Push/Pull)' : 'B (Hinge/Vertical Press/Pull)';
   return {
-    intent: 'LOWER_DURABILITY',
-    priority: 'required',
-    name: 'Tri Strength — Build Explosive Lower',
-    description: `Build Week ${planWeekLabel} — Neural drive and explosive power. Box jumps + explosive step-ups + fast hip thrusts. ` +
-      `Strength is now about rate of force development, not volume. RIR ${rir}.`,
-    duration: 50,
+    intent: 'FULLBODY_MAINTENANCE',
+    priority: 'preferred',
+    name: `Tri Durability — Anatomical Adaptation ${variantLabel}`,
+    description:
+      `Base Week ${planWeekLabel} (AA phase) — Full-body tissue work. Light loads, high reps (20-25), ` +
+      `slow tempos. Loads should feel easy; the goal is connective-tissue resilience, not muscle fatigue. ` +
+      `RIR 3-4 throughout.`,
+    duration: tier === 'commercial_gym' ? 45 : 40,
     exercises,
-    repProfile: 'strength',
-    tags: ['strength', 'lower_body', 'phase:build', `limiter:${limiter}`, 'triathlon', 'explosive'],
+    repProfile: 'hypertrophy',
+    tags: ['strength', 'full_body', 'triathlon', 'phase:base', 'phase:aa', `limiter:${limiter}`],
   };
 }
 
-function createBuildSwimPower(
+// ── Maximum Strength (MS) — heavy compounds, 75-85% 1RM ─────────────────────
+//
+// Spec §4.1: 6-10 reps, 2-3 sets, 1-2 sessions/week. Late base only. Same
+// movement patterns as AA but at meaningful loads. Still full-body.
+
+function createMSSession(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
-  _weekInPhase: number,
   planWeekLabel: number,
+  variantIndex: number,
 ): IntentSession {
-  const sets = 4;
-
   const exercises: StrengthExercise[] = [];
+  const variant: 'A' | 'B' = variantIndex % 2 === 0 ? 'A' : 'B';
 
-  // ── Power pull (swim catch power) ─────────────────────────────────────────
-  if (tier === 'commercial_gym') {
-    if (hasCable) {
+  // ── Compound 1: squat (var A) or deadlift (var B) ──────────────────────
+  if (variant === 'A') {
+    if (tier === 'commercial_gym') {
       exercises.push({
-        name: 'Explosive Lat Pull-Down',
-        sets, reps: 6,
-        weight: 'Moderate-heavy — fast pull, controlled return',
-        target_rir: 1,
-        notes: 'Rate of force development for the catch phase',
+        name: 'Barbell Back Squat',
+        sets: 3, reps: '6-8',
+        weight: '78% 1RM',
+        target_rir: 2,
+        notes: 'Full ROM — control the descent',
       });
     } else {
       exercises.push({
-        name: 'Pull-ups (Explosive)',
-        sets, reps: 4,
-        weight: 'Bodyweight — pull fast, lower in 3s',
-        target_rir: 1,
-        notes: 'Full ROM — scapulae pack before pulling',
+        name: 'Goblet Squat (Heavy)',
+        sets: 3, reps: 8,
+        weight: 'Heaviest single DB/KB you can hold',
+        target_rir: 2,
       });
     }
-    exercises.push({
-      name: 'Dumbbell Power Row (Single Arm)',
-      sets, reps: '6/side',
-      weight: 'Heavy DB — explosive pull, 3s lower',
-      target_rir: 1,
-    });
+  } else {
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'Conventional Deadlift',
+        sets: 3, reps: '6-8',
+        weight: '80% 1RM',
+        target_rir: 2,
+        notes: 'Reset between reps — quality over volume',
+      });
+    } else {
+      exercises.push({
+        name: 'Single-Leg RDL (Heavy DB)',
+        sets: 3, reps: '8/leg',
+        weight: 'Heaviest single DB',
+        target_rir: 2,
+      });
+    }
+  }
+
+  // ── Compound 2: push ────────────────────────────────────────────────────
+  if (tier === 'commercial_gym') {
+    if (variant === 'A') {
+      exercises.push({
+        name: 'Bench Press',
+        sets: 3, reps: '6-8',
+        weight: '78% 1RM',
+        target_rir: 2,
+      });
+    } else {
+      exercises.push({
+        name: 'Standing Barbell Overhead Press',
+        sets: 3, reps: '6-8',
+        weight: '75% 1RM',
+        target_rir: 2,
+      });
+    }
+  } else {
+    if (variant === 'A') {
+      exercises.push({
+        name: 'DB Bench Press',
+        sets: 3, reps: '8-10',
+        weight: 'Heaviest DBs available',
+        target_rir: 2,
+      });
+    } else {
+      exercises.push({
+        name: 'DB Shoulder Press',
+        sets: 3, reps: '8-10',
+        weight: 'Heaviest DBs available',
+        target_rir: 2,
+      });
+    }
+  }
+
+  // ── Compound 3: pull ────────────────────────────────────────────────────
+  if (tier === 'commercial_gym') {
+    if (variant === 'A') {
+      exercises.push({
+        name: 'Barbell Row',
+        sets: 3, reps: '6-8',
+        weight: '75% 1RM',
+        target_rir: 2,
+      });
+    } else {
+      exercises.push({
+        name: 'Pull-ups',
+        sets: 3, reps: '6-8',
+        weight: 'Bodyweight (add load when ready)',
+        target_rir: 2,
+      });
+    }
   } else {
     exercises.push({
-      name: 'Pull-ups (Explosive)',
-      sets, reps: 4,
-      weight: 'Bodyweight — pull fast, lower in 3s',
-      target_rir: 1,
-      notes: 'Full ROM — scapulae pack before pulling',
-    });
-    exercises.push({
-      name: 'Inverted Rows (Explosive)',
-      sets, reps: 8,
-      weight: 'Feet elevated — pull fast, lower in 3s',
-      target_rir: 1,
+      name: variant === 'A' ? 'DB Row (Chest-Supported)' : 'Band-Assisted Pull-up or Band Pull-Down',
+      sets: 3, reps: variant === 'A' ? '8-10' : '8-12',
+      weight: variant === 'A' ? 'Heaviest DBs' : 'Heavy band',
+      target_rir: 2,
     });
   }
 
-  // ── Swim-limiter: rotator cuff under load ─────────────────────────────────
-  if (limiter === 'swim') {
+  // ── Light accessories (no power work in durability per spec §4.5) ──────
+  exercises.push({
+    name: 'Dead Bug',
+    sets: 2, reps: '8/side',
+    weight: 'Bodyweight',
+  });
+  if (limiter === 'run') {
     exercises.push({
-      name: 'Single-Arm Cable External Rotation',
-      sets: 3, reps: '12/side',
-      weight: hasCable ? 'Light cable (elbow at 90°)' : 'Band',
-      notes: 'Protect the shoulder under swimming fatigue',
-    });
-  }
-
-  // ── Scapular stability (all disciplines) ─────────────────────────────────
-  exercises.push({ name: 'Face Pulls', sets: 3, reps: 15, weight: hasCable ? 'Cable (rope)' : 'Band', notes: 'Elbows high' });
-
-  // ── Core: anti-rotation + rotational power ────────────────────────────────
-  if (hasCable) {
-    exercises.push({
-      name: 'Cable Wood Chop (High to Low)',
-      sets: 3, reps: '10/side',
-      weight: 'Light-moderate cable',
-      notes: 'Rotation power for the swim pull-through',
-    });
-  } else {
-    exercises.push({
-      name: 'Medicine Ball Rotational Slam (or Band)',
-      sets: 3, reps: 8,
-      weight: 'Light ball or band',
-      notes: 'Rotational power — use full trunk',
+      name: 'Calf Raises (Bilateral)',
+      sets: 2, reps: 15,
+      weight: 'Bodyweight or light DB — 3s eccentric',
     });
   }
 
   return {
-    intent: 'UPPER_POSTURE',
+    intent: 'FULLBODY_MAINTENANCE',
     priority: 'required',
-    name: 'Tri Strength — Build Swim Power',
-    description: `Build Week ${planWeekLabel} — Explosive lat and scap power for swim catch. ` +
-      `Fast-concentric pulls + rotational core. ${limiter === 'swim' ? 'Rotator cuff under load included (swim limiter).' : ''}`,
-    duration: 45,
+    name: `Tri Durability — Maximum Strength ${variant}`,
+    description:
+      `Late Base Week ${planWeekLabel} (MS phase) — Heavy compounds at 6-8 reps, RIR 2. ` +
+      `Same movement patterns you've been training in AA, now at race-meaningful loads. ` +
+      `Squat / hinge / push / pull — 3 sets each, full-body.`,
+    duration: tier === 'commercial_gym' ? 50 : 45,
     exercises,
     repProfile: 'strength',
-    tags: ['strength', 'upper_body', 'phase:build', `limiter:${limiter}`, 'triathlon', 'explosive'],
+    tags: ['strength', 'full_body', 'triathlon', 'phase:base', 'phase:ms', `limiter:${limiter}`],
   };
 }
 
-// ============================================================================
-// RACE-SPECIFIC PHASE — sport-specific maintenance (2×12–15)
-// ============================================================================
+// ── Strength Maintenance (SM) — moderate load preserves adaptations ─────────
+//
+// Spec §4.1: 8-12 reps @ 65-75% 1RM, 2 sets, 1/week (in-season). Build phase
+// and race-specific phase. Reduced volume in race-specific.
 
-function createRaceSpecificMaintenance(
+function createSMSession(
+  tier: EquipmentTier,
+  hasCable: boolean,
+  limiter: LimiterSport,
+  planWeekLabel: number,
+  variantIndex: number,
+  reducedVolume: boolean,
+): IntentSession {
+  const exercises: StrengthExercise[] = [];
+  const variant: 'A' | 'B' = variantIndex % 2 === 0 ? 'A' : 'B';
+  const sets = reducedVolume ? 2 : 2; // Spec: 2 sets in SM. Reduced just trims duration + accessories.
+
+  if (variant === 'A') {
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'Barbell Back Squat',
+        sets, reps: '8-10',
+        weight: '70% 1RM',
+        target_rir: 3,
+      });
+    } else {
+      exercises.push({
+        name: 'Goblet Squat',
+        sets, reps: 10,
+        weight: 'Moderate DB/KB',
+        target_rir: 3,
+      });
+    }
+  } else {
+    if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'Conventional Deadlift',
+        sets, reps: '8-10',
+        weight: '70% 1RM',
+        target_rir: 3,
+      });
+    } else {
+      exercises.push({
+        name: 'DB Romanian Deadlift',
+        sets, reps: 10,
+        weight: 'Moderate DBs',
+        target_rir: 3,
+      });
+    }
+  }
+
+  if (tier === 'commercial_gym') {
+    exercises.push({
+      name: variant === 'A' ? 'Bench Press' : 'Standing Barbell Overhead Press',
+      sets, reps: '8-10',
+      weight: variant === 'A' ? '70% 1RM' : '65% 1RM',
+      target_rir: 3,
+    });
+    exercises.push({
+      name: variant === 'A' ? 'Barbell Row' : 'Pull-ups',
+      sets, reps: variant === 'A' ? '8-10' : '6-8',
+      weight: variant === 'A' ? '65% 1RM' : 'Bodyweight',
+      target_rir: 3,
+    });
+  } else {
+    exercises.push({
+      name: variant === 'A' ? 'DB Bench Press' : 'DB Shoulder Press',
+      sets, reps: 10,
+      weight: 'Moderate DBs',
+      target_rir: 3,
+    });
+    exercises.push({
+      name: variant === 'A' ? 'DB Row (Chest-Supported)' : 'Band-Assisted Pull-up',
+      sets, reps: variant === 'A' ? 10 : '8-12',
+      weight: variant === 'A' ? 'Moderate DBs' : 'Medium band',
+      target_rir: 3,
+    });
+  }
+
+  if (!reducedVolume) {
+    exercises.push({
+      name: 'Plank Hold',
+      sets: 2, reps: '30-45s',
+      weight: 'Bodyweight',
+    });
+    if (limiter === 'run') {
+      exercises.push({
+        name: 'Calf Raises (Bilateral)',
+        sets: 2, reps: 15,
+        weight: 'Bodyweight or light',
+      });
+    }
+  } else {
+    exercises.push({
+      name: 'Plank Hold',
+      sets: 1, reps: '30s',
+      weight: 'Bodyweight',
+    });
+  }
+
+  const phaseLabel = reducedVolume ? 'Race-Specific' : 'Build';
+  return {
+    intent: 'FULLBODY_MAINTENANCE',
+    priority: 'preferred',
+    name: `Tri Durability — Strength Maintenance ${variant}${reducedVolume ? ' (Reduced)' : ''}`,
+    description:
+      `${phaseLabel} Week ${planWeekLabel} (SM phase) — Maintain strength built in MS with 2 sets ` +
+      `at 8-10 reps and moderate load (~70% 1RM). Movement quality, not maximal effort. ` +
+      `${reducedVolume ? 'Race-specific volume reduced — minimize fatigue ahead of the race.' : ''}`.trim(),
+    duration: reducedVolume ? 30 : (tier === 'commercial_gym' ? 40 : 35),
+    exercises,
+    repProfile: 'maintenance',
+    tags: [
+      'strength', 'full_body', 'triathlon',
+      reducedVolume ? 'phase:race_specific' : 'phase:build',
+      'phase:sm', `limiter:${limiter}`,
+    ],
+  };
+}
+
+// ── Taper — 1 light session early week, skip-optional ───────────────────────
+//
+// Spec §7.2 (durability race week): Mon/Tue, 30 min, BW or 40% 1RM, 2×8-10,
+// mobility focus. After this session, no strength until post-race recovery.
+
+function createTaperSession(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
 ): IntentSession {
   const exercises: StrengthExercise[] = [];
-
-  // ── Lower: preserve hip drive + run durability ───────────────────────────
-  exercises.push({ name: 'Hip Thrusts', sets: 2, reps: 12, weight: tier === 'commercial_gym' ? 'Moderate barbell' : 'Loaded backpack', target_rir: 3 });
-  exercises.push({ name: 'Step-ups', sets: 2, reps: '10/leg', weight: tier === 'commercial_gym' ? 'Light DBs' : 'Bodyweight', target_rir: 3 });
-  exercises.push({ name: 'Single-Leg Calf Raises', sets: 2, reps: 12, weight: 'Bodyweight', notes: '3s eccentric', target_rir: 3 });
-
-  // ── Upper: sport-specific shoulder maintenance ────────────────────────────
-  if (limiter === 'swim') {
-    exercises.push({ name: 'Face Pulls', sets: 2, reps: 15, weight: hasCable ? 'Light cable' : 'Band', notes: 'Shoulder health priority' });
-    exercises.push({ name: 'Band Pull-Aparts', sets: 2, reps: 20, weight: 'Light band' });
-    exercises.push({ name: 'External Rotation (Side-Lying)', sets: 2, reps: '15/side', weight: 'Very light', notes: 'Rotator cuff maintenance' });
+  if (tier === 'commercial_gym') {
+    exercises.push({
+      name: 'Goblet Squat or Bodyweight Squat',
+      sets: 2, reps: '8-10',
+      weight: 'Light KB/DB or bodyweight',
+      target_rir: 5,
+      notes: 'Movement quality only — no fatigue',
+    });
   } else {
-    exercises.push({ name: 'Face Pulls', sets: 3, reps: 15, weight: hasCable ? 'Light cable' : 'Band' });
-    exercises.push({ name: 'Band Pull-Aparts', sets: 3, reps: 20, weight: 'Light band' });
+    exercises.push({
+      name: 'Bodyweight Squat',
+      sets: 2, reps: 10,
+      weight: 'Bodyweight',
+      target_rir: 5,
+    });
   }
 
-  // ── Core: stabilisation patterns ──────────────────────────────────────────
-  exercises.push({ name: 'Side Plank', sets: 2, reps: '30s/side', weight: 'Bodyweight' });
-  exercises.push({ name: 'Dead Bug', sets: 2, reps: '8/side', weight: 'Bodyweight' });
+  exercises.push({
+    name: 'Glute Bridges',
+    sets: 2, reps: 10,
+    weight: 'Bodyweight',
+    target_rir: 5,
+  });
+
+  exercises.push({
+    name: 'Band Pull-Aparts',
+    sets: 2, reps: 15,
+    weight: 'Light band',
+    notes: 'Shoulder activation — race-week posture',
+  });
+
+  exercises.push({
+    name: 'Bird Dog',
+    sets: 2, reps: '8/side',
+    weight: 'Bodyweight — slow',
+  });
+
+  if (limiter === 'run') {
+    exercises.push({
+      name: 'Calf Raises (Bilateral)',
+      sets: 2, reps: 12,
+      weight: 'Bodyweight',
+    });
+  }
 
   return {
     intent: 'FULLBODY_MAINTENANCE',
-    priority: 'preferred',
-    name: 'Tri Strength — Race-Specific Maintenance',
+    priority: 'optional',
+    name: 'Tri Durability — Taper Light Session',
     description:
-      'Race-specific phase — preserve all adaptations built in Base/Build with minimal fatigue. ' +
-      '2 sets, submaximal load, movement quality focus. Shoulder health session included.',
-    duration: 35,
+      'Race week — one light session early in the week (Monday or Tuesday). ' +
+      '30 minutes, bodyweight or 40% 1RM, mobility focus. Skip-optional if you ' +
+      'feel fresh and want the day for recovery. After this session, no strength ' +
+      'until the post-race recovery week.',
+    duration: 30,
     exercises,
     repProfile: 'maintenance',
-    tags: ['strength', 'full_body', 'phase:race_specific', `limiter:${limiter}`, 'triathlon'],
+    tags: ['strength', 'full_body', 'triathlon', 'phase:taper'],
   };
 }
 
-// ============================================================================
-// TAPER PHASE — neural priming (1–2 sets × 3–5 reps)
-// ============================================================================
+// ── Recovery week — light full-body, no intensity ───────────────────────────
 
-function createTaperPrimingSession(tier: EquipmentTier): IntentSession {
-  const exercises: StrengthExercise[] = [
-    {
-      name: tier === 'commercial_gym' ? 'Box Jumps' : 'Jump Squats',
-      sets: 2, reps: 3,
-      weight: 'Bodyweight — maximum intent',
-      target_rir: 5,
-      notes: 'Full rest between sets. You should feel fast, not tired.',
-    },
-    {
-      name: 'Hip Thrusts (Explosive)',
-      sets: 2, reps: 5,
-      weight: tier === 'commercial_gym' ? 'Moderate barbell (50–60%)' : 'Bodyweight',
-      target_rir: 5,
-      notes: 'Drive up explosively — keep the neuromuscular pattern alive',
-    },
-    {
-      name: 'Band Pull-Aparts',
-      sets: 2, reps: 15,
-      weight: 'Light band — not fatiguing',
-      notes: 'Shoulder activation before race week',
-    },
-  ];
-
-  return {
-    intent: 'LOWER_MAINTENANCE',
-    priority: 'optional',
-    name: 'Tri Strength — Taper Neural Priming',
-    description:
-      'Taper: sub-15 min session. Goal is to fire the neuromuscular system, not generate fatigue. ' +
-      'Box jumps + explosive hip thrusts + shoulder activation. Skip entirely race week.',
-    duration: 15,
-    exercises,
-    repProfile: 'strength',
-    tags: ['strength', 'full_body', 'phase:taper', 'triathlon', 'neural_priming'],
-  };
-}
-
-// ============================================================================
-// RECOVERY WEEK — one easy full-body session
-// ============================================================================
-
-function createRecoverySession(tier: EquipmentTier, hasCable: boolean, weekInPhase: number): IntentSession {
+function createRecoverySession(
+  tier: EquipmentTier,
+  hasCable: boolean,
+  limiter: LimiterSport,
+): IntentSession {
   return {
     intent: 'FULLBODY_MAINTENANCE',
     priority: 'preferred',
-    name: 'Tri Strength — Recovery Week',
+    name: 'Tri Durability — Recovery Week',
     description:
-      `Recovery week — maintain movement patterns, no new fatigue. ` +
-      `2 sets, stop well short of failure. Focus on quality and body awareness.`,
+      'Recovery week — maintain movement patterns at sub-maximal load. 2 sets, ' +
+      'stop well short of failure. Goal is body awareness and tissue maintenance, ' +
+      'not new fatigue.',
     duration: 30,
     exercises: [
-      { name: 'Bodyweight Squat or Goblet Squat', sets: 2, reps: 12, weight: 'Bodyweight / light KB', target_rir: 5 },
-      { name: 'Hip Thrusts', sets: 2, reps: 12, weight: 'Light load', target_rir: 5 },
-      { name: 'Step-ups', sets: 2, reps: '10/leg', weight: 'Bodyweight', target_rir: 5 },
-      { name: 'Face Pulls', sets: 2, reps: 15, weight: hasCable ? 'Light cable' : 'Band', target_rir: 5 },
-      { name: 'Side Plank', sets: 2, reps: '20s/side', weight: 'Bodyweight' },
+      {
+        name: tier === 'commercial_gym' ? 'Goblet Squat' : 'Bodyweight Squat',
+        sets: 2, reps: 12,
+        weight: tier === 'commercial_gym' ? 'Light KB' : 'Bodyweight',
+        target_rir: 5,
+      },
+      {
+        name: 'Glute Bridges',
+        sets: 2, reps: 12,
+        weight: 'Bodyweight',
+        target_rir: 5,
+      },
+      {
+        name: 'Band Pull-Aparts',
+        sets: 2, reps: 15,
+        weight: 'Light band',
+      },
+      {
+        name: 'Side Plank',
+        sets: 2, reps: '20s/side',
+        weight: 'Bodyweight',
+      },
+      {
+        name: limiter === 'run' ? 'Calf Raises (Bilateral)' : 'Band Lateral Walks',
+        sets: 2, reps: limiter === 'run' ? 15 : '10/side',
+        weight: 'Bodyweight or light band',
+      },
     ],
     repProfile: 'maintenance',
     tags: ['strength', 'full_body', 'recovery', 'triathlon'],
