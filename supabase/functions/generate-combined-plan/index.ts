@@ -28,6 +28,7 @@ import {
   validateTrainingFloors,
   tightenPhaseBlocksForFloorRebuild,
   evaluateLongDayVolumeFloors,
+  enforceLongDayFloors,
   LONG_RUN_TSS_SHARE_MAX,
   LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE,
   LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK,
@@ -170,6 +171,14 @@ Deno.serve(async (req: Request) => {
     let generatedWeeks = generateAllWeeks(blocks);
     let physiologicalFloorRebuiltOnce = false;
     const floorOpts = { hasTri: hasTriGoal };
+    // Long-day anchors are hard floors — re-enforce them after each compression pass so the
+    // 0.87× tightening shrinks quality / easy / swim but never compresses long_ride / long_run
+    // below their physiological minimums (`longRideFloorHours` / `longRunFloorMiles`).
+    const longDayFloorOpts = {
+      hasTri: hasTriGoal,
+      primaryDistance: (goals.find((g) => g.priority === 'A') ?? goals[0]).distance,
+      raceWeekNums: raceAnchors.map((a) => a.planWeek),
+    };
     let floors = validateTrainingFloors(generatedWeeks, floorOpts);
     const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 12;
     let floorPass = 0;
@@ -178,11 +187,13 @@ Deno.serve(async (req: Request) => {
       physiologicalFloorRebuiltOnce = true;
       floorPass += 1;
       generatedWeeks = generateAllWeeks(blocks, 'normal');
+      enforceLongDayFloors(generatedWeeks, longDayFloorOpts);
       floors = validateTrainingFloors(generatedWeeks, floorOpts);
     }
     if (!floors.ok) {
       physiologicalFloorRebuiltOnce = true;
       generatedWeeks = generateAllWeeks(blocks, 'deep');
+      enforceLongDayFloors(generatedWeeks, longDayFloorOpts);
       floors = validateTrainingFloors(generatedWeeks, floorOpts);
       floorPass += 1;
     }

@@ -7,11 +7,13 @@
  * (lower weekly budget + shrink long-run miles).
  */
 
-import type { GeneratedWeek, AthleteState, Phase } from './types.ts';
+import type { GeneratedWeek, AthleteState, Phase, PlannedSession, Sport } from './types.ts';
 import {
   DAYS_OF_WEEK,
+  estimateSessionTSS,
   longRideFloorHours,
   longRunFloorMiles,
+  weightedTSS,
   type TriRaceDistance,
 } from './science.ts';
 
@@ -394,4 +396,184 @@ export function evaluateLongDayVolumeFloors(
   }
 
   return out;
+}
+
+// ── Long-day floor enforcement (HARD; runs inside the rebuild loop) ─────────
+//
+// `tightenPhaseBlocksForFloorRebuild` shrinks every phase's `tssMultiplier` by 0.87 each pass to
+// resolve a long-run TSS share violation or WoW ramp violation. The shrink is uniform across all
+// session categories (quality, easy, swim, long), which compresses long_ride / long_run **below**
+// `longRideFloorHours` / `longRunFloorMiles` — the durability anchors get sacrificed alongside
+// fillable categories. That defeats the floor's purpose: it is a hard constraint that the
+// athlete needs regardless of how aggressively the rest of the week shrinks.
+//
+// `enforceLongDayFloors` runs **after** each rebuild's `generateAllWeeks` and **before** the
+// next `validateTrainingFloors` call. It mutates each non-recovery / non-taper / non-race week's
+// long_ride and long_run sessions in place, bumping any session below floor up to the floor.
+// The rebuild loop continues to tighten quality / easy / swim via `tssMultiplier`; only the
+// anchors are protected from compression.
+
+/** Mirror week-builder.ts `effectiveHardMin` — kept in lockstep with the constants there. */
+const HARD_INTENSITY_FRACTION = 0.65;
+const MODERATE_INTENSITY_FRACTION = 0.50;
+
+function hardFracOfIntensity(i: PlannedSession['intensity_class']): number {
+  if (i === 'HARD') return HARD_INTENSITY_FRACTION;
+  if (i === 'MODERATE') return MODERATE_INTENSITY_FRACTION;
+  return 0;
+}
+
+function findLongRunSessionInWeek(w: GeneratedWeek): PlannedSession | null {
+  let best: PlannedSession | null = null;
+  for (const s of w.sessions) {
+    const tags = Array.isArray(s.tags) ? s.tags.map((x) => String(x).toLowerCase()) : [];
+    if (!tags.includes('long_run')) continue;
+    if (s.type !== 'run') continue;
+    if (best == null || s.duration > best.duration) best = s;
+  }
+  return best;
+}
+
+function findLongRideSessionInWeek(w: GeneratedWeek): PlannedSession | null {
+  let best: PlannedSession | null = null;
+  for (const s of w.sessions) {
+    const tags = Array.isArray(s.tags) ? s.tags.map((x) => String(x).toLowerCase()) : [];
+    // Bricks have their own bike + run halves; `long_ride` floor doesn't apply.
+    if (tags.includes('brick')) continue;
+    if (!tags.includes('long_ride')) continue;
+    if (s.type !== 'bike') continue;
+    if (best == null || s.duration > best.duration) best = s;
+  }
+  return best;
+}
+
+function applyDeltaToWeek(
+  w: GeneratedWeek,
+  sport: Sport,
+  oldDuration: number,
+  newDuration: number,
+  oldHardFrac: number,
+  oldTss: number,
+  oldWeightedTss: number,
+  newTss: number,
+  newWeightedTss: number,
+): void {
+  w.total_raw_tss = Math.max(0, w.total_raw_tss - oldTss + newTss);
+  w.total_weighted_tss = Math.max(0, w.total_weighted_tss - oldWeightedTss + newWeightedTss);
+  const cur = w.sport_raw_tss[sport] ?? 0;
+  w.sport_raw_tss[sport] = Math.max(0, cur - oldTss + newTss);
+
+  const durDelta = newDuration - oldDuration;
+  const newZ3 = Math.max(0, w.zone3_plus_minutes + durDelta * oldHardFrac);
+  const newZ12 = Math.max(0, w.zone1_2_minutes + durDelta * (1 - oldHardFrac));
+  w.zone3_plus_minutes = Math.round(newZ3);
+  w.zone1_2_minutes = Math.round(newZ12);
+  const totalMin = w.zone1_2_minutes + w.zone3_plus_minutes;
+  w.eighty_twenty_ratio = totalMin > 0 ? w.zone1_2_minutes / totalMin : 1;
+}
+
+function bumpLongRunToFloor(s: PlannedSession, w: GeneratedWeek, floorMi: number): void {
+  // Round to integer miles so the materializer's `longrun_\d+mi_easypace` regex still matches.
+  // longRunFloorMiles emits 0.5 increments; Math.round on .5 rounds away from zero.
+  const milesInt = Math.max(1, Math.round(floorMi));
+  const newDuration = Math.round(milesInt * 9.5); // mirror longRun() in session-factory
+  const oldDuration = s.duration;
+  const oldHardFrac = hardFracOfIntensity(s.intensity_class);
+  const oldTss = s.tss;
+  const oldWeightedTss = s.weighted_tss;
+  const newTss = estimateSessionTSS('run', s.intensity_class, newDuration);
+  const newWeightedTss = weightedTSS('run', newTss);
+
+  s.duration = newDuration;
+  s.tss = newTss;
+  s.weighted_tss = newWeightedTss;
+  s.name = `Long Run — ${milesInt} mi`;
+  const isRaceSpecific = Array.isArray(s.tags) && s.tags.includes('race_specific');
+  s.steps_preset = [
+    isRaceSpecific
+      ? `longrun_${milesInt}mi_mp_finish`
+      : `longrun_${milesInt}mi_easypace`,
+  ];
+
+  applyDeltaToWeek(
+    w, 'run', oldDuration, newDuration, oldHardFrac,
+    oldTss, oldWeightedTss, newTss, newWeightedTss,
+  );
+}
+
+function bumpLongRideToFloor(s: PlannedSession, w: GeneratedWeek, floorH: number): void {
+  // longRideFloorHours emits 0.25-hour increments; round to integer minutes for the bike token.
+  const newDuration = Math.round(floorH * 60); // mirror longRide() in session-factory
+  const oldDuration = s.duration;
+  const oldHardFrac = hardFracOfIntensity(s.intensity_class);
+  const oldTss = s.tss;
+  const oldWeightedTss = s.weighted_tss;
+  const newTss = estimateSessionTSS('bike', s.intensity_class, newDuration);
+  const newWeightedTss = weightedTSS('bike', newTss);
+
+  s.duration = newDuration;
+  s.tss = newTss;
+  s.weighted_tss = newWeightedTss;
+  // longRide() name uses hours.toFixed(1) — keep the format identical.
+  s.name = `Long Ride — ${floorH.toFixed(1)} hr`;
+  s.steps_preset = [`bike_endurance_${newDuration}min_Z2`];
+
+  applyDeltaToWeek(
+    w, 'bike', oldDuration, newDuration, oldHardFrac,
+    oldTss, oldWeightedTss, newTss, newWeightedTss,
+  );
+}
+
+export type EnforceLongDayFloorsOpts = {
+  hasTri: boolean;
+  primaryDistance: TriRaceDistance;
+  /** Race anchor week numbers (1-indexed). Skipped — race week has its own caps. */
+  raceWeekNums?: number[];
+};
+
+/**
+ * After tightenPhaseBlocksForFloorRebuild's uniform compression, re-enforce the long-day floor on
+ * each non-recovery / non-taper / non-race week. Mutates `weeks` in place. Long sessions that are
+ * already at or above floor are not touched. Bricks (replacing standalone long_ride) are skipped —
+ * brick durability has its own dynamics. Race-specific weeks where long_run was replaced by a
+ * race-pace session are skipped (no `long_run` tag).
+ */
+export function enforceLongDayFloors(
+  weeks: GeneratedWeek[],
+  opts: EnforceLongDayFloorsOpts,
+): void {
+  const raceWeeks = new Set(opts.raceWeekNums ?? []);
+
+  for (const w of weeks) {
+    if (w.isRecovery) continue;
+    if (w.phase === 'taper') continue;
+    if (w.phase === 'recovery') continue;
+    if (raceWeeks.has(w.weekNum)) continue;
+
+    // Long run — applies to both single-sport (run) and tri.
+    const lrFloorMi = longRunFloorMiles(opts.primaryDistance, w.phase);
+    if (lrFloorMi > 0) {
+      const lrSession = findLongRunSessionInWeek(w);
+      if (lrSession) {
+        const observedMi = lrSession.duration / 9.5;
+        if (observedMi + 1e-9 < lrFloorMi) {
+          bumpLongRunToFloor(lrSession, w, lrFloorMi);
+        }
+      }
+    }
+
+    // Long ride — tri only. Run-only plans never schedule long_ride.
+    if (opts.hasTri) {
+      const lrideFloorH = longRideFloorHours(opts.primaryDistance, w.phase);
+      if (lrideFloorH > 0) {
+        const lrideSession = findLongRideSessionInWeek(w);
+        if (lrideSession) {
+          const observedH = lrideSession.duration / 60;
+          if (observedH + 1e-9 < lrideFloorH) {
+            bumpLongRideToFloor(lrideSession, w, lrideFloorH);
+          }
+        }
+      }
+    }
+  }
 }
