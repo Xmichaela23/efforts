@@ -18,45 +18,31 @@ import {
 } from './science.ts';
 
 /**
- * Single-sport / marathon plans: long-run raw TSS vs **weekly total** raw TSS (Daniels-style weekly load).
+ * Sanity ceiling on long-run raw TSS share — applied to **all** phases (no phase variation) for
+ * both single-sport (vs weekly total raw TSS) and tri run-discipline (vs run-only raw TSS) paths.
  *
- * Note: this is the **base-phase** cap. The validator scales per phase via
- * {@link LONG_RUN_TSS_SHARE_MAX_BY_PHASE} so taper / race-specific weeks aren't penalized
- * for naturally concentrated long-run shares (the rest of the week deliberately drops away).
- * Kept as `0.3` for backward-compat with the response-payload telemetry shape.
+ * **Not a coaching constraint.** TrainingPeaks ATP / Friel-style methodology uses weekly hours,
+ * CTL ramp, and duration floors — not TSS share caps — to size long sessions. The duration
+ * floor (`longRunFloorMiles`, history-aware via `effectiveLongRunFloorMiles`) is the source of
+ * truth for long-session size; the WoW ramp cap protects against overload; recovery week
+ * mechanics handle deloading. This cap is a backstop that flags weeks where some other system
+ * has gone wildly wrong (e.g. 90%+ of a week's TSS lands on one session).
  */
-export const LONG_RUN_TSS_SHARE_MAX = 0.3;
+export const LONG_RUN_TSS_SHARE_MAX = 0.7;
 
 /**
- * Multi-sport (tri): long-run vs **run-discipline** weekly raw TSS — bike/swim dominate total TSS; comparing LR
- * to whole-week total is a category error (see combined-plan notes). Same phase scaling as the single-sport path.
+ * Tri-specific alias of {@link LONG_RUN_TSS_SHARE_MAX} for the run-discipline share path.
+ * Same value — kept as a separate export so the response-payload telemetry shape (which surfaces
+ * the single-sport vs run-discipline caps separately) doesn't have to change.
  */
-export const LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE = 0.3;
-
-/** Tri fallback when weekly run TSS is too small to ratio meaningfully: LR vs total weekly raw TSS. */
-export const LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK = 0.4;
+export const LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE = 0.7;
 
 /**
- * Phase-aware long-run share caps. Applied to both single-sport (vs weekly total raw TSS) and
- * tri run-discipline (vs run-only raw TSS) paths — both use a 30% base cap.
- *
- * Why phase-aware: in taper / race-specific weeks the rest of the week drops volume by design
- * (shorter rides, fewer quality intervals, less swim yardage). The long run holds — sometimes
- * grows — to maintain durability into race day. A flat 30% cap penalizes intentional shape;
- * the cap should track the phase that's already in effect.
- *
- * Recovery weeks are skipped by the validator entirely (long aerobic anchor preserved while
- * other disciplines drop) so they don't appear here.
+ * Tri fallback when weekly run TSS is too small to ratio meaningfully: LR vs total weekly raw TSS.
+ * Stricter than the run-discipline cap because the denominator is the whole week (swim + bike +
+ * run + strength) — a 50% concentration of total weekly TSS on one session is the sanity bound.
  */
-export const LONG_RUN_TSS_SHARE_MAX_BY_PHASE: Record<
-  'base' | 'build' | 'race_specific' | 'taper',
-  number
-> = {
-  base: 0.40,
-  build: 0.42,
-  race_specific: 0.45,
-  taper: 0.50,
-};
+export const LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK = 0.5;
 
 /** Minimum weekly run raw TSS before we trust run-discipline share (else use tri total-week fallback). */
 export const TRI_RUN_DISCIPLINE_SHARE_MIN_RUN_TSS = 40;
@@ -176,25 +162,22 @@ export function validateTrainingFloors(
     let limit: number;
     let basis: string;
 
-    // Phase-aware cap for the two 30%-base paths (single-sport, tri run-discipline). Falls back
-    // to the static base cap when w.phase is unknown or 'recovery' (recovery is filtered above).
-    const phaseKey = w.phase as keyof typeof LONG_RUN_TSS_SHARE_MAX_BY_PHASE;
-    const phaseScaledCap = LONG_RUN_TSS_SHARE_MAX_BY_PHASE[phaseKey] ?? LONG_RUN_TSS_SHARE_MAX;
-
+    // Single sanity ceiling — no phase variation. Coaching-grade size control lives in the
+    // duration floor (effectiveLongRunFloorMiles) and the WoW ramp cap; this is a backstop.
     if (hasTri && runRaw >= TRI_RUN_DISCIPLINE_SHARE_MIN_RUN_TSS) {
       share = lr / runRaw;
-      limit = phaseScaledCap;
-      basis = `weekly run-discipline raw TSS (${w.phase} phase)`;
+      limit = LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE;
+      basis = 'weekly run-discipline raw TSS';
     } else if (hasTri) {
-      // Low-run-volume tri week: the run isn't the dominant discipline; phase scaling is moot.
-      // Cap stays at the existing 40% absolute fallback.
+      // Low-run-volume tri week: denominator is the whole week (swim + bike + run + strength),
+      // so a stricter ceiling makes sense — 50% of total weekly TSS on one session is the bound.
       share = lr / total;
       limit = LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK;
       basis = 'weekly total raw TSS (tri fallback — low run volume week)';
     } else {
       share = lr / total;
-      limit = phaseScaledCap;
-      basis = `weekly total raw TSS (${w.phase} phase)`;
+      limit = LONG_RUN_TSS_SHARE_MAX;
+      basis = 'weekly total raw TSS';
     }
 
     if (share > limit + 1e-9) {
