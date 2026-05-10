@@ -84,6 +84,23 @@ function swimSpreadGap(day: DayName, occupiedSwimDays: DayName[]): number {
   return minGap;
 }
 
+/** Circular weekday distance: 0 = same day, 1 = adjacent (incl. Sat↔Sun and Sun↔Mon). */
+function circularWeekdayDistance(a: DayName, b: DayName): number {
+  const g = Math.abs(DAY_INDEX[a] - DAY_INDEX[b]);
+  return Math.min(g, 7 - g);
+}
+
+/**
+ * Second and third swims cannot land ±1 calendar day from any swim already placed
+ * (minimum 2-day separation on the week ring).
+ */
+function violatesMinimumSwimSpread(candidate: DayName, existingSwimDays: DayName[]): boolean {
+  for (const s of existingSwimDays) {
+    if (circularWeekdayDistance(candidate, s) <= 1) return true;
+  }
+  return false;
+}
+
 /** Penalize easy_run on calendar days touching quality_run or long_run (hard quality / long stimulus neighbors). */
 function easyRunAnchorAdjacencyPenalty(
   d: DayName,
@@ -1444,12 +1461,14 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     const kind: SessionKind = (isLast && promoteQuality) ? 'quality_swim' : 'easy_swim';
 
     // Base ordering: Mon/Thu-first weekday spread, then remaining weekdays → weekend.
-    // Sort by (1) minimum gap vs swims already placed — avoids Mon+Tue clustering when
-    // Mon/Tue/Thu/Fri are open — then (2) day load, then (3) base tiebreak.
+    // Hard rule: each new swim must be ≥2 calendar steps from every swim already placed
+    // (no ±1 adjacency, wrap-aware); then sort by (1) minimum gap vs swims already placed,
+    // (2) day load, (3) base tiebreak.
     const baseOrder: DayName[] = [
       'monday', 'thursday', 'tuesday', 'friday', 'wednesday', 'sunday', 'saturday',
     ];
     const occupiedSwimDays = swimSlots.map((s) => s.day);
+    const swimSpreadOk = (d: DayName) => !violatesMinimumSwimSpread(d, occupiedSwimDays);
     const dayLoad = (d: DayName): number => {
       const slots = days[d];
       let load = slots.length;
@@ -1459,6 +1478,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     };
     const orderedRaw = baseOrder
       .filter((c) => !swimSlots.some((s) => s.day === c))
+      .filter(swimSpreadOk)
       .sort((a, b) => {
         const gapA = swimSpreadGap(a, occupiedSwimDays);
         const gapB = swimSpreadGap(b, occupiedSwimDays);
@@ -1482,6 +1502,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       // Never create a 3-session day: swim should not land on a day that already
       // has 2 sessions even if each pairwise matrix check passes.
       if (days[c].length >= 2) continue;
+      if (!swimSpreadOk(c)) continue;
       if (!canPlace(days, c, kind)) continue;
       picked = c;
       break;
