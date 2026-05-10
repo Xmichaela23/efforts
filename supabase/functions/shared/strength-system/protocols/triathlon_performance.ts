@@ -34,9 +34,11 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const planWeekLabel = Math.max(1, Number.isFinite(context.weekIndex) ? context.weekIndex : weekInPhase);
   const tier: EquipmentTier =
     context.userBaselines.equipment === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
-  // hasCable / hasGHD are explicit when threaded from Arc equipment list; fall back to safe defaults.
+  // hasCable / hasGHD / hasKettlebell are explicit when threaded from Arc equipment list; fall
+  // back to safe defaults.
   const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
   const hasGHD: boolean = context.userBaselines.hasGHD ?? false;
+  const hasKettlebell: boolean = context.userBaselines.hasKettlebell ?? false;
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
   const freq = strengthFrequency ?? 2;
   const phaseName = String(phase?.name ?? '').toLowerCase();
@@ -67,8 +69,8 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
   if (phaseName === 'race prep' || phaseName === 'race-specific' || phaseName === 'speed') {
     return freq >= 2
-      ? [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel), perfRaceUpper(tier, hasCable, limiter)]
-      : [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel)];
+      ? [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel, hasKettlebell), perfRaceUpper(tier, hasCable, limiter)]
+      : [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel, hasKettlebell)];
   }
 
   return [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel)];
@@ -453,13 +455,75 @@ function perfBuildUpper(tier: EquipmentTier, hasCable: boolean, limiter: Limiter
 
 // ── Race-specific: power / neural ───────────────────────────────────────────
 
-function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: number, planWeekLabel: number): IntentSession {
+function perfRaceLower(
+  tier: EquipmentTier,
+  limiter: LimiterSport,
+  weekInPhase: number,
+  planWeekLabel: number,
+  hasKettlebell?: boolean,
+): IntentSession {
   const wip = Math.max(1, weekInPhase);
   // Spec §3.1: Maintenance + Power = RIR 2 (not RIR 1). Express strength as power, not max load.
   const rir = 2;
   const ex: StrengthExercise[] = [];
 
-  // Spec §3.1 Maintenance + Power: 3-5 reps lift @ 70-75% 1RM, RIR 2, 2-3 sets/lift, with plyo paired.
+  // Spec §3.5 power-exercise rotation. Always paired with main compounds, always done first when
+  // fresh. Selected by weekInPhase + equipment availability:
+  //   commercial_gym: rotate Push Press → Box Jumps → Broad Jumps → KB Swings (when KB available)
+  //   home / DB tier: rotate Box Jumps → Broad Jumps → KB Swings (when KB available)
+  // Olympic lifts are explicitly excluded by spec (technical debt outweighs benefits for triathletes).
+  const powerExercise: StrengthExercise = (() => {
+    const rotation: Array<'push_press' | 'box_jumps' | 'broad_jumps' | 'kb_swings'> =
+      tier === 'commercial_gym'
+        ? hasKettlebell
+          ? ['push_press', 'box_jumps', 'broad_jumps', 'kb_swings']
+          : ['push_press', 'box_jumps', 'broad_jumps']
+        : hasKettlebell
+          ? ['box_jumps', 'broad_jumps', 'kb_swings']
+          : ['box_jumps', 'broad_jumps'];
+    const pick = rotation[(wip - 1) % rotation.length];
+    switch (pick) {
+      case 'push_press':
+        return {
+          name: 'Push Press',
+          sets: 3,
+          reps: '3-5',
+          weight: '70% 1RM (OHP) — explosive concentric, controlled descent',
+          target_rir: rir,
+          notes: 'First exercise when fresh — drive from legs, not shoulders',
+        };
+      case 'broad_jumps':
+        return {
+          name: 'Broad Jumps',
+          sets: 3,
+          reps: 4,
+          weight: 'Bodyweight — max horizontal distance, stick the landing',
+          target_rir: 2,
+          notes: 'Full reset between reps — quality over volume',
+        };
+      case 'kb_swings':
+        return {
+          name: 'KB Swings (Russian)',
+          sets: 3,
+          reps: 10,
+          weight: 'Heavy KB — explosive hip drive',
+          target_rir: rir,
+          notes: 'Russian (chest height); not American — hip extension is the lift',
+        };
+      case 'box_jumps':
+      default:
+        return {
+          name: 'Box Jumps',
+          sets: 3,
+          reps: 4,
+          weight: 'Bodyweight — max intent, soft land',
+          target_rir: 2,
+        };
+    }
+  })();
+  ex.push(powerExercise);
+
+  // Primary compound — Trap Bar Deadlift (commercial_gym) or Jump Squats (home/DB).
   if (tier === 'commercial_gym') {
     ex.push({
       name: 'Trap Bar Deadlift',
@@ -468,13 +532,6 @@ function perfRaceLower(tier: EquipmentTier, limiter: LimiterSport, weekInPhase: 
       weight: '72% 1RM — fast intent, controlled descent',
       target_rir: rir,
       notes: 'Reset each rep — express strength as power, not max load',
-    });
-    ex.push({
-      name: 'Box Jumps',
-      sets: 3,
-      reps: 3,
-      weight: 'Bodyweight — max intent, soft land',
-      target_rir: 2,
     });
   } else {
     ex.push({

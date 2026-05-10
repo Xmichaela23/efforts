@@ -65,6 +65,8 @@ export interface ProtocolContext {
     hasCable?: boolean;
     /** True only when athlete has a GHD machine, Nordic bench, or fixed floor anchor. Nordic Hamstring Curls must not be prescribed without this. */
     hasGHD?: boolean;
+    /** True when athlete has at least one kettlebell. Drives KB Swings selection in performance Maintenance + Power (spec §3.5). */
+    hasKettlebell?: boolean;
   };
   
   // Strength training configuration

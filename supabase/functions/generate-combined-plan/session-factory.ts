@@ -26,7 +26,7 @@ import {
   swimDrillBlockAthleteCopy,
   swimSessionPhilosophyLead,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
-import { buildStrengthEquipmentLine } from '../_shared/strength-equipment-tier.ts';
+import { buildStrengthEquipmentLine, hasKettlebell as detectKettlebell } from '../_shared/strength-equipment-tier.ts';
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
 import {
   calculateSwimTss,
@@ -1511,6 +1511,7 @@ export function triathlonStrength(
       equipmentTier: equipmentTier3,
       hasCable: options?.hasCable ?? (options?.equipmentType !== 'home_gym'),
       hasGHD: options?.hasGhd ?? false,
+      hasKettlebell: detectKettlebell(options?.strengthEquipment ?? []),
       ...((): { squat1RM?: number; deadlift1RM?: number; bench1RM?: number; overhead1RM?: number } => {
         const pn = options?.performanceNumbers;
         if (!pn || typeof pn !== 'object') return {};
