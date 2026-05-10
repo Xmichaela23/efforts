@@ -181,6 +181,30 @@ export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): numb
   return Math.round(peak * multiplier * 2) / 2;
 }
 
+/**
+ * Minimum long-ride hours by race distance and calendar phase. Mirror of {@link longRunFloorMiles}
+ * for the cycling side; consumed by `validate-training-floors.ts#evaluateLongDayVolumeFloors` as a
+ * **soft** trade-off (logged + surfaced in `week_trade_offs`, never blocks the build).
+ *
+ * Peak target reuses {@link expectedBikeDurationHours} so a 70.3 in race-specific lands at ~2.5h
+ * (3.0h × 0.83) and a full at ~5.0h (6.0h × 0.83). Taper / recovery return 0 — those phases are
+ * skipped by the validator so the value is moot, but 0 makes the "no floor here" semantics explicit.
+ */
+export function longRideFloorHours(distance: TriRaceDistance, phase: Phase): number {
+  const peak = expectedBikeDurationHours(distance);
+  const multiplier = (() => {
+    switch (phase) {
+      case 'base': return 0.50;
+      case 'build': return 0.67;
+      case 'race_specific': return 0.83;
+      case 'taper': return 0;
+      case 'recovery': return 0;
+      default: return 0;
+    }
+  })();
+  return Math.round(peak * multiplier * 4) / 4;
+}
+
 // For a run-only event, all non-strength budget goes to run.
 export const RUN_SPORT_DIST: Record<string, Record<Sport, number>> = {
   marathon:      { run: 0.82, bike: 0.00, swim: 0.00, strength: 0.10, race: 0 },

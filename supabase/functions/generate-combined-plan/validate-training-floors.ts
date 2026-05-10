@@ -7,8 +7,13 @@
  * (lower weekly budget + shrink long-run miles).
  */
 
-import type { GeneratedWeek, AthleteState } from './types.ts';
-import { DAYS_OF_WEEK } from './science.ts';
+import type { GeneratedWeek, AthleteState, Phase } from './types.ts';
+import {
+  DAYS_OF_WEEK,
+  longRideFloorHours,
+  longRunFloorMiles,
+  type TriRaceDistance,
+} from './science.ts';
 
 /**
  * Single-sport / marathon plans: long-run raw TSS vs **weekly total** raw TSS (Daniels-style weekly load).
@@ -80,11 +85,19 @@ export const FLOOR_REBUILD_TSS_MULTIPLIER_FACTOR = 0.87;
 /** Allow continued tightening past early rebuild stops — weekly volume must be able to compress further. */
 export const FLOOR_REBUILD_MIN_MULTIPLIER = 0.30;
 
-export type PhysiologicalFloorCode = 'LONG_RUN_TSS_SHARE' | 'WEEK_OVER_WEEK_TSS_RAMP';
+export type PhysiologicalFloorCode =
+  | 'LONG_RUN_TSS_SHARE'
+  | 'WEEK_OVER_WEEK_TSS_RAMP'
+  | 'LONG_DAY_VOLUME_FLOOR';
 
+/**
+ * `'fatal'` blocks the plan and routes through `physiologicalFloorRebuild`. `'soft'` surfaces in
+ * `week_trade_offs` + telemetry and ships the plan unchanged. Long-day volume floors are soft by
+ * design (per spec): a too-short long ride is a coachable nudge, not a structural failure.
+ */
 export type PhysiologicalFloorViolation = {
   code: PhysiologicalFloorCode;
-  severity: 'fatal';
+  severity: 'fatal' | 'soft';
   message: string;
   week_num?: number;
   metrics: Array<{ name: string; observed: number; limit: number; unit?: string }>;
@@ -259,4 +272,126 @@ export function tightenPhaseBlocksForFloorRebuild<T extends { tssMultiplier: num
       Math.round(b.tssMultiplier * FLOOR_REBUILD_TSS_MULTIPLIER_FACTOR * 1000) / 1000,
     ),
   }));
+}
+
+// ── Long-day volume floors (soft) ────────────────────────────────────────────
+//
+// Soft trade-offs only. A too-short long ride or long run on a normal training week is a coachable
+// nudge: the plan still ships, the athlete sees the nudge in `week_trade_offs`, telemetry records it.
+// Distinct from §4.19 long-run TSS *share* (hard, rebuild-routed) — that's about over-concentration;
+// this is about under-volume. Phases skipped: recovery, taper, and the race-anchor week itself
+// (taper + race week intentionally suppress long-day volume; flagging there fights the design).
+
+/** Builder pace assumption (9:30/mi). Mirror — keep in lockstep with `week-builder.ts:730`. */
+const LONG_RUN_PACE_MIN_PER_MI = 9.5;
+
+export type LongDayFloorWarning = {
+  weekNum: number;
+  discipline: 'long_run' | 'long_ride';
+  /** Athlete-facing prose, ready to push into `week_trade_offs`. */
+  message: string;
+  metrics: {
+    observed: number;
+    floor: number;
+    unit: 'mi' | 'h';
+    phase: Phase;
+  };
+};
+
+export type EvaluateLongDayFloorsOpts = {
+  /** Race anchor weeks (1-indexed plan week numbers). Skipped because race week has its own caps. */
+  raceWeekNums?: number[];
+  /** True for tri / multi-sport plans. Long-ride floor only evaluated when true. */
+  hasTri: boolean;
+  /** Primary A-race distance — feeds {@link longRunFloorMiles} / {@link longRideFloorHours}. */
+  primaryDistance: TriRaceDistance;
+};
+
+function maxLongRunMinutes(week: GeneratedWeek): number {
+  let best = 0;
+  for (const s of week.sessions) {
+    const tags = Array.isArray(s.tags) ? s.tags.map((x) => String(x).toLowerCase()) : [];
+    if (!tags.includes('long_run')) continue;
+    const dur = Number(s.duration) || 0;
+    if (dur > best) best = dur;
+  }
+  return best;
+}
+
+function maxLongRideMinutes(week: GeneratedWeek): number {
+  let best = 0;
+  for (const s of week.sessions) {
+    const tags = Array.isArray(s.tags) ? s.tags.map((x) => String(x).toLowerCase()) : [];
+    // `brick` sessions are tri-specific durability stimulus, not a long ride; exclude so a brick
+    // week's bike-leg ≈ 90 min isn't flagged against a 2.25h race-specific long-ride floor.
+    if (tags.includes('brick')) continue;
+    if (!tags.includes('long_ride')) continue;
+    const dur = Number(s.duration) || 0;
+    if (dur > best) best = dur;
+  }
+  return best;
+}
+
+function phaseLabel(phase: Phase): string {
+  switch (phase) {
+    case 'race_specific': return 'race-specific';
+    default: return phase;
+  }
+}
+
+/**
+ * Soft evaluation of long-ride and long-run volume floors. Skips recovery, taper, and race weeks.
+ * Returns a list of athlete-facing warnings; never blocks the build.
+ */
+export function evaluateLongDayVolumeFloors(
+  weeks: GeneratedWeek[],
+  opts: EvaluateLongDayFloorsOpts,
+): LongDayFloorWarning[] {
+  const out: LongDayFloorWarning[] = [];
+  const raceWeeks = new Set(opts.raceWeekNums ?? []);
+
+  for (const w of weeks) {
+    if (w.isRecovery) continue;
+    if (w.phase === 'taper') continue;
+    if (w.phase === 'recovery') continue;
+    if (raceWeeks.has(w.weekNum)) continue;
+
+    // Long run — applies to both single-sport (run) and tri.
+    const lrFloorMi = longRunFloorMiles(opts.primaryDistance, w.phase);
+    if (lrFloorMi > 0) {
+      const lrMin = maxLongRunMinutes(w);
+      const lrMi = Math.round((lrMin / LONG_RUN_PACE_MIN_PER_MI) * 10) / 10;
+      if (lrMi + 1e-9 < lrFloorMi) {
+        out.push({
+          weekNum: w.weekNum,
+          discipline: 'long_run',
+          message: lrMin > 0
+            ? `Week ${w.weekNum} long run is shorter than the typical ${phaseLabel(w.phase)} floor (${lrMi}mi vs ${lrFloorMi}mi). If recovery allows, extending toward ${lrFloorMi}+ mi protects durability.`
+            : `Week ${w.weekNum} has no long run scheduled — ${phaseLabel(w.phase)} plans target a ${lrFloorMi}+ mi long run for durability.`,
+          metrics: { observed: lrMi, floor: lrFloorMi, unit: 'mi', phase: w.phase },
+        });
+      }
+    }
+
+    // Long ride — tri only. Run-only plans don't ship long_ride sessions.
+    if (opts.hasTri) {
+      const lrideFloorH = longRideFloorHours(opts.primaryDistance, w.phase);
+      if (lrideFloorH > 0) {
+        const lrideMin = maxLongRideMinutes(w);
+        const lrideH = Math.round((lrideMin / 60) * 100) / 100;
+        if (lrideH + 1e-9 < lrideFloorH) {
+          out.push({
+            weekNum: w.weekNum,
+            discipline: 'long_ride',
+            message: lrideMin > 0
+              ? `Week ${w.weekNum} long ride is shorter than the typical ${phaseLabel(w.phase)} floor (${lrideH}h vs ${lrideFloorH}h). Lengthening toward ${lrideFloorH}h+ builds the bike-leg endurance the race demands.`
+              : `Week ${w.weekNum} has no long ride scheduled — ${phaseLabel(w.phase)} plans target a ${lrideFloorH}h+ long ride for bike-leg durability.`,
+            metrics: { observed: lrideH, floor: lrideFloorH, unit: 'h', phase: w.phase },
+          });
+        }
+      }
+    }
+  }
+
+  return out;
 }

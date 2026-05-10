@@ -27,6 +27,7 @@ import {
 import {
   validateTrainingFloors,
   tightenPhaseBlocksForFloorRebuild,
+  evaluateLongDayVolumeFloors,
   LONG_RUN_TSS_SHARE_MAX,
   LONG_RUN_TSS_SHARE_MAX_RUN_DISCIPLINE,
   LONG_RUN_TSS_SHARE_MAX_TRI_TOTAL_WEEK,
@@ -209,6 +210,43 @@ Deno.serve(async (req: Request) => {
         },
         400,
       );
+    }
+
+    // ── Long-day volume floors (soft) ──────────────────────────────────────
+    // Surfaces under-volume long_ride / long_run weeks as athlete-facing trade-offs. Distinct
+    // from the hard floor-rebuild loop above (which addresses *over-concentration*). Skips
+    // recovery, taper, and race weeks — those phases intentionally suppress long-day volume.
+    {
+      const primaryGoalForFloors = goals.find((g) => g.priority === 'A') ?? goals[0];
+      const longDayWarnings = evaluateLongDayVolumeFloors(generatedWeeks, {
+        hasTri: hasTriGoal,
+        primaryDistance: primaryGoalForFloors.distance,
+        raceWeekNums: raceAnchors.map((a) => a.planWeek),
+      });
+      if (longDayWarnings.length > 0) {
+        console.warn(
+          '[combined-plan] LONG_DAY_VOLUME_FLOOR soft trade-offs:',
+          longDayWarnings.map((w) => ({
+            week: w.weekNum,
+            discipline: w.discipline,
+            observed: w.metrics.observed,
+            floor: w.metrics.floor,
+            unit: w.metrics.unit,
+            phase: w.metrics.phase,
+          })),
+        );
+        const byWeek = new Map<number, string[]>();
+        for (const wn of longDayWarnings) {
+          const list = byWeek.get(wn.weekNum) ?? [];
+          list.push(wn.message);
+          byWeek.set(wn.weekNum, list);
+        }
+        for (const gw of generatedWeeks) {
+          const msgs = byWeek.get(gw.weekNum);
+          if (!msgs || msgs.length === 0) continue;
+          gw.week_trade_offs = [...(gw.week_trade_offs ?? []), ...msgs];
+        }
+      }
     }
 
     // ── Validate ───────────────────────────────────────────────────────────
