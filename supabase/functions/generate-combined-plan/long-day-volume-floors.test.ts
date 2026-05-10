@@ -724,3 +724,120 @@ Deno.test('evaluate: history-aware floor surfaces the same effective threshold',
   assert(lrWarn, 'expected warning when below history-aware floor');
   assertEquals(lrWarn.metrics.floor, 10);
 });
+
+// ── §11 race-distance peak cap + display-friendly rounding ──────────────────
+// The bug: `effectiveLongRunFloorMiles` previously returned raw `recent × 0.5` with no upper
+// bound and no display rounding, producing trade-off messages like "8.5mi vs 21.2335mi" when
+// a 70.3 athlete logged a 42.5mi recent long run. Cap at race-specific peak (11mi for 70.3,
+// 3.0hr for 70.3 ride) and round to the spec-floor precision (0.5mi / 0.25hr).
+
+Deno.test('effective floor: run capped at race-specific peak (70.3 → 11mi)', () => {
+  // Athlete with recent 42mi long run → raw 21mi. 70.3 race-specific peak = 11.0. Capped at 11.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 42), 11);
+  // Even in race-specific phase the cap binds (peak itself is the ceiling).
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'race_specific', 42), 11);
+});
+
+Deno.test('effective floor: run capped at race-specific peak (sprint → 4.0mi)', () => {
+  // Sprint athlete with prior IM training (recent 18mi) doesn't get a 9-mi sprint long-run floor.
+  // Sprint race-specific peak = 4.0. Capped at 4.0.
+  assertEquals(effectiveLongRunFloorMiles('sprint', 'base', 18), 4);
+});
+
+Deno.test('effective floor: run capped at race-specific peak (ironman → 18mi)', () => {
+  // Recent 50mi → raw 25mi. Ironman race-specific peak = 18mi. Capped at 18.
+  assertEquals(effectiveLongRunFloorMiles('ironman', 'base', 50), 18);
+});
+
+Deno.test('effective floor: run reproduces the buggy "21.2335mi" case (now → 11)', () => {
+  // The original bug: recent 42.467mi → 21.2335mi leaked into "8.5mi vs 21.2335mi" message.
+  // Post-fix: capped at 11 (70.3 race-specific peak) and rounded to 0.5 precision.
+  const v = effectiveLongRunFloorMiles('70.3', 'base', 42.467);
+  assertEquals(v, 11);
+  // Confirm it's both the threshold AND a display-friendly number (no floating noise).
+  assertEquals(v.toString(), '11');
+});
+
+Deno.test('effective floor: run rounded to 0.5mi precision', () => {
+  // Recent 17.3mi → raw 8.65 → spec 8.5 wins (raw < spec) → 8.5.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 17.3), 8.5);
+  // Recent 19mi → raw 9.5 → above spec 8.5; below cap 11; rounds to 9.5.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19), 9.5);
+  // Recent 19.1mi → raw 9.55 → rounds to 9.5 (nearest 0.5).
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19.1), 9.5);
+  // Recent 19.5mi → raw 9.75 → rounds to 10.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19.5), 10);
+});
+
+Deno.test('effective floor: ride capped at race-specific peak (70.3 → 3.0hr)', () => {
+  // Recent 8h ride → raw 4h. 70.3 race-specific peak = 3.0h. Capped at 3.0.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 8), 3);
+  // Even in race-specific phase the cap binds.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'race_specific', 8), 3);
+});
+
+Deno.test('effective floor: ride capped at race-specific peak (sprint)', () => {
+  // Sprint race-specific peak — recent 4h shouldn't produce a 2h sprint ride floor.
+  const cap = effectiveLongRideFloorHours('sprint', 'race_specific', 0);
+  const v = effectiveLongRideFloorHours('sprint', 'base', 4);
+  assertEquals(v, cap);
+});
+
+Deno.test('effective floor: ride rounded to 0.25hr precision', () => {
+  // Recent 5.3h → raw 2.65 → above spec 2.25; below cap 3.0; rounds to nearest 0.25 → 2.75.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 5.3), 2.75);
+  // Recent 5.1h → raw 2.55 → rounds to 2.5.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 5.1), 2.5);
+  // Recent 4.95h → raw 2.475 → rounds to 2.5.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 4.95), 2.5);
+});
+
+Deno.test('effective floor: ride taper/recovery short-circuit still wins over cap path', () => {
+  // The `spec <= 0` short-circuit must fire before the cap/round path so taper / recovery weeks
+  // continue to return 0 regardless of history.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'taper', 42), 0);
+  assertEquals(effectiveLongRideFloorHours('70.3', 'recovery', 42), 0);
+});
+
+Deno.test('evaluate: capped floor produces clean trade-off message (no floating-point noise)', () => {
+  // Pre-fix: a 70.3 athlete with recent 42.467mi long run would see "8.5mi vs 21.2335mi".
+  // Post-fix: capped at 11mi, rounded clean. Confirm the message contains "11mi" not raw decimals.
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 4,
+      phase: 'base',
+      sessions: [session({ type: 'run', tags: ['long_run', 'base'], durationMin: 80 })],
+    }),
+  ];
+  const out = evaluateLongDayVolumeFloors(weeks, {
+    hasTri: true,
+    primaryDistance: '70.3',
+    recentLongestRunMi: 42.467,
+  });
+  const lrWarn = out.find((w) => w.discipline === 'long_run');
+  assert(lrWarn, 'expected warning');
+  assertEquals(lrWarn.metrics.floor, 11);
+  // Message string must not contain raw `recent × 0.5` noise like "21.2335".
+  assert(!lrWarn.message.includes('21.2335'), `message leaked raw value: ${lrWarn.message}`);
+  assert(lrWarn.message.includes('11mi'), `expected canonical "11mi" in message: ${lrWarn.message}`);
+});
+
+Deno.test('enforce: capped floor lifts long_run to race-specific peak (not unbounded)', () => {
+  // Recent 42mi (would produce a 21-mi floor pre-fix). Post-fix: capped at 11mi (70.3 peak).
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 3,
+      phase: 'base',
+      sessions: [session({ type: 'run', tags: ['long_run', 'base'], durationMin: 30 })],
+    }),
+  ];
+  enforceLongDayFloors(weeks, {
+    hasTri: true,
+    primaryDistance: '70.3',
+    recentLongestRunMi: 42,
+  });
+  const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
+  // 11mi × 9.5 = 104.5 → rounds to 105
+  assertEquals(lrun.duration, Math.round(11 * 9.5));
+  assertEquals(lrun.steps_preset, ['longrun_11mi_easypace']);
+});
