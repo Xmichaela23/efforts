@@ -28,6 +28,8 @@ import {
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import {
   buildStrengthEquipmentLine,
+  hasBench as detectBench,
+  hasBox as detectBox,
   hasKettlebell as detectKettlebell,
   hasPullUpBar as detectPullUpBar,
 } from '../_shared/strength-equipment-tier.ts';
@@ -1519,6 +1521,8 @@ export function triathlonStrength(
       hasGHD: options?.hasGhd ?? false,
       hasKettlebell: detectKettlebell(options?.strengthEquipment ?? []),
       hasPullUpBar: detectPullUpBar(options?.strengthEquipment ?? []),
+      hasBench: detectBench(options?.strengthEquipment ?? []),
+      hasBox: detectBox(options?.strengthEquipment ?? []),
       ...(typeof options?.dbMaxLb === 'number' && options.dbMaxLb > 0
         ? { dbMaxLb: options.dbMaxLb }
         : {}),

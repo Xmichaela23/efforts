@@ -32,6 +32,10 @@ type DbCtx = {
   dbMaxLb: number;
   /** True when athlete has a pull-up / chin-up bar — gates Pull-ups vs band pull-down. */
   hasPullUpBar: boolean;
+  /** True when athlete has a bench. Gates DB Bench Press, DB Row (chest-supported), Hip Thrusts. */
+  hasBench: boolean;
+  /** True when athlete has a box / step / plyo platform. Gates Box Jumps, Step-ups, Bulgarian Split Squat. */
+  hasBox: boolean;
 };
 
 /**
@@ -81,7 +85,8 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const phaseName = String(phase?.name ?? '').toLowerCase();
 
   // Spec §8.2 DB context — used only when tier3 === 'dumbbell_based'. Default dbMaxLb=50 when
-  // wizard didn't supply.
+  // wizard didn't supply. hasBench / hasBox default to commercial_gym tier — keeps existing
+  // exercises selectable when chip detection didn't run.
   const dbCtx: DbCtx = {
     squat1RM: context.userBaselines.squat1RM,
     deadlift1RM: context.userBaselines.deadlift1RM,
@@ -89,6 +94,8 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     overhead1RM: context.userBaselines.overhead1RM,
     dbMaxLb: context.userBaselines.dbMaxLb ?? 50,
     hasPullUpBar,
+    hasBench: context.userBaselines.hasBench ?? (tier === 'commercial_gym'),
+    hasBox: context.userBaselines.hasBox ?? (tier === 'commercial_gym'),
   };
 
   if (isRecovery) {
@@ -178,7 +185,7 @@ function perfBaseLower(
   planWeekLabel: number,
   hasGHD?: boolean,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
   // Spec §3.1: Hypertrophy = 3-4 sets/lift. Mid/late weeks step up to 4 to drive volume progression.
@@ -288,7 +295,7 @@ function perfBaseUpper(
   weekInPhase: number,
   planWeekLabel: number,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
   // Spec §3.1: Hypertrophy = 3-4 sets/lift. Mid/late weeks step to 4.
@@ -333,24 +340,28 @@ function perfBaseUpper(
     }
   } else {
     // Spec §8.2 DB tier: DB Row (chest-supported) + DB Bench Press at 65% × 0.7 hypertrophy load.
+    // No bench (Part 3 gating): row → Bent-Over DB Row; bench → DB Floor Press.
     const row = dbPrescription({ pctOfBarbell1RM: 0.65, oneRMLb: dbCtx.bench1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (row.capped) cappedAny = true;
     ex.push({
-      name: 'DB Row (Chest-Supported)',
+      name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
       sets,
       reps: row.reps,
       weight: row.weight,
       target_rir: rir,
-      notes: 'Swim pull + thoracic extension for aero',
+      notes: dbCtx.hasBench
+        ? 'Swim pull + thoracic extension for aero'
+        : 'No bench — bent-over from hinge; brace core, neutral spine',
     });
     const bench = dbPrescription({ pctOfBarbell1RM: 0.65, oneRMLb: dbCtx.bench1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (bench.capped) cappedAny = true;
     ex.push({
-      name: 'DB Bench Press',
+      name: dbCtx.hasBench ? 'DB Bench Press' : 'DB Floor Press',
       sets,
       reps: bench.reps,
       weight: bench.weight,
       target_rir: rir,
+      ...(dbCtx.hasBench ? {} : { notes: 'No bench — floor press substitute (limited ROM; squeeze hard at lockout)' }),
     });
     // Pull-ups conditional on bar; otherwise band pull-down (spec §8.2).
     if (dbCtx.hasPullUpBar) {
@@ -421,7 +432,7 @@ function perfBuildLower(
   weekInPhase: number,
   planWeekLabel: number,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
   // Spec §3.1: Strength Build = 3-4 sets/lift. Step to 4 mid/late phase.
@@ -501,7 +512,7 @@ function perfBuildUpper(
   weekInPhase: number,
   planWeekLabel: number,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
   const sets = 4;
@@ -534,15 +545,18 @@ function perfBuildUpper(
     });
   } else {
     // Spec §8.2 DB tier: DB Row + DB Bench Press + DB Shoulder Press at strength-build load.
+    // Part 3: row → Bent-Over DB Row when no bench (chest-supported is the normal default).
     const row = dbPrescription({ pctOfBarbell1RM: 0.80, oneRMLb: dbCtx.bench1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
     if (row.capped) cappedAny = true;
     ex.push({
-      name: 'DB Row (Chest-Supported)',
+      name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
       sets,
       reps: row.reps,
       weight: row.weight,
       target_rir: rir,
-      notes: 'Heavy DBs — squeeze scaps fully at the top',
+      notes: dbCtx.hasBench
+        ? 'Heavy DBs — squeeze scaps fully at the top'
+        : 'No bench — bent-over from hinge; brace core, full ROM',
     });
     if (dbCtx.hasPullUpBar) {
       ex.push({
@@ -615,7 +629,7 @@ function perfRaceLower(
   planWeekLabel: number,
   hasKettlebell?: boolean,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const wip = Math.max(1, weekInPhase);
   // Spec §3.1: Maintenance + Power = RIR 2 (not RIR 1). Express strength as power, not max load.
@@ -685,12 +699,23 @@ function perfRaceLower(
         };
       case 'box_jumps':
       default:
+        // Part 3: Box Jumps require a box; substitute with Broad Jumps when none.
+        if (dbCtx.hasBox) {
+          return {
+            name: 'Box Jumps',
+            sets: 3,
+            reps: 4,
+            weight: 'Bodyweight — max intent, soft land',
+            target_rir: 2,
+          };
+        }
         return {
-          name: 'Box Jumps',
+          name: 'Broad Jumps',
           sets: 3,
           reps: 4,
-          weight: 'Bodyweight — max intent, soft land',
+          weight: 'Bodyweight — max horizontal distance, stick the landing',
           target_rir: 2,
+          notes: 'No box — broad jumps substitute; full reset between reps',
         };
     }
   })();
@@ -732,22 +757,46 @@ function perfRaceLower(
     });
   }
 
-  ex.push({
-    name: 'Hip Thrusts (Fast Concentric)',
-    sets: 3,
-    reps: 5,
-    weight: tier3 === 'commercial_gym' ? 'Moderate barbell — explosive intent' : 'Two heavy DBs across hips',
-    target_rir: rir,
-    notes: 'Explosive hip extension',
-  });
+  // Part 3: Hip Thrusts need a bench for hip support; without bench → Glute Bridges (BW, floor).
+  if (dbCtx.hasBench) {
+    ex.push({
+      name: 'Hip Thrusts (Fast Concentric)',
+      sets: 3,
+      reps: 5,
+      weight: tier3 === 'commercial_gym' ? 'Moderate barbell — explosive intent' : 'Two heavy DBs across hips',
+      target_rir: rir,
+      notes: 'Explosive hip extension',
+    });
+  } else {
+    ex.push({
+      name: 'Glute Bridges (Explosive)',
+      sets: 3,
+      reps: 8,
+      weight: 'Bodyweight — fast concentric, full hip extension at top',
+      target_rir: rir,
+      notes: 'No bench — floor glute bridges; reps bumped to maintain stimulus',
+    });
+  }
 
-  ex.push({
-    name: 'Explosive Step-ups',
-    sets: 3,
-    reps: '4/leg',
-    weight: tier3 === 'commercial_gym' ? 'Light DBs' : 'Bodyweight or light DBs',
-    target_rir: rir,
-  });
+  // Part 3: Step-ups need a box/step; without → Reverse Lunge (BW or DB).
+  if (dbCtx.hasBox) {
+    ex.push({
+      name: 'Explosive Step-ups',
+      sets: 3,
+      reps: '4/leg',
+      weight: tier3 === 'commercial_gym' ? 'Light DBs' : 'Bodyweight or light DBs',
+      target_rir: rir,
+    });
+  } else {
+    ex.push({
+      name: 'Reverse Lunge',
+      sets: 3,
+      reps: '6/leg',
+      weight: tier3 === 'commercial_gym' ? 'Light DBs' : 'Bodyweight',
+      target_rir: rir,
+      notes: 'No box — reverse lunge substitute; controlled descent, drive through front heel',
+    });
+  }
 
   if (limiter === 'run') {
     ex.push({
@@ -780,7 +829,7 @@ function perfRaceUpper(
   hasCable: boolean,
   limiter: LimiterSport,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
@@ -812,15 +861,18 @@ function perfRaceUpper(
     }
   } else {
     // Spec §8.2 DB tier: DB Row + Pull-ups (or Band Pull-Down if no bar) at maintenance load.
+    // Part 3: row → Bent-Over DB Row when no bench.
     const row = dbPrescription({ pctOfBarbell1RM: 0.75, oneRMLb: dbCtx.bench1RM, baseReps: 5, dbMaxLb: dbCtx.dbMaxLb });
     if (row.capped) cappedAny = true;
     ex.push({
-      name: 'DB Row (Chest-Supported)',
+      name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
       sets: 3,
       reps: row.reps,
       weight: row.weight,
       target_rir: 2,
-      notes: 'Crisp rows — fast concentric, controlled return',
+      notes: dbCtx.hasBench
+        ? 'Crisp rows — fast concentric, controlled return'
+        : 'No bench — bent-over from hinge, fast concentric',
     });
     if (dbCtx.hasPullUpBar) {
       ex.push({
@@ -880,7 +932,7 @@ function perfTaperSession(
   tier: EquipmentTier,
   hasCable: boolean,
   tier3: EquipmentTier3 = 'commercial_gym',
-  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false },
+  dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
   // Spec §3.1 Taper Priming: 3-4 reps fast bar speed @ 50-60% 1RM, RIR 3+, 2 sets, 1× (skip-optional).
   const ex: StrengthExercise[] = [];

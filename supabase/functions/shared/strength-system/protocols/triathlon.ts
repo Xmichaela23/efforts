@@ -67,13 +67,17 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   const tier: EquipmentTier = tier3 === 'commercial_gym' ? 'commercial_gym' : 'home_gym';
   const hasCable: boolean = context.userBaselines.hasCable ?? (tier === 'commercial_gym');
   const hasPullUpBar: boolean = context.userBaselines.hasPullUpBar ?? (tier === 'commercial_gym');
+  // Part 3 exercise-level gating: hasBench + hasBox. Default to commercial_gym tier when chip
+  // detection didn't run (preserves existing behavior for callers that haven't threaded chips).
+  const hasBench: boolean = context.userBaselines.hasBench ?? (tier === 'commercial_gym');
+  const hasBox: boolean = context.userBaselines.hasBox ?? (tier === 'commercial_gym');
   const limiter: LimiterSport = (context.triathlonContext?.limiterSport ?? 'run') as LimiterSport;
   const freq = Math.max(1, strengthFrequency ?? 2);
 
   const phaseName = String(phase?.name ?? '').toLowerCase();
 
   if (isRecovery) {
-    return [createRecoverySession(tier, hasCable, limiter, tier3, hasPullUpBar)];
+    return [createRecoverySession(tier, hasCable, limiter, tier3, hasPullUpBar, hasBench, hasBox)];
   }
 
   if (phaseName === 'recovery') {
@@ -82,7 +86,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
 
   if (phaseName === 'taper') {
     // Spec §7.2: 1 light session early week, then skip. Skip-optional.
-    return [createTaperSession(tier, hasCable, limiter, tier3, hasPullUpBar)];
+    return [createTaperSession(tier, hasCable, limiter, tier3, hasPullUpBar, hasBench, hasBox)];
   }
 
   if (phaseName === 'base') {
@@ -95,8 +99,8 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     for (let i = 0; i < sessionCount; i++) {
       sessions.push(
         useMS
-          ? createMSSession(tier, hasCable, limiter, planWeekLabel, i, tier3, hasPullUpBar)
-          : createAASession(tier, hasCable, limiter, wip, planWeekLabel, i, tier3, hasPullUpBar),
+          ? createMSSession(tier, hasCable, limiter, planWeekLabel, i, tier3, hasPullUpBar, hasBench, hasBox)
+          : createAASession(tier, hasCable, limiter, wip, planWeekLabel, i, tier3, hasPullUpBar, hasBench, hasBox),
       );
     }
     return sessions;
@@ -108,13 +112,13 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     const sessions: IntentSession[] = [];
     const sessionCount = Math.min(freq, 2);
     for (let i = 0; i < sessionCount; i++) {
-      sessions.push(createSMSession(tier, hasCable, limiter, planWeekLabel, i, reducedVolume, tier3, hasPullUpBar));
+      sessions.push(createSMSession(tier, hasCable, limiter, planWeekLabel, i, reducedVolume, tier3, hasPullUpBar, hasBench, hasBox));
     }
     return sessions;
   }
 
   // Default: AA (safe — early-base equivalent prescription).
-  return [createAASession(tier, hasCable, limiter, 1, planWeekLabel, 0, tier3, hasPullUpBar)];
+  return [createAASession(tier, hasCable, limiter, 1, planWeekLabel, 0, tier3, hasPullUpBar, hasBench, hasBox)];
 }
 
 // ── Anatomical Adaptation (AA) — high-rep tissue work, 40-60% 1RM or BW ─────
@@ -131,6 +135,8 @@ function createAASession(
   variantIndex: number,
   tier3: EquipmentTier3 = 'commercial_gym',
   hasPullUpBar: boolean = tier === 'commercial_gym',
+  hasBench: boolean = tier === 'commercial_gym',
+  hasBox: boolean = tier === 'commercial_gym',
 ): IntentSession {
   // Spec §8.3 BW+bands tier — early branch keeps the existing AA prescription clean.
   if (tier3 === 'bodyweight_bands') {
@@ -182,13 +188,21 @@ function createAASession(
 
   // ── Compound 2: push pattern ────────────────────────────────────────────
   if (variant === 'A') {
-    // Horizontal push
-    if (tier === 'commercial_gym') {
+    // Horizontal push — Part 3: DB Bench needs a bench; without bench → DB Floor Press → Push-ups.
+    if (tier === 'commercial_gym' && hasBench) {
       exercises.push({
         name: 'DB Bench Press (Light)',
         sets: 3, reps: '20-25',
         weight: 'Light DBs — full ROM, controlled',
         target_rir: 4,
+      });
+    } else if (tier === 'commercial_gym') {
+      exercises.push({
+        name: 'DB Floor Press (Light)',
+        sets: 3, reps: '20-25',
+        weight: 'Light DBs — limited ROM but loadable',
+        target_rir: 4,
+        notes: 'No bench — floor press substitute',
       });
     } else {
       exercises.push({
@@ -219,14 +233,16 @@ function createAASession(
 
   // ── Compound 3: pull pattern ────────────────────────────────────────────
   if (variant === 'A') {
-    // Horizontal pull
+    // Horizontal pull — Part 3: chest-supported needs bench; without bench → Bent-Over DB Row.
     if (tier === 'commercial_gym') {
       exercises.push({
-        name: 'DB Row (Chest-Supported)',
+        name: hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
         sets: 3, reps: '20-25',
         weight: 'Light-moderate DBs',
         target_rir: 4,
-        notes: 'Squeeze scaps; full ROM beats heavier load',
+        notes: hasBench
+          ? 'Squeeze scaps; full ROM beats heavier load'
+          : 'No bench — bent-over from hinge; brace core, neutral spine',
       });
     } else {
       exercises.push({
@@ -316,11 +332,13 @@ function createMSSession(
   variantIndex: number,
   tier3: EquipmentTier3 = 'commercial_gym',
   hasPullUpBar: boolean = tier === 'commercial_gym',
+  hasBench: boolean = tier === 'commercial_gym',
+  hasBox: boolean = tier === 'commercial_gym',
 ): IntentSession {
   // Spec §8.3: BW+bands tier replaces heavy compounds with harder BW progressions
   // (split squat / pistol prep) — no external load.
   if (tier3 === 'bodyweight_bands') {
-    return bwMSSession(variantIndex, limiter, planWeekLabel, hasPullUpBar);
+    return bwMSSession(variantIndex, limiter, planWeekLabel, hasPullUpBar, hasBox);
   }
   const exercises: StrengthExercise[] = [];
   const variant: 'A' | 'B' = variantIndex % 2 === 0 ? 'A' : 'B';
@@ -381,11 +399,13 @@ function createMSSession(
     }
   } else {
     if (variant === 'A') {
+      // Part 3: DB Bench Press needs a bench; without → DB Floor Press.
       exercises.push({
-        name: 'DB Bench Press',
+        name: hasBench ? 'DB Bench Press' : 'DB Floor Press',
         sets: 3, reps: '8-10',
         weight: 'Heaviest DBs available',
         target_rir: 2,
+        ...(hasBench ? {} : { notes: 'No bench — floor press substitute (limited ROM)' }),
       });
     } else {
       exercises.push({
@@ -415,8 +435,11 @@ function createMSSession(
       });
     }
   } else {
+    // Part 3: chest-supported row needs bench; without → Bent-Over DB Row.
     exercises.push({
-      name: variant === 'A' ? 'DB Row (Chest-Supported)' : 'Band-Assisted Pull-up or Band Pull-Down',
+      name: variant === 'A'
+        ? (hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row')
+        : 'Band-Assisted Pull-up or Band Pull-Down',
       sets: 3, reps: variant === 'A' ? '8-10' : '8-12',
       weight: variant === 'A' ? 'Heaviest DBs' : 'Heavy band',
       target_rir: 2,
@@ -466,6 +489,8 @@ function createSMSession(
   reducedVolume: boolean,
   tier3: EquipmentTier3 = 'commercial_gym',
   hasPullUpBar: boolean = tier === 'commercial_gym',
+  hasBench: boolean = tier === 'commercial_gym',
+  hasBox: boolean = tier === 'commercial_gym',
 ): IntentSession {
   // Spec §8.3: BW+bands tier — same SM intent (8-12 reps moderate stimulus) via BW progressions.
   if (tier3 === 'bodyweight_bands') {
@@ -589,6 +614,8 @@ function createTaperSession(
   limiter: LimiterSport,
   tier3: EquipmentTier3 = 'commercial_gym',
   hasPullUpBar: boolean = tier === 'commercial_gym',
+  hasBench: boolean = tier === 'commercial_gym',
+  hasBox: boolean = tier === 'commercial_gym',
 ): IntentSession {
   // Existing taper is already mostly bodyweight — only the squat line picks DB/KB or BW. The
   // BW+bands tier uses pure BW (no KB option) for the squat compound.
@@ -664,6 +691,8 @@ function createRecoverySession(
   limiter: LimiterSport,
   tier3: EquipmentTier3 = 'commercial_gym',
   hasPullUpBar: boolean = tier === 'commercial_gym',
+  hasBench: boolean = tier === 'commercial_gym',
+  hasBox: boolean = tier === 'commercial_gym',
 ): IntentSession {
   const useDb = tier3 === 'commercial_gym' || tier3 === 'dumbbell_based';
   return {
@@ -815,19 +844,31 @@ function bwMSSession(
   limiter: LimiterSport,
   planWeekLabel: number,
   hasPullUpBar: boolean,
+  hasBox: boolean = false,
 ): IntentSession {
   const variant: 'A' | 'B' = variantIndex % 2 === 0 ? 'A' : 'B';
   const ex: StrengthExercise[] = [];
 
   // MS load substitutes for BW+bands: harder variants + slower tempo replace heavy DBs / barbell.
   if (variant === 'A') {
-    ex.push({
-      name: 'Bulgarian Split Squat (Pistol Prep)',
-      sets: 3, reps: '6-8/leg',
-      weight: 'Bodyweight — slow descent, drive through front heel',
-      target_rir: 2,
-      notes: 'Single-leg progression toward pistol — stretches the squat-strength curve',
-    });
+    // Part 3: Bulgarian Split Squat needs a rear-foot platform; without box → Reverse Lunge.
+    if (hasBox) {
+      ex.push({
+        name: 'Bulgarian Split Squat (Pistol Prep)',
+        sets: 3, reps: '6-8/leg',
+        weight: 'Bodyweight — slow descent, drive through front heel',
+        target_rir: 2,
+        notes: 'Single-leg progression toward pistol — stretches the squat-strength curve',
+      });
+    } else {
+      ex.push({
+        name: 'Reverse Lunge (Pistol Prep)',
+        sets: 3, reps: '8/leg',
+        weight: 'Bodyweight — slow descent, drive through front heel',
+        target_rir: 2,
+        notes: 'No box — reverse lunge substitute; single-leg progression toward pistol',
+      });
+    }
   } else {
     ex.push({
       name: 'Single-Leg RDL (Bodyweight, Slow)',

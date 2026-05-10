@@ -120,6 +120,22 @@ export function hasBench(strengthEquipment: string[]): boolean {
 }
 
 /**
+ * Detect box / step / plyo platform. Used by Box Jumps + Step-ups + Bulgarian Split Squat.
+ * "Commercial gym" implies a box is on hand. Doorframe pull-up bars don't count.
+ */
+export function hasBox(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some(
+    (s) =>
+      s.includes('box') ||
+      s.includes('plyo box') ||
+      s.includes('plyo step') ||
+      s.includes('step') && !s.includes('stepper') ||
+      s.includes('commercial gym'),
+  );
+}
+
+/**
  * Three-tier equipment classification per spec §8.
  * - `commercial_gym` — full barbell + rack + bench (covers spec's "Full barbell tier")
  * - `dumbbell_based` — DBs + (usually) bench, no barbell

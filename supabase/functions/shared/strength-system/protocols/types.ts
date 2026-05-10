@@ -70,6 +70,13 @@ export interface ProtocolContext {
     /** True when athlete has a pull-up / chin-up bar. Pull-ups are gated on this; otherwise band pull-down (spec §8.2). */
     hasPullUpBar?: boolean;
     /**
+     * True when athlete has a bench. DB Bench Press, DB Row (chest-supported), Hip Thrusts all
+     * substitute when this is false. Spec §8.2 / §8.3 — overlooked when only DBs are listed.
+     */
+    hasBench?: boolean;
+    /** True when athlete has a box / step / plyo platform. Box Jumps + Step-ups + Bulgarian Split Squat gate on this. */
+    hasBox?: boolean;
+    /**
      * Heaviest dumbbell pair the athlete owns, per hand (lb). Used by the spec §8.2 DB-tier
      * cap-and-scale-reps logic — when the per-hand target exceeds this, the prescription caps
      * at `dbMaxLb` and reps scale up proportionally. Defaults to 50 lb when omitted.
