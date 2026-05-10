@@ -2,6 +2,8 @@
 // Input: plan session (with optional steps_preset), user baselines, export_hints
 // Output: friendly summary, concrete targets with ranges, total duration (minutes)
 
+import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
+
 export interface Baselines {
   performanceNumbers?: {
     fiveK_pace?: string;
@@ -1003,7 +1005,7 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
         const yd = /yd/i.test(dist) ? ydToYd(dist) : mToYd(dist);
         const restS = toSec(String(seg?.rest||''));
         totalSec += Math.max(0, reps-1)*restS;
-        push(`Drill ${String(seg?.drill_type||'').replace(/_/g,' ')} ${reps}×${yd} yd${restS>0?` @ :${restS}r`:''}`);
+        push(`Drill ${swimDrillDisplayName(String(seg?.drill_type||''))} ${reps}×${yd} yd${restS>0?` @ :${restS}r`:''}`);
         continue;
       }
       if (kind === 'main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) {

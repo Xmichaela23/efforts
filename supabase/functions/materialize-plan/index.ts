@@ -17,6 +17,7 @@ import {
 } from '../_shared/strength-equipment-tier.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
+import { swimDrillDisplayName } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -1703,20 +1704,20 @@ function expandTokensForRow(
       // Drill (name first): swim_drill_<name>_4x50yd(_r15)?(_equipment)?
       m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
       if (m) {
-        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(name);
+        const name = swimDrillDisplayName(m[1]); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[1]);
         const distM = unit==='yd'? ydToM(dist) : dist;
-        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
       // Drill (count first): swim_drills_6x50yd_fingertipdrag (optional _r15, optional equipment)
       // Use negative lookahead to prevent drill name from consuming _r\d+ pattern
       m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+?)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?$/);
       if (m) {
-        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name=m[4].replace(/_/g,' '); const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(name);
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const name = swimDrillDisplayName(m[4]); const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[4]);
         console.log(`  ✅ Matched drill (count first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
         for(let i=0;i<reps;i++) { 
-          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); 
+          steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`Drill — ${name}`, equipment: equip||undefined });
           // Only add rest BETWEEN reps, not after the last rep
           if(rest && i < reps - 1) {
             steps.push({ id: uid(), kind:'recovery', duration_s: rest });

@@ -16,6 +16,7 @@ export const SWIM_DRILL_ALIAS: Record<string, string> = {
   zipper: 'swim_drills_4x50yd_zipper',
   doggypaddle: 'swim_drills_4x50yd_doggypaddle',
   kick: 'swim_drills_4x50yd_kick',
+  sighting: 'swim_drills_4x50yd_sighting',
 };
 
 /**
@@ -34,11 +35,13 @@ export const SWIM_DRILL_TOKEN_POOL: readonly string[] = [
   'swim_drills_4x50yd_zipper',
   'swim_drills_4x50yd_doggypaddle',
   'swim_drills_4x50yd_snorkel_freeswim',
+  'swim_drills_4x50yd_sighting',
   'swim_drills_2x50yd_catchup',
   'swim_drills_2x50yd_singlearm',
   'swim_drills_2x50yd_fist',
   'swim_drills_2x50yd_fingertipdrag',
   'swim_drills_2x50yd_616',
+  'swim_drills_2x50yd_sighting',
   'swim_drills_2x100yd_scullfront',
   'swim_drills_2x100yd_snorkel_freeswim',
   'swim_drills_1x100yd_scullfront',
@@ -83,8 +86,12 @@ const SWIM_DRILL_POOLS: Record<SwimDrillPhase, readonly string[]> = {
     'swim_drills_2x50yd_fingertipdrag',
     'swim_drills_2x50yd_catchup',
   ],
-  // Peak / race-specific: familiar patterns only — no new equipment demands.
-  peak: ['swim_drills_2x50yd_catchup', 'swim_drills_2x50yd_fingertipdrag'],
+  // Peak / race-specific: familiar patterns + open-water sighting (race specificity).
+  peak: [
+    'swim_drills_2x50yd_catchup',
+    'swim_drills_2x50yd_fingertipdrag',
+    'swim_drills_2x50yd_sighting',
+  ],
   taper: ['swim_drills_2x50yd_catchup'],
 };
 
@@ -113,6 +120,11 @@ export const DRILL_EQUIPMENT_MAP: Record<string, DrillEquipment> = {
   fingertipdrag:    { required: [], optional: ['snorkel'] },
   singlearm:        { required: [], optional: ['snorkel'] },
   fist:             { required: [], optional: ['snorkel'] },
+  // Sighting / 6-3-6 / zipper / doggypaddle: no gear; head-up sighting is open-water race prep.
+  sighting:         { required: [], optional: [] },
+  '616':            { required: [], optional: [] },
+  zipper:           { required: [], optional: [] },
+  doggypaddle:      { required: [], optional: [] },
 };
 
 /**
@@ -285,7 +297,51 @@ const SWIM_DRILL_CUE: Record<string, string> = {
   zipper: 'compact recovery',
   doggypaddle: 'catch pathway',
   snorkel_freeswim: 'stroke rhythm without breathing turnover',
+  sighting: 'head-up race-day navigation',
 };
+
+/**
+ * Display name (athlete-facing) keyed by the drill suffix used in tokens like
+ * `swim_drills_4x50yd_<suffix>`. Suffixes are no-underscore for backward compatibility with the
+ * existing materializer regex and persisted plan rows; the display map handles formatting.
+ */
+const SWIM_DRILL_DISPLAY_NAME: Record<string, string> = {
+  catchup: 'Catch-Up',
+  singlearm: 'Single-Arm Freestyle',
+  fist: 'Fist Swim',
+  fingertipdrag: 'Fingertip Drag',
+  '616': '6-3-6 Rotation',
+  scull: 'Sculling',
+  scullfront: 'Front Sculling',
+  kick: 'Kick',
+  zipper: 'Zipper Drill',
+  doggypaddle: 'Doggy Paddle',
+  snorkel_freeswim: 'Snorkel Freestyle',
+  sighting: 'Sighting Drill',
+};
+
+/**
+ * Athlete-facing label for a drill suffix or `drill_type` field. Falls back to a Title-Cased
+ * underscore-replaced version of the input when the suffix isn't in {@link SWIM_DRILL_DISPLAY_NAME}.
+ */
+export function swimDrillDisplayName(rawSuffix: string): string {
+  const key = String(rawSuffix ?? '').trim().toLowerCase();
+  if (!key) return '';
+  if (SWIM_DRILL_DISPLAY_NAME[key]) return SWIM_DRILL_DISPLAY_NAME[key];
+  return key
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/** Drill display name from a full `swim_drills_*` token. Returns '' when the token doesn't match. */
+export function swimDrillDisplayNameFromToken(token: string): string {
+  const m = String(token ?? '').match(/^swim_drills_\d+x\d+(?:yd|m)_(.+?)(?:_r\d+)?(?:_(?:fins|board|buoy|snorkel))?$/i);
+  if (!m) return '';
+  return swimDrillDisplayName(m[1]);
+}
 
 /** Opening sentence for session copy when drills are included (training philosophy). */
 export function swimSessionPhilosophyLead(sessionKind: SwimDrillSessionKind): string {
@@ -308,8 +364,11 @@ export function swimDrillBlockAthleteCopy(tokens: string[]): string {
   for (const tok of tokens) {
     const m = String(tok).match(/^swim_drills_(\d+)x(\d+)yd_(.+)$/i);
     if (!m) continue;
-    const label = m[3].replace(/_/g, ' ');
-    const cue = SWIM_DRILL_CUE[m[3].toLowerCase()] ?? '';
+    // Pull the suffix off the trailing `_r<rest>` / `_fins|board|buoy|snorkel` decorations so the
+    // display lookup matches the canonical drill key (e.g. `fingertipdrag`, not `fingertipdrag_r15`).
+    const suffix = m[3].toLowerCase().replace(/_r\d+$/, '').replace(/_(?:fins|board|buoy|snorkel)$/, '');
+    const label = swimDrillDisplayName(suffix);
+    const cue = SWIM_DRILL_CUE[suffix] ?? '';
     parts.push(cue ? `${m[1]}×${m[2]} ${label} (${cue})` : `${m[1]}×${m[2]} ${label}`);
   }
   if (!parts.length) return '';
@@ -442,4 +501,131 @@ export function pickSwimDrillTokens(
   const out: string[] = [];
   for (let i = 0; i < count; i++) out.push(pool[(start + i) % n]!);
   return out;
+}
+
+// ── Per-session gear summary line ────────────────────────────────────────────
+
+export type SwimSessionGearLineOpts = {
+  /** Session-type-specific required gear (e.g. `['pull buoy']` for pull_focused). Empty if none. */
+  sessionRequired?: string[];
+  /** Drill tokens for this session. Drill required + optional gear is pulled from the equipment map. */
+  drillTokens?: string[];
+  /** Athlete's swim equipment chips from baselines.equipment.swimming (raw labels). Optional gear
+   *  is filtered to what the athlete actually owns — no point naming a snorkel they don't have. */
+  athleteGearLabels?: string[] | null;
+};
+
+/**
+ * Athlete-facing pool gear summary line for a swim session description.
+ *
+ * Format examples:
+ * - `Pool gear — Required: Pull buoy. Optional: Paddles, Snorkel.`
+ * - `Pool gear — Optional: Snorkel.`
+ * - (returns null when nothing required and athlete owns no useful optional)
+ *
+ * Required is unconditional (the session needs it regardless of whether the athlete has it — that's
+ * a separate check via {@link checkSwimEquipmentRequirements} or session substitution upstream).
+ * Optional is filtered to what the athlete owns so the line doesn't suggest gear they lack.
+ */
+export function buildSwimGearLine(opts: SwimSessionGearLineOpts): string | null {
+  const required = new Set<string>();
+  for (const r of opts.sessionRequired ?? []) {
+    const lbl = swimGearLabelForDisplay(r);
+    if (lbl) required.add(lbl);
+  }
+
+  const drillEq = swimDrillEquipmentFromTokens(opts.drillTokens ?? []);
+  for (const r of drillEq.required) {
+    const lbl = swimGearLabelForDisplay(r);
+    if (lbl) required.add(lbl);
+  }
+
+  const athleteGearKeys = swimGearNormalized(opts.athleteGearLabels ?? null);
+  const optional = new Set<string>();
+  for (const o of drillEq.optional) {
+    const k = String(o).toLowerCase();
+    if (!athleteGearKeys.has(k)) continue; // only mention optional gear the athlete actually owns
+    const lbl = swimGearLabelForDisplay(o);
+    if (!lbl) continue;
+    if (required.has(lbl)) continue; // de-dupe against required
+    optional.add(lbl);
+  }
+
+  const reqArr = [...required];
+  const optArr = [...optional];
+  if (reqArr.length === 0 && optArr.length === 0) return null;
+
+  const parts: string[] = [];
+  if (reqArr.length > 0) parts.push(`Required: ${reqArr.join(', ')}.`);
+  if (optArr.length > 0) parts.push(`Optional: ${optArr.join(', ')}.`);
+  return `Pool gear — ${parts.join(' ')}`;
+}
+
+// ── Equipment-aware session-type substitution ────────────────────────────────
+
+/**
+ * Swim session types that can be substituted when the athlete lacks required gear. Mirror of the
+ * `template.session_type` discriminator in `session-factory.ts#swimSessionFromTemplate` /
+ * `tri-generator.ts`. Anything not listed here is unaffected (no gear dependency).
+ */
+export type SwimSessionTypeForGear =
+  | 'easy'
+  | 'css_aerobic'
+  | 'threshold'
+  | 'race_specific_aerobic'
+  | 'speed'
+  | 'kick_focused'
+  | 'pull_focused'
+  | 'endurance'
+  | 'technique_aerobic';
+
+export type SwimGearSubstitutionResult = {
+  /** Effective session type to dispatch — equal to `requested` when no substitution fired. */
+  resolvedType: SwimSessionTypeForGear;
+  /** True when the requested type was substituted because of missing gear. */
+  substituted: boolean;
+  /** Gear keys (canonical: `pull buoy`, `kickboard`, `fins`, `snorkel`) that were missing. */
+  missingRequired: string[];
+  /** The session type that was originally requested. */
+  requestedType: SwimSessionTypeForGear;
+};
+
+/**
+ * Decides whether to substitute a swim session type when the athlete's gear can't support it.
+ *
+ * - `pull_focused` requires `pull buoy` (per `pullFocusRequiredGear`).
+ * - `kick_focused` requires `kickboard` (sprint/oly) OR `fins` (70.3/full) per `kickFocusRequiredGear`.
+ *   The caller passes the resolved required list to keep this module independent of the v21 module.
+ *
+ * When required gear is missing, the function returns the substitute type (`endurance` — closest
+ * functional match: same duration profile, no special gear). All other session types pass through.
+ */
+export function resolveSwimSessionTypeForGear(opts: {
+  requestedType: SwimSessionTypeForGear;
+  athleteGearLabels?: string[] | null;
+  /** Required gear keys for kick_focused — passed by the caller because they vary by race distance. */
+  kickFocusedRequiredGear?: string[];
+}): SwimGearSubstitutionResult {
+  const gear = swimGearNormalized(opts.athleteGearLabels ?? null);
+  const requested = opts.requestedType;
+
+  let required: string[] = [];
+  if (requested === 'pull_focused') required = ['pull buoy'];
+  else if (requested === 'kick_focused') required = opts.kickFocusedRequiredGear ?? ['kickboard'];
+
+  if (required.length === 0) {
+    return { resolvedType: requested, substituted: false, missingRequired: [], requestedType: requested };
+  }
+
+  const missing = required.filter((r) => !gear.has(r.toLowerCase()));
+  if (missing.length === 0) {
+    return { resolvedType: requested, substituted: false, missingRequired: [], requestedType: requested };
+  }
+
+  return {
+    resolvedType: 'endurance',
+    substituted: true,
+    missingRequired: missing,
+    requestedType: requested,
+  };
 }

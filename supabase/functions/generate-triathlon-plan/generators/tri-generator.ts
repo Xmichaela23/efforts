@@ -20,6 +20,7 @@ import {
 } from '../types.ts';
 
 import {
+  buildSwimGearLine,
   pickSwimDrillInset,
   swimDrillBlockAthleteCopy,
   swimSessionPhilosophyLead,
@@ -117,6 +118,21 @@ const DAY_CANONICAL: Record<string, string> = {
 };
 function canonicalDay(raw: string): string {
   return DAY_CANONICAL[raw.toLowerCase().trim()] ?? raw;
+}
+
+/** Append the standard "Pool gear — Required: …. Optional: …." line when the session has any. */
+function appendPoolGearLine(
+  description: string,
+  drillTokens: string[],
+  swimEquipment: string[] | null | undefined,
+  sessionRequired?: string[],
+): string {
+  const line = buildSwimGearLine({
+    drillTokens,
+    athleteGearLabels: swimEquipment,
+    sessionRequired: sessionRequired ?? [],
+  });
+  return line ? `${description} ${line}` : description;
 }
 
 /**
@@ -836,7 +852,11 @@ export class TriathlonGenerator {
           : '';
       return {
         day, type: 'swim', name: 'Aerobic Swim',
-        description: `${yd} yards. ${drillLead}Warm-up 300, technique + aerobic main, cool-down 200. Focus on technique — catch, pull, rotation.`,
+        description: appendPoolGearLine(
+          `${yd} yards. ${drillLead}Warm-up 300, technique + aerobic main, cool-down 200. Focus on technique — catch, pull, rotation.`,
+          drillTokens,
+          this.params.swim_equipment,
+        ),
         duration: Math.round(yd / 50),
         steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${rep100}x100yd_easy_r15`, 'swim_cooldown_200yd'],
         tags,
@@ -868,7 +888,11 @@ export class TriathlonGenerator {
             : '';
         return {
           day, type: 'swim', name: 'Race Pace CSS',
-          description: `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at comfortable race-pace CSS (15s rest) — sustainable, not maximal. Practice sighting between sets. Cool-down 200.`,
+          description: appendPoolGearLine(
+            `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at comfortable race-pace CSS (15s rest) — sustainable, not maximal. Practice sighting between sets. Cool-down 200.`,
+            drillTokens,
+            this.params.swim_equipment,
+          ),
           duration: Math.round(yd / 46),
           steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_css_${sets}x100yd_r15`, 'swim_cooldown_200yd'],
           tags,
@@ -894,7 +918,11 @@ export class TriathlonGenerator {
           : '';
       return {
         day, type: 'swim', name: 'Aerobic Swim + Drills',
-        description: `${yd} yards. ${drillLead}Warm-up 300, ${reps}×100 aerobic (build effort in final 200), cool-down 200. Endurance and stroke refinement.`,
+        description: appendPoolGearLine(
+          `${yd} yards. ${drillLead}Warm-up 300, ${reps}×100 aerobic (build effort in final 200), cool-down 200. Endurance and stroke refinement.`,
+          drillTokens,
+          this.params.swim_equipment,
+        ),
         duration: Math.round(yd / 47),
         steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${reps}x100yd_easy_r15`, 'swim_cooldown_200yd'],
         tags: ['aerobic_swim', 'swim_drills', 'endurance'],
@@ -925,7 +953,11 @@ export class TriathlonGenerator {
           : '';
       return {
         day, type: 'swim', name: 'CSS Threshold Intervals',
-        description: `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at CSS pace (10s rest — barely enough), cool-down 200. These should be sustainably hard — if splits blow up, slow down 2 sec/100.`,
+        description: appendPoolGearLine(
+          `${yd} yards. ${drillLead}Warm-up 300, ${sets}×100 at CSS pace (10s rest — barely enough), cool-down 200. These should be sustainably hard — if splits blow up, slow down 2 sec/100.`,
+          drillTokens,
+          this.params.swim_equipment,
+        ),
         duration: Math.round(yd / 44),
         steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_threshold_${sets}x100yd_r10`, 'swim_cooldown_200yd'],
         tags,
@@ -953,7 +985,11 @@ export class TriathlonGenerator {
         : '';
     return {
       day, type: 'swim', name: 'Swim Build',
-      description: `${yd} yards. ${drillLead}Warm-up 300, ${sets}×150 aerobic building to CSS effort (20s rest), cool-down 200.`,
+      description: appendPoolGearLine(
+        `${yd} yards. ${drillLead}Warm-up 300, ${sets}×150 aerobic building to CSS effort (20s rest), cool-down 200.`,
+        drillTokens,
+        this.params.swim_equipment,
+      ),
       duration: Math.round(yd / 48),
       steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${sets}x150yd_r20`, 'swim_cooldown_200yd'],
       tags,
@@ -983,7 +1019,11 @@ export class TriathlonGenerator {
         : '';
     return {
       day, type: 'swim', name: 'Easy Swim',
-      description: `${roundedYd} yards easy. ${drillLead}Drills + aerobic sets. Active recovery.`,
+      description: appendPoolGearLine(
+        `${roundedYd} yards easy. ${drillLead}Drills + aerobic sets. Active recovery.`,
+        drillTokens,
+        this.params.swim_equipment,
+      ),
       duration: Math.round(roundedYd / 50),
       steps_preset: ['swim_warmup_300yd_easy', ...drillTokens, `swim_aerobic_${reps}x100yd_easy_r20`, 'swim_cooldown_200yd'],
       tags,

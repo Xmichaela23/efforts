@@ -7,6 +7,7 @@ import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
+import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
 
 type StructuredPlannedViewProps = {
   workout: any;
@@ -474,7 +475,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       continue;
     }
     if (type==='swim_session') {
-      if (k==='drill_set') { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — drill ${String(seg?.drill_type||'').replace(/_/g,' ')}`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
+      if (k==='drill_set') { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); const drillLabel = swimDrillDisplayName(String(seg?.drill_type||'')); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — Drill — ${drillLabel}`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
       if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
     }
     if (type==='strength_session' && (k==='main_lift' || k==='accessory')) {

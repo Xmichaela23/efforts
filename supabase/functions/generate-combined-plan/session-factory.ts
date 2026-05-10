@@ -20,15 +20,41 @@ import { getProtocol, resolveProtocolIdForCombinedTriPlan } from '../shared/stre
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 import {
+  buildSwimGearLine,
   pickSwimDrillInset,
+  resolveSwimSessionTypeForGear,
   swimDrillBlockAthleteCopy,
   swimSessionPhilosophyLead,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
-import { calculateSwimTss, resolveCssSecPer100Yd } from './swim-protocol-v21.ts';
+import {
+  calculateSwimTss,
+  kickFocusRequiredGear,
+  resolveCssSecPer100Yd,
+} from './swim-protocol-v21.ts';
 import type { SwimDistanceKey, SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────-
+
+/**
+ * Append a standardized pool-gear summary to a swim session description. Returns the description
+ * unchanged when the session has no required gear and the athlete owns no useful optional gear.
+ *
+ * Format: `… Pool gear — Required: Pull buoy. Optional: Paddles, Snorkel.`
+ */
+function appendPoolGearLine(
+  description: string,
+  drillTokens: string[],
+  swimEquipment: string[] | null | undefined,
+  sessionRequired?: string[],
+): string {
+  const line = buildSwimGearLine({
+    drillTokens,
+    athleteGearLabels: swimEquipment,
+    sessionRequired: sessionRequired ?? [],
+  });
+  return line ? `${description} ${line}` : description;
+}
 
 function shiftWeekday(day: string, delta: number): string {
   const i = DAYS_OF_WEEK.indexOf(day as (typeof DAYS_OF_WEEK)[number]);
@@ -535,7 +561,11 @@ export function speedSwim(
     day,
     'swim',
     `Swim Speed / Turnover — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${drillLead}${fastReps}×50 yd strong smooth speed (≈90–95% effort — crisp turnover, not all-out sprint) with 45 sec easy jog/walk rest. ${aeroReps}×150 yd easy aerobic to flush lactate. Cool down ${cd} yd.`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${drillLead}${fastReps}×50 yd strong smooth speed (≈90–95% effort — crisp turnover, not all-out sprint) with 45 sec easy jog/walk rest. ${aeroReps}×150 yd easy aerobic to flush lactate. Cool down ${cd} yd.`,
+      drillTokens,
+      swimEquipment,
+    ),
     dur,
     'HARD',
     [
@@ -585,7 +615,11 @@ export function thresholdSwim(
   return session(
     day, 'swim',
     `Swim Threshold — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.`,
+      drillTokens,
+      swimEquipment,
+    ),
     dur, 'HARD',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_threshold_${threshReps}x100yd_r15`, `swim_aerobic_${aeroReps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
     tags,
@@ -657,7 +691,11 @@ export function cssAerobicSwim(
   return session(
     day, 'swim',
     name,
-    `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.`,
+      drillTokens,
+      options?.swimEquipment,
+    ),
     dur, 'MODERATE',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r15`, `swim_cooldown_${cd}yd`],
     tags,
@@ -730,7 +768,11 @@ export function easySwim(
   return session(
     day, 'swim',
     title,
-    `Warm up ${wu} yd easy. ${drillLead}${reps}×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down ${cd} yd.`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${drillLead}${reps}×150 yd at easy aerobic pace. Focus on technique: high elbow catch, bilateral breathing. Cool down ${cd} yd.`,
+      drillTokens,
+      swimEquipment,
+    ),
     dur, 'EASY',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],
     tags,
@@ -754,6 +796,7 @@ export function kickFocusedSwim(
   goalId: string,
   raceDistance: SwimDistanceKey,
   swimThresholdPace?: string | null,
+  swimEquipment?: string[] | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdEasy(totalYards);
   const wu = 300;
@@ -771,9 +814,6 @@ export function kickFocusedSwim(
 
   const kickSuffix = longCourse ? 'fins' : 'board';
   const intensity: Intensity = longCourse ? 'EASY' : 'MODERATE';
-  const gearLine = longCourse
-    ? 'Pool gear — fins required (short blade); kickboard optional.'
-    : 'Pool gear — kickboard required.';
   const kickCopy = longCourse
     ? `${kickReps}×50 yd kick with fins at light–moderate effort (20 sec rest). Focus ankle mobility and streamline — small relaxed kick from hips for rotation support (not a sprint kick).`
     : `${kickReps}×50 yd kick with kickboard at moderate effort (20 sec rest). Narrow kick from hips, toes pointed — quiet legs on the integration lengths.`;
@@ -794,7 +834,12 @@ export function kickFocusedSwim(
     day,
     'swim',
     `Kick-Focused Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${kickCopy} ${integrateCopy} Cool down ${cd} yd. ${gearLine}`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${kickCopy} ${integrateCopy} Cool down ${cd} yd.`,
+      [],
+      swimEquipment,
+      kickFocusRequiredGear(raceDistance),
+    ),
     dur,
     intensity,
     [
@@ -818,6 +863,7 @@ export function pullFocusedSwim(
   raceDistance: SwimDistanceKey,
   swimThresholdPace?: string | null,
   athleteFitness: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
+  swimEquipment?: string[] | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -833,11 +879,11 @@ export function pullFocusedSwim(
   const paceGuidedMin = Math.round(((totalYards / 100) * cssSec * (longCourse ? 1.22 : 1.12)) / 60);
   const dur = Math.max(Math.round(totalYards / (longCourse ? 38 : 35)), paceGuidedMin);
 
-  const paddlesNote =
+  const paddlesCue =
     athleteFitness === 'beginner'
       ? ''
-      : 'Optional — small paddles for upper-body overload if comfortable (skip if shoulders feel tight). ';
-  const gearLine = `Pool gear — pull buoy required. ${paddlesNote}Keep core engaged so hips do not sag.`;
+      : 'Small paddles optional for upper-body overload if comfortable (skip if shoulders feel tight). ';
+  const formCue = 'Keep core engaged so hips do not sag.';
 
   const tags: string[] = ['quality', 'pull_focus_swim', 'swim', 'moderate', 'req:buoy'];
   if (athleteFitness !== 'beginner') tags.push('optional:paddles');
@@ -850,7 +896,12 @@ export function pullFocusedSwim(
     day,
     'swim',
     `Pull-Focused Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${pullCopy} ${integrateCopy} Cool down ${cd} yd. ${gearLine}`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${pullCopy} ${integrateCopy} Cool down ${cd} yd. ${paddlesCue}${formCue}`,
+      [],
+      swimEquipment,
+      ['pull buoy'],
+    ),
     dur,
     'MODERATE',
     [
@@ -923,7 +974,11 @@ export function enduranceSwim(
     day,
     'swim',
     `Endurance Swim — ${totalYards} yd`,
-    `Warm up ${wu} yd easy. ${drillLead}Main set — ${structure}${odNote} Cool down ${cd} yd.`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${drillLead}Main set — ${structure}${odNote} Cool down ${cd} yd.`,
+      drillTokens,
+      swimEquipment,
+    ),
     dur,
     'EASY',
     [
@@ -957,15 +1012,38 @@ export function swimSessionFromTemplate(
   },
 ): PlannedSession {
   const dk: SwimDistanceKey = opts?.swimRaceDistanceKey ?? '70.3';
+
+  // Equipment-aware substitution: swap pull_focused → endurance when athlete lacks pull buoy,
+  // kick_focused → endurance when athlete lacks the distance-specific kick gear (kickboard
+  // sprint/oly, fins 70.3/full). Non-substitutable types pass through unchanged.
+  const sub = resolveSwimSessionTypeForGear({
+    requestedType: template.session_type as
+      | 'pull_focused' | 'kick_focused' | 'endurance' | 'easy' | 'css_aerobic'
+      | 'threshold' | 'race_specific_aerobic' | 'speed' | 'technique_aerobic',
+    athleteGearLabels: swimEquipment,
+    kickFocusedRequiredGear: kickFocusRequiredGear(dk),
+  });
+  const effectiveType = sub.resolvedType;
+  if (sub.substituted) {
+    console.log('[session-factory] swim session substituted for missing gear', {
+      day,
+      requested: sub.requestedType,
+      resolved: sub.resolvedType,
+      missing: sub.missingRequired,
+    });
+  }
+
   console.log('[session-factory] creating swim session', {
     plan_week: planWeek,
     day,
-    session_type: template.session_type,
+    session_type: effectiveType,
+    requested_session_type: template.session_type,
+    substituted: sub.substituted,
     resolved_yards: yards,
     target_yards_template: template.target_yards,
   });
   const created: PlannedSession = ((): PlannedSession => {
-    switch (template.session_type) {
+    switch (effectiveType) {
       case 'threshold':
         return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
       case 'css_aerobic':
@@ -984,7 +1062,7 @@ export function swimSessionFromTemplate(
       case 'speed':
         return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
       case 'kick_focused':
-        return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined);
+        return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined, swimEquipment);
       case 'pull_focused':
         return pullFocusedSwim(
           day,
@@ -993,6 +1071,7 @@ export function swimSessionFromTemplate(
           dk,
           opts?.swimThresholdPace ?? undefined,
           opts?.athleteFitness ?? 'intermediate',
+          swimEquipment,
         );
       case 'endurance':
         return enduranceSwim(
