@@ -63,8 +63,9 @@ function tfDay(day: DayName | string): string {
  * `base`, returns `base` unchanged. The placement loop still applies hard / sequential
  * rule checks — preferred is a hint, not an override.
  */
+/** Athlete-stated day is always tried first, even when not in the template `base` list. */
 function biasOrderForPreferredDay(base: DayName[], preferred: DayName | undefined): DayName[] {
-  if (!preferred || !base.includes(preferred)) return base;
+  if (!preferred) return base;
   return [preferred, ...base.filter((d) => d !== preferred)];
 }
 
@@ -150,12 +151,19 @@ export interface WeekOptimizerInputs {
      */
     hard_bike_avoid_days?: DayName[];
     /**
-     * Athlete's preferred day for **quality_run** (intervals / tempo). When set and the
-     * day passes the hard-ban matrix (not adjacent to quality_bike, not long_run / long_ride
-     * day), the optimizer places quality_run there before falling back to the algorithmic
-     * priority list.
+     * Athlete's preferred day for **quality_run** (intervals / tempo). When set, tried first;
+     * placement requires same-day matrix **and** sequentialOk (§4.5: not calendar day after quality_bike).
      */
     quality_run?: DayName;
+    /** Mid-week easy run — when set, tried first for `easy_run` placement. */
+    easy_run?: DayName;
+    /** Mid-week easy bike — when set, tried first and must appear or conflict. */
+    easy_bike?: DayName;
+    /**
+     * Swim weekday preferences in Arc order: `[easy_swim, quality_swim]` (+ optional third).
+     * Each slot tries its preferred day before spread/load ordering.
+     */
+    swim?: DayName[];
     /**
      * Athlete-stated preferred days for strength sessions (§4.15). Index 0 = upper slot,
      * index 1 = lower slot. The optimizer biases its candidate order toward these days
@@ -366,16 +374,11 @@ function canPlaceWithModifier(
  * Sequential rules between adjacent days (mirrors SEQUENTIAL_RULES_TEXT).
  * Returns false when placing `kind` on `day` would violate.
  *
- * EXPERIENCE MODIFIER for same-day stacks is handled in \`canPlaceWithModifier\`,
- * not here — adjacent-day quality_bike ↔ quality_run is always forbidden.
+ * EXPERIENCE MODIFIER for same-day stacks is handled in \`canPlaceWithModifier\`.
+ * §4.5: calendar day after quality_bike cannot host quality_run — no exceptions.
  */
 export type SequentialRelax = {
   allow_easy_run_after_long_run?: boolean;
-  /**
-   * performance + co-equal: quality_run the calendar day after quality_bike is normally
-   * forbidden; allowed when lower_body_strength is placed same day (AM run / PM lift).
-   */
-  quality_run_day_after_qb_with_same_day_lower?: boolean;
 };
 
 function sequentialOk(
@@ -413,13 +416,11 @@ function sequentialOk(
   // quality_bike, quality_run, lower_body_strength all blocked). Quality_bike depletes
   // glycogen and creates CNS fatigue; stacking another HIGH stimulus the next day produces
   // a junk session.
-  // Exception: consolidated hard day (performance + co-equal) allows QR + lower same day,
-  // signaled via the relax flag — see EXPERIENCE_MODIFIER §5.2.
+  // §4.5 [consensus]: quality_run cannot fall on the calendar day after quality_bike (hard block).
   // §5.1 extension [derived]: performance intent — lower-body lift the day after a group /
-  // quality bike session is allowed at 24h+ separation (distinct from stacking QB + threshold same day).
+  // quality bike session is allowed at 24h+ separation (distinct from quality_run).
   if (prevKinds.includes('quality_bike')) {
     if (kind === 'quality_run') {
-      if (relax?.quality_run_day_after_qb_with_same_day_lower) return true;
       return false;
     }
     if (kind === 'quality_bike') return false;
@@ -605,29 +606,26 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       blockedQr.add(dayAfter(qualityBikeDay));
     }
 
-    // Honor athlete's stated quality_run preference using only the same-day matrix
-    // (canPlace). The adjacent-day sequential rule is an algorithmic default — when
-    // the athlete explicitly states a day (e.g. Thu intervals after Wed group ride)
-    // that is an informed choice and we respect it. Log a trade-off note if the
-    // sequential rule would normally object, so the plan is auditable.
     const preferredQr = inputs.preferences.quality_run;
-    if (preferredQr && canPlace(days, preferredQr, 'quality_run')) {
-      qualityRunDay = preferredQr;
-      place(days, preferredQr, 'quality_run');
-      if (!sequentialOk(days, preferredQr, 'quality_run', inputs.athlete)) {
-        trade_offs.push(
-          `quality_run: placed on ${tfDay(preferredQr)} per athlete preference` +
-          (qualityBikeDay ? ` — back-to-back with quality_bike (${tfDay(qualityBikeDay)}); athlete-declared schedule` : '') +
-          '.',
+    if (preferredQr && !qualityRunDay) {
+      if (
+        !blockedQr.has(preferredQr) &&
+        canPlace(days, preferredQr, 'quality_run') &&
+        sequentialOk(days, preferredQr, 'quality_run', inputs.athlete)
+      ) {
+        qualityRunDay = preferredQr;
+        place(days, preferredQr, 'quality_run');
+      } else if (preferredQr) {
+        conflicts.push(
+          `quality_run: athlete preference (${tfDay(preferredQr)}) not viable under sequential rules or same-day matrix — trying algorithmic placement.`,
         );
       }
     }
 
     const strengthFreqEarly = inputs.preferences.strength_frequency;
 
-    // Performance + co-equal: try AM quality_run / PM lower on day-after quality_bike BEFORE
-    // standalone prio scan. Otherwise prio prefers Friday (nDaysAfter qb, 2)) / Tuesday and
-    // lands a standalone qr, so consolidated Thu never runs — wrong geometry vs Wed group ride.
+    // Performance + co-equal: AM quality_run / PM lower same calendar day (§5.2 matrix).
+    // §4.5 forbids quality_run on the calendar day after quality_bike — do not use day-after-QB here.
     if (
       !qualityRunDay &&
       isPerf &&
@@ -636,8 +634,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     ) {
       const candidates: DayName[] = [];
       if (qualityBikeDay) {
-        candidates.push(dayAfter(qualityBikeDay));
         candidates.push(nDaysAfter(qualityBikeDay, 2));
+        candidates.push(dayBefore(qualityBikeDay));
       }
       for (const d of ALL_DAYS) {
         if (!candidates.includes(d)) candidates.push(d);
@@ -649,9 +647,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         if (qualityBikeDay && d === qualityBikeDay) continue;
 
         const trial = cloneDays(days);
-        if (!sequentialOk(trial, d, 'quality_run', inputs.athlete, {
-          quality_run_day_after_qb_with_same_day_lower: true,
-        })) continue;
+        if (!sequentialOk(trial, d, 'quality_run', inputs.athlete)) continue;
         if (!canPlace(trial, d, 'quality_run')) continue;
         place(trial, d, 'quality_run');
         if (!canPlaceWithModifier(trial, d, 'lower_body_strength', inputs.athlete)) continue;
@@ -700,9 +696,12 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
   // ── easy_bike (mid-week) ─────────────────────────────────────────────────
   let easyBikeDay: DayName | undefined;
+  const ebPref = inputs.preferences.easy_bike;
+  const ebBase: DayName[] = ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'];
+  const easyBikeCandidates = ebPref ? biasOrderForPreferredDay(ebBase, ebPref) : ebBase;
   // Prefer Monday when open so easy_bike shares a day with later upper/strength (MODERATE)
   // rather than sitting alone as LOW-only mid-week — avoids rest-budget pass wiping an isolated easy_bike day.
-  for (const c of ['monday', 'wednesday', 'tuesday', 'thursday', 'friday'] as DayName[]) {
+  for (const c of easyBikeCandidates) {
     if (c === longRide || c === longRun) continue;
     if (qualityBikeDay && c === qualityBikeDay) continue;
     if (qualityRunDay && c === qualityRunDay) continue;
@@ -712,9 +711,15 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     break;
   }
   if (!easyBikeDay) {
-    conflicts.push(
-      'easy_bike: no matrix-clean weekday available — try freeing up a quality day or trimming swim/strength frequency.',
-    );
+    if (ebPref) {
+      conflicts.push(
+        `easy_bike: could not place athlete preference (${tfDay(ebPref)}) — same-day matrix full or incompatible with quality_run / quality_bike.`,
+      );
+    } else {
+      conflicts.push(
+        'easy_bike: no matrix-clean weekday available — try freeing up a quality day or trimming swim/strength frequency.',
+      );
+    }
     trade_offs.push('Mid-week easy bike dropped — schedule too dense.');
   }
 
@@ -729,7 +734,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
   const placeEasyRun = (): void => {
     const easyRunTiebreak: DayName[] = ['tuesday', 'thursday', 'monday', 'wednesday', 'friday'];
-    const easyRunOrder: DayName[] = (
+    const scored = (
       ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as DayName[]
     ).slice().sort((a, b) => {
       const pa = easyRunAnchorAdjacencyPenalty(a, qualityRunDay, longRun);
@@ -740,6 +745,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       if (ga !== gb) return gb - ga;
       return easyRunTiebreak.indexOf(a) - easyRunTiebreak.indexOf(b);
     });
+    const prefEr = inputs.preferences.easy_run;
+    const easyRunOrder = prefEr ? [prefEr, ...scored.filter((d) => d !== prefEr)] : scored;
     const dAfterLongRun = dayAfter(longRun);
     let picked: DayName | undefined;
     for (const c of easyRunOrder) {
@@ -1092,7 +1099,7 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       if (slots.some((s) => s.fatigue === 'HIGH')) load += 5;
       return load;
     };
-    const ordered = baseOrder
+    const orderedRaw = baseOrder
       .filter((c) => !swimSlots.some((s) => s.day === c))
       .sort((a, b) => {
         const gapA = swimSpreadGap(a, occupiedSwimDays);
@@ -1102,6 +1109,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         if (loadDiff !== 0) return loadDiff;
         return baseOrder.indexOf(a) - baseOrder.indexOf(b);
       });
+    const preferredSwimDay = inputs.preferences.swim?.[swimSlots.length];
+    const ordered =
+      preferredSwimDay && !swimSlots.some((s) => s.day === preferredSwimDay)
+        ? [preferredSwimDay, ...orderedRaw.filter((d) => d !== preferredSwimDay)]
+        : orderedRaw;
 
     // If the athlete stated a quality_run preference, protect that day from swim
     // placement — quality_run must be placed there later and cannot share with any swim kind.
@@ -1244,16 +1256,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     `[optimal-week] placed slots: ${placedSlotsSummary}; preferred_days_keys=${Object.keys(preferred_days).join(',')}`,
   );
 
-  if (qualityBikeDay && qualityRunDay) {
-    const gap = Math.abs(DAY_INDEX[qualityRunDay] - DAY_INDEX[qualityBikeDay]);
-    const wrap = Math.min(gap, 7 - gap);
-    if (wrap === 1) {
-      trade_offs.push(
-        `ADJACENT_QUALITY: quality_run (${tfDay(qualityRunDay)}) is back-to-back with quality_bike (${tfDay(qualityBikeDay)}). That's your declared schedule with the group ride pinned. Remind the athlete: keep ${tfDay(qualityBikeDay)} controlled and ${tfDay(qualityRunDay)} intervals will land fresh enough to count.`,
-      );
-    }
-  }
-
   return {
     days,
     rest_days: [...restDays].sort((a, b) => DAY_INDEX[a] - DAY_INDEX[b]),
@@ -1330,9 +1332,8 @@ export function deriveOptimalWeekWithCoEqualRecovery(
  *
  * Used by the materializer to decide whether to repair via deriveOptimalWeek().
  *
- * @param preferences When set, `quality_run` placement mirrors `deriveOptimalWeek`: athlete-stated
- *   `preferences.quality_run` that matches `pd.quality_run` skips sequential checks (same-day matrix only).
- *   `easy_run` on the calendar day after `pd.long_run` uses the same `allow_easy_run_after_long_run` pass as derive's last-resort `placeEasyRun`.
+ * @param preferences Used for strength_preferred_days conflict hints only; sequential rules
+ *   always apply to every pinned day (including quality_run — §4.5 vs quality_bike).
  */
 export function validatePreferredDays(
   pd: PreferredDaysOut,
@@ -1345,17 +1346,6 @@ export function validatePreferredDays(
   const qrDay = pd.quality_run;
   const strengthDaysOnly = normalizeStrengthPreferredEntries(pd.strength).map((s) => s.day);
   const stArr = strengthDaysOnly.length ? strengthDaysOnly : undefined;
-  const consolidatedQrLower =
-    athlete.training_intent === 'performance' &&
-    athlete.strength_intent === 'performance' &&
-    qrDay != null &&
-    stArr != null &&
-    stArr.includes(qrDay);
-
-  const athleteDeclaredQr =
-    preferences?.quality_run != null &&
-    preferences.quality_run === pd.quality_run &&
-    pd.quality_run != null;
 
   /** Same last-resort as `placeEasyRun` when the only slot is the day after long_run. */
   function sequentialRelaxForSlot(
@@ -1409,13 +1399,7 @@ export function validatePreferredDays(
   tryPlace(pd.long_ride, 'long_ride', 'long_ride');
   tryPlace(pd.long_run, 'long_run', 'long_run');
   tryPlace(pd.quality_bike, 'quality_bike', 'quality_bike');
-  tryPlace(
-    pd.quality_run,
-    'quality_run',
-    'quality_run',
-    consolidatedQrLower ? { quality_run_day_after_qb_with_same_day_lower: true } : undefined,
-    athleteDeclaredQr,
-  );
+  tryPlace(pd.quality_run, 'quality_run', 'quality_run');
   tryPlace(pd.easy_bike, 'easy_bike', 'easy_bike');
   tryPlace(pd.easy_run, 'easy_run', 'easy_run');
 

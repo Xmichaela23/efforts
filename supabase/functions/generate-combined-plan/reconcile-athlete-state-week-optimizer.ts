@@ -104,6 +104,11 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
   const qr =
     state.run_quality_day != null ? sunIndexToDayName(state.run_quality_day) : undefined;
 
+  const swimPref: DayName[] = [];
+  if (state.swim_easy_day != null) swimPref.push(sunIndexToDayName(state.swim_easy_day));
+  if (state.swim_quality_day != null) swimPref.push(sunIndexToDayName(state.swim_quality_day));
+  if (state.swim_third_day != null) swimPref.push(sunIndexToDayName(state.swim_third_day));
+
   const restDays: DayName[] = (state.rest_days ?? []).map(sunIndexToDayName);
 
   const trainingDays = Math.max(
@@ -133,6 +138,9 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
       training_days: trainingDays,
       ...(restDays.length ? { rest_days: restDays } : {}),
       ...(qr ? { quality_run: qr } : {}),
+      ...(state.run_easy_day != null ? { easy_run: sunIndexToDayName(state.run_easy_day) } : {}),
+      ...(state.bike_easy_day != null ? { easy_bike: sunIndexToDayName(state.bike_easy_day) } : {}),
+      ...(swimPref.length ? { swim: swimPref } : {}),
       ...(strengthPreferredDays ? { strength_preferred_days: strengthPreferredDays } : {}),
     },
     athlete: {

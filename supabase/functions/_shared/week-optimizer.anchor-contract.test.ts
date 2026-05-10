@@ -209,17 +209,16 @@ Deno.test({
   },
 });
 
-// ── Fixture 04: 2× co-equal + Wed QB + Thu QR lands cleanly (no recovery downgrade) ────────
+// ── Fixture 04: 2× co-equal + Wed QB + Fri QR lands cleanly (no recovery downgrade) ────────
 
 /**
- * Historically this fixture was used to force `CO_EQUAL_STRENGTH` under a narrow §4.4 read.
- * With Mon-first `easy_bike`, swim spread, and easy_run ordering, **Thu quality_run + PM lower**
- * stacks cleanly and **Mon upper** stays ≥3d away — 2× co-equal fits without the recovery wrapper.
+ * §4.5 requires quality_run not on the calendar day after quality_bike — with Wed QB,
+ * Fri quality_run is valid; Thu is not. Mon upper + Thu lower stay ≥3d apart from consolidated geometry.
  *
  * `deriveOptimalWeekWithCoEqualRecovery` must still return `used_co_equal_1x_fallback: false` here.
  */
 Deno.test({
-  name: '04 §4.4 geometry: 2× co-equal + mid-week QB + Thu QR preference fits (no 1× fallback)',
+  name: '04 §4.4 geometry: 2× co-equal + mid-week QB + Fri QR preference fits (no 1× fallback)',
   fn() {
     const inputs: WeekOptimizerInputs = {
       anchors: {
@@ -227,7 +226,7 @@ Deno.test({
         long_run: 'sunday',
         quality_bike: { day: 'wednesday', intensity: 'quality' },
       },
-      preferences: basePreferences({ strength_frequency: 2, quality_run: 'thursday' }),
+      preferences: basePreferences({ strength_frequency: 2, quality_run: 'friday' }),
       athlete: baseAthlete({
         training_intent: 'performance',
         strength_intent: 'performance',
@@ -238,13 +237,13 @@ Deno.test({
 
     assertEquals(used_co_equal_1x_fallback, false);
     assertEquals(week.preferred_days.quality_bike, 'wednesday');
-    assertEquals(week.preferred_days.quality_run, 'thursday');
+    assertEquals(week.preferred_days.quality_run, 'friday');
 
     assertEquals(Array.isArray(week.preferred_days.strength), true);
     assertEquals(
       week.preferred_days.strength!.length,
       2,
-      `expected 2× strength with stacked Thu lower — got ${week.preferred_days.strength!.length}`,
+      `expected 2× strength — got ${week.preferred_days.strength!.length}`,
     );
 
     const recoveryHit = week.trade_offs.some((t) =>
@@ -291,10 +290,10 @@ Deno.test({
   },
 });
 
-// ── Fixture 05: stated quality_run preference with Wed QB (declared adjacent OK) ─────
+// ── Fixture 05: stated quality_run preference — §4.5 blocks Thu after Wed QB; Fri OK ─
 
 Deno.test({
-  name: '05 quality_run preference Thu with Wed QB — places without phantom QB',
+  name: '05 quality_run preference Fri with Wed QB — honors §4.5 (not day-after quality_bike)',
   fn() {
     const inputs: WeekOptimizerInputs = {
       anchors: {
@@ -302,12 +301,12 @@ Deno.test({
         long_run: 'sunday',
         quality_bike: { day: 'wednesday', intensity: 'quality' },
       },
-      preferences: basePreferences({ quality_run: 'thursday' }),
+      preferences: basePreferences({ quality_run: 'friday' }),
       athlete: baseAthlete(),
     };
     const week = deriveOptimalWeek(inputs);
     assertEquals(week.preferred_days.quality_bike, 'wednesday');
-    assertEquals(week.preferred_days.quality_run, 'thursday');
+    assertEquals(week.preferred_days.quality_run, 'friday');
     assertPreferredDaysMatchGraph(week);
     assertEquals(validatePreferredDays(week.preferred_days, inputs.athlete, inputs.preferences).length, 0);
   },
