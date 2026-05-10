@@ -1954,17 +1954,48 @@ function Step7Budget({
 
 /**
  * Step 7B — weekly hours available.
- * Five tier buttons mapping to midpoints (6 / 9 / 11 / 13 / 15) per
- * §SESSION-FREQUENCY-DEFAULTS §2 tier table. Replaces the hardcoded
- * {beginner:6, intermediate:10, advanced:14} mapping that drove
+ * Five tier cards mapping to midpoints (6 / 9 / 11 / 13 / 15) per
+ * §SESSION-FREQUENCY-DEFAULTS §2 tier table. Each card shows what the athlete
+ * gets at that hours band so the choice is informed, not numeric. Replaces the
+ * hardcoded {beginner:6, intermediate:10, advanced:14} mapping that drove
  * `weekly_hours_available` for everyone in the same fitness bucket.
  */
-const HOURS_TIERS: Array<{ label: string; value: number }> = [
-  { label: '5–7 hrs', value: 6 },
-  { label: '8–10 hrs', value: 9 },
-  { label: '10–12 hrs', value: 11 },
-  { label: '12–14 hrs', value: 13 },
-  { label: '14+ hrs', value: 15 },
+const HOURS_TIERS: Array<{
+  label: string;
+  value: number;
+  sessions: string;
+  benefit: string;
+}> = [
+  {
+    label: '5–7 hrs',
+    value: 6,
+    sessions: '2 swims · 2 bikes · 2 runs',
+    benefit: 'Enough to finish strong. Ideal if training fits around a full life.',
+  },
+  {
+    label: '8–10 hrs',
+    value: 9,
+    sessions: '2 swims · 2-3 bikes · 3 runs',
+    benefit: 'The most common 70.3 window. Builds real fitness without consuming your week.',
+  },
+  {
+    label: '10–12 hrs',
+    value: 11,
+    sessions: '2 swims · 3 bikes · 3 runs',
+    benefit: "Performance territory. You'll see meaningful speed gains on the bike.",
+  },
+  {
+    label: '12–14 hrs',
+    value: 13,
+    sessions: '3 swims · 3 bikes · 3 runs',
+    benefit: 'Competitive age-group volume. Requires disciplined recovery.',
+  },
+  {
+    label: '14+ hrs',
+    value: 15,
+    sessions: '3 swims · 3-4 bikes · 3-4 runs',
+    benefit: 'Full commitment. Only sustainable with flexible schedule and strong recovery habits.',
+  },
 ];
 
 function Step7BHours({
@@ -1974,25 +2005,39 @@ function Step7BHours({
     <StepLayout
       step={step} totalSteps={totalSteps}
       title="How many hours a week can you train?"
-      subtitle="Drives session count per discipline. Beginners through 7 hr/wk get 2 swims, 2 bikes, 2 runs; 12 hr/wk and up shifts to 3+3+3."
+      subtitle="Pick what you can hit consistently — not your best week."
       onBack={onBack} onContinue={onNext} canContinue={state.weeklyHours !== null}
     >
-      <div className="grid grid-cols-1 gap-2">
-        {HOURS_TIERS.map(({ label, value }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setState({ ...state, weeklyHours: value })}
-            className={`h-14 rounded-xl border text-base font-semibold transition-colors
-              ${state.weeklyHours === value
-                ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
-                : 'border-white/15 bg-white/[0.05] text-white/70 hover:border-white/30'}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="grid grid-cols-1 gap-2.5">
+        {HOURS_TIERS.map(({ label, value, sessions, benefit }) => {
+          const selected = state.weeklyHours === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setState({ ...state, weeklyHours: value })}
+              aria-pressed={selected}
+              className={`w-full rounded-xl border px-4 py-3.5 text-left transition-colors space-y-1
+                ${selected
+                  ? 'border-teal-400/70 bg-teal-500/15'
+                  : 'border-white/15 bg-white/[0.05] hover:border-white/30'}`}
+            >
+              <div className={`text-[17px] font-semibold ${selected ? 'text-teal-100' : 'text-white/85'}`}>
+                {label}
+              </div>
+              <div className={`text-[13px] ${selected ? 'text-teal-100/85' : 'text-white/65'}`}>
+                {sessions}
+              </div>
+              <div className={`text-[13px] leading-snug ${selected ? 'text-teal-100/65' : 'text-white/50'}`}>
+                {benefit}
+              </div>
+            </button>
+          );
+        })}
       </div>
-      <p className="text-xs text-white/35 px-1">Be honest — undershooting locks you into a smaller plan; overshooting bakes in skipped workouts.</p>
+      <p className="text-xs text-white/35 px-1 pt-1">
+        Be honest — undershooting locks you into a smaller plan; overshooting bakes in skipped workouts.
+      </p>
     </StepLayout>
   );
 }
