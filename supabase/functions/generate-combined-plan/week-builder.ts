@@ -1117,10 +1117,44 @@ export function buildWeek(
   if (!bikeQualitySlot?.isRest && hasTri) {
     if (recoveryRebuildWeek1) {
       const recBikeHr = Math.max(0.75, Math.min(1.0, bikeTotalMin * 0.15 / 55));
-      bikeQualitySlot!.sessions.push(easyBike(bikeQualityDay, recBikeHr, servedGoal));
+      const grLabel = groupRideAnchorDisplayLabel(athleteState);
+      if (grLabel) {
+        const capHr = Math.min(recBikeHr, resolveGroupRideHours(phase, athleteState));
+        bikeQualitySlot!.sessions.push(
+          groupRideSession(
+            bikeQualityDay,
+            capHr,
+            phase,
+            servedGoal,
+            grLabel,
+            athleteState.group_ride_route_url,
+            athleteState.group_ride_route_snapshot,
+            athleteState.plan_units === 'metric' ? 'metric' : 'imperial',
+          ),
+        );
+      } else {
+        bikeQualitySlot!.sessions.push(easyBike(bikeQualityDay, recBikeHr, servedGoal));
+      }
     } else if (isRecovery) {
       const recBikeHr = Math.max(0.75, Math.min(1.0, bikeTotalMin * 0.20 / 55));
-      bikeQualitySlot!.sessions.push(easyBike(bikeQualityDay, recBikeHr, servedGoal));
+      const grLabel = groupRideAnchorDisplayLabel(athleteState);
+      if (grLabel) {
+        const capHr = Math.min(recBikeHr, resolveGroupRideHours(phase, athleteState));
+        bikeQualitySlot!.sessions.push(
+          groupRideSession(
+            bikeQualityDay,
+            capHr,
+            phase,
+            servedGoal,
+            grLabel,
+            athleteState.group_ride_route_url,
+            athleteState.group_ride_route_snapshot,
+            athleteState.plan_units === 'metric' ? 'metric' : 'imperial',
+          ),
+        );
+      } else {
+        bikeQualitySlot!.sessions.push(easyBike(bikeQualityDay, recBikeHr, servedGoal));
+      }
     } else {
       const bq = bikeQualityDay;
       if (phase === 'taper') {

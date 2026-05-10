@@ -369,6 +369,8 @@ function sequentialOk(
   // a junk session.
   // Exception: consolidated hard day (performance + co-equal) allows QR + lower same day,
   // signaled via the relax flag — see EXPERIENCE_MODIFIER §5.2.
+  // §5.1 extension [derived]: performance intent — lower-body lift the day after a group /
+  // quality bike session is allowed at 24h+ separation (distinct from stacking QB + threshold same day).
   if (prevKinds.includes('quality_bike')) {
     if (kind === 'quality_run') {
       if (relax?.quality_run_day_after_qb_with_same_day_lower) return true;
@@ -377,7 +379,10 @@ function sequentialOk(
     if (kind === 'quality_bike') return false;
     if (kind === 'long_ride') return false;
     if (kind === 'long_run') return false;
-    if (kind === 'lower_body_strength') return false;
+    if (kind === 'lower_body_strength') {
+      if (athlete.training_intent === 'performance') return true;
+      return false;
+    }
   }
   // Prev day was quality_run → today: no quality_bike, no quality_run.
   if (prevKinds.includes('quality_run')) {
@@ -416,7 +421,8 @@ function sequentialOk(
       const hasLong = slots.some((s) => s.kind === 'long_ride' || s.kind === 'long_run');
       const hasQb = slots.some((s) => s.kind === 'quality_bike');
       if (!hasLong && !hasQb) continue;
-      if (perfIntent && delta === 2 && hasQb && !hasLong) continue;
+      // §5.1: performance — (a) day-before-QB lower ok at 24h+ (Tue lower → Wed QB); (b) Mon lower → Wed QB via delta-2 only was too narrow alone.
+      if (perfIntent && (delta === 1 || delta === 2) && hasQb && !hasLong) continue;
       return false;
     }
   }
