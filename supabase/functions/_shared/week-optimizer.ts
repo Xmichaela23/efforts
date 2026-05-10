@@ -1254,17 +1254,26 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       );
 
       if (consolidatedQrLowerDay) {
-        let upperDay: DayName | undefined;
-        for (const uc of upperOrder) {
-          if (uc === longRide || uc === longRun) continue;
-          if (uc === consolidatedQrLowerDay) continue;
-          if (!canPlace(days, uc, 'upper_body_strength')) continue;
-          if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
-          const gap = Math.abs(DAY_INDEX[uc] - DAY_INDEX[consolidatedQrLowerDay]);
-          const wrap = Math.min(gap, 7 - gap);
-          if (wrap < 3) continue;
-          upperDay = uc;
-          break;
+        // §4.6: ≥3 days upper↔lower preferred, ≥2 days hard floor. Try the preferred spacing
+        // first, then relax to the hard floor before declaring the week unschedulable.
+        const findUpperWithSpacing = (minSpacing: number): DayName | undefined => {
+          for (const uc of upperOrder) {
+            if (uc === longRide || uc === longRun) continue;
+            if (uc === consolidatedQrLowerDay) continue;
+            if (!canPlace(days, uc, 'upper_body_strength')) continue;
+            if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
+            const gap = Math.abs(DAY_INDEX[uc] - DAY_INDEX[consolidatedQrLowerDay]);
+            const wrap = Math.min(gap, 7 - gap);
+            if (wrap < minSpacing) continue;
+            return uc;
+          }
+          return undefined;
+        };
+        let upperDay = findUpperWithSpacing(3);
+        let strengthSpacingRelaxed = false;
+        if (!upperDay) {
+          upperDay = findUpperWithSpacing(2);
+          strengthSpacingRelaxed = !!upperDay;
         }
         if (upperDay) {
           place(days, upperDay, 'upper_body_strength');
@@ -1279,10 +1288,15 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
               `Strength: default Monday upper moved to ${tfDay(upperDay)} — spacing vs lower on ${tfDay(consolidatedQrLowerDay)}.`,
             );
           }
+          if (strengthSpacingRelaxed) {
+            trade_offs.push(
+              `Strength: upper on ${tfDay(upperDay)} sits 2 days from lower on ${tfDay(consolidatedQrLowerDay)} (preferred 3) — densest gap that fits the long-day anchors and recovery rules.`,
+            );
+          }
           placeThirdStrengthIfNeeded();
         } else {
           conflicts.push(
-            'CO_EQUAL_STRENGTH: consolidated quality_run+lower is set but no upper day with ≥3d spacing — adjust the week.',
+            'CO_EQUAL_STRENGTH: consolidated quality_run+lower is set but no upper day with the ≥2-day hard-floor spacing — adjust the week.',
           );
         }
       } else {
@@ -1293,33 +1307,42 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           preferredLowerDay,
         );
 
-        let upperDay: DayName | undefined;
-        let lowerDay: DayName | undefined;
+        // §4.6: ≥3 days upper↔lower preferred, ≥2 days hard floor. The same loop is reused for
+        // both passes — only the spacing threshold changes — so a relaxed pass can still honor
+        // every other rule (sequential, matrix, no-lower-body sovereignty days).
+        const findStrengthPair = (
+          minSpacing: number,
+        ): { upper?: DayName; lower?: DayName } => {
+          for (const uc of upperOrder) {
+            if (uc === longRide || uc === longRun) continue;
+            if (days[uc].length >= 2) continue;
+            if (!canPlace(days, uc, 'upper_body_strength')) continue;
+            if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
 
-        for (const uc of upperOrder) {
-          if (uc === longRide || uc === longRun) continue;
-          if (days[uc].length >= 2) continue;
-          if (!canPlace(days, uc, 'upper_body_strength')) continue;
-          if (!sequentialOk(days, uc, 'upper_body_strength', inputs.athlete)) continue;
+            const trial = cloneDays(days);
+            place(trial, uc, 'upper_body_strength');
 
-          const trial = cloneDays(days);
-          place(trial, uc, 'upper_body_strength');
-
-          for (const lc of lowerCandidatesBase) {
-            if (lc === uc) continue;
-            if (lc === longRide || lc === longRun) continue;
-            if (noLowerBody.has(lc)) continue;
-            if (days[lc].length >= 2) continue;
-            if (!canPlaceWithModifier(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
-            if (!sequentialOk(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
-            const gap = Math.abs(DAY_INDEX[lc] - DAY_INDEX[uc]);
-            const wrap = Math.min(gap, 7 - gap);
-            if (wrap < 3) continue;
-            upperDay = uc;
-            lowerDay = lc;
-            break;
+            for (const lc of lowerCandidatesBase) {
+              if (lc === uc) continue;
+              if (lc === longRide || lc === longRun) continue;
+              if (noLowerBody.has(lc)) continue;
+              if (days[lc].length >= 2) continue;
+              if (!canPlaceWithModifier(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
+              if (!sequentialOk(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
+              const gap = Math.abs(DAY_INDEX[lc] - DAY_INDEX[uc]);
+              const wrap = Math.min(gap, 7 - gap);
+              if (wrap < minSpacing) continue;
+              return { upper: uc, lower: lc };
+            }
           }
-          if (lowerDay) break;
+          return {};
+        };
+
+        let { upper: upperDay, lower: lowerDay } = findStrengthPair(3);
+        let strengthSpacingRelaxed = false;
+        if (!upperDay || !lowerDay) {
+          ({ upper: upperDay, lower: lowerDay } = findStrengthPair(2));
+          strengthSpacingRelaxed = !!(upperDay && lowerDay);
         }
 
         if (upperDay && lowerDay) {
@@ -1352,10 +1375,18 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
               `Strength: usual Mon upper / Thu lower became upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} — moved to stay clear of your pinned rides/runs and recovery spacing.`,
             );
           }
+          if (strengthSpacingRelaxed) {
+            // §4.6: ≥3 days preferred, ≥2 days hard floor. The spacing relaxed here is a real
+            // tradeoff (slightly less recovery between upper and lower), but it's the spec's
+            // hard floor — better than dropping a strength session entirely.
+            trade_offs.push(
+              `Strength: upper on ${tfDay(upperDay)} sits 2 days from lower on ${tfDay(lowerDay)} (preferred 3) — densest gap that fits the long-day anchors and recovery rules.`,
+            );
+          }
           placeThirdStrengthIfNeeded();
         } else {
           conflicts.push(
-            'CO_EQUAL_STRENGTH: 2× lifting was requested with co-equal (performance) intent, but no valid upper+lower pair fits the anchors. Do not treat 1× as sufficient — adjust the week (e.g. move easy_run after strength, trim swim, or shift long days) or get explicit athlete confirmation to downgrade.',
+            'CO_EQUAL_STRENGTH: 2× lifting was requested with co-equal (performance) intent, but no upper+lower pair fits the anchors at the ≥2-day hard floor. Do not treat 1× as sufficient — adjust the week (e.g. move easy_run after strength, trim swim, or shift long days) or get explicit athlete confirmation to downgrade.',
           );
         }
       }

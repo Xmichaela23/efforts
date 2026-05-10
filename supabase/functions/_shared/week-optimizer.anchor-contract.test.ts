@@ -264,6 +264,79 @@ Deno.test({
   },
 });
 
+// ── Fixture 04b: §4.6 hard-floor — no anchors, 2× co-equal lands at ≥2-day spacing ─────
+
+Deno.test({
+  name: '04b §4.6 no-anchor 11hr/wk performance: 2× strength lands via ≥2d hard floor (no 1× fallback)',
+  /**
+   * Regression for the strength-drop bug:
+   * - Athlete: 11hr/wk, performance + co-equal, no group ride / no group run / no
+   *   strength_preferred_days. Frequency defaults give 2× strength.
+   * - Optimizer geometry without group anchors: long_ride Sat, long_run Sun, default
+   *   quality_bike Tue, quality_run lands Thu. noLowerBody = {Fri, Sat, Sun}, plus
+   *   prev-day-long_run blocks Mon, plus same-day quality_bike blocks Tue → only Wed
+   *   is viable for lower. ≥3-day spacing from Wed had no upper candidate; the spec's
+   *   ≥2-day hard floor (§4.6) means Mon upper + Wed lower is acceptable.
+   * - Pre-fix: optimizer pushed CO_EQUAL_STRENGTH conflict and recovery wrapper
+   *   downgraded to 1× — even though no athlete anchor caused it.
+   */
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: {
+        long_ride: 'saturday',
+        long_run: 'sunday',
+      },
+      preferences: basePreferences({
+        strength_frequency: 2,
+        bikes_per_week: 3,
+        runs_per_week: 3,
+      }),
+      athlete: baseAthlete({
+        training_intent: 'performance',
+        strength_intent: 'performance',
+      }),
+    };
+
+    const { week, used_co_equal_1x_fallback } = deriveOptimalWeekWithCoEqualRecovery(inputs);
+
+    assertEquals(
+      used_co_equal_1x_fallback,
+      false,
+      `expected no 1× fallback; got trade_offs: ${JSON.stringify(week.trade_offs)} conflicts: ${JSON.stringify(week.conflicts)}`,
+    );
+    assertEquals(Array.isArray(week.preferred_days.strength), true);
+    assertEquals(
+      week.preferred_days.strength!.length,
+      2,
+      `expected 2× strength — got ${week.preferred_days.strength!.length}`,
+    );
+
+    // The spacing-relaxed trade-off note must be present so the athlete knows the
+    // compromise (2 days instead of 3) — the spec requires "name the constraint".
+    const relaxedHit = week.trade_offs.some((t) =>
+      /sits 2 days from lower/i.test(String(t)) &&
+      /preferred 3/i.test(String(t)),
+    );
+    assert(
+      relaxedHit,
+      `expected spacing-relaxed trade-off line; got: ${JSON.stringify(week.trade_offs)}`,
+    );
+
+    // No CO_EQUAL_STRENGTH conflict should fire when the ≥2-day hard floor is honored.
+    const coEqHit = week.conflicts.some((c) => /^CO_EQUAL_STRENGTH/.test(String(c)));
+    assert(
+      !coEqHit,
+      `expected no CO_EQUAL_STRENGTH conflict; got: ${JSON.stringify(week.conflicts)}`,
+    );
+
+    assertPreferredDaysMatchGraph(week);
+    assertEquals(
+      validatePreferredDays(week.preferred_days, inputs.athlete, inputs.preferences).length,
+      0,
+    );
+  },
+});
+
 // ── Fixture 07: Wed group ride — QR may land Friday before Sat long_ride (§4.10 run-only pre-long) ─
 
 Deno.test({
