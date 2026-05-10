@@ -83,6 +83,16 @@ Deno.serve(async (req: Request) => {
 
     const state703Cutoff = promote703SwimIntentForCutoffRisk(goals, state);
 
+    console.log('[generate-combined-plan] athleteState before reconcile:', {
+      bike_quality_day: state703Cutoff.bike_quality_day,
+      bike_quality_label: state703Cutoff.bike_quality_label,
+      run_quality_day: state703Cutoff.run_quality_day,
+      run_easy_day: state703Cutoff.run_easy_day,
+      bike_easy_day: state703Cutoff.bike_easy_day,
+      long_run_day: state703Cutoff.long_run_day,
+      long_ride_day: state703Cutoff.long_ride_day,
+    });
+
     // Used downstream for floor caps, quality_run rescue, and ramp-cap reporting.
     const hasTriGoal = goals.some((g) =>
       ['triathlon', 'tri'].includes(String(g.sport ?? '').toLowerCase()),

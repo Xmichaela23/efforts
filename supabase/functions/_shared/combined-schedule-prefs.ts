@@ -341,6 +341,11 @@ export function mergeCombinedSchedulePrefs(
     if (!src) continue;
     const lr = pickDay(src, ['long_run_day', 'longRunDay', 'long_run', 'longRun']);
     const lrd = pickDay(src, ['long_ride_day', 'longRideDay', 'long_ride', 'longRide']);
+    /** Flat numeric/string pins — Arc DB rows often persist these without nested preferred_days. */
+    const rq = pickDay(src, ['run_quality_day', 'runQualityDay']);
+    const re = pickDay(src, ['run_easy_day', 'runEasyDay']);
+    const bq = pickDay(src, ['bike_quality_day', 'bikeQualityDay']);
+    const be = pickDay(src, ['bike_easy_day', 'bikeEasyDay']);
     const se = pickDay(src, ['swim_easy_day', 'swimEasyDay', 'easy_swim_day', 'swim_recovery_day']);
     const sq = pickDay(src, [
       'swim_quality_day',
@@ -425,6 +430,10 @@ export function mergeCombinedSchedulePrefs(
 
     if (lr !== undefined) out.long_run_day = lr;
     if (lrd !== undefined) out.long_ride_day = lrd;
+    if (rq !== undefined) out.run_quality_day = rq;
+    if (re !== undefined) out.run_easy_day = re;
+    if (bq !== undefined) out.bike_quality_day = bq;
+    if (be !== undefined) out.bike_easy_day = be;
     if (se !== undefined) out.swim_easy_day = se;
     if (sq !== undefined) out.swim_quality_day = sq;
     if (st !== undefined) out.swim_third_day = st;

@@ -160,8 +160,20 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
  * bike-only / swim-only configurations the optimizer can't anchor).
  */
 export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): AthleteState {
+  const incomingPins = {
+    bike_quality_day: state.bike_quality_day,
+    bike_quality_label: state.bike_quality_label,
+    run_quality_day: state.run_quality_day,
+    run_easy_day: state.run_easy_day,
+    bike_easy_day: state.bike_easy_day,
+    has_group_ride_url: Boolean(String(state.group_ride_route_url ?? '').trim()),
+  };
+
   const inputs = buildWeekOptimizerInputs(state);
-  if (!inputs) return state;
+  if (!inputs) {
+    console.log('[generate-combined-plan] reconcileAthleteStateWithWeekOptimizer: skipped_no_long_run_anchor', incomingPins);
+    return state;
+  }
 
   const { week: optimal, used_co_equal_1x_fallback } = deriveOptimalWeekWithCoEqualRecovery(inputs);
   const pd = optimal.preferred_days;
@@ -228,9 +240,21 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
   );
 
   console.log('[generate-combined-plan] reconcileAthleteStateWithWeekOptimizer:', JSON.stringify({
+    incoming_schedule_pins: incomingPins,
+    optimizer_inputs_quality_bike_anchor: inputs?.anchors?.quality_bike ?? null,
+    optimizer_inputs_quality_run_pref: inputs?.preferences?.quality_run ?? null,
     preferred_days_keys: Object.keys(pd),
     strength_slots,
     quality_run_in_optimizer_output: Boolean(pd.quality_run),
+    pd_quality_bike: pd.quality_bike ?? null,
+    pd_quality_run: pd.quality_run ?? null,
+    outgoing_pins: {
+      bike_quality_day: merged.bike_quality_day,
+      bike_quality_label: merged.bike_quality_label,
+      run_quality_day: merged.run_quality_day,
+      run_easy_day: merged.run_easy_day,
+      bike_easy_day: merged.bike_easy_day,
+    },
     trade_off_sample: optimal.trade_offs.slice(0, 4),
     conflict_sample: optimal.conflicts.slice(0, 4),
     ...(strengthPrefRejections.length > 0
