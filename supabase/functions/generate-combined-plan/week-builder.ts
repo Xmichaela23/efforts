@@ -1553,6 +1553,7 @@ export function buildWeek(
               qualityRunDayName: runQualityDay,
               strengthProtocolId: athleteState.strength_protocol,
               strengthIntent: athleteState.strength_intent,
+              equipmentTier: athleteState.equipment_tier,
             }),
           );
         } else {
@@ -1625,6 +1626,7 @@ export function buildWeek(
             qualityRunDayName: runQualityDay,
             strengthProtocolId: athleteState.strength_protocol,
             strengthIntent: athleteState.strength_intent,
+            equipmentTier: athleteState.equipment_tier,
           }));
         } else {
           strSlot.sessions.push(runStrength(strDay, phase, servedGoal, {

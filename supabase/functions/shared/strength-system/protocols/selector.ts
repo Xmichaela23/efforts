@@ -105,16 +105,32 @@ export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
 /**
  * Resolve stored `training_prefs.strength_protocol` + `strength_intent` to the
  * tri implementation used by combined-plan `triathlonStrength`.
+ *
+ * Equipment-tier gate (docs/STRENGTH-PROTOCOL.md §2): when `equipmentTier` is
+ * `bodyweight_bands` and intent would route to `triathlon_performance`, downgrade
+ * to `triathlon` (durability) — progressive loading isn't possible without
+ * barbell or dumbbell access. The gate-fired signal is returned via the second
+ * value so callers can surface the spec §2 trade-off message.
  */
 export function resolveProtocolIdForCombinedTriPlan(
   rawProtocol: string | undefined,
   strengthIntent: string | undefined,
+  equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands',
 ): 'triathlon' | 'triathlon_performance' {
   const p = String(rawProtocol ?? '').trim();
   const intent = String(strengthIntent ?? '').trim().toLowerCase();
-  if (p === 'triathlon_performance') return 'triathlon_performance';
+
+  // Equipment gate fires before any intent or protocol routing — bodyweight_bands tier
+  // can never run progressive-loading protocols, even when explicitly requested.
+  const tierBlocksPerformance = equipmentTier === 'bodyweight_bands';
+
+  if (p === 'triathlon_performance') {
+    return tierBlocksPerformance ? 'triathlon' : 'triathlon_performance';
+  }
   if (p === 'triathlon') return 'triathlon';
-  if (intent === 'performance') return 'triathlon_performance';
+  if (intent === 'performance') {
+    return tierBlocksPerformance ? 'triathlon' : 'triathlon_performance';
+  }
   if (p && RUN_CENTRIC_STRENGTH_PROTOCOL_IDS.has(p)) return 'triathlon';
   return 'triathlon';
 }

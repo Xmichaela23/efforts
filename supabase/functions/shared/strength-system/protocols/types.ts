@@ -55,6 +55,12 @@ export interface ProtocolContext {
     bench1RM?: number;
     overhead1RM?: number;
     equipment: 'home_gym' | 'commercial_gym';
+    /**
+     * Three-tier equipment classification (docs/STRENGTH-PROTOCOL.md §8). When set, protocols
+     * may distinguish dumbbell_based vs bodyweight_bands for finer exercise substitution; when
+     * absent, protocols fall back to the 2-tier `equipment` field.
+     */
+    equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
     /** True only when athlete explicitly has a cable machine (or commercial gym membership). Barbell-capable home gyms may lack one. */
     hasCable?: boolean;
     /** True only when athlete has a GHD machine, Nordic bench, or fixed floor anchor. Nordic Hamstring Curls must not be prescribed without this. */

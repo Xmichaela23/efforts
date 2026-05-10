@@ -58,6 +58,7 @@ import {
   hasBarbellCapability,
   hasCableMachine,
   hasGHD,
+  resolveStrengthEquipmentTier3,
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveProtocolIdForCombinedTriPlan } from '../shared/strength-system/protocols/selector.ts';
@@ -563,6 +564,18 @@ function mergeTrainingPrefsWithArcDefaults(
       const raw = arc.equipment as { strength?: string[] } | null | undefined;
       const arr = Array.isArray(raw?.strength) ? raw.strength : [];
       if (hasBarbellCapability(arr)) tp.equipment_type = 'commercial_gym';
+    }
+    // Three-tier equipment classification per docs/STRENGTH-PROTOCOL.md §8. Drives the
+    // performance-without-loadable-resistance gate — bodyweight_bands tier downgrades
+    // performance intent to durability with a trade-off (§2).
+    {
+      const raw = arc.equipment as { strength?: string[] } | null | undefined;
+      const arr = Array.isArray(raw?.strength) ? raw.strength : [];
+      tp.equipment_tier = resolveStrengthEquipmentTier3(
+        tp.equipment_type,
+        arr,
+        arc.performance_numbers,
+      );
     }
     if (!String(tp.limiter_sport ?? '').trim()) {
       tp.limiter_sport = inferLimiterSportFromArc(arc);

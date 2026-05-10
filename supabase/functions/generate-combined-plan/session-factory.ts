@@ -1276,12 +1276,26 @@ export function downgradedHardToModerateFrom(s: PlannedSession): PlannedSession 
 function resolveTriCombinedStrengthProtocol(options: {
   strengthProtocolId?: string;
   strengthIntent?: 'support' | 'performance';
-}): StrengthProtocol {
+  equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+}): {
+  protocol: StrengthProtocol;
+  /** True when the equipment-tier gate downgraded the requested protocol to durability. */
+  gateDowngraded: boolean;
+} {
+  const wantedId =
+    options.strengthIntent === 'performance' || options.strengthProtocolId === 'triathlon_performance'
+      ? 'triathlon_performance'
+      : 'triathlon';
   const id = resolveProtocolIdForCombinedTriPlan(
     options.strengthProtocolId,
     options.strengthIntent,
+    options.equipmentTier,
   );
-  return id === 'triathlon_performance' ? triathlonPerformanceProtocol : triathlonProtocol;
+  const gateDowngraded = wantedId === 'triathlon_performance' && id === 'triathlon';
+  return {
+    protocol: id === 'triathlon_performance' ? triathlonPerformanceProtocol : triathlonProtocol,
+    gateDowngraded,
+  };
 }
 
 // Maps combined-plan phase names to the StrengthPhase format expected by the
@@ -1450,6 +1464,8 @@ export function triathlonStrength(
     /** Protocol id (triathlon, neural_speed, durability, …). Default: triathlon. */
     strengthProtocolId?: string;
     strengthIntent?: 'support' | 'performance';
+    /** Three-tier equipment classification (docs/STRENGTH-PROTOCOL.md §8). When omitted, derived from `equipmentType`. */
+    equipmentTier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
   },
 ): PlannedSession {
   const longRide = options?.longRideDayName ?? 'Saturday';
@@ -1460,6 +1476,14 @@ export function triathlonStrength(
   const easySessionDays = [...DAYS_OF_WEEK].filter(
     (d) => !longSessionDays.includes(d) && d !== qb,
   );
+
+  // Tier 3: prefer the explicit value when threaded; otherwise derive from the 2-tier equipment_type
+  // (commercial_gym → commercial_gym; home_gym → dumbbell_based as a safe default that still gates
+  // performance correctly when DBs are present and downgrades only when the upstream resolver
+  // already classified bodyweight_bands).
+  const equipmentTier3: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands' =
+    options?.equipmentTier ??
+    (options?.equipmentType === 'commercial_gym' ? 'commercial_gym' : 'dumbbell_based');
 
   const ctx: ProtocolContext = {
     weekIndex: Math.max(1, options?.weekIndex ?? 1),
@@ -1474,6 +1498,7 @@ export function triathlonStrength(
     },
     userBaselines: {
       equipment: options?.equipmentType ?? 'commercial_gym',
+      equipmentTier: equipmentTier3,
       hasCable: options?.hasCable ?? (options?.equipmentType !== 'home_gym'),
       hasGHD: options?.hasGhd ?? false,
     },
@@ -1485,10 +1510,19 @@ export function triathlonStrength(
     },
   };
 
-  const protocol = resolveTriCombinedStrengthProtocol({
+  const { protocol, gateDowngraded } = resolveTriCombinedStrengthProtocol({
     strengthProtocolId: options?.strengthProtocolId,
     strengthIntent: options?.strengthIntent,
+    equipmentTier: equipmentTier3,
   });
+
+  if (gateDowngraded) {
+    console.log('[strength] equipment-tier gate downgraded performance → durability', {
+      equipmentTier: equipmentTier3,
+      strengthIntent: options?.strengthIntent,
+      strengthProtocolId: options?.strengthProtocolId,
+    });
+  }
 
   const sessions = protocol.createWeekSessions(ctx);
   // sessionIndex 0 = lower/posterior chain, 1 = upper/swim
@@ -1502,6 +1536,17 @@ export function triathlonStrength(
       intensity_class: 'EASY', zone_targets: 'rest',
       steps_preset: [], tags: ['strength', 'taper'], serves_goal: goalId,
     };
+  }
+  // When the equipment-tier gate fired (spec §2), prepend the trade-off to the chosen session's
+  // description and tag the session for downstream UX surfacing. This guarantees the athlete sees
+  // why their performance request became durability.
+  if (gateDowngraded) {
+    const note =
+      'Performance strength requires barbell or dumbbell access for progressive loading. ' +
+      "With your current equipment we'll deliver the durability protocol instead. " +
+      'Add dumbbells or barbell access to unlock the performance protocol.';
+    chosen.description = `${note} ${chosen.description}`;
+    chosen.tags = [...(chosen.tags ?? []), 'gate:performance_downgraded_no_loadable_resistance'];
   }
   return intentToPlanned(chosen, day, phase, goalId);
 }

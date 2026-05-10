@@ -76,3 +76,102 @@ export function resolveStrengthEquipmentTypeForPlan(
   if (ex === 'home_gym' || ex === 'commercial_gym') return ex;
   return 'home_gym';
 }
+
+// ── Three-tier equipment (docs/STRENGTH-PROTOCOL.md §2 + §8) ────────────────
+
+/** Detect dumbbell access (any DB chip). Adjustable, fixed, or pair counts all qualify. */
+export function hasDumbbells(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some(
+    (s) =>
+      s.includes('dumbbell') ||
+      /\bdb\b/.test(s) ||
+      s.includes('adjustable dumb'),
+  );
+}
+
+/** Detect kettlebell access (used by performance Maintenance + Power phase). */
+export function hasKettlebell(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some((s) => s.includes('kettlebell') || /\bkb\b/.test(s));
+}
+
+/** Detect bench access. */
+export function hasBench(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some((s) => s.includes('bench'));
+}
+
+/**
+ * Three-tier equipment classification per spec §8.
+ * - `commercial_gym` — full barbell + rack + bench (covers spec's "Full barbell tier")
+ * - `dumbbell_based` — DBs + (usually) bench, no barbell
+ * - `bodyweight_bands` — bands only, possibly pull-up bar
+ */
+export type StrengthEquipmentTier3 = 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+
+/**
+ * Resolve to 3-tier classification. Strict precedence:
+ *   barbell signals → commercial_gym (matches `resolveStrengthEquipmentTypeForPlan`)
+ *   DBs detected   → dumbbell_based
+ *   else           → bodyweight_bands
+ *
+ * `performanceNumbers` only upgrades to commercial_gym (consistent with the 2-tier resolver):
+ * an athlete with logged compound 1RMs probably has barbell access even if the chip list is stale.
+ */
+export function resolveStrengthEquipmentTier3(
+  explicitEquipmentType: unknown,
+  strengthEquipment: string[],
+  performanceNumbers: unknown,
+): StrengthEquipmentTier3 {
+  if (hasBarbellCapability(strengthEquipment) || hasCompound1RMSignals(performanceNumbers)) {
+    return 'commercial_gym';
+  }
+  if (hasDumbbells(strengthEquipment)) {
+    return 'dumbbell_based';
+  }
+  // Honor an explicit "commercial_gym" tag if the user typed it manually but their chip list
+  // is otherwise sparse — treat as commercial_gym (matches 2-tier behavior).
+  const ex = String(explicitEquipmentType ?? '').trim().toLowerCase();
+  if (ex === 'commercial_gym') return 'commercial_gym';
+  return 'bodyweight_bands';
+}
+
+/**
+ * Performance-without-loadable-resistance gate (spec §2). Returns the effective intent +
+ * a downgrade message when an athlete asked for performance but lacks barbell AND DBs —
+ * progressive loading isn't possible at the bodyweight_bands tier.
+ */
+export function gateStrengthIntentByTier(
+  intent: 'performance' | 'support' | 'none' | 'co-equal' | string | null | undefined,
+  tier3: StrengthEquipmentTier3,
+): {
+  effectiveIntent: 'performance' | 'support' | 'none';
+  downgraded: boolean;
+  message: string | null;
+} {
+  const norm = String(intent ?? '').trim().toLowerCase();
+  const wantsPerf = norm === 'performance' || norm === 'co-equal';
+  const isNone = norm === 'none';
+
+  if (isNone) {
+    return { effectiveIntent: 'none', downgraded: false, message: null };
+  }
+
+  if (wantsPerf && tier3 === 'bodyweight_bands') {
+    return {
+      effectiveIntent: 'support',
+      downgraded: true,
+      message:
+        'Performance strength requires barbell or dumbbell access for progressive loading. ' +
+        "With your current equipment we'll deliver the durability protocol instead. " +
+        'Add dumbbells or barbell access to unlock performance protocol.',
+    };
+  }
+
+  return {
+    effectiveIntent: wantsPerf ? 'performance' : 'support',
+    downgraded: false,
+    message: null,
+  };
+}

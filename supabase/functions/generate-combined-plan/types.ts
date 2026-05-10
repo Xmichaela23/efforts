@@ -112,6 +112,18 @@ export interface AthleteState {
   /** Whether the athlete has commercial gym access — drives strength exercise selection. */
   equipment_type?: 'home_gym' | 'commercial_gym';
   /**
+   * Three-tier equipment classification per docs/STRENGTH-PROTOCOL.md §8. Computed alongside
+   * `equipment_type` in `create-goal-and-materialize-plan` from the athlete's strength chips:
+   * - `commercial_gym` — full barbell + rack + bench
+   * - `dumbbell_based` — DBs + (usually) bench, no barbell
+   * - `bodyweight_bands` — bands only, possibly pull-up bar
+   *
+   * Drives the performance-without-loadable-resistance gate in
+   * `gateStrengthIntentByTier`: performance intent at `bodyweight_bands` tier downgrades
+   * to durability with a trade-off message (§2).
+   */
+  equipment_tier?: 'commercial_gym' | 'dumbbell_based' | 'bodyweight_bands';
+  /**
    * Training methodology for triathlon goals. Derived from the primary goal's
    * `goal` field when absent: 'complete' → 'base_first', 'performance' → 'race_peak'.
    *
