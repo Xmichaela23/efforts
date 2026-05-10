@@ -1544,6 +1544,26 @@ async function buildCombinedPlan(
         const labels = st.map((x) => String(x).trim()).filter(Boolean);
         return labels.length ? { strength_equipment: labels } : {};
       })(),
+      // Spec §8.2 DB max — wizard sets training_prefs.db_max_lb when athlete has DBs but no
+      // barbell. Default 50 if dumbbell_based tier and field unset.
+      ...((): { db_max_lb?: number } => {
+        const explicit = Number(
+          (freshCombinedPrefs as { db_max_lb?: unknown }).db_max_lb ??
+          (backfilledPrimaryPrefs as { db_max_lb?: unknown }).db_max_lb,
+        );
+        if (Number.isFinite(explicit) && explicit > 0) return { db_max_lb: explicit };
+        const rawChips = arcForCombined.equipment?.strength;
+        const arr = Array.isArray(rawChips)
+          ? (rawChips as unknown[]).map((x) => String(x).trim()).filter(Boolean)
+          : [];
+        const tier = resolveStrengthEquipmentTier3(
+          resolvedEquipmentType,
+          arr,
+          arcForCombined.performance_numbers,
+        );
+        if (tier === 'dumbbell_based') return { db_max_lb: 50 };
+        return {};
+      })(),
       rest_days: freshCombinedPrefs.rest_days ?? [],
       ...(freshCombinedPrefs.long_run_day !== undefined
         ? { long_run_day: freshCombinedPrefs.long_run_day }

@@ -120,6 +120,13 @@ export interface AthleteState {
   /** Athlete bodyweight in pounds (for spec §5 conservative-default 1RM fallback). */
   bodyweight_lb?: number;
   /**
+   * Heaviest dumbbell pair the athlete has access to, per hand (lb). Drives the spec §8.2
+   * cap-and-scale-reps logic in `triathlon_performance.ts` for `dumbbell_based` tier athletes:
+   * working weight = `min(0.7 × pct × 1RM / 2, db_max_lb)` per hand; reps scale up
+   * proportionally when capped to maintain stimulus.
+   */
+  db_max_lb?: number;
+  /**
    * Strength equipment chips from `user_baselines.equipment.strength` — used by
    * `buildStrengthEquipmentLine` (spec §9.3) to filter optional gear to athlete inventory.
    * Mirrors the existing `swim_equipment` field.

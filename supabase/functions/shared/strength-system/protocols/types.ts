@@ -67,6 +67,14 @@ export interface ProtocolContext {
     hasGHD?: boolean;
     /** True when athlete has at least one kettlebell. Drives KB Swings selection in performance Maintenance + Power (spec §3.5). */
     hasKettlebell?: boolean;
+    /** True when athlete has a pull-up / chin-up bar. Pull-ups are gated on this; otherwise band pull-down (spec §8.2). */
+    hasPullUpBar?: boolean;
+    /**
+     * Heaviest dumbbell pair the athlete owns, per hand (lb). Used by the spec §8.2 DB-tier
+     * cap-and-scale-reps logic — when the per-hand target exceeds this, the prescription caps
+     * at `dbMaxLb` and reps scale up proportionally. Defaults to 50 lb when omitted.
+     */
+    dbMaxLb?: number;
   };
   
   // Strength training configuration

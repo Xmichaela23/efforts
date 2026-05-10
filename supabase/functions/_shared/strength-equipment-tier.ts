@@ -96,6 +96,23 @@ export function hasKettlebell(strengthEquipment: string[]): boolean {
   return n.some((s) => s.includes('kettlebell') || /\bkb\b/.test(s));
 }
 
+/** Detect pull-up / chin-up bar access. Drives Pull-ups vs band-assisted pull-down (spec §8.2). */
+export function hasPullUpBar(strengthEquipment: string[]): boolean {
+  const n = normStrengthEquipmentStrings(strengthEquipment);
+  return n.some(
+    (s) =>
+      s.includes('pull-up bar') ||
+      s.includes('pull up bar') ||
+      s.includes('pullup bar') ||
+      s.includes('chin-up bar') ||
+      s.includes('chin up bar') ||
+      s.includes('commercial gym') ||
+      // Doorframe and tower-style trainers also count.
+      s.includes('power tower') ||
+      (s.includes('rack') && (s.includes('pull') || s.includes('chin'))),
+  );
+}
+
 /** Detect bench access. */
 export function hasBench(strengthEquipment: string[]): boolean {
   const n = normStrengthEquipmentStrings(strengthEquipment);

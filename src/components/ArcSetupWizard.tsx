@@ -340,6 +340,12 @@ type WizardState = {
   // Step 8 (tri)
   strengthIncluded: boolean | null;
   strengthIntent: 'performance' | 'support' | null;
+  /**
+   * Heaviest dumbbell pair the athlete has access to (per hand, lb). Surfaces in Step 8 when the
+   * athlete has DBs but no barbell — drives the spec §8.2 cap-and-scale-reps prescription. Default
+   * 50 lb when the input is shown.
+   */
+  dbMaxLb: number | null;
   // Step 9
   planStartDate: string;
   anythingUnusual: string;
@@ -442,6 +448,7 @@ function blank(): WizardState {
     daysPerWeek: null,
     weeklyHours: null,
     strengthIncluded: null, strengthIntent: null,
+    dbMaxLb: null,
     planStartDate: nextMonday,
     anythingUnusual: '',
     assessmentWeekPreference: null,
@@ -655,6 +662,9 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     ...(snapshotPersist ? { group_ride_route_snapshot: snapshotPersist } : {}),
     ...(state.strengthIncluded && state.strengthIntent
       ? { strength_intent: state.strengthIntent }
+      : {}),
+    ...(state.strengthIncluded && typeof state.dbMaxLb === 'number' && state.dbMaxLb > 0
+      ? { db_max_lb: state.dbMaxLb }
       : {}),
     ...(triPlan && state.swimIntent
       ? { swim_intent: state.swimIntent }
@@ -2065,6 +2075,8 @@ function Step8Strength({
   );
   const hasDumbbellChip = equipLower.some((s) => s.includes('dumbbell') || /\bdb\b/.test(s));
   const tier3IsBwBands = !hasBarbellChip && !hasDumbbellChip;
+  // Spec §8.2: when athlete has DBs but no barbell, ask DB max for the cap-and-scale-reps logic.
+  const tier3IsDumbbellBased = hasDumbbellChip && !hasBarbellChip;
 
   // §5 1RM presence — any compound entry unlocks accurate loading.
   const pn = arc?.performanceNumbers ?? null;
@@ -2097,6 +2109,7 @@ function Step8Strength({
     state.strengthIntent === 'performance' &&
     !showGateWarning &&
     !has1RM;
+  const showDbMaxInput = state.strengthIncluded === true && tier3IsDumbbellBased;
 
   const canContinue =
     state.strengthIncluded !== null &&
@@ -2152,6 +2165,35 @@ function Step8Strength({
             <span className="block font-semibold">Support</span>
             <span className="block text-[13px] text-white/55 mt-0.5">Strength to support endurance and prevent injury. 1×/week, lighter loads, full-body. Race fitness comes first.</span>
           </ChoiceBtn>
+        </div>
+      )}
+
+      {showDbMaxInput && (
+        <div className="rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug">
+          <p className="font-semibold text-white/85 mb-1">Heaviest DB pair (lbs)</p>
+          <p className="text-white/55 mb-2 text-[12px]">
+            We use this to cap working weights when the prescribed load exceeds your DB max — reps
+            scale up to maintain stimulus.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={5}
+              max={200}
+              step={5}
+              value={state.dbMaxLb ?? 50}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setState({
+                  ...state,
+                  dbMaxLb: Number.isFinite(n) && n > 0 ? Math.round(n) : 50,
+                });
+              }}
+              className="w-20 rounded-md border border-white/15 bg-white/[0.06] px-2 py-1.5 text-white/90 text-[14px] focus:outline-none focus:ring-1 focus:ring-teal-400/40"
+            />
+            <span className="text-white/55 text-[12px]">lb per hand · default 50</span>
+          </div>
         </div>
       )}
 

@@ -26,7 +26,11 @@ import {
   swimDrillBlockAthleteCopy,
   swimSessionPhilosophyLead,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
-import { buildStrengthEquipmentLine, hasKettlebell as detectKettlebell } from '../_shared/strength-equipment-tier.ts';
+import {
+  buildStrengthEquipmentLine,
+  hasKettlebell as detectKettlebell,
+  hasPullUpBar as detectPullUpBar,
+} from '../_shared/strength-equipment-tier.ts';
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
 import {
   calculateSwimTss,
@@ -1476,6 +1480,8 @@ export function triathlonStrength(
     performanceNumbers?: Record<string, unknown>;
     /** Athlete strength equipment chips (`user_baselines.equipment.strength`). Drives spec §9.3 line. */
     strengthEquipment?: string[];
+    /** Heaviest DB pair the athlete owns (per hand, lb). Drives spec §8.2 cap-and-scale-reps. */
+    dbMaxLb?: number;
   },
 ): PlannedSession {
   const longRide = options?.longRideDayName ?? 'Saturday';
@@ -1512,6 +1518,10 @@ export function triathlonStrength(
       hasCable: options?.hasCable ?? (options?.equipmentType !== 'home_gym'),
       hasGHD: options?.hasGhd ?? false,
       hasKettlebell: detectKettlebell(options?.strengthEquipment ?? []),
+      hasPullUpBar: detectPullUpBar(options?.strengthEquipment ?? []),
+      ...(typeof options?.dbMaxLb === 'number' && options.dbMaxLb > 0
+        ? { dbMaxLb: options.dbMaxLb }
+        : {}),
       ...((): { squat1RM?: number; deadlift1RM?: number; bench1RM?: number; overhead1RM?: number } => {
         const pn = options?.performanceNumbers;
         if (!pn || typeof pn !== 'object') return {};
