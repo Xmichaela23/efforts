@@ -1418,6 +1418,18 @@ function expandTokensForRow(
           let baselineMissing = false;
           let requiredBaseline: string | undefined = undefined;
           
+          // Pre-resolved numeric weight (dispatcher computed absolute lb at plan-gen time using
+          // the dispatcher's view of the athlete's 1RM). Used by the rebuild scaler to close the
+          // description-vs-delivered contract: both come from the same emit-time computation, so
+          // they can't drift even if `user_baselines.performance_numbers` changes between plan
+          // generation and materialization. See
+          // `shared/strength-system/protocols/triathlon_performance.ts:scaleSessionToRebuildLoads`.
+          const preResolvedRaw = (ex as any)?.weight;
+          const isPreResolvedNumeric =
+            typeof preResolvedRaw === 'number' &&
+            Number.isFinite(preResolvedRaw) &&
+            preResolvedRaw > 0;
+
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
           if (isQualitativeStrengthWeight((ex as any)?.weight)) {
             weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
@@ -1425,6 +1437,20 @@ function expandTokensForRow(
             requiredBaseline = undefined;
             percent_1rm = undefined;
             resolved_from = undefined;
+          } else if (isPreResolvedNumeric) {
+            // Pass-through: dispatcher already resolved this against its 1RM snapshot.
+            const isMetricA = !!(baselines as any).isMetric;
+            const wUnitA = isMetricA ? 'kg' : 'lb';
+            prescribed = preResolvedRaw as number;
+            if (exerciseConfig?.displayFormat === 'perHand') {
+              weightDisplay = `${prescribed} ${wUnitA} each`;
+            } else {
+              weightDisplay = `${prescribed} ${wUnitA}`;
+            }
+            percent_1rm = typeof (ex as any)?.percent_1rm === 'number'
+              ? ((ex as any).percent_1rm as number)
+              : (typeof percentRaw === 'number' ? percentRaw : undefined);
+            resolved_from = exerciseConfig?.primaryRef ?? 'pre_resolved';
           } else if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
             const targetPercent = resolveStrengthPercentForLift(
@@ -1556,6 +1582,14 @@ function expandTokensForRow(
           let baselineMissing = false;
           let requiredBaseline: string | undefined = undefined;
           
+          // Pre-resolved numeric weight from the rebuild scaler (see first call site for the
+          // contract). Mirror the same pass-through branch here so the regenerate path honors it.
+          const preResolvedRaw2 = (ex as any)?.weight;
+          const isPreResolvedNumeric2 =
+            typeof preResolvedRaw2 === 'number' &&
+            Number.isFinite(preResolvedRaw2) &&
+            preResolvedRaw2 > 0;
+
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
           if (isQualitativeStrengthWeight((ex as any)?.weight)) {
             weightDisplay = qualitativeWeightDisplay((ex as any)?.weight);
@@ -1563,6 +1597,19 @@ function expandTokensForRow(
             requiredBaseline = undefined;
             percent_1rm = undefined;
             resolved_from = undefined;
+          } else if (isPreResolvedNumeric2) {
+            const isMetricB = !!(baselines as any).isMetric;
+            const wUnitB = isMetricB ? 'kg' : 'lb';
+            prescribed = preResolvedRaw2 as number;
+            if (exerciseConfig?.displayFormat === 'perHand') {
+              weightDisplay = `${prescribed} ${wUnitB} each`;
+            } else {
+              weightDisplay = `${prescribed} ${wUnitB}`;
+            }
+            percent_1rm = typeof (ex as any)?.percent_1rm === 'number'
+              ? ((ex as any).percent_1rm as number)
+              : (typeof percentRaw === 'number' ? percentRaw : undefined);
+            resolved_from = exerciseConfig?.primaryRef ?? 'pre_resolved';
           } else if (!isBandExercise && exerciseConfig) {
             // Use new research-based config for percentage-based weights
             const targetPercent = resolveStrengthPercentForLift(

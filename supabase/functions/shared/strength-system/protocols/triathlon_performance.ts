@@ -115,21 +115,35 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   // structure is the right shape (compound lifts, no plyo) but at reduced intensity so the
   // athlete doesn't crash a week after recovery. See `phase-structure.ts:insertRebuildBlock`.
   if (phaseName === 'rebuild') {
+    // Pass the dispatcher's 1RM view into the rebuild scaler so absolute lb is resolved at
+    // emit time. Description and exercise weight both come from this same 1RM — they cannot
+    // drift downstream regardless of what the materializer's live `user_baselines` lookup
+    // might return. Closes the Week-17-155lb safety bug (delivered weight reading a different
+    // 1RM than the description assumed).
+    const dispatcherBaselines: DispatcherBaselines1RM = {
+      deadlift: context.userBaselines.deadlift1RM,
+      squat: context.userBaselines.squat1RM,
+      bench: context.userBaselines.bench1RM,
+      overhead: context.userBaselines.overhead1RM,
+    };
     const rebuildSessions = freq >= 2
       ? [
         scaleSessionToRebuildLoads(
           perfBuildLower(tier, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
           weekInPhase,
+          dispatcherBaselines,
         ),
         scaleSessionToRebuildLoads(
           perfBuildUpper(tier, hasCable, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
           weekInPhase,
+          dispatcherBaselines,
         ),
       ]
       : [
         scaleSessionToRebuildLoads(
           perfBuildLower(tier, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
           weekInPhase,
+          dispatcherBaselines,
         ),
       ];
     return rebuildSessions;
@@ -183,6 +197,52 @@ function rebuildLoadFactor(weekInPhase: number): number {
   return Math.min(1.0, REBUILD_BASE_FACTOR + REBUILD_WEEKLY_RAMP * (wip - 1));
 }
 
+/** The four anchor lifts that gate compound rebuild prescription. */
+type AnchorLift = 'deadlift' | 'squat' | 'bench' | 'overhead';
+
+/**
+ * Dispatcher-time view of 1RM baselines, passed into `scaleSessionToRebuildLoads` so absolute lb
+ * is resolved at emit time using the same 1RM the dispatcher saw — eliminating drift between the
+ * description and the materializer's live `user_baselines` lookup.
+ */
+export type DispatcherBaselines1RM = {
+  deadlift?: number;
+  squat?: number;
+  bench?: number;
+  overhead?: number;
+};
+
+/** Map a compound-exercise name (from perfBuildLower / perfBuildUpper) to its anchor lift. */
+function anchorLiftForExercise(exerciseName: string): AnchorLift | null {
+  const n = String(exerciseName ?? '').toLowerCase();
+  // Order matters — check more-specific tokens first.
+  if (/deadlift|\brdl\b|romanian/.test(n)) return 'deadlift';
+  if (n.includes('squat')) return 'squat';
+  if (/overhead|push press|\bohp\b|shoulder press/.test(n)) return 'overhead';
+  // Barbell Row uses bench as anchor (per materialize-plan/exercise-config.ts:394-407 ratio 0.80
+  // of bench), but the dispatcher emits "X% 1RM (bench anchor)" — the "% 1RM" here is already
+  // bench-relative, so we apply it directly to bench 1RM without the 0.80 ratio.
+  if (n.includes('row') && !n.includes('face') && !n.includes('upright')) return 'bench';
+  if (n.includes('bench')) return 'bench';
+  return null;
+}
+
+/** Resolve absolute working weight (lb) from a %1RM target and the appropriate anchor 1RM. */
+function resolveAbsoluteWeightLb(
+  scaledPct: number,
+  exerciseName: string,
+  baselines: DispatcherBaselines1RM,
+): { lb: number; anchor: AnchorLift; oneRm: number } | null {
+  const anchor = anchorLiftForExercise(exerciseName);
+  if (!anchor) return null;
+  const oneRm = baselines[anchor];
+  if (!Number.isFinite(oneRm as number) || (oneRm as number) <= 0) return null;
+  const raw = (scaledPct / 100) * (oneRm as number);
+  // Round to nearest 5 lb to match materialize-plan's `roundToIncrement` for imperial increments.
+  const lb = Math.max(5, Math.round(raw / 5) * 5);
+  return { lb, anchor, oneRm: oneRm as number };
+}
+
 /** Scale a `'XX% 1RM'` weight string by `factor`; preserves anything that isn't `% 1RM`. */
 function scaleWeightString(weight: unknown, factor: number): unknown {
   if (typeof weight !== 'string') return weight;
@@ -206,47 +266,131 @@ function scaleAbsoluteWeight(weight: unknown, factor: number): unknown {
   return Math.round(raw / 2.5) * 2.5;
 }
 
-/** Apply rebuild scaling to a Build session in place — used as a thin shim around perfBuild*. */
-function scaleSessionToRebuildLoads(session: IntentSession, weekInPhase: number): IntentSession {
+/**
+ * Apply rebuild scaling to a Build session — used as a thin shim around perfBuild*.
+ *
+ * **Architectural contract:** description text and delivered load CANNOT drift. Both are
+ * resolved at this single emit-time call using the dispatcher's view of the athlete's 1RM
+ * baselines. The exercise's `weight` field is emitted as an absolute pre-resolved lb number
+ * (e.g., `114` for a 76% 1RM target on a 150-lb deadlift 1RM); materialize-plan's pre-resolved
+ * numeric-weight path passes it through unchanged. The description quotes the literal lb +
+ * the source 1RM, so the athlete sees the calculation and any drift between description and
+ * delivered is impossible by construction.
+ *
+ * Closes the Week-17-155lb safety bug (the materializer's live `user_baselines.deadlift`
+ * lookup could read a different 1RM than the dispatcher's request payload had, producing a
+ * delivered lb the description never agreed to).
+ *
+ * For DB-tier sessions where the source weight is already an absolute number (per
+ * `dbPrescription`), `scaleAbsoluteWeight` does the same scaling and the description falls
+ * back to the factor-only template (no %1RM string to anchor on).
+ *
+ * For exercises whose anchor 1RM is missing from the dispatcher baselines (no 1RM logged for
+ * that lift), the weight stays as a "% 1RM" string and the materializer's existing %1RM
+ * resolution applies — same as pre-fix behavior for that exercise.
+ */
+function scaleSessionToRebuildLoads(
+  session: IntentSession,
+  weekInPhase: number,
+  baselines: DispatcherBaselines1RM,
+): IntentSession {
   const factor = rebuildLoadFactor(weekInPhase);
   const wip = Math.max(1, weekInPhase);
 
-  // Scale exercises and, in the same pass, capture the first compound lift's source + scaled
-  // %1RM so the description can quote what was actually emitted (not just the factor).
-  // Architectural guarantee: description text and delivered load can't drift — they read from
-  // the same scaled exercise. Closes the "description claims 95% but loads at 87.5%" gap.
-  let mainLiftSourcePct: number | null = null;
+  // Track the first compound lift's resolved lb for the description. The description reads
+  // from THIS exact value — same value the exercise's `weight` field carries — so they
+  // cannot drift.
+  let mainLiftAbsLb: number | null = null;
+  let mainLiftSourceAbsLb: number | null = null;
+  let mainLiftAnchor: AnchorLift | null = null;
+  let mainLiftOneRm: number | null = null;
   let mainLiftScaledPct: number | null = null;
+  let mainLiftSourcePct: number | null = null;
+
   const scaledExercises: StrengthExercise[] = session.exercises.map((ex) => {
     const w = ex.weight;
     let scaled: unknown = w;
-    if (typeof w === 'string') scaled = scaleWeightString(w, factor);
-    else if (typeof w === 'number') scaled = scaleAbsoluteWeight(w, factor);
-    if (mainLiftSourcePct == null && typeof w === 'string' && typeof scaled === 'string') {
-      const srcMatch = w.match(/^\s*(\d+)\s*%\s*1RM/i);
-      const scaledMatch = scaled.match(/^\s*(\d+)\s*%\s*1RM/i);
-      if (srcMatch && scaledMatch) {
-        mainLiftSourcePct = Number(srcMatch[1]);
-        mainLiftScaledPct = Number(scaledMatch[1]);
+    let percent_1rm: number | undefined;
+
+    if (typeof w === 'string') {
+      // Source weight is "X% 1RM" or "X-Y% 1RM" (perfBuildLower / perfBuildUpper main lifts).
+      // Some sources include trailing annotations like "(bench anchor)" — scaleWeightString
+      // declines to scale those (regex anchored to $); for the anchor-annotated case we still
+      // extract the source % to resolve absolute lb when possible.
+      const cleanMatch = w.match(/^\s*(\d+)\s*%\s*1RM\s*$/i);
+      const anyMatch = w.match(/(\d+)\s*%\s*1RM/i);
+      const srcPct = cleanMatch ? Number(cleanMatch[1]) : (anyMatch ? Number(anyMatch[1]) : null);
+      if (srcPct != null && Number.isFinite(srcPct)) {
+        const scaledPct = Math.round(srcPct * factor);
+        const resolved = resolveAbsoluteWeightLb(scaledPct, ex.name, baselines);
+        if (resolved) {
+          // Emit as pre-resolved number — materializer passes through, can't recompute against
+          // a divergent 1RM. Track for description.
+          scaled = resolved.lb;
+          percent_1rm = scaledPct / 100;
+          if (mainLiftAbsLb == null) {
+            mainLiftAbsLb = resolved.lb;
+            mainLiftScaledPct = scaledPct;
+            mainLiftSourcePct = srcPct;
+            mainLiftAnchor = resolved.anchor;
+            mainLiftOneRm = resolved.oneRm;
+            const sourceResolved = resolveAbsoluteWeightLb(srcPct, ex.name, baselines);
+            mainLiftSourceAbsLb = sourceResolved?.lb ?? null;
+          }
+        } else {
+          // No 1RM available for this exercise's anchor → keep scaled %1RM string for the
+          // materializer's existing %1RM resolver. Still track the %1RM for the description so
+          // it falls back to the %-only template (not the bare factor template) and the athlete
+          // sees what was scaled.
+          scaled = scaleWeightString(w, factor);
+          if (mainLiftScaledPct == null) {
+            mainLiftScaledPct = scaledPct;
+            mainLiftSourcePct = srcPct;
+          }
+        }
+      } else {
+        // Not a parseable %1RM (e.g., qualitative). Pass through unchanged via existing helper.
+        scaled = scaleWeightString(w, factor);
       }
+    } else if (typeof w === 'number') {
+      scaled = scaleAbsoluteWeight(w, factor);
     }
-    return { ...ex, weight: scaled as StrengthExercise['weight'] };
+
+    const next: StrengthExercise = { ...ex, weight: scaled as StrengthExercise['weight'] };
+    if (percent_1rm != null) {
+      (next as unknown as { percent_1rm?: number }).percent_1rm = percent_1rm;
+    }
+    return next;
   });
 
   // Replace "Strength Build" with "Rebuild" — single targeted replace. A prior implementation
-  // chained a second case-insensitive `/Build/gi` replace which then matched "build" *inside*
-  // the already-renamed "Rebuild" and produced "ReRebuild". The single replace handles every
+  // chained a second case-insensitive `/Build/gi` replace which matched "build" *inside* the
+  // already-renamed "Rebuild" and produced "ReRebuild". The single replace handles every
   // source name (`perfBuildLower` / `perfBuildUpper` both emit "… Strength Build (Lower/Upper)").
   const renamed = session.name.replace(/Strength Build/gi, 'Rebuild');
 
-  // Description quotes the actual scaled compound load. When no string-%1RM lift exists
-  // (DB tier sessions emit absolute lb), fall back to the factor — still consistent because
-  // scaleAbsoluteWeight uses the same `factor`.
+  // Description quotes the absolute lb resolved at this same emit-time call. The athlete sees
+  // both the literal target weight AND the source 1RM used to compute it — making the
+  // contract verifiable in plain language. If their saved 1RM is wrong, the description
+  // reveals it (e.g., shows "your saved deadlift 1RM is 200 lb" when the athlete believes
+  // their 1RM is 150).
   let description: string;
-  if (mainLiftScaledPct != null && mainLiftSourcePct != null) {
+  if (
+    mainLiftAbsLb != null &&
+    mainLiftSourceAbsLb != null &&
+    mainLiftAnchor != null &&
+    mainLiftOneRm != null
+  ) {
+    description =
+      `Rebuild Week ${wip} — Compound lifts at ${mainLiftAbsLb} lb ` +
+      `(down from ${mainLiftSourceAbsLb} lb pre-race build; ` +
+      `computed at ${mainLiftScaledPct}% × your saved ${mainLiftAnchor} 1RM of ${mainLiftOneRm} lb).`;
+  } else if (mainLiftScaledPct != null && mainLiftSourcePct != null) {
+    // 1RM unavailable — fall back to %1RM-only copy.
     description =
       `Rebuild Week ${wip} — post-race ramp. Compound lifts at ${mainLiftScaledPct}% 1RM ` +
-      `(down from ${mainLiftSourcePct}% pre-race build, ramping back toward race-specific).`;
+      `(down from ${mainLiftSourcePct}% pre-race build, ramping back toward race-specific). ` +
+      `Log a 1RM baseline for exact lb targets.`;
   } else {
     const pctText = `${Math.round(factor * 100)}%`;
     description =

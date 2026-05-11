@@ -283,35 +283,73 @@ function rebuildContext(weekInPhase: number): ProtocolContext {
   };
 }
 
-function findExerciseWeight(session: IntentSession, namePattern: RegExp): string | null {
+function findExercise(session: IntentSession, namePattern: RegExp): { name: string; weight: unknown; percent_1rm?: number } | null {
   const ex = session.exercises.find((e) => namePattern.test(e.name));
   if (!ex) return null;
-  return typeof ex.weight === 'string' ? ex.weight : null;
+  return ex as { name: string; weight: unknown; percent_1rm?: number };
 }
 
-Deno.test('strength rebuild week 1: %1RM scaled to 0.90× of build (e.g., 80% → 72%)', () => {
+Deno.test('strength rebuild week 1: absolute lb resolved at dispatcher (deadlift 250 1RM → 180 lb)', () => {
+  // Architectural contract: dispatcher resolves absolute lb at emit time using context.userBaselines.
+  // rebuildContext has deadlift1RM=250, factor=0.90 for week 1 → 80% × 0.90 = 72% → 72% × 250 = 180lb.
+  // Materializer can't recompute against a divergent 1RM — the number is pinned at emit.
   const sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(1));
-  // Lower session: Conventional Deadlift in build is 80% 1RM. Rebuild week 1 → 80 × 0.90 = 72.
   const lower = sessions.find((s) => /Lower/i.test(s.name));
   assert(lower, `expected a lower-body rebuild session — got ${sessions.map((s) => s.name).join(', ')}`);
-  const dl = findExerciseWeight(lower, /Deadlift/i);
-  assert(dl, `expected deadlift weight string — got ${JSON.stringify(lower.exercises.map((e) => e.name))}`);
-  assertEquals(dl, '72% 1RM');
-  const sq = findExerciseWeight(lower, /Squat/i);
-  // Squat in build is 78% 1RM. Rebuild week 1 → 78 × 0.90 = 70.2 → 70.
-  assertEquals(sq, '70% 1RM');
+  const dl = findExercise(lower, /Deadlift/i);
+  assert(dl, `expected deadlift — got ${JSON.stringify(lower.exercises.map((e) => e.name))}`);
+  // Weight is a NUMBER (pre-resolved lb), not a "% 1RM" string.
+  assertEquals(typeof dl.weight, 'number', `weight should be pre-resolved number, got ${typeof dl.weight}`);
+  assertEquals(dl.weight, 180); // 0.72 × 250 = 180
+  assertEquals(dl.percent_1rm, 0.72);
+  // Squat: 78% × 0.90 = 70%; squat1RM=200 → 0.70 × 200 = 140.
+  const sq = findExercise(lower, /Squat/i);
+  assertEquals(sq?.weight, 140);
+  assertEquals(sq?.percent_1rm, 0.70);
 });
 
-Deno.test('strength rebuild week 2: ramp +5% (e.g., 80% × 0.95 = 76%)', () => {
+Deno.test('strength rebuild week 2: ramp +5% delivers absolute lb (deadlift 250 1RM → 190 lb)', () => {
+  // Week 2: factor=0.95 → 80% × 0.95 = 76% → 76% × 250 = 190lb.
   const sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(2));
   const lower = sessions.find((s) => /Lower/i.test(s.name));
   assert(lower);
-  const dl = findExerciseWeight(lower, /Deadlift/i);
-  // 80 × 0.95 = 76.
-  assertEquals(dl, '76% 1RM');
-  // Squat: 78 × 0.95 = 74.1 → 74.
-  const sq = findExerciseWeight(lower, /Squat/i);
-  assertEquals(sq, '74% 1RM');
+  const dl = findExercise(lower, /Deadlift/i);
+  assertEquals(dl?.weight, 190); // 0.76 × 250 = 190
+  assertEquals(dl?.percent_1rm, 0.76);
+  // Squat: 78% × 0.95 = 74%; squat1RM=200 → 0.74 × 200 = 148 → round 5 = 150.
+  const sq = findExercise(lower, /Squat/i);
+  assertEquals(sq?.weight, 150);
+  assertEquals(sq?.percent_1rm, 0.74);
+});
+
+Deno.test('Bug A reproducer: contract closure — description ≡ delivered, no materialize-time drift', () => {
+  // The verification failure was: athlete deadlift1RM=150, Week 17 (Rebuild Week 2) description
+  // claimed 76% but plan delivered 155 lb (= 103% of 1RM, dangerous). Root cause: materializer
+  // read 1RM from `user_baselines.performance_numbers` live, which could differ from the
+  // dispatcher's request payload snapshot. Architectural fix: dispatcher resolves absolute lb at
+  // emit time; materializer passes it through unchanged.
+  //
+  // Reproducer: a low-1RM athlete (150) gets a rebuild week 2 plan. The emitted weight is the
+  // literal lb at the dispatcher's 1RM — no path for the materializer to multiply by a
+  // different baseline. 0.76 × 150 = 114 → round to 5 = 115.
+  const ctxLow1RM: ProtocolContext = {
+    ...rebuildContext(2),
+    userBaselines: { ...rebuildContext(2).userBaselines, deadlift1RM: 150 },
+  };
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctxLow1RM);
+  const lower = sessions.find((s) => /Lower/i.test(s.name))!;
+  const dl = findExercise(lower, /Deadlift/i)!;
+  assertEquals(dl.weight, 115); // 0.76 × 150 = 114 → round 5 = 115; not 155
+  // Description names the same lb that's in the exercise → can't diverge by construction.
+  assert(
+    String(lower.description).includes('115 lb'),
+    `description must quote the literal emitted lb (115) — got "${lower.description}"`,
+  );
+  // Description includes the saved 1RM so an athlete can verify the calculation.
+  assert(
+    String(lower.description).includes('150 lb'),
+    `description must surface the saved 1RM (150) for verification — got "${lower.description}"`,
+  );
 });
 
 Deno.test('strength rebuild: session name + tags reflect rebuild semantics, not "Build"', () => {
@@ -326,15 +364,17 @@ Deno.test('strength rebuild: session name + tags reflect rebuild semantics, not 
 
 Deno.test('strength rebuild: bug reproducer — pre-fix would emit base hypertrophy 65% loads at week 16', () => {
   // Concrete reproduction of the Push Press / Trap Bar regression. Pre-fix, week 16 for the next
-  // goal landed in `base` phase week 1, which `perfBaseLower` reads as 65% 1RM (e.g., 200 × 0.65
-  // = 130lb deadlift). With rebuild week 1 (this fix), deadlift = 80 × 0.90 = 72% 1RM
-  // (200 × 0.72 = 144lb) — preserving more of the pre-race build progression.
+  // goal landed in `base` phase week 1, which `perfBaseLower` reads as 65% 1RM. With rebuild
+  // week 1 (this fix), deadlift comes out at 0.72 × deadlift1RM. For rebuildContext deadlift1RM=250
+  // the emitted lb is 180 (= 72% × 250). Critical: 180/250 = 72% must be > the pre-fix 65%.
   const sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(1));
   const lower = sessions.find((s) => /Lower/i.test(s.name))!;
-  const dl = findExerciseWeight(lower, /Deadlift/i)!;
-  const dlPct = Number(dl.match(/(\d+)%/)?.[1]);
-  // Must be > 65% (pre-fix base value). Rebuild week 1 lands at 72%.
-  assert(dlPct > 65, `rebuild deadlift % (${dlPct}) must exceed pre-fix base value (65%)`);
+  const dl = findExercise(lower, /Deadlift/i)!;
+  assertEquals(typeof dl.weight, 'number');
+  const dlLb = dl.weight as number;
+  const oneRM = rebuildContext(1).userBaselines.deadlift1RM!;
+  const dlPct = dlLb / oneRM;
+  assert(dlPct > 0.65, `rebuild deadlift ratio (${dlPct}) must exceed pre-fix base value (0.65)`);
 });
 
 // ── §4b regression: ReRebuild rename bug ────────────────────────────────────
@@ -361,44 +401,68 @@ Deno.test('strength rebuild: session name is "Rebuild" (Lower/Upper), not "ReReb
 
 // ── §4c regression: description matches delivered loads ────────────────────
 
-Deno.test('strength rebuild: description text quotes the actually-emitted %1RM, not the factor', () => {
-  // Bug: previously description text was generated from `Math.round(factor * 100)` while the
-  // emitted exercise weights came from `Math.round(sourcePct * factor)`. Per-exercise integer
-  // rounding could put the emitted % a couple of points off the factor. The fix derives the
-  // description from the first compound-lift's scaled `%1RM`, so description and delivered
-  // can't drift.
+Deno.test('strength rebuild: description quotes absolute lb computed from saved 1RM (week 2)', () => {
+  // Architectural contract: description text and emitted weight share the same emit-time
+  // computation. Week 2 (factor 0.95) on deadlift1RM=250 → 0.76 × 250 = 190 lb.
+  // Source build = 0.80 × 250 = 200 lb. Description quotes both.
   const wk2Sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(2));
   const lower = wk2Sessions.find((s) => /Lower/i.test(s.name))!;
-  // Deadlift in build is 80% 1RM. Rebuild week 2 emits 80 × 0.95 = 76% 1RM.
-  const dl = findExerciseWeight(lower, /Deadlift/i)!;
-  const dlPctEmitted = Number(dl.match(/(\d+)%/)?.[1]);
-  assertEquals(dlPctEmitted, 76);
-  // Description must reference the literal emitted % (76) and the source % (80), not just "95%".
+  const dl = findExercise(lower, /Deadlift/i)!;
+  assertEquals(dl.weight, 190);
   assert(
-    lower.description.includes('76% 1RM'),
-    `description must quote the literal emitted %1RM — got "${lower.description}"`,
+    String(lower.description).includes('190 lb'),
+    `description must quote the literal emitted lb (190) — got "${lower.description}"`,
   );
   assert(
-    lower.description.includes('80%'),
-    `description must reference the pre-race build source % (80%) — got "${lower.description}"`,
+    String(lower.description).includes('200 lb'),
+    `description must reference the pre-race build lb (200) — got "${lower.description}"`,
+  );
+  assert(
+    String(lower.description).includes('250 lb'),
+    `description must surface the saved deadlift 1RM (250) for verification — got "${lower.description}"`,
   );
 });
 
-Deno.test('strength rebuild: description quotes source 80% / scaled 72% for week 1', () => {
+Deno.test('strength rebuild: description quotes source / scaled lb for week 1', () => {
   const wk1Sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(1));
   const lower = wk1Sessions.find((s) => /Lower/i.test(s.name))!;
-  // Week 1: factor 0.90, deadlift 80 × 0.90 = 72.
+  // Week 1: 0.72 × 250 = 180. Source build: 0.80 × 250 = 200.
   assert(
-    lower.description.includes('72% 1RM'),
-    `description must quote scaled 72% — got "${lower.description}"`,
+    String(lower.description).includes('180 lb'),
+    `description must quote scaled lb (180) — got "${lower.description}"`,
   );
   assert(
-    lower.description.includes('80%'),
-    `description must reference source 80% — got "${lower.description}"`,
+    String(lower.description).includes('200 lb'),
+    `description must reference source build lb (200) — got "${lower.description}"`,
   );
   assert(
-    lower.description.includes('Rebuild Week 1'),
+    String(lower.description).includes('Rebuild Week 1'),
     `description must label as Rebuild Week 1 — got "${lower.description}"`,
+  );
+});
+
+Deno.test('strength rebuild: description falls back to %1RM when 1RM is missing for the anchor lift', () => {
+  // No saved 1RMs → dispatcher can't resolve absolute lb; falls back to %1RM-only description
+  // and leaves weight as a "% 1RM" string for the materializer's existing %1RM resolution.
+  const ctx: ProtocolContext = {
+    ...rebuildContext(2),
+    userBaselines: {
+      ...rebuildContext(2).userBaselines,
+      deadlift1RM: undefined,
+      squat1RM: undefined,
+      bench1RM: undefined,
+      overhead1RM: undefined,
+    },
+  };
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  const lower = sessions.find((s) => /Lower/i.test(s.name))!;
+  const dl = findExercise(lower, /Deadlift/i)!;
+  assertEquals(typeof dl.weight, 'string', `weight should fall back to "%1RM" string when no 1RM available`);
+  assertEquals(dl.weight, '76% 1RM');
+  // Description should mention the %1RM and a baseline-missing hint.
+  assert(
+    /76% 1RM/.test(String(lower.description)),
+    `description should quote %1RM when 1RM is missing — got "${lower.description}"`,
   );
 });
 
