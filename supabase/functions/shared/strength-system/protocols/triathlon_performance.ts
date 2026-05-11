@@ -110,6 +110,31 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return [];
   }
 
+  // Rebuild = post-race ramp back. Reads previous peak × (0.90 + 0.05×(wip-1)) — week 1 lands
+  // around build-phase loads scaled down 10%, week 2 close to full build loads. Strength build
+  // structure is the right shape (compound lifts, no plyo) but at reduced intensity so the
+  // athlete doesn't crash a week after recovery. See `phase-structure.ts:insertRebuildBlock`.
+  if (phaseName === 'rebuild') {
+    const rebuildSessions = freq >= 2
+      ? [
+        scaleSessionToRebuildLoads(
+          perfBuildLower(tier, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
+          weekInPhase,
+        ),
+        scaleSessionToRebuildLoads(
+          perfBuildUpper(tier, hasCable, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
+          weekInPhase,
+        ),
+      ]
+      : [
+        scaleSessionToRebuildLoads(
+          perfBuildLower(tier, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
+          weekInPhase,
+        ),
+      ];
+    return rebuildSessions;
+  }
+
   if (phaseName === 'base') {
     return freq >= 2
       ? [
@@ -138,6 +163,75 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   }
 
   return [perfBaseLower(tier, limiter, weekInPhase, planWeekLabel, false, tier3, dbCtx)];
+}
+
+// ── Rebuild (post-race ramp): scaled-down build loads ──────────────────────
+//
+// Closes the post-B-race regression (e.g., Push Press 105lb week 13 → 70lb week 16). Without
+// rebuild, week 16 was the next goal's `base` week 1 — strength factory read `weekInPhase=1`
+// and emitted base-hypertrophy loads (≈65%), erasing the build progression that preceded the
+// race. With rebuild, the ramp is explicit: week 1 of rebuild ≈ build-load × 0.90, week 2 ≈
+// build-load × 0.95. Two weeks of rebuild lands the athlete close to pre-race build loads
+// without crashing them into peak-power immediately.
+
+const REBUILD_BASE_FACTOR = 0.90;
+const REBUILD_WEEKLY_RAMP = 0.05;
+
+function rebuildLoadFactor(weekInPhase: number): number {
+  const wip = Math.max(1, weekInPhase);
+  // Cap at 1.0 — at some point the ramp catches the original load and we're back to build territory.
+  return Math.min(1.0, REBUILD_BASE_FACTOR + REBUILD_WEEKLY_RAMP * (wip - 1));
+}
+
+/** Scale a `'XX% 1RM'` weight string by `factor`; preserves anything that isn't `% 1RM`. */
+function scaleWeightString(weight: unknown, factor: number): unknown {
+  if (typeof weight !== 'string') return weight;
+  // Match patterns like "65% 1RM", "78% 1RM", "65-70% 1RM" (use the lower bound for scaling).
+  const m = weight.match(/^\s*(\d+)(?:\s*-\s*(\d+))?\s*%\s*1RM\s*$/i);
+  if (!m) return weight;
+  const lo = Number(m[1]);
+  const hi = m[2] ? Number(m[2]) : null;
+  const loScaled = Math.round(lo * factor);
+  if (hi != null) {
+    const hiScaled = Math.round(hi * factor);
+    return `${loScaled}-${hiScaled}% 1RM`;
+  }
+  return `${loScaled}% 1RM`;
+}
+
+/** Scale a numeric absolute weight (e.g. DB pounds) by `factor`, rounding to nearest 2.5lb. */
+function scaleAbsoluteWeight(weight: unknown, factor: number): unknown {
+  if (typeof weight !== 'number' || !Number.isFinite(weight)) return weight;
+  const raw = weight * factor;
+  return Math.round(raw / 2.5) * 2.5;
+}
+
+/** Apply rebuild scaling to a Build session in place — used as a thin shim around perfBuild*. */
+function scaleSessionToRebuildLoads(session: IntentSession, weekInPhase: number): IntentSession {
+  const factor = rebuildLoadFactor(weekInPhase);
+  const wip = Math.max(1, weekInPhase);
+  const scaledExercises: StrengthExercise[] = session.exercises.map((ex) => {
+    const w = ex.weight;
+    let scaled: unknown = w;
+    if (typeof w === 'string') scaled = scaleWeightString(w, factor);
+    else if (typeof w === 'number') scaled = scaleAbsoluteWeight(w, factor);
+    return { ...ex, weight: scaled as StrengthExercise['weight'] };
+  });
+  // Replace the session's "Build / Strength Build" naming with rebuild semantics so the athlete
+  // sees the post-race ramp explicitly, and so plan exports can show "Rebuild Week N" instead of
+  // a misleading "Build Week 1".
+  const renamed = session.name
+    .replace(/Strength Build/gi, 'Rebuild')
+    .replace(/Build/gi, 'Rebuild');
+  const pctText = `${Math.round(factor * 100)}%`;
+  const description = `Rebuild Week ${wip} — post-race ramp at ${pctText} of pre-race build loads. Same compound lifts, intensity scaled so you don't crash a week after recovery.`;
+  return {
+    ...session,
+    name: renamed,
+    description,
+    exercises: scaledExercises,
+    tags: [...session.tags.filter((t) => !t.startsWith('phase:')), 'phase:rebuild'],
+  };
 }
 
 // ── Recovery (deload week): −volume, keep patterns ────────────────────────

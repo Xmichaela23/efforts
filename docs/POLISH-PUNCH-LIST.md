@@ -22,6 +22,8 @@ One-off fixes compound into architectural debt. Root-cause fixes prevent the nex
 
 2. **Floor canonical-value contract.** Three "different" trade-off message bugs ("21.2335mi" string, no rounding, no race-specific cap) all traced to validate-training-floors returning raw math that flowed straight to athlete-facing messages. Fix: effective floor functions return a single canonical value (capped at race-specific peak, rounded for display) that both threshold and message read from. No downstream re-derivation possible. One return-value change closed the class.
 
+3. **Explicit `rebuild` phase post-B-race.** Week 16 Push Press dropped from 105lb to 70lb because the next goal's `base` week 1 was indistinguishable from a fresh-start macrocycle to consumers (strength loads, swim ceilings, long-day floors). Initial debugging looked at the week-in-phase counter, but the counter was working correctly — the *model* was missing semantic information. Fix: add `rebuild` to the Phase enum, emit 1-2 rebuild weeks between recovery and the next goal's abbreviated cycle, populate `weeksSinceRaceIncludingRebuild` for diagnostics, and have each consumer read `phase === 'rebuild'` to apply pre-race × 0.85 (or +5%/wk ramp) instead of base values. One enum addition + scoped consumer arms closed Push Press, swim yardage, and long-day floor regressions in the same code path.
+
 This principle applies to all remaining polish work.
 
 ---
@@ -64,10 +66,12 @@ For each numbered item:
 - [x] Capability tier renamed from commercial_gym → full_barbell
 - [x] Plan export shows both Equipment Location AND Capability Tier
 - [x] "Strength Protocol: durability" mislabel fixed (suppressed for tri exports)
+- [x] Week 16 Push Press regression — fixed at architectural level via explicit `rebuild` phase + canonical post-race ramp contract (strength reads previous build × 0.90 +5%/wk; long-day floors and swim ceilings continue pre-race progression)
 
 ### Open
-- [ ] Week 16 Push Press regression — phase-week counter resetting after race week
-- [ ] Broad Jumps not appearing in power rotation
+- [ ] Broad Jumps not appearing in power rotation — root cause identified (Push Press incorrectly added to dumbbell tier rotation in `triathlon_performance.ts:644-651`, displacing Broad Jumps from short phases). Small targeted fix — separate PR.
+- [ ] 9-week edge case trade-off message — when plan length forces base phase to 0 weeks, surface explicit "base phase skipped due to plan length" trade-off instead of silent skip
+- [ ] Minimum rebuild week count enforcement — when post-B-race window <2 weeks, current code skips rebuild entirely; consider whether to compress taper to guarantee ≥1 rebuild week
 - [ ] Verify all 6 intent × tier combinations end-to-end
 - [ ] Materialize-plan numerical resolution for % 1RM strings (deferred)
 

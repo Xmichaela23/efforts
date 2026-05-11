@@ -31,7 +31,7 @@ export interface SessionFrequencyInputs {
  * `generate-combined-plan/types.ts` — duplicated here to avoid backward dep on
  * `_shared` from a downstream module.
  */
-export type FrequencyPhase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery';
+export type FrequencyPhase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery' | 'rebuild';
 
 /** Output: per-discipline session counts plus telemetry. */
 export interface SessionFrequencyDefaults {
@@ -72,7 +72,7 @@ interface TierRow {
 }
 
 const ZERO_BRICKS: Record<FrequencyPhase, 0 | 1 | 2> = {
-  base: 0, build: 0, race_specific: 0, taper: 0, recovery: 0,
+  base: 0, build: 0, race_specific: 0, taper: 0, recovery: 0, rebuild: 0,
 };
 
 // §2 base table (70.3). Per Phase A decision, boundaries are <8 / <10 / <12 / <14 / ≥14.

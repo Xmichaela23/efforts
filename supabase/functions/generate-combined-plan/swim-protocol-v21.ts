@@ -19,6 +19,7 @@ function normalizePhaseKey(phase: string): Phase {
   if (p === 'race_specific' || p === 'racespecific') return 'race_specific';
   if (p === 'taper' || p === 'race_week') return 'taper';
   if (p === 'recovery' || p === 'deload') return 'recovery';
+  if (p === 'rebuild' || p === 'post_race_rebuild') return 'rebuild';
   if (p === 'base' || p === 'general') return 'base';
   if (p === 'build' || p === 'building') return 'build';
   return 'build';

@@ -8,7 +8,7 @@ import type { SessionFrequencyDefaults } from '../_shared/session-frequency-defa
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
-export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery';
+export type Phase = 'base' | 'build' | 'race_specific' | 'taper' | 'recovery' | 'rebuild';
 export type Priority = 'A' | 'B' | 'C';
 export type LoadingPattern = '3:1' | '2:1';
 
@@ -307,6 +307,14 @@ export interface PhaseBlock {
   tssMultiplier: number;  // 1.0 normal, 0.65 recovery, declining for taper
   sportDistribution: Partial<Record<Sport, number>>; // fractions summing ≤ 1
   weekInPhase?: number;  // current week within this phase (1-based), set by week-builder
+  /**
+   * Running count of weeks elapsed since the prior race (recovery + rebuild combined).
+   * Set on `recovery` and `rebuild` blocks emitted post-race; unset on standalone phases.
+   * Consumers opt in to read this when they need post-race context (e.g., strength rebuild
+   * loading reads `weekInPhase` directly within the rebuild block; this field is the
+   * higher-level "how far past the race am I" tag for diagnostics + future consumers).
+   */
+  weeksSinceRaceIncludingRebuild?: number;
 }
 
 export interface EventRelationship {

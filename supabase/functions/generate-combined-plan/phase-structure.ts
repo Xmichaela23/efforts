@@ -137,8 +137,17 @@ export function buildPhaseTimeline(
       const recStart = w1 + 1;
       const recEnd = w1 + recW;
       insertRecoveryBlock(recStart, recEnd, g1.id, blocks, athleteState);
+      // Rebuild before the next goal's abbreviated cycle — preserves pre-race progression so
+      // strength/swim/long-day consumers don't read week 1 of the new goal as fresh-start base.
+      const windowWks = w2 - recEnd;
+      const rebuildWks = rebuildWeeksAfterRace(g1.distance, recW, windowWks);
+      const rebuildStart = recEnd + 1;
+      const rebuildEnd = recEnd + rebuildWks;
+      if (rebuildWks > 0) {
+        insertRebuildBlock(rebuildStart, rebuildEnd, g2, blocks, athleteState, recW);
+      }
       // Second race: build + taper in remaining weeks (no quality after w1 in this plan)
-      const secondStart = recEnd + 1;
+      const secondStart = rebuildEnd + 1;
       if (secondStart <= w2) {
         buildAbbreviatedBlocks(g2, secondStart, w2, blocks, athleteState);
       }
@@ -173,11 +182,17 @@ export function buildPhaseTimeline(
     const rel       = classifyEventRelationship(gapWeeks);
 
     if (rel === 'overlapping') {
-      // 8–16 week gap: full cycle to first, recovery, abbreviated build, taper to second
+      // 8–16 week gap: full cycle to first, recovery, rebuild, abbreviated build, taper to second
       buildSingleEventBlocks(aChrono[0], 1, firstEnd, blocks, athleteState);
       const recWeeks = recoveryWeeksPostRace(aChrono[0].distance, aChrono[0].priority);
       insertRecoveryBlock(firstEnd + 1, firstEnd + recWeeks, aChrono[0].id, blocks, athleteState);
-      const buildStart = firstEnd + recWeeks + 1;
+      const recEndA = firstEnd + recWeeks;
+      const windowWks = secondEnd - recEndA;
+      const rebuildWks = rebuildWeeksAfterRace(aChrono[0].distance, recWeeks, windowWks);
+      if (rebuildWks > 0) {
+        insertRebuildBlock(recEndA + 1, recEndA + rebuildWks, aChrono[1], blocks, athleteState, recWeeks);
+      }
+      const buildStart = recEndA + rebuildWks + 1;
       buildAbbreviatedBlocks(aChrono[1], buildStart, secondEnd, blocks, athleteState);
     } else if (rel === 'compressed') {
       // 4–8 week gap: shared peak, separate tapers
@@ -190,7 +205,12 @@ export function buildPhaseTimeline(
         const recStart = firstEnd + 1;
         const recEnd = firstEnd + recW;
         insertRecoveryBlock(recStart, recEnd, aChrono[0].id, blocks, athleteState);
-        const secondStart = recEnd + 1;
+        const windowWks = secondEnd - recEnd;
+        const rebuildWks = rebuildWeeksAfterRace(aChrono[0].distance, recW, windowWks);
+        if (rebuildWks > 0) {
+          insertRebuildBlock(recEnd + 1, recEnd + rebuildWks, aChrono[1], blocks, athleteState, recW);
+        }
+        const secondStart = recEnd + rebuildWks + 1;
         if (secondStart <= secondEnd) {
           buildAbbreviatedBlocks(aChrono[1], secondStart, secondEnd, blocks, athleteState);
         }
@@ -284,6 +304,84 @@ function insertRecoveryBlock(
       isRecovery: true,
       tssMultiplier: 0.5,
       sportDistribution,
+      // Running count from the race week. Recovery weeks 1, 2, … (week 1 = first week post-race).
+      weeksSinceRaceIncludingRebuild: w - startWeek + 1,
+    });
+  }
+}
+
+/**
+ * Number of `rebuild` weeks to emit between a B-race recovery and the next goal's run-in.
+ *
+ * **Why rebuild exists (architectural):** without an explicit `rebuild` phase, the next goal's
+ * `base` (or `race_specific` from `buildAbbreviatedBlocks`) starts at `weekInPhase = 1`, which
+ * consumers (strength loads, swim ceilings, long-day floors) read as "first week of base" and
+ * silently regress loads to base-week-1 values — causing post-race regressions like Push Press
+ * dropping from 105lb to 70lb because the prior peak progression context is lost.
+ *
+ * **Sizing:** B-race rebuild is 1-2 weeks shaped by race distance and recovery weeks already
+ * spent; capped by the available window (must leave ≥1 week for race_specific or taper before
+ * the next race). Sprint / Olympic recover faster (1 week); 70.3+ benefit from 2 (full ramp).
+ * If recovery already absorbed ≥2 weeks (longer races), shave one rebuild week.
+ *
+ * Returns 0 when there's no room or no benefit (very short windows go straight to abbreviated).
+ */
+function rebuildWeeksAfterRace(
+  raceDistance: string,
+  recoveryWeeksConsumed: number,
+  windowWeeks: number,
+): number {
+  if (windowWeeks < 2) return 0;
+  const d = String(raceDistance || '').toLowerCase();
+  const desired =
+    d === 'sprint' || d === 'olympic' || d === '5k' || d === '10k' ? 1 : 2;
+  // Longer recovery already restored fitness — shave rebuild proportionally (but keep ≥1 week
+  // when desired > 0).
+  const adjusted = Math.max(1, desired - Math.max(0, recoveryWeeksConsumed - 1));
+  // Always preserve at least one week for race_specific or taper.
+  return Math.max(0, Math.min(adjusted, windowWeeks - 1));
+}
+
+/**
+ * Insert `rebuild` weeks for the upcoming goal between a recovery block and the next macrocycle.
+ * Mirrors `insertRecoveryBlock` shape — one row per week (ADR 0002). Each rebuild row carries:
+ *   - `phase: 'rebuild'`, `primaryGoalId: <next goal>`, `isRecovery: false`
+ *   - `tssMultiplier: 0.85` (matches `longRunFloorMiles` / `longRideFloorHours` rebuild multiplier
+ *     so anchor sessions don't get inflated relative to the floor)
+ *   - `weeksSinceRaceIncludingRebuild` continuing the recovery count
+ *   - `weekInPhase` is computed at runtime by `weekInPhaseForTimeline` (returns 1, 2 within the
+ *     consecutive rebuild block — drives the strength +5%/week ramp without touching counter math)
+ */
+function insertRebuildBlock(
+  startWeek: number,
+  endWeek: number,
+  nextGoal: GoalInput,
+  blocks: PhaseBlock[],
+  as: AthleteState,
+  recoveryWeeksConsumed: number,
+) {
+  if (startWeek > endWeek) return;
+  // Sport distribution shifts toward the next goal so the ramp is sport-correct (e.g., a tri
+  // rebuild after a half-marathon B-race uses tri distribution, not run-only).
+  const dist = getBaseDistribution(
+    nextGoal.sport,
+    nextGoal.distance,
+    as.limiter_sport as Sport | undefined,
+    as.swim_intent,
+    as.swim_load_source,
+  );
+  for (let w = startWeek; w <= endWeek; w++) {
+    blocks.push({
+      phase: 'rebuild',
+      startWeek: w,
+      endWeek: w,
+      primaryGoalId: nextGoal.id,
+      isRecovery: false,
+      tssMultiplier: 0.85,
+      sportDistribution: dist,
+      // Continue the count so a consumer reading this field sees a monotonically increasing
+      // "weeks past the race" tag across recovery → rebuild.
+      weeksSinceRaceIncludingRebuild: recoveryWeeksConsumed + (w - startWeek + 1),
     });
   }
 }
@@ -350,7 +448,9 @@ export function applyLoadingPattern(blocks: PhaseBlock[], pattern: '3:1' | '2:1'
 
   let weekInBlock = 1;
   for (const b of blocks.sort((a, x) => a.startWeek - x.startWeek)) {
-    if (b.phase === 'taper' || b.phase === 'recovery') {
+    // Rebuild has its own internal ramp (strength reads weekInPhase for +5%/wk; long-day floors
+    // read phase=rebuild for the 0.85 multiplier). Do not impose a 3:1/2:1 deload on top.
+    if (b.phase === 'taper' || b.phase === 'recovery' || b.phase === 'rebuild') {
       result.push(b);
       weekInBlock = 1;
       continue;
@@ -377,7 +477,11 @@ function pushBlock(
     endWeek,
     primaryGoalId: goal.id,
     isRecovery: false,
-    tssMultiplier: phase === 'taper' ? 0.65 : phase === 'recovery' ? 0.45 : 1.0,
+    tssMultiplier:
+      phase === 'taper' ? 0.65 :
+      phase === 'recovery' ? 0.45 :
+      phase === 'rebuild' ? 0.85 :
+      1.0,
     sportDistribution: dist,
   });
 }
@@ -396,6 +500,7 @@ function pushBlockRange(
     const isRecovery = phase === 'recovery';
     const tssM = phase === 'taper' ? Math.max(0.45, 1.0 - (w - startWeek) * 0.10)
                : phase === 'recovery' ? 0.45
+               : phase === 'rebuild' ? 0.85
                : 1.0;
     blocks.push({
       phase,

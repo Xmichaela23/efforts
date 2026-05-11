@@ -204,7 +204,7 @@ Deno.test('hours_per_week echoes input', () => {
 Deno.test('bricks 5-7 tier: 0 in all phases', () => {
   const out = compute({ weekly_hours_available: 6 });
   assertEquals(out.bricks_per_week_by_phase, {
-    base: 0, build: 0, race_specific: 0, taper: 0, recovery: 0,
+    base: 0, build: 0, race_specific: 0, taper: 0, recovery: 0, rebuild: 0,
   });
 });
 

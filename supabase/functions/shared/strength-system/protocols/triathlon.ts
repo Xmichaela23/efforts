@@ -84,6 +84,19 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return [];
   }
 
+  // Rebuild = post-race ramp. Durability protocol has no high-peak loads to preserve, so rebuild
+  // continues AA-style tissue work (high reps, sub-maximal load) — same shape as base early weeks.
+  // The explicit arm prevents accidental fall-through to MS/SM if dispatch order changes later.
+  if (phaseName === 'rebuild') {
+    const sessions: IntentSession[] = [];
+    const sessionCount = Math.min(freq, 2);
+    const wip = Math.max(1, weekInPhase);
+    for (let i = 0; i < sessionCount; i++) {
+      sessions.push(createAASession(tier, hasCable, limiter, wip, planWeekLabel, i, tier3, hasPullUpBar, hasBench, hasBox));
+    }
+    return sessions;
+  }
+
   if (phaseName === 'taper') {
     // Spec §7.2: 1 light session early week, then skip. Skip-optional.
     return [createTaperSession(tier, hasCable, limiter, tier3, hasPullUpBar, hasBench, hasBox)];

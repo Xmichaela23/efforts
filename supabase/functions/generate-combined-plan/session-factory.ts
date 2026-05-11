@@ -1317,7 +1317,14 @@ function resolveTriCombinedStrengthProtocol(options: {
 // from combined-plan anymore. Taper weeks correctly use createTaperSessions.
 function toStrengthPhase(phase: Phase): { name: string; start_week: number; end_week: number; weeks_in_phase: number } {
   const nameMap: Record<Phase, string> = {
-    base: 'Base', build: 'Build', race_specific: 'Speed', taper: 'Taper', recovery: 'Recovery',
+    base: 'Base',
+    build: 'Build',
+    race_specific: 'Speed',
+    taper: 'Taper',
+    recovery: 'Recovery',
+    // Rebuild routes through `Rebuild` so triathlon_performance dispatcher can emit
+    // scaled-load build sessions (peak × 0.90 +5%/wk) instead of resetting to base week-1 loads.
+    rebuild: 'Rebuild',
   };
   const name = nameMap[phase] ?? 'Base';
   console.log(`[strength] combined-plan phase=${phase} → strength phase name=${name}`);

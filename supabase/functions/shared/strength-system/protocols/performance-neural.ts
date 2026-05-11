@@ -68,6 +68,16 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return [createPerfRecoverySession(tier)];
   }
 
+  // Rebuild = post-race ramp. Neural-speed protocol's "build and beyond" path uses 85%+ 1RM,
+  // which is way too heavy for a week after a race. Route rebuild through base hypertrophy
+  // (3×8-10 at 65-72%) — safe ramp back into loading without skipping the adaptation step.
+  if (phaseName === 'rebuild') {
+    sessions.push(createBaseHypertrophyLower(tier, weekInPhase));
+    sessions.push(createUpperStrengthSession(phase, weekInPhase, isRecovery, tier));
+    if (freq >= 2) sessions.push(createUpperMaintenanceSession(phase, weekInPhase, isRecovery, tier));
+    return sessions;
+  }
+
   // Base phase: structural hypertrophy foundation (3×8-10) before neural loading.
   // Neural loading (85%+ 1RM) requires a hypertrophy base — jumping straight to heavy
   // triples in week 1 skips adaptation and risks injury for endurance athletes.

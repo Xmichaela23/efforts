@@ -28,6 +28,9 @@ export const PHASE_TSS_RANGES: Record<Phase, { min: number; max: number }> = {
   race_specific: { min: 450, max: 700 },
   taper:         { min: 200, max: 400 },
   recovery:      { min: 80,  max: 200 },
+  // Rebuild = post-race ramp back from recovery toward the next goal's training. Sits between
+  // recovery (80-200) and build (400-600); approximates pre-race phase × 0.85.
+  rebuild:       { min: 320, max: 500 },
 };
 
 // TSS/hour by sport × intensity class.
@@ -171,6 +174,9 @@ export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): numb
       case 'base': return 0.75;
       case 'build': return 0.85;
       case 'race_specific': return 1.00;
+      // Rebuild = post-race ramp back; reads as pre-race build × ~1.0 to avoid resetting to base
+      // floor right after the athlete just held a long-run progression. 0.85 matches build floor.
+      case 'rebuild': return 0.85;
       // Taper long-run floor: keep pre–A-race Sunday run conservative (e.g. 70.3 ≈ 5 mi, not 6+).
       case 'taper': return 0.45;
       case 'recovery': return 0.40;
@@ -198,6 +204,9 @@ export function longRideFloorHours(distance: TriRaceDistance, phase: Phase): num
       case 'base': return 0.75;
       case 'build': return 0.85;
       case 'race_specific': return 1.00;
+      // Rebuild mirrors build for the long-ride floor — keep the bike-leg ramp continuous past
+      // a B-race instead of dropping to 0 (taper/recovery sentinel).
+      case 'rebuild': return 0.85;
       case 'taper': return 0;
       case 'recovery': return 0;
       default: return 0;
@@ -287,6 +296,9 @@ export const PHASE_ZONE_DIST: Record<Phase, { low: number; tempo: number; high: 
   race_specific: { low: 0.77, tempo: 0.13, high: 0.10 },
   taper:         { low: 0.83, tempo: 0.07, high: 0.10 },
   recovery:      { low: 0.95, tempo: 0.05, high: 0.00 },
+  // Rebuild = ramp-back from recovery; mostly aerobic with a small tempo touch to re-introduce
+  // intensity safely. Closer to base than build (no VO2/threshold yet).
+  rebuild:       { low: 0.88, tempo: 0.08, high: 0.04 },
 };
 
 // ── §5.2  Brick frequency by phase ──────────────────────────────────────────
@@ -296,6 +308,8 @@ export const BRICKS_PER_WEEK: Record<Phase, number> = {
   race_specific: 2,
   taper:         1,
   recovery:      0,
+  // Rebuild = aerobic ramp; one brick re-introduces multi-sport stimulus without overload.
+  rebuild:       1,
 };
 
 // ── §6.1  Taper duration in weeks (distance × priority) ─────────────────────

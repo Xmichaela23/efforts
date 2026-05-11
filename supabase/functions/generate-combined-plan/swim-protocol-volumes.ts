@@ -109,8 +109,14 @@ export const SWIM_VOLUME_RANGES: Record<
 
 export function normalizePhaseToSwimProtocolBand(phase: Phase): SwimProtocolPhaseBandKey {
   if (phase === 'recovery') return 'taper';
+  // Rebuild reads through the race_specific band (the prior peak) so the post-race ramp doesn't
+  // collapse to base-week-1 yardage. The 0.85 scale is applied in `getProtocolVolumeBand` below.
+  if (phase === 'rebuild') return 'race_specific';
   return phase;
 }
+
+/** Multiplier applied to band min/max when reading rebuild — pre-race phase × 0.85. */
+const REBUILD_BAND_SCALE = 0.85;
 
 /** Canonical race swim distance (yd) for easy-session caps / coaching context. */
 export function raceCourseSwimYards(distance: SwimDistanceKey): number {
@@ -133,7 +139,16 @@ export function getProtocolVolumeBand(
 ): { min: number; max: number } | null {
   const pk = normalizePhaseToSwimProtocolBand(phase);
   const row = SWIM_VOLUME_RANGES[distance]?.[fitness]?.[pk];
-  return row ?? null;
+  if (!row) return null;
+  // Rebuild = pre-race phase × 0.85. Scale both bounds so floors and ceilings track the ramp
+  // (otherwise the floor stays at race_specific level and clamps yards too high).
+  if (phase === 'rebuild') {
+    return {
+      min: Math.round(row.min * REBUILD_BAND_SCALE),
+      max: Math.round(row.max * REBUILD_BAND_SCALE),
+    };
+  }
+  return row;
 }
 
 /** Split weekly band minimum across simultaneous swims so floors sum ~one weekly target (not bmin × sessions). */
