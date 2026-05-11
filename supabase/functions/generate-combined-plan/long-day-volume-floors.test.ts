@@ -623,9 +623,11 @@ Deno.test('effective floor: low recent volume → spec floor wins (run)', () => 
   assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 10), 8.5);
 });
 
-Deno.test('effective floor: high recent volume → recent×0.5 wins (run)', () => {
-  // 70.3 base spec = 8.5; recent = 20 → 10.0; max = 10.0.
-  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 20), 10);
+Deno.test('effective floor: high recent volume → next-phase cap binds (run)', () => {
+  // 70.3 base spec = 8.5; recent = 20 → raw 10.0; next-phase cap (build) = 9.5; capped = 9.5.
+  // (Pre-fix this returned 10 because the cap was race-specific peak 11; new contract caps at
+  // the next phase the athlete will inhabit, preventing race-distance prescription in early base.)
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 20), 9.5);
 });
 
 Deno.test('effective floor: ride mirrors run formula', () => {
@@ -642,9 +644,11 @@ Deno.test('effective floor: ride taper/recovery returns 0 even with high recent'
   assertEquals(effectiveLongRideFloorHours('70.3', 'recovery', 6), 0);
 });
 
-Deno.test('enforce: history-aware floor lifts long_run above spec for high-volume athletes', () => {
-  // Athlete with recent_longest_run = 20mi → effective floor = 10mi (vs spec 8.5).
-  // Long_run currently at 30min (3.2mi). After enforcement: bumped to 10mi → 95min.
+Deno.test('enforce: history-aware floor lifts long_run above spec but caps at next-phase peak', () => {
+  // Athlete with recent_longest_run = 20mi → raw 10; next-phase cap (build) = 9.5; effective = 9.5.
+  // Long_run currently at 30min (3.2mi). After enforcement: bumped to 9.5mi → Math.round(9.5)=10
+  // → duration = Math.round(10 * 9.5) = 95min, steps_preset = longrun_10mi_easypace.
+  // (bumpLongRunToFloor rounds floorMi to the nearest integer for the token; 9.5 rounds to 10.)
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 3,
@@ -658,7 +662,6 @@ Deno.test('enforce: history-aware floor lifts long_run above spec for high-volum
     recentLongestRunMi: 20,
   });
   const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
-  // Math.round(10) → 10; duration = 95
   assertEquals(lrun.duration, 95);
   assertEquals(lrun.steps_preset, ['longrun_10mi_easypace']);
 });
@@ -706,8 +709,8 @@ Deno.test('enforce: low-recent-volume athlete still gets spec floor (history doe
 });
 
 Deno.test('evaluate: history-aware floor surfaces the same effective threshold', () => {
-  // Athlete with recent_longest_run = 20mi → effective floor 10mi. Long run at 9mi (85.5min)
-  // is below effective floor → warning, even though above spec floor (8.5mi).
+  // Athlete with recent_longest_run = 20mi → raw 10; next-phase cap (build) = 9.5; effective 9.5.
+  // Long run at 9mi (85.5min) is below the 9.5 floor → warning fires.
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 2,
@@ -722,74 +725,93 @@ Deno.test('evaluate: history-aware floor surfaces the same effective threshold',
   });
   const lrWarn = out.find((w) => w.discipline === 'long_run');
   assert(lrWarn, 'expected warning when below history-aware floor');
-  assertEquals(lrWarn.metrics.floor, 10);
+  assertEquals(lrWarn.metrics.floor, 9.5);
 });
 
-// ── §11 race-distance peak cap + display-friendly rounding ──────────────────
-// The bug: `effectiveLongRunFloorMiles` previously returned raw `recent × 0.5` with no upper
-// bound and no display rounding, producing trade-off messages like "8.5mi vs 21.2335mi" when
-// a 70.3 athlete logged a 42.5mi recent long run. Cap at race-specific peak (11mi for 70.3,
-// 3.0hr for 70.3 ride) and round to the spec-floor precision (0.5mi / 0.25hr).
+// ── §11 next-phase cap + display-friendly rounding ─────────────────────────
+// The cap on history-derived floors is the NEXT phase's floor, not the macrocycle peak.
+// Base caps at build (prevents race-distance prescription in early base), build caps at
+// race-specific, race-specific is its own ceiling. Rebuild caps at race-specific (the recent
+// reference). Plus display-friendly rounding: 0.5mi for run, 0.25hr for ride.
 
-Deno.test('effective floor: run capped at race-specific peak (70.3 → 11mi)', () => {
-  // Athlete with recent 42mi long run → raw 21mi. 70.3 race-specific peak = 11.0. Capped at 11.
-  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 42), 11);
-  // Even in race-specific phase the cap binds (peak itself is the ceiling).
+Deno.test('effective floor: run base capped at build peak (70.3 → 9.5mi)', () => {
+  // Athlete with recent 42mi long run → raw 21mi. 70.3 build floor = 9.5. Capped at 9.5.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 42), 9.5);
+  // Race-specific is its own cap → 11.
   assertEquals(effectiveLongRunFloorMiles('70.3', 'race_specific', 42), 11);
+  // Build caps at race-specific → 11.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'build', 42), 11);
 });
 
-Deno.test('effective floor: run capped at race-specific peak (sprint → 4.0mi)', () => {
-  // Sprint athlete with prior IM training (recent 18mi) doesn't get a 9-mi sprint long-run floor.
-  // Sprint race-specific peak = 4.0. Capped at 4.0.
-  assertEquals(effectiveLongRunFloorMiles('sprint', 'base', 18), 4);
+Deno.test('effective floor: run base capped at build peak (sprint → 3.5mi)', () => {
+  // Sprint build floor = 0.85 × 4 = 3.4 → round 0.5 = 3.5. Recent 18mi → raw 9mi, capped at 3.5.
+  assertEquals(effectiveLongRunFloorMiles('sprint', 'base', 18), 3.5);
 });
 
-Deno.test('effective floor: run capped at race-specific peak (ironman → 18mi)', () => {
-  // Recent 50mi → raw 25mi. Ironman race-specific peak = 18mi. Capped at 18.
-  assertEquals(effectiveLongRunFloorMiles('ironman', 'base', 50), 18);
+Deno.test('effective floor: run base capped at build peak (ironman → 15.5mi)', () => {
+  // Recent 50mi → raw 25mi. Ironman build floor = 0.85 × 18 = 15.3 → round 0.5 = 15.5.
+  assertEquals(effectiveLongRunFloorMiles('ironman', 'base', 50), 15.5);
 });
 
-Deno.test('effective floor: run reproduces the buggy "21.2335mi" case (now → 11)', () => {
+Deno.test('effective floor: run reproduces the buggy "21.2335mi" case (now → 9.5)', () => {
   // The original bug: recent 42.467mi → 21.2335mi leaked into "8.5mi vs 21.2335mi" message.
-  // Post-fix: capped at 11 (70.3 race-specific peak) and rounded to 0.5 precision.
+  // Post-fix: capped at next-phase peak (9.5 for base) and rounded to 0.5 precision.
   const v = effectiveLongRunFloorMiles('70.3', 'base', 42.467);
-  assertEquals(v, 11);
+  assertEquals(v, 9.5);
   // Confirm it's both the threshold AND a display-friendly number (no floating noise).
-  assertEquals(v.toString(), '11');
+  assertEquals(v.toString(), '9.5');
 });
 
 Deno.test('effective floor: run rounded to 0.5mi precision', () => {
+  // 70.3 base, next-phase cap = 9.5mi.
   // Recent 17.3mi → raw 8.65 → spec 8.5 wins (raw < spec) → 8.5.
   assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 17.3), 8.5);
-  // Recent 19mi → raw 9.5 → above spec 8.5; below cap 11; rounds to 9.5.
+  // Recent 19mi → raw 9.5 → above spec 8.5; equal to cap 9.5; rounds to 9.5.
   assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19), 9.5);
-  // Recent 19.1mi → raw 9.55 → rounds to 9.5 (nearest 0.5).
+  // Recent 19.1mi → raw 9.55 → capped at 9.5.
   assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19.1), 9.5);
-  // Recent 19.5mi → raw 9.75 → rounds to 10.
-  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19.5), 10);
+  // Recent 19.5mi → raw 9.75 → capped at 9.5.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'base', 19.5), 9.5);
 });
 
-Deno.test('effective floor: ride capped at race-specific peak (70.3 → 3.0hr)', () => {
-  // Recent 8h ride → raw 4h. 70.3 race-specific peak = 3.0h. Capped at 3.0.
-  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 8), 3);
-  // Even in race-specific phase the cap binds.
+Deno.test('effective floor: ride base capped at build peak (70.3 → 2.5hr)', () => {
+  // Recent 8h ride → raw 4h. 70.3 build floor = 2.5h. Capped at 2.5.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 8), 2.5);
+  // Race-specific is its own cap → 3.0.
   assertEquals(effectiveLongRideFloorHours('70.3', 'race_specific', 8), 3);
+  // Build caps at race-specific → 3.0.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'build', 8), 3);
 });
 
-Deno.test('effective floor: ride capped at race-specific peak (sprint)', () => {
-  // Sprint race-specific peak — recent 4h shouldn't produce a 2h sprint ride floor.
-  const cap = effectiveLongRideFloorHours('sprint', 'race_specific', 0);
+Deno.test('effective floor: ride base capped at build peak (sprint)', () => {
+  // Sprint build floor — recent 4h shouldn't exceed it.
+  const cap = effectiveLongRideFloorHours('sprint', 'build', 0);
   const v = effectiveLongRideFloorHours('sprint', 'base', 4);
   assertEquals(v, cap);
 });
 
 Deno.test('effective floor: ride rounded to 0.25hr precision', () => {
-  // Recent 5.3h → raw 2.65 → above spec 2.25; below cap 3.0; rounds to nearest 0.25 → 2.75.
-  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 5.3), 2.75);
-  // Recent 5.1h → raw 2.55 → rounds to 2.5.
+  // 70.3 base, next-phase cap = 2.5h.
+  // Recent 5.3h → raw 2.65 → above spec 2.25; capped at 2.5; rounds to 2.5.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'base', 5.3), 2.5);
+  // Recent 5.1h → raw 2.55 → rounds to 2.5 (capped).
   assertEquals(effectiveLongRideFloorHours('70.3', 'base', 5.1), 2.5);
-  // Recent 4.95h → raw 2.475 → rounds to 2.5.
+  // Recent 4.95h → raw 2.475 → rounds to 2.5 (rounds to 0.25, but the cap is 2.5 anyway).
   assertEquals(effectiveLongRideFloorHours('70.3', 'base', 4.95), 2.5);
+});
+
+Deno.test('effective floor: rebuild caps at race-specific (post-race reference point)', () => {
+  // Rebuild is the post-race ramp. The athlete just came off race-specific fitness; the cap
+  // should be race-specific peak (the recent reference), not over-conservative.
+  // 70.3 rebuild floor = 9.5 (0.85 × 11). Cap from nextPhaseForLongDayFloorCap = race_specific.
+  // Recent 30mi → raw 15 → capped at 11 (race_specific peak).
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'rebuild', 30), 11);
+  // Recent 0 → spec 9.5 wins.
+  assertEquals(effectiveLongRunFloorMiles('70.3', 'rebuild', 0), 9.5);
+  // Ride: 70.3 rebuild floor = 2.5h. Cap = race_specific = 3.0h. Recent 8h → raw 4h → capped at 3.0.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'rebuild', 8), 3);
+  // Recent 0 → spec 2.5 wins.
+  assertEquals(effectiveLongRideFloorHours('70.3', 'rebuild', 0), 2.5);
 });
 
 Deno.test('effective floor: ride taper/recovery short-circuit still wins over cap path', () => {
@@ -799,9 +821,9 @@ Deno.test('effective floor: ride taper/recovery short-circuit still wins over ca
   assertEquals(effectiveLongRideFloorHours('70.3', 'recovery', 42), 0);
 });
 
-Deno.test('evaluate: capped floor produces clean trade-off message (no floating-point noise)', () => {
+Deno.test('evaluate: next-phase cap produces clean trade-off message (no floating-point noise)', () => {
   // Pre-fix: a 70.3 athlete with recent 42.467mi long run would see "8.5mi vs 21.2335mi".
-  // Post-fix: capped at 11mi, rounded clean. Confirm the message contains "11mi" not raw decimals.
+  // Post-fix: capped at next-phase floor (9.5mi for base) and rounded clean.
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 4,
@@ -816,14 +838,15 @@ Deno.test('evaluate: capped floor produces clean trade-off message (no floating-
   });
   const lrWarn = out.find((w) => w.discipline === 'long_run');
   assert(lrWarn, 'expected warning');
-  assertEquals(lrWarn.metrics.floor, 11);
+  assertEquals(lrWarn.metrics.floor, 9.5);
   // Message string must not contain raw `recent × 0.5` noise like "21.2335".
   assert(!lrWarn.message.includes('21.2335'), `message leaked raw value: ${lrWarn.message}`);
-  assert(lrWarn.message.includes('11mi'), `expected canonical "11mi" in message: ${lrWarn.message}`);
+  assert(lrWarn.message.includes('9.5mi'), `expected canonical "9.5mi" in message: ${lrWarn.message}`);
 });
 
-Deno.test('enforce: capped floor lifts long_run to race-specific peak (not unbounded)', () => {
-  // Recent 42mi (would produce a 21-mi floor pre-fix). Post-fix: capped at 11mi (70.3 peak).
+Deno.test('enforce: capped floor lifts long_run to next-phase peak (not race-distance)', () => {
+  // Recent 42mi (would produce a 21-mi floor pre-fix, then 11-mi race-spec cap, then 9.5-mi
+  // next-phase cap). Bump quanta: floor 9.5 rounds to integer mile via Math.round → 10mi token.
   const weeks: GeneratedWeek[] = [
     week({
       weekNum: 3,
@@ -837,7 +860,7 @@ Deno.test('enforce: capped floor lifts long_run to race-specific peak (not unbou
     recentLongestRunMi: 42,
   });
   const lrun = weeks[0].sessions.find((s) => s.tags.includes('long_run'))!;
-  // 11mi × 9.5 = 104.5 → rounds to 105
-  assertEquals(lrun.duration, Math.round(11 * 9.5));
-  assertEquals(lrun.steps_preset, ['longrun_11mi_easypace']);
+  // Math.round(9.5) → 10; duration = Math.round(10 * 9.5) = 95
+  assertEquals(lrun.duration, 95);
+  assertEquals(lrun.steps_preset, ['longrun_10mi_easypace']);
 });

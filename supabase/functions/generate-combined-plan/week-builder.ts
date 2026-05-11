@@ -792,7 +792,11 @@ export function buildWeek(
     longRideHours = Math.min(longRideCapHours, longRideHours);
   }
 
-  if (returnFromRecoveryDeload && hasTri && !raceThisWeek) {
+  if (returnFromRecoveryDeload && hasTri && !raceThisWeek && phase !== 'rebuild') {
+    // Skip for rebuild — rebuild phase already has its own `tssMultiplier: 0.85` and a
+    // dedicated long-ride floor (race_specific × 0.85). Layering an extra 0.85× compress
+    // from the generic return-from-recovery hand-off would double-deload and leave the
+    // rebuild long_ride well below the rebuild floor, defeating the rebuild ramp.
     longRideHours = Math.max(1, Math.round(longRideHours * 0.85 * 4) / 4);
     longRideMinutes = Math.round(longRideHours * 60);
   }

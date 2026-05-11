@@ -234,6 +234,12 @@ Deno.serve(async (req: Request) => {
       recentLongestRunMi: state.recent_longest_run_mi ?? 0,
       recentLongestRideHr: state.recent_longest_ride_hr ?? 0,
     };
+    // Run enforcement unconditionally before validation — long-day floors are guaranteed hard
+    // contracts (rebuild floor must hit 2.5h for 70.3 regardless of whether other validators
+    // happen to flag a violation). Previously enforcement only ran inside the rebuild loop,
+    // which meant a rebuild long_ride that the validator silently accepted (warnings, not
+    // failures) was left under-floor. This single unconditional pass closes that gap.
+    enforceLongDayFloors(generatedWeeks, longDayFloorOpts);
     let floors = validateTrainingFloors(generatedWeeks, floorOpts);
     const MAX_PHYSIOLOGICAL_FLOOR_PASSES = 12;
     let floorPass = 0;

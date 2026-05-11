@@ -301,6 +301,28 @@ export type EvaluateLongDayFloorsOpts = {
 };
 
 /**
+ * Map the current training phase to the phase whose floor caps history-derived adjustments.
+ * Closes the over-prescription gap where an early-base athlete with a high recent-volume
+ * history would be capped at race-distance peak (11 mi for 70.3), telling them to run race
+ * distance in week 1 of base. The cap should be the NEXT phase's peak — base caps at build,
+ * build caps at race-specific. Race-specific is its own ceiling.
+ *
+ * Rebuild caps at race-specific because the athlete just came off race-specific fitness; the
+ * recent reference point is appropriate.
+ */
+function nextPhaseForLongDayFloorCap(phase: Phase): Phase {
+  switch (phase) {
+    case 'base':          return 'build';
+    case 'build':         return 'race_specific';
+    case 'race_specific': return 'race_specific';
+    case 'rebuild':       return 'race_specific';
+    case 'taper':         return 'race_specific';
+    case 'recovery':      return 'race_specific';
+    default:              return 'race_specific';
+  }
+}
+
+/**
  * Effective long-run floor. History-aware: `max(longRunFloorMiles(distance, phase), recent × 0.5)`.
  * New users (recent = 0) get the spec floor; experienced athletes recently logging > 2 × spec floor
  * get a higher effective floor so the rebuild doesn't compress their long_run below half of what
@@ -309,9 +331,10 @@ export type EvaluateLongDayFloorsOpts = {
  * **Canonical value contract:** the return value is both the threshold (compared against observed
  * mileage) AND the display value (interpolated into athlete-facing trade-off messages). Two
  * guardrails make that safe:
- *   1. **Race-distance peak cap** — `recent × 0.5` is bounded above by
- *      `longRunFloorMiles(distance, 'race_specific')`. An athlete with recent 42-mi long runs
- *      training for a 70.3 doesn't get a 21-mi floor; they get the 11-mi race-specific peak.
+ *   1. **Next-phase cap** — `recent × 0.5` is bounded above by the NEXT phase's floor (via
+ *      {@link nextPhaseForLongDayFloorCap}). Base caps at build's floor, build caps at
+ *      race-specific's floor. Prevents an early-base athlete with a 40-mi history from being
+ *      prescribed an 11-mi long run in week 1.
  *   2. **Display-friendly rounding** — rounded to the nearest 0.5 mi, matching the precision the
  *      underlying spec floor already emits. No `8.5mi vs 21.2335mi` strings can leak downstream.
  */
@@ -321,7 +344,7 @@ export function effectiveLongRunFloorMiles(
   recentLongestRunMi: number,
 ): number {
   const spec = longRunFloorMiles(distance, phase);
-  const peakCap = longRunFloorMiles(distance, 'race_specific');
+  const peakCap = longRunFloorMiles(distance, nextPhaseForLongDayFloorCap(phase));
   const fromRecent = Math.max(0, recentLongestRunMi) * 0.5;
   const raw = Math.max(spec, fromRecent);
   const capped = Math.min(raw, peakCap);
@@ -330,9 +353,10 @@ export function effectiveLongRunFloorMiles(
 
 /**
  * Effective long-ride floor. Mirror of {@link effectiveLongRunFloorMiles} for cycling. Same
- * canonical-value contract: capped at `longRideFloorHours(distance, 'race_specific')` and rounded
- * to the nearest 0.25 hr (matching the spec-floor precision). Taper / recovery short-circuit to 0
- * (validators skip these phases anyway, but the 0 sentinel makes "no floor here" explicit).
+ * canonical-value contract: capped at the next phase's floor (via
+ * {@link nextPhaseForLongDayFloorCap}) and rounded to the nearest 0.25 hr (matching the spec-floor
+ * precision). Taper / recovery short-circuit to 0 (validators skip these phases anyway, but the 0
+ * sentinel makes "no floor here" explicit).
  */
 export function effectiveLongRideFloorHours(
   distance: TriRaceDistance,
@@ -341,7 +365,7 @@ export function effectiveLongRideFloorHours(
 ): number {
   const spec = longRideFloorHours(distance, phase);
   if (spec <= 0) return 0; // taper / recovery — skipped by validators anyway
-  const peakCap = longRideFloorHours(distance, 'race_specific');
+  const peakCap = longRideFloorHours(distance, nextPhaseForLongDayFloorCap(phase));
   const fromRecent = Math.max(0, recentLongestRideHr) * 0.5;
   const raw = Math.max(spec, fromRecent);
   const capped = Math.min(raw, peakCap);
