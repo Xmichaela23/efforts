@@ -1873,7 +1873,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             </p>
           </div>
         )}
-        {arcScheduleSignals && (
+        {arcScheduleSignals && scheduleSignalsNonEmpty(arcScheduleSignals) && (
           <div className="rounded-2xl border border-amber-500/35 bg-amber-950/35 p-4 mb-4 shrink-0">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold text-amber-100/95 leading-snug">Schedule adjustments</p>
