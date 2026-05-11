@@ -67,9 +67,9 @@ For each numbered item:
 - [x] Plan export shows both Equipment Location AND Capability Tier
 - [x] "Strength Protocol: durability" mislabel fixed (suppressed for tri exports)
 - [x] Week 16 Push Press regression — fixed at architectural level via explicit `rebuild` phase + canonical post-race ramp contract (strength reads previous build × 0.90 +5%/wk; long-day floors and swim ceilings continue pre-race progression)
+- [x] Broad Jumps not appearing in power rotation — small targeted fix: removed `'push_press'` from dumbbell_based / bodyweight_bands tier rotations in `triathlon_performance.ts`. Home/DB athletes now rotate plyo + KB only, so Broad Jumps reaches selection in short race-prep windows.
 
 ### Open
-- [ ] Broad Jumps not appearing in power rotation — root cause identified (Push Press incorrectly added to dumbbell tier rotation in `triathlon_performance.ts:644-651`, displacing Broad Jumps from short phases). Small targeted fix — separate PR.
 - [ ] 9-week edge case trade-off message — when plan length forces base phase to 0 weeks, surface explicit "base phase skipped due to plan length" trade-off instead of silent skip
 - [ ] Minimum rebuild week count enforcement — when post-B-race window <2 weeks, current code skips rebuild entirely; consider whether to compress taper to guarantee ≥1 rebuild week
 - [ ] Verify all 6 intent × tier combinations end-to-end

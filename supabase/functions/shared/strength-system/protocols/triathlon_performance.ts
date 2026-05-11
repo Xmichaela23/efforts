@@ -732,8 +732,17 @@ function perfRaceLower(
   let cappedAny = false;
 
   // Spec §3.5 power-exercise rotation. Always paired with main compounds, always done first when
-  // fresh. Spec §8.2: DB tier swaps Push Press → DB Push Press; KB Swings still gated on chip.
-  // Olympic lifts are explicitly excluded by spec (technical debt outweighs benefits for triathletes).
+  // fresh. Olympic lifts are explicitly excluded by spec (technical debt outweighs benefits for
+  // triathletes). KB Swings gated on the kettlebell chip.
+  //
+  // **Why dumbbell_based / bodyweight_bands tiers exclude push_press:** the original Rock 5 spec
+  // restricts barbell Push Press to full_barbell — home / DB athletes rotate plyo + KB only.
+  // Including push_press in the dumbbell rotation displaced Broad Jumps from short race-prep
+  // windows (length-3 rotation × 2-week race-spec block → index 2 never reached). Removing it
+  // restores the intended rotation cadence: every exercise hits within a typical 2-3 week block.
+  // The DB Push Press substitution branch in the `case 'push_press'` arm below is preserved as a
+  // defensive path in case a future tier re-introduces push_press; it is currently unreachable
+  // for non-full_barbell tiers.
   const powerExercise: StrengthExercise = (() => {
     const rotation: Array<'push_press' | 'box_jumps' | 'broad_jumps' | 'kb_swings'> =
       tier3 === 'full_barbell'
@@ -741,8 +750,8 @@ function perfRaceLower(
           ? ['push_press', 'box_jumps', 'broad_jumps', 'kb_swings']
           : ['push_press', 'box_jumps', 'broad_jumps']
         : hasKettlebell
-          ? ['push_press', 'box_jumps', 'broad_jumps', 'kb_swings']
-          : ['push_press', 'box_jumps', 'broad_jumps'];
+          ? ['box_jumps', 'broad_jumps', 'kb_swings']
+          : ['box_jumps', 'broad_jumps'];
     const pick = rotation[(wip - 1) % rotation.length];
     switch (pick) {
       case 'push_press':
