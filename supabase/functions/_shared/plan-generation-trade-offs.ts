@@ -48,6 +48,50 @@ export type ScheduleSignals = {
 };
 
 /**
+ * Internal optimizer telemetry that should NOT surface to athletes — the engine reorganized
+ * the week's layout (one valid placement chosen over another) and no athlete-visible constraint
+ * was violated. These are useful for coach diagnostics + analytics, but adding them to
+ * `week_trade_offs` or `schedule_signals.trade_offs` clutters the athlete's "Schedule
+ * adjustments" panel with engineering noise like "Weekly layout: moved easy_bike from
+ * Monday to Wednesday."
+ *
+ * **Canonical-value contract:** the API response and DB-persisted `generation_trade_offs`
+ * surface only athlete-facing messages. Frontend doesn't re-derive — it trusts the server.
+ * The two boundary aggregators below (`aggregateOptimizerScheduleSignals`,
+ * `enrichScheduleSignalsWithCombinedPlanTradeOffs`) apply this filter so all downstream
+ * consumers see the same clean list.
+ *
+ * Pattern set is explicit (not a blanket "anything mentioning the word 'moved'") — extend it
+ * deliberately when new internal-only messages are added at emission sites.
+ */
+const INTERNAL_OPTIMIZER_TELEMETRY_PATTERNS: RegExp[] = [
+  // Load balancer / layout reorganization — internal placement decisions, no athlete constraint.
+  /^Weekly layout: moved\b/i,
+  /^Weekly load balance: moved\b/i,
+  /\bload balancer move\b/i,
+  // Default Monday upper moved purely for spacing — internal scheduler choice (lines 1287, 1419
+  // of week-optimizer.ts emit these). Distinguished from "could not stay" / "schedule constraints"
+  // variants which describe an athlete-visible constraint and stay surfaced.
+  /^Strength: default Monday upper moved\b/i,
+  /^Strength: default Monday/i,
+  // Legacy swim-budget bookkeeping — previously filtered client-side in GoalsScreen; folded in
+  // here so the server is now the single source of truth.
+  /^Swim budget raised by \d+ yd total to honor \d+ pinned swim days\.?$/i,
+];
+
+export function isInternalOptimizerTelemetry(message: string): boolean {
+  const s = String(message ?? '').trim();
+  if (!s) return false;
+  return INTERNAL_OPTIMIZER_TELEMETRY_PATTERNS.some((re) => re.test(s));
+}
+
+/** Apply the {@link isInternalOptimizerTelemetry} filter to a trade-off list. */
+export function filterAthleteFacingTradeOffs(messages: string[] | null | undefined): string[] {
+  if (!Array.isArray(messages)) return [];
+  return messages.filter((m) => typeof m === 'string' && !isInternalOptimizerTelemetry(m));
+}
+
+/**
  * Athlete-facing copy for optimizer / reconciler trade-off lines (docs/SCHEDULING-RULES.md §7).
  * Internal codes stay in source strings; this runs at the API boundary.
  */
@@ -116,7 +160,9 @@ export function aggregateOptimizerScheduleSignals(
   }
   return {
     conflicts: [...conflicts],
-    trade_offs: [...tradeOffs].map((t) => humanizeScheduleTradeOffLine(t)),
+    trade_offs: filterAthleteFacingTradeOffs(
+      [...tradeOffs].map((t) => humanizeScheduleTradeOffLine(t)),
+    ),
     used_co_equal_1x_fallback: coEqual,
     pin_restore_skipped: [...pinSkipped],
   };
@@ -506,7 +552,7 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
 
   return {
     ...signals,
-    trade_offs: out.map((t) => humanizeScheduleTradeOffLine(String(t))),
+    trade_offs: filterAthleteFacingTradeOffs(out.map((t) => humanizeScheduleTradeOffLine(String(t)))),
   };
 }
 

@@ -36,13 +36,15 @@ type ArcScheduleSignalsState = {
   pin_restore_skipped?: string[];
 };
 
-/** Old planner strings — internal accounting, not actionable; strip from UI and emptiness checks. */
-const SWIM_PINNED_BUDGET_TRADE_OFF_RE =
-  /^Swim budget raised by \d+ yd total to honor \d+ pinned swim days\.?$/i;
-
+/**
+ * Server is the source of truth for athlete-facing vs internal optimizer telemetry; see
+ * `supabase/functions/_shared/plan-generation-trade-offs.ts:filterAthleteFacingTradeOffs`.
+ * This helper now just sanitizes the array shape — the filtering itself happens at the boundary
+ * aggregators on the server.
+ */
 function tradeOffsForScheduleNoticeDisplay(tradeOffs: string[] | undefined): string[] {
   if (!Array.isArray(tradeOffs)) return [];
-  return tradeOffs.filter((t) => typeof t === 'string' && !SWIM_PINNED_BUDGET_TRADE_OFF_RE.test(t.trim()));
+  return tradeOffs.filter((t) => typeof t === 'string' && t.trim().length > 0);
 }
 
 function scheduleSignalsNonEmpty(sig: ArcScheduleSignalsState | Record<string, unknown> | undefined | null): boolean {
