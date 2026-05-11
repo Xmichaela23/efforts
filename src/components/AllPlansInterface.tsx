@@ -1703,11 +1703,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         // doesn't read as two unrelated easy sessions. Parse miles/hours from each leg's name
         // (session-factory emits "Brick — Bike 2.5 hr" and "Brick — Run 4 mi off the bike"); fall
         // back to duration-derived values if the name shape changes.
+        //
+        // The bike leg's `w.type` is `'ride'` (not `'bike'`) because the import normalization at
+        // ~line 804 maps `discipline === 'bike'` → `mappedType = 'ride'`. Accept both labels so
+        // brick titles always include the bike portion. Without this, the combined name dropped
+        // to "Brick — Run 4mi" (run-only) and athletes interpreted the day as no-bike.
         const isBrickWorkout = (w: any) => Array.isArray(w?.tags) && w.tags.includes('brick');
+        const isBikeLikeType = (t: unknown) => {
+          const s = String(t || '').toLowerCase();
+          return s === 'bike' || s === 'ride' || s === 'cycling';
+        };
         const brickLegs = dayWorkouts.filter(isBrickWorkout);
         const nonBrickWorkouts = dayWorkouts.filter((w) => !isBrickWorkout(w));
         if (brickLegs.length > 0) {
-          const bikeLeg = brickLegs.find((w) => String(w.type || '').toLowerCase() === 'bike');
+          const bikeLeg = brickLegs.find((w) => isBikeLikeType(w.type));
           const runLeg = brickLegs.find((w) => String(w.type || '').toLowerCase() === 'run');
           const parts: string[] = [];
           if (bikeLeg) {
