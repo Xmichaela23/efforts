@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 11, 2026
+Last updated: May 11, 2026 (eod)
 
 ---
 
@@ -74,6 +74,7 @@ For each numbered item:
 - [ ] Minimum rebuild week count enforcement — when post-B-race window <2 weeks, current code skips rebuild entirely; consider whether to compress taper to guarantee ≥1 rebuild week
 - [ ] Verify all 6 intent × tier combinations end-to-end
 - [ ] Materialize-plan numerical resolution for % 1RM strings (deferred)
+- [ ] **Recovery week strength load — `createPerfRecoverySession` emits "2×8 @ 130 lb" deadlift every recovery week regardless of plan position.** Heavier than build-phase working load (115-120 lb). Doesn't honor "deload ~10% down" intent. Audit the recovery session generator and align load math with the new dispatcher-owned %1RM contract. Same canonical-value pattern applies — single source of truth for deload load math.
 
 ---
 
@@ -144,6 +145,10 @@ For each numbered item:
 - [ ] Verify threshold pace / VDOT → run zones
 - [ ] Verify recent training history → volume floor calibration
 - [ ] Tradeoff messages should disappear when their question isn't violated
+- [ ] **Concurrent training spacing — strength lower body currently allowed to land between quality ride and quality run** (e.g., Wed lower between Tue Sweet Spot bike and Thu VO2max run). Research (Hickson 1980, Wilson 2012) shows 24+ hours separation needed in both directions; otherwise legs are fatigued for endurance quality AND endurance pre-fatigue reduces strength adaptation. Decide architectural approach:
+  - Option A: Surface as a trade-off message when athlete's pinned strength day creates a conflict
+  - Option B: Engine refuses to place strength lower body within 24h of quality endurance using the same prime movers
+  Add the concurrent training spacing rule to `docs/SCHEDULING-RULES.md` regardless. Document the research backing.
 
 ---
 
