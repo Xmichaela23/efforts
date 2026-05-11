@@ -15,7 +15,7 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildPhaseTimeline, blockForWeek } from './phase-structure.ts';
-import { longRideFloorHours, longRunFloorMiles } from './science.ts';
+import { BRICKS_PER_WEEK, longRideFloorHours, longRunFloorMiles } from './science.ts';
 import { getProtocolVolumeBand, normalizePhaseToSwimProtocolBand } from './swim-protocol-volumes.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
@@ -335,6 +335,88 @@ Deno.test('strength rebuild: bug reproducer — pre-fix would emit base hypertro
   const dlPct = Number(dl.match(/(\d+)%/)?.[1]);
   // Must be > 65% (pre-fix base value). Rebuild week 1 lands at 72%.
   assert(dlPct > 65, `rebuild deadlift % (${dlPct}) must exceed pre-fix base value (65%)`);
+});
+
+// ── §4b regression: ReRebuild rename bug ────────────────────────────────────
+
+Deno.test('strength rebuild: session name is "Rebuild" (Lower/Upper), not "ReRebuild"', () => {
+  // Bug: case-insensitive `.replace(/Build/gi, 'Rebuild')` after a first `Strength Build →
+  // Rebuild` replace was matching "build" *inside* the already-renamed "Rebuild", producing
+  // "ReRebuild". The second replace was redundant (perfBuildLower / perfBuildUpper both emit
+  // "Strength Build" so the first replace handles them). Dropped the second replace.
+  for (const wip of [1, 2]) {
+    const sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(wip));
+    for (const s of sessions) {
+      assert(
+        !/Re ?Rebuild/i.test(s.name),
+        `session name leaked double prefix — got "${s.name}" for wip=${wip}`,
+      );
+      assert(
+        /Tri Performance — Rebuild \((Lower|Upper)\)/.test(s.name),
+        `expected clean "Tri Performance — Rebuild (Lower|Upper)" — got "${s.name}"`,
+      );
+    }
+  }
+});
+
+// ── §4c regression: description matches delivered loads ────────────────────
+
+Deno.test('strength rebuild: description text quotes the actually-emitted %1RM, not the factor', () => {
+  // Bug: previously description text was generated from `Math.round(factor * 100)` while the
+  // emitted exercise weights came from `Math.round(sourcePct * factor)`. Per-exercise integer
+  // rounding could put the emitted % a couple of points off the factor. The fix derives the
+  // description from the first compound-lift's scaled `%1RM`, so description and delivered
+  // can't drift.
+  const wk2Sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(2));
+  const lower = wk2Sessions.find((s) => /Lower/i.test(s.name))!;
+  // Deadlift in build is 80% 1RM. Rebuild week 2 emits 80 × 0.95 = 76% 1RM.
+  const dl = findExerciseWeight(lower, /Deadlift/i)!;
+  const dlPctEmitted = Number(dl.match(/(\d+)%/)?.[1]);
+  assertEquals(dlPctEmitted, 76);
+  // Description must reference the literal emitted % (76) and the source % (80), not just "95%".
+  assert(
+    lower.description.includes('76% 1RM'),
+    `description must quote the literal emitted %1RM — got "${lower.description}"`,
+  );
+  assert(
+    lower.description.includes('80%'),
+    `description must reference the pre-race build source % (80%) — got "${lower.description}"`,
+  );
+});
+
+Deno.test('strength rebuild: description quotes source 80% / scaled 72% for week 1', () => {
+  const wk1Sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(1));
+  const lower = wk1Sessions.find((s) => /Lower/i.test(s.name))!;
+  // Week 1: factor 0.90, deadlift 80 × 0.90 = 72.
+  assert(
+    lower.description.includes('72% 1RM'),
+    `description must quote scaled 72% — got "${lower.description}"`,
+  );
+  assert(
+    lower.description.includes('80%'),
+    `description must reference source 80% — got "${lower.description}"`,
+  );
+  assert(
+    lower.description.includes('Rebuild Week 1'),
+    `description must label as Rebuild Week 1 — got "${lower.description}"`,
+  );
+});
+
+// ── §4d regression: BRICKS_PER_WEEK['rebuild'] is 0 ────────────────────────
+
+Deno.test('BRICKS_PER_WEEK[rebuild] = 0 — no bricks in rebuild so long_ride floor enforces', () => {
+  // When BRICKS_PER_WEEK['rebuild'] was 1, the week-builder scheduled a brick in rebuild
+  // weeks. Bricks are excluded from `enforceLongDayFloors` (correctly — a brick's bike leg
+  // shouldn't be flagged against the standalone long_ride floor). But that exclusion meant
+  // a rebuild week's brick could leave a 1.8h bike leg in place when the rebuild long_ride
+  // floor expects 2.5h for 70.3. Setting bricks=0 in rebuild forces a standalone long_ride
+  // session that enforceLongDayFloors can lift to the rebuild floor.
+  // Pulled directly from the test plan regression: week 16 long ride was 1.8hr instead of 2.5hr.
+  assertEquals(
+    BRICKS_PER_WEEK.rebuild,
+    0,
+    'rebuild bricks must be 0 — see test plan regression where week 16 long ride was 1.8hr instead of 2.5hr',
+  );
 });
 
 // ── §5 PhaseBlock contract: weeksSinceRaceIncludingRebuild semantics ────────

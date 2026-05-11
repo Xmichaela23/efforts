@@ -210,21 +210,50 @@ function scaleAbsoluteWeight(weight: unknown, factor: number): unknown {
 function scaleSessionToRebuildLoads(session: IntentSession, weekInPhase: number): IntentSession {
   const factor = rebuildLoadFactor(weekInPhase);
   const wip = Math.max(1, weekInPhase);
+
+  // Scale exercises and, in the same pass, capture the first compound lift's source + scaled
+  // %1RM so the description can quote what was actually emitted (not just the factor).
+  // Architectural guarantee: description text and delivered load can't drift — they read from
+  // the same scaled exercise. Closes the "description claims 95% but loads at 87.5%" gap.
+  let mainLiftSourcePct: number | null = null;
+  let mainLiftScaledPct: number | null = null;
   const scaledExercises: StrengthExercise[] = session.exercises.map((ex) => {
     const w = ex.weight;
     let scaled: unknown = w;
     if (typeof w === 'string') scaled = scaleWeightString(w, factor);
     else if (typeof w === 'number') scaled = scaleAbsoluteWeight(w, factor);
+    if (mainLiftSourcePct == null && typeof w === 'string' && typeof scaled === 'string') {
+      const srcMatch = w.match(/^\s*(\d+)\s*%\s*1RM/i);
+      const scaledMatch = scaled.match(/^\s*(\d+)\s*%\s*1RM/i);
+      if (srcMatch && scaledMatch) {
+        mainLiftSourcePct = Number(srcMatch[1]);
+        mainLiftScaledPct = Number(scaledMatch[1]);
+      }
+    }
     return { ...ex, weight: scaled as StrengthExercise['weight'] };
   });
-  // Replace the session's "Build / Strength Build" naming with rebuild semantics so the athlete
-  // sees the post-race ramp explicitly, and so plan exports can show "Rebuild Week N" instead of
-  // a misleading "Build Week 1".
-  const renamed = session.name
-    .replace(/Strength Build/gi, 'Rebuild')
-    .replace(/Build/gi, 'Rebuild');
-  const pctText = `${Math.round(factor * 100)}%`;
-  const description = `Rebuild Week ${wip} — post-race ramp at ${pctText} of pre-race build loads. Same compound lifts, intensity scaled so you don't crash a week after recovery.`;
+
+  // Replace "Strength Build" with "Rebuild" — single targeted replace. A prior implementation
+  // chained a second case-insensitive `/Build/gi` replace which then matched "build" *inside*
+  // the already-renamed "Rebuild" and produced "ReRebuild". The single replace handles every
+  // source name (`perfBuildLower` / `perfBuildUpper` both emit "… Strength Build (Lower/Upper)").
+  const renamed = session.name.replace(/Strength Build/gi, 'Rebuild');
+
+  // Description quotes the actual scaled compound load. When no string-%1RM lift exists
+  // (DB tier sessions emit absolute lb), fall back to the factor — still consistent because
+  // scaleAbsoluteWeight uses the same `factor`.
+  let description: string;
+  if (mainLiftScaledPct != null && mainLiftSourcePct != null) {
+    description =
+      `Rebuild Week ${wip} — post-race ramp. Compound lifts at ${mainLiftScaledPct}% 1RM ` +
+      `(down from ${mainLiftSourcePct}% pre-race build, ramping back toward race-specific).`;
+  } else {
+    const pctText = `${Math.round(factor * 100)}%`;
+    description =
+      `Rebuild Week ${wip} — post-race ramp at ${pctText} of pre-race build loads. ` +
+      `Same compound lifts, intensity scaled so you don't crash a week after recovery.`;
+  }
+
   return {
     ...session,
     name: renamed,

@@ -308,8 +308,13 @@ export const BRICKS_PER_WEEK: Record<Phase, number> = {
   race_specific: 2,
   taper:         1,
   recovery:      0,
-  // Rebuild = aerobic ramp; one brick re-introduces multi-sport stimulus without overload.
-  rebuild:       1,
+  // Rebuild = rebuild each sport individually before stacking concurrent stimulus again.
+  // Bricks (combined bike+run) interfere with the rebuild semantics AND — because bricks are
+  // excluded from the standalone long-ride floor in validate-training-floors — a brick week
+  // can leave a 1.8h bike leg in place when the rebuild long-ride floor expects 2.5h (70.3).
+  // Forcing 0 bricks in rebuild guarantees a standalone long_ride session that
+  // enforceLongDayFloors then lifts to the rebuild floor (peak × 0.85).
+  rebuild:       0,
 };
 
 // ── §6.1  Taper duration in weeks (distance × priority) ─────────────────────
