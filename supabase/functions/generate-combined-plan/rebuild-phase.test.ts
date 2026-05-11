@@ -291,8 +291,10 @@ function findExercise(session: IntentSession, namePattern: RegExp): { name: stri
 
 Deno.test('strength rebuild week 1: absolute lb resolved at dispatcher (deadlift 250 1RM → 180 lb)', () => {
   // Architectural contract: dispatcher resolves absolute lb at emit time using context.userBaselines.
-  // rebuildContext has deadlift1RM=250, factor=0.90 for week 1 → 80% × 0.90 = 72% → 72% × 250 = 180lb.
-  // Materializer can't recompute against a divergent 1RM — the number is pinned at emit.
+  // rebuildContext has deadlift1RM=250, factor=0.90 for week 1. Source build% is pinned to wip=2
+  // in BUILD_PCT_TABLE = 80% (see triathlon_performance.ts:REBUILD_SOURCE_WIP). Both deadlift and
+  // squat read the same main-compound %: 80% × 0.90 = 72%. Materializer can't recompute against
+  // a divergent 1RM — the number is pinned at emit.
   const sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(1));
   const lower = sessions.find((s) => /Lower/i.test(s.name));
   assert(lower, `expected a lower-body rebuild session — got ${sessions.map((s) => s.name).join(', ')}`);
@@ -302,24 +304,24 @@ Deno.test('strength rebuild week 1: absolute lb resolved at dispatcher (deadlift
   assertEquals(typeof dl.weight, 'number', `weight should be pre-resolved number, got ${typeof dl.weight}`);
   assertEquals(dl.weight, 180); // 0.72 × 250 = 180
   assertEquals(dl.percent_1rm, 0.72);
-  // Squat: 78% × 0.90 = 70%; squat1RM=200 → 0.70 × 200 = 140.
+  // Squat: 80% × 0.90 = 72%; squat1RM=200 → 0.72 × 200 = 144 → round 5 = 145.
   const sq = findExercise(lower, /Squat/i);
-  assertEquals(sq?.weight, 140);
-  assertEquals(sq?.percent_1rm, 0.70);
+  assertEquals(sq?.weight, 145);
+  assertEquals(sq?.percent_1rm, 0.72);
 });
 
 Deno.test('strength rebuild week 2: ramp +5% delivers absolute lb (deadlift 250 1RM → 190 lb)', () => {
-  // Week 2: factor=0.95 → 80% × 0.95 = 76% → 76% × 250 = 190lb.
+  // Week 2: factor=0.95, source 80% → 76% → 76% × 250 = 190lb.
   const sessions = triathlonPerformanceProtocol.createWeekSessions(rebuildContext(2));
   const lower = sessions.find((s) => /Lower/i.test(s.name));
   assert(lower);
   const dl = findExercise(lower, /Deadlift/i);
   assertEquals(dl?.weight, 190); // 0.76 × 250 = 190
   assertEquals(dl?.percent_1rm, 0.76);
-  // Squat: 78% × 0.95 = 74%; squat1RM=200 → 0.74 × 200 = 148 → round 5 = 150.
+  // Squat: 80% × 0.95 = 76%; squat1RM=200 → 0.76 × 200 = 152 → round 5 = 150.
   const sq = findExercise(lower, /Squat/i);
   assertEquals(sq?.weight, 150);
-  assertEquals(sq?.percent_1rm, 0.74);
+  assertEquals(sq?.percent_1rm, 0.76);
 });
 
 Deno.test('Bug A reproducer: contract closure — description ≡ delivered, no materialize-time drift', () => {

@@ -157,7 +157,6 @@ For each numbered item:
 - [ ] Brick session not appearing in plan export markdown
 - [ ] Schedule Adjustments panel should hide when generation_trade_offs is empty after filtering
 - [ ] Bypass-path audit for strength_intent normalization
-- [ ] **Within-phase progressive overload model — design decision deferred** from rebuild-phase fix. Currently base/build weeks are flat within phase (e.g., 100 lb deadlift weeks 1-5). Research and spec the progression cadence (linear +X%/wk, undulating, block periodization), differential by lift/experience/phase. Update dispatcher emit to own the progression. Description ≡ delivered preserved by construction.
 
 ---
 

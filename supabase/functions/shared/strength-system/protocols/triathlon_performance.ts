@@ -39,6 +39,28 @@ type DbCtx = {
 };
 
 /**
+ * Within-phase %1RM progression tables. Linear across **active training weeks only** — recovery
+ * weeks emit through `createPerfRecoverySession` (a separate session shape) and never read these
+ * tables. The two arms must not stack.
+ *
+ * Description text and the `weight` field both read from the SAME index into these tables, so
+ * the description's quoted "X% 1RM" cannot drift from what the materializer resolves. The
+ * materializer reads from `plan.config.athlete_snapshot` for the 1RM, so percent × 1RM is
+ * deterministic from the dispatcher's single point of resolution.
+ *
+ * See docs/STRENGTH-PROTOCOL.md §3.1.
+ */
+const BASE_PCT_TABLE = [65, 68, 70, 72] as const;   // Hypertrophy: linear across active W1-4.
+const BUILD_PCT_TABLE = [78, 80, 83, 85] as const;  // Strength build: linear across active W1-4.
+const RACE_PCT_TABLE = [70, 72, 75] as const;       // Maintenance + Power: linear across active weeks.
+
+function pctForActiveWeek(table: ReadonlyArray<number>, weekInPhase: number): number {
+  const wip = Math.max(1, weekInPhase);
+  const idx = Math.min(wip - 1, table.length - 1);
+  return table[idx];
+}
+
+/**
  * After phase-function exercises are built, surface the spec §8.2 trade-off if any DB-tier
  * prescription was capped by the athlete's DB max. Mutates description + tags so the athlete
  * sees one note per session, not per exercise.
@@ -126,22 +148,29 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
       bench: context.userBaselines.bench1RM,
       overhead: context.userBaselines.overhead1RM,
     };
+    // Rebuild source compound% is pinned to the build-phase "default" wip (= 2 in BUILD_PCT_TABLE
+     // [78, 80, 83, 85], i.e., 80% 1RM). The rebuild ramp itself comes from
+    // `scaleSessionToRebuildLoads` reading the rebuild phase's own wip (1 → 0.90 factor,
+    // 2 → 0.95 factor). Pinning the source decouples rebuild loads from within-phase build
+    // progression: W15 = 80% × 0.90 = 72% → ~110 lb @150 1RM, W16 = 80% × 0.95 = 76% → ~115 lb.
+    // Matches the pre-Part-2 emit so this commit is load-neutral for rebuild weeks.
+    const REBUILD_SOURCE_WIP = 2;
     const rebuildSessions = freq >= 2
       ? [
         scaleSessionToRebuildLoads(
-          perfBuildLower(tier, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
+          perfBuildLower(tier, limiter, REBUILD_SOURCE_WIP, planWeekLabel, tier3, dbCtx),
           weekInPhase,
           dispatcherBaselines,
         ),
         scaleSessionToRebuildLoads(
-          perfBuildUpper(tier, hasCable, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
+          perfBuildUpper(tier, hasCable, limiter, REBUILD_SOURCE_WIP, planWeekLabel, tier3, dbCtx),
           weekInPhase,
           dispatcherBaselines,
         ),
       ]
       : [
         scaleSessionToRebuildLoads(
-          perfBuildLower(tier, limiter, weekInPhase, planWeekLabel, tier3, dbCtx),
+          perfBuildLower(tier, limiter, REBUILD_SOURCE_WIP, planWeekLabel, tier3, dbCtx),
           weekInPhase,
           dispatcherBaselines,
         ),
@@ -171,7 +200,7 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
     return freq >= 2
       ? [
         perfRaceLower(tier, limiter, weekInPhase, planWeekLabel, hasKettlebell, tier3, dbCtx),
-        perfRaceUpper(tier, hasCable, limiter, tier3, dbCtx),
+        perfRaceUpper(tier, hasCable, limiter, weekInPhase, tier3, dbCtx),
       ]
       : [perfRaceLower(tier, limiter, weekInPhase, planWeekLabel, hasKettlebell, tier3, dbCtx)];
   }
@@ -458,6 +487,7 @@ function perfBaseLower(
   // Spec §3.1: Hypertrophy = 3-4 sets/lift. Mid/late weeks step up to 4 to drive volume progression.
   const sets = wip <= 2 ? 3 : 4;
   const rir = 3;
+  const basePct = pctForActiveWeek(BASE_PCT_TABLE, wip);
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
@@ -466,7 +496,7 @@ function perfBaseLower(
       name: 'Conventional Deadlift',
       sets,
       reps: '8-10',
-      weight: '65% 1RM',
+      weight: `${basePct}% 1RM`,
       target_rir: rir,
       notes: 'Hip hinge — bike + run power base',
     });
@@ -474,13 +504,14 @@ function perfBaseLower(
       name: 'Barbell Back Squat',
       sets,
       reps: '8-10',
-      weight: '65% 1RM',
+      weight: `${basePct}% 1RM`,
       target_rir: rir,
       notes: 'Knee drive + run strength',
     });
   } else {
-    // Spec §8.2 DB tier: DB Romanian Deadlift + Goblet Squat at hypertrophy load (65% × 0.7).
-    const dl = dbPrescription({ pctOfBarbell1RM: 0.65, oneRMLb: dbCtx.deadlift1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
+    // Spec §8.2 DB tier: DB Romanian Deadlift + Goblet Squat at hypertrophy load (basePct × 0.7).
+    const pctFraction = basePct / 100;
+    const dl = dbPrescription({ pctOfBarbell1RM: pctFraction, oneRMLb: dbCtx.deadlift1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (dl.capped) cappedAny = true;
     ex.push({
       name: 'DB Romanian Deadlift',
@@ -490,7 +521,7 @@ function perfBaseLower(
       target_rir: rir,
       notes: 'Hip hinge — bike + run power base',
     });
-    const sq = dbPrescription({ pctOfBarbell1RM: 0.65, oneRMLb: dbCtx.squat1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
+    const sq = dbPrescription({ pctOfBarbell1RM: pctFraction, oneRMLb: dbCtx.squat1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (sq.capped) cappedAny = true;
     ex.push({
       name: 'Goblet Squat',
@@ -545,7 +576,7 @@ function perfBaseLower(
       intent: 'LOWER_DURABILITY',
       priority: 'required',
       name: 'Tri Performance — Base Hypertrophy (Lower)',
-      description: `Base Week ${planWeekLabel} — Two primary lower compounds (≈65% 1RM, RIR ${rir}) plus ${hasGHD ? 'Nordic curls 2×5' : 'single-leg RDL 2×8/leg'} for hamstring resilience; accessories stay light.`,
+      description: `Base Week ${planWeekLabel} — Two primary lower compounds (${basePct}% 1RM, RIR ${rir}) plus ${hasGHD ? 'Nordic curls 2×5' : 'single-leg RDL 2×8/leg'} for hamstring resilience; accessories stay light.`,
       duration: tier === 'commercial_gym' ? 50 : 48,
       exercises: ex,
       repProfile: 'hypertrophy',
@@ -568,6 +599,7 @@ function perfBaseUpper(
   // Spec §3.1: Hypertrophy = 3-4 sets/lift. Mid/late weeks step to 4.
   const sets = wip <= 2 ? 3 : 4;
   const rir = 3;
+  const basePct = pctForActiveWeek(BASE_PCT_TABLE, wip);
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
@@ -576,7 +608,7 @@ function perfBaseUpper(
       name: 'Barbell Row',
       sets,
       reps: '8-10',
-      weight: '65% 1RM (bench anchor)',
+      weight: `${basePct}% 1RM (bench anchor)`,
       target_rir: rir,
       notes: 'Swim pull + thoracic extension for aero',
     });
@@ -584,7 +616,7 @@ function perfBaseUpper(
       name: 'Bench Press',
       sets,
       reps: '8-10',
-      weight: '65% 1RM',
+      weight: `${basePct}% 1RM`,
       target_rir: rir,
     });
     if (hasCable) {
@@ -606,9 +638,10 @@ function perfBaseUpper(
       });
     }
   } else {
-    // Spec §8.2 DB tier: DB Row (chest-supported) + DB Bench Press at 65% × 0.7 hypertrophy load.
+    // Spec §8.2 DB tier: DB Row (chest-supported) + DB Bench Press at basePct × 0.7 hypertrophy load.
     // No bench (Part 3 gating): row → Bent-Over DB Row; bench → DB Floor Press.
-    const row = dbPrescription({ pctOfBarbell1RM: 0.65, oneRMLb: dbCtx.bench1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
+    const pctFraction = basePct / 100;
+    const row = dbPrescription({ pctOfBarbell1RM: pctFraction, oneRMLb: dbCtx.bench1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (row.capped) cappedAny = true;
     ex.push({
       name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
@@ -620,7 +653,7 @@ function perfBaseUpper(
         ? 'Swim pull + thoracic extension for aero'
         : 'No bench — bent-over from hinge; brace core, neutral spine',
     });
-    const bench = dbPrescription({ pctOfBarbell1RM: 0.65, oneRMLb: dbCtx.bench1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
+    const bench = dbPrescription({ pctOfBarbell1RM: pctFraction, oneRMLb: dbCtx.bench1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (bench.capped) cappedAny = true;
     ex.push({
       name: dbCtx.hasBench ? 'DB Bench Press' : 'DB Floor Press',
@@ -681,7 +714,7 @@ function perfBaseUpper(
       intent: 'UPPER_POSTURE',
       priority: 'required',
       name: 'Tri Performance — Base Hypertrophy (Upper)',
-      description: `Base Week ${planWeekLabel} — Upper hypertrophy for swim pull, posture, and shoulder health (RIR ${rir}).`,
+      description: `Base Week ${planWeekLabel} — Upper hypertrophy at ${basePct}% 1RM for swim pull, posture, and shoulder health (RIR ${rir}).`,
       duration: 45,
       exercises: ex,
       repProfile: 'hypertrophy',
@@ -705,6 +738,7 @@ function perfBuildLower(
   // Spec §3.1: Strength Build = 3-4 sets/lift. Step to 4 mid/late phase.
   const mainSets = wip <= 2 ? 3 : 4;
   const rir = 2;
+  const buildPct = pctForActiveWeek(BUILD_PCT_TABLE, wip);
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
@@ -713,19 +747,20 @@ function perfBuildLower(
       name: 'Conventional Deadlift',
       sets: mainSets,
       reps: '4-6',
-      weight: '80% 1RM',
+      weight: `${buildPct}% 1RM`,
       target_rir: rir,
     });
     ex.push({
       name: 'Barbell Back Squat',
       sets: mainSets,
       reps: '4-6',
-      weight: '78% 1RM',
+      weight: `${buildPct}% 1RM`,
       target_rir: rir,
     });
   } else {
-    // Spec §8.2 DB tier: DB Romanian Deadlift + Goblet Squat at strength-build load (~80% × 0.7).
-    const dl = dbPrescription({ pctOfBarbell1RM: 0.80, oneRMLb: dbCtx.deadlift1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    // Spec §8.2 DB tier: DB Romanian Deadlift + Goblet Squat at strength-build load (buildPct × 0.7).
+    const pctFraction = buildPct / 100;
+    const dl = dbPrescription({ pctOfBarbell1RM: pctFraction, oneRMLb: dbCtx.deadlift1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
     if (dl.capped) cappedAny = true;
     ex.push({
       name: 'DB Romanian Deadlift',
@@ -734,7 +769,7 @@ function perfBuildLower(
       weight: dl.weight,
       target_rir: rir,
     });
-    const sq = dbPrescription({ pctOfBarbell1RM: 0.78, oneRMLb: dbCtx.squat1RM, baseReps: 6, dbMaxLb: dbCtx.dbMaxLb });
+    const sq = dbPrescription({ pctOfBarbell1RM: pctFraction, oneRMLb: dbCtx.squat1RM, baseReps: 6, dbMaxLb: dbCtx.dbMaxLb });
     if (sq.capped) cappedAny = true;
     ex.push({
       name: 'Goblet Squat',
@@ -762,7 +797,7 @@ function perfBuildLower(
       intent: 'LOWER_DURABILITY',
       priority: 'required',
       name: 'Tri Performance — Strength Build (Lower)',
-      description: `Build Week ${planWeekLabel} — Two heavy compounds only (3 working sets each, ~78–80% 1RM), RIR ${rir}. Hamstring Nordics live in base; build stays squat + hinge volume-capped.`,
+      description: `Build Week ${planWeekLabel} — Two heavy compounds only (${mainSets} working sets each, ${buildPct}% 1RM), RIR ${rir}. Hamstring Nordics live in base; build stays squat + hinge volume-capped.`,
       duration: 48,
       exercises: ex,
       repProfile: 'strength',
@@ -784,6 +819,7 @@ function perfBuildUpper(
   const wip = Math.max(1, weekInPhase);
   const sets = 4;
   const rir = 2;
+  const buildPct = pctForActiveWeek(BUILD_PCT_TABLE, wip);
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
@@ -792,7 +828,7 @@ function perfBuildUpper(
       name: 'Barbell Row',
       sets,
       reps: '4-6',
-      weight: '80% 1RM (bench anchor)',
+      weight: `${buildPct}% 1RM (bench anchor)`,
       target_rir: rir,
     });
     ex.push({
@@ -813,7 +849,7 @@ function perfBuildUpper(
   } else {
     // Spec §8.2 DB tier: DB Row + DB Bench Press + DB Shoulder Press at strength-build load.
     // Part 3: row → Bent-Over DB Row when no bench (chest-supported is the normal default).
-    const row = dbPrescription({ pctOfBarbell1RM: 0.80, oneRMLb: dbCtx.bench1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    const row = dbPrescription({ pctOfBarbell1RM: buildPct / 100, oneRMLb: dbCtx.bench1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
     if (row.capped) cappedAny = true;
     ex.push({
       name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
@@ -877,7 +913,7 @@ function perfBuildUpper(
       intent: 'UPPER_POSTURE',
       priority: 'required',
       name: 'Tri Performance — Strength Build (Upper)',
-      description: `Build Week ${planWeekLabel} — Heavy pull + press (RIR ${rir}).`,
+      description: `Build Week ${planWeekLabel} — Heavy pull (${buildPct}% 1RM) + overhead press (RIR ${rir}).`,
       duration: 45,
       exercises: ex,
       repProfile: 'strength',
@@ -901,6 +937,7 @@ function perfRaceLower(
   const wip = Math.max(1, weekInPhase);
   // Spec §3.1: Maintenance + Power = RIR 2 (not RIR 1). Express strength as power, not max load.
   const rir = 2;
+  const racePct = pctForActiveWeek(RACE_PCT_TABLE, wip);
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
@@ -1003,14 +1040,14 @@ function perfRaceLower(
       name: 'Trap Bar Deadlift',
       sets: 3,
       reps: '4-5',
-      weight: '72% 1RM — fast intent, controlled descent',
+      weight: `${racePct}% 1RM — fast intent, controlled descent`,
       target_rir: rir,
       notes: 'Reset each rep — express strength as power, not max load',
     });
   } else {
     // Spec §8.2 DB tier: DB RDL replaces deadlift; Jump Squats keep BW plyo character.
     const dl = dbPrescription({
-      pctOfBarbell1RM: 0.72,
+      pctOfBarbell1RM: racePct / 100,
       oneRMLb: dbCtx.deadlift1RM,
       baseReps: '4-5',
       dbMaxLb: dbCtx.dbMaxLb,
@@ -1090,7 +1127,7 @@ function perfRaceLower(
       intent: 'LOWER_DURABILITY',
       priority: 'required',
       name: 'Tri Performance — Maintenance + Power (Lower)',
-      description: `Race-prep Week ${planWeekLabel} — Power-focused: 3-5 reps lift @ 70-75% 1RM, RIR 2, paired with plyo. Express strength as power; minimal fatigue.`,
+      description: `Race-prep Week ${planWeekLabel} — Power-focused: 3-5 reps lift @ ${racePct}% 1RM, RIR 2, paired with plyo. Express strength as power; minimal fatigue.`,
       duration: 50,
       exercises: ex,
       repProfile: 'strength',
@@ -1104,9 +1141,11 @@ function perfRaceUpper(
   tier: EquipmentTier,
   hasCable: boolean,
   limiter: LimiterSport,
+  weekInPhase: number,
   tier3: EquipmentTier3 = 'full_barbell',
   dbCtx: DbCtx = { dbMaxLb: 50, hasPullUpBar: false, hasBench: false, hasBox: false },
 ): IntentSession {
+  const racePct = pctForActiveWeek(RACE_PCT_TABLE, weekInPhase);
   const ex: StrengthExercise[] = [];
   let cappedAny = false;
 
@@ -1115,7 +1154,7 @@ function perfRaceUpper(
       name: 'Barbell Row',
       sets: 3,
       reps: 5,
-      weight: '75% 1RM — crisp rows',
+      weight: `${racePct}% 1RM — crisp rows`,
       target_rir: 2,
     });
     if (hasCable) {
@@ -1138,7 +1177,7 @@ function perfRaceUpper(
   } else {
     // Spec §8.2 DB tier: DB Row + Pull-ups (or Band Pull-Down if no bar) at maintenance load.
     // Part 3: row → Bent-Over DB Row when no bench.
-    const row = dbPrescription({ pctOfBarbell1RM: 0.75, oneRMLb: dbCtx.bench1RM, baseReps: 5, dbMaxLb: dbCtx.dbMaxLb });
+    const row = dbPrescription({ pctOfBarbell1RM: racePct / 100, oneRMLb: dbCtx.bench1RM, baseReps: 5, dbMaxLb: dbCtx.dbMaxLb });
     if (row.capped) cappedAny = true;
     ex.push({
       name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row',
@@ -1191,8 +1230,7 @@ function perfRaceUpper(
       intent: 'UPPER_POSTURE',
       priority: 'required',
       name: 'Tri Performance — Maintenance + Power (Upper)',
-      description:
-        'Race-prep upper — maintain pulling strength and shoulder health; lower overall volume than build phase.',
+      description: `Race-prep Week ${weekInPhase} — Maintain pulling strength @ ${racePct}% 1RM and shoulder health; lower overall volume than build phase.`,
       duration: 35,
       exercises: ex,
       repProfile: 'maintenance',
