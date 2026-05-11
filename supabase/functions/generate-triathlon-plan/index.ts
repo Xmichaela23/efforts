@@ -85,6 +85,8 @@ Deno.serve(async (req: Request) => {
       training_intent:             request.training_intent,
       strength_frequency:          request.strength_frequency ?? 0,
       equipment_type:              request.equipment_type,
+      equipment_tier:              request.equipment_tier,
+      strength_intent:             request.strength_intent,
       limiter_sport:               request.limiter_sport,
       existing_run_days:           request.existing_run_days,
       preferred_days:              request.preferred_days,

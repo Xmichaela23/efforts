@@ -5,7 +5,10 @@
 // ============================================================================
 
 import { TrainingPlan, Session, StrengthExercise, Phase, PhaseStructure } from './types.ts';
-import { getProtocol } from '../shared/strength-system/protocols/selector.ts';
+import {
+  getProtocol,
+  resolveStrengthProtocolForGoal,
+} from '../shared/strength-system/protocols/selector.ts';
 import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import {
@@ -247,6 +250,8 @@ export function overlayStrength(
   noDoubles?: boolean,
   memoryContext?: PlanningMemoryContext,
   isMetric = false,
+  strengthIntent?: 'support' | 'performance' | string,
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands',
 ): TrainingPlan {
   const modifiedPlan = { ...plan };
   const modifiedSessions: Record<string, Session[]> = {};
@@ -294,6 +299,8 @@ export function overlayStrength(
       effectiveNoDoubles,
       memoryContext,
       isMetric,
+      strengthIntent,
+      equipmentTier,
     });
 
     modifiedSessions[weekStr] = [...sessions, ...strengthSessions];
@@ -547,8 +554,25 @@ function computeStrengthForPlanWeek(args: {
   effectiveNoDoubles: boolean;
   memoryContext?: PlanningMemoryContext;
   isMetric?: boolean;
+  strengthIntent?: 'support' | 'performance' | string;
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
 }): Session[] {
-  const protocol = getProtocol(args.protocolId);
+  // Resolve the actual protocol via the sport-agnostic resolver so single-sport run plans
+  // honor `strength_intent`. When `protocolId` is unset but the athlete's intent is
+  // performance, the resolver upgrades to `neural_speed` (AA-MS-SM progression) instead of
+  // falling through to durability — closing the bypass drift identified in the audit.
+  const resolved = resolveStrengthProtocolForGoal({
+    rawProtocol: args.protocolId,
+    strengthIntent: args.strengthIntent,
+    equipmentTier: args.equipmentTier,
+    sport: 'run',
+  });
+  if (args.strengthIntent && resolved.protocolId !== args.protocolId) {
+    console.log(
+      `[PlanGen] strength resolver: rawProtocol=${args.protocolId ?? 'none'} intent=${args.strengthIntent ?? 'none'} tier=${args.equipmentTier ?? 'none'} → ${resolved.protocolId}${resolved.performanceGateFired ? ' (gate fired)' : ''}`,
+    );
+  }
+  const protocol = getProtocol(resolved.protocolId);
   const week = args.week;
   const phase = getCurrentPhase(week, args.phaseStructure);
   const isRecovery = args.phaseStructure.recovery_weeks.includes(week);
@@ -611,7 +635,9 @@ function computeStrengthForPlanWeek(args: {
     args.methodology
       ? {
           methodology: args.methodology,
-          protocol: args.protocolId,
+          // Use the resolver's output so placement sees the actual protocol the athlete is
+          // running (e.g., `neural_speed`), not the raw `protocolId` which may have been undefined.
+          protocol: resolved.protocolId,
           strengthFrequency: placementFrequency,
           noDoubles: args.effectiveNoDoubles,
           injuryHotspots: args.memoryContext?.injuryHotspots ?? [],
@@ -639,6 +665,8 @@ export function buildStrengthSessionsForPlanWeek(params: {
   noDoubles?: boolean;
   memoryContext?: PlanningMemoryContext;
   isMetric?: boolean;
+  strengthIntent?: 'support' | 'performance' | string;
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
 }): Session[] {
   const memoryDrivenNoDoubles =
     params.memoryContext?.interferenceRisk != null &&
@@ -659,6 +687,8 @@ export function buildStrengthSessionsForPlanWeek(params: {
     effectiveNoDoubles,
     memoryContext: params.memoryContext,
     isMetric: params.isMetric,
+    strengthIntent: params.strengthIntent,
+    equipmentTier: params.equipmentTier,
   });
 }
 
@@ -677,10 +707,24 @@ export function overlayStrengthLegacy(
   noDoubles?: boolean,
   memoryContext?: PlanningMemoryContext,
   isMetric = false,
+  strengthIntent?: 'support' | 'performance' | string,
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands',
 ): TrainingPlan {
   // Map old tier names to new
   const newTier: StrengthTier = tier === 'injury_prevention' ? 'bodyweight' : 'barbell';
-  return overlayStrength(plan, frequency, phaseStructure, newTier, protocolId, methodology, noDoubles, memoryContext, isMetric);
+  return overlayStrength(
+    plan,
+    frequency,
+    phaseStructure,
+    newTier,
+    protocolId,
+    methodology,
+    noDoubles,
+    memoryContext,
+    isMetric,
+    strengthIntent,
+    equipmentTier,
+  );
 }
 
 // OLD FUNCTIONS REMOVED - Now in protocol system

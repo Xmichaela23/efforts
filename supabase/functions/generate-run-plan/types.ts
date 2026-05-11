@@ -17,6 +17,20 @@ export interface GeneratePlanRequest {
   strength_tier?: 'injury_prevention' | 'strength_power';
   equipment_type?: 'home_gym' | 'commercial_gym';
   strength_protocol?: string; // Optional protocol ID (canonical: 'durability' | 'neural_speed' | 'upper_aesthetics'). Legacy IDs accepted and normalized. Note: 'minimum_dose' is deferred until frontend support.
+  /**
+   * Athlete's strength intent from the goal wizard ('support' | 'performance'). When
+   * `strength_protocol` is unset but intent is `'performance'`, the resolver upgrades the
+   * protocol to `neural_speed` so an athlete who set performance intent gets progressive
+   * loading (AA-MS-SM) instead of silently falling through to the durability default.
+   * See `shared/strength-system/protocols/selector.ts:resolveStrengthProtocolForGoal`.
+   */
+  strength_intent?: 'support' | 'performance';
+  /**
+   * Three-tier equipment capability classification (docs/STRENGTH-PROTOCOL.md §8). When
+   * `'bodyweight_bands'`, performance routing downgrades to durability with a trade-off.
+   * Optional — when omitted, the equipment gate doesn't fire.
+   */
+  equipment_tier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
   no_doubles?: boolean; // If true, cannot stack strength on same day as quality runs (default: false, allows doubles)
   race_date?: string;
   race_name?: string;

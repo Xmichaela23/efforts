@@ -29,6 +29,7 @@ import {
 import { triathlonProtocol } from '../../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../../shared/strength-system/protocols/triathlon_performance.ts';
 import type { ProtocolContext } from '../../shared/strength-system/protocols/types.ts';
+import { resolveStrengthProtocolForGoal } from '../../shared/strength-system/protocols/selector.ts';
 
 // ============================================================================
 // SWIM VOLUME TABLES (yards/week at peak by distance × fitness)
@@ -1061,8 +1062,22 @@ export class TriathlonGenerator {
 
     const protocolPhaseName = phaseNameMap[phase.name] ?? phase.name ?? 'Base';
 
-    const usePerformanceStrength =
+    // Performance wins if ANY of goal / training_intent / strength_intent say so. Previously
+    // the strength_intent field was ignored entirely, so an athlete who set
+    // `strength_intent: 'performance'` for a `goal: 'complete'` / `training_intent: 'completion'`
+    // plan silently dropped to durability. The resolver applies the same three-signal OR plus
+    // the bodyweight_bands equipment gate (downgrades performance → durability when no loadable
+    // resistance is available).
+    const goalSignalsPerformance =
       this.params.goal === 'performance' || this.params.training_intent === 'performance';
+    const resolverIntent: 'performance' | 'support' =
+      this.params.strength_intent ?? (goalSignalsPerformance ? 'performance' : 'support');
+    const resolved = resolveStrengthProtocolForGoal({
+      strengthIntent: resolverIntent,
+      equipmentTier: this.params.equipment_tier,
+      sport: 'triathlon',
+    });
+    const usePerformanceStrength = resolved.protocolId === 'triathlon_performance';
 
     const ctx: ProtocolContext = {
       weekIndex: weekInPhase,

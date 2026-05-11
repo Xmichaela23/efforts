@@ -103,36 +103,136 @@ export const RUN_CENTRIC_STRENGTH_PROTOCOL_IDS = new Set<string>([
 ]);
 
 /**
+ * Sport context for protocol resolution. Combined-tri and standalone-tri both use `'triathlon'`.
+ * Single-sport run plans use `'run'`. Other / unknown sports fall through to a defensive default.
+ */
+export type StrengthResolverSport = 'triathlon' | 'run' | 'other';
+
+export type ResolveStrengthProtocolInput = {
+  /** Stored `training_prefs.strength_protocol` (canonical or legacy id, may be empty). */
+  rawProtocol?: string;
+  /** Stored `training_prefs.strength_intent` ('support' | 'performance' | unset). */
+  strengthIntent?: string;
+  /**
+   * Three-tier equipment **capability** classification (docs/STRENGTH-PROTOCOL.md §8). When
+   * `'bodyweight_bands'`, any performance routing downgrades to the support equivalent and
+   * `performanceGateFired` returns `true` so callers can surface the spec §2 trade-off.
+   * Optional — when omitted, the gate never fires.
+   */
+  equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
+  /** Goal sport context — drives which protocol family applies. */
+  sport: StrengthResolverSport;
+};
+
+export type ResolveStrengthProtocolResult = {
+  protocolId: ProtocolId;
+  /**
+   * True when `bodyweight_bands` tier forced a performance→support downgrade. Callers should
+   * surface the docs/STRENGTH-PROTOCOL.md §2 trade-off ("loadable resistance not available").
+   */
+  performanceGateFired: boolean;
+};
+
+/**
+ * Single sport-agnostic protocol resolver consulted by every plan generator (combined-tri,
+ * standalone-tri, run-only). Replaces the bypass paths in `generate-run-plan` and
+ * `generate-triathlon-plan/generators/tri-generator.ts` that previously read either
+ * `strength_protocol` or `goal/training_intent` independently, causing silent drift when
+ * an athlete set `strength_intent: 'performance'` for a single-sport plan but received
+ * support-equivalent loading.
+ *
+ * **Resolution order (per sport):**
+ *
+ * - **triathlon:** explicit `'triathlon'`/`'triathlon_performance'` wins → intent
+ *   `'performance'` routes to `'triathlon_performance'` → otherwise `'triathlon'`.
+ *   Run-centric protocols leaked into a tri context coerce to `'triathlon'` (durability).
+ *
+ * - **run:** explicit run-centric protocol (in {@link RUN_CENTRIC_STRENGTH_PROTOCOL_IDS}) wins →
+ *   intent `'performance'` routes to `'neural_speed'` → otherwise `'durability'`.
+ *   `'triathlon'`/`'triathlon_performance'` ids leaked into a run context coerce to
+ *   `'durability'` (defensive — should not happen via normal flow).
+ *
+ * - **other:** preserve explicit protocol when canonical-or-legacy; default `'durability'`.
+ *
+ * Equipment-tier gate (`bodyweight_bands`) downgrades performance protocols to their support
+ * equivalent in all sport branches, mirroring the historical
+ * {@link resolveProtocolIdForCombinedTriPlan} behavior.
+ */
+export function resolveStrengthProtocolForGoal(
+  input: ResolveStrengthProtocolInput,
+): ResolveStrengthProtocolResult {
+  const p = String(input.rawProtocol ?? '').trim();
+  const intent = String(input.strengthIntent ?? '').trim().toLowerCase();
+  const tierBlocksPerformance = input.equipmentTier === 'bodyweight_bands';
+  const sport = input.sport;
+
+  if (sport === 'triathlon') {
+    if (p === 'triathlon_performance') {
+      return tierBlocksPerformance
+        ? { protocolId: 'triathlon', performanceGateFired: true }
+        : { protocolId: 'triathlon_performance', performanceGateFired: false };
+    }
+    if (p === 'triathlon') {
+      return { protocolId: 'triathlon', performanceGateFired: false };
+    }
+    if (intent === 'performance') {
+      return tierBlocksPerformance
+        ? { protocolId: 'triathlon', performanceGateFired: true }
+        : { protocolId: 'triathlon_performance', performanceGateFired: false };
+    }
+    // Run-centric protocol id in a tri context — coerce to durability.
+    return { protocolId: 'triathlon', performanceGateFired: false };
+  }
+
+  if (sport === 'run') {
+    if (p && RUN_CENTRIC_STRENGTH_PROTOCOL_IDS.has(p)) {
+      // Explicit run-centric choice wins. Normalize legacy ids to canonical.
+      const canonical = normalizeProtocolId(p);
+      return { protocolId: canonical, performanceGateFired: false };
+    }
+    if (p === 'triathlon' || p === 'triathlon_performance') {
+      // Tri-only ids leaked into a single-sport run context — defensive fallback.
+      return { protocolId: 'durability', performanceGateFired: false };
+    }
+    if (intent === 'performance') {
+      return tierBlocksPerformance
+        ? { protocolId: 'durability', performanceGateFired: true }
+        : { protocolId: 'neural_speed', performanceGateFired: false };
+    }
+    return { protocolId: 'durability', performanceGateFired: false };
+  }
+
+  // sport === 'other' — preserve explicit choice when it parses, else durability.
+  if (p) {
+    try {
+      return { protocolId: normalizeProtocolId(p), performanceGateFired: false };
+    } catch {
+      /* unknown id → fall through */
+    }
+  }
+  return { protocolId: 'durability', performanceGateFired: false };
+}
+
+/**
  * Resolve stored `training_prefs.strength_protocol` + `strength_intent` to the
  * tri implementation used by combined-plan `triathlonStrength`.
  *
- * Equipment-tier gate (docs/STRENGTH-PROTOCOL.md §2): when `equipmentTier` is
- * `bodyweight_bands` and intent would route to `triathlon_performance`, downgrade
- * to `triathlon` (durability) — progressive loading isn't possible without
- * barbell or dumbbell access. The gate-fired signal is returned via the second
- * value so callers can surface the spec §2 trade-off message.
+ * Thin wrapper around {@link resolveStrengthProtocolForGoal} (`sport: 'triathlon'`) kept
+ * for backward compatibility with existing call sites. New code should call the resolver
+ * directly so the gate-fired signal is available for trade-off surfacing.
  */
 export function resolveProtocolIdForCombinedTriPlan(
   rawProtocol: string | undefined,
   strengthIntent: string | undefined,
   equipmentTier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands',
 ): 'triathlon' | 'triathlon_performance' {
-  const p = String(rawProtocol ?? '').trim();
-  const intent = String(strengthIntent ?? '').trim().toLowerCase();
-
-  // Equipment gate fires before any intent or protocol routing — bodyweight_bands tier
-  // can never run progressive-loading protocols, even when explicitly requested.
-  const tierBlocksPerformance = equipmentTier === 'bodyweight_bands';
-
-  if (p === 'triathlon_performance') {
-    return tierBlocksPerformance ? 'triathlon' : 'triathlon_performance';
-  }
-  if (p === 'triathlon') return 'triathlon';
-  if (intent === 'performance') {
-    return tierBlocksPerformance ? 'triathlon' : 'triathlon_performance';
-  }
-  if (p && RUN_CENTRIC_STRENGTH_PROTOCOL_IDS.has(p)) return 'triathlon';
-  return 'triathlon';
+  const result = resolveStrengthProtocolForGoal({
+    rawProtocol,
+    strengthIntent,
+    equipmentTier,
+    sport: 'triathlon',
+  });
+  return result.protocolId === 'triathlon_performance' ? 'triathlon_performance' : 'triathlon';
 }
 
 /**

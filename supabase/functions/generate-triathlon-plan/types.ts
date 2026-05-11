@@ -61,10 +61,23 @@ export interface GenerateTriPlanRequest {
   strength_frequency?: 0 | 1 | 2;
   /** Whether the athlete has access to a commercial gym or is limited to home/bodyweight equipment. */
   equipment_type?: 'home_gym' | 'commercial_gym';
+  /**
+   * Three-tier equipment **capability** classification (docs/STRENGTH-PROTOCOL.md §8). When set,
+   * `bodyweight_bands` triggers the spec §2 gate — performance routing downgrades to durability.
+   */
+  equipment_tier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
   /** Athlete's weakest triathlon discipline — shifts strength exercise emphasis. */
   limiter_sport?: 'swim' | 'bike' | 'run';
   /** From goal training_prefs; e.g. comeback → more frequent recovery weeks. */
   training_intent?: TrainingIntent;
+  /**
+   * Athlete's strength intent from the goal wizard. When `'performance'`, the resolver routes
+   * to `triathlon_performance` regardless of whether `goal` or `training_intent` also signal
+   * performance — closes the bypass drift where a comeback / completion-goal athlete who set
+   * `strength_intent: 'performance'` previously dropped to durability silently.
+   * See `shared/strength-system/protocols/selector.ts:resolveStrengthProtocolForGoal`.
+   */
+  strength_intent?: 'support' | 'performance';
 
   units?: 'imperial' | 'metric';
 
@@ -148,10 +161,21 @@ export interface TriGeneratorParams {
   strength_frequency?: number;
   /** Whether the athlete has access to a commercial gym or is limited to home/bodyweight equipment. */
   equipment_type?: 'home_gym' | 'commercial_gym';
+  /**
+   * Three-tier equipment capability classification (docs/STRENGTH-PROTOCOL.md §8). When set,
+   * `bodyweight_bands` triggers the spec §2 performance→support downgrade in the resolver.
+   */
+  equipment_tier?: 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands';
   /** True when the athlete has a cable machine (or commercial gym membership with cable access). */
   has_cable?: boolean;
   /** True when the athlete has a GHD machine or Nordic bench (unlocks Nordic Hamstring Curls). */
   has_ghd?: boolean;
+  /**
+   * Athlete's strength intent from the goal wizard. Drives protocol selection via the
+   * sport-agnostic resolver; performance wins if ANY of goal / training_intent / strength_intent
+   * say so.
+   */
+  strength_intent?: 'support' | 'performance';
 
   /** Days already occupied by run sessions in a concurrent run plan */
   existing_run_days?: string[];

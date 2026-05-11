@@ -211,8 +211,23 @@ Deno.serve(async (req: Request) => {
         const methodology = request.approach ? mapApproachToMethodology(request.approach) : undefined;
         const noDoubles = request.no_doubles || false; // Default to allowing doubles
         
-        // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell')
-        plan = overlayStrengthLegacy(plan, request.strength_frequency as 2 | 3, phaseStructure, tier, equipment, protocolId, methodology, noDoubles, memoryContext, (request.units ?? 'imperial') === 'metric');
+        // Use legacy function to map old tier names ('injury_prevention', 'strength_power') to new ('bodyweight', 'barbell').
+        // strength_intent + equipment_tier flow through so the resolver in strength-overlay can
+        // upgrade an unset/durability protocol to `neural_speed` when the athlete chose performance.
+        plan = overlayStrengthLegacy(
+          plan,
+          request.strength_frequency as 2 | 3,
+          phaseStructure,
+          tier,
+          equipment,
+          protocolId,
+          methodology,
+          noDoubles,
+          memoryContext,
+          (request.units ?? 'imperial') === 'metric',
+          request.strength_intent,
+          request.equipment_tier,
+        );
       } catch (error: any) {
         // Protocol validation error - log canonical protocol for debugging
         const protocolId = request.strength_protocol || 'none';
