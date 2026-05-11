@@ -856,6 +856,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const expandSpecFromTags = parseExpandSpecFromTags();
               const buildName = (): string => {
                 if (discipline === 'strength') return 'Strength';
+                // Bricks: preserve the source session's distinctive name (e.g.,
+                // "Brick — Bike 2.5 hr" or "Brick — Run 4 mi off the bike" from session-factory).
+                // Without this, the generic tag-based path below returns "Ride" / "Run" for
+                // brick legs because bricks don't carry `long_ride` / `long_run` tags, which
+                // erases the brick semantics from the export.
+                if (hasTag('brick')) {
+                  const orig = String((s as any).name ?? '').trim();
+                  if (/^Brick\b/i.test(orig)) return orig;
+                  if (mappedType === 'ride') return 'Brick — Bike';
+                  if (mappedType === 'run') return 'Brick — Run off the bike';
+                }
                 if (mappedType === 'ride') {
                   if (hasTag('long_ride')) return 'Ride — Long Ride';
                   if (contains('vo2')) return 'Ride — VO2';
@@ -1686,7 +1697,41 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
       for (const d of orderedDays) {
         lines.push(`### ${d}`);
-        for (const w of (groups[d] as any[]).slice().sort(markdownExportSessionOrder)) {
+        const dayWorkouts = (groups[d] as any[]).slice().sort(markdownExportSessionOrder);
+        // Bricks emit as two session rows (bike leg + run leg) from session-factory; the export
+        // merges them into one combined bullet ("Brick — Bike Xhr + Run Ymi") so a brick week
+        // doesn't read as two unrelated easy sessions. Parse miles/hours from each leg's name
+        // (session-factory emits "Brick — Bike 2.5 hr" and "Brick — Run 4 mi off the bike"); fall
+        // back to duration-derived values if the name shape changes.
+        const isBrickWorkout = (w: any) => Array.isArray(w?.tags) && w.tags.includes('brick');
+        const brickLegs = dayWorkouts.filter(isBrickWorkout);
+        const nonBrickWorkouts = dayWorkouts.filter((w) => !isBrickWorkout(w));
+        if (brickLegs.length > 0) {
+          const bikeLeg = brickLegs.find((w) => String(w.type || '').toLowerCase() === 'bike');
+          const runLeg = brickLegs.find((w) => String(w.type || '').toLowerCase() === 'run');
+          const parts: string[] = [];
+          if (bikeLeg) {
+            const m = String(bikeLeg.name || '').match(/Bike\s+([\d.]+)\s*hr/i);
+            const hr = m ? m[1] : ((bikeLeg.duration || 0) / 60).toFixed(1);
+            parts.push(`Bike ${hr}hr`);
+          }
+          if (runLeg) {
+            const m = String(runLeg.name || '').match(/Run\s+([\d.]+)\s*mi/i);
+            parts.push(m ? `Run ${m[1]}mi` : 'Run');
+          }
+          const combinedName = parts.length ? `Brick — ${parts.join(' + ')}` : 'Brick';
+          const totalDuration = brickLegs.reduce(
+            (sum, w) => sum + (typeof w.duration === 'number' ? w.duration : 0),
+            0,
+          );
+          const brickMeta: string[] = [];
+          if (totalDuration > 0) brickMeta.push(fmtHM(totalDuration));
+          lines.push(`- ${combinedName}${brickMeta.length ? ` (${brickMeta.join(' • ')})` : ''}`);
+          for (const leg of brickLegs) {
+            if (leg.description) lines.push(`  - ${leg.description}`);
+          }
+        }
+        for (const w of nonBrickWorkouts) {
           const meta: string[] = [];
           // Handle intensity - only include if it's a valid string
           if (w.intensity && typeof w.intensity === 'string' && w.intensity.length > 0) {
