@@ -109,19 +109,21 @@ These are the textbook rules for the typical athlete. Each has a science justifi
 
 **Default severity:** ≥48h between same-sport HARD sessions. ≥24h between cross-sport HARD sessions.
 
-### 4.2 Lower-body strength → long_run gap [consensus]
-**Rule:** Heavy lower-body strength must precede long_run by ≥48h.
+### 4.2 Lower-body strength → long_run gap [consensus] (asymmetric: 24h pre, 48h post)
+**Rule:** Heavy lower-body strength must precede long_run by **≥24h** (PRE direction). long_run must precede heavy lower-body strength by **≥48h** (POST direction).
 
-**Science:** Heavy lifting creates muscle damage and CNS fatigue lasting 24-48h. Running on damaged legs increases injury risk and reduces aerobic adaptation. Multiple studies (Doma et al. 2017; Bell et al. 2000) demonstrate impaired running economy and time-to-exhaustion 24-48h post heavy lower.
+**Science (PRE direction — 24h):** Doma's running-economy work (2017 review, primary citations therein) shows running economy is mildly impaired in the 24-48h post-strength window (~3-5%), and resolves by 48h. At 24h the impairment is real but moderate, and the long aerobic session is volume / Z2 (forgiving), not a quality-impaired session. Robineau et al. (2016) tested 0h / 6h / 24h between strength and aerobic — **24h was sufficient for full strength adaptation**, indistinguishable from longer recovery. Coffey & Hawley (2017) — molecular AMPK/mTOR interference is acute (minutes to hours), not days; mTOR returns to baseline well within 24h. Standard 70.3 / Ironman coaching templates (Friel, MyProCoach, Purple Patch) routinely place Friday strength + Saturday long ride. Pre-2026-05-11 the engine enforced ≥48h pre, which has no research backing and conflicts with the standard prescription.
 
-**Default severity:** ≥48h.
+**Science (POST direction — 48h):** Long aerobic sessions cause significant eccentric muscle damage (especially long_run), glycogen depletion, and CNS fatigue. Lifting heavy on damaged legs produces both poor lift quality (reduced strength adaptation) and elevated injury risk. Bell et al. (2000); Doma et al. (2017); Hyldahl & Hubal (2014) — muscle protein synthesis, force production, and movement quality remain impaired 24-48h post long aerobic. The asymmetry vs the 24h-pre rule reflects the asymmetric damage profile: long aerobic → strength is harsher than strength → long aerobic.
 
-### 4.3 Lower-body strength → long_ride gap [coaching-convention]
-**Rule:** Heavy lower-body strength must precede long_ride by ≥48h.
+**Default severity:** Hard rule, asymmetric.
 
-**Science:** Cycling research is less consistent than running. Doma & Deakin (2013) show cycling threshold power impaired at 24h post heavy squats; de Souza et al. (2007) show recovery within 24h for trained cyclists. The 48h default is the conservative reading.
+### 4.3 Lower-body strength → long_ride gap [coaching-convention] (asymmetric: 24h pre, 48h post)
+**Rule:** Same asymmetric rule as §4.2 — ≥24h pre, ≥48h post.
 
-**Default severity:** ≥48h (conservative). ≥24h is defensible for trained cyclists; covered by override 5.1.
+**Science:** Cycling tolerates concurrent training better than running (no eccentric damage component). Doma & Deakin (2013) show cycling threshold power impaired at 24h post heavy squats but recovering by 48h; de Souza et al. (2007) show recovery within 24h for trained cyclists. The PRE direction is therefore defensible at 24h. The POST direction tracks long_run for consistency — long_ride still causes substantial glycogen depletion and aerobic system stress, even if the eccentric damage component is smaller.
+
+**Default severity:** Hard rule, asymmetric.
 
 ### 4.4 Lower-body strength → quality_bike gap [coaching-convention]
 **Rule:** Heavy lower-body strength must precede quality_bike by ≥48h.
@@ -265,6 +267,24 @@ These are the textbook rules for the typical athlete. Each has a science justifi
 
 **Default severity:** Hard rule.
 
+### 4.21 Concurrent training spacing — lower_body ↔ leg-dominant quality endurance [consensus]
+**Rule:** Lower-body strength sessions must have **≥24h separation in both directions** from leg-dominant quality endurance sessions (quality_bike, quality_run). Long-day spacing is **asymmetric** per §4.2 / §4.3: **≥24h pre** long_ride / long_run, **≥48h post** long_ride / long_run. The sandwich pattern (lower_body_strength between two leg-dominant *quality* sessions within ±1 day) is hard-rejected at placement. **All training intents** — no performance-intent relaxation. Supersedes the §5.1 24h-relaxation override.
+
+**Science:**
+- **Hickson, R.C. (1980).** *"Interference of strength development by simultaneously training for strength and endurance."* Eur J Appl Physiol 45(2-3):255-263. DOI: [10.1007/BF00421333](https://doi.org/10.1007/BF00421333) — original concurrent-training interference paper.
+- **Wilson, J.M. et al. (2012).** *"Concurrent training: a meta-analysis examining interference of aerobic and resistance exercises."* J Strength Cond Res 26(8):2293-2307. PMID: [22002517](https://pubmed.ncbi.nlm.nih.gov/22002517/) — meta-analysis quantifying the interference effect.
+- **Robineau, J. et al. (2016).** *"Specific Training Effects of Concurrent Aerobic and Strength Exercises Depend on Recovery Duration."* J Strength Cond Res 30(3):672-683. DOI: [10.1519/JSC.0000000000000798](https://doi.org/10.1519/JSC.0000000000000798) — explicit demonstration that 24h+ separation rescues both adaptations.
+- **Coffey, V.G. & Hawley, J.A. (2017).** *"Concurrent exercise training: do opposites distract?"* J Physiol 595(9):2883-2896 — molecular mechanism review (AMPK/mTOR signaling crosstalk over the 24h window).
+- **Petré, H. et al. (2021).** Sports Med systematic review — meta-analysis showing the interference effect is *stronger* in trained individuals, defeating the prior "trained athletes can absorb tighter spacing" assumption that justified §5.1's performance carve-out.
+
+**Default severity:** Hard rule, all intents. Long-day 48h spacing is non-negotiable.
+
+**Tier ladder for placement:** the engine tries placement in increasing-compromise order — preferred is CLEAN (no leg-quality adjacency), accept SOFT (one-sided adjacency) with soft trade-off, accept SANDWICH (both-sided adjacency) as last resort with hard trade-off. If even SANDWICH cannot find a day (because long-day 48h binds), drop the session and emit a session-frequency-reduced trade-off naming the constraint.
+
+**Current code status:** Enforced in `_shared/week-optimizer.ts` `sequentialOk` (strict baseline) with a tier-aware `SequentialRelax` flag set (`allow_lower_adj_one_sided`, `allow_lower_sandwich`) that the placement loop steps through. Companion classifier: `concurrentSpacingTier()`. Prime-mover taxonomy in `_shared/schedule-session-constraints.ts:SESSION_PRIME_MOVER`. Trade-off message emitted via `emitConcurrentSpacingTradeOff()`.
+
+**Scope:** Combined-plan generator only (this commit). Other plan generators (`generate-run-plan`, `generate-triathlon-plan`, `generate-plan`) have independent placement pipelines and need a parallel audit — tracked in `docs/POLISH-PUNCH-LIST.md`.
+
 ---
 
 ## 5. Advanced overrides (rule severity relaxes for qualifying profiles)
@@ -273,17 +293,17 @@ Some athletes can absorb more aggressive scheduling than defaults assume. These 
 
 **All thresholds in §5 should be configurable in code** (not magic numbers in rule logic). Recommended location: a `OVERRIDE_GATES` constants module that the rules engine reads.
 
-### 5.1 24h lower-body → quality_bike gap (Rule 4.4 relaxation) [derived]
-**Override:** ≥24h gap allowed instead of ≥48h.
+### 5.1 24h lower-body → quality_bike gap (Rule 4.4 relaxation) [DEPRECATED — superseded by §4.21]
+**Status:** ~~Active~~ **Superseded** by §4.21 (concurrent training spacing). The performance-intent 24h carve-out this override codified was removed in the 2026-05-11 pass. Rationale: Petré et al 2021 meta-analysis shows the concurrent-training interference effect is *stronger* in trained individuals, not weaker — the assumption that motivated this override does not survive contact with the literature. The strict §4.21 rule (≥24h lower↔quality_bike in both directions, all intents) now applies; this section is retained for historical context only.
 
-**Science:** Trained cyclist research (de Souza 2007, others) shows 24h recovery is sufficient for sub-VO2 cycling. Threshold work specifically (not VO2) is feasible 24h post heavy lower for trained athletes.
+**Original wording (no longer active):** ~~Override: ≥24h gap allowed instead of ≥48h. Science: Trained cyclist research (de Souza 2007, others) shows 24h recovery is sufficient for sub-VO2 cycling. Threshold work specifically (not VO2) is feasible 24h post heavy lower for trained athletes.~~
 
-**Profile gates (configurable defaults):**
-- Age < `OVERRIDE_5_1_AGE_MAX` (default 40)
-- Years consistent training ≥ `OVERRIDE_5_1_HISTORY_MIN` (default 3)
-- No recent lower-body injury
-- Last lower session RPE ≤ `OVERRIDE_5_1_RPE_MAX` (default 7)
-- Quality_bike intensity ≤ threshold (not VO2)
+**~~Profile gates (configurable defaults):~~**
+- ~~Age < `OVERRIDE_5_1_AGE_MAX` (default 40)~~
+- ~~Years consistent training ≥ `OVERRIDE_5_1_HISTORY_MIN` (default 3)~~
+- ~~No recent lower-body injury~~
+- ~~Last lower session RPE ≤ `OVERRIDE_5_1_RPE_MAX` (default 7)~~
+- ~~Quality_bike intensity ≤ threshold (not VO2)~~
 
 ### 5.2 Same-day lower + quality_run (consolidated hard day) [derived]
 **Override:** Lower_body_strength + quality_run same day allowed (AM run / PM lift).

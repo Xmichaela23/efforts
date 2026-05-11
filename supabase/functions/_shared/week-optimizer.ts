@@ -409,6 +409,22 @@ function canPlaceWithModifier(
  */
 export type SequentialRelax = {
   allow_easy_run_after_long_run?: boolean;
+  /**
+   * §4.7 tiered relaxation for lower_body_strength concurrent-training spacing. The placement
+   * loop searches in this order:
+   *   1. {} (strict): reject any leg-quality adjacency (Tue QB → Wed lower blocked, Wed lower
+   *      → Thu QR blocked, sandwich blocked).
+   *   2. { allow_lower_adj_one_sided: true }: accept one-sided adjacency (lower next to one
+   *      leg-quality session). Still blocks sandwich + long-day adjacency.
+   *   3. { allow_lower_adj_one_sided: true, allow_lower_sandwich: true }: accept sandwich as a
+   *      last resort. Still blocks long-day adjacency (48h rule never relaxes).
+   *
+   * Long_ride/long_run adjacency to lower_body_strength is NEVER relaxed — 48h gap is the
+   * floor regardless of week density. If the engine can't satisfy 48h vs long, it should drop
+   * a strength session instead of compromising the long-session recovery window.
+   */
+  allow_lower_adj_one_sided?: boolean;
+  allow_lower_sandwich?: boolean;
 };
 
 function sequentialOk(
@@ -442,69 +458,105 @@ function sequentialOk(
     if (kind !== 'long_ride' && isHigh(kind)) return false;
   }
 
-  // Prev day was quality_bike → today cannot be HIGH (§4.7: long_ride, long_run,
-  // quality_bike, quality_run, lower_body_strength all blocked). Quality_bike depletes
-  // glycogen and creates CNS fatigue; stacking another HIGH stimulus the next day produces
-  // a junk session.
+  // §4.7 concurrent-training spacing (Hickson 1980, Wilson 2012, Robineau 2016, Coffey & Hawley
+  // 2017, Petré 2021): leg-dominant strength must be ≥24h from leg-dominant quality endurance
+  // (quality_bike, quality_run) and ≥48h from long_ride/long_run, in BOTH directions, ALL intents.
+  // No performance-intent relaxation — Petré 2021 meta-analysis shows the AMPK/mTOR interference
+  // is *stronger* in trained individuals.
+
+  // §4.7 tier-aware lower-vs-leg-quality adjacency. When relax flags are set, individual
+  // adjacency blocks are skipped per the tier ladder above (allow_lower_adj_one_sided →
+  // allow_lower_sandwich). The §4.5 quality_run-after-quality_bike block is HARD regardless.
+  const allowLowerAdj = !!relax?.allow_lower_adj_one_sided;
+  const allowSandwich = !!relax?.allow_lower_sandwich;
+
+  // Prev day was quality_bike → today cannot be HIGH (still blocks long_ride, long_run,
+  // quality_bike, quality_run, lower_body_strength). Adjacency = sub-24h gap from same prime movers.
   // §4.5 [consensus]: quality_run cannot fall on the calendar day after quality_bike (hard block).
-  // §5.1 extension [derived]: performance intent — lower-body lift the day after a group /
-  // quality bike session is allowed at 24h+ separation (distinct from quality_run).
   if (prevKinds.includes('quality_bike')) {
-    if (kind === 'quality_run') {
-      return false;
-    }
+    if (kind === 'quality_run') return false;
     if (kind === 'quality_bike') return false;
     if (kind === 'long_ride') return false;
     if (kind === 'long_run') return false;
-    if (kind === 'lower_body_strength') {
-      if (athlete.training_intent === 'performance') return true;
-      return false;
-    }
+    if (kind === 'lower_body_strength' && !allowLowerAdj) return false; // §4.7 strict 24h
   }
-  // Prev day was quality_run → today: no quality_bike, no quality_run.
+  // Prev day was quality_run → today: no quality_bike, no quality_run, no lower_body_strength.
+  // The lower_body_strength block is §4.7 NEW (mirrors the QB rule for QR; prior code had a gap
+  // here that allowed Wed lower between Tue QB and Thu QR — the original concurrent-training bug).
   if (prevKinds.includes('quality_run')) {
     if (kind === 'quality_run') return false;
     if (kind === 'quality_bike') return false;
+    if (kind === 'lower_body_strength' && !allowLowerAdj) return false; // §4.7 strict 24h
   }
-  // Next day already has quality_bike → today cannot be quality_run (easy day
-  // before anchored hammer / group ride). Symmetric guard for quality_bike
-  // placement after a quality_run day.
+  // Next day already has quality_bike → today cannot be quality_run (easy day before anchored
+  // hammer / group ride). Symmetric guard for quality_bike placement after a quality_run day.
   if (nextKinds.includes('quality_bike') && kind === 'quality_run') return false;
   if (nextKinds.includes('quality_run') && kind === 'quality_bike') return false;
 
-  const perfIntent = athlete.training_intent === 'performance';
   const twoBackKinds = (days[nDaysAfter(day, -2)] ?? []).map((s) => s.kind);
 
-  // Gap after lower_body_strength before hard leg/CNS days (§4.2–4.4).
-  // §5.1 [derived]: performance intent → 24h vs quality_bike only (still 48h vs long_run).
+  // Gap after lower_body_strength before hard leg/CNS days. §4.7: 24h all intents for quality
+  // (matched by adjacency block above + bidirectional placement-time check); 48h for long
+  // (NEVER relaxes — long-day recovery window is non-negotiable).
   if (kind === 'long_run') {
     if (prevKinds.includes('lower_body_strength')) return false;
     if (twoBackKinds.includes('lower_body_strength')) return false;
   }
   if (kind === 'quality_bike') {
-    if (prevKinds.includes('lower_body_strength')) return false;
-    if (!perfIntent && twoBackKinds.includes('lower_body_strength')) return false;
+    if (prevKinds.includes('lower_body_strength') && !allowLowerAdj) return false;
+    // §4.7: 48h+ (twoBackKinds) is fine for all intents — only adjacency (prev day) blocks.
+  }
+  if (kind === 'quality_run') {
+    // §4.7 NEW: mirror the lower→QB rule for QR. Prior code only blocked QR after QB; never
+    // checked QR after lower_body_strength. That asymmetry was the second half of the
+    // concurrent-training bug.
+    if (prevKinds.includes('lower_body_strength') && !allowLowerAdj) return false;
   }
   if (kind === 'lower_body_strength') {
     if (prevKinds.includes('lower_body_strength')) return false;
     if (twoBackKinds.includes('lower_body_strength')) return false;
   }
 
-  // Lower_body cannot fall in the two calendar days before long_ride / long_run;
-  // before quality_bike require two days unless §5.1 performance relaxation (second day only).
+  // §4.21 asymmetric long-session spacing: lower→long PRE needs only 24h (Robineau 2016 supports
+  // full strength adaptation at 24h; Doma's running-economy data shows impairment resolves by
+  // 48h pre and is moderate-but-acceptable at 24h; standard coaching templates routinely place
+  // Friday strength + Saturday long ride). 48h pre would block this common pattern with no
+  // research backing.
+  //
+  // POST-long lower (long → lower) is the asymmetric stricter side: 48h required. Long sessions
+  // (especially long_run) cause significant eccentric muscle damage + glycogen depletion;
+  // lifting heavy on damaged legs is a poor adaptation AND an injury risk. The 24h-post block
+  // already lives in line 442 (`prevKinds.includes('long_run'/'long_ride')` → isHigh block);
+  // here we add the 48h-post block via twoBackKinds. Sun long_run → Mon (24h post) blocked,
+  // Sun long_run → Tue (48h post) blocked.
   if (kind === 'lower_body_strength') {
+    if (twoBackKinds.includes('long_ride')) return false; // 48h-post long_ride
+    if (twoBackKinds.includes('long_run')) return false;  // 48h-post long_run
+  }
+
+  // Lower_body §4.7 forward-spacing toward quality (PRE direction for lower → QB / QR).
+  //   delta=1 (24h pre): block if hasQuality AND !allowLowerAdj (§4.7 24h adjacency rule)
+  //   delta=2 (48h pre): unconditionally allowed for both long and quality (24h+ satisfies §4.21)
+  //
+  // Sandwich case (lower with leg-quality on BOTH prev AND next day) — block unless allowSandwich.
+  // Long-day PRE: no block here — 24h pre is sufficient per Robineau 2016 + coaching consensus.
+  if (kind === 'lower_body_strength') {
+    const prevIsLegQuality = prevKinds.some((k) => k === 'quality_bike' || k === 'quality_run');
+    const nextIsLegQuality = nextKinds.some((k) => k === 'quality_bike' || k === 'quality_run');
+    if (prevIsLegQuality && nextIsLegQuality && !allowSandwich) return false;
     for (const delta of [1, 2] as const) {
       const slots = days[nDaysAfter(day, delta)] ?? [];
-      const hasLong = slots.some((s) => s.kind === 'long_ride' || s.kind === 'long_run');
-      const hasQb = slots.some((s) => s.kind === 'quality_bike');
-      if (!hasLong && !hasQb) continue;
-      // §5.1: performance — (a) day-before-QB lower ok at 24h+ (Tue lower → Wed QB); (b) Mon lower → Wed QB via delta-2 only was too narrow alone.
-      if (perfIntent && (delta === 1 || delta === 2) && hasQb && !hasLong) continue;
-      return false;
+      const hasQuality = slots.some((s) => s.kind === 'quality_bike' || s.kind === 'quality_run');
+      if (delta === 1 && hasQuality && !allowLowerAdj) return false; // §4.7 24h adjacency to QB/QR
+      // delta === 1 && hasLong → ALLOWED (24h pre long is research-defensible; Robineau 2016)
+      // delta === 2 && hasQuality → allowed (48h satisfies §4.7 strict 24h)
+      // delta === 2 && hasLong → allowed (48h pre long is well outside any impairment window)
     }
   }
 
   // Day before combined quality_bike + quality_run: no lower-body strength (leg/CNS density vs §6.4).
+  // §4.7 sandwich case is already prevented by the adjacency rules above (prev/next QB/QR vs lower);
+  // this remains as an extra guard for the rare same-day QB+QR stack.
   if (kind === 'lower_body_strength') {
     const nk = (days[dayAfter(day)] ?? []).map((s) => s.kind);
     if (nk.includes('quality_bike') && nk.includes('quality_run')) return false;
@@ -513,9 +565,103 @@ function sequentialOk(
   return true;
 }
 
-/** Days that must not host lower_body_strength (leg sovereignty / recovery). */
+/**
+ * §4.7 placement-time tier classifier — what severity of concurrent-training conflict would
+ * placing `kind` on `day` create?
+ *
+ * Returns:
+ *   'CLEAN'     — no leg-quality / leg-long on D-1 or D+1. Strict ≥24h / ≥48h satisfied.
+ *   'SOFT'      — one-sided adjacency (lower sits next to one leg-quality session). Acceptable
+ *                  with a soft trade-off when no CLEAN day exists.
+ *   'SANDWICH'  — leg-quality on both D-1 AND D+1 (the original Wed-lower-between-Tue-QB-and-
+ *                  Thu-QR bug). Hard trade-off; accept only when no SOFT day exists either.
+ *
+ * For non-lower kinds, always returns 'CLEAN' — the tier rule applies only to lower-body
+ * strength placement (the asymmetry is intentional; quality sessions are anchored, lower moves
+ * around them).
+ */
+export type ConcurrentSpacingTier = 'CLEAN' | 'SOFT' | 'SANDWICH';
+
+export function concurrentSpacingTier(
+  days: Record<DayName, SessionSlot[]>,
+  day: DayName,
+  kind: SessionKind,
+): ConcurrentSpacingTier {
+  if (kind !== 'lower_body_strength') return 'CLEAN';
+  const prevK = (days[dayBefore(day)] ?? []).map((s) => s.kind);
+  const nextK = (days[dayAfter(day)] ?? []).map((s) => s.kind);
+  const prevIsLegQuality = prevK.some((k) => k === 'quality_bike' || k === 'quality_run');
+  const nextIsLegQuality = nextK.some((k) => k === 'quality_bike' || k === 'quality_run');
+  if (prevIsLegQuality && nextIsLegQuality) return 'SANDWICH';
+  if (prevIsLegQuality || nextIsLegQuality) return 'SOFT';
+  return 'CLEAN';
+}
+
+/** Human label for a leg-quality session, used in trade-off messages. */
+function legQualityLabel(kind: SessionKind): string {
+  if (kind === 'quality_bike') return 'quality ride';
+  if (kind === 'quality_run') return 'quality run';
+  return String(kind);
+}
+
+/**
+ * §4.7 trade-off emitter — names the constraint when lower placement lands at SOFT or SANDWICH
+ * tier. Honest, actionable text:
+ *   • SOFT  → "Strength lower on D sits next to leg-quality session on adj-D. Concurrent training
+ *              research recommends ≥24h ideal; consider moving long-day anchors to free a clean day."
+ *   • SANDWICH → "Strength lower on D sandwiched between QB-on-D-1 and QR-on-D+1. No better day
+ *                  exists under your anchors. To improve: free [suggested day] for strength,
+ *                  reduce strength frequency, or move a long-day anchor."
+ *
+ * No-op when tier is undefined (placement failed entirely) or CLEAN.
+ */
+function emitConcurrentSpacingTradeOff(
+  days: Record<DayName, SessionSlot[]>,
+  lowerDay: DayName,
+  tier: ConcurrentSpacingTier | undefined,
+  trade_offs: string[],
+): void {
+  if (!tier || tier === 'CLEAN') return;
+  const prevK = (days[dayBefore(lowerDay)] ?? []).map((s) => s.kind);
+  const nextK = (days[dayAfter(lowerDay)] ?? []).map((s) => s.kind);
+  const prevLegQ = prevK.find((k) => k === 'quality_bike' || k === 'quality_run');
+  const nextLegQ = nextK.find((k) => k === 'quality_bike' || k === 'quality_run');
+  if (tier === 'SANDWICH' && prevLegQ && nextLegQ) {
+    trade_offs.push(
+      `Strength lower on ${tfDay(lowerDay)} sits between ${legQualityLabel(prevLegQ)} on ` +
+        `${tfDay(dayBefore(lowerDay))} and ${legQualityLabel(nextLegQ)} on ` +
+        `${tfDay(dayAfter(lowerDay))} — concurrent-training research recommends ≥24h separation ` +
+        `from leg-dominant quality endurance (Hickson 1980; Wilson et al 2012; Petré et al 2021). ` +
+        `Your anchors leave no cleaner placement. To improve: free a day for strength (move a ` +
+        `long-day anchor, trim a quality session, or reduce strength to 1×).`,
+    );
+    return;
+  }
+  if (tier === 'SOFT') {
+    const adjK = prevLegQ ?? nextLegQ;
+    const adjDay = prevLegQ ? dayBefore(lowerDay) : dayAfter(lowerDay);
+    if (adjK) {
+      trade_offs.push(
+        `Strength lower on ${tfDay(lowerDay)} sits 24h from ${legQualityLabel(adjK)} on ` +
+          `${tfDay(adjDay)} — concurrent-training research recommends ≥24h separation in both ` +
+          `directions (Hickson 1980; Coffey & Hawley 2017). Tight spacing is acceptable but may ` +
+          `slightly compromise both sessions; consider freeing an adjacent day if recovery suffers.`,
+      );
+    }
+  }
+}
+
+/**
+ * Days that must not host lower_body_strength.
+ *
+ * Pre-2026-05-11: included `dayBefore(longRide)` and `dayBefore(longRun)` as a hard 48h-pre
+ * block. Post-2026-05-11: the 48h-pre block was relaxed to 24h-pre per §4.21 (Robineau 2016 +
+ * standard coaching prescription: Friday strength + Saturday long ride is a valid pattern).
+ * Only the long-day calendar slots themselves remain blocked here; sequential / 48h-POST rules
+ * live in `sequentialOk`.
+ */
 function lowerBodyBlockedDays(longRide: DayName, longRun: DayName): Set<DayName> {
-  return new Set<DayName>([longRide, longRun, dayBefore(longRide), dayBefore(longRun)]);
+  return new Set<DayName>([longRide, longRun]);
 }
 
 // ── Post-placement load + layout balancer (§6.2 soft-move ordering) ─────────
@@ -1030,7 +1176,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       }
       for (const d of candidates) {
         if (d === longRide || d === longRun) continue;
-        if (d === dayBefore(longRun)) continue;
+        // (Pre-2026-05-11 also blocked dayBefore(longRun) here as a 48h-pre safety; relaxed per
+        // §4.21 — sequentialOk now enforces the 24h-pre boundary correctly.)
         if (noLowerBody.has(d)) continue;
         if (qualityBikeDay && d === qualityBikeDay) continue;
 
@@ -1312,7 +1459,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         // every other rule (sequential, matrix, no-lower-body sovereignty days).
         const findStrengthPair = (
           minSpacing: number,
-        ): { upper?: DayName; lower?: DayName } => {
+          lowerRelax: SequentialRelax = {},
+        ): { upper?: DayName; lower?: DayName; lowerTier?: ConcurrentSpacingTier } => {
           for (const uc of upperOrder) {
             if (uc === longRide || uc === longRun) continue;
             if (days[uc].length >= 2) continue;
@@ -1328,22 +1476,42 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
               if (noLowerBody.has(lc)) continue;
               if (days[lc].length >= 2) continue;
               if (!canPlaceWithModifier(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
-              if (!sequentialOk(trial, lc, 'lower_body_strength', inputs.athlete)) continue;
+              if (!sequentialOk(trial, lc, 'lower_body_strength', inputs.athlete, lowerRelax)) continue;
               const gap = Math.abs(DAY_INDEX[lc] - DAY_INDEX[uc]);
               const wrap = Math.min(gap, 7 - gap);
               if (wrap < minSpacing) continue;
-              return { upper: uc, lower: lc };
+              const lowerTier = concurrentSpacingTier(trial, lc, 'lower_body_strength');
+              return { upper: uc, lower: lc, lowerTier };
             }
           }
           return {};
         };
 
-        let { upper: upperDay, lower: lowerDay } = findStrengthPair(3);
+        // §4.7 tier ladder: prefer CLEAN (no leg-quality adjacency) even at relaxed spacing
+        // (≥2d upper↔lower) over SOFT (one-sided leg-quality adjacency) at preferred spacing
+        // (≥3d). Concurrent-training research outweighs the upper↔lower spacing convention.
+        //   1. CLEAN @ 3d → 2. CLEAN @ 2d → 3. SOFT @ 3d → 4. SOFT @ 2d → 5. SANDWICH @ 3d → 6. SANDWICH @ 2d
+        let pair = findStrengthPair(3, {});
         let strengthSpacingRelaxed = false;
-        if (!upperDay || !lowerDay) {
-          ({ upper: upperDay, lower: lowerDay } = findStrengthPair(2));
-          strengthSpacingRelaxed = !!(upperDay && lowerDay);
+        if (!pair.upper || !pair.lower) {
+          pair = findStrengthPair(2, {});
+          strengthSpacingRelaxed = !!(pair.upper && pair.lower);
         }
+        if (!pair.upper || !pair.lower) {
+          pair = findStrengthPair(3, { allow_lower_adj_one_sided: true });
+        }
+        if (!pair.upper || !pair.lower) {
+          pair = findStrengthPair(2, { allow_lower_adj_one_sided: true });
+          if (pair.upper && pair.lower) strengthSpacingRelaxed = true;
+        }
+        if (!pair.upper || !pair.lower) {
+          pair = findStrengthPair(3, { allow_lower_adj_one_sided: true, allow_lower_sandwich: true });
+        }
+        if (!pair.upper || !pair.lower) {
+          pair = findStrengthPair(2, { allow_lower_adj_one_sided: true, allow_lower_sandwich: true });
+          if (pair.upper && pair.lower) strengthSpacingRelaxed = true;
+        }
+        const { upper: upperDay, lower: lowerDay, lowerTier } = pair;
 
         if (upperDay && lowerDay) {
           place(days, upperDay, 'upper_body_strength');
@@ -1383,10 +1551,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
               `Strength: upper on ${tfDay(upperDay)} sits 2 days from lower on ${tfDay(lowerDay)} (preferred 3) — densest gap that fits the long-day anchors and recovery rules.`,
             );
           }
+          // §4.7 concurrent-training spacing trade-off — surface the compromise honestly when
+          // the tier ladder fell through to SOFT or SANDWICH.
+          emitConcurrentSpacingTradeOff(days, lowerDay, lowerTier, trade_offs);
           placeThirdStrengthIfNeeded();
         } else {
           conflicts.push(
-            'CO_EQUAL_STRENGTH: 2× lifting was requested with co-equal (performance) intent, but no upper+lower pair fits the anchors at the ≥2-day hard floor. Do not treat 1× as sufficient — adjust the week (e.g. move easy_run after strength, trim swim, or shift long days) or get explicit athlete confirmation to downgrade.',
+            'CO_EQUAL_STRENGTH: 2× lifting was requested with co-equal (performance) intent, but no upper+lower pair fits the anchors even at the SANDWICH tier (§4.7 last-resort). Long-day 48h spacing is non-negotiable. Adjust the week (e.g. move easy_run after strength, trim swim, or shift long days) or get explicit athlete confirmation to downgrade to 1× strength.',
           );
         }
       }
@@ -1437,22 +1608,57 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
           preferredLowerDayNc,
         );
 
-        let lowerDay: DayName | undefined;
-        for (const c of lowerCandidates) {
-          if (upperDay && c === upperDay) continue;
-          if (c === longRide || c === longRun) continue;
-          if (noLowerBody.has(c)) continue;
-          if (days[c].length >= 2) continue;
-          if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
-          if (!sequentialOk(days, c, 'lower_body_strength', inputs.athlete)) continue;
-          if (upperDay) {
-            const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[upperDay]);
-            const wrap = Math.min(gap, 7 - gap);
-            if (wrap < 3) continue;
+        // §4.7 tier ladder for the non-coeq path: try CLEAN with full ≥3d upper↔lower spacing,
+        // then CLEAN with ≥2d, then SOFT with ≥3d, …, SANDWICH with ≥2d as last resort.
+        const tryFindLower = (lowerRelax: SequentialRelax, minUpperSpacing: number, restrictTo?: DayName) => {
+          for (const c of lowerCandidates) {
+            if (restrictTo && c !== restrictTo) continue;
+            if (upperDay && c === upperDay) continue;
+            if (c === longRide || c === longRun) continue;
+            if (noLowerBody.has(c)) continue;
+            if (days[c].length >= 2) continue;
+            if (!canPlaceWithModifier(days, c, 'lower_body_strength', inputs.athlete)) continue;
+            if (!sequentialOk(days, c, 'lower_body_strength', inputs.athlete, lowerRelax)) continue;
+            if (upperDay) {
+              const gap = Math.abs(DAY_INDEX[c] - DAY_INDEX[upperDay]);
+              const wrap = Math.min(gap, 7 - gap);
+              if (wrap < minUpperSpacing) continue;
+            }
+            return { day: c, tier: concurrentSpacingTier(days, c, 'lower_body_strength') };
           }
-          lowerDay = c;
-          break;
+          return undefined;
+        };
+
+        // §4.21 pin-respect: when the athlete pinned a specific lower day, try the pin FIRST
+        // through every tier (CLEAN → SOFT → SANDWICH) before falling back to the algorithmic
+        // tier ladder. This honors the athlete's preference even when a cleaner non-pin day
+        // would be available — surfacing the cost via §4.21 trade-off message rather than
+        // silently relocating. The fallback ladder still runs if the pin can't fit at any tier.
+        let lowerHit: { day: DayName; tier: ConcurrentSpacingTier } | undefined;
+        if (preferredLowerDayNc) {
+          lowerHit = tryFindLower({}, 3, preferredLowerDayNc);
+          if (!lowerHit) lowerHit = tryFindLower({}, 2, preferredLowerDayNc);
+          if (!lowerHit) lowerHit = tryFindLower({ allow_lower_adj_one_sided: true }, 3, preferredLowerDayNc);
+          if (!lowerHit) lowerHit = tryFindLower({ allow_lower_adj_one_sided: true }, 2, preferredLowerDayNc);
+          if (!lowerHit) {
+            lowerHit = tryFindLower({ allow_lower_adj_one_sided: true, allow_lower_sandwich: true }, 3, preferredLowerDayNc);
+          }
+          if (!lowerHit) {
+            lowerHit = tryFindLower({ allow_lower_adj_one_sided: true, allow_lower_sandwich: true }, 2, preferredLowerDayNc);
+          }
         }
+        if (!lowerHit) lowerHit = tryFindLower({}, 3);
+        if (!lowerHit) lowerHit = tryFindLower({}, 2);
+        if (!lowerHit) lowerHit = tryFindLower({ allow_lower_adj_one_sided: true }, 3);
+        if (!lowerHit) lowerHit = tryFindLower({ allow_lower_adj_one_sided: true }, 2);
+        if (!lowerHit) {
+          lowerHit = tryFindLower({ allow_lower_adj_one_sided: true, allow_lower_sandwich: true }, 3);
+        }
+        if (!lowerHit) {
+          lowerHit = tryFindLower({ allow_lower_adj_one_sided: true, allow_lower_sandwich: true }, 2);
+        }
+        const lowerDay = lowerHit?.day;
+        const lowerTier = lowerHit?.tier;
         if (lowerDay) {
           const stacking = qualityRunDay === lowerDay && isPerf && isCoEq;
           place(days, lowerDay, 'lower_body_strength', stacking ? { timing: 'PM' } : {});
@@ -1479,6 +1685,8 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
               `Strength: typical Mon upper / Thu lower adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (schedule constraints).`,
             );
           }
+          // §4.7 concurrent-training spacing trade-off — surface SOFT/SANDWICH compromises.
+          emitConcurrentSpacingTradeOff(days, lowerDay, lowerTier, trade_offs);
         } else {
           conflicts.push(
             `lower_body_strength (session 2 of 2): no valid day found — 48h pre-sovereign rule blocks the day before long_ride (${longRide}) and long_run (${longRun}); consider reducing to 1× strength, dropping a quality session, or moving long_ride/long_run.`,
@@ -1867,7 +2075,16 @@ export function validatePreferredDays(
   tryPlace(pd.easy_run, 'easy_run', 'easy_run');
 
   for (const { day, kind } of normalizeStrengthPreferredEntries(pd.strength)) {
-    tryPlace(day, kind, `strength(${kind})`);
+    // §4.7: validate against the most permissive tier (SANDWICH allowed). The optimizer's tier
+    // ladder may have produced a SOFT or SANDWICH placement when the athlete's anchors leave no
+    // CLEAN day; validatePreferredDays should NOT re-reject those — it's an integrity check, not
+    // a re-optimization. The athlete-visible compromise is surfaced via the §4.7 trade-off
+    // message at placement time.
+    const relax: SequentialRelax | undefined =
+      kind === 'lower_body_strength'
+        ? { allow_lower_adj_one_sided: true, allow_lower_sandwich: true }
+        : undefined;
+    tryPlace(day, kind, `strength(${kind})`, relax);
   }
   // Swim ordering: [easy, quality].
   if (Array.isArray(pd.swim)) {

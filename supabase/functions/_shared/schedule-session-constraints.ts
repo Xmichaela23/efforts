@@ -20,6 +20,59 @@ export const SESSION_FATIGUE = {
 /** Includes brick + `quality_swim` (both have fatigue tiers; `quality_swim` is a full matrix row). */
 export type SessionFatigueId = keyof typeof SESSION_FATIGUE;
 
+/**
+ * Prime-mover taxonomy (docs/SCHEDULING-RULES.md §4.7).
+ *
+ * Drives concurrent-training spacing: leg-loaded sessions must respect 24h/48h gaps from
+ * lower-body strength in both directions per Hickson 1980, Wilson et al 2012, Robineau et al
+ * 2016, Coffey & Hawley 2017, Petré et al 2021. Replaces enumerative session-name lists in the
+ * scheduler — adding a new SessionKind only requires assigning a group here.
+ *
+ * - `leg`     — quads / glutes / hamstrings / calves are primary movers. Volume alone can
+ *               create fatigue accumulation; intensity matters for the constraint severity
+ *               (see `LEG_QUALITY_KINDS` + `LEG_LONG_KINDS` below).
+ * - `upper`   — primarily upper-body / shoulder mechanics. Concurrent constraint does not apply.
+ * - `neutral` — swim (whole-body, non-leg-dominant), recovery, mobility.
+ */
+export const SESSION_PRIME_MOVER: Record<MatrixSessionKind, 'leg' | 'upper' | 'neutral'> = {
+  easy_bike: 'leg',
+  easy_run: 'leg',
+  easy_swim: 'neutral',
+  quality_swim: 'neutral',
+  quality_bike: 'leg',
+  quality_run: 'leg',
+  long_ride: 'leg',
+  long_run: 'leg',
+  lower_body_strength: 'leg',
+  upper_body_strength: 'upper',
+} as const;
+
+/**
+ * Leg-dominant QUALITY sessions — must be ≥24h from lower_body_strength in both directions.
+ * Same prime movers loaded at intensity within 24h compromise both endurance quality (legs
+ * pre-fatigued) and strength adaptation (AMPK/mTOR signaling interference). All intents.
+ */
+export const LEG_QUALITY_KINDS: ReadonlyArray<MatrixSessionKind> = [
+  'quality_bike',
+  'quality_run',
+];
+
+/**
+ * Leg-dominant LONG sessions — must be ≥48h from lower_body_strength in both directions.
+ * Long sessions add glycogen depletion + muscle damage on top of the AMPK interference window,
+ * compounding the recovery requirement. All intents.
+ */
+export const LEG_LONG_KINDS: ReadonlyArray<MatrixSessionKind> = [
+  'long_ride',
+  'long_run',
+];
+
+/** True if the session loads legs at intensity (quality or long). Easy leg sessions excluded. */
+export function isLegLoadedAtIntensity(k: MatrixSessionKind): boolean {
+  return (LEG_QUALITY_KINDS as ReadonlyArray<MatrixSessionKind>).includes(k) ||
+    (LEG_LONG_KINDS as ReadonlyArray<MatrixSessionKind>).includes(k);
+}
+
 /** Matrix session roles (10×10): `quality_swim` is its own row — not aliased to `easy_swim`. */
 export const SESSION_KINDS = [
   'easy_bike',

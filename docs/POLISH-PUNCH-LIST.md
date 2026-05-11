@@ -145,15 +145,8 @@ For each numbered item:
 - [ ] Verify threshold pace / VDOT → run zones
 - [ ] Verify recent training history → volume floor calibration
 - [ ] Tradeoff messages should disappear when their question isn't violated
-- [ ] **Concurrent training spacing constraint — HIGH severity scheduling defect.** Default scheduler places strength lower body between quality endurance sessions (e.g., Wed lower between Tue Sweet Spot ride and Thu VO2max run). No athlete pin involved — engine choosing this layout on its own. Violates concurrent training research (Hickson 1980, Wilson 2012 — 24h+ spacing required in both directions). Same prime movers loaded three days in a row degrades both strength adaptation AND endurance quality.
-
-  Required architectural fix:
-  1. Add concurrent training spacing rule to `docs/SCHEDULING-RULES.md`: "Strength sessions targeting [legs/upper] must be ≥24h from any quality endurance session targeting the same prime movers."
-  2. Default placement scorer penalizes sandwich layouts (strength between two leg-dominant quality sessions).
-  3. Acceptable default patterns: strength paired same-day with quality endurance (AM/PM stacking), OR strength on easy day, OR strength after long sessions (legs already cooked, recovery week ahead).
-  4. Surface trade-off when no valid placement exists given other constraints (anchor days, frequency, available days).
-
-  Research: Hickson 1980 (concurrent training interference), Wilson et al 2012 (meta-analysis), Coffey & Hawley 2017 (molecular mechanisms), Hyldahl & Hubal 2014 (recovery timing). 24-48h minimum between strength lower and quality run/ride sessions.
+- [x] **Concurrent training spacing constraint — HIGH severity scheduling defect.** ✅ Shipped 2026-05-11 for combined-plan generator. `docs/SCHEDULING-RULES.md §4.21` codifies the rule; `_shared/week-optimizer.ts` enforces strict 24h/48h spacing + sandwich rejection + tier ladder (CLEAN → SOFT → SANDWICH → DROP); `_shared/schedule-session-constraints.ts:SESSION_PRIME_MOVER` provides the prime-mover taxonomy. §5.1 performance-intent carve-out deprecated. Research cited inline: Hickson 1980, Wilson et al 2012, Robineau et al 2016, Coffey & Hawley 2017, Petré et al 2021.
+- [ ] **Apply §4.21 to other plan generators.** Above fix is combined-plan only. `generate-run-plan`, `generate-triathlon-plan`, `generate-plan` have independent placement pipelines that were NOT routed through the new rule. Audit each, identify placement entry points, apply prime-mover taxonomy + tier ladder. Use `_shared/week-optimizer.ts` as the reference implementation.
 
 ---
 
