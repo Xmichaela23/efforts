@@ -145,10 +145,15 @@ For each numbered item:
 - [ ] Verify threshold pace / VDOT → run zones
 - [ ] Verify recent training history → volume floor calibration
 - [ ] Tradeoff messages should disappear when their question isn't violated
-- [ ] **Concurrent training spacing — strength lower body currently allowed to land between quality ride and quality run** (e.g., Wed lower between Tue Sweet Spot bike and Thu VO2max run). Research (Hickson 1980, Wilson 2012) shows 24+ hours separation needed in both directions; otherwise legs are fatigued for endurance quality AND endurance pre-fatigue reduces strength adaptation. Decide architectural approach:
-  - Option A: Surface as a trade-off message when athlete's pinned strength day creates a conflict
-  - Option B: Engine refuses to place strength lower body within 24h of quality endurance using the same prime movers
-  Add the concurrent training spacing rule to `docs/SCHEDULING-RULES.md` regardless. Document the research backing.
+- [ ] **Concurrent training spacing constraint — HIGH severity scheduling defect.** Default scheduler places strength lower body between quality endurance sessions (e.g., Wed lower between Tue Sweet Spot ride and Thu VO2max run). No athlete pin involved — engine choosing this layout on its own. Violates concurrent training research (Hickson 1980, Wilson 2012 — 24h+ spacing required in both directions). Same prime movers loaded three days in a row degrades both strength adaptation AND endurance quality.
+
+  Required architectural fix:
+  1. Add concurrent training spacing rule to `docs/SCHEDULING-RULES.md`: "Strength sessions targeting [legs/upper] must be ≥24h from any quality endurance session targeting the same prime movers."
+  2. Default placement scorer penalizes sandwich layouts (strength between two leg-dominant quality sessions).
+  3. Acceptable default patterns: strength paired same-day with quality endurance (AM/PM stacking), OR strength on easy day, OR strength after long sessions (legs already cooked, recovery week ahead).
+  4. Surface trade-off when no valid placement exists given other constraints (anchor days, frequency, available days).
+
+  Research: Hickson 1980 (concurrent training interference), Wilson et al 2012 (meta-analysis), Coffey & Hawley 2017 (molecular mechanisms), Hyldahl & Hubal 2014 (recovery timing). 24-48h minimum between strength lower and quality run/ride sessions.
 
 ---
 
