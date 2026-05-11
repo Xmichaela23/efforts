@@ -1424,11 +1424,18 @@ function expandTokensForRow(
           // they can't drift even if `user_baselines.performance_numbers` changes between plan
           // generation and materialization. See
           // `shared/strength-system/protocols/triathlon_performance.ts:scaleSessionToRebuildLoads`.
+          //
+          // Also accept pure-numeric strings ("115" without unit or %) so JSONB round-trips
+          // that incidentally stringify the number don't drop the athlete into the default
+          // 0.7 fallback path (= 105 lb vs the dispatcher's intended 115 lb safety bug).
           const preResolvedRaw = (ex as any)?.weight;
-          const isPreResolvedNumeric =
-            typeof preResolvedRaw === 'number' &&
-            Number.isFinite(preResolvedRaw) &&
-            preResolvedRaw > 0;
+          const preResolvedNum =
+            typeof preResolvedRaw === 'number' && Number.isFinite(preResolvedRaw) && preResolvedRaw > 0
+              ? preResolvedRaw
+              : (typeof preResolvedRaw === 'string' && /^\s*\d+(?:\.\d+)?\s*$/.test(preResolvedRaw)
+                  ? parseFloat(preResolvedRaw)
+                  : null);
+          const isPreResolvedNumeric = preResolvedNum != null && preResolvedNum > 0;
 
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
           if (isQualitativeStrengthWeight((ex as any)?.weight)) {
@@ -1441,7 +1448,7 @@ function expandTokensForRow(
             // Pass-through: dispatcher already resolved this against its 1RM snapshot.
             const isMetricA = !!(baselines as any).isMetric;
             const wUnitA = isMetricA ? 'kg' : 'lb';
-            prescribed = preResolvedRaw as number;
+            prescribed = preResolvedNum as number;
             if (exerciseConfig?.displayFormat === 'perHand') {
               weightDisplay = `${prescribed} ${wUnitA} each`;
             } else {
@@ -1584,11 +1591,15 @@ function expandTokensForRow(
           
           // Pre-resolved numeric weight from the rebuild scaler (see first call site for the
           // contract). Mirror the same pass-through branch here so the regenerate path honors it.
+          // Also accept pure-numeric strings — see the first site for the JSONB round-trip rationale.
           const preResolvedRaw2 = (ex as any)?.weight;
-          const isPreResolvedNumeric2 =
-            typeof preResolvedRaw2 === 'number' &&
-            Number.isFinite(preResolvedRaw2) &&
-            preResolvedRaw2 > 0;
+          const preResolvedNum2 =
+            typeof preResolvedRaw2 === 'number' && Number.isFinite(preResolvedRaw2) && preResolvedRaw2 > 0
+              ? preResolvedRaw2
+              : (typeof preResolvedRaw2 === 'string' && /^\s*\d+(?:\.\d+)?\s*$/.test(preResolvedRaw2)
+                  ? parseFloat(preResolvedRaw2)
+                  : null);
+          const isPreResolvedNumeric2 = preResolvedNum2 != null && preResolvedNum2 > 0;
 
           // If the prescription is qualitative (e.g., "Light"), preserve it as display text.
           if (isQualitativeStrengthWeight((ex as any)?.weight)) {
@@ -1600,7 +1611,7 @@ function expandTokensForRow(
           } else if (isPreResolvedNumeric2) {
             const isMetricB = !!(baselines as any).isMetric;
             const wUnitB = isMetricB ? 'kg' : 'lb';
-            prescribed = preResolvedRaw2 as number;
+            prescribed = preResolvedNum2 as number;
             if (exerciseConfig?.displayFormat === 'perHand') {
               weightDisplay = `${prescribed} ${wUnitB} each`;
             } else {
