@@ -96,6 +96,8 @@ type StrengthIntentMat = 'support' | 'performance' | null;
 
 type SwimIntentMat = 'focus' | 'race' | null;
 
+import { readAthleteSnapshotOrLive } from '../_shared/athlete-snapshot.ts';
+
 /** Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower). */
 function resolveStrengthPercentForLift(
   exerciseName: string,
@@ -2396,7 +2398,41 @@ Deno.serve(async (req) => {
         strength.hip_thrust,
         Math.max(75, Math.round(dlNum * 0.55)),
       );
-      console.log('[materialize-plan] strength 1RM (manual > learned > default):', {
+      // **Athlete snapshot override** — read the plan-pinned snapshot AFTER the legacy merge so
+      // the snapshot wins for new plans while legacy plans (no snapshot) fall back to the merge
+      // result. Single read point at the top of the baseline-loading section ensures every
+      // downstream materializer branch (research-config, legacy fallback, pre-resolved-numeric)
+      // sees the same baselines — closes the per-session divergence (Week 16 vs Week 17 reading
+      // different 1RMs in the same plan).
+      try {
+        const planIdForSnap = rows[0]?.training_plan_id;
+        if (planIdForSnap) {
+          const { data: planRowForSnap } = await supabase
+            .from('plans')
+            .select('config')
+            .eq('id', planIdForSnap)
+            .maybeSingle();
+          const planConfigForSnap = (planRowForSnap?.config && typeof planRowForSnap.config === 'object'
+            ? planRowForSnap.config
+            : null) as Record<string, unknown> | null;
+          const resolved = readAthleteSnapshotOrLive(
+            planConfigForSnap,
+            { performance_numbers: ub?.performance_numbers ?? null, learned_fitness: ub?.learned_fitness ?? null },
+          );
+          // Snapshot wins per field; preserve existing baselines.* (default fallbacks) when
+          // snapshot has no value for that lift.
+          if (resolved.performance_numbers.deadlift != null) (baselines as any).deadlift = resolved.performance_numbers.deadlift;
+          if (resolved.performance_numbers.squat != null) (baselines as any).squat = resolved.performance_numbers.squat;
+          if (resolved.performance_numbers.bench != null) (baselines as any).bench = resolved.performance_numbers.bench;
+          if (resolved.performance_numbers.overheadPress1RM != null) (baselines as any).overheadPress1RM = resolved.performance_numbers.overheadPress1RM;
+          if (resolved.performance_numbers.hipThrust != null) (baselines as any).hipThrust = resolved.performance_numbers.hipThrust;
+          console.log(`[materialize-plan] athlete-snapshot source=${resolved.source}`, resolved.performance_numbers);
+        }
+      } catch (e) {
+        console.warn('[materialize-plan] athlete-snapshot read failed; using merged baselines:', e);
+      }
+
+      console.log('[materialize-plan] strength 1RM (post-snapshot, manual > learned > default):', {
         squat: (baselines as any).squat,
         bench: (baselines as any).bench,
         deadlift: (baselines as any).deadlift,

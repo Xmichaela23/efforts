@@ -16,6 +16,7 @@ import {
 import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
 import { validateRequest, validatePlanSchema } from './validation.ts';
 import { TriathlonGenerator } from './generators/tri-generator.ts';
+import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,6 +115,28 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // Athlete-input snapshot pinned at plan generation. Same canonical-value contract as the
+    // combined-plan path — materializer + downstream consumers read this rather than re-querying
+    // user_baselines live. v1 populates strength only; FTP / swim / run / equipment / intent /
+    // capacity / bio land in follow-up commits.
+    let athleteSnapshotPerformanceNumbers: Record<string, unknown> | null = null;
+    try {
+      const { data: ubForSnap } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers')
+        .eq('user_id', request.user_id)
+        .maybeSingle();
+      if (ubForSnap?.performance_numbers && typeof ubForSnap.performance_numbers === 'object') {
+        athleteSnapshotPerformanceNumbers = ubForSnap.performance_numbers as Record<string, unknown>;
+      }
+    } catch (e) {
+      console.warn('[TriPlanGen] athlete snapshot baseline fetch failed:', e);
+    }
+    const athlete_snapshot = buildAthleteSnapshot({
+      athleteState: { performance_numbers: athleteSnapshotPerformanceNumbers },
+      source: 'request',
+    });
+
     const { data: inserted, error: insertErr } = await supabase
       .from('plans')
       .insert({
@@ -125,6 +148,7 @@ Deno.serve(async (req: Request) => {
         status:         'active',
         plan_type:      'generated',
         config: {
+          athlete_snapshot,
           source:                   'generated',
           plan_version:             'triathlon_v1',
           sport:                    'triathlon',

@@ -36,6 +36,7 @@ import {
   WEEK_OVER_WEEK_RAW_TSS_RAMP_MAX_TRI,
 } from './validate-training-floors.ts';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
+import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -523,6 +524,15 @@ Deno.serve(async (req: Request) => {
       units: planUnits,
       swim_unit: 'yd',
       user_selected_start_date: start_date ?? new Date().toISOString().slice(0, 10),
+      // Canonical athlete-input snapshot. Pinned at generation time; consumers
+      // (materialize-plan, coach, adapt-plan) read from this rather than re-querying
+      // user_baselines live. Initial v1 populates strength 1RMs only; FTP / swim CSS /
+      // run threshold / equipment / intent / capacity / bio land in follow-up commits.
+      athlete_snapshot: buildAthleteSnapshot({
+        athleteState: state as unknown as Record<string, unknown>,
+        goals: goals as unknown as Array<Record<string, unknown>>,
+        source: 'request',
+      }),
     };
 
     const previewSummary = {

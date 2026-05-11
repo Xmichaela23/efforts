@@ -22,6 +22,7 @@ import { validateRequest, validatePlanSchema, validateTokens, detectScheduleConf
 import { SustainableGenerator } from './generators/sustainable.ts';
 import { PerformanceBuildGenerator } from './generators/performance-build.ts';
 import { overlayStrength, overlayStrengthLegacy } from './strength-overlay.ts';
+import { buildAthleteSnapshot } from '../_shared/athlete-snapshot.ts';
 import { mapApproachToMethodology } from '../shared/strength-system/placement/strategy.ts';
 import { addTimingLogic } from './timing-logic.ts';
 import { 
@@ -284,6 +285,30 @@ Deno.serve(async (req: Request) => {
 
     // startDate was already calculated above for the generator
 
+    // Pin the athlete-input snapshot for this plan. Fetch `user_baselines.performance_numbers`
+    // now so the materializer (which runs later when sessions get expanded into
+    // planned_workouts) reads from this pinned view rather than re-querying live tables — same
+    // canonical-value contract as the combined-plan path; closes description↔delivered drift
+    // even if the athlete updates a 1RM after plan creation. v1 populates strength only;
+    // bike / swim / run / equipment / intent / capacity / bio added in follow-up commits.
+    let athleteSnapshotPerformanceNumbers: Record<string, unknown> | null = null;
+    try {
+      const { data: ubForSnap } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers')
+        .eq('user_id', request.user_id)
+        .maybeSingle();
+      if (ubForSnap?.performance_numbers && typeof ubForSnap.performance_numbers === 'object') {
+        athleteSnapshotPerformanceNumbers = ubForSnap.performance_numbers as Record<string, unknown>;
+      }
+    } catch (e) {
+      console.warn('[generate-run-plan] athlete snapshot baseline fetch failed:', e);
+    }
+    const athlete_snapshot = buildAthleteSnapshot({
+      athleteState: { performance_numbers: athleteSnapshotPerformanceNumbers },
+      source: 'request',
+    });
+
     const { data: insertedPlan, error: insertError } = await supabase
       .from('plans')
       .insert({
@@ -295,6 +320,7 @@ Deno.serve(async (req: Request) => {
         status: 'active', // Plan is active, activate-plan will create workouts
         plan_type: 'generated',
         config: {
+          athlete_snapshot,
           source: 'generated',
           plan_version: 'strength_protocols_v1', // Version stamp for plan structure
           approach: request.approach,
