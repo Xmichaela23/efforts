@@ -31,6 +31,7 @@ import {
   aggregateOptimizerScheduleSignals,
   buildCombinedPlanGenerationTradeOffs,
   enrichScheduleSignalsWithCombinedPlanTradeOffs,
+  hasAthletePinsFromPrefs,
   stripStaleQualityRunUnplacedFromScheduleSignals,
   type BackfillOptimizerSnapshot,
   type PlanOptimizerSnapshotInput,
@@ -1186,7 +1187,14 @@ async function buildCombinedPlan(
     }
   }
 
-  const schedule_signals = aggregateOptimizerScheduleSignals(optimizerSnapshotsForTradeOffs);
+  // Anchor-referring trade-off messages ("adjust pinned long or group-ride days first") are
+  // false noise when the athlete pinned no anchors. Derive the signal from combinedSchedulePrefs
+  // and pass it to the boundary aggregator — see `_shared/plan-generation-trade-offs.ts`.
+  const athleteHasPins = hasAthletePinsFromPrefs(combinedSchedulePrefs as Record<string, unknown>);
+  const schedule_signals = aggregateOptimizerScheduleSignals(
+    optimizerSnapshotsForTradeOffs,
+    { hasAthletePins: athleteHasPins },
+  );
 
   console.log(
     '[buildCombinedPlan] week_optimizer_derived_for_goal_ids:',
@@ -1708,6 +1716,7 @@ async function buildCombinedPlan(
     const schedule_signals_mid = enrichScheduleSignalsWithCombinedPlanTradeOffs(schedule_signals, {
       week_trade_offs: wtoPrev,
       sessions_by_week: sbwPrev,
+      hasAthletePins: athleteHasPins,
     });
     const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
       schedule_signals_mid,
@@ -1791,6 +1800,7 @@ async function buildCombinedPlan(
   const schedule_signals_mid = enrichScheduleSignalsWithCombinedPlanTradeOffs(schedule_signals, {
     week_trade_offs: wtoDb,
     sessions_by_week: sbwDb,
+    hasAthletePins: athleteHasPins,
   });
   const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
     schedule_signals_mid,
@@ -2285,10 +2295,15 @@ Deno.serve(async (req: Request) => {
       triGenerateBody.generation_trade_offs = standalone_generation_trade_offs;
       console.log('[create-goal] standalone tri generation_trade_offs:', JSON.stringify(standalone_generation_trade_offs));
 
+      // Standalone tri may not have a combinedSchedulePrefs in scope here; derive from the
+      // standalone goal's training_prefs as a fallback signal.
+      const standaloneTriPrefs = (newGoal.training_prefs as Record<string, unknown>) ?? {};
+      const standaloneHasPins = hasAthletePinsFromPrefs(standaloneTriPrefs);
       const triScheduleSignals = aggregateOptimizerScheduleSignals(
         standaloneTriOptimizerSnapshot
           ? [{ goal_id: triTradeOffGoalId || 'tri', ...standaloneTriOptimizerSnapshot }]
           : [],
+        { hasAthletePins: standaloneHasPins },
       );
 
       const triGenerated = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-triathlon-plan', triGenerateBody);

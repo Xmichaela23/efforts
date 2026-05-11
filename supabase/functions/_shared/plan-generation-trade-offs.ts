@@ -79,16 +79,85 @@ const INTERNAL_OPTIMIZER_TELEMETRY_PATTERNS: RegExp[] = [
   /^Swim budget raised by \d+ yd total to honor \d+ pinned swim days\.?$/i,
 ];
 
+/**
+ * Patterns that reference athlete-pinned anchors ("adjust pinned long or group-ride days",
+ * "move a fixed ride", "your pinned anchors"). When the athlete has NOT pinned any anchors,
+ * these messages are false references — they tell the athlete to adjust pins they never set.
+ *
+ * Filtered out via {@link filterAthleteFacingTradeOffs} when the caller passes
+ * `hasAthletePins: false`. When pins ARE set, these messages are useful actionable guidance
+ * and stay surfaced.
+ */
+const ANCHOR_REFERENCE_PATTERNS: RegExp[] = [
+  /\bpinned\s+long\s+or\s+group-ride\b/i,
+  /\bpinned\s+(rides?|days?|workouts?|anchors?|long\s+runs?|long\s+rides?)\b/i,
+  /\byour\s+pinned\s+\w+/i,
+  /\byour\s+pins\b/i,
+  /\bmove\s+a?\s*fixed\s+(ride|workout|long\s+(run|ride))/i,
+  /\badjust\s+a?\s*fixed\s+(ride|workout|long\s+(run|ride))/i,
+  /\banchored\s+(group\s+ride|ride|run)\b/i,
+];
+
 export function isInternalOptimizerTelemetry(message: string): boolean {
   const s = String(message ?? '').trim();
   if (!s) return false;
   return INTERNAL_OPTIMIZER_TELEMETRY_PATTERNS.some((re) => re.test(s));
 }
 
-/** Apply the {@link isInternalOptimizerTelemetry} filter to a trade-off list. */
-export function filterAthleteFacingTradeOffs(messages: string[] | null | undefined): string[] {
+/** True when the message references athlete-pinned anchors (pins / fixed / anchored / your pins). */
+export function referencesAthletePins(message: string): boolean {
+  const s = String(message ?? '').trim();
+  if (!s) return false;
+  return ANCHOR_REFERENCE_PATTERNS.some((re) => re.test(s));
+}
+
+/**
+ * Derive whether the athlete has pinned at least one schedule anchor from a normalized
+ * preferences-like object. Used by callers to compute the `hasAthletePins` boolean threaded into
+ * the boundary aggregators. Conservative: a single non-empty pinned field is enough.
+ *
+ * Accepts a generic shape so the helper lives in `_shared` without a backward dep on
+ * `generate-combined-plan/types.ts`.
+ */
+export function hasAthletePinsFromPrefs(prefs: Record<string, unknown> | null | undefined): boolean {
+  if (!prefs || typeof prefs !== 'object') return false;
+  const dayFields = [
+    'long_run_day',
+    'long_ride_day',
+    'bike_quality_day',
+    'bike_easy_day',
+    'run_quality_day',
+    'run_easy_day',
+    'swim_quality_day',
+    'swim_easy_day',
+    'swim_third_day',
+  ];
+  for (const k of dayFields) {
+    const v = (prefs as Record<string, unknown>)[k];
+    if (v != null && v !== '' && (typeof v === 'number' || typeof v === 'string')) return true;
+  }
+  // strength_preferred_days is an array of weekday names.
+  const sp = (prefs as Record<string, unknown>).strength_preferred_days;
+  if (Array.isArray(sp) && sp.length > 0) return true;
+  return false;
+}
+
+/**
+ * Apply the trade-off filters: drop internal optimizer telemetry always; drop anchor-referring
+ * messages when the athlete has NOT pinned any anchors (`options.hasAthletePins === false`).
+ * When `hasAthletePins` is unset, anchor-referring messages are surfaced (conservative default).
+ */
+export function filterAthleteFacingTradeOffs(
+  messages: string[] | null | undefined,
+  options?: { hasAthletePins?: boolean },
+): string[] {
   if (!Array.isArray(messages)) return [];
-  return messages.filter((m) => typeof m === 'string' && !isInternalOptimizerTelemetry(m));
+  return messages.filter((m) => {
+    if (typeof m !== 'string') return false;
+    if (isInternalOptimizerTelemetry(m)) return false;
+    if (options?.hasAthletePins === false && referencesAthletePins(m)) return false;
+    return true;
+  });
 }
 
 /**
@@ -138,6 +207,7 @@ export function humanizeScheduleTradeOffLine(raw: string): string {
 
 export function aggregateOptimizerScheduleSignals(
   snapshots: PlanOptimizerSnapshotInput[],
+  options?: { hasAthletePins?: boolean },
 ): ScheduleSignals {
   const conflicts = new Set<string>();
   const tradeOffs = new Set<string>();
@@ -162,6 +232,7 @@ export function aggregateOptimizerScheduleSignals(
     conflicts: [...conflicts],
     trade_offs: filterAthleteFacingTradeOffs(
       [...tradeOffs].map((t) => humanizeScheduleTradeOffLine(t)),
+      options,
     ),
     used_co_equal_1x_fallback: coEqual,
     pin_restore_skipped: [...pinSkipped],
@@ -525,6 +596,7 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
   opts: {
     week_trade_offs?: Record<string, unknown> | null;
     sessions_by_week?: Record<string, unknown> | null;
+    hasAthletePins?: boolean;
   },
 ): ScheduleSignals {
   const seen = new Set(signals.trade_offs.map((t) => String(t).trim()).filter(Boolean));
@@ -552,7 +624,10 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
 
   return {
     ...signals,
-    trade_offs: filterAthleteFacingTradeOffs(out.map((t) => humanizeScheduleTradeOffLine(String(t)))),
+    trade_offs: filterAthleteFacingTradeOffs(
+      out.map((t) => humanizeScheduleTradeOffLine(String(t))),
+      { hasAthletePins: opts.hasAthletePins },
+    ),
   };
 }
 

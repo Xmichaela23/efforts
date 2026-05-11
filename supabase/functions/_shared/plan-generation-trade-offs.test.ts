@@ -16,7 +16,9 @@ import {
   aggregateOptimizerScheduleSignals,
   enrichScheduleSignalsWithCombinedPlanTradeOffs,
   filterAthleteFacingTradeOffs,
+  hasAthletePinsFromPrefs,
   isInternalOptimizerTelemetry,
+  referencesAthletePins,
 } from './plan-generation-trade-offs.ts';
 
 // ── §1 classifier: internal telemetry patterns ──────────────────────────────
@@ -153,4 +155,118 @@ Deno.test('boundary filter: end-to-end — internal-only optimizer snapshot prod
     },
   ]);
   assertEquals(out.trade_offs, []);
+});
+
+// ── §4 anchor-reference filter (Bug D) ─────────────────────────────────────
+
+Deno.test('referencesAthletePins: catches "pinned long or group-ride days" suffix', () => {
+  assert(referencesAthletePins('If you need two strength days, adjust pinned long or group-ride days first.'));
+});
+
+Deno.test('referencesAthletePins: catches "move a fixed ride / long run / long ride"', () => {
+  assert(referencesAthletePins('To add a second day, move a fixed ride, long run, or swim block.'));
+  assert(referencesAthletePins('move a fixed workout (group ride, long run, or long ride).'));
+});
+
+Deno.test('referencesAthletePins: catches "your pins" / "your pinned anchors"', () => {
+  assert(referencesAthletePins('anchored group ride and run intervals share the same day — deliberate pairing around your pins.'));
+  assert(referencesAthletePins('week-builder resolved it on its micro-grid (your pinned anchors).'));
+});
+
+Deno.test('referencesAthletePins: athlete-facing constraint messages without anchor refs are NOT matched', () => {
+  assert(!referencesAthletePins('Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.'));
+  assert(!referencesAthletePins('Mid-week easy bike dropped — schedule too dense.'));
+  assert(!referencesAthletePins('Quality run not placed — tighten anchors or confirm a schedule change with the athlete.'));
+});
+
+Deno.test('filterAthleteFacingTradeOffs: drops anchor-referring messages when hasAthletePins=false', () => {
+  const input = [
+    'Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.',
+    'If you need two strength days, adjust pinned long or group-ride days first.',
+    'Mid-week easy bike dropped — schedule too dense.',
+    'To add a second day, move a fixed ride, long run, or swim block.',
+  ];
+  const out = filterAthleteFacingTradeOffs(input, { hasAthletePins: false });
+  assertEquals(out, [
+    'Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.',
+    'Mid-week easy bike dropped — schedule too dense.',
+  ]);
+});
+
+Deno.test('filterAthleteFacingTradeOffs: keeps anchor-referring messages when hasAthletePins=true', () => {
+  const input = [
+    'Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.',
+    'If you need two strength days, adjust pinned long or group-ride days first.',
+    'Mid-week easy bike dropped — schedule too dense.',
+  ];
+  const out = filterAthleteFacingTradeOffs(input, { hasAthletePins: true });
+  // All three pass — athlete actually has pins, so the anchor-referring guidance is actionable.
+  assertEquals(out.length, 3);
+});
+
+Deno.test('filterAthleteFacingTradeOffs: omitted option keeps anchor refs (conservative default)', () => {
+  const input = ['If you need two strength days, adjust pinned long or group-ride days first.'];
+  const out = filterAthleteFacingTradeOffs(input);
+  assertEquals(out.length, 1);
+});
+
+Deno.test('hasAthletePinsFromPrefs: any non-empty day field is enough', () => {
+  assert(hasAthletePinsFromPrefs({ long_run_day: 0 }));
+  assert(hasAthletePinsFromPrefs({ long_ride_day: 6 }));
+  assert(hasAthletePinsFromPrefs({ bike_quality_day: 'tuesday' }));
+  assert(hasAthletePinsFromPrefs({ strength_preferred_days: ['Monday'] }));
+});
+
+Deno.test('hasAthletePinsFromPrefs: empty / null / undefined → false', () => {
+  assertEquals(hasAthletePinsFromPrefs(null), false);
+  assertEquals(hasAthletePinsFromPrefs(undefined), false);
+  assertEquals(hasAthletePinsFromPrefs({}), false);
+  assertEquals(hasAthletePinsFromPrefs({ strength_preferred_days: [] }), false);
+});
+
+Deno.test('Bug D end-to-end: aggregator drops anchor refs when hasAthletePins=false', () => {
+  const out = aggregateOptimizerScheduleSignals(
+    [
+      {
+        goal_id: 'g1',
+        trade_offs: [
+          'Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.',
+          'CO_EQUAL_STRENGTH (recovery): co-equal strength provisional fallback',
+        ],
+        conflicts: [],
+        used_co_equal_1x_fallback: false,
+        pin_restore_skipped: [],
+      },
+    ],
+    { hasAthletePins: false },
+  );
+  // The CO_EQUAL_STRENGTH humanization rewrites to "move a fixed ride …", which is
+  // an anchor-referring message — must be dropped when athlete has no pins.
+  assert(
+    !out.trade_offs.some((t) => /fixed ride/i.test(t)),
+    `expected anchor-ref message dropped — got ${JSON.stringify(out.trade_offs)}`,
+  );
+  // Athlete-facing constraint message stays surfaced.
+  assert(out.trade_offs.some((t) => /Strength frequency reduced/i.test(t)));
+});
+
+Deno.test('Bug D: enrich aggregator honors hasAthletePins', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'Strength frequency reduced from 3× to 2× — week too dense for 3× without conflict.',
+        'If you need two strength days, adjust pinned long or group-ride days first.',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: null,
+      hasAthletePins: false,
+    },
+  );
+  assert(!enriched.trade_offs.some((t) => /pinned long or group-ride/i.test(t)));
+  assert(enriched.trade_offs.some((t) => /Strength frequency reduced/i.test(t)));
 });
