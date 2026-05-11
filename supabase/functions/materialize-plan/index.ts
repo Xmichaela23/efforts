@@ -315,7 +315,27 @@ function adjustPerformanceAccessoryLoadLb(
 }
 
 /** Performance intent: compound progression (+5 lb / 2-wk); accessory progression (+2.5 lb / wk); week 4n deload for both. */
-function adjustPerformanceWorkingLoadLb(
+/**
+ * Performance-intent accessory progression dispatch. The compound branch was removed —
+ * see commit notes + `docs/POLISH-PUNCH-LIST.md` for the architectural reasoning. tl;dr:
+ *
+ *   The legacy compound branch added a plan-week-driven offset (`+5 lb per 2 weeks` + a
+ *   `× 0.9` deload on week 4n) on top of the dispatcher's phase-aware %1RM emit AND on
+ *   top of `scaleSessionToRebuildLoads`'s pre-resolved rebuild weights. That double-stack
+ *   produced description↔delivered drift across every strength session (Week 15 rebuild
+ *   delivered 145 lb when the snapshot-computed description said 110 lb, etc.). The fix
+ *   is single-source-of-truth: the dispatcher owns progression via phase-aware %1RM and
+ *   the rebuild ramp factor. Within-phase progression (e.g., base 65% → 67% → 70%) is a
+ *   coaching-protocol question tracked in the punch list; when designed, it belongs in
+ *   the dispatcher emit so the description text still matches what's delivered.
+ *
+ * The accessory branch is preserved — it was added as a deliberate feature in commit
+ * `832a8449` with a different cadence (+2.5 lb / week, not week-modulo-4 deload) for
+ * isolation lifts that aren't 1RM-anchored. Description text on accessory exercises is
+ * qualitative ("Light cable", "Band"), so the description↔delivered contract isn't
+ * impacted by the +2.5 lb adjustment.
+ */
+export function adjustPerformanceWorkingLoadLb(
   weightLb: number | undefined,
   exerciseName: string,
   strengthIntent: StrengthIntentMat,
@@ -323,16 +343,6 @@ function adjustPerformanceWorkingLoadLb(
 ): number | undefined {
   if (weightLb == null || !Number.isFinite(weightLb) || strengthIntent !== 'performance') return weightLb;
   const n = String(exerciseName || '').toLowerCase();
-  if (isPerformanceCompoundExercise(n)) {
-    const w = Number(weekNum);
-    let x = weightLb;
-    if (Number.isFinite(w) && w >= 1 && w % 4 === 0) {
-      x *= 0.9;
-    } else if (Number.isFinite(w) && w >= 1) {
-      x += Math.floor((w - 1) / 2) * 5;
-    }
-    return Math.max(5, Math.round(x / 5) * 5);
-  }
   if (isPerformanceAccessoryProgressionExercise(n)) {
     return adjustPerformanceAccessoryLoadLb(weightLb, weekNum);
   }
