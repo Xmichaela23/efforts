@@ -633,6 +633,28 @@ function rewriteStrengthLineToRealized(
 }
 
 /**
+ * Rewrite the optimizer's hardcoded "AM run / PM lift" consolidated-day phrasing for
+ * strength_first-preference athletes (STRENGTH-PROTOCOL.md §6.5). The optimizer doesn't read
+ * `strength_ordering_preference`; it always emits the endurance_first phrasing. This post-
+ * processor flips the ordering language to match the athlete's stated preference.
+ *
+ * Matches three optimizer message variants:
+ *   "consolidated on <day> (AM run / PM lift) — performance + co-equal; ..."
+ *   "stacked with quality_run on <day> (AM run / PM lift) — consolidated hard day per ..."
+ *   any other prose containing "AM run / PM lift"
+ *
+ * For strength_first: rewrites to "AM lift / PM run".
+ * For endurance_first (default): no change.
+ */
+function rewriteConsolidatedOrderingForPreference(
+  line: string,
+  pref: 'endurance_first' | 'strength_first',
+): string {
+  if (pref !== 'strength_first') return line;
+  return line.replace(/AM run \/ PM lift/gi, 'AM lift / PM run');
+}
+
+/**
  * Merge week-builder `week_trade_offs` plus derived calendar facts into Goals-schedule banner lines.
  * Optimizer-only aggregates omit builder/session truths unless we enrich here.
  */
@@ -642,6 +664,9 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
     week_trade_offs?: Record<string, unknown> | null;
     sessions_by_week?: Record<string, unknown> | null;
     hasAthletePins?: boolean;
+    /** §6.5 athlete preference for same-day Lower + Quality ordering. Drives "AM run / PM lift"
+     *  vs "AM lift / PM run" rewrite in trade-off messages. Default: 'endurance_first'. */
+    strengthOrderingPreference?: 'endurance_first' | 'strength_first';
   },
 ): ScheduleSignals {
   const seen = new Set(signals.trade_offs.map((t) => String(t).trim()).filter(Boolean));
@@ -682,10 +707,14 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
       })
     : out;
 
+  // §6.5: flip "AM run / PM lift" → "AM lift / PM run" for strength_first athletes.
+  const pref = opts.strengthOrderingPreference === 'strength_first' ? 'strength_first' : 'endurance_first';
+  const orderingFixed = realigned.map((line) => rewriteConsolidatedOrderingForPreference(line, pref));
+
   // Post-rewrite dedup: rewrites may collapse two divergent strings into the same realigned text.
   const dedupedHumanized: string[] = [];
   const seenHumanized = new Set<string>();
-  for (const t of realigned) {
+  for (const t of orderingFixed) {
     const h = humanizeScheduleTradeOffLine(String(t));
     const key = h.trim();
     if (!key || seenHumanized.has(key)) continue;

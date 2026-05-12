@@ -380,6 +380,75 @@ Deno.test('Bug 1: rewrite deduplicates two lines that collapse to the same reali
   assertEquals(strengthLines.length, 1, `expected dedup — got ${JSON.stringify(strengthLines)}`);
 });
 
+Deno.test('§6.5: strength_first preference flips "AM run / PM lift" → "AM lift / PM run"', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'quality_run + lower_body_strength consolidated on Thursday (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (intentional same-day pairing).',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: null,
+      strengthOrderingPreference: 'strength_first',
+    },
+  );
+  assert(
+    enriched.trade_offs.some((t) => /AM lift \/ PM run/i.test(t)),
+    `expected "AM lift / PM run" for strength_first — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+  assert(
+    !enriched.trade_offs.some((t) => /AM run \/ PM lift/i.test(t)),
+    `should not retain "AM run / PM lift" — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});
+
+Deno.test('§6.5: endurance_first (default) keeps "AM run / PM lift" verbatim', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'quality_run + lower_body_strength consolidated on Thursday (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (intentional same-day pairing).',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: null,
+      strengthOrderingPreference: 'endurance_first',
+    },
+  );
+  assert(
+    enriched.trade_offs.some((t) => /AM run \/ PM lift/i.test(t)),
+    `expected "AM run / PM lift" preserved for endurance_first — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});
+
+Deno.test('§6.5: omitting strengthOrderingPreference defaults to endurance_first (no rewrite)', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'lower_body_strength stacked with quality_run on Thursday (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: null,
+    },
+  );
+  assert(
+    enriched.trade_offs.some((t) => /AM run \/ PM lift/i.test(t)),
+    `expected "AM run / PM lift" preserved when preference omitted — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});
+
 Deno.test('Bug 1: sessions_by_week without strength sessions = no rewrite (safe pass-through)', () => {
   const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
     {

@@ -1723,6 +1723,10 @@ async function buildCombinedPlan(
       week_trade_offs: wtoPrev,
       sessions_by_week: sbwPrev,
       hasAthletePins: athleteHasPins,
+      strengthOrderingPreference:
+        (freshCombinedPrefs as Record<string, unknown>).strength_ordering_preference === 'strength_first'
+          ? 'strength_first'
+          : 'endurance_first',
     });
     const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
       schedule_signals_mid,
@@ -1807,6 +1811,10 @@ async function buildCombinedPlan(
     week_trade_offs: wtoDb,
     sessions_by_week: sbwDb,
     hasAthletePins: athleteHasPins,
+    strengthOrderingPreference:
+      (freshCombinedPrefs as Record<string, unknown>).strength_ordering_preference === 'strength_first'
+        ? 'strength_first'
+        : 'endurance_first',
   });
   const schedule_signals_out = stripStaleQualityRunUnplacedFromScheduleSignals(
     schedule_signals_mid,
