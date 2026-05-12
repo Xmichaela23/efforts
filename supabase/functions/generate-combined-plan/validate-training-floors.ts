@@ -387,10 +387,14 @@ function maxLongRideMinutes(week: GeneratedWeek): number {
   let best = 0;
   for (const s of week.sessions) {
     const tags = Array.isArray(s.tags) ? s.tags.map((x) => String(x).toLowerCase()) : [];
-    // `brick` sessions are tri-specific durability stimulus, not a long ride; exclude so a brick
-    // week's bike-leg ≈ 90 min isn't flagged against a 2.25h race-specific long-ride floor.
-    if (tags.includes('brick')) continue;
-    if (!tags.includes('long_ride')) continue;
+    // Bug 4 (2026-05-12): count brick bike legs toward long-ride volume. Race-prep weeks often
+    // replace the standalone long_ride with a brick (bike + run off-the-bike). If the brick's
+    // bike leg meets or exceeds the floor, the long-ride durability box is checked. Counting it
+    // here keeps observed-vs-floor honest: brick bike = 2.5h vs build floor 2.5h → no warning,
+    // not "no long ride scheduled (observed=0)". Bike-leg only — the brick's run portion is
+    // ≤ 25 min and represents transition stimulus, not bike endurance.
+    const isBrickBike = tags.includes('brick') && (s.type === 'bike' || tags.includes('bike'));
+    if (!tags.includes('long_ride') && !isBrickBike) continue;
     const dur = Number(s.duration) || 0;
     if (dur > best) best = dur;
   }

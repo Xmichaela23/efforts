@@ -325,25 +325,103 @@ Deno.test('run-only plan: long_run floor still evaluated', () => {
   assertEquals(out[0].metrics.floor, longRunFloorMiles('marathon', 'build'));
 });
 
-// ── §6 brick exclusion ──────────────────────────────────────────────────────
+// ── §6 brick bike counted as long_ride (Bug 4, 2026-05-12) ─────────────────
 
-Deno.test('brick session not counted as long_ride', () => {
-  // Brick has both 'brick' and may have 'long_ride' tags in some templates; exclude bricks.
+Deno.test('Bug 4: brick bike at floor satisfies long-ride floor (no warning)', () => {
+  // Race-prep weeks often replace the standalone long_ride with a brick. If the brick's bike
+  // leg meets or exceeds the floor, the long-ride durability box is checked.
   const weeks: GeneratedWeek[] = [
     week({
-      weekNum: 10,
+      weekNum: 6,
+      phase: 'build', // 70.3 build floor = 2.5h = 150min
+      sessions: [
+        session({ type: 'bike', tags: ['brick', 'bike', 'build'], durationMin: 150 }),
+        session({ type: 'run', tags: ['brick', 'run', 'build'], durationMin: 40 }),
+        session({ type: 'run', tags: ['long_run'], durationMin: 100 }),
+      ],
+    }),
+  ];
+  const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
+  const lrideWarn = out.find((w) => w.discipline === 'long_ride');
+  assertEquals(lrideWarn, undefined, `expected no long_ride warning — brick bike @ 150min meets 2.5h build floor; got ${JSON.stringify(out)}`);
+});
+
+Deno.test('Bug 4: brick bike below floor warns with brick duration as observed', () => {
+  // Plan 54 scenario: Week 6 brick bike = 2.3h (138min); 70.3 build floor = 2.5h. The warning
+  // should fire, but with observed=2.3h (not 0). The old "no long ride scheduled" message
+  // would be wrong — there's a 2.3h brick bike doing the bulk of the work.
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 6,
+      phase: 'build',
+      sessions: [
+        session({ type: 'bike', tags: ['brick', 'bike', 'build'], durationMin: 138 }),
+        session({ type: 'run', tags: ['brick', 'run', 'build'], durationMin: 40 }),
+      ],
+    }),
+  ];
+  const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
+  const lrideWarn = out.find((w) => w.discipline === 'long_ride');
+  assert(lrideWarn, `expected long_ride warning — brick 2.3h < 2.5h floor; got ${JSON.stringify(out)}`);
+  assertEquals(lrideWarn.metrics.observed, 2.3, `expected observed=2.3h (brick bike duration); got ${lrideWarn.metrics.observed}`);
+  // Message should reflect that a long_ride-shaped session exists, not "no long ride scheduled".
+  assert(!/no long ride scheduled/i.test(lrideWarn.message), `expected non-empty observation message — got "${lrideWarn.message}"`);
+});
+
+Deno.test('Bug 4: brick bike at race-specific floor (3.0h) satisfies', () => {
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 12,
       phase: 'race_specific',
       sessions: [
-        session({ type: 'bike', tags: ['brick', 'long_ride'], durationMin: 90 }),
+        session({ type: 'bike', tags: ['brick', 'bike', 'race_specific'], durationMin: 180 }),
+        session({ type: 'run', tags: ['brick', 'run', 'race_specific'], durationMin: 55 }),
         session({ type: 'run', tags: ['long_run'], durationMin: 120 }),
       ],
     }),
   ];
   const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
-  // No standalone long_ride → observed=0 warning. Brick was excluded by the evaluator.
   const lrideWarn = out.find((w) => w.discipline === 'long_ride');
-  assert(lrideWarn, 'expected long_ride warning — brick should not satisfy the floor');
-  assertEquals(lrideWarn.metrics.observed, 0);
+  assertEquals(lrideWarn, undefined, `expected no long_ride warning — brick bike @ 180min meets 3.0h race-specific floor; got ${JSON.stringify(out)}`);
+});
+
+Deno.test('Bug 4: standalone long_ride + shorter brick bike → max wins', () => {
+  // Week with both a standalone long_ride (above floor) AND a brick bike (below). The
+  // standalone covers the floor; no warning.
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 4,
+      phase: 'build',
+      sessions: [
+        session({ type: 'bike', tags: ['long_ride'], durationMin: 160 }),
+        session({ type: 'bike', tags: ['brick', 'bike'], durationMin: 90 }),
+        session({ type: 'run', tags: ['brick', 'run'], durationMin: 30 }),
+      ],
+    }),
+  ];
+  const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
+  const lrideWarn = out.find((w) => w.discipline === 'long_ride');
+  assertEquals(lrideWarn, undefined, `expected no warning — standalone long_ride @ 160min ≥ 2.5h floor; got ${JSON.stringify(out)}`);
+});
+
+Deno.test('Bug 4: brick run portion NOT counted toward long_ride', () => {
+  // Brick run leg ≤ 25 min represents transition stimulus, not bike endurance — the floor
+  // count should ignore it. Without this, a brick week with 100min bike + 20min run would
+  // (incorrectly) read as 100min, but at least not the run leg.
+  const weeks: GeneratedWeek[] = [
+    week({
+      weekNum: 5,
+      phase: 'build',
+      sessions: [
+        // Only a brick run, no brick bike — pathological but tests the type guard.
+        session({ type: 'run', tags: ['brick', 'run'], durationMin: 25 }),
+      ],
+    }),
+  ];
+  const out = evaluateLongDayVolumeFloors(weeks, { hasTri: true, primaryDistance: '70.3' });
+  const lrideWarn = out.find((w) => w.discipline === 'long_ride');
+  assert(lrideWarn, 'expected warning — no bike-shaped long_ride or brick bike present');
+  assertEquals(lrideWarn.metrics.observed, 0, `expected observed=0; got ${lrideWarn.metrics.observed}`);
 });
 
 // ── §7 message format ──────────────────────────────────────────────────────
