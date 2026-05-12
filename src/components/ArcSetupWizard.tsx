@@ -341,6 +341,15 @@ type WizardState = {
   strengthIncluded: boolean | null;
   strengthIntent: 'performance' | 'support' | null;
   /**
+   * Same-day strength + quality endurance ordering preference (STRENGTH-PROTOCOL.md §6.5).
+   * Only surfaces in the wizard when `strengthIntent === 'performance'` (Hybrid). For
+   * `support` / `none` intents the engine defaults to `endurance_first`. Default for hybrid
+   * is `endurance_first` (Doma & Deakin — protects running economy and race performance).
+   * Athletes who prioritize lifts can flip to `strength_first` (Eddens 2018 — protects
+   * lower-body dynamic strength). Drives AM/PM ordering on Lower + Quality Run/Bike pairings.
+   */
+  strengthOrderingPreference: 'endurance_first' | 'strength_first' | null;
+  /**
    * Heaviest dumbbell pair the athlete has access to (per hand, lb). Surfaces in Step 8 when the
    * athlete has DBs but no barbell — drives the spec §8.2 cap-and-scale-reps prescription. Default
    * 50 lb when the input is shown.
@@ -447,7 +456,7 @@ function blank(): WizardState {
     longRideDay: '', longRunDay: '',
     daysPerWeek: null,
     weeklyHours: null,
-    strengthIncluded: null, strengthIntent: null,
+    strengthIncluded: null, strengthIntent: null, strengthOrderingPreference: null,
     dbMaxLb: null,
     planStartDate: nextMonday,
     anythingUnusual: '',
@@ -670,6 +679,16 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
     ...(snapshotPersist ? { group_ride_route_snapshot: snapshotPersist } : {}),
     ...(state.strengthIncluded && state.strengthIntent
       ? { strength_intent: state.strengthIntent }
+      : {}),
+    // §6.5 ordering preference. Hybrid athletes pick; durability / none auto-default
+    // to endurance_first downstream so it's safe to always emit when intent is set.
+    ...(state.strengthIncluded && state.strengthIntent
+      ? {
+        strength_ordering_preference:
+          state.strengthIntent === 'performance'
+            ? (state.strengthOrderingPreference ?? 'endurance_first')
+            : 'endurance_first',
+      }
       : {}),
     ...(state.strengthIncluded && typeof state.dbMaxLb === 'number' && state.dbMaxLb > 0
       ? { db_max_lb: state.dbMaxLb }
@@ -2270,6 +2289,101 @@ function Step8Strength({
   );
 }
 
+/**
+ * §6.5 ordering-preference question. Only surfaces for Hybrid Strength Athletes
+ * (`strengthIntent === 'performance'`). The §6 rule itself is explained upfront — the athlete
+ * needs to understand what they're choosing, not have it hidden behind a disclosure.
+ */
+function Step8bStrengthOrdering({
+  state, setState, onNext, onBack, step, totalSteps,
+}: {
+  state: WizardState; setState: WizardSetState;
+  onNext: () => void; onBack: () => void;
+  step: number; totalSteps: number;
+}) {
+  const pref = state.strengthOrderingPreference;
+  const canContinue = pref !== null;
+  return (
+    <StepLayout
+      step={step}
+      totalSteps={totalSteps}
+      title="Same-day session priority"
+      onBack={onBack}
+      onContinue={onNext}
+      canContinue={canContinue}
+    >
+      <div className="space-y-3 text-[14px] leading-relaxed text-white/70">
+        <p>
+          Your training plan will sometimes put strength and a hard run or bike on the same day.
+          Research shows the order matters — what you do first gets the better stimulus.
+        </p>
+        <ul className="list-disc pl-5 space-y-1.5 text-white/65">
+          <li>
+            <span className="text-white/85 font-medium">Endurance first</span> protects your race
+            performance. Heavy strength after a quality run or bike fatigues your legs less than
+            the reverse.
+          </li>
+          <li>
+            <span className="text-white/85 font-medium">Strength first</span> protects your lifts.
+            Quality endurance before heavy strength reduces force production and blunts strength
+            adaptation.
+          </li>
+        </ul>
+        <p className="text-white/60">
+          Either way, leave <span className="text-white/85 font-medium">6+ hours between the two
+          sessions</span>. Eat between them.
+        </p>
+        <p className="text-white/80 font-medium pt-1">Which is your priority?</p>
+      </div>
+
+      <div className="space-y-2 pt-2">
+        <ChoiceBtn
+          active={pref === 'endurance_first'}
+          onClick={() => setState({ ...state, strengthOrderingPreference: 'endurance_first' })}
+        >
+          <span className="block font-semibold">🏃 Endurance first</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">
+            Recommended for triathletes focused on race results.
+          </span>
+        </ChoiceBtn>
+        <ChoiceBtn
+          active={pref === 'strength_first'}
+          onClick={() => setState({ ...state, strengthOrderingPreference: 'strength_first' })}
+        >
+          <span className="block font-semibold">🏋️ Strength first</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">
+            For athletes whose strength PRs matter as much as race times.
+          </span>
+        </ChoiceBtn>
+      </div>
+
+      <details className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] text-white/55 leading-snug">
+        <summary className="cursor-pointer text-white/65 hover:text-white/85 font-medium select-none">
+          Research backing
+        </summary>
+        <div className="mt-2 space-y-1.5">
+          <p>
+            <span className="text-white/75">Eddens et al. 2018</span> (Sports Medicine) meta-analysis:
+            strength-first ordering produced superior lower-body dynamic strength gains over
+            prolonged concurrent training.
+          </p>
+          <p>
+            <span className="text-white/75">Doma & Deakin</span>: endurance-first protects running
+            economy.
+          </p>
+          <p>
+            <span className="text-white/75">Makhlouf et al. 2016</span>: strength prior to endurance
+            for greater dynamic strength gains.
+          </p>
+          <p className="text-white/45 pt-1">
+            Effect sizes are moderate — both choices are defensible.
+          </p>
+        </div>
+      </details>
+    </StepLayout>
+  );
+}
+
 function Step9Confirm({
   state, setState, onBack, onConfirm, step, totalSteps, saving, arc,
 }: {
@@ -2547,6 +2661,11 @@ function getSteps(state: WizardState) {
   steps.push('budget');
   steps.push('hours');
   if (tri) steps.push('strength');
+  // §6.5: ordering-preference screen only for Hybrid athletes (strength_intent='performance').
+  // Durability/none auto-default to endurance_first at save time; no screen surfaced.
+  if (tri && state.strengthIncluded && state.strengthIntent === 'performance') {
+    steps.push('strength_ordering');
+  }
   steps.push('confirm');
   return steps;
 }
@@ -2721,6 +2840,9 @@ export default function ArcSetupWizard() {
             )}
             {currentStep === 'strength' && (
               <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+            )}
+            {currentStep === 'strength_ordering' && (
+              <Step8bStrengthOrdering {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'confirm' && (
               <Step9Confirm
