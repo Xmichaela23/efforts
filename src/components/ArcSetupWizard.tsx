@@ -636,8 +636,16 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
       : state.strengthIntent === 'performance'
         ? 'performance'
         : 'support';
+  const daysForMatrix = (() => {
+    const d = state.daysPerWeek ?? 7;
+    if (d <= 4) return 4 as const;
+    if (d === 5) return 5 as const;
+    if (d === 6) return 6 as const;
+    return 7 as const;
+  })();
   const sessionFrequencyDefaults = computeSessionFrequencyDefaults({
     weekly_hours_available: weeklyHoursValue,
+    days_per_week: daysForMatrix,
     ...(swimIntentForFreq ? { swim_intent: swimIntentForFreq } : {}),
     strength_intent: strengthIntentForFreq,
     // limiter_sport is inferred server-side from Arc context (see

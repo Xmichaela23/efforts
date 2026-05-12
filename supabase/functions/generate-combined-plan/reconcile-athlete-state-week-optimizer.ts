@@ -104,8 +104,16 @@ function resolveSessionFrequencyDefaults(state: AthleteState): SessionFrequencyD
   if (state.session_frequency_defaults) {
     return { ...state.session_frequency_defaults, source: 'override' };
   }
+  // Clamp arbitrary day counts to the matrix-supported {4, 5, 6, 7} range. AthleteState
+  // can carry any number; downstream uses Math.max(4, Math.min(7, ...)) already (see
+  // week-optimizer.ts:145-148), but the frequency matrix narrows to a tighter type.
+  const dayInput = Math.round(state.days_per_week ?? 7);
+  const days_per_week: 4 | 5 | 6 | 7 =
+    dayInput <= 4 ? 4 : dayInput === 5 ? 5 : dayInput === 6 ? 6 : 7;
+
   const inputs: SessionFrequencyInputs = {
     weekly_hours_available: state.weekly_hours_available,
+    days_per_week,
     ...(state.limiter_sport === 'swim' || state.limiter_sport === 'bike' || state.limiter_sport === 'run'
       ? { limiter_sport: state.limiter_sport }
       : {}),
