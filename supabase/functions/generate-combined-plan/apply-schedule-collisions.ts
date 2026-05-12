@@ -214,9 +214,16 @@ export function tryApplyScheduleCollisionsToGrid(
     weekTradeOffs: string[];
     /** Goal distance key (sprint / olympic / 70.3 / ironman) → collision tier. */
     triDistance?: TriathlonDistance;
+    /**
+     * Performance + co-equal strength athletes get the §5.2 consolidated hard-day exception:
+     * lower_body_lift on quality_run day is preserved (AM run / PM lift). Without this flag,
+     * the resolver's RULE 2 would relocate the lift to a non-quality day, bypassing the
+     * optimizer's consolidation. See `_shared/resolve-schedule-collisions.ts:RULE 2` comment.
+     */
+    isPerformanceCoequal?: boolean;
   },
 ): void {
-  const { weekNum, conflictEvents, weekTradeOffs, triDistance = '70.3' } = ctx;
+  const { weekNum, conflictEvents, weekTradeOffs, triDistance = '70.3', isPerformanceCoequal = false } = ctx;
   let attempt = 0;
   const maxAttempts = 2;
 
@@ -226,7 +233,7 @@ export function tryApplyScheduleCollisionsToGrid(
     if (extracted.payload.length === 0) return;
 
     try {
-      const resolved = resolveScheduleRules(extracted.payload, triDistance);
+      const resolved = resolveScheduleRules(extracted.payload, triDistance, { isPerformanceCoequal });
       applyResolvedCollisionDays(flat, extracted, resolved);
       if (attempt > 0) {
         weekTradeOffs.push(

@@ -125,17 +125,26 @@ function highStressDaysFrom(resolved: PlannedSession[]): DayOfWeek[] {
 
 export type ScheduleCollisionInvariantOptions = {
   allowLongStack?: boolean;
+  /**
+   * Performance + co-equal strength athletes (`training_intent === 'performance'` AND
+   * `strength_intent === 'performance'`) get the §5.2 consolidated hard-day exception:
+   * lower_body_lift may share quality_run day as a deliberate AM/PM stack. See
+   * `docs/SCHEDULING-RULES.md §5.2` + `_shared/week-optimizer.ts:canPlaceWithModifier`.
+   * When this flag is set, the lower-body-on-quality_run pairing is NOT a violation.
+   */
+  isPerformanceCoequal?: boolean;
 };
 
 /**
  * Final gatekeeper: quality_run ≠ quality_bike same day; optional long_ride/long_run split;
- * lower_body_lift ∉ high-stress days.
+ * lower_body_lift ∉ high-stress days (with §5.2 perf+coeq exception for quality_run day).
  */
 export function validateScheduleCollisionInvariants(
   resolved: PlannedSession[],
   options?: ScheduleCollisionInvariantOptions,
 ): void {
   const allowLongStack = options?.allowLongStack === true;
+  const isPerformanceCoequal = options?.isPerformanceCoequal === true;
 
   const qBike = getSession(resolved, 'quality_bike');
   const qRun = getSession(resolved, 'quality_run');
@@ -158,19 +167,33 @@ export function validateScheduleCollisionInvariants(
   const stress = highStressDaysFrom(resolved);
   const lb = getSession(resolved, 'lower_body_lift');
   if (lb && stress.includes(lb.day)) {
-    throw new ScheduleCollisionError(
-      'SCHEDULE_GRIDLOCK_LOWER_BODY',
-      'SCHEDULE_GRIDLOCK: Cannot safely place Lower Body Lift without violating endurance constraints.',
-    );
+    // §5.2 consolidated hard-day exception: perf+coeq athletes may stack lower_body + quality_run
+    // same day (AM/PM split). The other high-stress days (quality_bike, long_ride, long_run)
+    // remain forbidden — those are not consolidation candidates per the spec.
+    const isConsolidatedHardDay =
+      isPerformanceCoequal && qRun != null && lb.day === qRun.day;
+    if (!isConsolidatedHardDay) {
+      throw new ScheduleCollisionError(
+        'SCHEDULE_GRIDLOCK_LOWER_BODY',
+        'SCHEDULE_GRIDLOCK: Cannot safely place Lower Body Lift without violating endurance constraints.',
+      );
+    }
   }
+}
+
+export interface ResolveScheduleRulesOptions {
+  /** See `ScheduleCollisionInvariantOptions.isPerformanceCoequal`. Default false. */
+  isPerformanceCoequal?: boolean;
 }
 
 export function resolveScheduleRules(
   sessions: PlannedSession[],
   distance: TriathlonDistance = '70.3',
+  options?: ResolveScheduleRulesOptions,
 ): PlannedSession[] {
   const resolved = cloneSessions(sessions);
   const config = DISTANCE_CONFIG[distance] ?? DISTANCE_CONFIG['70.3'];
+  const isPerformanceCoequal = options?.isPerformanceCoequal === true;
 
   const qBike = getSession(resolved, 'quality_bike');
   const qRun = getSession(resolved, 'quality_run');
@@ -214,12 +237,23 @@ export function resolveScheduleRules(
     longRun.day = newDay;
   }
 
-  // RULE 2: Lower body lift — ranked scoring; forbidden only on high-stress days
+  // RULE 2: Lower body lift — ranked scoring; forbidden only on high-stress days.
+  //
+  // §5.2 perf+coeq exception: lower_body_lift on quality_run day is the consolidated
+  // hard-day pattern (AM run / PM lift), explicitly sanctioned in `docs/SCHEDULING-RULES.md
+  // §5.2` and emitted by `_shared/week-optimizer.ts:canPlaceWithModifier`. Pre-fix this
+  // resolver relocated lower_body_lift OFF quality_run day without honoring the exception —
+  // the bypass path that produced Monday-lower-instead-of-Thursday-consolidated for plan 51.
   const lbLift = getSession(resolved, 'lower_body_lift');
   if (lbLift) {
     const highStressDays = highStressDaysFrom(resolved);
+    const qRunForConsolidation = getSession(resolved, 'quality_run');
+    const lbOnQRunConsolidated =
+      isPerformanceCoequal &&
+      qRunForConsolidation != null &&
+      lbLift.day === qRunForConsolidation.day;
 
-    if (highStressDays.includes(lbLift.day)) {
+    if (highStressDays.includes(lbLift.day) && !lbOnQRunConsolidated) {
       const FORBIDDEN = -999;
       const dayScores = SCHEDULE_COLLISION_DAYS.map((day) => {
         if (highStressDays.includes(day)) return { day, score: FORBIDDEN };
@@ -266,6 +300,9 @@ export function resolveScheduleRules(
     }
   }
 
-  validateScheduleCollisionInvariants(resolved, { allowLongStack: config.allowLongStack });
+  validateScheduleCollisionInvariants(resolved, {
+    allowLongStack: config.allowLongStack,
+    isPerformanceCoequal,
+  });
   return resolved;
 }

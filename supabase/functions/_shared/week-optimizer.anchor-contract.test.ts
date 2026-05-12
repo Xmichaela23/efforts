@@ -791,6 +791,79 @@ Deno.test({
 
 // ── Fixture 05: stated quality_run preference — §4.5 blocks Thu after Wed QB; Fri OK ─
 
+// ── Bug 3 reproducer: Santa Cruz / NorCal reference plan geometry ─────────────────────────
+//
+// Athlete: 6-day perf+coeq, 11hr, Sat long_ride, Sun long_run, Tue QB, Thu QR (all pinned),
+// strength pins [Fri upper, Wed lower]. Reference plan (50) shows Mon LOWER + Fri UPPER
+// despite §4.21 Sun-long_run → Mon-lower being a hard block in sequentialOk.
+//
+// This test reproduces the geometry and asserts the §4.21 contract: Mon lower must NOT
+// be placed (Sun long_run is its prev day; line 455-458 of week-optimizer.ts is the hard
+// block). Expected outcome: Mon upper + Thu consolidated lower (CLEAN tier via the
+// §5.2 consolidated AM-QR + PM-lower pattern from yesterday's pin-respect path).
+//
+// If this test FAILS by showing Mon lower placed, the optimizer has a bypass path that
+// circumvents the §4.21 long_run prev-day check.
+
+Deno.test({
+  name: '04i bug-3 reproducer: 6-day perf+coeq w/ pinned QR Thu + pinned strength [Fri, Wed] must NOT place Mon lower',
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: {
+        long_ride: 'saturday',
+        long_run: 'sunday',
+        quality_bike: { day: 'tuesday', intensity: 'quality' },
+      },
+      preferences: basePreferences({
+        strength_frequency: 2,
+        bikes_per_week: 3,
+        runs_per_week: 3,
+        swims_per_week: 2,
+        training_days: 6,
+        quality_run: 'thursday',
+        easy_run: 'wednesday', // common wizard default
+        swim: ['monday', 'tuesday'], // matches user's plan header
+        strength_preferred_days: ['friday', 'wednesday'], // upper, lower per §4.15 indexing
+      }),
+      athlete: baseAthlete({
+        training_intent: 'performance',
+        strength_intent: 'performance',
+        swim_intent: 'race', // matches user's "Race-adequate swimming"
+      }),
+    };
+
+    const { week } = deriveOptimalWeekWithCoEqualRecovery(inputs);
+
+    // Debug — log the full placement so we can see what the engine actually produces
+    const layout = ALL_DAYS.map((d) => `${d}=${(week.days[d] ?? []).map((s) => s.kind).join('+') || 'rest'}`).join('; ');
+    console.log(`[04i] ${layout}`);
+    console.log(`[04i] preferred_days.strength=${JSON.stringify(week.preferred_days.strength)}`);
+    console.log(`[04i] trade_offs=${JSON.stringify(week.trade_offs)}`);
+    console.log(`[04i] conflicts=${JSON.stringify(week.conflicts)}`);
+
+    // §4.21 invariant: Mon lower with Sun long_run is a hard block. This must hold.
+    const mondayHasLower = (week.days['monday'] ?? []).some((s) => s.kind === 'lower_body_strength');
+    assert(
+      !mondayHasLower,
+      `§4.21 violation: Mon lower placed despite Sun long_run prev-day. Layout: ${layout}`,
+    );
+
+    // Verify the realized placement matches what the optimizer's findStrengthPair tier ladder
+    // should produce: Mon upper + Thu consolidated lower (consolidated AM-QR + PM-lower per §5.2).
+    const mondayHasUpper = (week.days['monday'] ?? []).some((s) => s.kind === 'upper_body_strength');
+    const thursdayHasLower = (week.days['thursday'] ?? []).some((s) => s.kind === 'lower_body_strength');
+    const thursdayHasQR = (week.days['thursday'] ?? []).some((s) => s.kind === 'quality_run');
+    assert(
+      mondayHasUpper,
+      `expected Mon upper (CLEAN tier with Sat/Sun anchors); got: ${layout}`,
+    );
+    assert(
+      thursdayHasLower && thursdayHasQR,
+      `expected Thu consolidated AM-QR + PM-lower; got: ${layout}`,
+    );
+  },
+});
+
 Deno.test({
   name: '05 quality_run preference Fri with Wed QB — honors §4.5 (not day-after quality_bike)',
   fn() {

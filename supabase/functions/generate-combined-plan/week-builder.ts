@@ -1902,6 +1902,8 @@ export function buildWeek(
     conflictEvents,
     weekTradeOffs: mergedTradeOffs,
     triDistance: normalizeGoalDistanceToTriCollisionDistance(primaryGoal?.distance),
+    // §5.2 perf+coeq consolidated hard-day exception — see resolve-schedule-collisions RULE 2.
+    isPerformanceCoequal,
   });
 
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────

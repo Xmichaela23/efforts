@@ -117,3 +117,79 @@ Deno.test('resolveScheduleRules does not mutate input', () => {
   resolveScheduleRules(sessions);
   assertEquals(JSON.stringify(sessions), snap);
 });
+
+// ── Bug 3 regression: §5.2 perf+coeq consolidated hard-day exception ──────────
+//
+// RULE 2 (lower_body off high-stress days) was relocating lower_body_lift OFF quality_run day
+// without honoring the §5.2 consolidated hard-day pattern (lower + QR same-day AM/PM is
+// sanctioned for performance + co-equal athletes). Plan 51 reference geometry:
+//   Sat long_ride, Sun long_run, Tue quality_bike, Thu quality_run.
+// Optimizer placed Thu lower (consolidated). RULE 2 relocated it to Monday (highest-scored
+// non-stress day). After fix: with `isPerformanceCoequal: true`, Thursday lower stays.
+
+Deno.test('Bug 3: perf+coeq exception keeps lower_body_lift on quality_run day (Thu consolidated)', () => {
+  const sessions: PlannedSession[] = [
+    base({ id: 'qb', type: 'quality_bike', day: 'tuesday', intensity: 'Z4', isWeightBearing: false }),
+    base({ id: 'qr', type: 'quality_run', day: 'thursday', intensity: 'Z4', isWeightBearing: true }),
+    base({ id: 'lr', type: 'long_ride', day: 'saturday', intensity: 'Z2', isWeightBearing: false }),
+    base({ id: 'lrun', type: 'long_run', day: 'sunday', intensity: 'Z2', isWeightBearing: true }),
+    base({ id: 'lb', type: 'lower_body_lift', day: 'thursday', intensity: 'Z3', isWeightBearing: false }),
+    base({ id: 'ub', type: 'upper_body_lift', day: 'friday', intensity: 'Z3', isWeightBearing: false }),
+  ];
+  const out = resolveScheduleRules(sessions, '70.3', { isPerformanceCoequal: true });
+  const lb = out.find((s) => s.type === 'lower_body_lift')!;
+  assertEquals(lb.day, 'thursday', `expected lb to stay on Thursday under perf+coeq; got ${lb.day}`);
+});
+
+Deno.test('Bug 3: WITHOUT perf+coeq flag, lower_body_lift IS relocated off quality_run day', () => {
+  // Default behavior preserved — non-perf-coeq athletes still get RULE 2 relocation.
+  const sessions: PlannedSession[] = [
+    base({ id: 'qb', type: 'quality_bike', day: 'tuesday', intensity: 'Z4', isWeightBearing: false }),
+    base({ id: 'qr', type: 'quality_run', day: 'thursday', intensity: 'Z4', isWeightBearing: true }),
+    base({ id: 'lr', type: 'long_ride', day: 'saturday', intensity: 'Z2', isWeightBearing: false }),
+    base({ id: 'lrun', type: 'long_run', day: 'sunday', intensity: 'Z2', isWeightBearing: true }),
+    base({ id: 'lb', type: 'lower_body_lift', day: 'thursday', intensity: 'Z3', isWeightBearing: false }),
+  ];
+  const out = resolveScheduleRules(sessions, '70.3'); // no options → default
+  const lb = out.find((s) => s.type === 'lower_body_lift')!;
+  assertEquals(lb.day !== 'thursday', true, `expected lb relocated off Thursday for non-perf-coeq; got ${lb.day}`);
+});
+
+Deno.test('Bug 3: perf+coeq exception does NOT extend to long_ride / long_run / quality_bike days', () => {
+  // Only quality_run day gets the exception (consolidated AM/PM rule per §5.2). lower_body on
+  // long_ride / long_run / quality_bike is still a violation — relocate.
+  for (const stressDay of ['tuesday', 'saturday', 'sunday'] as const) {
+    const sessions: PlannedSession[] = [
+      base({ id: 'qb', type: 'quality_bike', day: 'tuesday', intensity: 'Z4', isWeightBearing: false }),
+      base({ id: 'qr', type: 'quality_run', day: 'thursday', intensity: 'Z4', isWeightBearing: true }),
+      base({ id: 'lr', type: 'long_ride', day: 'saturday', intensity: 'Z2', isWeightBearing: false }),
+      base({ id: 'lrun', type: 'long_run', day: 'sunday', intensity: 'Z2', isWeightBearing: true }),
+      base({ id: 'lb', type: 'lower_body_lift', day: stressDay, intensity: 'Z3', isWeightBearing: false }),
+    ];
+    const out = resolveScheduleRules(sessions, '70.3', { isPerformanceCoequal: true });
+    const lb = out.find((s) => s.type === 'lower_body_lift')!;
+    assertEquals(
+      lb.day !== stressDay,
+      true,
+      `lower_body on ${stressDay} (non-QR stress day) must still relocate; got ${lb.day}`,
+    );
+  }
+});
+
+Deno.test('Bug 3: validateScheduleCollisionInvariants accepts lb-on-QR for perf+coeq', () => {
+  const sessions: PlannedSession[] = [
+    base({ id: 'qb', type: 'quality_bike', day: 'tuesday', intensity: 'Z4', isWeightBearing: false }),
+    base({ id: 'qr', type: 'quality_run', day: 'thursday', intensity: 'Z4', isWeightBearing: true }),
+    base({ id: 'lr', type: 'long_ride', day: 'saturday', intensity: 'Z2', isWeightBearing: false }),
+    base({ id: 'lrun', type: 'long_run', day: 'sunday', intensity: 'Z2', isWeightBearing: true }),
+    base({ id: 'lb', type: 'lower_body_lift', day: 'thursday', intensity: 'Z3', isWeightBearing: false }),
+  ];
+  // Without flag: throws (lb on quality_run day = high stress).
+  assertThrows(
+    () => validateScheduleCollisionInvariants(sessions),
+    ScheduleCollisionError,
+    'SCHEDULE_GRIDLOCK:',
+  );
+  // With flag: passes (consolidated hard-day).
+  validateScheduleCollisionInvariants(sessions, { isPerformanceCoequal: true });
+});
