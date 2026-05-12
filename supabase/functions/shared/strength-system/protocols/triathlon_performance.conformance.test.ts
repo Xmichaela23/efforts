@@ -303,6 +303,23 @@ Deno.test('S-003 DB tier (build upper): DB tier has DB Bench Press as horizontal
   assert(findByName(upper, /DB Bench Press|Floor Press/i), `DB build upper: missing DB Bench — got [${exerciseNames(upper)}]`);
 });
 
+// ── §3.8 W-003 — Durability deload SKIP ─────────────────────────────────────
+//
+// W-003 is enforced at the week-builder strFreq cap (week-builder.ts ~line 1534):
+// for `support` (durability) intent + isRecovery, strFreq is forced to 0 →
+// `slotsOrdered.slice(0, 0)` is empty → no strength sessions placed on the calendar.
+//
+// The dispatcher itself (triathlon.ts createWeekSessions) still has a recovery session
+// path; it's never invoked in production for durability deload because the caller
+// short-circuits at strFreq=0. This is the philosophical fork from §3.2 / §4.2:
+// hybrid REDUCES, durability SKIPS; the split tracks athlete intent at the caller layer
+// rather than reshaping the dispatcher.
+//
+// No dispatcher-level test added here — the gate lives at week-builder. An integration
+// test would require building a full plan; the Task 8 verification regen exercises
+// this path. If the strFreq cap drifts in the future, regression will surface as
+// "durability athlete has strength session in a deload week" in plan exports.
+
 // ── §3.8 W-002 — Hybrid deload REDUCE (not skip) ────────────────────────────
 
 Deno.test('W-002: hybrid deload week emits 1U + 1L (not skipped) when freq>=2', () => {
@@ -376,4 +393,50 @@ Deno.test('P-005: rebuild lower includes Hip Thrusts (S-005 still applies to reb
   const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
   const lower = lowerOf(sessions);
   assert(findByName(lower, /Hip Thrust|Glute Bridges/i), `rebuild lower missing Hip Thrusts — got [${exerciseNames(lower)}]`);
+});
+
+// ── §3.8 D-002 — Valid phase labels (no "Race-prep") ────────────────────────
+
+Deno.test('D-002: race-specific session descriptions use "Maintenance + Power", never "Race-prep"', () => {
+  for (const wip of [1, 2, 3]) {
+    const sessions = triathlonPerformanceProtocol.createWeekSessions(ctxWithPhase('race-specific', wip));
+    for (const s of sessions) {
+      assert(
+        !/Race-prep|race-prep|Race-Prep/.test(s.description),
+        `${s.name} wip=${wip}: description has forbidden "Race-prep" — got "${s.description}"`,
+      );
+      assert(
+        /Maintenance \+ Power/i.test(s.description),
+        `${s.name} wip=${wip}: description should reference "Maintenance + Power" — got "${s.description}"`,
+      );
+    }
+  }
+});
+
+Deno.test('D-002: race-specific session NAMES use valid phase labels', () => {
+  // Per §3.8 D-002 the valid set is: Hypertrophy, Strength Build, Maintenance + Power,
+  // Taper Priming, Rebuild. Session names already comply; this test guards against drift.
+  const validNamePatterns = [
+    /Hypertrophy/i,
+    /Strength Build/i,
+    /Maintenance \+ Power/i,
+    /Taper Priming/i,
+    /Rebuild/i,
+    /Deload/i, // Deload sessions belong to a phase's deload week, not a separate phase
+  ];
+  for (const phase of ['base', 'build', 'race-specific', 'rebuild']) {
+    for (const wip of [1, 2]) {
+      const sessions = triathlonPerformanceProtocol.createWeekSessions(
+        ctxWithPhase(phase, wip, { isRecovery: phase === 'recovery' }),
+      );
+      for (const s of sessions) {
+        const matches = validNamePatterns.some((re) => re.test(s.name));
+        assert(matches, `${phase} wip=${wip}: session name "${s.name}" does not match any valid D-002 phase label`);
+        assert(
+          !/Race-prep|race-prep|Race-Prep/.test(s.name),
+          `${phase} wip=${wip}: session name "${s.name}" contains forbidden "Race-prep"`,
+        );
+      }
+    }
+  }
 });
