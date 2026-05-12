@@ -127,6 +127,7 @@ For each numbered item:
 - [ ] Surface tradeoffs at decision time, not after plan generation
 - [ ] Link each equipment chip to what it unlocks
 - [ ] Explain what each baseline input drives
+- [ ] **`training_intent` wizard copy vs engine reality (2026-05-12 verification).** Step 2 wizard offers three options ("Race the clock", "Strong, healthy finish", "First time at this distance") promising three different prescriptions — intervals + threshold + pace targets + 3-4 wk recovery / tempo + no pace targets + 3 wk recovery / conservative + 2 wk recovery + no intensity. Engine reality: `training_intent` only gates 5 same-day pairing exceptions in `_shared/week-optimizer.ts` + 1 in `week-builder.ts` (consolidated AM run / PM lift, lb-on-QR exception). `completion` and `first_race` are functionally identical; pace targets, loading pattern, run-quality selection, and phase structure all ignore `training_intent`. Loading pattern is driven by `tri_approach` + fitness, not by intent. The wizard's primary intent question is cosmetic for 2 of 3 options today. **Two paths:** (a) wire `training_intent` through to loading pattern + intensity selection + pace-target emission (Ticket B #16 in task #120); (b) soften wizard copy to match engine reality. Picking (a) when Ticket B lands; (b) is the interim if it ships first. Same wiring-break pattern as `swim_experience`, `limiter_sport`, `goal_type` per Ticket B.
 
 ---
 
