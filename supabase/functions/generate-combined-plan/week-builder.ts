@@ -92,6 +92,40 @@ import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-
  *
  * Exported for testing — also called internally three times in this file.
  */
+/**
+ * §3.7 race-distance dose scaling for strength sessions/week. Returns the engine's
+ * sessions-per-week budget given phase + athlete intent + race distance + weekly hours.
+ *
+ * - base: 2 (all distances, both intents)
+ * - build: hybrid → 1 if Full IM + hours ≥ 18, else 2; durability → 1
+ * - race_specific: hybrid → 1 if Full IM, else 2; durability → 1
+ * - rebuild: 2 (inter-race, both protocols per §7.4 / P-005)
+ * - other phases: 1
+ *
+ * Exported for unit tests. Pure function — no side effects, day-agnostic.
+ */
+export function strFreqForPhase(args: {
+  phase: Phase;
+  performanceStrength: boolean;
+  goalDistance: string;
+  weeklyHours: number;
+}): number {
+  const { phase, performanceStrength, goalDistance, weeklyHours } = args;
+  const d = String(goalDistance ?? '').trim().toLowerCase();
+  const isFullIm = d === 'ironman' || d === 'full' || d.includes('iron');
+  if (phase === 'base') return 2;
+  if (phase === 'build') {
+    if (!performanceStrength) return 1;
+    return isFullIm && weeklyHours >= 18 ? 1 : 2;
+  }
+  if (phase === 'race_specific') {
+    if (!performanceStrength) return 1;
+    return isFullIm ? 1 : 2;
+  }
+  if (phase === 'rebuild') return 2;
+  return 1;
+}
+
 export function weekInPhaseForTimeline(phaseBlocks: PhaseBlock[], weekNum: number, block: PhaseBlock): number {
   let n = 1;
   for (let w = weekNum - 1; w >= 1; w--) {
@@ -1515,19 +1549,17 @@ export function buildWeek(
   // recoveryRebuildWeek1 (post-marathon week 1) suppresses strength entirely — handled below.
   const performanceStrength =
     String(athleteState.strength_intent ?? '').trim().toLowerCase() === 'performance';
-  let strFreq: number;
-  if (phase === 'base') {
-    strFreq = 2;
-  } else if (phase === 'build' || phase === 'race_specific') {
-    strFreq = performanceStrength ? 2 : 1;
-  } else if (phase === 'rebuild') {
-    // §7.4 / P-005: inter-race rebuild emits 1 upper + 1 lower per week, both protocols. Pre-fix
-    // this fell into the `else` 1× branch, dropping the upper rebuild session entirely (Plan 54
-    // W15/W16 shipped Lower-only when the athlete had performance intent).
-    strFreq = 2;
-  } else {
-    strFreq = 1;
-  }
+  // §3.7 race-distance dose scaling. Full IM athletes get reduced strength dose in build /
+  // race-specific to protect endurance recovery; sprint / olympic / 70.3 stay at 2/2/2 per phase.
+  // The §2.3 volume gate (>22 hrs/wk → force durability) is a separate downstream protection.
+  const goalDistance = String(primaryGoal?.distance ?? '').trim().toLowerCase();
+  const weeklyHours = Number(athleteState.weekly_hours_available ?? 0);
+  let strFreq = strFreqForPhase({
+    phase,
+    performanceStrength,
+    goalDistance,
+    weeklyHours,
+  });
   // Deload (loading-pattern recovery) week handling — split by athlete intent per the §3.2 /
   // §4.2 philosophical fork:
   //   • Hybrid (performance) — W-002 REDUCE: preserve 1U + 1L; the dispatcher emits reduced
@@ -2027,7 +2059,10 @@ function attachSameDayPairingMetadata(
     if (!partner || !partnerKind || !LOWER_PAIRING_PARTNERS.has(partnerKind)) continue;
 
     const { lowerOrdering, partnerOrdering } = decideOrdering(partnerKind, pref);
-    const gapHours = 6;
+    // §6.1 / W-005: Long Ride pairing requires a longer recovery window (8h) than
+    // Quality / Easy pairings (6h). The bike-leg eccentric stress + fueling/refueling burden is
+    // larger than a quality run/bike, and Lower must follow the ride — no exceptions.
+    const gapHours = partnerKind === 'long_ride' ? 8 : 6;
 
     lower.pairing = {
       same_day_with: pairingId(day, partnerKind),

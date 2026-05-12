@@ -1,6 +1,22 @@
+/**
+ * NOT USED BY TRIATHLON PLAN GENERATION.
+ *
+ * Triathlon plans route through generate-combined-plan/week-builder.ts, which uses the
+ * optimizer-derived strength_optimizer_slots and athlete-pinned strength_preferred_days
+ * (STRENGTH-PROTOCOL.md §6, day-agnostic). This file's `simplePlacementPolicy` is consumed
+ * only by `generate-run-plan/strength-overlay.ts:631` for run-only plans (Hal Higdon /
+ * Jack Daniels methodologies, which anchor on specific weekdays per the methodology
+ * convention).
+ *
+ * Day-agnostic conventions in the triathlon protocol do not apply here — the run methodologies
+ * legitimately prescribe specific weekday patterns. The dead import in
+ * generate-combined-plan/session-factory.ts has been removed; no tri-plan code path reaches
+ * `simplePlacementPolicy.assignSessions`.
+ */
+
 // ============================================================================
 // METHODOLOGY-AWARE PLACEMENT POLICY
-// 
+//
 // Uses strategy pattern to place strength sessions based on run methodology:
 // - Hal Higdon (Completion): Mon=Upper, Wed=Lower, Fri=Optional
 // - Jack Daniels (Performance): Mon=Upper, Tue=Lower (stacked), Wed=None, Fri=Optional

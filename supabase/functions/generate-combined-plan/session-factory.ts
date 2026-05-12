@@ -17,7 +17,6 @@ import type { StrengthProtocol } from '../shared/strength-system/protocols/types
 import { triathlonProtocol } from '../shared/strength-system/protocols/triathlon.ts';
 import { triathlonPerformanceProtocol } from '../shared/strength-system/protocols/triathlon_performance.ts';
 import { getProtocol, resolveProtocolIdForCombinedTriPlan } from '../shared/strength-system/protocols/selector.ts';
-import { simplePlacementPolicy } from '../shared/strength-system/placement/simple.ts';
 import type { ProtocolContext, IntentSession } from '../shared/strength-system/protocols/types.ts';
 import {
   buildSwimGearLine,

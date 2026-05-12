@@ -1,6 +1,21 @@
+/**
+ * NOT USED BY TRIATHLON PLAN GENERATION.
+ *
+ * Triathlon plans route through triathlon_performance.ts (hybrid intent) or triathlon.ts
+ * (durability intent) and assemble via generate-combined-plan/week-builder.ts. This file
+ * implements the `upper_aesthetics` protocol for run-only and non-tri strength-priority
+ * plans. Day-agnostic conventions in the triathlon protocol (STRENGTH-PROTOCOL.md §0.1 / §6)
+ * do not apply here; this file is free to anchor on specific weekdays (e.g., Wednesday upper)
+ * because the run-only callers (generate-run-plan) use a different placement model.
+ *
+ * Note: "hybrid" in this filename refers to upper-body hypertrophy/strength periodization
+ * (the run-overlay strength protocol), NOT to the triathlon hybrid-strength-athlete
+ * intent introduced in STRENGTH-PROTOCOL.md v2.
+ */
+
 // ============================================================================
 // UPPER PRIORITY HYBRID PROTOCOL
-// 
+//
 // Philosophy: True hypertrophy → strength periodization for upper body.
 // 
 // Grounded in Schoenfeld et al., Helms et al., and concurrent training research:

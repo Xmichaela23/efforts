@@ -136,6 +136,36 @@ Deno.test({
   },
 });
 
+Deno.test({
+  name: 'W-004 scope: Upper strength permitted day-after Long Run (no eccentric overlap)',
+  fn() {
+    // The 48h Long Run rule (week-optimizer.ts:501-535) is keyed on lower_body_strength only.
+    // Upper has no eccentric-leg overlap with Long Run and is explicitly allowed by the
+    // isHigh predicate (week-optimizer.ts:442-445 excludes upper_body_strength) — verified by
+    // line comment 447-449. This regression locks that scope: Upper can and DOES land within
+    // 48h of Long Run when the optimizer needs the placement. Specifically, the 6-day default
+    // template places Upper on Monday (24h after Sunday long_run) — which is the desired
+    // "Upper + long run = OK" pattern.
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences(),
+      athlete: baseAthlete({ training_intent: 'performance', strength_intent: 'performance' }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const upperDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'upper_body_strength'));
+    assert(upperDays.length >= 1, 'expected at least one upper_body_strength placement');
+    // Upper landing Monday (24h after Sunday Long Run) is the canonical week template — proves
+    // Upper isn't caught by the long-run 48h block. If the rule ever widened to all strength,
+    // Upper would be forced off Monday and into Wednesday/Friday at best.
+    const upperOnMonday = upperDays.includes('monday');
+    const upperOnPostLongDay = upperDays.some((d) => d === 'monday'); // sanity expression
+    assert(
+      upperOnMonday || upperOnPostLongDay,
+      `expected upper to land within 48h of Sunday long_run; got upperDays=[${upperDays.join(', ')}]`,
+    );
+  },
+});
+
 // ── Fixture 06 first: sparse / minimal anchors (regression class: May 6) ─────────────
 
 Deno.test({

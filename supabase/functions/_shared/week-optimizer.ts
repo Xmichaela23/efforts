@@ -1450,9 +1450,14 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
               `strength_preferred_days: ${tfDay(preferredUpperDay)} (upper) rejected — placement rules excluded it; placed ${tfDay(upperDay)} instead.`,
             );
           }
-          if (upperDay !== 'monday') {
+          // Day-agnostic trade-off framing: reference the athlete's pinned default if they pinned
+          // one; otherwise drop the "moved from default" prose entirely. The prior hardcoded
+          // "Monday default" claim was wrong for athletes who never trained on Mondays. The
+          // realized placement is in the calendar; the trade-off only adds value when it explains
+          // a divergence from the ATHLETE's pinned intent.
+          if (preferredUpperDay && upperDay !== preferredUpperDay) {
             trade_offs.push(
-              `Strength: default Monday upper moved to ${tfDay(upperDay)} — spacing vs lower on ${tfDay(consolidatedQrLowerDay)}.`,
+              `Strength: upper moved from your preferred ${tfDay(preferredUpperDay)} to ${tfDay(upperDay)} — spacing vs lower on ${tfDay(consolidatedQrLowerDay)}.`,
             );
           }
           if (strengthSpacingRelaxed) {
@@ -1553,15 +1558,24 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             trade_offs.push(
               `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
             );
-            if (upperDay !== 'monday' || lowerDay !== 'thursday') {
+            // Day-agnostic divergence message: only emit when the athlete pinned days that the
+            // engine couldn't honor. Otherwise the realized placement IS the plan — no "moved from"
+            // baseline to reference.
+            const upperDiverges = preferredUpperDay && upperDay !== preferredUpperDay;
+            const lowerDiverges = preferredLowerDay && lowerDay !== preferredLowerDay;
+            if (upperDiverges || lowerDiverges) {
               trade_offs.push(
-                `Strength: usual Mon upper / Thu lower could not stay — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (heavy lower day stacks with your quality run).`,
+                `Strength: preferred ${preferredUpperDay ? tfDay(preferredUpperDay) : 'upper'} / ${preferredLowerDay ? tfDay(preferredLowerDay) : 'lower'} pattern could not stay — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (heavy lower day stacks with your quality run).`,
               );
             }
-          } else if (upperDay !== 'monday' || lowerDay !== 'thursday') {
-            trade_offs.push(
-              `Strength: usual Mon upper / Thu lower became upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} — moved to stay clear of your pinned rides/runs and recovery spacing.`,
-            );
+          } else {
+            const upperDiverges = preferredUpperDay && upperDay !== preferredUpperDay;
+            const lowerDiverges = preferredLowerDay && lowerDay !== preferredLowerDay;
+            if (upperDiverges || lowerDiverges) {
+              trade_offs.push(
+                `Strength: preferred ${preferredUpperDay ? tfDay(preferredUpperDay) : 'upper'} / ${preferredLowerDay ? tfDay(preferredLowerDay) : 'lower'} pattern shifted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} — moved to stay clear of your pinned rides/runs and recovery spacing.`,
+              );
+            }
           }
           if (strengthSpacingRelaxed) {
             // §4.6: ≥3 days preferred, ≥2 days hard floor. The spacing relaxed here is a real
@@ -1606,9 +1620,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             `strength_preferred_days: ${tfDay(preferredUpperDayNc)} (upper) rejected — placement rules excluded it; placed ${tfDay(upperDay)} instead.`,
           );
         }
-        if (upperDay !== 'monday') {
+        // Day-agnostic: only surface the relocation if the athlete pinned a specific day that
+        // the engine couldn't honor. Without a pinned preference, the placement IS the plan;
+        // there's no baseline to compare against (the prior code assumed Monday was a universal
+        // default which is wrong for athletes who never train Mondays).
+        if (preferredUpperDayNc && upperDay !== preferredUpperDayNc) {
           trade_offs.push(
-            `Strength: default Monday upper moved to ${tfDay(upperDay)} (support / 1×–2× template).`,
+            `Strength: upper moved from your preferred ${tfDay(preferredUpperDayNc)} to ${tfDay(upperDay)} (support / 1×–2× template).`,
           );
         }
       } else {
@@ -1692,18 +1710,22 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             trade_offs.push(
               `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
             );
-            if (upperDay && (upperDay !== 'monday' || lowerDay !== 'thursday')) {
+            // Day-agnostic divergence message (same pattern as the co-equal branch upstream).
+            const upperDiverges = upperDay && preferredUpperDayNc && upperDay !== preferredUpperDayNc;
+            const lowerDiverges = preferredLowerDayNc && lowerDay !== preferredLowerDayNc;
+            if (upperDay && (upperDiverges || lowerDiverges)) {
               trade_offs.push(
-                `Strength: typical Mon upper / Thu lower adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)}.`,
+                `Strength: preferred ${preferredUpperDayNc ? tfDay(preferredUpperDayNc) : 'upper'} / ${preferredLowerDayNc ? tfDay(preferredLowerDayNc) : 'lower'} pattern adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)}.`,
               );
             }
-          } else if (
-            upperDay &&
-            (upperDay !== 'monday' || lowerDay !== 'thursday')
-          ) {
-            trade_offs.push(
-              `Strength: typical Mon upper / Thu lower adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (schedule constraints).`,
-            );
+          } else if (upperDay) {
+            const upperDiverges = preferredUpperDayNc && upperDay !== preferredUpperDayNc;
+            const lowerDiverges = preferredLowerDayNc && lowerDay !== preferredLowerDayNc;
+            if (upperDiverges || lowerDiverges) {
+              trade_offs.push(
+                `Strength: preferred ${preferredUpperDayNc ? tfDay(preferredUpperDayNc) : 'upper'} / ${preferredLowerDayNc ? tfDay(preferredLowerDayNc) : 'lower'} pattern adjusted — upper on ${tfDay(upperDay)}, lower on ${tfDay(lowerDay)} (schedule constraints).`,
+              );
+            }
           }
           // §4.7 concurrent-training spacing trade-off — surface SOFT/SANDWICH compromises.
           emitConcurrentSpacingTradeOff(days, lowerDay, lowerTier, trade_offs);

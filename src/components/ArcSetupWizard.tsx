@@ -2363,17 +2363,19 @@ function Step8bStrengthOrdering({
         </summary>
         <div className="mt-2 space-y-1.5">
           <p>
-            <span className="text-white/75">Eddens et al. 2018</span> (Sports Medicine) meta-analysis:
-            strength-first ordering produced superior lower-body dynamic strength gains over
-            prolonged concurrent training.
+            <span className="text-white/75">Eddens, van Someren, Howatson (2018)</span>,{' '}
+            <em>Sports Medicine</em> 48(1):177-188 — meta-analysis: strength-first ordering
+            produced superior lower-body dynamic strength gains over prolonged concurrent training.
           </p>
           <p>
-            <span className="text-white/75">Doma & Deakin</span>: endurance-first protects running
+            <span className="text-white/75">Doma & Deakin (2013)</span>,{' '}
+            <em>Appl Physiol Nutr Metab</em> 38(6):651-656 — endurance-first protects running
             economy.
           </p>
           <p>
-            <span className="text-white/75">Makhlouf et al. 2016</span>: strength prior to endurance
-            for greater dynamic strength gains.
+            <span className="text-white/75">Makhlouf et al. (2016)</span>,{' '}
+            <em>J Strength Cond Res</em> 30(3):841-850 — strength prior to endurance for greater
+            dynamic strength gains.
           </p>
           <p className="text-white/45 pt-1">
             Effect sizes are moderate — both choices are defensible.

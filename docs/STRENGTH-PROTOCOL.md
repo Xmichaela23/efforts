@@ -494,7 +494,7 @@ This is a defensible simplification. The actual interference effect is moderate 
 
 ### 7.1 Hybrid protocol race week
 
-**Taper Priming session — Wednesday only, 25 min, optional skip:**
+**Taper Priming session — approximately 3-4 days before race day, 25 min, optional skip:**
 - 1 lower compound: 2 × 4 reps @ 50-60% 1RM, fast bar speed
 - 1 upper compound: 2 × 4 reps @ 50-60% 1RM, fast bar speed
 - 2 accessories: light bands, activation only
@@ -654,9 +654,9 @@ Equipment line is generated from session needs ∩ athlete inventory.
 - Fyfe et al., *Interference between concurrent resistance and endurance exercise: molecular bases and the role of individual training variables* (Sports Med, 2014; 2016 update)
 - Doma, Deakin, Bentley, *Implications of impaired endurance performance following single bouts of resistance training: an alternate concurrent training perspective* (Sports Med, 2017)
 - Berryman et al., *Strength training for middle- and long-distance performance: a meta-analysis* (Int J Sports Physiol Perform, 2018)
-- Eddens, van Someren, Howatson, *The Role of Intra-Session Exercise Sequence in the Interference Effect: A Systematic Review with Meta-Analysis* (Sports Med, 2018) — strength-first protects lower-body dynamic strength
-- Doma & Deakin, *The cumulative effects of strength training on running performance* and follow-up work — endurance-first protects running economy
-- Makhlouf et al. (2016) — strength prior to endurance for greater dynamic strength gains
+- Eddens L, van Someren K, Howatson G, *The Role of Intra-Session Exercise Sequence in the Interference Effect: A Systematic Review with Meta-Analysis* (Sports Med, 2018; 48(1):177-188) — strength-first protects lower-body dynamic strength
+- Doma K, Deakin GB, *The effects of strength training and endurance training order on running economy and performance* (Appl Physiol Nutr Metab, 2013; 38(6):651-656) — endurance-first protects running economy
+- Makhlouf I, Castagna C, Manzi V, Laurencelle L, Behm DG, Chaouachi A, *Effect of Sequencing Strength and Endurance Training in Young Male Soccer Players* (J Strength Cond Res, 2016; 30(3):841-850) — strength prior to endurance for greater dynamic strength gains
 
 **Plyometrics and running economy**
 - Spurrs et al., *The effect of plyometric training on distance running performance* (Eur J Appl Physiol, 2003)

@@ -1478,9 +1478,9 @@ function perfTaperSession(
       priority: 'optional',
       name: 'Tri Performance — Taper Priming',
       description:
-        'Race week — Wednesday only, ~25 min. 1 lower compound + 1 upper compound at 50-60% 1RM ' +
-        'for 2×3-4 fast reps, plus 2 light-band activation accessories. No plyometrics. Skip-optional ' +
-        'if you feel sharp. Goal is neural drive, not fatigue.',
+        'Race week — approximately 3-4 days before race day, ~25 min. 1 lower compound + 1 upper ' +
+        'compound at 50-60% 1RM for 2×3-4 fast reps, plus 2 light-band activation accessories. ' +
+        'No plyometrics. Skip-optional if you feel sharp. Goal is neural drive, not fatigue.',
       duration: 25,
       exercises: ex,
       repProfile: 'strength',

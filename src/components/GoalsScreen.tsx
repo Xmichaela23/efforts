@@ -157,6 +157,164 @@ function parseElapsedRaceTimeInput(input: string): number | null {
   return parts[0] * 60 + parts[1];
 }
 
+/**
+ * Inline settings for triathlon strength preferences — STRENGTH-PROTOCOL.md §0.2 / §6.5.
+ * Surfaces on the expanded goal card for triathlon goals. Allows the athlete to edit
+ * `strength_intent` and `strength_ordering_preference` post-wizard. Same copy as the wizard.
+ *
+ * Writes to `goals.training_prefs` via `useGoals.updateGoal`. The next plan regeneration
+ * reads the updated values; existing planned weeks are NOT retroactively updated (the
+ * athlete needs to regenerate to apply the new preference).
+ */
+function StrengthPreferencesPanel({
+  goal,
+  updateGoal,
+}: {
+  goal: Goal;
+  updateGoal: (id: string, patch: Partial<Goal>) => Promise<Goal | null>;
+}) {
+  const sport = goalSportLower(goal?.sport);
+  const isTriGoal = sport === 'triathlon';
+  const trainingPrefs: Record<string, unknown> =
+    (goal.training_prefs && typeof goal.training_prefs === 'object'
+      ? goal.training_prefs
+      : {}) as Record<string, unknown>;
+  const strengthIntent =
+    trainingPrefs.strength_intent === 'performance' || trainingPrefs.strength_intent === 'support'
+      ? (trainingPrefs.strength_intent as 'performance' | 'support')
+      : null;
+  const orderingPreference =
+    trainingPrefs.strength_ordering_preference === 'strength_first'
+      ? 'strength_first'
+      : 'endurance_first';
+  const [expanded, setExpanded] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+
+  if (!isTriGoal || strengthIntent == null) return null;
+
+  const persist = async (patch: Partial<Record<string, unknown>>) => {
+    setBusy(true);
+    try {
+      const nextPrefs = { ...trainingPrefs, ...patch };
+      await updateGoal(goal.id, { training_prefs: nextPrefs } as Partial<Goal>);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleIntentChange = async (next: 'performance' | 'support') => {
+    if (next === strengthIntent) return;
+    // Per §6.5, durability athletes always get endurance_first; clear strength_first when
+    // switching intent away from hybrid.
+    const patch: Record<string, unknown> = { strength_intent: next };
+    if (next !== 'performance') patch.strength_ordering_preference = 'endurance_first';
+    await persist(patch);
+  };
+
+  const handleOrderingChange = async (next: 'endurance_first' | 'strength_first') => {
+    if (next === orderingPreference) return;
+    await persist({ strength_ordering_preference: next });
+  };
+
+  return (
+    <div className="mt-3 ml-[44px] pt-3 border-t border-white/[0.06]">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex items-center gap-1.5 text-xs font-medium text-white/55 hover:text-white/80 transition-colors"
+      >
+        Strength preferences{expanded ? ' —' : ' +'}
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-3 text-[13px]">
+          <div className="space-y-1.5">
+            <p className="text-white/55">Strength intent</p>
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleIntentChange('performance')}
+                className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                  strengthIntent === 'performance'
+                    ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
+                    : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
+                }`}
+              >
+                <span className="block font-semibold">Hybrid Strength Athlete</span>
+                <span className="block text-[12px] text-white/55 mt-0.5">
+                  Strength is a goal alongside endurance. Maintain or build your lifts through race
+                  training.
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleIntentChange('support')}
+                className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                  strengthIntent === 'support'
+                    ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
+                    : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
+                }`}
+              >
+                <span className="block font-semibold">Durability-Focused</span>
+                <span className="block text-[12px] text-white/55 mt-0.5">
+                  Strength supports endurance. Injury prevention and tissue tolerance — race time
+                  is the only metric.
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {strengthIntent === 'performance' && (
+            <div className="space-y-1.5">
+              <p className="text-white/55">Same-day session priority</p>
+              <p className="text-[12px] text-white/45 leading-snug">
+                When strength shares a day with a hard run or bike: what you do first gets the
+                better stimulus. Leave 6+ hours between.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleOrderingChange('endurance_first')}
+                  className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                    orderingPreference === 'endurance_first'
+                      ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
+                      : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
+                  }`}
+                >
+                  <span className="block font-semibold">🏃 Endurance first</span>
+                  <span className="block text-[12px] text-white/55 mt-0.5">
+                    Recommended for triathletes focused on race results.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleOrderingChange('strength_first')}
+                  className={`text-left rounded-lg px-3 py-2 border transition-colors disabled:opacity-50 ${
+                    orderingPreference === 'strength_first'
+                      ? 'border-teal-400/70 bg-teal-500/15 text-teal-100'
+                      : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
+                  }`}
+                >
+                  <span className="block font-semibold">🏋️ Strength first</span>
+                  <span className="block text-[12px] text-white/55 mt-0.5">
+                    For athletes whose strength PRs matter as much as race times.
+                  </span>
+                </button>
+              </div>
+              <p className="text-[11px] text-white/35 leading-snug pt-1">
+                Changes apply on next plan regeneration.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const GoalsScreen: React.FC<GoalsScreenProps> = ({
   onClose, onSelectPlan, onViewAllPlans, onPlanBuilt,
   expandRunEventForCourseNonce = 0,
@@ -1569,15 +1727,18 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         )}
 
         {isExpanded && (
-          <div className="mt-3 ml-[44px] flex items-center gap-2 pt-3 border-t border-white/[0.06]">
-            <button onClick={() => handleTogglePause(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:bg-white/[0.06] hover:text-white/70 transition-all">
-              {goal.status === 'paused' ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              {goal.status === 'paused' ? 'Resume' : 'Pause'}
-            </button>
-            <button onClick={() => handleDeleteGoal(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-400/60 hover:bg-red-400/10 hover:text-red-400/80 transition-all">
-              <Trash2 className="h-3.5 w-3.5" />Delete
-            </button>
-          </div>
+          <>
+            <StrengthPreferencesPanel goal={goal} updateGoal={updateGoal} />
+            <div className="mt-3 ml-[44px] flex items-center gap-2 pt-3 border-t border-white/[0.06]">
+              <button onClick={() => handleTogglePause(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:bg-white/[0.06] hover:text-white/70 transition-all">
+                {goal.status === 'paused' ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                {goal.status === 'paused' ? 'Resume' : 'Pause'}
+              </button>
+              <button onClick={() => handleDeleteGoal(goal)} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-400/60 hover:bg-red-400/10 hover:text-red-400/80 transition-all">
+                <Trash2 className="h-3.5 w-3.5" />Delete
+              </button>
+            </div>
+          </>
         )}
       </div>
     );

@@ -103,7 +103,20 @@ Deno.test('Task E: Lower + Long Ride forces strength PM regardless of preference
     const lr = sessions.find((x) => x.type === 'bike')!;
     assertEquals(lower.pairing!.ordering, 'PM', `pref=${pref}: lower must be PM for Long Ride pairing`);
     assertEquals(lr.pairing!.ordering, 'AM', `pref=${pref}: Long Ride must be AM`);
+    // §6.1 / W-005: Long Ride pairing demands 8h gap (vs 6h for Quality pairings).
+    assertEquals(lower.pairing!.gap_hours, 8, `pref=${pref}: Long Ride pairing must have 8h gap`);
+    assertEquals(lr.pairing!.gap_hours, 8, `pref=${pref}: Long Ride side must also carry 8h gap`);
   }
+});
+
+Deno.test('Task C: Lower + Quality Run gap_hours = 6 (vs Long Ride 8)', () => {
+  const sessions = [
+    s({ day: 'Thursday', type: 'strength', tags: ['strength', 'lower_body'] }),
+    s({ day: 'Thursday', type: 'run', tags: ['run', 'interval', 'quality'] }),
+  ];
+  attachSameDayPairingMetadataForTest(sessions, stateWith('endurance_first'));
+  const lower = sessions.find((x) => x.type === 'strength')!;
+  assertEquals(lower.pairing!.gap_hours, 6, 'Quality pairing gap_hours should be 6');
 });
 
 Deno.test('Task E: Lower + Easy Run → strength AM (recovery-flush ordering)', () => {
@@ -204,7 +217,8 @@ function validateSameDayPairing(
     }
     const longRide = daySessions.find((s) => s.type === 'bike' && (s.tags?.includes('long_ride') ?? false));
     if (longRide) {
-      // W-005: Lower + Long Ride same-day requires strength PM + ordering metadata + 6h gap
+      // W-005: Lower + Long Ride same-day requires strength PM + ordering metadata + 8h gap
+      // (per v2.1 final §6.1 — bike-leg eccentric stress demands the longer recovery window).
       if (!lower.pairing || !longRide.pairing) {
         errors.push(`W-005 hard fail: Lower + Long Ride on ${day} missing pairing metadata`);
         continue;
@@ -212,8 +226,8 @@ function validateSameDayPairing(
       if (lower.pairing.ordering !== 'PM' || longRide.pairing.ordering !== 'AM') {
         errors.push(`W-005 hard fail: Lower + Long Ride on ${day} must have strength=PM, ride=AM (got strength=${lower.pairing.ordering}, ride=${longRide.pairing.ordering})`);
       }
-      if (lower.pairing.gap_hours < 6 || longRide.pairing.gap_hours < 6) {
-        errors.push(`W-005 hard fail: Lower + Long Ride on ${day} gap < 6h`);
+      if (lower.pairing.gap_hours < 8 || longRide.pairing.gap_hours < 8) {
+        errors.push(`W-005 hard fail: Lower + Long Ride on ${day} gap < 8h (got lower=${lower.pairing.gap_hours}, ride=${longRide.pairing.gap_hours})`);
       }
       continue;
     }
