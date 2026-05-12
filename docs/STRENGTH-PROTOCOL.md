@@ -2,29 +2,64 @@
 
 How the plan engine generates strength sessions for triathlon athletes. Companion to `docs/SCHEDULING-RULES.md` (placement), `docs/SESSION-FREQUENCY-DEFAULTS.md` (session counts), and the Arc wizard (athlete input).
 
+**Scope:** triathlon athletes only. Marathon-specific and hybrid race protocols (HYROX/Spartan/strength meets) will live in separate documents with their own phase models, accessory rotations, and selection logic. Do not extend this doc to those use cases.
+
 ---
 
 ## 0. Core principle
 
-**Athlete intent determines methodology. Equipment determines execution. Volume and distance determine dose. 1RM determines load.**
+**Athlete identity determines methodology. Equipment determines execution. Volume and distance determine dose. 1RM determines load.**
 
-Strength training for triathletes is not one program with intensity dials. It's two distinct philosophies, scaled by total endurance volume and race distance:
+Strength training for triathletes is not one program with intensity dials. It's two distinct programs serving two distinct athletes:
 
-1. **Durability** — strength supports endurance. Injury prevention, tissue tolerance, posture. Joe Friel AA-MS-SM model.
-2. **Performance** — strength is co-equal with endurance. Real loads, real periodization, athlete maintains or builds strength alongside race fitness. Crawley / Viada / hybrid athletics approach.
+**The hybrid strength athlete** (intent: `co-equal`) treats strength as a goal alongside endurance. They came from strength or always did both. Their off-season may increase strength while reducing endurance. They measure success by race time **and** strength PRs **and** body composition. A 7-day skip of strength in a recovery week violates their contract with the program — they chose this protocol specifically because they don't want to lose their lifts. Acceptable race-day trade-offs exist if it means staying strong year-round.
 
-The wizard captures intent and goals; the engine selects the protocol, then scales it to the athlete's weekly volume, race distance, and plan length. The protocol drives everything downstream.
+**The durability-focused triathlete** (intent: `support`) treats strength as injury insurance for endurance. They came from endurance and added strength. Their off-season reduces strength to make room for base building. They measure success by race time alone. A recovery week is for total-load recovery — strength is the first thing to drop. Race-day performance is everything.
+
+These are two different programs for two different athletes. The wizard captures identity (intent); the engine selects the protocol, then scales it to the athlete's weekly volume, race distance, and plan length. The protocol drives everything downstream.
 
 ---
 
 ## 0.1 Audience and conformance
 
-This document is the single source of truth for strength session generation. The runtime conformance validator (see §3.8) asserts every generated strength session against the rules in §3.3, §3.4, §3.6, and §3.7. Code that contradicts this document is a bug.
+This document is the single source of truth for strength session generation. The runtime conformance validator (see §3.8) asserts every generated strength session against the rules in §3.3, §3.4, §3.6, §3.7, and §7.4. Code that contradicts this document is a bug.
 
 This document does **not** specify:
 - Scheduling and placement (see `SCHEDULING-RULES.md`)
 - Session counts per week (see `SESSION-FREQUENCY-DEFAULTS.md`)
 - Endurance session structure or pacing
+
+---
+
+## 0.2 Wizard-facing labels
+
+Internal `strength_intent` values are technical jargon. Athlete-facing labels in the Arc wizard:
+
+| Internal value | Wizard label | One-line description |
+|---|---|---|
+| `co-equal` | **Hybrid Strength Athlete** | "Strength is a goal alongside endurance. Maintain or build your lifts through race training." |
+| `support` | **Durability-Focused** | "Strength supports endurance. Injury prevention and tissue tolerance — race time is the only metric." |
+| `none` | **Endurance Only** | "No strength sessions. Pure swim/bike/run." |
+
+The wizard surfaces these labels with the descriptions; internal storage stays `co-equal` / `support` / `none` to preserve database compatibility.
+
+---
+
+## 0.3 Expected race-day trade-offs (athlete-facing honesty)
+
+Athletes choosing the hybrid protocol deserve a straight answer about what they're trading.
+
+On a flat, fast, cool-weather 70.3 or shorter race, a pure endurance triathlete at equivalent endurance volume will probably finish 1–3% faster than the same athlete on the hybrid protocol. That's a few minutes on a 5-hour race.
+
+The trade-off shrinks or reverses under any of:
+- **Hilly or technical courses** — power-to-weight and bike strength close or reverse the gap
+- **Long course (full Ironman)** — durability matters more; late-race form breakdown is partly a strength deficit
+- **Hot conditions** — better muscle mass tolerates thermal load
+- **Masters athletes (35+)** — muscle preservation becomes a meaningful performance variable, not just a vanity metric
+
+The hybrid athlete also gains injury durability, body composition maintenance, year-round strength PRs, and quality-of-life outside of triathlon — none of which are zero-cost trades for a pure endurance athlete who treats them as nice-to-haves.
+
+This trade-off is surfaced to the athlete during wizard setup, not buried.
 
 ---
 
@@ -53,7 +88,7 @@ Protocol selection runs in three gates, in order. First gate that triggers a sub
 
 | Strength intent | Default protocol |
 |---|---|
-| `co-equal` | `performance` |
+| `co-equal` | `performance` (hybrid) |
 | `support` | `durability` |
 | `none` | `none` |
 
@@ -65,36 +100,36 @@ Protocol selection runs in three gates, in order. First gate that triggers a sub
 | Dumbbell-based (DBs + bench, no barbell) | Yes, with substitutions | Yes, with substitutions |
 | Bodyweight + bands (no DBs, no barbell) | No — force durability | Yes |
 
-**Trade-off when performance requested without barbell or dumbbells:** "Performance strength requires barbell or dumbbell access for progressive loading. With your current equipment we'll deliver durability protocol instead. Add dumbbells or barbell access to unlock performance protocol."
+**Trade-off when performance requested without barbell or dumbbells:** "Hybrid strength training requires barbell or dumbbell access for progressive loading. With your current equipment we'll deliver the durability protocol instead. Add dumbbells or barbell access to unlock the hybrid protocol."
 
 ### 2.3 Volume gate
 
-Performance protocol carries real concurrent-training interference cost. Above a volume threshold, the interference outweighs the benefit, and durability is the right choice regardless of athlete intent.
+Hybrid protocol carries real concurrent-training interference cost. Above a volume threshold, the interference outweighs the benefit, and durability is the right choice regardless of athlete intent.
 
 | Total weekly endurance hours | Action |
 |---|---|
 | < 18 hrs | Honor intent |
-| 18–22 hrs | Honor intent, surface advisory: "At your volume, consider 1 strength session/week or switch to durability — full performance protocol may compromise endurance recovery." Default to 1x/week performance if athlete keeps intent. |
-| > 22 hrs | Force durability protocol with notification: "At sustained 22+ hours of weekly endurance, performance strength interferes with recovery. We're delivering durability protocol — 1 session per week, high-rep, light load — through race-specific phase." |
+| 18–22 hrs | Honor intent, surface advisory: "At your volume, consider 1 strength session/week or switch to durability — full hybrid protocol may compromise endurance recovery." Default to 1x/week hybrid if athlete keeps intent. |
+| > 22 hrs | Force durability protocol with notification: "At sustained 22+ hours of weekly endurance, hybrid strength interferes with recovery. We're delivering durability protocol — 1 session per week, high-rep, light load — through race-specific phase." |
 
 Volume is computed as `weekly_hours_available` plus any explicit overrides, evaluated at the start of each phase. A late-build athlete who ramps from 14 → 20 hrs/week crosses the gate during build and gets the advisory then, not at plan start.
 
 ---
 
-## 3. Performance protocol (co-equal intent)
+## 3. Performance protocol (hybrid intent)
 
-Modern hybrid methodology. Strength is a primary pursuit alongside endurance, scaled by race distance and plan length.
+Modern hybrid methodology. Strength is a primary pursuit alongside endurance, scaled by race distance and plan length. The athlete maintains or builds their lifts through the season; race-day performance and strength PRs are co-equal success metrics.
 
 ### 3.1 Phase definitions
 
 | Phase | Duration | Reps | %1RM | RIR | Sets/lift | Sessions/week |
 |---|---|---|---|---|---|---|
-| Hypertrophy | 4 weeks | 8-10 | 65-72% | 3 | 3-4 | 2 |
-| Strength Build | 4 weeks | 4-6 | 78-85% | 2 | 3-4 | 2 |
-| Maintenance + Power | 4-6 weeks | 3-5 (lift) + plyo | 70-75% | 2 | 2-3 | 2 |
+| Hypertrophy | 4 weeks | 8-10 | 65-72% | 3 | 3-4 | 2 (1U + 1L) |
+| Strength Build | 4 weeks | 4-6 | 78-85% | 2 | 3-4 | 2 (1U + 1L) |
+| Maintenance + Power | 4-6 weeks | 3-5 (lift) + plyo | 70-75% | 2 | 2-3 | 2 (1U + 1L) |
 | Taper Priming | Race week | 3-4 (fast bar speed) | 50-60% | 3+ | 2 | 1 (skip optional) |
 
-**Index semantics:** Within each phase, weeks progress linearly through the rep × %1RM range, ending at the high end of %1RM and low end of reps in the final week. A 4-week Hypertrophy phase progresses 65% → 67% → 70% → 72% across weeks 1–4. If the engine extends a phase (longer plan length, see §9), W5+ clamps to the phase's high %1RM, does not reset to the low end (this is a current bug — see §3.8 P-002).
+**Index semantics:** Within each phase, weeks progress linearly through the rep × %1RM range, ending at the high end of %1RM and low end of reps in the final week. A 4-week Hypertrophy phase progresses 65% → 67% → 70% → 72% across weeks 1–4. If the engine extends a phase (longer plan length, see §9), W5+ clamps to the phase's high %1RM, does not reset to the low end (see §3.8 P-002).
 
 ### 3.2 Phase-to-mesocycle mapping (standard 16-week 70.3 build)
 
@@ -107,11 +142,23 @@ Modern hybrid methodology. Strength is a primary pursuit alongside endurance, sc
 
 For non-standard plan lengths, see §9.
 
-Deload week (every 4th week): same exercises at 80% load, 2 sets only, RIR 4+. No phase progression during deload.
+**Deload weeks (every 4th week) — hybrid protocol:**
+
+Deload is **REDUCE**, not skip. The hybrid athlete chose this protocol specifically to avoid losing strength stimulus; a 7-day skip puts them inside the detraining window for neural drive and cross-sectional area (10-14 days per Israetel's RP framework). Deload-week strength session:
+
+- 1 upper session + 1 lower session (same frequency as loading weeks)
+- 2 sets per main lift (vs 3-4 in loading weeks)
+- 60-65% 1RM (well below phase target)
+- RIR 4+
+- Accessories cut entirely
+- Power exercises skipped if in race-specific phase
+- ~25-30 min total per session
+
+This applies Minimum Effective Volume (MEV) — enough stimulus to prevent detraining at near-zero recovery cost.
 
 ### 3.3 Exercise hierarchy
 
-**Pattern coverage rule:** every upper-body session must touch all four upper patterns across the week (horizontal push, horizontal pull, vertical push, vertical pull). The two weekly upper sessions split the patterns; no single session needs all four. Every lower-body session must touch squat and hinge patterns.
+**Pattern coverage rule (single-session model):** the triathlon hybrid protocol runs 1 upper session per week. That single session must touch all four upper patterns (horizontal push, horizontal pull, vertical push, vertical pull). Each weekly upper session includes a primary compound from one push/pull category and a secondary compound from the other. Every lower-body session must touch squat and hinge patterns.
 
 | Day | Movement pattern | Primary | Secondary |
 |---|---|---|---|
@@ -121,6 +168,8 @@ Deload week (every 4th week): same exercises at 80% load, 2 sets only, RIR 4+. N
 | Upper | Horizontal pull | Barbell Row | DB Row (chest-supported) |
 | Upper | Vertical push | Standing OHP | DB Shoulder Press |
 | Upper | Vertical pull | Pull-ups | Lat Pulldown / Band Pull-Down |
+
+**Single weekly upper composition:** Each upper session includes Row + Bench + OHP + Pull-ups (all four patterns). This is non-negotiable — pattern omission within a single session is a conformance violation (S-003) because there is no second weekly session to cover the missing pattern.
 
 **Equipment substitutions:**
 - No barbell → DB version of same movement
@@ -142,15 +191,15 @@ Deload week (every 4th week): same exercises at 80% load, 2 sets only, RIR 4+. N
 | Maintenance + Power | 2×6-8 | — | 2×6/leg | 2×10-12 |
 | Taper Priming | — | — | — | — |
 
-Hip Thrusts are required in every lower session in base and build phases — they're the primary glute-dominant accessory for run drive and bike power, and absence is a conformance violation (S-005).
+Hip Thrusts are required in every lower session in base and build phases (S-005). They're the primary glute-dominant accessory for run drive and bike power.
 
 Accessories are sub-maximal load, RIR 3+. They support compound recovery, not replace it.
 
-Evidence base: glute and posterior chain dominance for run/bike power has a real peer-reviewed base (Contreras, Distefano). Scapular and rotator cuff work for swim catch position is clinical / coaching consensus, lighter peer-reviewed evidence — included as low-cost prevention, not as a primary performance driver.
+Evidence base: glute and posterior chain dominance for run/bike power has a real peer-reviewed base (Contreras hip thrust EMG work; Distefano single-leg studies). Scapular and rotator cuff work for swim catch is clinical / coaching consensus, lighter peer-reviewed evidence — included as low-cost prevention.
 
-### 3.5 Power phase content (Maintenance + Power phase only — see §3.7 for distance modifiers)
+### 3.5 Power phase content (Maintenance + Power phase — see §3.7 for distance modifiers)
 
-Inserted before main lifts in race-specific phase, replaces some accessory volume.
+Inserted before main lifts, replaces some accessory volume.
 
 | Equipment | Power exercise | Sets × Reps |
 |---|---|---|
@@ -178,17 +227,17 @@ Rules:
 
 **Performance Upper (45 min):**
 1. Power exercise (per §3.7 rules, 5 min)
-2. Primary compound — pattern A (horizontal push or vertical push) (15 min, 3-4 sets)
-3. Secondary compound — pattern B (corresponding pull) (10 min, 3 sets)
-4. Required accessory — Band Face Pulls (5 min)
-5. Required accessory — Band Pull-Aparts (5 min)
-6. Core finisher — Pallof Press (5 min)
+2. Primary horizontal pattern — Bench OR Row (15 min, 3-4 sets)
+3. Primary vertical pattern — OHP OR Pull-ups (10 min, 3 sets)
+4. Secondary horizontal pattern — the other of Bench/Row (8 min, 3 sets)
+5. Secondary vertical pattern — the other of OHP/Pull-ups (4 min, 2-3 sets)
+6. Required accessories — Band Face Pulls + Band Pull-Aparts (3 min)
 
-Upper sessions alternate weekly: session 1 covers horizontal push + horizontal pull; session 2 covers vertical push + vertical pull. The rotation ensures all four patterns appear across the week (per §3.3 pattern coverage rule and §3.8 W-001).
+All four upper patterns appear in every single upper session. Volume distributes across primary (heavier, more sets) and secondary (lighter, fewer sets) treatments. Week-to-week, the primary/secondary designation rotates so each pattern gets a primary treatment roughly every other week.
 
 ### 3.7 Distance and volume sensitivity
 
-Performance protocol scales by race distance. Sprint and Olympic athletes have more recovery headroom and benefit from earlier and heavier power emphasis. Full Ironman athletes need reduced strength dose to protect endurance recovery.
+Hybrid protocol scales by race distance. Sprint and Olympic athletes have more recovery headroom and benefit from earlier and heavier power emphasis. Full Ironman athletes need reduced strength dose to protect endurance recovery.
 
 **Race-distance dose modifiers:**
 
@@ -213,7 +262,7 @@ The runtime validator runs after `materialize-plan` and asserts every generated 
 |---|---|
 | S-001 | Every Lower session must include Squat OR Deadlift as primary compound |
 | S-002 | Every Lower session must include the other of Squat/Deadlift as secondary compound |
-| S-003 | Every Upper session must include at least one push pattern and one pull pattern |
+| S-003 | Every Upper session must include all four upper patterns (horizontal push, horizontal pull, vertical push, vertical pull) — single-session pattern coverage rule per §3.3 |
 | S-004 | Every Upper session must include Band Face Pulls and Band Pull-Aparts as required accessories |
 | S-005 | Every Lower session in base/build phases must include Hip Thrusts as required accessory |
 | S-006 | Every session must include a core finisher (Pallof Press, Dead Bug, or equivalent) |
@@ -222,9 +271,10 @@ The runtime validator runs after `materialize-plan` and asserts every generated 
 
 | ID | Rule |
 |---|---|
-| W-001 | Two upper sessions per week must cover all four upper patterns (horizontal push, horizontal pull, vertical push, vertical pull) |
-| W-002 | Deload week (every 4th week) loads must be 80% of phase target, 2 sets, RIR 4+ |
-| W-003 | Sessions/week must match §3.7 race-distance modifier for the current phase |
+| W-001 | Hybrid protocol weeks include exactly 1 upper + 1 lower per §3.7 race-distance modifier |
+| W-002 | Hybrid protocol deload weeks (every 4th week) emit reduced sessions — 2 sets, 60-65% 1RM, RIR 4+, no accessories. NOT skipped. |
+| W-003 | Durability protocol deload weeks skip strength entirely (see §4.2) |
+| W-004 | No same-day pairing of Lower strength with Quality run, Long run, Quality bike, or Long ride (cross-reference `SCHEDULING-RULES.md` §3.5) |
 
 **Per-phase invariants:**
 
@@ -234,13 +284,14 @@ The runtime validator runs after `materialize-plan` and asserts every generated 
 | P-002 | If Hypertrophy extends beyond 4 weeks, W5+ clamps to 72% (high end of phase range), does not reset to 65% |
 | P-003 | Each phase's reps × %1RM progression is monotonic — no regression within a phase except deload weeks |
 | P-004 | Power phase content (§3.5) starts at the correct week per §3.7 race-distance rules |
+| P-005 | Inter-race rebuild emits 1 upper + 1 lower per week, progressive load (see §7.4) |
 
 **Description ↔ delivered contract:**
 
 | ID | Rule |
 |---|---|
 | D-001 | Session description's %1RM strings must match delivered absolute lb values within ±2.5 lb rounding |
-| D-002 | Session title's phase name must match the phase assigned by the engine (e.g., "Build Upper" ≠ Hypertrophy week emission) |
+| D-002 | Session title's phase name must match the phase assigned by the engine. Phase labels are: "Hypertrophy", "Strength Build", "Maintenance + Power", "Taper Priming", "Rebuild" (inter-race). "Race-prep" is not a valid emission. |
 | D-003 | Equipment line must list only equipment present in athlete's `baselines.equipment.strength` |
 
 **Equipment substitution contract:**
@@ -257,9 +308,9 @@ Validator output is a per-week pass/fail report keyed to plan_id, week_index, an
 
 ## 4. Durability protocol (support intent)
 
-Joe Friel's AA-MS-SM methodology. Strength supports endurance; primary goal is injury prevention and tissue tolerance.
+Joe Friel's AA-MS-SM methodology. Strength supports endurance; primary goal is injury prevention and tissue tolerance. The durability-focused triathlete measures success in race time and treats strength as expendable when recovery is the priority.
 
-Note on naming: this protocol is sometimes called "Norwegian-style" in coaching circles, but that conflates two distinct things. Olav Aleksander Bu's Norwegian methodology for elite triathlon involves very specific lactate-clamped zone 2 and double-threshold sessions with minimal strength (often 1x/week at maintenance loads, and primarily for injury prevention rather than power). Friel's AA-MS-SM model is a complete prescriptive strength program with three distinct phases. This document implements the Friel model, with Norwegian as background context only.
+Note on naming: this protocol is sometimes called "Norwegian-style" in coaching circles, but that conflates two distinct things. Olav Aleksander Bu's Norwegian methodology for elite triathlon involves very specific lactate-clamped zone 2 and double-threshold sessions with minimal strength (often 1x/week at maintenance loads). Friel's AA-MS-SM model is a complete prescriptive strength program with three distinct phases. This document implements the Friel model, with Norwegian as background context.
 
 ### 4.1 Phase definitions
 
@@ -280,9 +331,13 @@ Note on naming: this protocol is sometimes called "Norwegian-style" in coaching 
 | Race-specific | Strength Maintenance (volume reduced) |
 | Taper | 1 light session early week, then skip |
 
+**Deload weeks — durability protocol:** SKIP entirely. The durability athlete is using the recovery week for total-load recovery; strength is the first thing to drop and the easiest to add back. No detraining concern at the volumes/loads used in this protocol (a one-week gap from 75% 1RM × 8-10 reps × 2 sets doesn't measurably reduce neural drive or hypertrophy markers).
+
+This is the philosophical fork from §3.2: hybrid REDUCES on deload, durability SKIPS. The split tracks athlete intent, not just program load.
+
 ### 4.3 Exercise hierarchy
 
-Same compound movements as performance protocol, but executed at lighter loads with higher reps. The emphasis is on movement quality, full range of motion, and tissue adaptation — not maximal load.
+Same compound movements as hybrid protocol, but executed at lighter loads with higher reps. The emphasis is on movement quality, full range of motion, and tissue adaptation — not maximal load.
 
 **Bodyweight + bands tier (no DBs/barbell):**
 - Goblet squat → Bodyweight squat with 3-second descent
@@ -294,7 +349,7 @@ Same compound movements as performance protocol, but executed at lighter loads w
 
 ### 4.4 Accessory work
 
-Higher emphasis on stability and mobility than performance protocol:
+Higher emphasis on stability and mobility than hybrid protocol:
 
 - Plank holds (core endurance)
 - Side plank (lateral chain)
@@ -307,7 +362,7 @@ All accessories: 2-3 sets, 12-20 reps, focus on form.
 
 ### 4.5 Power work
 
-Durability protocol does not include power phase. Athletes wanting power development should select co-equal intent and performance protocol. Durability is for injury prevention and aerobic-priority training.
+Durability protocol does not include power phase. Athletes wanting power development should select the hybrid protocol. Durability is for injury prevention and aerobic-priority training.
 
 ### 4.6 Session structure (45 min)
 
@@ -322,7 +377,7 @@ Sessions are full-body. No upper/lower split because frequency is too low to jus
 
 ### 4.7 Volume-forced cases
 
-Athletes routed to durability via §2.3 volume gate (intent was co-equal, but volume exceeds 22 hrs/week) run durability at the reduced cadence shown in their phase mapping above, with one substitution: drop the SM phase to 1x/week minimum even if 2x is theoretically available, and skip strength entirely in the final 3 weeks before race day.
+Athletes routed to durability via §2.3 volume gate (intent was co-equal/hybrid but volume exceeds 22 hrs/week) run durability at the reduced cadence shown in their phase mapping above, with one substitution: drop the SM phase to 1x/week minimum even if 2x is theoretically available, and skip strength entirely in the final 3 weeks before race day.
 
 ---
 
@@ -336,7 +391,7 @@ working_weight = 1RM × phase_percentage
 
 When no 1RM data exists:
 
-**Performance protocol:** Surface trade-off message: "Loads will be conservative until you complete a baseline test or enter your 1RM. Tap [Baseline Test: Lower Body] in the wizard or log a 1RM in your profile."
+**Hybrid protocol:** Surface trade-off message: "Loads will be conservative until you complete a baseline test or enter your 1RM. Tap [Baseline Test: Lower Body] in the wizard or log a 1RM in your profile."
 
 Use conservative defaults until 1RM provided:
 
@@ -370,16 +425,18 @@ These are approximate "untrained adult" benchmarks. Once athlete completes basel
 | Upper | Any bike | Yes — leave 4h |
 | Upper | Swim | Yes — strength after swim ideally |
 
-Athlete-facing coaching cue (performance protocol only):
+This rule must be enforced regardless of athlete day preference. If athlete preference would place Lower strength on a day with Quality Run, the scheduler must resolve the conflict (move strength or move quality), not honor both. See W-004 in §3.8.
+
+Athlete-facing coaching cue (hybrid protocol only):
 > "Leave 6+ hours between heavy strength and hard endurance. Prefer strength morning, endurance evening, or vice versa. Research shows shorter gaps reduce both adaptations."
 
 Durability protocol skips this cue (loads are light enough that interference is negligible).
 
 ---
 
-## 7. Race week protocol
+## 7. Race week and inter-race protocol
 
-### 7.1 Performance protocol race week
+### 7.1 Hybrid protocol race week
 
 **Taper Priming session — Wednesday only, 25 min, optional skip:**
 - 1 lower compound: 2 × 4 reps @ 50-60% 1RM, fast bar speed
@@ -398,9 +455,26 @@ Purpose: maintain neural drive without accumulating fatigue. Skip-optional expli
 
 After this session, no strength until post-race recovery week.
 
-### 7.3 Post-race recovery week
+### 7.3 Post-race recovery week (single-race or final race in plan)
 
 Both protocols: skip strength entirely for 7 days post-race. Resume with deload-equivalent loads in week 2 post-race.
+
+### 7.4 Inter-race rebuild (multi-race plans)
+
+When a plan contains two races, the inter-race period is structured as:
+
+**Week 1 post-race A (rebuild W0):** Skip strength entirely. Total-load recovery.
+
+**Weeks 2 to (race-B−2) — rebuild phase:** 1 upper + 1 lower per week, both protocols. Load progresses from 70% × 1RM toward race-week levels.
+
+- **Hybrid rebuild progression:** W1 rebuild at 72%, W2 at 76%, W3+ at 78-80%. Reps stay in Strength Build range (4-6). All four upper patterns in single upper session (per §3.3). Hip Thrusts on every lower session.
+- **Durability rebuild progression:** Resume SM phase at standard loads (65-75% × 8-12 reps). No power work.
+
+**Race-B week:** Standard race-week protocol per §7.1 or §7.2 depending on athlete intent.
+
+**P-005 conformance:** Inter-race rebuild must emit both upper and lower sessions per week, not lower-only. Lower-only inter-race rebuild is a violation (the original audited plan had this bug).
+
+If the gap between races is <3 weeks total, drop to durability protocol for that inter-race period regardless of intent — there's not enough time to meaningfully rebuild hybrid loads without compromising race-B taper.
 
 ---
 
@@ -410,13 +484,13 @@ Both protocols: skip strength entirely for 7 days post-race. Resume with deload-
 **Required:** Barbell + plates, squat rack OR power cage, bench (flat or adjustable)
 **Optional:** Pull-up bar, kettlebells, dumbbells, resistance bands, cable machine
 
-All performance and durability prescriptions available.
+All hybrid and durability prescriptions available.
 
 ### 8.2 Dumbbell-based tier
 **Required:** Dumbbells (adjustable or 2-3 pairs), bench
 **Optional:** Pull-up bar, resistance bands, kettlebells
 
-**Performance protocol substitutions:**
+**Hybrid protocol substitutions:**
 - Barbell Back Squat → Goblet Squat or DB Front Squat
 - Conventional Deadlift → DB Romanian Deadlift
 - Bench Press → DB Bench Press
@@ -430,7 +504,7 @@ Loads: DB max in pairs typically caps at ~70% of barbell loads. Adjust 1RM-based
 **Required:** Resistance bands (light, medium, heavy)
 **Optional:** Pull-up bar, suspension trainer
 
-**Performance protocol:** Not available. Surface trade-off, route to durability.
+**Hybrid protocol:** Not available. Surface trade-off, route to durability.
 
 **Durability protocol substitutions:**
 - Squat → Bodyweight squat with 3-sec descent, single-leg variations
@@ -445,7 +519,7 @@ Loads: DB max in pairs typically caps at ~70% of barbell loads. Adjust 1RM-based
 
 The phase durations in §3.1 and §4.1 assume a standard 16-week 70.3 build. Shorter and longer plans scale as follows.
 
-### 9.1 Performance protocol scaling
+### 9.1 Hybrid protocol scaling
 
 | Plan length | Hypertrophy | Strength Build | Maint+Power | Taper |
 |---|---|---|---|---|
@@ -455,7 +529,7 @@ The phase durations in §3.1 and §4.1 assume a standard 16-week 70.3 build. Sho
 | 19–24 weeks (long 70.3 / short IM) | 4–5 weeks | 4–5 weeks | 6–8 weeks | 1 week |
 | 25+ weeks (full IM build) | 5–6 weeks | 5–6 weeks | 8–10 weeks | 1 week |
 
-**Minimum performance protocol plan length is 8 weeks.** Plans shorter than 8 weeks route to a compressed durability variant: 2 weeks AA, 2 weeks MS, remainder SM, no power phase. There is not enough time to build hypertrophy and strength meaningfully on top of endurance load.
+**Minimum hybrid protocol plan length is 8 weeks.** Plans shorter than 8 weeks route to a compressed durability variant: 2 weeks AA, 2 weeks MS, remainder SM, no power phase. There is not enough time to build hypertrophy and strength meaningfully on top of endurance load.
 
 **Phase extension rule (P-002 in §3.8):** When a phase extends beyond its baseline duration (Hypertrophy stretched from 4 → 6 weeks, for example), the additional weeks clamp to the high end of the %1RM range with a small deload built in at week 4. They do not restart the progression at the low end.
 
@@ -476,21 +550,24 @@ Durability is more forgiving on length because SM extends indefinitely; no minim
 ### 10.1 Files that read this spec
 
 - `supabase/functions/_shared/strength-protocol.ts` — protocol selection logic (intent + equipment + volume gates per §2)
-- `supabase/functions/_shared/triathlon_performance.ts` — performance protocol session generation per phase
+- `supabase/functions/_shared/triathlon_performance.ts` — hybrid protocol session generation per phase
 - `supabase/functions/_shared/triathlon_durability.ts` — durability protocol session generation per phase
 - `generate-combined-plan/phase-structure.ts` — phase boundaries per §3.2 and §9
 - `generate-combined-plan/session-factory.ts` — session assembly per §3.6
 - `generate-combined-plan/types.ts` — `StrengthProtocol` type union
 - `validate-strength-conformance.ts` (new) — implements §3.8 contract
-- `ArcSetupWizard.tsx` — surfaces equipment trade-off (§2.2) and volume advisory (§2.3)
+- `ArcSetupWizard.tsx` — surfaces wizard labels per §0.2, equipment trade-off per §2.2, volume advisory per §2.3, race-day trade-off summary per §0.3
 
 ### 10.2 Known gaps to be closed by §3.8 conformance pass
 
-- Hypertrophy W5 emits at 65% instead of clamping to 72% (P-002)
-- `perfBaseUpper` missing OHP — vertical push gap (S-003 / W-001)
-- `perfBuildUpper` missing Bench — horizontal push gap (S-003 / W-001)
-- `perfBaseLower` and `perfBuildLower` missing Hip Thrusts (S-005)
-- Some plan branches still emit durability sessions for `co-equal` intent (root cause: protocol selection bug, not session-factory)
+- Hypertrophy W5 emits at 65% instead of clamping to 72% (P-002) — fixed per autonomous session
+- `perfBaseUpper` missing OHP (S-003) — fixed
+- `perfBuildUpper` missing Bench (S-003) — fixed
+- `perfBaseLower` and `perfBuildLower` missing Hip Thrusts (S-005) — fixed
+- Deload weeks skip strength in hybrid protocol — should REDUCE per §3.2 / W-002 (open)
+- Same-day Lower + Quality Run pairing on Thursdays (W-004 / §6) — open, cross-doc with scheduling rules
+- Inter-race rebuild emits Lower only, missing Upper (P-005 / §7.4) — open
+- Phase label "Race-prep" emitted instead of "Maintenance + Power" (D-002) — open
 
 ### 10.3 Rendering — Pool gear pattern for strength
 
@@ -506,37 +583,47 @@ Equipment line is generated from session needs ∩ athlete inventory.
 ## 11. Research references
 
 **Modern hybrid methodology**
-- Fergus Crawley (OMNIA Performance) — hybrid training framework
-- Alex Viada, *The Hybrid Athlete*
+- Fergus Crawley (OMNIA Performance) — hybrid training framework, deload-as-maintenance principle
+- Alex Viada, *The Hybrid Athlete* — concurrent programming, "touch" sessions during recovery
 - Hybrid Athletics general programming corpus
 
-**Friel AA-MS-SM model**
-- Joe Friel, *The Triathlete's Training Bible* (5th edition, 2016) — Chapter 13 on strength
-- TrainingPeaks ATP Strength Phase Workouts
+**Volume programming and deload (RP / MEV framework)**
+- Mike Israetel & Renaissance Periodization — Minimum Effective Volume principle; deload defined as reduced volume at maintained intensity range, not skip
+- Helms, Morgan, Valdez, *The Muscle and Strength Pyramid: Training* (2nd ed., 2019)
 
-**Norwegian methodology (background context only, not implementation basis)**
-- Olav Aleksander Bu — coach to Kristian Blummenfelt and Gustav Iden; published methodology emphasizes lactate-clamped zone 2 and double-threshold sessions
-- Mark Allen analysis confirming "refined traditional principles" rather than novel strength model
-
-**Concurrent training interference**
+**Concurrent training interference (modern evidence base)**
 - Coffey & Hawley, *Concurrent exercise training: Do opposites distract?* (J Physiol, 2017)
 - Wilson et al., *Concurrent training: a meta-analysis examining interference of aerobic and resistance exercises* (J Strength Cond Res, 2012)
-- 6-8 hour separation between heavy strength and hard endurance to minimize interference
+- Fyfe et al., *Interference between concurrent resistance and endurance exercise: molecular bases and the role of individual training variables* (Sports Med, 2014; 2016 update)
+- Doma, Deakin, Bentley, *Implications of impaired endurance performance following single bouts of resistance training: an alternate concurrent training perspective* (Sports Med, 2017)
+- Berryman et al., *Strength training for middle- and long-distance performance: a meta-analysis* (Int J Sports Physiol Perform, 2018)
 
 **Plyometrics and running economy**
 - Spurrs et al., *The effect of plyometric training on distance running performance* (Eur J Appl Physiol, 2003)
 - Saunders et al., *Short-term plyometric training improves running economy in highly trained middle and long distance runners* (J Strength Cond Res, 2006)
 - Paavolainen et al., *Explosive-strength training improves 5-km running time by improving running economy and muscle power* (J Appl Physiol, 1999)
 
+**Type II fiber preservation in endurance athletes**
+- Methenitis et al., *Type II muscle fibers, force-velocity, and the modifiability of endurance performance* (multiple papers, 2018-2020)
+- Aagaard & Andersen, *Effects of strength training on endurance capacity in top-level endurance athletes* (Scand J Med Sci Sports, 2010)
+
 **Glute and posterior chain for endurance**
 - Contreras et al. — hip thrust biomechanics and EMG studies
-- Single-leg work for hip stability — clinical PT consensus
+- Distefano et al. — single-leg work for hip stability and injury prevention
+
+**Friel AA-MS-SM model (durability protocol)**
+- Joe Friel, *The Triathlete's Training Bible* (5th edition, 2016) — Chapter 13 on strength
+- TrainingPeaks ATP Strength Phase Workouts
+
+**Norwegian methodology (background context only)**
+- Olav Aleksander Bu — coach to Kristian Blummenfelt and Gustav Iden
+- Mark Allen analysis: "refined traditional principles" rather than novel strength model
 
 **Sport-specific upper accessories**
 - Rotator cuff and scapular work for swim catch position — primarily clinical and coaching consensus; lighter peer-reviewed evidence base than the run/bike accessories. Included as low-cost prevention.
 
 **Volume thresholds for protocol switching**
-- Coaching consensus across IM coaches (Hadfield, Bennett, Vance) that strength frequency drops to 1x/week at 18+ hrs/week endurance volume and approaches maintenance-only at 22+ hrs/week. Not a single citation but a defensible heuristic from practice.
+- Coaching consensus across IM coaches (Hadfield, Bennett, Vance) that strength frequency drops to 1x/week at 18+ hrs/week endurance volume and approaches maintenance-only at 22+ hrs/week. Defensible heuristic, not single-citation evidence.
 
 ---
 
