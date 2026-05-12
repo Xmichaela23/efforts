@@ -29,6 +29,7 @@ import type {
 } from './types.ts';
 import type { Sport, Intensity } from './types.ts';
 import { brickCapForPhaseWeek } from '../../../src/lib/session-frequency-defaults.ts';
+import { validateNonBrickStackTaggingFlat } from '../_shared/stack-tagging-validator.ts';
 import {
   getSwimSlotTemplates,
   getRecoverySwimTemplate,
@@ -502,6 +503,19 @@ function computeWeekMetrics(
   }
 
   const totalMin = z12min + z3min;
+
+  // §A.5 (`docs/BRICK-PROTOCOL.md` backstop): scan the final session set for non-brick same-day
+  // bike+run pairings. Commit 4's matrix flip prevents this at placement; the validator is the
+  // defense-in-depth catch for engine bugs / athlete pin configs / migration cases. Production
+  // behavior is a soft warning surfaced as a trade-off so the athlete sees the policy violation.
+  const stackViolations = validateNonBrickStackTaggingFlat(sessions);
+  const mergedTradeOffs: string[] = [...(weekTradeOffs ?? [])];
+  for (const v of stackViolations) {
+    mergedTradeOffs.push(
+      `${v.message} Engine policy: same-day bike+run requires explicit brick designation.`,
+    );
+  }
+
   return {
     weekNum, phase, isRecovery, sessions,
     total_raw_tss: Math.round(total_raw),
@@ -510,7 +524,7 @@ function computeWeekMetrics(
     zone1_2_minutes: Math.round(z12min),
     zone3_plus_minutes: Math.round(z3min),
     eighty_twenty_ratio: totalMin > 0 ? z12min / totalMin : 1,
-    ...(weekTradeOffs && weekTradeOffs.length > 0 ? { week_trade_offs: weekTradeOffs } : {}),
+    ...(mergedTradeOffs.length > 0 ? { week_trade_offs: mergedTradeOffs } : {}),
     ...(conflictEvents && conflictEvents.length > 0 ? { conflict_events: conflictEvents } : {}),
   };
 }
