@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 11, 2026 (eod)
+Last updated: May 11, 2026 (eod — Theme A shipped)
 
 ---
 
@@ -148,6 +148,40 @@ For each numbered item:
 - [x] **Concurrent training spacing constraint — HIGH severity scheduling defect.** ✅ Shipped 2026-05-11 for combined-plan generator. `docs/SCHEDULING-RULES.md §4.21` codifies the rule; `_shared/week-optimizer.ts` enforces strict 24h/48h spacing + sandwich rejection + tier ladder (CLEAN → SOFT → SANDWICH → DROP); `_shared/schedule-session-constraints.ts:SESSION_PRIME_MOVER` provides the prime-mover taxonomy. §5.1 performance-intent carve-out deprecated. Research cited inline: Hickson 1980, Wilson et al 2012, Robineau et al 2016, Coffey & Hawley 2017, Petré et al 2021.
 - [ ] **Apply §4.21 to other plan generators.** Above fix is combined-plan only. `generate-run-plan`, `generate-triathlon-plan`, `generate-plan` have independent placement pipelines that were NOT routed through the new rule. Audit each, identify placement entry points, apply prime-mover taxonomy + tier ladder. Use `_shared/week-optimizer.ts` as the reference implementation.
 - [ ] **Consolidated strength-integration mode (Model B) — research citations + spec.** §4.21 today implements "Separated" mode (strength on its own days, away from hard endurance — concurrent-training-spacing strict). Hybrid practitioners use a different "Consolidated" mode where strength stacks AM/PM with quality endurance on the same calendar day; hard days get harder, rest days get protected. The §5.2 consolidated-hard-day pattern the optimizer already produces (Thu AM quality_run + PM lower) is functionally Model B in disguise — lean into it as the explicit mode rather than treat as exception. Spec needs: wizard question (Separated default vs Consolidated opt-in), parallel rule set in engine, research basis. Citations to gather: Fergus Crawley / Omnia hybrid framework; Nick Bare PRESCRIBED methodology; Blaine Lints (Tactical Hybrid); Petré et al 2021 (re-read for support of either approach depending on consolidation); Murach & Bagley 2016 (skeletal muscle adaptation to concurrent training, AM/PM separation); Sale 1990 (post-activation potentiation favors AM strength before PM endurance in some protocols). Document in a new `docs/CONSOLIDATED-MODE.md` spec before code; parallel to §4.21 separated mode in SCHEDULING-RULES.md.
+
+---
+
+## Queued for next sessions (Theme A complete 2026-05-11)
+
+These are the architectural threads opened during the 2026-05-11 session, scoped and queued for follow-up. None are blocking today's ship.
+
+### HIGH severity
+- [ ] **Race-week protocol audit — Week 14 and Week 18 findings.** Race weeks aren't yet treated as a distinct architectural class. Today's brick-cap fix (commit `e0aad332`) sets race-week brick to 0 in `week-builder.ts:effectiveBricks`, but week-level structure (taper-into-race transition, race-day session shape, post-race rebuild handoff) needs a dedicated protocol spec. Audit Week 14 (B-race) and Week 18 (A-race) of the existing test plans, identify the contract gaps, write `docs/RACE-WEEK-PROTOCOL.md` before code.
+
+### Theme B — Strength integration mode (Separated vs Consolidated)
+- [ ] Wizard question + copy: "How should strength fit into your week?" with Separated / Consolidated options + research-backed copy (Hickson 1980 cited for Separated; Crawley/Omnia, Nick Bare, Blaine Lints cited for Consolidated). Default Separated.
+- [ ] AthleteState `integration_mode` field + payload threading from wizard through reconciler to optimizer.
+- [ ] Parallel engine rule set: `mode === 'separated'` keeps today's §4.21 strict 24h spacing; `mode === 'consolidated'` inverts — strength_lower + leg_quality SAME-DAY is preferred placement, separated becomes the trade-off. §5.2 consolidated-hard-day pattern already exists as the implementation foundation.
+- [ ] New `docs/CONSOLIDATED-MODE.md` spec parallel to §4.21 separated mode.
+
+### Theme C — Wizard gates and minimum-day warnings
+- [ ] Day-count gate matrix at wizard (after distribution philosophy question):
+  - Hard block: 5d + Co-equal + Separated; 5d + Performance + Any; <5d + Performance
+  - Soft warn: 6d + Co-equal + Separated; 5d + Co-equal + Consolidated; <5d + Co-equal
+- [ ] Warning copy template: "Tight fit. {session_count} sessions in {days} days with {spacing_rule}. Options: [bump days] [switch mode] [continue] [drop intent]."
+- [ ] Hard-block copy template surfacing the actual math.
+- [ ] Wire gate logic from (days × hours × intent × integration_mode) — session count from frequency matrix, spacing rule from §4.21 (separated) or §5.2 (consolidated).
+- [ ] GATE-BLOCK flag from `computeSessionFrequencyDefaults` (commit `4700db5a`) wired to the wizard's refusal path.
+
+### Item 2 — Swim protocol audit
+- [ ] `SWIM-PROTOCOL.md` exists but audit pattern (per process: write spec → audit existing impl against spec → report gaps → scope) has not yet been run.
+- [ ] Cross-check swim session generation against the documented protocol; identify drift.
+
+### Item 3 — Cycling protocol audit (CYCLING-PROTOCOL.md missing)
+- [ ] Write `CYCLING-PROTOCOL.md` spec doc — currently 0% (per §3 above).
+- [ ] Distinguish Easy / Endurance / Long / Quality / Brick rides; stop calling Z2 weekday rides "long rides."
+- [ ] Verify cycling power zones flow from FTP correctly.
+- [ ] Confirm Wednesday group ride anchor threading.
 
 ---
 
