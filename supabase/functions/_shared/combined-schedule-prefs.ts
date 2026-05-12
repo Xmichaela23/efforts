@@ -297,6 +297,8 @@ export interface CombinedSchedulePrefs {
   strength_protocol?: string;
   /** From Arc: support = tri accessory loads; performance = compound / progressive overload. */
   strength_intent?: StrengthIntentArc;
+  /** §6.5 same-day Lower + Quality ordering preference (default endurance_first for non-hybrid). */
+  strength_ordering_preference?: 'endurance_first' | 'strength_first';
   /** Tri swim: focus = higher-volume program; race = maintenance / execute leg (engine Step 2+). */
   swim_intent?: SwimIntentArc;
   /**
@@ -359,6 +361,11 @@ export function mergeCombinedSchedulePrefs(
     const siRaw = src.strength_intent ?? src.strengthIntent;
     const si =
       siRaw === 'support' || siRaw === 'performance' ? (siRaw as StrengthIntentArc) : undefined;
+    const sopRaw = src.strength_ordering_preference ?? src.strengthOrderingPreference;
+    const sop: 'endurance_first' | 'strength_first' | undefined =
+      sopRaw === 'strength_first' ? 'strength_first'
+      : sopRaw === 'endurance_first' ? 'endurance_first'
+      : undefined;
     const swimIRaw = src.swim_intent ?? src.swimIntent;
     const swimI =
       swimIRaw === 'focus' || swimIRaw === 'race' ? (swimIRaw as SwimIntentArc) : undefined;
@@ -440,6 +447,7 @@ export function mergeCombinedSchedulePrefs(
     if (rd !== undefined) out.rest_days = rd;
     if (sp !== undefined) out.strength_protocol = sp;
     if (si !== undefined) out.strength_intent = si;
+    if (sop !== undefined) out.strength_ordering_preference = sop;
     if (swimI !== undefined) out.swim_intent = swimI;
     if (swimLS !== undefined) out.swim_load_source = swimLS;
     if (ti !== undefined) out.training_intent = ti;

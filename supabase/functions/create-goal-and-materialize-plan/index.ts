@@ -1640,6 +1640,12 @@ async function buildCombinedPlan(
       ...(freshCombinedPrefs.strength_intent
         ? { strength_intent: freshCombinedPrefs.strength_intent }
         : {}),
+      // §6.5 ordering preference (STRENGTH-PROTOCOL.md). Hybrid athletes pick;
+      // durability/none auto-default `endurance_first` at wizard save time.
+      strength_ordering_preference:
+        (freshCombinedPrefs as Record<string, unknown>).strength_ordering_preference === 'strength_first'
+          ? 'strength_first' as const
+          : 'endurance_first' as const,
       ...(freshCombinedPrefs.swim_intent ? { swim_intent: freshCombinedPrefs.swim_intent } : {}),
       ...(freshCombinedPrefs.swim_load_source ? { swim_load_source: freshCombinedPrefs.swim_load_source } : {}),
       ...((): { swim_experience?: string } => {

@@ -92,6 +92,21 @@ export interface AthleteState {
   strength_protocol?: string;
   /** From Arc / goal: support = accessory loads for tri; performance = compound / %1RM progression. */
   strength_intent?: 'support' | 'performance';
+  /**
+   * Same-day Lower + Quality endurance ordering preference (STRENGTH-PROTOCOL.md §6.5).
+   *
+   * - `endurance_first` (default): Quality run/bike AM, Lower strength PM. Protects race
+   *   performance and running economy (Doma & Deakin). Recommended for race-focused
+   *   triathletes regardless of intent.
+   * - `strength_first`: Lower strength AM, Quality run/bike PM. Protects lower-body dynamic
+   *   strength (Eddens 2018 meta-analysis). For hybrid athletes whose strength PRs matter
+   *   as much as race times.
+   *
+   * The §6.5 rule: durability athletes always get `endurance_first` (race time is the only
+   * metric); hybrid athletes pick. Lower + Long Ride same-day always orders strength PM
+   * regardless of preference (the Long Ride 6h+ post rule overrides — §6.1).
+   */
+  strength_ordering_preference?: 'endurance_first' | 'strength_first';
   /** Tri swim program from goal training_prefs: focus vs race-support (placement/volume in later steps). */
   swim_intent?: 'focus' | 'race';
   /**
@@ -345,6 +360,25 @@ export interface PlannedStrengthExercise {
   notes?: string;
 }
 
+/**
+ * Same-day pairing metadata attached to sessions that share a day with a constrained partner
+ * (Lower strength + Quality Run / Quality Bike / Long Ride / Easy Run / Easy Bike).
+ * STRENGTH-PROTOCOL.md §6.2 / §6.5 / W-005 / W-006.
+ *
+ * Required on both sides of a constrained pairing. Missing on either side = W-006 hard fail.
+ */
+export interface SessionPairingMetadata {
+  /** Identifier of the paired session (heuristic: `${day}:${session_kind}` since plan-time IDs
+   *  aren't stable). Lets the conformance validator match the two halves. */
+  same_day_with: string;
+  /** Which slot this session occupies on the shared day. */
+  ordering: 'AM' | 'PM';
+  /** Hours between the two sessions. §6.2 floor: 6h. */
+  gap_hours: number;
+  /** Optional athlete-facing one-liner (e.g., "Same-day with Quality Run — see daily view for ordering."). */
+  coaching_cue?: string;
+}
+
 export interface PlannedSession {
   day: string;           // 'Monday' … 'Sunday'
   type: Sport;
@@ -372,6 +406,8 @@ export interface PlannedSession {
   target_yards?: number;
   /** When set (e.g. neural_speed / triathlon protocol), activate-plan persists this and materialize uses it instead of token-derived exercises. */
   strength_exercises?: PlannedStrengthExercise[];
+  /** §6.2 / §6.5 / W-005 / W-006 — same-day Lower + Quality endurance pairing metadata. */
+  pairing?: SessionPairingMetadata;
 }
 
 /** Typed scheduling conflicts for downstream resolver (Arc); additive to week_trade_offs prose. */

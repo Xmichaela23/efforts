@@ -1927,7 +1927,134 @@ export function buildWeek(
   // ── Steps 6 & 7: TSS + ramp rate validation handled in validator.ts ───────
 
   const allSessions = gridSessions(grid);
+  // §6.2 / §6.5 (W-005 / W-006): attach AM/PM ordering + 6h gap metadata to constrained same-day
+  // pairings (Lower strength + Quality Run / Quality Bike / Long Ride / Easy Run / Easy Bike).
+  // Conformance validator (Task F) hard-fails missing metadata on these pairings.
+  attachSameDayPairingMetadata(allSessions, athleteState);
   return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs, conflictEvents);
+}
+
+/**
+ * Pairing kinds that require AM/PM ordering metadata when same-day with `lower_body_strength`
+ * (STRENGTH-PROTOCOL.md §6.2). Lower + Long Run is forbidden same-day (W-004 hard rule);
+ * if the optimizer ever lets that pair through, the validator will hard-fail, so no pairing
+ * metadata is attached for it here.
+ */
+const LOWER_PAIRING_PARTNERS = new Set<string>([
+  'quality_run',
+  'quality_bike',
+  'long_ride',
+  'easy_run',
+  'easy_bike',
+]);
+
+function pairingId(day: string, slot: string): string {
+  return `${day}:${slot}`;
+}
+
+/**
+ * Decide AM/PM ordering between Lower and its partner (STRENGTH-PROTOCOL.md §6.5 / W-007).
+ *
+ * - Long Ride pairing: strength always PM (overrides preference per §6.1 hard rule — Long Ride
+ *   first is the only safe ordering).
+ * - Easy Run / Easy Bike pairing: strength preferred AM (recovery flush from the easy session).
+ * - Quality Run / Quality Bike pairing: per athlete `strength_ordering_preference`.
+ *   • endurance_first (default): partner AM, Lower PM
+ *   • strength_first: Lower AM, partner PM
+ */
+function decideOrdering(
+  partnerKind: string,
+  pref: 'endurance_first' | 'strength_first',
+): { lowerOrdering: 'AM' | 'PM'; partnerOrdering: 'AM' | 'PM' } {
+  if (partnerKind === 'long_ride') {
+    return { lowerOrdering: 'PM', partnerOrdering: 'AM' };
+  }
+  if (partnerKind === 'easy_run' || partnerKind === 'easy_bike') {
+    return { lowerOrdering: 'AM', partnerOrdering: 'PM' };
+  }
+  // quality_run / quality_bike: respect athlete preference
+  if (pref === 'strength_first') {
+    return { lowerOrdering: 'AM', partnerOrdering: 'PM' };
+  }
+  return { lowerOrdering: 'PM', partnerOrdering: 'AM' };
+}
+
+/** Exported for unit tests in `same-day-pairing.test.ts`. Production callers use the
+ *  internal `attachSameDayPairingMetadata` call inside `buildWeek`. */
+export function attachSameDayPairingMetadataForTest(
+  sessions: PlannedSession[],
+  athleteState: AthleteState,
+): void {
+  attachSameDayPairingMetadata(sessions, athleteState);
+}
+
+function attachSameDayPairingMetadata(
+  sessions: PlannedSession[],
+  athleteState: AthleteState,
+): void {
+  const pref: 'endurance_first' | 'strength_first' =
+    athleteState.strength_ordering_preference === 'strength_first' ? 'strength_first' : 'endurance_first';
+
+  const byDay = new Map<string, PlannedSession[]>();
+  for (const s of sessions) {
+    const arr = byDay.get(s.day) ?? [];
+    arr.push(s);
+    byDay.set(s.day, arr);
+  }
+
+  for (const [day, daySessions] of byDay) {
+    const lower = daySessions.find(
+      (s) => s.type === 'strength' && (s.tags?.includes('lower_body') ?? false),
+    );
+    if (!lower) continue;
+
+    // Find the first partner kind present on this day, preferring high-stress partners.
+    const partnerOrder: string[] = ['long_ride', 'quality_run', 'quality_bike', 'easy_run', 'easy_bike'];
+    let partner: PlannedSession | undefined;
+    let partnerKind: string | undefined;
+    for (const kind of partnerOrder) {
+      const found = daySessions.find((s) => {
+        if (s === lower) return false;
+        const slot = plannedSessionToScheduleSlot(s);
+        return slot === kind;
+      });
+      if (found) {
+        partner = found;
+        partnerKind = kind;
+        break;
+      }
+    }
+    if (!partner || !partnerKind || !LOWER_PAIRING_PARTNERS.has(partnerKind)) continue;
+
+    const { lowerOrdering, partnerOrdering } = decideOrdering(partnerKind, pref);
+    const gapHours = 6;
+
+    lower.pairing = {
+      same_day_with: pairingId(day, partnerKind),
+      ordering: lowerOrdering,
+      gap_hours: gapHours,
+      coaching_cue: `Same-day with ${humanizePartnerKind(partnerKind)} — see daily view for ordering.`,
+    };
+    lower.timing = lowerOrdering;
+
+    partner.pairing = {
+      same_day_with: pairingId(day, 'lower_body_strength'),
+      ordering: partnerOrdering,
+      gap_hours: gapHours,
+    };
+    partner.timing = partnerOrdering;
+  }
+}
+
+function humanizePartnerKind(kind: string): string {
+  switch (kind) {
+    case 'quality_run': return 'Quality Run';
+    case 'quality_bike': return 'Quality Bike';
+    case 'long_ride': return 'Long Ride';
+    case 'easy_run': return 'Easy Run';
+    case 'easy_bike': return 'Easy Bike';
+    default: return kind;
+  }
 }
 
 const CONCENTRATED_LOAD_DAY =

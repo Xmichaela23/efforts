@@ -86,6 +86,56 @@ function baseAthlete(
   };
 }
 
+// ── W-004: Lower + Long Run 48h hard rule (v2.1 Task B verification) ──────────────
+
+Deno.test({
+  name: 'W-004: Sunday long_run + 2x strength → Lower lands ≥48h from Sunday on both sides',
+  fn() {
+    // Athlete pins Sunday long_run with hybrid (performance) intent + 2x strength.
+    // 48h rule: Lower cannot land Saturday (24h pre) or Monday (24h post). The acceptable
+    // Lower days are Tuesday/Wednesday/Thursday/Friday (≥48h from Sunday on both sides).
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences(),
+      athlete: baseAthlete({ training_intent: 'performance', strength_intent: 'performance' }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+    assertEquals(lowerDays.length, 1, `expected exactly 1 lower_body_strength placement; got ${lowerDays.length} on [${lowerDays.join(', ')}]`);
+    const lowerDay = lowerDays[0]!;
+    // Hard rule §6.1 / W-004: no same-day, no 24h pre, no 24h post — i.e. lowerDay is NOT
+    // saturday, sunday, or monday.
+    const forbidden: DayName[] = ['saturday', 'sunday', 'monday'];
+    assert(
+      !forbidden.includes(lowerDay),
+      `W-004 violation: lower placed on ${lowerDay} (within 48h of Sunday long_run on ${forbidden.join('/')})`,
+    );
+  },
+});
+
+Deno.test({
+  name: 'W-004: Sunday long_run + 2x strength → Lower never lands Monday (24h-post hard block)',
+  fn() {
+    // The physiologically critical direction is post-long_run: lifting heavy on legs damaged by
+    // long-run eccentric volume is the injury vector (§6.3). Per v2.1 §6.1 the optimizer must
+    // refuse to place Lower on Monday when Sunday is long_run, even under tight constraints.
+    // 24h-pre (Saturday) remains acceptable per Robineau 2016 / coaching consensus — legs are
+    // fresh for the long run, eccentric load doesn't compound.
+    for (const tier of ['support', 'performance'] as const) {
+      const inputs: WeekOptimizerInputs = {
+        anchors: { long_ride: 'saturday', long_run: 'sunday' },
+        preferences: basePreferences(),
+        athlete: baseAthlete({ training_intent: 'performance', strength_intent: tier }),
+      };
+      const week = deriveOptimalWeek(inputs);
+      const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+      for (const d of lowerDays) {
+        assert(d !== 'monday', `W-004 (24h post): tier=${tier} placed lower on Monday after Sunday long_run`);
+      }
+    }
+  },
+});
+
 // ── Fixture 06 first: sparse / minimal anchors (regression class: May 6) ─────────────
 
 Deno.test({
