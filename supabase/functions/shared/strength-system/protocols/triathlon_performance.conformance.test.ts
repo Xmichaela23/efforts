@@ -302,3 +302,78 @@ Deno.test('S-003 DB tier (build upper): DB tier has DB Bench Press as horizontal
   const upper = upperOf(triathlonPerformanceProtocol.createWeekSessions(ctx));
   assert(findByName(upper, /DB Bench Press|Floor Press/i), `DB build upper: missing DB Bench — got [${exerciseNames(upper)}]`);
 });
+
+// ── §3.8 W-002 — Hybrid deload REDUCE (not skip) ────────────────────────────
+
+Deno.test('W-002: hybrid deload week emits 1U + 1L (not skipped) when freq>=2', () => {
+  const ctx = ctxWithPhase('base', 1, { isRecovery: true });
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  assertEquals(sessions.length, 2, `expected 2 deload sessions (1U + 1L); got ${sessions.length}: ${sessions.map((s) => s.name).join(', ')}`);
+  assert(sessions.some((s) => /Lower/i.test(s.name)), `expected a Lower session — got [${sessions.map((s) => s.name).join(', ')}]`);
+  assert(sessions.some((s) => /Upper/i.test(s.name)), `expected an Upper session — got [${sessions.map((s) => s.name).join(', ')}]`);
+});
+
+Deno.test('W-002: deload sessions tagged "deload" and "phase:recovery"', () => {
+  const ctx = ctxWithPhase('base', 1, { isRecovery: true });
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  for (const s of sessions) {
+    assert(s.tags.includes('deload'), `${s.name}: missing 'deload' tag — got [${s.tags.join(', ')}]`);
+    assert(s.tags.includes('phase:recovery'), `${s.name}: missing 'phase:recovery' tag — got [${s.tags.join(', ')}]`);
+  }
+});
+
+Deno.test('W-002: deload uses 2 sets per main lift @ 62% 1RM (MEV per Israetel)', () => {
+  const ctx = ctxWithPhase('base', 1, { isRecovery: true });
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  const lower = lowerOf(sessions);
+  const dl = findByName(lower, /Deadlift/i);
+  assertEquals(dl?.sets, 2, `deload Deadlift should be 2 sets, got ${dl?.sets}`);
+  assertEquals(dl?.weight, '62% 1RM', `deload Deadlift should be 62% 1RM, got ${dl?.weight}`);
+  assertEquals(dl?.target_rir, 4, `deload Deadlift should be RIR 4, got ${dl?.target_rir}`);
+});
+
+Deno.test('W-002: deload cuts accessories — no Hip Thrusts, no Face Pulls, no core finisher', () => {
+  const ctx = ctxWithPhase('base', 1, { isRecovery: true });
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  for (const s of sessions) {
+    assert(!findByName(s, /Hip Thrust|Glute Bridge/i), `${s.name}: deload should not have Hip Thrusts — got [${exerciseNames(s)}]`);
+    assert(!findByName(s, /Face Pulls/i), `${s.name}: deload should not have Face Pulls — got [${exerciseNames(s)}]`);
+    assert(!findByName(s, /Pull-Aparts/i), `${s.name}: deload should not have Pull-Aparts — got [${exerciseNames(s)}]`);
+    assert(!findByName(s, /Dead Bug|Pallof|Copenhagen/i), `${s.name}: deload should not have core finisher — got [${exerciseNames(s)}]`);
+  }
+});
+
+Deno.test('W-002: deload session description includes the literal "Deload" phrase per D-002', () => {
+  const ctx = ctxWithPhase('base', 1, { isRecovery: true });
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  for (const s of sessions) {
+    assert(/Deload/i.test(s.description), `${s.name}: description should mention Deload — got "${s.description}"`);
+  }
+});
+
+// ── §3.8 P-005 — Inter-race rebuild emits both U + L ───────────────────────
+
+Deno.test('P-005: rebuild phase emits 1 upper + 1 lower when freq>=2', () => {
+  const ctx = ctxWithPhase('rebuild', 1);
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  assertEquals(sessions.length, 2, `expected 2 rebuild sessions (1U + 1L); got ${sessions.length}: ${sessions.map((s) => s.name).join(', ')}`);
+  assert(sessions.some((s) => /Lower/i.test(s.name)), `expected a Lower rebuild session — got [${sessions.map((s) => s.name).join(', ')}]`);
+  assert(sessions.some((s) => /Upper/i.test(s.name)), `expected an Upper rebuild session — got [${sessions.map((s) => s.name).join(', ')}]`);
+});
+
+Deno.test('P-005: rebuild upper covers all four upper patterns (S-003 single-session rule still applies)', () => {
+  const ctx = ctxWithPhase('rebuild', 1);
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  const upper = upperOf(sessions);
+  assert(findByName(upper, /Bench Press|Floor Press/i), `rebuild upper missing horizontal push — got [${exerciseNames(upper)}]`);
+  assert(findByName(upper, /\bRow\b/i), `rebuild upper missing horizontal pull — got [${exerciseNames(upper)}]`);
+  assert(findByName(upper, /Overhead Press|Shoulder Press/i), `rebuild upper missing vertical push — got [${exerciseNames(upper)}]`);
+  assert(findByName(upper, /Pull-?ups|Pull-?Down/i), `rebuild upper missing vertical pull — got [${exerciseNames(upper)}]`);
+});
+
+Deno.test('P-005: rebuild lower includes Hip Thrusts (S-005 still applies to rebuild)', () => {
+  const ctx = ctxWithPhase('rebuild', 1);
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  const lower = lowerOf(sessions);
+  assert(findByName(lower, /Hip Thrust|Glute Bridges/i), `rebuild lower missing Hip Thrusts — got [${exerciseNames(lower)}]`);
+});

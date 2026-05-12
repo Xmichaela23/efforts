@@ -1520,13 +1520,24 @@ export function buildWeek(
     strFreq = 2;
   } else if (phase === 'build' || phase === 'race_specific') {
     strFreq = performanceStrength ? 2 : 1;
+  } else if (phase === 'rebuild') {
+    // §7.4 / P-005: inter-race rebuild emits 1 upper + 1 lower per week, both protocols. Pre-fix
+    // this fell into the `else` 1× branch, dropping the upper rebuild session entirely (Plan 54
+    // W15/W16 shipped Lower-only when the athlete had performance intent).
+    strFreq = 2;
   } else {
     strFreq = 1;
   }
-  // Loading-pattern deload weeks (`isRecovery`) still used phase `build` / `race_specific` with
-  // performance intent → strFreq was 2, but `createWeekSessions` often returns one deload template;
-  // both slots then mapped to the same session (duplicate Mon/Tue). One strength day in deload.
-  if (isRecovery && hasTri) strFreq = Math.min(strFreq, 1);
+  // Deload (loading-pattern recovery) week handling — split by athlete intent per the §3.2 /
+  // §4.2 philosophical fork:
+  //   • Hybrid (performance) — W-002 REDUCE: preserve 1U + 1L; the dispatcher emits reduced
+  //     deload sessions (2 sets, 62% 1RM, RIR 4+, no accessories). Keep strFreq at loading-week
+  //     frequency so both slots fire.
+  //   • Durability (support / non-performance) — W-003 SKIP: no strength on the deload week.
+  if (isRecovery && hasTri) {
+    if (!performanceStrength) strFreq = 0;
+    // performanceStrength: strFreq stays per phase above (typically 2)
+  }
   if (recoveryRebuildWeek1) strFreq = 0;
 
   const capRaw = athleteState.strength_sessions_cap;

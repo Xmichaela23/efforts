@@ -121,7 +121,14 @@ function createWeekSessions(context: ProtocolContext): IntentSession[] {
   };
 
   if (isRecovery) {
-    return [createPerfRecoverySession(tier, hasCable)];
+    // W-002 hybrid deload: REDUCE (1U + 1L MEV) when freq>=2; single lower session for the
+    // rare freq=1 hybrid case (down-gated by volume gate per §2.3 or legacy callers).
+    return freq >= 2
+      ? [
+        createPerfDeloadLower(tier, tier3, dbCtx, planWeekLabel),
+        createPerfDeloadUpper(tier, hasCable, tier3, dbCtx, planWeekLabel),
+      ]
+      : [createPerfDeloadLower(tier, tier3, dbCtx, planWeekLabel)];
   }
 
   if (phaseName === 'taper') {
@@ -438,38 +445,112 @@ function scaleSessionToRebuildLoads(
 
 // ── Recovery (deload week): −volume, keep patterns ────────────────────────
 
-function createPerfRecoverySession(tier: EquipmentTier, hasCable: boolean): IntentSession {
-  const ex: StrengthExercise[] = [
-    {
-      name: tier === 'commercial_gym' ? 'Conventional Deadlift' : 'Single-Leg RDL',
+/**
+ * §3.2 / W-002 hybrid deload — REDUCE not SKIP. The hybrid athlete chose this protocol
+ * specifically to avoid losing strength stimulus; a 7-day skip puts them inside the detraining
+ * window for neural drive and cross-sectional area (10-14 days per Israetel's RP framework).
+ *
+ * Deload sessions apply MEV (Minimum Effective Volume): 2 sets per main compound at 60-65% 1RM,
+ * RIR 4+, NO accessories (no Hip Thrusts, no Face Pulls, no core), NO power exercises. ~25-30 min.
+ * Enough stimulus to prevent detraining at near-zero recovery cost.
+ *
+ * For freq>=2 athletes (the typical hybrid case), createPerfDeloadLower + createPerfDeloadUpper
+ * preserve loading-week frequency. The freq=1 fallback emits a single lower session — used by
+ * legacy paths and edge cases; rare in practice for true hybrid intent.
+ */
+function createPerfDeloadLower(
+  tier: EquipmentTier,
+  tier3: EquipmentTier3,
+  dbCtx: DbCtx,
+  planWeekLabel: number,
+): IntentSession {
+  const ex: StrengthExercise[] = [];
+  let cappedAny = false;
+  if (tier3 === 'full_barbell') {
+    ex.push({
+      name: 'Conventional Deadlift',
       sets: 2,
-      reps: tier === 'commercial_gym' ? 8 : '8/leg',
-      weight: tier === 'commercial_gym' ? '~90% of usual working weight' : 'Controlled',
+      reps: '4-6',
+      weight: '62% 1RM',
       target_rir: 4,
-      notes: 'Recovery week — reduce load ~10%, stop with plenty in reserve',
-    },
-    { name: 'Hip Thrusts', sets: 2, reps: 10, weight: 'Light–moderate', target_rir: 4 },
-    { name: 'Step-ups', sets: 2, reps: '8/leg', weight: 'Light', target_rir: 4 },
-    {
-      name: 'Face Pulls',
+      notes: 'Deload — fast bar speed, plenty in reserve',
+    });
+    ex.push({
+      name: 'Barbell Back Squat',
       sets: 2,
-      reps: 15,
-      weight: hasCable ? 'Light cable' : 'Band',
+      reps: '4-6',
+      weight: '62% 1RM',
       target_rir: 4,
+    });
+  } else {
+    const dl = dbPrescription({ pctOfBarbell1RM: 0.62, oneRMLb: dbCtx.deadlift1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    if (dl.capped) cappedAny = true;
+    ex.push({ name: 'DB Romanian Deadlift', sets: 2, reps: dl.reps, weight: dl.weight, target_rir: 4 });
+    const sq = dbPrescription({ pctOfBarbell1RM: 0.62, oneRMLb: dbCtx.squat1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    if (sq.capped) cappedAny = true;
+    ex.push({ name: 'Goblet Squat', sets: 2, reps: sq.reps, weight: sq.weight, target_rir: 4 });
+  }
+  return applyDbCapTradeoff(
+    {
+      intent: 'LOWER_DURABILITY',
+      priority: 'preferred',
+      name: 'Tri Performance — Hypertrophy Deload (Lower)',
+      description: `Hypertrophy Deload Week ${planWeekLabel} — reduced volume to preserve strength stimulus while supporting total recovery. 2 sets per lift @ 62% 1RM, RIR 4+. No accessories.`,
+      duration: 28,
+      exercises: ex,
+      repProfile: 'maintenance',
+      tags: ['strength', 'lower_body', 'triathlon_performance', 'phase:recovery', 'deload'],
     },
-    { name: 'Dead Bug', sets: 2, reps: '8/side', weight: 'Bodyweight', target_rir: 4 },
-  ];
-  return {
-    intent: 'FULLBODY_MAINTENANCE',
-    priority: 'preferred',
-    name: 'Tri Performance — Recovery / Deload',
-    description:
-      'Deload: fewer sets, lighter loads (~10% down), same movement patterns. Maintain tissue tolerance without soreness.',
-    duration: 35,
-    exercises: ex,
-    repProfile: 'maintenance',
-    tags: ['strength', 'recovery', 'triathlon_performance', 'phase:recovery'],
-  };
+    cappedAny,
+  );
+}
+
+function createPerfDeloadUpper(
+  tier: EquipmentTier,
+  hasCable: boolean,
+  tier3: EquipmentTier3,
+  dbCtx: DbCtx,
+  planWeekLabel: number,
+): IntentSession {
+  const ex: StrengthExercise[] = [];
+  let cappedAny = false;
+  if (tier3 === 'full_barbell') {
+    ex.push({
+      name: 'Bench Press',
+      sets: 2,
+      reps: '4-6',
+      weight: '62% 1RM',
+      target_rir: 4,
+      notes: 'Deload — fast bar speed, plenty in reserve',
+    });
+    ex.push({
+      name: 'Barbell Row',
+      sets: 2,
+      reps: '4-6',
+      weight: '62% 1RM (bench anchor)',
+      target_rir: 4,
+    });
+  } else {
+    const bench = dbPrescription({ pctOfBarbell1RM: 0.62, oneRMLb: dbCtx.bench1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    if (bench.capped) cappedAny = true;
+    ex.push({ name: dbCtx.hasBench ? 'DB Bench Press' : 'DB Floor Press', sets: 2, reps: bench.reps, weight: bench.weight, target_rir: 4 });
+    const row = dbPrescription({ pctOfBarbell1RM: 0.62, oneRMLb: dbCtx.bench1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    if (row.capped) cappedAny = true;
+    ex.push({ name: dbCtx.hasBench ? 'DB Row (Chest-Supported)' : 'Bent-Over DB Row', sets: 2, reps: row.reps, weight: row.weight, target_rir: 4 });
+  }
+  return applyDbCapTradeoff(
+    {
+      intent: 'UPPER_POSTURE',
+      priority: 'preferred',
+      name: 'Tri Performance — Hypertrophy Deload (Upper)',
+      description: `Hypertrophy Deload Week ${planWeekLabel} — reduced volume to preserve strength stimulus while supporting total recovery. 2 sets per lift @ 62% 1RM, RIR 4+. No accessories.`,
+      duration: 25,
+      exercises: ex,
+      repProfile: 'maintenance',
+      tags: ['strength', 'upper_body', 'triathlon_performance', 'phase:recovery', 'deload'],
+    },
+    cappedAny,
+  );
 }
 
 // ── Base: hypertrophy (weeks 1–8 in a typical macrocycle) ───────────────────
