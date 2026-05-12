@@ -171,6 +171,8 @@ This applies Minimum Effective Volume (MEV) — enough stimulus to prevent detra
 
 **Single weekly upper composition:** Each upper session includes Row + Bench + OHP + Pull-ups (all four patterns). This is non-negotiable — pattern omission within a single session is a conformance violation (S-003) because there is no second weekly session to cover the missing pattern.
 
+**Deload-week carveout (S-003 exception):** Hypertrophy Deload sessions per §3.2 reduce volume to 2 sets per main lift at 60-65% 1RM. The pattern-coverage rule narrows to **2 patterns** in deload weeks — one horizontal pair (Bench OR Row) and one of its complementary patterns — matching the MEV principle that reduced volume should span a reduced pattern count, not all four at half-stimulus. The deload Upper session emits exactly the two main compounds; vertical patterns (OHP / Pull-ups) sit out for the week. Reduced volume × reduced pattern count = effective MEV; reduced volume × full pattern count would dilute the stimulus across too many movements to maintain anything.
+
 **Equipment substitutions:**
 - No barbell → DB version of same movement
 - No DBs and no barbell → durability protocol (per §2.2)
@@ -262,7 +264,7 @@ The runtime validator runs after `materialize-plan` and asserts every generated 
 |---|---|
 | S-001 | Every Lower session must include Squat OR Deadlift as primary compound |
 | S-002 | Every Lower session must include the other of Squat/Deadlift as secondary compound |
-| S-003 | Every Upper session must include all four upper patterns (horizontal push, horizontal pull, vertical push, vertical pull) — single-session pattern coverage rule per §3.3 |
+| S-003 | Every Upper session must include all four upper patterns (horizontal push, horizontal pull, vertical push, vertical pull) — single-session pattern coverage rule per §3.3. **Deload-week carveout:** Hypertrophy Deload Upper sessions emit only 2 patterns (Bench + Row); the vertical pair sits out for the week. Validator checks pattern count = 4 outside deload, = 2 inside deload weeks. |
 | S-004 | Every Upper session must include Band Face Pulls and Band Pull-Aparts as required accessories |
 | S-005 | Every Lower session in base/build phases must include Hip Thrusts as required accessory |
 | S-006 | Every session must include a core finisher (Pallof Press, Dead Bug, or equivalent) |

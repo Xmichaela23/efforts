@@ -587,6 +587,48 @@ export function speedSwim(
   );
 }
 
+/**
+ * §7.1 race-week swim — 600-800 yd aerobic activation with 4×50 build accelerations, no
+ * threshold repeats. Replaces the race-week Friday threshold session (plan #56 audit item #11):
+ * threshold work 2 days before race is contrary to taper physiology. The build accelerations
+ * preserve neuromuscular sharpness without lactate accumulation.
+ */
+export function raceWeekActivationSwim(
+  day: string,
+  totalYards: number,
+  goalId: string,
+  swimEquipment?: string[] | null,
+): PlannedSession {
+  const wu = 300;
+  const cd = 200;
+  const main = Math.max(200, totalYards - wu - cd);
+  const fastReps = 4; // 4 × 50 build accelerations (spec)
+  const aeroYd = Math.max(0, main - fastReps * 50);
+  const aeroReps = Math.max(2, Math.round(aeroYd / 100));
+  const dur = Math.round(totalYards / 35);
+  return session(
+    day,
+    'swim',
+    `Race-Week Activation Swim — ${totalYards} yd`,
+    appendPoolGearLine(
+      `Warm up ${wu} yd easy. ${fastReps}×50 yd build accelerations (start easy, finish strong; long rest between — pure neuromuscular sharpener, NOT threshold). ${aeroReps}×100 yd easy aerobic. Cool down ${cd} yd.`,
+      [],
+      swimEquipment,
+    ),
+    dur,
+    'EASY',
+    [
+      `swim_warmup_${wu}yd_easy`,
+      `swim_threshold_${fastReps}x50yd_r45`,
+      `swim_aerobic_${aeroReps}x100yd_easy_r20`,
+      `swim_cooldown_${cd}yd`,
+    ],
+    ['activation', 'taper', 'swim', 'race_week'],
+    'Z1-Z2 with brief build 50s',
+    goalId,
+  );
+}
+
 export function thresholdSwim(
   day: string,
   totalYards: number,
@@ -1049,6 +1091,13 @@ export function swimSessionFromTemplate(
     target_yards_template: template.target_yards,
   });
   const created: PlannedSession = ((): PlannedSession => {
+    // §7.1 / plan #56 audit item 11: race-week (`taper` phase) threshold swim 2 days before
+    // race is contrary to taper physiology. Substitute to a 600-800 yd aerobic activation
+    // (4×50 build accelerations + easy aerobic) regardless of which day in race week.
+    if (effectiveType === 'threshold' && phase === 'taper') {
+      const activationYards = Math.max(600, Math.min(800, yards));
+      return raceWeekActivationSwim(day, activationYards, goalId, swimEquipment);
+    }
     switch (effectiveType) {
       case 'threshold':
         return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);

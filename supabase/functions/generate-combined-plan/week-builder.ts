@@ -1861,7 +1861,7 @@ export function buildWeek(
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
   const week8020TradeOffs = enforce8020(grid, phase);
 
-  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid), bikeQualityDay);
+  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid), bikeQualityDay, athleteState);
 
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
@@ -2092,16 +2092,16 @@ function humanizePartnerKind(kind: string): string {
   }
 }
 
-const CONCENTRATED_LOAD_DAY =
-  'Concentrated load day — lower-body strength landed the same day as your mid-week quality run (run before lifting when stacked). Intentional pairing around anchors / co-equal spacing.';
-
 /**
  * Wednesday quality-bike anchors often shift quality_run to Thursday; pairing with lower-body
  * strength uses the performance co-equal exception. Surface that for coach/UI (`week_trade_offs`).
+ * Ordering phrasing honors §6.5 strength_ordering_preference — "run before lifting" was hardcoded
+ * endurance_first; v2.1 fix flips to athlete preference.
  */
 function collectQualityRunLowerBodyTradeOffs(
   sessions: PlannedSession[],
   _bikeQualityDayResolved: string,
+  athleteState: AthleteState,
 ): string[] {
   const byDay = new Map<string, PlannedSession[]>();
   for (const s of sessions) {
@@ -2116,7 +2116,17 @@ function collectQualityRunLowerBodyTradeOffs(
     const hasLowerBodyStrength = daySessions.some(
       (s) => s.type === 'strength' && (s.tags?.includes('lower_body') ?? false),
     );
-    if (hasQualityRun && hasLowerBodyStrength) return [CONCENTRATED_LOAD_DAY];
+    if (hasQualityRun && hasLowerBodyStrength) {
+      const pref = athleteState.strength_ordering_preference === 'strength_first'
+        ? 'strength_first'
+        : 'endurance_first';
+      const orderingClause = pref === 'strength_first'
+        ? 'lift before run when stacked'
+        : 'run before lifting when stacked';
+      return [
+        `Concentrated load day — lower-body strength landed the same day as your mid-week quality run (${orderingClause}). Intentional pairing around anchors / co-equal spacing.`,
+      ];
+    }
   }
   return [];
 }

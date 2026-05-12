@@ -360,6 +360,27 @@ Deno.test('W-002: deload cuts accessories — no Hip Thrusts, no Face Pulls, no 
   }
 });
 
+Deno.test('S-003 deload carveout: Hypertrophy Deload Upper emits 2 patterns (Bench + Row), not 4', () => {
+  // Per the §3.3 deload-week exception (v2.1 close-out plan #56 item 4): deload sessions emit
+  // a reduced compound set (Bench + Row only). Vertical patterns (OHP / Pull-ups) sit out.
+  // MEV principle: reduced volume × reduced pattern count, not reduced volume × all four
+  // patterns diluted.
+  const ctx = ctxWithPhase('base', 1, { isRecovery: true });
+  const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);
+  const upper = upperOf(sessions);
+  assert(findByName(upper, /Bench Press/i), `deload upper should include Bench — got [${exerciseNames(upper)}]`);
+  assert(findByName(upper, /\bRow\b/i), `deload upper should include Row — got [${exerciseNames(upper)}]`);
+  // S-003 carveout: vertical patterns intentionally absent in deload.
+  assert(
+    !findByName(upper, /Overhead Press|Shoulder Press/i),
+    `deload upper should NOT include OHP (§3.3 carveout) — got [${exerciseNames(upper)}]`,
+  );
+  assert(
+    !findByName(upper, /Pull-?ups|Pull-?Down/i),
+    `deload upper should NOT include Pull-ups (§3.3 carveout) — got [${exerciseNames(upper)}]`,
+  );
+});
+
 Deno.test('W-002: deload session description includes the literal "Deload" phrase per D-002', () => {
   const ctx = ctxWithPhase('base', 1, { isRecovery: true });
   const sessions = triathlonPerformanceProtocol.createWeekSessions(ctx);

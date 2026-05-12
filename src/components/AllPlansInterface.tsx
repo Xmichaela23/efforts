@@ -1601,8 +1601,23 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }, 0);
   };
 
-  /** Same-day ordering for markdown export: swim → bike → run → strength so bricks read bike→run. */
+  /**
+   * Same-day ordering for markdown export. Honors §6.2 / §6.5 AM/PM pairing metadata first
+   * (AM card above PM card, matching Today's Efforts) so a strength_first-preference athlete
+   * sees Lower Strength above Run Intervals on Thursdays. Falls back to discipline rank
+   * (swim → bike → run → strength) for sessions without pairing metadata so bricks still
+   * read bike→run.
+   */
   const markdownExportSessionOrder = (a: any, b: any): number => {
+    const timingRank = (w: any): number => {
+      const t = w?.timing
+        ?? (w?.workout_metadata && typeof w.workout_metadata === 'object' ? w.workout_metadata.timing : null);
+      if (t === 'AM') return 0;
+      if (t === 'PM') return 2;
+      return 1;
+    };
+    const tDelta = timingRank(a) - timingRank(b);
+    if (tDelta !== 0) return tDelta;
     const rank = (w: any): number => {
       const t = String(w?.type || w?.discipline || '').toLowerCase();
       const n = String(w?.name || '').toLowerCase();

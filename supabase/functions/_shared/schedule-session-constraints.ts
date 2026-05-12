@@ -102,16 +102,25 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  * non-brick bike+run stacks are now placement violations. Symmetric flip — both cells.
  * ✓/✗ rows: [easy_bike, easy_run, easy_swim, quality_swim, quality_bike, quality_run, long_ride, long_run, lower_body, upper_body]
  */
+/**
+ * 2026-05-12 (v2.1 close-out plan #56 fix): `lower_body_strength × easy_run` flipped to ✓
+ * (both cells, symmetric). STRENGTH-PROTOCOL.md §6.2 explicitly permits Lower + Easy Run same-day
+ * with 6h+ gap (Lower first preferred — easy run as recovery flush). The prior ✗ matrix value
+ * blocked deload-week Thursday Lower from emitting (Easy Run replaces Quality Run in deload weeks
+ * via the recovery template; matrix-conflict resolver then stripped the Lower session), and
+ * blocked race-week Taper Priming sessions for the same reason. The §6.2 ordering metadata
+ * attached in week-builder.ts:attachSameDayPairingMetadata handles the AM/PM split.
+ */
 const ROWS: Record<MatrixSessionKind, number[]> = {
   easy_bike:            [1, 0, 1, 1, 0, 1, 0, 0, 1, 1],
-  easy_run:             [0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+  easy_run:             [0, 1, 1, 1, 0, 0, 0, 0, 1, 0],
   easy_swim:            [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
   quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
   quality_bike:         [0, 0, 1, 1, 0, 0, 0, 0, 0, 1],
   quality_run:          [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
   long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
   long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-  lower_body_strength:  [1, 0, 1, 1, 0, 0, 0, 0, 0, 1],
+  lower_body_strength:  [1, 1, 1, 1, 0, 0, 0, 0, 0, 1],
   upper_body_strength:  [1, 0, 1, 1, 1, 1, 0, 0, 1, 1],
 };
 
