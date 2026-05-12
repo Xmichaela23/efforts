@@ -274,7 +274,10 @@ The runtime validator runs after `materialize-plan` and asserts every generated 
 | W-001 | Hybrid protocol weeks include exactly 1 upper + 1 lower per §3.7 race-distance modifier |
 | W-002 | Hybrid protocol deload weeks (every 4th week) emit reduced sessions — 2 sets, 60-65% 1RM, RIR 4+, no accessories. NOT skipped. |
 | W-003 | Durability protocol deload weeks skip strength entirely (see §4.2) |
-| W-004 | No same-day pairing of Lower strength with Quality run, Long run, Quality bike, or Long ride (cross-reference `SCHEDULING-RULES.md` §3.5) |
+| W-004 | Lower strength must be ≥48h from Long Run on both sides. Same-day pairing of Lower with Long Run is forbidden (hard fail). |
+| W-005 | Lower + Long Ride same-day is permitted only if strength session has explicit AM/PM ordering metadata showing strength placed AFTER ride with documented 6h+ gap. Missing ordering metadata on same-day pairing = hard fail. |
+| W-006 | Lower + Quality Run OR Lower + Quality Bike same-day requires both sessions to carry AM/PM ordering metadata AND a documented 6h+ gap. Missing ordering metadata = hard fail. The pairing itself is not a violation. |
+| W-007 | When Lower + Quality Run/Bike same-day, ordering metadata must match athlete's `strength_ordering_preference`. Wrong-direction ordering = warning surfaced to athlete (not hard fail). Missing ordering = hard fail (per W-006). |
 
 **Per-phase invariants:**
 
@@ -412,25 +415,78 @@ These are approximate "untrained adult" benchmarks. Once athlete completes basel
 
 (Authoritative in `SCHEDULING-RULES.md` §3.5 and §4. Repeated here for completeness; if these conflict, scheduling rules win.)
 
-| Strength session | Same-day endurance session | Allowed? |
-|---|---|---|
-| Lower | Long run (same day) | No — 24h gap minimum |
-| Lower | Quality run | No — 24h gap minimum |
-| Lower | Long ride | No — 24h gap minimum |
-| Lower | Quality bike | No — 24h gap minimum |
-| Lower | Easy bike | Yes — strength first, leave 6h |
-| Lower | Easy run | Yes — strength first, leave 6h |
-| Lower | Swim | Yes — strength after swim |
-| Upper | Any run | Yes — leave 4h |
-| Upper | Any bike | Yes — leave 4h |
-| Upper | Swim | Yes — strength after swim ideally |
+The triathlete's weekly schedule has limited space — typically 4-5 hard endurance days plus 2 strength sessions in 7 days. Some same-day pairings are unavoidable. The protocol distinguishes pairings that are physiologically problematic from pairings that are merely sub-optimal but manageable with proper ordering.
 
-This rule must be enforced regardless of athlete day preference. If athlete preference would place Lower strength on a day with Quality Run, the scheduler must resolve the conflict (move strength or move quality), not honor both. See W-004 in §3.8.
+### 6.1 Hard rules (never violate)
+
+| Pairing | Constraint |
+|---|---|
+| Lower + Long Run | **48h gap minimum.** Both load the same eccentric musculature at high volume. Doubling concurrent eccentric load on the same legs inside 48h is where injury risk and recovery debt live. |
+| Lower + Long Ride | Strongly prefer separate days. If same-day is unavoidable, strength placed AFTER ride with 6h+ gap. Never strength first. |
+
+### 6.2 Same-day with ordering (acceptable)
+
+| Pairing | Constraint |
+|---|---|
+| Lower + Quality Run | 6h+ gap, ordered. Default: Quality run AM, Lower PM. For hybrid athletes who prioritize strength PRs, Lower AM and Quality PM is acceptable. |
+| Lower + Quality Bike | 6h+ gap, ordered. Same default ordering. |
+| Lower + Easy Run | 6h+ gap, Lower first preferred (easy run as recovery flush). |
+| Lower + Easy Bike | 6h+ gap, Lower first preferred. |
+| Lower + Swim | Acceptable. 4h+ gap, swim first or after. |
+| Upper + Any Run | 4h+ gap. No ordering preference. |
+| Upper + Any Bike | 4h+ gap. No ordering preference. |
+| Upper + Swim | 4h+ gap. Ideally swim first to avoid lat fatigue affecting the catch. |
+
+### 6.3 Why Quality + Lower works same-day (and Long Run + Lower doesn't)
+
+Long runs and Lower strength share the same mechanism — high-volume eccentric loading of quads, hamstrings, and glutes. Doubling that within 48h compounds tissue damage faster than the athlete recovers, with no benefit. Long Run = volume; Lower = volume + load. Both at once = injury vector.
+
+Quality runs (intervals, tempo, threshold) are predominantly neural and energetic. They tax the cardiovascular system and develop lactate buffering, but eccentric mechanical load per mile is significantly lower than long-run pace. Stacking Quality Run with Lower strength on the same day, ordered properly with a 6h+ gap, is well-tolerated by trained athletes. Coaching evidence is consistent on this distinction across Friel, Crawley, Viada, and Daniels.
+
+The takeaway: protect the legs from concurrent eccentric volume, not from concurrent training stimulus per se.
+
+### 6.4 Scheduling implication
+
+For a typical 70.3 athlete training 11 hrs/week with 4-5 hard endurance days plus 2 strength sessions, Lower strength will frequently land on the same day as a quality endurance session. This is correct behavior, not a bug. The engine's job is to:
+
+1. Never place Lower within 48h of Long Run (hard rule)
+2. Strongly prefer separating Lower from Long Ride; if same-day, enforce strength-after ordering
+3. When Lower lands with Quality Run or Quality Bike, emit explicit AM/PM ordering metadata and a 6h+ gap indication
+
+If athlete day-preference pins Lower to a day that already contains Quality Run, the engine honors both, adds ordering metadata, and surfaces a coaching cue. It does not move either session unless the conflict is with Long Run (hard rule).
 
 Athlete-facing coaching cue (hybrid protocol only):
-> "Leave 6+ hours between heavy strength and hard endurance. Prefer strength morning, endurance evening, or vice versa. Research shows shorter gaps reduce both adaptations."
+> "When strength shares a day with quality run or bike, leave 6+ hours between sessions. Prefer endurance morning, strength evening — or vice versa if you race strength PRs alongside endurance. Avoid back-to-back."
 
 Durability protocol skips this cue (loads are light enough that interference is negligible).
+
+### 6.5 Same-day ordering — strength-first vs endurance-first
+
+When Lower strength shares a day with Quality Run or Quality Bike, the order between the two sessions measurably affects adaptations. The literature is consistent on the broad pattern, even if effect sizes are moderate.
+
+**Strength-first protects strength adaptations.** Eddens et al.'s 2018 systematic review and meta-analysis in *Sports Medicine* found that resistance-then-endurance ordering produced superior gains in lower-body dynamic strength over prolonged (≥5 weeks) concurrent training programs. Mechanism: endurance training induces neuromuscular fatigue (reduced motor unit firing frequency, decreased force production) that, when performed first, blunts the strength stimulus that follows. AMPK signaling from the endurance bout also remains elevated for at least 3 hours, partially inhibiting mTOR pathway activation during the subsequent resistance session.
+
+**Endurance-first protects endurance adaptations.** Doma & Deakin (2013) found long-distance runners had better performance and running-economy improvements when endurance preceded strength in same-day sessions, with a 6h gap between. Heavy strength training reduces force production and movement efficiency for hours afterward, degrading the quality of any subsequent high-intensity endurance work.
+
+**Outcomes where order doesn't matter** (per Eddens et al. 2018 and follow-up meta-analyses):
+- VO2max gains
+- Muscle hypertrophy
+- Lower-body static strength (isometric measures)
+- Body composition
+
+**Order matters most for:**
+- Lower-body dynamic strength (squat 1RM, deadlift 1RM)
+- Specific endurance performance and running economy
+
+**The practical rule for triathletes:**
+
+The athlete picks their default ordering based on what they're prioritizing this season:
+
+- **Hybrid Strength Athlete prioritizing lifts → strength first.** They chose this protocol specifically to maintain or build strength. Strength-first ordering reinforces that adaptation.
+- **Hybrid Strength Athlete prioritizing race performance → endurance first.** Even within hybrid intent, an athlete who values race time over strength PRs gets endurance-first ordering. Race-specific phase athletes often default here regardless of base-phase preference.
+- **Durability-focused athlete → endurance first (always).** Durability protocol explicitly subordinates strength to race performance. Strength is never first for this athlete.
+
+This is a defensible simplification. The actual interference effect is moderate (not large), varies with training status and volume, and individual response differs. But it's the simplest evidence-backed heuristic we can give athletes to make an informed choice.
 
 ---
 
@@ -565,7 +621,8 @@ Durability is more forgiving on length because SM extends indefinitely; no minim
 - `perfBuildUpper` missing Bench (S-003) — fixed
 - `perfBaseLower` and `perfBuildLower` missing Hip Thrusts (S-005) — fixed
 - Deload weeks skip strength in hybrid protocol — should REDUCE per §3.2 / W-002 (open)
-- Same-day Lower + Quality Run pairing on Thursdays (W-004 / §6) — open, cross-doc with scheduling rules
+- Lower + Quality Run same-day pairings need explicit AM/PM ordering metadata + 6h gap field on each session. The pairing itself is correct; the metadata is missing. (W-006 / §6.4) — open
+- Lower + Long Run 48h gap rule needs validator implementation (W-004) — open
 - Inter-race rebuild emits Lower only, missing Upper (P-005 / §7.4) — open
 - Phase label "Race-prep" emitted instead of "Maintenance + Power" (D-002) — open
 
@@ -597,6 +654,9 @@ Equipment line is generated from session needs ∩ athlete inventory.
 - Fyfe et al., *Interference between concurrent resistance and endurance exercise: molecular bases and the role of individual training variables* (Sports Med, 2014; 2016 update)
 - Doma, Deakin, Bentley, *Implications of impaired endurance performance following single bouts of resistance training: an alternate concurrent training perspective* (Sports Med, 2017)
 - Berryman et al., *Strength training for middle- and long-distance performance: a meta-analysis* (Int J Sports Physiol Perform, 2018)
+- Eddens, van Someren, Howatson, *The Role of Intra-Session Exercise Sequence in the Interference Effect: A Systematic Review with Meta-Analysis* (Sports Med, 2018) — strength-first protects lower-body dynamic strength
+- Doma & Deakin, *The cumulative effects of strength training on running performance* and follow-up work — endurance-first protects running economy
+- Makhlouf et al. (2016) — strength prior to endurance for greater dynamic strength gains
 
 **Plyometrics and running economy**
 - Spurrs et al., *The effect of plyometric training on distance running performance* (Eur J Appl Physiol, 2003)
