@@ -280,6 +280,7 @@ The runtime validator runs after `materialize-plan` and asserts every generated 
 | W-005 | Lower + Long Ride same-day is permitted only if strength session has explicit AM/PM ordering metadata showing strength placed AFTER ride with documented 6h+ gap. Missing ordering metadata on same-day pairing = hard fail. |
 | W-006 | Lower + Quality Run OR Lower + Quality Bike same-day requires both sessions to carry AM/PM ordering metadata AND a documented 6h+ gap. Missing ordering metadata = hard fail. The pairing itself is not a violation. |
 | W-007 | When Lower + Quality Run/Bike same-day, ordering metadata must match athlete's `strength_ordering_preference`. Wrong-direction ordering = warning surfaced to athlete (not hard fail). Missing ordering = hard fail (per W-006). |
+| W-008 | Heavy Lower (Build / Race-spec / Rebuild phases, 78-85% loads) must follow §6.1 cycling/running asymmetry: never 24h-adjacent to Quality Run or Long Run; permitted 24h-adjacent to bike sessions (cycling concentric-dominant per Wilson 2012). Hypertrophy / Deload Lower (sub-maximal 60-72% loads) has relaxed adjacency — 24h-adjacent placements emit informational trade-off rather than hard constraint trip. |
 
 **Per-phase invariants:**
 
@@ -419,19 +420,29 @@ These are approximate "untrained adult" benchmarks. Once athlete completes basel
 
 The triathlete's weekly schedule has limited space — typically 4-5 hard endurance days plus 2 strength sessions in 7 days. Some same-day pairings are unavoidable. The protocol distinguishes pairings that are physiologically problematic from pairings that are merely sub-optimal but manageable with proper ordering.
 
-### 6.1 Hard rules (never violate)
+### 6.1 Cycling vs running asymmetry — the operative distinction
+
+Running is eccentric-impact-dominant. Each ground contact at endurance pace delivers ~2-3× bodyweight in deceleration force into quads, hamstrings, and glutes — the same musculature heavy Lower strength loads. Concurrent or near-concurrent eccentric volume in those tissues compounds damage faster than recovery (Wilson 2012 meta-analysis: interference effect for resistance-strength endpoints is significantly larger when paired with running than with cycling; Doma 2017: running impairs subsequent strength force-production for 24-48h post-session).
+
+Cycling is concentric-dominant. Pedal stroke is closed-chain, no eccentric impact, much lower per-rep mechanical damage. The interference effect of cycling on subsequent strength training is real but materially smaller than running (Wilson 2012 ES≈0.32 cycling vs ≈0.94 running for strength impairment; Coffey & Hawley 2017 review: molecular mechanisms also differ — running's AMPK signaling is more sustained than cycling's at matched RPE).
+
+This asymmetry drives the scheduling rules below. The "heavy" qualifier applies to Strength Build (78-85% 1RM), Maintenance + Power (70-75% with plyo), and Rebuild (72-80%) phase loads. Hypertrophy (65-72%) and Deload (60-65%) loads are sub-maximal and don't drive significant interference — adjacency rules relax for those phases.
+
+### 6.1.1 Hard rules (never violate, all phases, all athletes)
 
 | Pairing | Constraint |
 |---|---|
-| Lower + Long Run | **48h gap minimum.** Both load the same eccentric musculature at high volume. Doubling concurrent eccentric load on the same legs inside 48h is where injury risk and recovery debt live. |
-| Lower + Long Ride | Strongly prefer separate days. If same-day is unavoidable, strength placed AFTER ride with 6h+ gap. Never strength first. |
+| Heavy Lower + Long Run | **48h gap minimum, both sides.** Eccentric musculature overlap is the injury vector. Long Run = volume; Heavy Lower = volume + load on the same tissue inside the recovery window. |
+| Heavy Lower + Maximal Bike Test (FTP test, 20-min test) | **≥48h either side.** Maximal bike efforts produce CNS fatigue and glycogen depletion comparable to a heavy lift in their own right; stacking them inside 48h leaves both adaptations stunted. |
+| Lower + Long Run same-day | **Forbidden, all phases.** No ordering metadata fixes this; the tissue load is the constraint, not the temporal gap. |
 
-### 6.2 Same-day with ordering (acceptable)
+### 6.1.2 Acceptable same-day with ordering (heavy phases)
 
 | Pairing | Constraint |
 |---|---|
-| Lower + Quality Run | 6h+ gap, ordered. Default: Quality run AM, Lower PM. For hybrid athletes who prioritize strength PRs, Lower AM and Quality PM is acceptable. |
-| Lower + Quality Bike | 6h+ gap, ordered. Same default ordering. |
+| Heavy Lower + Quality Run | 6h+ gap, AM/PM ordered. Default Quality Run AM, Lower PM (Doma & Deakin 2013 — protects running economy). Hybrid + strength_first preference inverts. |
+| Heavy Lower + Quality Bike | 6h+ gap, AM/PM ordered. Same default ordering. Lower interference cost than the Quality Run pairing per Wilson 2012. |
+| Heavy Lower + Long Ride | 6h+ gap, **Bike first mandatory** (cycling-to-strength is the safer direction — quads don't accumulate eccentric damage from the ride that compromises the subsequent lift). Engine never places Lower before Long Ride. |
 | Lower + Easy Run | 6h+ gap, Lower first preferred (easy run as recovery flush). |
 | Lower + Easy Bike | 6h+ gap, Lower first preferred. |
 | Lower + Swim | Acceptable. 4h+ gap, swim first or after. |
@@ -439,11 +450,40 @@ The triathlete's weekly schedule has limited space — typically 4-5 hard endura
 | Upper + Any Bike | 4h+ gap. No ordering preference. |
 | Upper + Swim | 4h+ gap. Ideally swim first to avoid lat fatigue affecting the catch. |
 
-### 6.3 Why Quality + Lower works same-day (and Long Run + Lower doesn't)
+### 6.1.3 Avoid (engine should not place, heavy phases)
 
-Long runs and Lower strength share the same mechanism — high-volume eccentric loading of quads, hamstrings, and glutes. Doubling that within 48h compounds tissue damage faster than the athlete recovers, with no benefit. Long Run = volume; Lower = volume + load. Both at once = injury vector.
+| Pairing | Why |
+|---|---|
+| Heavy Lower 24h before Quality Run | No recovery window AND no consolidation benefit. Strength fatigue still elevated for the run; the run misses both quality and the strength buffer. The worst possible placement when consolidation is available. |
+| Heavy Lower 24h after Quality Run | Same logic, mirrored. Run fatigue is still elevated; lift loads underperform; both adaptations are compromised compared to either same-day consolidation or 48h separation. |
+| Heavy Lower 24h before Maximal Bike Test | CNS fatigue carryover; test result understates fitness. |
+
+When neither consolidation (same-day) nor 48h separation fits the schedule, the engine will fall back to a 24h-adjacent placement and surface a trade-off message ("schedule constraints forced this placement; consolidation was attempted but anchors blocked it").
+
+### 6.1.4 Permitted (engine can place freely, heavy phases)
+
+- Heavy Lower 24h before/after Long Ride — cycling adjacency is well-tolerated (Wilson 2012). Long Ride doesn't damage the lifting musculature the way Long Run does.
+- Heavy Lower 24h before/after Easy Bike, Easy Run, or Swim — sub-threshold loads don't drive meaningful interference.
+- Lower at Hypertrophy / Deload loads (65-72%, 60-65% deload) adjacent to anything except Long Run — these phases have **relaxed adjacency rules** because the load isn't heavy enough to compromise endurance quality the next day, and isn't fatigued enough to be compromised BY endurance the prior day.
+
+### 6.1.5 Optimizer preference order (heavy Lower)
+
+When the optimizer needs to place heavy Lower (Build / Race-spec / Rebuild phases), it searches in this order:
+
+1. **Same-day with Quality Run or Quality Bike, AM/PM ordered, 6h+ gap.** Best — consolidates the hard day, gives full recovery on adjacent days. Available when athlete preference + anchors permit.
+2. **48h+ from all hard endurance.** Second-best — clean separation.
+3. **24h-adjacent to bike sessions only** (Long Ride, Quality Bike). Acceptable per cycling/running asymmetry — Wilson 2012 ES≈0.32.
+4. **Never 24h-adjacent to Quality Run or Long Run.** The last resort if anchors leave no other option, surfaced as a hard trade-off ("schedule too dense; consider moving an anchor or reducing strength to 1×").
+
+For Hypertrophy / Deload Lower (sub-maximal loads), preferences 1-3 apply but step 4's restriction relaxes — 24h-adjacent placement is still suboptimal but not flagged as a hard trade-off.
+
+### 6.2 Why Quality Run + Lower works same-day (and Long Run + Lower doesn't)
+
+Long runs and heavy Lower strength share the same mechanism — high-volume eccentric loading of quads, hamstrings, and glutes. Doubling that within 48h compounds tissue damage faster than the athlete recovers, with no benefit. Long Run = volume; Lower = volume + load. Both at once = injury vector.
 
 Quality runs (intervals, tempo, threshold) are predominantly neural and energetic. They tax the cardiovascular system and develop lactate buffering, but eccentric mechanical load per mile is significantly lower than long-run pace. Stacking Quality Run with Lower strength on the same day, ordered properly with a 6h+ gap, is well-tolerated by trained athletes. Coaching evidence is consistent on this distinction across Friel, Crawley, Viada, and Daniels.
+
+Quality bike + Lower has even lower interference because cycling is concentric-dominant (Wilson 2012). The conservative engine treatment of "6h+ gap with ordering" matches the quality-run pairing for simplicity, but the actual physiological cost is smaller.
 
 The takeaway: protect the legs from concurrent eccentric volume, not from concurrent training stimulus per se.
 
@@ -651,14 +691,18 @@ Equipment line is generated from session needs ∩ athlete inventory.
 - Helms, Morgan, Valdez, *The Muscle and Strength Pyramid: Training* (2nd ed., 2019)
 
 **Concurrent training interference (modern evidence base)**
-- Coffey & Hawley, *Concurrent exercise training: Do opposites distract?* (J Physiol, 2017)
-- Wilson et al., *Concurrent training: a meta-analysis examining interference of aerobic and resistance exercises* (J Strength Cond Res, 2012)
+- Wilson JM, Marin PJ, Rhea MR, Wilson SMC, Loenneke JP, Anderson JC, *Concurrent Training: A Meta-Analysis Examining Interference of Aerobic and Resistance Exercises* (J Strength Cond Res, 2012; 26(8):2293-2307) — **cycling vs running asymmetry quantified**: interference effect on lower-body strength substantially larger when paired with running than cycling (running ES≈0.94, cycling ES≈0.32). Foundational citation for §6.1 cycling/running distinction.
+- Coffey VG, Hawley JA, *Concurrent exercise training: do opposites distract?* (J Physiol, 2017; 595(9):2883-2896) — molecular mechanism review (AMPK / mTOR signaling) explaining why endurance mode and intensity affect strength interference asymmetrically.
+- Doma K, Deakin GB, Bentley DJ, *Implications of Impaired Endurance Performance Following Single Bouts of Resistance Training: An Alternate Concurrent Training Perspective* (Sports Med, 2017; 47(11):2187-2200) — quantifies the post-strength endurance impairment and recovery window; underpins §6.1.2 endurance-first default ordering.
 - Fyfe et al., *Interference between concurrent resistance and endurance exercise: molecular bases and the role of individual training variables* (Sports Med, 2014; 2016 update)
-- Doma, Deakin, Bentley, *Implications of impaired endurance performance following single bouts of resistance training: an alternate concurrent training perspective* (Sports Med, 2017)
 - Berryman et al., *Strength training for middle- and long-distance performance: a meta-analysis* (Int J Sports Physiol Perform, 2018)
 - Eddens L, van Someren K, Howatson G, *The Role of Intra-Session Exercise Sequence in the Interference Effect: A Systematic Review with Meta-Analysis* (Sports Med, 2018; 48(1):177-188) — strength-first protects lower-body dynamic strength
 - Doma K, Deakin GB, *The effects of strength training and endurance training order on running economy and performance* (Appl Physiol Nutr Metab, 2013; 38(6):651-656) — endurance-first protects running economy
 - Makhlouf I, Castagna C, Manzi V, Laurencelle L, Behm DG, Chaouachi A, *Effect of Sequencing Strength and Endurance Training in Young Male Soccer Players* (J Strength Cond Res, 2016; 30(3):841-850) — strength prior to endurance for greater dynamic strength gains
+
+**Practical scheduling syntheses (coaching evidence base)**
+- Roadman Cycling, *How to Schedule Strength Training With Cycling* — coaching synthesis: cycling-adjacent strength is well-tolerated when intensity is moderate; same-day pairings with hard endurance prefer 6h+ gap. Supports §6.1.4 permitted cycling-adjacency.
+- TrainRight (Carmichael Training Systems), *Concurrent Strength + Endurance Programming for Endurance Athletes* — practical scheduling for triathletes: 48h gap pre/post Long Run for heavy lift; 24h-adjacent bike work is acceptable; consolidation (AM/PM on the same hard day) is preferred over splitting across adjacent days.
 
 **Plyometrics and running economy**
 - Spurrs et al., *The effect of plyometric training on distance running performance* (Eur J Appl Physiol, 2003)

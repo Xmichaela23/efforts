@@ -2124,7 +2124,7 @@ function collectQualityRunLowerBodyTradeOffs(
         ? 'lift before run when stacked'
         : 'run before lifting when stacked';
       return [
-        `Concentrated load day — lower-body strength landed the same day as your mid-week quality run (${orderingClause}). Intentional pairing around anchors / co-equal spacing.`,
+        `Concentrated load day — lower-body strength landed the same day as your mid-week quality run (${orderingClause}). Intentional pairing around anchors / co-equal spacing. Concentrated load day with a recovery day after — better for both adaptations than splitting across adjacent days.`,
       ];
     }
   }

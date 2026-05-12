@@ -2382,6 +2382,51 @@ function Step8bStrengthOrdering({
           </p>
         </div>
       </details>
+
+      <details className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] text-white/55 leading-snug">
+        <summary className="cursor-pointer text-white/65 hover:text-white/85 font-medium select-none">
+          How we schedule your strength
+        </summary>
+        <div className="mt-2 space-y-2">
+          <p>
+            Running and cycling don't interfere with strength training the same way. Running
+            involves eccentric impact damage; cycling is concentric-dominant with much less
+            recovery cost. We use this when placing your sessions:
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-white/55">
+            <li>
+              <span className="text-white/70">Long runs get a 48-hour buffer</span> before and
+              after heavy lower-body strength — running fatigue lingers, and stacking compromises
+              both.
+            </li>
+            <li>
+              <span className="text-white/70">Quality runs share a day with strength</span> when
+              possible with 6+ hour separation — concentrated load day, full recovery the next.
+            </li>
+            <li>
+              <span className="text-white/70">Cycling sessions are more flexible</span> — heavy
+              strength can land near a bike workout without the same interference cost.
+            </li>
+          </ul>
+          <div className="pt-1 space-y-1">
+            <p className="text-white/45">
+              <span className="text-white/70">Wilson et al. (2012)</span>,{' '}
+              <em>J Strength Cond Res</em> 26(8):2293-2307 — running interferes with lower-body
+              strength substantially more than cycling.
+            </p>
+            <p className="text-white/45">
+              <span className="text-white/70">Doma et al. (2017)</span>,{' '}
+              <em>Sports Medicine</em> 47(11):2187-2200 — concurrent training mode effects on
+              endurance performance.
+            </p>
+            <p className="text-white/45">
+              <span className="text-white/70">Coffey & Hawley (2017)</span>,{' '}
+              <em>J Physiol</em> 595(9):2883-2896 — molecular mechanisms of concurrent training
+              interference.
+            </p>
+          </div>
+        </div>
+      </details>
     </StepLayout>
   );
 }
