@@ -1342,10 +1342,30 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       easyRunDay = picked;
       place(days, picked, 'easy_run');
     } else {
-      conflicts.push(
-        'easy_run: no matrix-clean weekday available — try removing a strength session or moving the quality_run.',
-      );
-      trade_offs.push('Mid-week easy run dropped — schedule too dense.');
+      // §A.4 (`docs/BRICK-PROTOCOL.md` companion): if easy_bike was placed AND its day was in
+      // the easy_run candidate set, the new matrix flip (easy_bike × easy_run = ✗) is the
+      // proximate cause of the drop. Emit a targeted trade-off explaining the constraint;
+      // otherwise fall back to the generic density message.
+      const ebDay = easyBikeDay;
+      const easyBikeBlockedRun = ebDay != null
+        && easyRunOrder.includes(ebDay)
+        && ebDay !== longRide
+        && ebDay !== longRun
+        && ebDay !== dAfterLongRun
+        && (!qualityRunDay || ebDay !== qualityRunDay);
+      if (easyBikeBlockedRun && ebDay) {
+        conflicts.push(
+          `easy_run: no matrix-clean weekday — the easy_bike day on ${tfDay(ebDay)} cannot also host easy_run (per docs/BRICK-PROTOCOL.md, same-day bike + run must be a tagged brick, not an accidental stack).`,
+        );
+        trade_offs.push(
+          `Midweek aerobic bike and easy run can't share a day. Dropping easy run for this week. Bike and run stay on separate days per coaching standard.`,
+        );
+      } else {
+        conflicts.push(
+          'easy_run: no matrix-clean weekday available — try removing a strength session or moving the quality_run.',
+        );
+        trade_offs.push('Mid-week easy run dropped — schedule too dense.');
+      }
     }
   };
 

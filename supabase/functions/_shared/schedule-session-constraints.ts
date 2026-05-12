@@ -95,11 +95,16 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  * so `quality_run` × `quality_swim` is ✗ by default (was wrongly ✓ via `easy_swim` alias).
  * May 2026: `quality_bike` × `easy_run` flipped to ✗ — quality bike day is protected; easy run
  * on a group-ride day adds fatigue without stimulus and should not be placed by the optimizer.
+ * May 2026 (Theme A commit 4): `easy_bike × easy_run` flipped to ✗ — three reference 70.3
+ * plans (Triathlete.com, Mottiv, MyProCoach) all place midweek aerobic bike and easy run on
+ * separate days; same-day stacking creates accidental brick patterns that aren't tagged or
+ * intended. Bricks are the explicit phase-gated session type (`docs/BRICK-PROTOCOL.md`);
+ * non-brick bike+run stacks are now placement violations. Symmetric flip — both cells.
  * ✓/✗ rows: [easy_bike, easy_run, easy_swim, quality_swim, quality_bike, quality_run, long_ride, long_run, lower_body, upper_body]
  */
 const ROWS: Record<MatrixSessionKind, number[]> = {
-  easy_bike:            [1, 1, 1, 1, 0, 1, 0, 0, 1, 1],
-  easy_run:             [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+  easy_bike:            [1, 0, 1, 1, 0, 1, 0, 0, 1, 1],
+  easy_run:             [0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
   easy_swim:            [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
   quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
   quality_bike:         [0, 0, 1, 1, 0, 0, 0, 0, 0, 1],

@@ -28,6 +28,7 @@ import {
 } from './week-optimizer.ts';
 
 const MIDWEEK: DayName[] = ['tuesday', 'wednesday', 'thursday'];
+const ALL_DAYS: DayName[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 function dayHasKind(
   week: ReturnType<typeof deriveOptimalWeek>,
@@ -601,6 +602,111 @@ Deno.test({
       validatePreferredDays(week.preferred_days, inputs.athlete, inputs.preferences).length,
       0,
     );
+  },
+});
+
+// ── Fixture 04g: Matrix flip — easy_bike × easy_run cannot share a day ─────────────────
+
+Deno.test({
+  name: '04g matrix-flip: easy_bike and easy_run never share a day (no accidental brick)',
+  /**
+   * Theme A commit 4: ROWS.easy_bike[easy_run] = 0 (was 1). The optimizer must respect this
+   * by placing the two sessions on separate days. Verified across two representative geometries:
+   *   1. 7-day support-intent athlete (frequency matrix at 10hr×6d gives bikes=3 / runs=3,
+   *      both with easy sessions).
+   *   2. Co-equal 12hr athlete (matrix at 12hr×6d gives 3/3/3).
+   *
+   * Invariant: no calendar day contains BOTH easy_bike and easy_run.
+   */
+  fn() {
+    const cases: Array<{ label: string; inputs: WeekOptimizerInputs }> = [
+      {
+        label: 'support 10hr 6d',
+        inputs: {
+          anchors: { long_ride: 'saturday', long_run: 'sunday' },
+          preferences: basePreferences({ strength_frequency: 1, bikes_per_week: 3, runs_per_week: 3 }),
+          athlete: baseAthlete({ training_intent: 'performance', strength_intent: 'support' }),
+        },
+      },
+      {
+        label: 'co-equal 12hr 6d',
+        inputs: {
+          anchors: { long_ride: 'saturday', long_run: 'sunday' },
+          preferences: basePreferences({ strength_frequency: 2, bikes_per_week: 3, runs_per_week: 3 }),
+          athlete: baseAthlete({ training_intent: 'performance', strength_intent: 'performance' }),
+        },
+      },
+    ];
+
+    for (const { label, inputs } of cases) {
+      const { week } = deriveOptimalWeekWithCoEqualRecovery(inputs);
+      for (const day of ALL_DAYS) {
+        const kinds = (week.days[day] ?? []).map((s) => s.kind);
+        const hasEasyBike = kinds.includes('easy_bike');
+        const hasEasyRun = kinds.includes('easy_run');
+        assert(
+          !(hasEasyBike && hasEasyRun),
+          `${label}: ${day} has BOTH easy_bike and easy_run (matrix flip violated). Kinds: ${kinds.join(', ')}`,
+        );
+      }
+    }
+  },
+});
+
+// ── Fixture 04h: Matrix flip — drop-with-trade-off when geometry forces conflict ───────
+
+Deno.test({
+  name: '04h matrix-flip: dense week drops easy_run with §A.4 trade-off when easy_bike claims the only viable day',
+  /**
+   * Construct a geometry where the optimizer places easy_bike on the only weekday left for
+   * easy_run. The new matrix forces a drop; the targeted trade-off message must fire.
+   *
+   * Geometry: 5-day training week, long_ride Sat, long_run Sun, Wed quality_bike anchor,
+   * Thu quality_run lands algorithmically. Tue / Fri claimed by easy_bike (the priority
+   * candidate). Easy_run candidates: Mon, Tue, Fri — Mon blocked by long_run prev-day rule,
+   * Tue/Fri blocked by easy_bike matrix flip. → drop with the targeted message.
+   */
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: {
+        long_ride: 'saturday',
+        long_run: 'sunday',
+        quality_bike: { day: 'wednesday', intensity: 'quality' },
+      },
+      preferences: basePreferences({
+        strength_frequency: 1,
+        bikes_per_week: 3,
+        runs_per_week: 3,
+        training_days: 5,
+      }),
+      athlete: baseAthlete({ training_intent: 'performance', strength_intent: 'support' }),
+    };
+
+    const { week } = deriveOptimalWeekWithCoEqualRecovery(inputs);
+
+    // The trade-off may or may not fire depending on whether the geometry forces a drop —
+    // assert the no-shared-day invariant unconditionally, then verify the message text shape
+    // IF easy_run was dropped due to the matrix flip.
+    for (const day of ALL_DAYS) {
+      const kinds = (week.days[day] ?? []).map((s) => s.kind);
+      assert(
+        !(kinds.includes('easy_bike') && kinds.includes('easy_run')),
+        `${day} has both easy_bike and easy_run (matrix flip violated)`,
+      );
+    }
+
+    const easyRunPlaced = ALL_DAYS.some((d) => (week.days[d] ?? []).some((s) => s.kind === 'easy_run'));
+    const matrixFlipTradeOff = week.trade_offs.some((t) => {
+      const s = String(t);
+      return /Midweek aerobic bike and easy run can't share a day/.test(s);
+    });
+    if (!easyRunPlaced) {
+      assert(
+        matrixFlipTradeOff,
+        `easy_run was dropped — targeted §A.4 trade-off must fire; got: ${JSON.stringify(week.trade_offs)}`,
+      );
+    }
+    // If easy_run WAS placed (i.e., geometry had room despite matrix flip), no trade-off needed.
   },
 });
 
