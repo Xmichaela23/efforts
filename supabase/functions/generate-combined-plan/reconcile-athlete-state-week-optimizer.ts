@@ -13,7 +13,7 @@ import {
   computeSessionFrequencyDefaults,
   type SessionFrequencyDefaults,
   type SessionFrequencyInputs,
-} from '../_shared/session-frequency-defaults.ts';
+} from '../../../src/lib/session-frequency-defaults.ts';
 
 const SUN_DAY_NAMES: DayName[] = [
   'sunday',

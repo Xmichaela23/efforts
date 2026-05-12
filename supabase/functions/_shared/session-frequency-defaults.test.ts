@@ -10,7 +10,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   computeSessionFrequencyDefaults,
   type SessionFrequencyInputs,
-} from './session-frequency-defaults.ts';
+} from '../../../src/lib/session-frequency-defaults.ts';
 
 function compute(inputs: SessionFrequencyInputs) {
   return computeSessionFrequencyDefaults(inputs);

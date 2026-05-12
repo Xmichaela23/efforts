@@ -4,7 +4,7 @@
 import type { PlanGenerationTradeOff } from '../_shared/plan-generation-trade-offs.ts';
 import type { GroupRideRouteSnapshot } from '../_shared/group-ride-route-snapshot.ts';
 import type { SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
-import type { SessionFrequencyDefaults } from '../_shared/session-frequency-defaults.ts';
+import type { SessionFrequencyDefaults } from '../../../src/lib/session-frequency-defaults.ts';
 
 export type Sport = 'run' | 'bike' | 'swim' | 'strength' | 'race';
 export type Intensity = 'HARD' | 'MODERATE' | 'EASY';
