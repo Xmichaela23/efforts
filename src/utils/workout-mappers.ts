@@ -73,6 +73,15 @@ export function mapUnifiedItemToPlanned(item: any): PlannedWorkout {
     pool_length_m: typeof planned.pool_length_m === 'number' ? planned.pool_length_m : null,
     route_url: typeof planned.route_url === 'string' ? planned.route_url : null,
     route_snapshot: planned.route_snapshot ?? null,
+
+    // §6.2 / §6.5 same-day pairing ordering (Today's Efforts renders AM before PM).
+    // Server stashes `timing` and `pairing` inside `workout_metadata` at activation; pull them
+    // back here so the client has flat fields to read.
+    timing: (() => {
+      const t = planned.timing ?? planned.workout_metadata?.timing;
+      return t === 'AM' || t === 'PM' ? t : null;
+    })(),
+    pairing: planned.pairing ?? planned.workout_metadata?.pairing ?? null,
   };
 }
 

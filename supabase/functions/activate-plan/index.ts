@@ -544,6 +544,22 @@ Deno.serve(async (req) => {
         if (routeSnap && typeof routeSnap === 'object' && !Array.isArray(routeSnap)) {
           baseRow.route_snapshot = routeSnap;
         }
+        // §6.2 / §6.5 same-day pairing: AM/PM timing + structured pairing payload. The client
+        // (TodaysEffort) sorts cards so AM precedes PM. Pairing payload carries gap_hours and
+        // the partner identifier for diagnostics / conformance validation. Stashed inside
+        // workout_metadata (JSON column, no schema change needed); the mapper unpacks it.
+        const pairing = (s as any).pairing;
+        const timingRaw = (s as any).timing;
+        const wantTiming = timingRaw === 'AM' || timingRaw === 'PM';
+        const wantPairing = pairing && typeof pairing === 'object' && !Array.isArray(pairing);
+        if (wantTiming || wantPairing) {
+          const meta = (baseRow.workout_metadata && typeof baseRow.workout_metadata === 'object'
+            ? baseRow.workout_metadata
+            : {}) as Record<string, unknown>;
+          if (wantTiming) meta.timing = timingRaw;
+          if (wantPairing) meta.pairing = pairing;
+          baseRow.workout_metadata = meta;
+        }
         if (mapped === 'mobility') {
           // Pass through authored mobility exercises as-is (display-time structure)
           const mob = (s as any)?.mobility_exercises

@@ -57,5 +57,20 @@ export interface PlannedWorkout {
   /** Strava / pinned route for anchored group rides (activation copies snapshot onto row) */
   route_url?: string | null;
   route_snapshot?: Record<string, unknown> | null;
+
+  /**
+   * STRENGTH-PROTOCOL.md §6.2 / §6.5 — AM/PM slot when this session shares a day with a
+   * constrained partner (Lower strength + Quality Run / Quality Bike / Long Ride / Easy *).
+   * Today's Efforts sorts cards so AM precedes PM. Field is undefined for sessions that
+   * don't participate in a same-day pairing.
+   */
+  timing?: 'AM' | 'PM' | null;
+  /** Full pairing metadata payload — same shape as `PlannedSession.pairing` server-side. */
+  pairing?: {
+    same_day_with: string;
+    ordering: 'AM' | 'PM';
+    gap_hours: number;
+    coaching_cue?: string;
+  } | null;
 }
 

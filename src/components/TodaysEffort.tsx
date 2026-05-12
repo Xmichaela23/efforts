@@ -682,7 +682,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // Split into activated (no 'optional') and optional
     const activated = dateWorkoutsMemo.filter((w:any)=> !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
     const optionals = dateWorkoutsMemo.filter((w:any)=> Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'));
-    setDisplayWorkouts([...activated, ...optionals]);
+    // STRENGTH-PROTOCOL.md §6.5 / Task H: AM before PM for paired sessions. Stable sort —
+    // sessions without `timing` keep their relative order; AM-tagged float to the top;
+    // PM-tagged sink. The server attached ordering metadata during plan generation
+    // (week-builder.ts:attachSameDayPairingMetadata); the client just renders that order.
+    const rank = (w: any): number => {
+      const t = w?.timing;
+      if (t === 'AM') return 0;
+      if (t === 'PM') return 2;
+      return 1;
+    };
+    const sortByTiming = (arr: any[]): any[] => [...arr].sort((a, b) => rank(a) - rank(b));
+    setDisplayWorkouts([...sortByTiming(activated), ...sortByTiming(optionals)]);
   }, [dateWorkoutsMemo, activeDate]);
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
