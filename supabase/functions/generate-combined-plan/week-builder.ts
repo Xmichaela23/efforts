@@ -28,6 +28,7 @@ import type {
   ConflictEvent, ConflictType, WeekStateReason,
 } from './types.ts';
 import type { Sport, Intensity } from './types.ts';
+import { brickCapForPhaseWeek } from '../../../src/lib/session-frequency-defaults.ts';
 import {
   getSwimSlotTemplates,
   getRecoverySwimTemplate,
@@ -690,12 +691,19 @@ export function buildWeek(
 
   // Loading-pattern recovery weeks keep the mesocycle phase (build / RS) but must not inherit
   // brick frequency from that phase — otherwise "recovery" weeks become the hardest weekends.
-  // §SESSION-FREQUENCY-DEFAULTS §9: when the reconciler populated session_frequency_defaults,
-  // its tier-aware `bricks_per_week_by_phase` is the cap (e.g. 5-7 tier = 0 in all phases;
-  // 14+ tier = 2 in race_specific). Take the min of phase-default and tier-cap. When the
-  // defaults aren't populated (legacy / no-long-run path), fall back to BRICKS_PER_WEEK[phase].
+  //
+  // docs/BRICK-PROTOCOL.md §3 phase × hours-tier cap is enforced via `brickCapForPhaseWeek`
+  // which honors the Taper-W1 race-rehearsal exception (W1 = 1 brick, W2+ = 0). When the
+  // reconciler populated `session_frequency_defaults` we use the helper; legacy / no-long-run
+  // path falls back to `BRICKS_PER_WEEK[phase]`. Take the min so the helper is a CAP, not a
+  // floor — phase logic upstream can still set 0 (e.g. taper W2+, rebuild, race week).
+  const weekInPhaseForBrick = options?.phaseBlocks?.length
+    ? weekInPhaseForTimeline(options.phaseBlocks, weekNum, block)
+    : 1;
   const phaseBrickDefault = BRICKS_PER_WEEK[phase];
-  const tierBrickCap = athleteState.session_frequency_defaults?.bricks_per_week_by_phase?.[phase];
+  const tierBrickCap = athleteState.session_frequency_defaults
+    ? brickCapForPhaseWeek(athleteState.session_frequency_defaults, phase, weekInPhaseForBrick)
+    : undefined;
   const baseBricks = tierBrickCap != null ? Math.min(phaseBrickDefault, tierBrickCap) : phaseBrickDefault;
   const bricksThisWeek = recoveryRebuildWeek1 || isRecovery ? 0 : baseBricks;
   // Race week: no brick stress; all load is the event itself

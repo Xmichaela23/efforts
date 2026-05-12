@@ -9,7 +9,9 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  brickCapForPhaseWeek,
   computeSessionFrequencyDefaults,
+  type FrequencyPhase,
   type SessionFrequencyInputs,
 } from '../../../src/lib/session-frequency-defaults.ts';
 
@@ -288,49 +290,132 @@ Deno.test('sport=hybrid throws (forward-compat stub for no-event athletes)', () 
   assert(caught, 'expected throw for sport=hybrid');
 });
 
-// ── bricks_per_week_by_phase (tier-only — phase reconciliation in commit 3) ───
+// ── docs/BRICK-PROTOCOL.md — phase × hours-tier cap matrix ────────────────────
 
-Deno.test('bricks 5-7 tier: 0 in all phases (matrix-cell-independent)', () => {
-  for (const d of [5, 6, 7] as const) {
-    const out = compute({ weekly_hours_available: 6, days_per_week: d });
-    assertEquals(out.bricks_per_week_by_phase, {
-      base: 0, build: 0, race_specific: 0, taper: 0, recovery: 0, rebuild: 0,
-    }, `days=${d}`);
+Deno.test('bricks 5-7 tier: base=0, build=1, race=1 (commit 3 cell decisions)', () => {
+  const out = compute({ weekly_hours_available: 6, days_per_week: 6 });
+  assertEquals(out.bricks_per_week_by_phase.base, 0);
+  assertEquals(out.bricks_per_week_by_phase.build, 1, 'build now 1 (was 0 pre-commit-3)');
+  assertEquals(out.bricks_per_week_by_phase.race_specific, 1, 'race now 1 (was 0 pre-commit-3)');
+  assertEquals(out.bricks_per_week_by_phase.taper, 0);
+  assertEquals(out.bricks_per_week_by_phase.recovery, 0);
+  assertEquals(out.bricks_per_week_by_phase.rebuild, 0);
+});
+
+Deno.test('bricks 8-10 tier: base=0, build=1, race=1', () => {
+  const out = compute({ weekly_hours_available: 9, days_per_week: 6 });
+  assertEquals(out.bricks_per_week_by_phase.base, 0);
+  assertEquals(out.bricks_per_week_by_phase.build, 1);
+  assertEquals(out.bricks_per_week_by_phase.race_specific, 1, 'race now 1 (was 0 pre-commit-3)');
+});
+
+Deno.test('bricks 10-12 tier: base=0, build=1, race=1', () => {
+  const out = compute({ weekly_hours_available: 11, days_per_week: 6 });
+  assertEquals(out.bricks_per_week_by_phase.base, 0);
+  assertEquals(out.bricks_per_week_by_phase.build, 1);
+  assertEquals(out.bricks_per_week_by_phase.race_specific, 1, 'race now 1 (was 0 pre-commit-3)');
+});
+
+Deno.test('bricks 12-14 tier: base=0, build=1, race=2 (tier-aware split)', () => {
+  const out = compute({ weekly_hours_available: 13, days_per_week: 6 });
+  assertEquals(out.bricks_per_week_by_phase.base, 0);
+  assertEquals(out.bricks_per_week_by_phase.build, 1);
+  assertEquals(out.bricks_per_week_by_phase.race_specific, 2, 'race now 2 at 12+ hr (was 1)');
+});
+
+Deno.test('bricks 14+ tier: base=0, build=1 (FIX — was 0), race=2', () => {
+  const out = compute({ weekly_hours_available: 16, days_per_week: 6 });
+  assertEquals(out.bricks_per_week_by_phase.base, 0);
+  assertEquals(out.bricks_per_week_by_phase.build, 1, 'build now 1 (was 0 anomaly pre-commit-3)');
+  assertEquals(out.bricks_per_week_by_phase.race_specific, 2);
+});
+
+Deno.test('bricks: recovery, taper(matrix), rebuild are 0 (Taper-W1 lives in helper)', () => {
+  for (const hours of [6, 9, 11, 13, 16]) {
+    const out = compute({ weekly_hours_available: hours, days_per_week: 6 });
+    assertEquals(out.bricks_per_week_by_phase.recovery, 0, `recovery hours=${hours}`);
+    assertEquals(out.bricks_per_week_by_phase.taper, 0, `taper matrix value (W2+) hours=${hours}`);
+    assertEquals(out.bricks_per_week_by_phase.rebuild, 0, `rebuild hours=${hours}`);
   }
 });
 
-Deno.test('bricks 8-10 tier: 1 in build only', () => {
-  const out = compute({ weekly_hours_available: 9, days_per_week: 6 });
-  assertEquals(out.bricks_per_week_by_phase.build, 1);
-  assertEquals(out.bricks_per_week_by_phase.race_specific, 0);
-  assertEquals(out.bricks_per_week_by_phase.base, 0);
-  assertEquals(out.bricks_per_week_by_phase.taper, 0);
-});
+// ── brickCapForPhaseWeek — Taper-W1 race-rehearsal + recovery/rebuild guards ──
 
-Deno.test('bricks 10-12 tier: 1 in build only', () => {
-  const out = compute({ weekly_hours_available: 11, days_per_week: 6 });
-  assertEquals(out.bricks_per_week_by_phase.build, 1);
-  assertEquals(out.bricks_per_week_by_phase.race_specific, 0);
-});
+function defaultsFor(hours: number) {
+  return compute({ weekly_hours_available: hours, days_per_week: 6 });
+}
 
-Deno.test('bricks 12-14 tier: 1 build + 1 race_specific', () => {
-  const out = compute({ weekly_hours_available: 13, days_per_week: 6 });
-  assertEquals(out.bricks_per_week_by_phase.build, 1);
-  assertEquals(out.bricks_per_week_by_phase.race_specific, 1);
-});
-
-Deno.test('bricks 14+ tier: 2 in race_specific only (pre-commit-3 baseline)', () => {
-  const out = compute({ weekly_hours_available: 16, days_per_week: 6 });
-  assertEquals(out.bricks_per_week_by_phase.race_specific, 2);
-  assertEquals(out.bricks_per_week_by_phase.build, 0);
-  assertEquals(out.bricks_per_week_by_phase.base, 0);
-});
-
-Deno.test('bricks: recovery, taper, rebuild are always 0 (pre-commit-3 baseline)', () => {
+Deno.test('brickCapForPhaseWeek: taper W1 = 1 race-rehearsal regardless of tier', () => {
   for (const hours of [6, 9, 11, 13, 16]) {
-    const out = compute({ weekly_hours_available: hours, days_per_week: 6 });
-    assertEquals(out.bricks_per_week_by_phase.recovery, 0, `hours=${hours}`);
-    assertEquals(out.bricks_per_week_by_phase.taper, 0, `hours=${hours}`);
-    assertEquals(out.bricks_per_week_by_phase.rebuild, 0, `hours=${hours}`);
+    const cap = brickCapForPhaseWeek(defaultsFor(hours), 'taper', 1);
+    assertEquals(cap, 1, `taper W1 hours=${hours}`);
+  }
+});
+
+Deno.test('brickCapForPhaseWeek: taper W2 = 0 (volume reduction)', () => {
+  for (const hours of [6, 9, 11, 13, 16]) {
+    const cap = brickCapForPhaseWeek(defaultsFor(hours), 'taper', 2);
+    assertEquals(cap, 0, `taper W2 hours=${hours}`);
+  }
+});
+
+Deno.test('brickCapForPhaseWeek: taper W3+ = 0', () => {
+  assertEquals(brickCapForPhaseWeek(defaultsFor(11), 'taper', 3), 0);
+  assertEquals(brickCapForPhaseWeek(defaultsFor(11), 'taper', 10), 0);
+});
+
+Deno.test('brickCapForPhaseWeek: rebuild always 0 regardless of matrix', () => {
+  for (const wip of [1, 2, 3]) {
+    assertEquals(brickCapForPhaseWeek(defaultsFor(14), 'rebuild', wip), 0, `rebuild W${wip}`);
+  }
+});
+
+Deno.test('brickCapForPhaseWeek: recovery always 0 regardless of matrix', () => {
+  for (const wip of [1, 2]) {
+    assertEquals(brickCapForPhaseWeek(defaultsFor(13), 'recovery', wip), 0, `recovery W${wip}`);
+  }
+});
+
+Deno.test('brickCapForPhaseWeek: base / build / race_specific delegate to matrix', () => {
+  const d11 = defaultsFor(11); // 10-12 tier: build=1, race=1
+  assertEquals(brickCapForPhaseWeek(d11, 'base', 1), 0);
+  assertEquals(brickCapForPhaseWeek(d11, 'base', 5), 0);
+  assertEquals(brickCapForPhaseWeek(d11, 'build', 1), 1);
+  assertEquals(brickCapForPhaseWeek(d11, 'build', 4), 1);
+  assertEquals(brickCapForPhaseWeek(d11, 'race_specific', 1), 1);
+  assertEquals(brickCapForPhaseWeek(d11, 'race_specific', 2), 1);
+
+  const d14 = defaultsFor(14); // 14+ tier: build=1, race=2
+  assertEquals(brickCapForPhaseWeek(d14, 'build', 1), 1);
+  assertEquals(brickCapForPhaseWeek(d14, 'race_specific', 1), 2);
+});
+
+Deno.test('brickCapForPhaseWeek: weekInPhase is 1-indexed (W1 = first active week)', () => {
+  const d = defaultsFor(10);
+  // W1 is the special case for taper; verify it's the FIRST week, not week 0
+  assertEquals(brickCapForPhaseWeek(d, 'taper', 1), 1, 'W1 = first taper week, gets rehearsal');
+  assertEquals(brickCapForPhaseWeek(d, 'taper', 0), 0, 'W0 (impossible / legacy) defaults to W2+ behavior');
+});
+
+// ── BRICK-PROTOCOL.md §2 invariants — every tier × phase cell ─────────────────
+
+Deno.test('brick matrix invariant: every tier emits ≥1 brick at race-specific (no 0-brick race phase)', () => {
+  for (const hours of [6, 9, 11, 13, 16]) {
+    const cap = brickCapForPhaseWeek(defaultsFor(hours), 'race_specific', 1);
+    assert(cap >= 1, `race-specific cap should be ≥1 at hours=${hours}; got ${cap}`);
+  }
+});
+
+Deno.test('brick matrix invariant: every tier emits 1 brick at build (no 0-brick build phase)', () => {
+  for (const hours of [6, 9, 11, 13, 16]) {
+    const cap = brickCapForPhaseWeek(defaultsFor(hours), 'build', 1);
+    assertEquals(cap, 1, `build cap should be exactly 1 at hours=${hours}`);
+  }
+});
+
+Deno.test('brick matrix invariant: base phase always 0 (per protocol)', () => {
+  for (const hours of [6, 9, 11, 13, 16]) {
+    const cap = brickCapForPhaseWeek(defaultsFor(hours), 'base', 1);
+    assertEquals(cap, 0, `base cap should be 0 at hours=${hours}`);
   }
 });

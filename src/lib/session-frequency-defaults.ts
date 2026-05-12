@@ -188,12 +188,19 @@ const ZERO_BRICKS: Record<FrequencyPhase, 0 | 1 | 2> = {
 
 type SportTierExtras = Record<TierLabel, TierExtras>;
 
+// Brick caps per `docs/BRICK-PROTOCOL.md` cell decisions (2026-05-11). Empirical synthesis
+// of Triathlete.com 20-week, Mottiv 18-week, MyProCoach Intermediate + user-locked decisions:
+//   • Base   — 0 across all tiers (no overcrowding at low volume; matches Mottiv majority)
+//   • Build  — 1 brick at every tier (fixes 14+/build = 0 anomaly; matches all 3 references)
+//   • Race   — 1 brick at ≤12 hr tiers, 2 bricks at >12 hr tiers (tier-aware split per refs)
+//   • Taper  — phase cap is 0 (W2+); W1 race-rehearsal brick lives in `brickCapForPhaseWeek`
+//   • Rebuild / Recovery — always 0 (handled by builder regardless)
 const TRIATHLON_TIER_EXTRAS: SportTierExtras = {
-  '5-7':   { strengthBaseline: 0, bricksByPhase: ZERO_BRICKS },
-  '8-10':  { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS, build: 1 } },
-  '10-12': { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS, build: 1 } },
-  '12-14': { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 1 } },
-  '14+':   { strengthBaseline: 2, bricksByPhase: { ...ZERO_BRICKS, race_specific: 2 } },
+  '5-7':   { strengthBaseline: 0, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 1 } },
+  '8-10':  { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 1 } },
+  '10-12': { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 1 } },
+  '12-14': { strengthBaseline: 1, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 2 } },
+  '14+':   { strengthBaseline: 2, bricksByPhase: { ...ZERO_BRICKS, build: 1, race_specific: 2 } },
 };
 
 const SPORT_TIER_EXTRAS: Partial<Record<Sport, SportTierExtras>> = {
@@ -335,4 +342,32 @@ export function computeSessionFrequencyDefaults(
     notes,
     ...(gate_block ? { gate_block } : {}),
   };
+}
+
+/**
+ * Week-index-aware brick cap lookup (`docs/BRICK-PROTOCOL.md §3`).
+ *
+ * Most phases have a single per-week brick cap that applies uniformly. Taper is the exception:
+ * week 1 of taper is the race-rehearsal week (1 brick); week 2+ is volume reduction (0 bricks).
+ * Rebuild + recovery are always 0. All other phases pass through `bricks_per_week_by_phase[phase]`.
+ *
+ * Callers (currently `generate-combined-plan/week-builder.ts`) should use THIS helper rather
+ * than indexing `bricks_per_week_by_phase` directly, so the Taper-W1 special case is honored.
+ */
+export function brickCapForPhaseWeek(
+  defaults: SessionFrequencyDefaults,
+  phase: FrequencyPhase,
+  weekInPhase: number,
+): 0 | 1 | 2 {
+  // Taper-W1 race rehearsal — 1 brick regardless of hours tier (per cell decisions). W2+ → 0.
+  if (phase === 'taper') {
+    return weekInPhase === 1 ? 1 : 0;
+  }
+  // Rebuild + recovery: always 0, regardless of how the matrix is populated. The matrix already
+  // has 0 for these phases today; explicit guard so a future matrix tweak can't accidentally emit
+  // bricks during recovery / rebuild.
+  if (phase === 'recovery' || phase === 'rebuild') {
+    return 0;
+  }
+  return defaults.bricks_per_week_by_phase[phase];
 }
