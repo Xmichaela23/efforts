@@ -2341,7 +2341,7 @@ function Step8bStrengthOrdering({
           active={pref === 'endurance_first'}
           onClick={() => setState({ ...state, strengthOrderingPreference: 'endurance_first' })}
         >
-          <span className="block font-semibold">🏃 Endurance first</span>
+          <span className="block font-semibold">Endurance first</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
             Recommended for triathletes focused on race results.
           </span>
@@ -2350,7 +2350,7 @@ function Step8bStrengthOrdering({
           active={pref === 'strength_first'}
           onClick={() => setState({ ...state, strengthOrderingPreference: 'strength_first' })}
         >
-          <span className="block font-semibold">🏋️ Strength first</span>
+          <span className="block font-semibold">Strength first</span>
           <span className="block text-[13px] text-white/55 mt-0.5">
             For athletes whose strength PRs matter as much as race times.
           </span>

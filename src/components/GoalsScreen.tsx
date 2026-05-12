@@ -283,7 +283,7 @@ function StrengthPreferencesPanel({
                       : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
                   }`}
                 >
-                  <span className="block font-semibold">🏃 Endurance first</span>
+                  <span className="block font-semibold">Endurance first</span>
                   <span className="block text-[12px] text-white/55 mt-0.5">
                     Recommended for triathletes focused on race results.
                   </span>
@@ -298,7 +298,7 @@ function StrengthPreferencesPanel({
                       : 'border-white/15 bg-white/[0.04] text-white/75 hover:border-white/30'
                   }`}
                 >
-                  <span className="block font-semibold">🏋️ Strength first</span>
+                  <span className="block font-semibold">Strength first</span>
                   <span className="block text-[12px] text-white/55 mt-0.5">
                     For athletes whose strength PRs matter as much as race times.
                   </span>
