@@ -588,6 +588,51 @@ export function deriveGroupRideQualityRunSameDayTradeOff(
 }
 
 /**
+ * Bug 1 (2026-05-12): Optimizer emits strength-placement trade-off strings with the days the
+ * OPTIMIZER chose. After week-builder collision passes / matrix conflict resolution, the actual
+ * placement in `sessions_by_week` can differ. The athlete then sees a banner naming days that
+ * don't match their calendar. This pass realigns the days in any "Strength: … upper on X, lower
+ * on Y" line to the realized placement.
+ *
+ * Approach: rewrite the days in the line; preserve the surrounding prose ("moved to stay clear
+ * of your pinned rides/runs", etc.) since the rationale is still accurate even if the days drift.
+ */
+function deriveRealizedStrengthPlacementFromSessionsByWeek(
+  sessions_by_week: Record<string, unknown> | null | undefined,
+): { upper: string; lower: string } | null {
+  if (!sessions_by_week || typeof sessions_by_week !== 'object') return null;
+  const sortedKeys = Object.keys(sessions_by_week).sort((a, b) => Number(a) - Number(b));
+  for (const k of sortedKeys) {
+    const sess = sessions_by_week[k];
+    if (!Array.isArray(sess)) continue;
+    let upper: string | null = null;
+    let lower: string | null = null;
+    for (const raw of sess) {
+      if (!raw || typeof raw !== 'object') continue;
+      const s = raw as Record<string, unknown>;
+      if (String(s.type ?? '').toLowerCase() !== 'strength') continue;
+      const tags = Array.isArray(s.tags) ? s.tags.map((t) => String(t).toLowerCase()) : [];
+      const day = String(s.day ?? '').trim();
+      if (!day) continue;
+      if (!upper && tags.includes('upper_body')) upper = day;
+      else if (!lower && tags.includes('lower_body')) lower = day;
+      if (upper && lower) break;
+    }
+    if (upper && lower) return { upper, lower };
+  }
+  return null;
+}
+
+function rewriteStrengthLineToRealized(
+  line: string,
+  realized: { upper: string; lower: string },
+): string {
+  return line
+    .replace(/(\bupper on )\w+/i, `$1${realized.upper}`)
+    .replace(/(\blower on )\w+/i, `$1${realized.lower}`);
+}
+
+/**
  * Merge week-builder `week_trade_offs` plus derived calendar facts into Goals-schedule banner lines.
  * Optimizer-only aggregates omit builder/session truths unless we enrich here.
  */
@@ -622,12 +667,35 @@ export function enrichScheduleSignalsWithCombinedPlanTradeOffs(
     seen.add(derived);
   }
 
+  const realizedStrength = deriveRealizedStrengthPlacementFromSessionsByWeek(
+    opts.sessions_by_week ?? null,
+  );
+
+  const realigned = realizedStrength
+    ? out.map((line) => {
+        const m = line.match(/^Strength:.*\bupper on (\w+)\b.*\blower on (\w+)\b/i);
+        if (!m) return line;
+        const sameUpper = m[1].toLowerCase() === realizedStrength.upper.toLowerCase();
+        const sameLower = m[2].toLowerCase() === realizedStrength.lower.toLowerCase();
+        if (sameUpper && sameLower) return line;
+        return rewriteStrengthLineToRealized(line, realizedStrength);
+      })
+    : out;
+
+  // Post-rewrite dedup: rewrites may collapse two divergent strings into the same realigned text.
+  const dedupedHumanized: string[] = [];
+  const seenHumanized = new Set<string>();
+  for (const t of realigned) {
+    const h = humanizeScheduleTradeOffLine(String(t));
+    const key = h.trim();
+    if (!key || seenHumanized.has(key)) continue;
+    seenHumanized.add(key);
+    dedupedHumanized.push(h);
+  }
+
   return {
     ...signals,
-    trade_offs: filterAthleteFacingTradeOffs(
-      out.map((t) => humanizeScheduleTradeOffLine(String(t))),
-      { hasAthletePins: opts.hasAthletePins },
-    ),
+    trade_offs: filterAthleteFacingTradeOffs(dedupedHumanized, { hasAthletePins: opts.hasAthletePins }),
   };
 }
 

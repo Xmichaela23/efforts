@@ -270,3 +270,137 @@ Deno.test('Bug D: enrich aggregator honors hasAthletePins', () => {
   assert(!enriched.trade_offs.some((t) => /pinned long or group-ride/i.test(t)));
   assert(enriched.trade_offs.some((t) => /Strength frequency reduced/i.test(t)));
 });
+
+// ── Bug 1 (2026-05-12): strength-placement realignment against realized sessions ──
+
+Deno.test('Bug 1: stale "Strength: ... upper on X, lower on Y" rewritten to realized days', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'Strength: usual Mon upper / Thu lower became upper on Friday, lower on Wednesday — moved to stay clear of your pinned rides/runs and recovery spacing.',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: {
+        '1': [
+          { type: 'strength', tags: ['strength', 'upper_body'], day: 'Monday' },
+          { type: 'strength', tags: ['strength', 'lower_body'], day: 'Thursday' },
+        ],
+      },
+    },
+  );
+  assert(
+    !enriched.trade_offs.some((t) => /upper on Friday/i.test(t) || /lower on Wednesday/i.test(t)),
+    `expected days rewritten — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+  assert(
+    enriched.trade_offs.some((t) => /upper on Monday/i.test(t) && /lower on Thursday/i.test(t)),
+    `expected line rewritten to Mon/Thu — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});
+
+Deno.test('Bug 1: matching realized days kept verbatim (no false rewrite)', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'Strength: usual Mon upper / Thu lower became upper on Friday, lower on Wednesday — moved to stay clear of your pinned rides/runs and recovery spacing.',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: {
+        '1': [
+          { type: 'strength', tags: ['strength', 'upper_body'], day: 'Friday' },
+          { type: 'strength', tags: ['strength', 'lower_body'], day: 'Wednesday' },
+        ],
+      },
+    },
+  );
+  assert(
+    enriched.trade_offs.some((t) => /upper on Friday/i.test(t) && /lower on Wednesday/i.test(t)),
+    `expected line untouched — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});
+
+Deno.test('Bug 1: spacing-relaxed line also realigned', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'Strength: upper on Friday sits 2 days from lower on Wednesday (preferred 3) — densest gap that fits the long-day anchors and recovery rules.',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: {
+        '1': [
+          { type: 'strength', tags: ['strength', 'upper_body'], day: 'Tuesday' },
+          { type: 'strength', tags: ['strength', 'lower_body'], day: 'Friday' },
+        ],
+      },
+    },
+  );
+  assert(
+    enriched.trade_offs.some((t) => /upper on Tuesday/i.test(t) && /lower on Friday/i.test(t)),
+    `expected spacing line rewritten — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});
+
+Deno.test('Bug 1: rewrite deduplicates two lines that collapse to the same realized text', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'Strength: usual Mon upper / Thu lower became upper on Friday, lower on Wednesday — moved to stay clear of your pinned rides/runs and recovery spacing.',
+        'Strength: usual Mon upper / Thu lower became upper on Tuesday, lower on Saturday — moved to stay clear of your pinned rides/runs and recovery spacing.',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: {
+        '1': [
+          { type: 'strength', tags: ['strength', 'upper_body'], day: 'Monday' },
+          { type: 'strength', tags: ['strength', 'lower_body'], day: 'Thursday' },
+        ],
+      },
+    },
+  );
+  const strengthLines = enriched.trade_offs.filter((t) => /^Strength:/i.test(t));
+  assertEquals(strengthLines.length, 1, `expected dedup — got ${JSON.stringify(strengthLines)}`);
+});
+
+Deno.test('Bug 1: sessions_by_week without strength sessions = no rewrite (safe pass-through)', () => {
+  const enriched = enrichScheduleSignalsWithCombinedPlanTradeOffs(
+    {
+      conflicts: [],
+      trade_offs: [
+        'Strength: usual Mon upper / Thu lower became upper on Friday, lower on Wednesday — moved to stay clear.',
+      ],
+      used_co_equal_1x_fallback: false,
+      pin_restore_skipped: [],
+    },
+    {
+      week_trade_offs: null,
+      sessions_by_week: {
+        '1': [
+          { type: 'run', tags: ['easy_run'], day: 'Monday' },
+        ],
+      },
+    },
+  );
+  assert(
+    enriched.trade_offs.some((t) => /upper on Friday/i.test(t) && /lower on Wednesday/i.test(t)),
+    `expected original days preserved when realized unknown — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+});

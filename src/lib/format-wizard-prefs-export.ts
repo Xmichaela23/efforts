@@ -42,8 +42,64 @@ function formatStrengthOrDayToken(x: unknown): string {
   return fmtPrefScalar(x);
 }
 
-/** Preferred-day anchors from wizard (`preferred_days`). */
-function formatPreferredDays(pd: unknown): string[] {
+/**
+ * Bug 2 (2026-05-12): `preferred_days` on training_prefs is a MERGED structure — wizard pins
+ * stacked under optimizer-derived defaults. Surfacing the whole thing as "Athlete preferences"
+ * makes engine defaults look like user choices.
+ *
+ * Source of truth for what the athlete actually pinned is the individual `*_day` integer fields
+ * on training_prefs (e.g., `long_run_day`, `bike_quality_day`) and the `strength_preferred_days`
+ * array. The wizard writes these directly; the optimizer fills `preferred_days` from a wider net
+ * (pins + matrix-derived defaults). Cross-reference: only surface `preferred_days[key]` when its
+ * corresponding pin field is set.
+ *
+ * If no individual pin fields are set at all, fall back to legacy behavior (render everything) —
+ * pre-Bug-2 goals were saved without the individual fields, and suppressing everything would
+ * regress the export for older goals.
+ */
+const PREFERRED_DAY_KEY_TO_PIN_FIELDS: Record<string, string[]> = {
+  long_run: ['long_run_day'],
+  long_ride: ['long_ride_day'],
+  quality_bike: ['bike_quality_day'],
+  easy_bike: ['bike_easy_day'],
+  quality_run: ['run_quality_day'],
+  easy_run: ['run_easy_day'],
+  swim: ['swim_easy_day', 'swim_quality_day', 'swim_third_day'],
+  strength: ['strength_preferred_days'],
+};
+
+function hasAnyUserPinFields(prefs: Record<string, unknown> | undefined): boolean {
+  if (!prefs) return false;
+  for (const fields of Object.values(PREFERRED_DAY_KEY_TO_PIN_FIELDS)) {
+    for (const f of fields) {
+      const v = prefs[f];
+      if (v == null) continue;
+      if (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) return true;
+      if (Array.isArray(v) && v.length > 0) return true;
+    }
+  }
+  return false;
+}
+
+function preferredDayKeyIsUserPinned(
+  key: string,
+  prefs: Record<string, unknown> | undefined,
+): boolean {
+  if (!prefs) return false;
+  const fields = PREFERRED_DAY_KEY_TO_PIN_FIELDS[key];
+  if (!fields) return false;
+  for (const f of fields) {
+    const v = prefs[f];
+    if (v == null) continue;
+    if (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) return true;
+    if (Array.isArray(v) && v.length > 0) return true;
+  }
+  return false;
+}
+
+/** Preferred-day anchors from wizard (`preferred_days`). When `fullPrefs` is supplied AND any
+ *  individual pin field is set, only emit keys with corresponding user pins; otherwise emit all. */
+function formatPreferredDays(pd: unknown, fullPrefs?: Record<string, unknown>): string[] {
   if (!pd || typeof pd !== 'object') return [];
   const o = pd as Record<string, unknown>;
   const preferredOrder = [
@@ -56,11 +112,18 @@ function formatPreferredDays(pd: unknown): string[] {
     'swim',
     'strength',
   ];
+  const suppressEngineDerived = hasAnyUserPinFields(fullPrefs);
+  const shouldEmit = (key: string): boolean => {
+    if (!suppressEngineDerived) return true;
+    if (!(key in PREFERRED_DAY_KEY_TO_PIN_FIELDS)) return true;
+    return preferredDayKeyIsUserPinned(key, fullPrefs);
+  };
   const seen = new Set<string>();
   const lines: string[] = [];
   for (const k of preferredOrder) {
     if (!(k in o)) continue;
     seen.add(k);
+    if (!shouldEmit(k)) continue;
     const v = o[k];
     const label = titleCaseKey(k);
     if (Array.isArray(v)) {
@@ -73,6 +136,7 @@ function formatPreferredDays(pd: unknown): string[] {
   }
   for (const k of Object.keys(o)) {
     if (seen.has(k)) continue;
+    if (!shouldEmit(k)) continue;
     const v = o[k];
     const label = titleCaseKey(k);
     if (Array.isArray(v)) {
@@ -259,7 +323,7 @@ export function formatWizardPrefsMarkdownLines(goal: {
     const val = prefs[key];
     if (key === 'preferred_days') {
       used.add(key);
-      const sub = formatPreferredDays(val);
+      const sub = formatPreferredDays(val, prefs);
       if (sub.length) {
         out.push(`- **Preferred days:**`);
         sub.forEach((l) => out.push(l));
@@ -315,7 +379,7 @@ export function formatWizardPrefsMarkdownLines(goal: {
     const val = prefs[key];
     const label = KEY_DISPLAY_LABELS[key] ?? titleCaseKey(key);
     if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-      const sub = formatPreferredDays(val);
+      const sub = formatPreferredDays(val, prefs);
       if (sub.length) {
         out.push(`- **${label}:**`);
         sub.forEach((l) => out.push(l));
