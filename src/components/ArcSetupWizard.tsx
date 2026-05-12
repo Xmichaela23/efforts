@@ -2151,8 +2151,8 @@ function Step8Strength({
           Yes
         </ChoiceBtn>
         <ChoiceBtn active={state.strengthIncluded === false} onClick={() => setState({ ...state, strengthIncluded: false, strengthIntent: null })}>
-          <span className="block font-semibold">None</span>
-          <span className="block text-[13px] text-white/55 mt-0.5">Skip strength entirely.</span>
+          <span className="block font-semibold">Endurance Only</span>
+          <span className="block text-[13px] text-white/55 mt-0.5">No strength sessions. Pure swim/bike/run.</span>
         </ChoiceBtn>
       </div>
 
@@ -2163,15 +2163,43 @@ function Step8Strength({
             active={state.strengthIntent === 'performance'}
             onClick={() => setState({ ...state, strengthIntent: 'performance' })}
           >
-            <span className="block font-semibold">Co-equal</span>
-            <span className="block text-[13px] text-white/55 mt-0.5">Real strength training alongside endurance. 2×/week, compound lifts, progressive loading. You'll keep getting stronger.</span>
+            <span className="block font-semibold">Hybrid Strength Athlete</span>
+            <span className="block text-[13px] text-white/55 mt-0.5">Strength is a goal alongside endurance. Maintain or build your lifts through race training.</span>
           </ChoiceBtn>
+          {state.strengthIntent === 'performance' && (
+            // STRENGTH-PROTOCOL.md §0.3 race-day trade-off disclosure. Inline `<details>` keeps it
+            // collapsed-by-default with no JS state needed — accessible, low-friction.
+            <details className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[13px] text-white/60 leading-snug ml-1">
+              <summary className="cursor-pointer text-white/70 hover:text-white/90 font-medium select-none">
+                What's the trade-off?
+              </summary>
+              <div className="mt-2 space-y-2">
+                <p>
+                  On a flat, fast, cool-weather 70.3 or shorter race, a pure endurance triathlete at
+                  equivalent endurance volume will probably finish 1–3% faster than the same athlete
+                  on the hybrid protocol. That's a few minutes on a 5-hour race.
+                </p>
+                <p>The trade-off shrinks or reverses under any of:</p>
+                <ul className="list-disc pl-5 space-y-1 text-white/55">
+                  <li><span className="text-white/70">Hilly or technical courses</span> — power-to-weight and bike strength close or reverse the gap</li>
+                  <li><span className="text-white/70">Long course (full Ironman)</span> — durability matters more; late-race form breakdown is partly a strength deficit</li>
+                  <li><span className="text-white/70">Hot conditions</span> — better muscle mass tolerates thermal load</li>
+                  <li><span className="text-white/70">Masters athletes (35+)</span> — muscle preservation becomes a meaningful performance variable</li>
+                </ul>
+                <p>
+                  Hybrid also gains injury durability, body composition maintenance, year-round strength
+                  PRs, and quality-of-life outside of triathlon — none of which a pure endurance athlete
+                  gets for free.
+                </p>
+              </div>
+            </details>
+          )}
           <ChoiceBtn
             active={state.strengthIntent === 'support'}
             onClick={() => setState({ ...state, strengthIntent: 'support' })}
           >
-            <span className="block font-semibold">Support</span>
-            <span className="block text-[13px] text-white/55 mt-0.5">Strength to support endurance and prevent injury. 1×/week, lighter loads, full-body. Race fitness comes first.</span>
+            <span className="block font-semibold">Durability-Focused</span>
+            <span className="block text-[13px] text-white/55 mt-0.5">Strength supports endurance. Injury prevention and tissue tolerance — race time is the only metric.</span>
           </ChoiceBtn>
         </div>
       )}

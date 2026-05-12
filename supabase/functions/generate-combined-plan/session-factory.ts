@@ -177,7 +177,7 @@ export function longRun(
     day, 'run',
     `Long Run — ${miles} mi`,
     isRaceSpecific
-      ? `Race-prep long run. Miles 1–${Math.round(miles * 0.5)} easy Z2, final ${Math.round(miles * 0.5)} at ${paceCopy!.finish}.`
+      ? `Race-specific long run. Miles 1–${Math.round(miles * 0.5)} easy Z2, final ${Math.round(miles * 0.5)} at ${paceCopy!.finish}.`
       : `Aerobic long run at conversational pace. Full Z2 effort — if you can\'t speak in sentences, slow down.`,
     dur,
     isRaceSpecific ? 'MODERATE' : 'EASY',

@@ -168,8 +168,9 @@ const SWIM_EXPERIENCE_LABELS: Record<string, string> = {
 };
 
 const STRENGTH_INTENT_LABELS: Record<string, string> = {
-  performance: 'Strength co-equal (2×)',
-  support: 'Strength supports triathlon',
+  performance: 'Hybrid Strength Athlete',
+  support: 'Durability-Focused',
+  none: 'Endurance Only',
 };
 
 /**
