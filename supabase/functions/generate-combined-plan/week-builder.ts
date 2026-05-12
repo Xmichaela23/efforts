@@ -82,16 +82,23 @@ import { normalizeGoalDistanceToTriCollisionDistance } from '../_shared/resolve-
 /**
  * Timeline rows are one week each (`pushBlockRange`: startWeek === endWeek). Using
  * `weekNum - block.startWeek + 1` would always yield 1 — count consecutive weeks
- * with the same phase / goal / recovery flag instead.
+ * with the same phase / goal instead.
+ *
+ * Recovery boundaries DO NOT reset the count (STRENGTH-PROTOCOL.md §3.1 / §3.8 P-002).
+ * A 4+1+1 base block (active W1, W2, W3, recovery W4, active W5) returns `weekInPhase = 5`
+ * at W5. The strength dispatcher's `pctForActiveWeek` then clamps W5 to the table's last
+ * entry (72%), not the first (65%). Pre-fix behavior reset W5 → 1 → 65% — silently
+ * reverting hypertrophy progression across mid-phase recovery weeks.
+ *
+ * Exported for testing — also called internally three times in this file.
  */
-function weekInPhaseForTimeline(phaseBlocks: PhaseBlock[], weekNum: number, block: PhaseBlock): number {
+export function weekInPhaseForTimeline(phaseBlocks: PhaseBlock[], weekNum: number, block: PhaseBlock): number {
   let n = 1;
   for (let w = weekNum - 1; w >= 1; w--) {
     const b = blockForWeek(phaseBlocks, w);
     if (
       b.phase === block.phase &&
-      b.primaryGoalId === block.primaryGoalId &&
-      b.isRecovery === block.isRecovery
+      b.primaryGoalId === block.primaryGoalId
     ) {
       n++;
     } else break;

@@ -553,6 +553,29 @@ function perfBaseLower(
     });
   }
 
+  // §3.4 required lower-day accessory (S-005): Hip Thrusts in every base/build session for run
+  // drive + bike power. Hypertrophy phase prescription: 3×8-10. Without a bench, substitute
+  // floor Glute Bridges (BW) — same movement intent, reduced ROM.
+  if (dbCtx.hasBench) {
+    ex.push({
+      name: 'Hip Thrusts',
+      sets: 3,
+      reps: '8-10',
+      weight: tier3 === 'full_barbell' ? 'Moderate barbell across hips' : 'Two heavy DBs across hips',
+      target_rir: rir,
+      notes: 'Glute drive — run + bike power; squeeze at lockout',
+    });
+  } else {
+    ex.push({
+      name: 'Glute Bridges',
+      sets: 3,
+      reps: 12,
+      weight: 'Bodyweight — full hip extension at top',
+      target_rir: rir,
+      notes: 'No bench — floor glute bridges; reps bumped to maintain stimulus',
+    });
+  }
+
   if (limiter === 'run' || limiter === 'bike') {
     ex.push({
       name: 'Calf Raises (Bilateral)',
@@ -576,7 +599,7 @@ function perfBaseLower(
       intent: 'LOWER_DURABILITY',
       priority: 'required',
       name: 'Tri Performance — Base Hypertrophy (Lower)',
-      description: `Base Week ${planWeekLabel} — Two primary lower compounds (${basePct}% 1RM, RIR ${rir}) plus ${hasGHD ? 'Nordic curls 2×5' : 'single-leg RDL 2×8/leg'} for hamstring resilience; accessories stay light.`,
+      description: `Base Week ${planWeekLabel} — Two primary lower compounds (${basePct}% 1RM, RIR ${rir}) plus ${hasGHD ? 'Nordic curls 2×5' : 'single-leg RDL 2×8/leg'} and Hip Thrusts 3×8-10 for glute drive; accessories stay light.`,
       duration: tier === 'commercial_gym' ? 50 : 48,
       exercises: ex,
       repProfile: 'hypertrophy',
@@ -618,6 +641,16 @@ function perfBaseUpper(
       reps: '8-10',
       weight: `${basePct}% 1RM`,
       target_rir: rir,
+    });
+    // §3.3 pattern coverage: vertical push is required across the week's upper sessions; OHP
+    // anchors the base session per S-003 (separate progression curve — see notes at OHP entries).
+    ex.push({
+      name: 'Standing Barbell Overhead Press',
+      sets: 3,
+      reps: '8-10',
+      weight: '72% 1RM',
+      target_rir: rir,
+      notes: 'Vertical push — shoulder mechanics anchor (flat curve, not basePct)',
     });
     if (hasCable) {
       ex.push({
@@ -662,6 +695,17 @@ function perfBaseUpper(
       weight: bench.weight,
       target_rir: rir,
       ...(dbCtx.hasBench ? {} : { notes: 'No bench — floor press substitute (limited ROM; squeeze hard at lockout)' }),
+    });
+    // §3.3 pattern coverage: DB tier vertical push via DB Shoulder Press (S-003).
+    const ohp = dbPrescription({ pctOfBarbell1RM: 0.72, oneRMLb: dbCtx.overhead1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
+    if (ohp.capped) cappedAny = true;
+    ex.push({
+      name: 'DB Shoulder Press',
+      sets: 3,
+      reps: ohp.reps,
+      weight: ohp.weight,
+      target_rir: rir,
+      notes: 'Vertical push — shoulder mechanics anchor',
     });
     // Pull-ups conditional on bar; otherwise band pull-down (spec §8.2).
     if (dbCtx.hasPullUpBar) {
@@ -780,6 +824,29 @@ function perfBuildLower(
     });
   }
 
+  // §3.4 required lower-day accessory (S-005): Hip Thrusts in every base/build session.
+  // Build phase prescription: 3×8 (slightly lower volume than base; SL-RDL and Step-ups drop
+  // per the phase table). Without bench → floor Glute Bridges.
+  if (dbCtx.hasBench) {
+    ex.push({
+      name: 'Hip Thrusts',
+      sets: 3,
+      reps: 8,
+      weight: tier3 === 'full_barbell' ? 'Heavy barbell across hips' : 'Two heavy DBs across hips',
+      target_rir: rir,
+      notes: 'Glute drive — run + bike power; squeeze hard at lockout',
+    });
+  } else {
+    ex.push({
+      name: 'Glute Bridges',
+      sets: 3,
+      reps: 12,
+      weight: 'Bodyweight — full hip extension at top',
+      target_rir: rir,
+      notes: 'No bench — floor glute bridges; reps bumped to maintain stimulus',
+    });
+  }
+
   if (limiter === 'run' || limiter === 'bike') {
     ex.push({
       name: 'Weighted Single-Leg Calf Raises',
@@ -797,7 +864,7 @@ function perfBuildLower(
       intent: 'LOWER_DURABILITY',
       priority: 'required',
       name: 'Tri Performance — Strength Build (Lower)',
-      description: `Build Week ${planWeekLabel} — Two heavy compounds only (${mainSets} working sets each, ${buildPct}% 1RM), RIR ${rir}. Hamstring Nordics live in base; build stays squat + hinge volume-capped.`,
+      description: `Build Week ${planWeekLabel} — Two heavy compounds (${mainSets} working sets each, ${buildPct}% 1RM, RIR ${rir}) plus Hip Thrusts 3×8 for glute drive. Hamstring Nordics live in base; build stays squat + hinge volume-capped.`,
       duration: 48,
       exercises: ex,
       repProfile: 'strength',
@@ -831,6 +898,15 @@ function perfBuildUpper(
       weight: `${buildPct}% 1RM (bench anchor)`,
       target_rir: rir,
     });
+    // §3.3 pattern coverage: horizontal push (S-003). Build keeps Bench on the main compound curve.
+    ex.push({
+      name: 'Bench Press',
+      sets,
+      reps: '4-6',
+      weight: `${buildPct}% 1RM`,
+      target_rir: rir,
+      notes: 'Horizontal push — pairs with Row for chest/back balance',
+    });
     ex.push({
       name: 'Pull-ups',
       sets: 3,
@@ -860,6 +936,19 @@ function perfBuildUpper(
       notes: dbCtx.hasBench
         ? 'Heavy DBs — squeeze scaps fully at the top'
         : 'No bench — bent-over from hinge; brace core, full ROM',
+    });
+    // §3.3 pattern coverage: DB tier horizontal push via DB Bench Press / Floor Press (S-003).
+    const benchBuild = dbPrescription({ pctOfBarbell1RM: buildPct / 100, oneRMLb: dbCtx.bench1RM, baseReps: '4-6', dbMaxLb: dbCtx.dbMaxLb });
+    if (benchBuild.capped) cappedAny = true;
+    ex.push({
+      name: dbCtx.hasBench ? 'DB Bench Press' : 'DB Floor Press',
+      sets,
+      reps: benchBuild.reps,
+      weight: benchBuild.weight,
+      target_rir: rir,
+      notes: dbCtx.hasBench
+        ? 'Horizontal push — heavy DBs, controlled descent'
+        : 'No bench — floor press substitute (limited ROM; squeeze hard at lockout)',
     });
     if (dbCtx.hasPullUpBar) {
       ex.push({
