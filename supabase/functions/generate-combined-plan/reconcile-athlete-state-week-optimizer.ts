@@ -197,6 +197,12 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
     athlete: {
       ...(trainingIntent ? { training_intent: trainingIntent } : {}),
       strength_intent: strengthIntent,
+      // §6.1.5 / W-007: surface ordering preference to optimizer so the consolidated AM/PM
+      // path is gated by athlete intent. `endurance_first` (default) keeps stricter separation;
+      // `strength_first` unlocks consolidation outside the full performance-intent path.
+      ...(state.strength_ordering_preference
+        ? { strength_ordering_preference: state.strength_ordering_preference }
+        : {}),
       ...(state.swim_intent ? { swim_intent: state.swim_intent } : {}),
       weeks_into_plan: 8,
     },

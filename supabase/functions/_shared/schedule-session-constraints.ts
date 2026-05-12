@@ -110,6 +110,15 @@ export type MatrixSessionKind = (typeof SESSION_KINDS)[number];
  * via the recovery template; matrix-conflict resolver then stripped the Lower session), and
  * blocked race-week Taper Priming sessions for the same reason. The §6.2 ordering metadata
  * attached in week-builder.ts:attachSameDayPairingMetadata handles the AM/PM split.
+ *
+ * 2026-05-12 (§6.1 cycling/running asymmetry refinement): `lower_body_strength × long_ride`
+ * flipped to ✓ (both cells, symmetric). STRENGTH-PROTOCOL.md §6.1.2 permits same-day Heavy
+ * Lower + Long Ride with 6h+ gap and BIKE FIRST mandatory ordering. The prior ✗ blocked the
+ * engine from EVER placing this pairing — the doc said "if same-day is unavoidable, strength
+ * after ride" but the matrix forbade it absolutely. Wilson 2012 quantifies cycling-adjacent
+ * strength interference as substantially smaller than running-adjacent (ES≈0.32 vs ≈0.94).
+ * `attachSameDayPairingMetadata` already enforces strength=PM, ride=AM, gap_hours=8 for this
+ * pairing — no further wiring needed once the matrix permits placement.
  */
 const ROWS: Record<MatrixSessionKind, number[]> = {
   easy_bike:            [1, 0, 1, 1, 0, 1, 0, 0, 1, 1],
@@ -118,9 +127,9 @@ const ROWS: Record<MatrixSessionKind, number[]> = {
   quality_swim:         [1, 1, 1, 1, 1, 0, 0, 0, 1, 1],
   quality_bike:         [0, 0, 1, 1, 0, 0, 0, 0, 0, 1],
   quality_run:          [1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-  long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  long_ride:            [0, 0, 0, 0, 0, 0, 1, 0, 1, 0],
   long_run:             [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-  lower_body_strength:  [1, 1, 1, 1, 0, 0, 0, 0, 0, 1],
+  lower_body_strength:  [1, 1, 1, 1, 0, 0, 1, 0, 0, 1],
   upper_body_strength:  [1, 0, 1, 1, 1, 1, 0, 0, 1, 1],
 };
 

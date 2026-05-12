@@ -205,6 +205,14 @@ export interface WeekOptimizerInputs {
   athlete: {
     training_intent?: 'performance' | 'completion' | 'first_race' | 'comeback';
     strength_intent?: 'performance' | 'support';
+    /**
+     * §6.5 / W-007 same-day Lower + Quality endurance ordering preference. Gates the §6.1.5
+     * optimizer-preference path that allows non-performance-intent hybrid athletes to take the
+     * consolidated AM/PM placement: only `strength_first` triggers consolidation outside the
+     * full `isPerf && isCoEq` performance-intent path. `endurance_first` (default) preserves
+     * stricter separation — that athlete explicitly opted for race-performance prioritization.
+     */
+    strength_ordering_preference?: 'endurance_first' | 'strength_first';
     /** Tri swim program (prefs); week-builder / templates use in Step 2+. */
     swim_intent?: 'focus' | 'race';
     /** Affects swim quality timing default: weeks 1–6 → easy-only swims unless masters anchor; 7+ → quality enabled. */
@@ -392,8 +400,16 @@ function canPlaceWithModifier(
   const isPerf = athlete.training_intent === 'performance';
   const isCoEq = athlete.strength_intent === 'performance';
 
-  // Performance + co-equal strength: quality_run + lower_body_strength → consolidated hard day (AM run / PM lift).
-  if (isPerf && isCoEq) {
+  // Performance + co-equal strength: quality_run + lower_body_strength → consolidated hard day
+  // (AM run / PM lift).
+  //
+  // §6.1.5 widening (commit 2 of cycling/running asymmetry pass): hybrid athletes who explicitly
+  // chose `strength_first` ordering preference ALSO unlock this consolidation regardless of
+  // training_intent. They opted into the consolidation trade-off via the wizard. Endurance_first
+  // (default) preserves stricter separation per user directive.
+  const allowConsolidation =
+    isCoEq && (isPerf || athlete.strength_ordering_preference === 'strength_first');
+  if (allowConsolidation) {
     if (kind === 'lower_body_strength' && there === 'quality_run') return true;
     if (kind === 'quality_run' && there === 'lower_body_strength') return true;
   }
@@ -1158,12 +1174,20 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
     const strengthFreqEarly = inputs.preferences.strength_frequency;
 
-    // Performance + co-equal: AM quality_run / PM lower same calendar day (§5.2 matrix).
+    // §6.1.5 optimizer preference 1 — consolidation (AM quality_run / PM lower same calendar
+    // day, §5.2 matrix). Gate widened per v2.1-plus-§6.1 refinement:
+    //   - `isPerf && isCoEq` — original performance+co-equal path (Race the clock + Hybrid)
+    //   - `isCoEq && strength_ordering_preference === 'strength_first'` — conservative widening:
+    //     hybrid athlete who explicitly chose strength-first ordering already opted into the
+    //     consolidation trade-off. `endurance_first` (default) preserves separation per their
+    //     stated race-performance prioritization.
     // §4.5 forbids quality_run on the calendar day after quality_bike — do not use day-after-QB here.
+    const allowConsolidation =
+      isCoEq &&
+      (isPerf || inputs.athlete.strength_ordering_preference === 'strength_first');
     if (
       !qualityRunDay &&
-      isPerf &&
-      isCoEq &&
+      allowConsolidation &&
       strengthFreqEarly >= 2
     ) {
       const candidates: DayName[] = [];

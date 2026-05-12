@@ -136,6 +136,90 @@ Deno.test({
   },
 });
 
+// ── §6.1.5 consolidation gate widening (commit 2 of §6.1 cycling/running asymmetry pass) ─
+
+Deno.test({
+  name: '§6.1.5: isCoEq + strength_first preference triggers Thursday consolidation (non-perf intent)',
+  fn() {
+    // Plan #57-style: training_intent=first_race, strength_intent=performance (Hybrid),
+    // strength_ordering_preference=strength_first. Pre-fix: consolidation gated on
+    // isPerf && isCoEq only — first_race intent fell through to SOFT-tier Friday placement.
+    // Post-fix: strength_first signals athlete opted into consolidation trade-off, so
+    // Thursday QR+Lower consolidation fires.
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences(),
+      athlete: baseAthlete({
+        training_intent: 'first_race',
+        strength_intent: 'performance',
+        strength_ordering_preference: 'strength_first',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+    const qrDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'quality_run'));
+    assertEquals(lowerDays.length, 1, `expected single lower placement; got [${lowerDays.join(', ')}]`);
+    assertEquals(qrDays.length, 1, `expected single quality_run placement; got [${qrDays.join(', ')}]`);
+    assertEquals(lowerDays[0], qrDays[0], `expected consolidation (Lower + QR same day); got Lower=${lowerDays[0]} QR=${qrDays[0]}`);
+  },
+});
+
+Deno.test({
+  name: '§6.1.5: isCoEq + endurance_first (default) keeps stricter separation (no consolidation forced)',
+  fn() {
+    // Same athlete, endurance_first preference. Per user directive: endurance_first
+    // explicitly opted into race-performance prioritization → keep stricter separation,
+    // do NOT force consolidation. Lower lands on a non-QR day (Friday SOFT-tier per current
+    // tier ladder when no clean day exists).
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences(),
+      athlete: baseAthlete({
+        training_intent: 'first_race',
+        strength_intent: 'performance',
+        strength_ordering_preference: 'endurance_first',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+    const qrDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'quality_run'));
+    assertEquals(lowerDays.length, 1, `expected single lower placement; got [${lowerDays.join(', ')}]`);
+    // The placement should NOT be same-day as QR — endurance_first preserves separation.
+    assert(
+      qrDays.length === 0 || lowerDays[0] !== qrDays[0],
+      `endurance_first should NOT consolidate Lower + QR; got both on ${lowerDays[0]}`,
+    );
+  },
+});
+
+Deno.test({
+  name: '§6.1.5: isPerf path unchanged (performance + co-equal still consolidates regardless of ordering pref)',
+  fn() {
+    // Belt-and-suspenders: the full perf-intent path predates the §6.1.5 widening and must
+    // keep consolidating regardless of ordering preference (the §5.2 EXPERIENCE_MODIFIER
+    // exception is intent-driven, not preference-driven).
+    for (const pref of ['endurance_first', 'strength_first'] as const) {
+      const inputs: WeekOptimizerInputs = {
+        anchors: { long_ride: 'saturday', long_run: 'sunday' },
+        preferences: basePreferences(),
+        athlete: baseAthlete({
+          training_intent: 'performance',
+          strength_intent: 'performance',
+          strength_ordering_preference: pref,
+        }),
+      };
+      const week = deriveOptimalWeek(inputs);
+      const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+      const qrDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'quality_run'));
+      assertEquals(
+        lowerDays[0],
+        qrDays[0],
+        `pref=${pref}: performance intent should always consolidate; got Lower=${lowerDays[0]} QR=${qrDays[0]}`,
+      );
+    }
+  },
+});
+
 Deno.test({
   name: 'W-004 scope: Upper strength permitted day-after Long Run (no eccentric overlap)',
   fn() {
