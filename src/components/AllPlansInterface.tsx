@@ -22,8 +22,11 @@ import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
-import { computeDayTimings } from '@/lib/pairing-timing';
-import { fetchStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
+import { computeDayTimings, type StrengthOrderingPreference } from '@/lib/pairing-timing';
+import {
+  fetchStrengthOrderingPreference,
+  useStrengthOrderingPreference,
+} from '@/lib/use-strength-ordering-preference';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -203,7 +206,53 @@ interface AllPlansInterfaceProps {
   showCompleted?: boolean;
 }
 
-const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ 
+/**
+ * Order one day's workouts the same way every consumer in this file should: by
+ * AM/PM timing first (which already encodes `strength_ordering_preference` via
+ * `computeDayTimings`), then by discipline rank as a stable tiebreaker, then by
+ * name. Two consumers below depend on this — the rendered weekly view and the
+ * markdown export — and they previously diverged silently when the weekly view
+ * skipped the sort entirely (Thursday rendered Run-above-Lower for a
+ * strength_first athlete). Single helper, single source of truth.
+ */
+function orderDayWorkoutsByTimingThenDiscipline(
+  workouts: any[],
+  orderingPref: StrengthOrderingPreference,
+): any[] {
+  if (!Array.isArray(workouts) || workouts.length <= 1) {
+    return Array.isArray(workouts) ? workouts.slice() : [];
+  }
+  const sorted = workouts.slice();
+  const timings = computeDayTimings(sorted, orderingPref);
+  const timingRank = (w: any): number => {
+    const t = timings.get(w) ?? w?.timing
+      ?? (w?.workout_metadata && typeof w.workout_metadata === 'object' ? w.workout_metadata.timing : null);
+    if (t === 'AM') return 0;
+    if (t === 'PM') return 2;
+    return 1;
+  };
+  const disciplineRank = (w: any): number => {
+    const t = String(w?.type || w?.discipline || '').toLowerCase();
+    const n = String(w?.name || '').toLowerCase();
+    if (t === 'swim' || /\bswim\b/.test(n)) return 0;
+    if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
+      return 1;
+    }
+    if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
+    if (t === 'strength') return 3;
+    return 4;
+  };
+  sorted.sort((a, b) => {
+    const tDelta = timingRank(a) - timingRank(b);
+    if (tDelta !== 0) return tDelta;
+    const dDelta = disciplineRank(a) - disciplineRank(b);
+    if (dDelta !== 0) return dDelta;
+    return String(a?.name || '').localeCompare(String(b?.name || ''));
+  });
+  return sorted;
+}
+
+const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   onClose, 
   onSelectPlan, 
   onBuildWorkout,
@@ -225,7 +274,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
-  
+  // Drives `orderDayWorkoutsByTimingThenDiscipline` for the rendered weekly view below.
+  // Hook depends only on the planId string, so dep churn from `selectedPlanDetail` object
+  // refs (which re-ref on every weekly refetch) cannot cancel the in-flight fetch.
+  const { value: weekViewOrderingPref } = useStrengthOrderingPreference(
+    selectedPlanDetail?.id ?? null,
+  );
+
   // DEBUG: Log every render and track selectedPlanDetail changes
   const renderCountRef = useRef(0);
   renderCountRef.current++;
@@ -1721,41 +1776,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
       for (const d of orderedDays) {
         lines.push(`### ${d}`);
-        // §6.5 render-time AM/PM ordering. Compute timing per day from sessions + athlete pref,
-        // then sort by a closure that reads from the Map directly. Earlier version mutated
-        // `w.timing` and reused `markdownExportSessionOrder` but the mutation didn't take in the
-        // deployed bundle — TodaysEffort (which reads `timings.get(w)` directly) worked while
-        // the markdown export still sorted by discipline rank. Cause is unconfirmed but a closure
-        // bypasses any object-freeze / proxy stripping that could explain the divergence.
-        const dayWorkoutsRaw = (groups[d] as any[]).slice();
-        const timings = computeDayTimings(dayWorkoutsRaw, orderingPref);
-        const dayWorkouts = dayWorkoutsRaw.sort((a: any, b: any) => {
-          const timingRank = (w: any): number => {
-            const t = timings.get(w) ?? w?.timing
-              ?? (w?.workout_metadata && typeof w.workout_metadata === 'object' ? w.workout_metadata.timing : null);
-            if (t === 'AM') return 0;
-            if (t === 'PM') return 2;
-            return 1;
-          };
-          const tDelta = timingRank(a) - timingRank(b);
-          if (tDelta !== 0) return tDelta;
-          // Fallback to discipline rank — identical to markdownExportSessionOrder so the secondary
-          // sort key matches the original behavior for workouts not in a Lower+endurance pair.
-          const disciplineRank = (w: any): number => {
-            const t = String(w?.type || w?.discipline || '').toLowerCase();
-            const n = String(w?.name || '').toLowerCase();
-            if (t === 'swim' || /\bswim\b/.test(n)) return 0;
-            if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
-              return 1;
-            }
-            if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
-            if (t === 'strength') return 3;
-            return 4;
-          };
-          const dDelta = disciplineRank(a) - disciplineRank(b);
-          if (dDelta !== 0) return dDelta;
-          return String(a?.name || '').localeCompare(String(b?.name || ''));
-        });
+        // §6.5 render-time AM/PM ordering. `orderDayWorkoutsByTimingThenDiscipline`
+        // is the same helper the rendered weekly view below uses, so the markdown
+        // export and the on-screen plan-detail view cannot diverge on which session
+        // sorts first within a day.
+        const dayWorkouts = orderDayWorkoutsByTimingThenDiscipline(groups[d] as any[], orderingPref);
         // Bricks emit as two session rows (bike leg + run leg) from session-factory; the export
         // merges them into one combined bullet ("Brick — Bike Xhr + Run Ymi") so a brick week
         // doesn't read as two unrelated easy sessions. Parse miles/hours from each leg's name
@@ -2340,8 +2365,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       });
                       const keys = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
                       return keys.map(day => {
-                        // Get date from first workout of the day
-                        const firstWorkout = groups[day]?.[0];
+                        // Sort each day's workouts by AM/PM timing then discipline so a
+                        // strength_first athlete sees Lower above Run on stacked days.
+                        // Without this, `groups[day]` was rendered in `currentWeekData.workouts`
+                        // insertion order and Thursday rendered Run-above-Lower.
+                        const dayWorkouts = orderDayWorkoutsByTimingThenDiscipline(
+                          groups[day],
+                          weekViewOrderingPref,
+                        );
+                        const firstWorkout = dayWorkouts[0];
                         const dateStr = firstWorkout?.date;
                         const formattedDate = dateStr ? (() => {
                           try {
@@ -2349,7 +2381,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                             return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                           } catch { return ''; }
                         })() : '';
-                        
+
                         return (
                         <div key={day} className="bg-white/[0.05] backdrop-blur-md border border-white/15 rounded-xl overflow-hidden">
                           <div className="px-3 py-2 text-sm font-medium text-white flex items-center gap-2">
@@ -2357,7 +2389,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                             {formattedDate && <span className="text-white/50 font-normal">{formattedDate}</span>}
                           </div>
                           <div className="px-3 pb-3 space-y-3">
-                            {groups[day].map((workout: any, index: number) => (
+                            {dayWorkouts.map((workout: any, index: number) => (
                               <div
                                 key={workout.id || `workout-${day}-${index}`}
                                 onClick={() => handleWorkoutClick(workout)}
