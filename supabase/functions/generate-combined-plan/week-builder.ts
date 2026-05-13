@@ -1570,6 +1570,14 @@ export function buildWeek(
     if (!performanceStrength) strFreq = 0;
     // performanceStrength: strFreq stays per phase above (typically 2)
   }
+  // §7.3 post-race recovery: SKIP strength entirely for 7 days regardless of intent.
+  // The mid-block 3:1 loading-pattern deload (W-002 REDUCE for hybrid) keeps `phase` as
+  // 'base'/'build'/'race_specific' with `isRecovery=true`; the dedicated post-race recovery
+  // block (`insertRecoveryBlock`) is the only path that sets `phase='recovery'`. Distinguishing
+  // by phase preserves the hybrid REDUCE behavior on mid-block deloads while enforcing the
+  // post-race SKIP — otherwise performance athletes get a deload Lower on Thursday of W14, which
+  // is exactly the §7.3 violation observed in Plan #59.
+  if (phase === 'recovery') strFreq = 0;
   if (recoveryRebuildWeek1) strFreq = 0;
 
   const capRaw = athleteState.strength_sessions_cap;
