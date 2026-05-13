@@ -237,32 +237,57 @@ export function pickPrimaryEventGoalId(
   return sorted[0]?.id ?? null;
 }
 
+/**
+ * Walk known error shapes to a readable string. Returning the input verbatim when it's
+ * already a non-empty string; recursing into `.message` / `.error` for structured errors;
+ * JSON.stringify as a last resort so a bracket-object literal never reaches the wizard UI.
+ * The previous version coerced everything through `String(val)`, which produced
+ * `"[object Object]"` when a server returned `{ error: { message, code } }` and that string
+ * passed the `typeof === 'string'` gate downstream.
+ */
+function unwrapErrorField(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() || null;
+  if (!value || typeof value !== 'object') return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.message === 'string' && v.message.trim()) return v.message;
+  if (typeof v.error === 'string' && v.error.trim()) return v.error;
+  if (v.error && typeof v.error === 'object') {
+    const nested = unwrapErrorField(v.error);
+    if (nested) return nested;
+  }
+  try {
+    const s = JSON.stringify(value);
+    return s && s !== '{}' ? s : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function parseArcInvokeError(
   error: unknown,
   data: unknown,
   fallback: string,
 ): Promise<{ message: string; code?: string }> {
   if (data && typeof data === 'object') {
-    const msg = (data as { error?: string }).error;
     const code = (data as { error_code?: string }).error_code;
-    if (typeof msg === 'string' && msg.trim()) return { message: msg, code };
+    const msg = unwrapErrorField((data as { error?: unknown }).error);
+    if (msg) return { message: msg, code };
   }
   try {
     const ctx = (error as { context?: { json?: () => Promise<unknown> } })?.context;
     if (ctx?.json) {
-      const payload = (await ctx.json()) as { error?: string; error_code?: string };
-      if (typeof payload?.error === 'string' && payload.error.trim()) {
-        return { message: payload.error, code: payload.error_code };
-      }
+      const payload = (await ctx.json()) as { error?: unknown; error_code?: string };
+      const msg = unwrapErrorField(payload?.error);
+      if (msg) return { message: msg, code: payload?.error_code };
     }
   } catch {
     /* ignore */
   }
-  const msg =
+  const errMsg =
     error && typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message?: string }).message)
-      : '';
-  return { message: msg || fallback };
+      ? unwrapErrorField((error as { message?: unknown }).message)
+      : null;
+  return { message: errMsg || fallback };
 }
 
 // ─── Core persist function ───────────────────────────────────────────────────

@@ -461,10 +461,32 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
   }
 
   if (!resp.ok) {
-    const detail = payload?.error || payload?.message || `${name} failed (${resp.status})`;
+    const detail = coerceErrorDetailToString(payload, `${name} failed (${resp.status})`);
     throw new AppError('downstream_function_failed', detail, 400);
   }
   return payload;
+}
+
+/**
+ * Coerce a downstream `payload.error` / `payload.message` to a string. AppError's `super(message)`
+ * stringifies via `String(value)`, which produces `"[object Object]"` when a downstream returns
+ * a structured error (e.g. `{ error: { message: ..., code: ... } }`). Walking known shapes here
+ * keeps the wizard-facing error readable instead of leaking the bracket-object literal.
+ */
+function coerceErrorDetailToString(payload: unknown, fallback: string): string {
+  if (typeof payload !== 'object' || payload === null) {
+    return typeof payload === 'string' && payload.trim() ? payload : fallback;
+  }
+  const p = payload as Record<string, unknown>;
+  const errField = p.error;
+  if (typeof errField === 'string' && errField.trim()) return errField;
+  if (errField && typeof errField === 'object') {
+    const nested = (errField as Record<string, unknown>).message ?? (errField as Record<string, unknown>).error;
+    if (typeof nested === 'string' && nested.trim()) return nested;
+    try { return JSON.stringify(errField); } catch { /* fall through */ }
+  }
+  if (typeof p.message === 'string' && (p.message as string).trim()) return p.message as string;
+  return fallback;
 }
 
 /** Swim rows from generate-combined-plan — log here so they appear on create-goal-and-materialize-plan (the HTTP caller). Downstream buildWeek logs only appear under function `generate-combined-plan`. */
