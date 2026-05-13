@@ -646,10 +646,13 @@ function emitConcurrentSpacingTradeOff(
     trade_offs.push(
       `Strength lower on ${tfDay(lowerDay)} sits between ${legQualityLabel(prevLegQ)} on ` +
         `${tfDay(dayBefore(lowerDay))} and ${legQualityLabel(nextLegQ)} on ` +
-        `${tfDay(dayAfter(lowerDay))} — concurrent-training research recommends ≥24h separation ` +
-        `from leg-dominant quality endurance (Hickson 1980; Wilson et al 2012; Petré et al 2021). ` +
-        `Your anchors leave no cleaner placement. To improve: free a day for strength (move a ` +
-        `long-day anchor, trim a quality session, or reduce strength to 1×).`,
+        `${tfDay(dayAfter(lowerDay))} — for heavy training blocks (Strength Build, Maintenance + ` +
+        `Power, Rebuild) concurrent-training research recommends ≥24h separation from leg-dominant ` +
+        `quality endurance (Hickson 1980; Wilson et al 2012; Petré et al 2021). Hypertrophy and ` +
+        `Deload loads (60-72% 1RM) don't drive significant interference at this adjacency (§6.1 ` +
+        `cycling/running asymmetry). Your anchors leave no cleaner placement during heavy weeks. ` +
+        `To improve: free a day for strength (move a long-day anchor, trim a quality session, ` +
+        `or reduce strength to 1×).`,
     );
     return;
   }
@@ -657,12 +660,27 @@ function emitConcurrentSpacingTradeOff(
     const adjK = prevLegQ ?? nextLegQ;
     const adjDay = prevLegQ ? dayBefore(lowerDay) : dayAfter(lowerDay);
     if (adjK) {
-      trade_offs.push(
-        `Strength lower on ${tfDay(lowerDay)} sits 24h from ${legQualityLabel(adjK)} on ` +
-          `${tfDay(adjDay)} — concurrent-training research recommends ≥24h separation in both ` +
-          `directions (Hickson 1980; Coffey & Hawley 2017). Tight spacing is acceptable but may ` +
-          `slightly compromise both sessions; consider freeing an adjacent day if recovery suffers.`,
-      );
+      // Cycling-adjacent strength is well-tolerated (Wilson 2012 ES≈0.32). Running-adjacent
+      // is materially more costly (ES≈0.94). Different wording per adjacency kind.
+      const isCyclingAdj = adjK === 'quality_bike';
+      if (isCyclingAdj) {
+        trade_offs.push(
+          `Strength lower on ${tfDay(lowerDay)} sits 24h from quality bike on ${tfDay(adjDay)} — ` +
+            `cycling-adjacent strength is well-tolerated (Wilson 2012 cycling ES≈0.32 vs running ` +
+            `ES≈0.94). For heavy training blocks consider freeing the day if recovery suffers, ` +
+            `but this adjacency is acceptable for most athletes.`,
+        );
+      } else {
+        trade_offs.push(
+          `Strength lower on ${tfDay(lowerDay)} sits 24h from ${legQualityLabel(adjK)} on ` +
+            `${tfDay(adjDay)} — for heavy training blocks (Strength Build, Maintenance + Power, ` +
+            `Rebuild) concurrent-training research recommends ≥24h separation in both directions ` +
+            `(Hickson 1980; Coffey & Hawley 2017). Hypertrophy and Deload loads don't drive ` +
+            `significant interference at this adjacency. Tight spacing is acceptable in heavy ` +
+            `weeks but may slightly compromise both sessions; consider freeing an adjacent day ` +
+            `if recovery suffers.`,
+        );
+      }
     }
   }
 }
