@@ -34,6 +34,11 @@ import {
   type StrengthFreqIntent,
 } from '@/lib/session-frequency-defaults';
 import { parseTimeToSeconds, type RaceDistance } from '@/lib/effort-score';
+import {
+  computeSessionFrequencyDefaults,
+  type DaysPerWeek,
+  type StrengthFreqIntent,
+} from '@/lib/session-frequency-defaults';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
 
@@ -1997,43 +2002,63 @@ function Step7Budget({
  * hardcoded {beginner:6, intermediate:10, advanced:14} mapping that drove
  * `weekly_hours_available` for everyone in the same fitness bucket.
  */
+/**
+ * Hours-tier cards. The `sessions` line used to be a hard-coded string and drifted from the
+ * engine matrix (10–12 hrs · 2 swims promised but engine returned 3 at 6–7 days; §2.1 strength
+ * deduction added another conditional that the static text didn't capture). Now `benefit` stays
+ * static while `sessions` is computed at render time from the athlete's known strength_intent
+ * and days_per_week via `computeSessionFrequencyDefaults`. Same source of truth as the engine.
+ */
 const HOURS_TIERS: Array<{
   label: string;
   value: number;
-  sessions: string;
   benefit: string;
 }> = [
-  {
-    label: '5–7 hrs',
-    value: 6,
-    sessions: '2 swims · 2 bikes · 2 runs',
-    benefit: 'Enough to finish strong. Ideal if training fits around a full life.',
-  },
-  {
-    label: '8–10 hrs',
-    value: 9,
-    sessions: '2 swims · 2-3 bikes · 3 runs',
-    benefit: 'The most common 70.3 window. Builds real fitness without consuming your week.',
-  },
-  {
-    label: '10–12 hrs',
-    value: 11,
-    sessions: '2 swims · 3 bikes · 3 runs',
-    benefit: "Performance territory. You'll see meaningful speed gains on the bike.",
-  },
-  {
-    label: '12–14 hrs',
-    value: 13,
-    sessions: '3 swims · 3 bikes · 3 runs',
-    benefit: 'Competitive age-group volume. Requires disciplined recovery.',
-  },
-  {
-    label: '14+ hrs',
-    value: 15,
-    sessions: '3 swims · 3-4 bikes · 3-4 runs',
-    benefit: 'Full commitment. Only sustainable with flexible schedule and strong recovery habits.',
-  },
+  { label: '5–7 hrs', value: 6, benefit: 'Enough to finish strong. Ideal if training fits around a full life.' },
+  { label: '8–10 hrs', value: 9, benefit: 'The most common 70.3 window. Builds real fitness without consuming your week.' },
+  { label: '10–12 hrs', value: 11, benefit: "Performance territory. You'll see meaningful speed gains on the bike." },
+  { label: '12–14 hrs', value: 13, benefit: 'Competitive age-group volume. Requires disciplined recovery.' },
+  { label: '14+ hrs', value: 15, benefit: 'Full commitment. Only sustainable with flexible schedule and strong recovery habits.' },
 ];
+
+/**
+ * Map wizard state to the StrengthFreqIntent the engine sees. `strengthIncluded === false`
+ * → 'none'; otherwise pass through (`'performance'` for Hybrid, `'support'` for Durability).
+ * Null/unset returns undefined so `computeSessionFrequencyDefaults` falls back to tier baseline.
+ */
+function wizardStrengthIntent(state: WizardState): StrengthFreqIntent | undefined {
+  if (state.strengthIncluded === false) return 'none';
+  if (state.strengthIntent === 'performance') return 'performance';
+  if (state.strengthIntent === 'support') return 'support';
+  return undefined;
+}
+
+/**
+ * Clamp wizard days_per_week input to the matrix-supported {5, 6, 7} range. The engine's matrix
+ * doesn't have a 4-day cell and clamps internally; mirror that here so the card preview matches
+ * what the engine will actually return.
+ */
+function wizardDaysPerWeek(state: WizardState): DaysPerWeek {
+  const d = state.daysPerWeek;
+  if (d === 5 || d === 6 || d === 7) return d;
+  if (typeof d === 'number' && d >= 7) return 7;
+  if (typeof d === 'number' && d <= 5) return 5;
+  return 6;
+}
+
+/** Render the swim/bike/run prescription line for a given hours-tier value, using the athlete's
+ *  current strength_intent + days_per_week. Returns "X swims · Y bikes · Z runs". */
+function formatHoursTierSessions(hoursValue: number, state: WizardState): string {
+  const defaults = computeSessionFrequencyDefaults({
+    weekly_hours_available: hoursValue,
+    days_per_week: wizardDaysPerWeek(state),
+    strength_intent: wizardStrengthIntent(state),
+  });
+  const s = defaults.swims_per_week;
+  const b = defaults.bikes_per_week;
+  const r = defaults.runs_per_week;
+  return `${s} ${s === 1 ? 'swim' : 'swims'} · ${b} ${b === 1 ? 'bike' : 'bikes'} · ${r} ${r === 1 ? 'run' : 'runs'}`;
+}
 
 function Step7BHours({
   state, setState, onNext, onBack, step, totalSteps,
@@ -2046,8 +2071,13 @@ function Step7BHours({
       onBack={onBack} onContinue={onNext} canContinue={state.weeklyHours !== null}
     >
       <div className="grid grid-cols-1 gap-2.5">
-        {HOURS_TIERS.map(({ label, value, sessions, benefit }) => {
+        {HOURS_TIERS.map(({ label, value, benefit }) => {
           const selected = state.weeklyHours === value;
+          // Reactive session line: reflects the actual matrix cell the engine will return given
+          // the athlete's already-chosen strength_intent + days_per_week. §2.1 deduction applies
+          // for Hybrid athletes (one tier lower at borderline hours/days). No drift between card
+          // preview and emitted plan.
+          const sessions = formatHoursTierSessions(value, state);
           return (
             <button
               key={value}
@@ -2706,13 +2736,19 @@ function getSteps(state: WizardState) {
   if (showBikePlacement) steps.push('bq_placement');
   if (tri) steps.push('longdays');
   steps.push('budget');
-  steps.push('hours');
+  // §2.1 wizard reorder: strength (and §6.5 ordering screen) ASK before hours so the hours card
+  // can render the athlete's actual prescription (post-deduction tier + days-aware swim count).
+  // Pre-reorder the card showed a static hours-tier promise that didn't account for strength
+  // wall-clock — athlete saw "2 swims at 10–12 hrs" but received 3 (or 2 post-§2.1 for hybrid).
+  // After reorder the card knows strength_intent + days_per_week and renders the exact cell the
+  // engine will return.
   if (tri) steps.push('strength');
   // §6.5: ordering-preference screen only for Hybrid athletes (strength_intent='performance').
   // Durability/none auto-default to endurance_first at save time; no screen surfaced.
   if (tri && state.strengthIncluded && state.strengthIntent === 'performance') {
     steps.push('strength_ordering');
   }
+  steps.push('hours');
   steps.push('confirm');
   return steps;
 }
