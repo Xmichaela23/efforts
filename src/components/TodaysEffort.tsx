@@ -690,6 +690,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // training_plan_id so the lookup follows the calendar selection if the user has multiple plans.
   useEffect(() => {
     const planId = dateWorkoutsMemo.find((w: any) => w?.training_plan_id)?.training_plan_id;
+    // TEMP DIAG (consolidation pre-flight). Remove after hypothesis verified.
+    console.log('[diag-pref] fetch-fire planId=', planId, 'dateWorkoutsMemo.length=', dateWorkoutsMemo.length, 'detailedPlans keys=', Object.keys(detailedPlans ?? {}).length);
     if (!planId) {
       setOrderingPref('endurance_first');
       return;
@@ -708,6 +710,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           goalId = planRow?.goal_id ?? null;
         }
         if (!goalId) {
+          // TEMP DIAG. Remove after hypothesis verified.
+          console.log('[diag-pref] fetch-resolve goalId-missing planId=', planId);
           if (!cancelled) setOrderingPref('endurance_first');
           return;
         }
@@ -716,9 +720,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           .select('training_prefs')
           .eq('id', goalId)
           .maybeSingle();
-        if (cancelled) return;
-        setOrderingPref(readStrengthOrderingPreference(goalRow as { training_prefs?: unknown } | null));
-      } catch {
+        if (cancelled) {
+          // TEMP DIAG. Remove after hypothesis verified.
+          console.log('[diag-pref] fetch-resolve CANCELLED planId=', planId, 'goalId=', goalId);
+          return;
+        }
+        const parsedPref = readStrengthOrderingPreference(goalRow as { training_prefs?: unknown } | null);
+        // TEMP DIAG. Remove after hypothesis verified.
+        console.log('[diag-pref] fetch-resolve planId=', planId, 'goalId=', goalId, 'pref=', parsedPref, 'training_prefs.strength_ordering_preference=', (goalRow as { training_prefs?: { strength_ordering_preference?: unknown } } | null)?.training_prefs?.strength_ordering_preference);
+        setOrderingPref(parsedPref);
+      } catch (e) {
+        // TEMP DIAG. Remove after hypothesis verified.
+        console.log('[diag-pref] fetch-resolve THREW planId=', planId, 'err=', e);
         if (!cancelled) setOrderingPref('endurance_first');
       }
     })();
@@ -735,6 +748,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // planned_workouts). Compute at render time from the day's sessions + athlete's
     // `strength_ordering_preference`, then apply the same AM<PM stable sort.
     const timings = computeDayTimings(dateWorkoutsMemo, orderingPref);
+    // TEMP DIAG (consolidation pre-flight). Remove after hypothesis verified.
+    console.log('[diag-pref] sort-fire orderingPref=', orderingPref, 'activeDate=', activeDate, 'timings.size=', timings.size, 'dateWorkoutsMemo.types=', dateWorkoutsMemo.map((w: any) => `${w?.type}:${w?.name?.slice(0,30)}`));
     const rank = (w: any): number => {
       const t = timings.get(w) ?? w?.timing;
       if (t === 'AM') return 0;
