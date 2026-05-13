@@ -711,8 +711,31 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true, inserted, plan_id: planId, start_date: startDate }), { headers: { ...corsHeaders, 'Content-Type':'application/json' } })
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json', ...corsHeaders } })
+    // PostgrestError has shape { message, code, details, hint } and no toString() override —
+    // `String(e)` collapses it to '[object Object]', which the caller stringifies further and
+    // surfaces verbatim to the wizard. Walk known error shapes (PostgrestError, Error, plain
+    // object with `.message`) so any schema or constraint failure surfaces a readable string.
+    const msg = describeError(e)
+    console.error('[activate-plan] error response:', msg)
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { 'Content-Type':'application/json', ...corsHeaders } })
   }
 })
+
+function describeError(e: unknown): string {
+  if (typeof e === 'string') return e || 'Unknown error'
+  if (!e || typeof e !== 'object') return String(e ?? 'Unknown error')
+  const obj = e as Record<string, unknown>
+  const parts: string[] = []
+  if (typeof obj.message === 'string' && obj.message) parts.push(obj.message)
+  if (typeof obj.code === 'string' && obj.code) parts.push(`code=${obj.code}`)
+  if (typeof obj.details === 'string' && obj.details) parts.push(`details=${obj.details}`)
+  if (typeof obj.hint === 'string' && obj.hint) parts.push(`hint=${obj.hint}`)
+  if (parts.length) return parts.join(' | ')
+  try {
+    const j = JSON.stringify(e)
+    if (j && j !== '{}') return j
+  } catch { /* fall through */ }
+  return 'Unknown error'
+}
 
 
