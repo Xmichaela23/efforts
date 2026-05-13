@@ -370,6 +370,18 @@ Deno.serve(async (req: Request) => {
       weighted_tss: s.weighted_tss,
       zone_targets: s.zone_targets,
       serves_goal: s.serves_goal,
+      // §6.2 / §6.5 same-day pairing metadata. `attachSameDayPairingMetadata` (week-builder.ts)
+      // sets `timing` ('AM'/'PM') and `pairing` (gap_hours + partner id) on Lower + partner
+      // sessions for strength_first vs endurance_first ordering. activate-plan reads these to
+      // populate `workout_metadata.timing` so `markdownExportSessionOrder` and Today's Efforts
+      // render the AM card before the PM card. Commit 20caa3f5 accidentally dropped `timing`
+      // when adding `route_url`; `pairing` was never carried. Without these fields the export
+      // falls back to discipline rank (run < strength) and a strength_first athlete sees Run
+      // Intervals above Lower Strength on Thursday — the inverse of their stated preference.
+      ...(s.timing === 'AM' || s.timing === 'PM' ? { timing: s.timing } : {}),
+      ...(s.pairing && typeof s.pairing === 'object' && !Array.isArray(s.pairing)
+        ? { pairing: s.pairing }
+        : {}),
       ...(typeof s.session_kind === 'string' && s.session_kind ? { session_kind: s.session_kind } : {}),
       ...(Array.isArray(s.strength_exercises) && s.strength_exercises.length > 0
         ? { strength_exercises: s.strength_exercises }
