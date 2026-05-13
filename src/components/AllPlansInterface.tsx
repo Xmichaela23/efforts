@@ -22,7 +22,8 @@ import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
-import { computeDayTimings, readStrengthOrderingPreference } from '@/lib/pairing-timing';
+import { computeDayTimings } from '@/lib/pairing-timing';
+import { fetchStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -1640,7 +1641,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     if (!plan) return;
 
     let wizardMdLines: string[] = [];
-    let orderingPref: 'endurance_first' | 'strength_first' = 'endurance_first';
+    // §6.5 ordering preference resolution via the shared fetcher. Same cache the
+    // `useStrengthOrderingPreference` hook (TodaysEffort) reads from, so this export and the
+    // top-cards display can't disagree. Resolves to 'endurance_first' on any failure path —
+    // matches the server's default when the field is missing.
+    const orderingPref = await fetchStrengthOrderingPreference(plan?.id ?? null);
     try {
       const gid = plan.goal_id;
       if (gid && typeof gid === 'string') {
@@ -1651,11 +1656,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           .maybeSingle();
         if (goal) {
           wizardMdLines = formatWizardPrefsMarkdownLines(goal as any);
-          // §6.5 ordering preference drives the AM/PM split for paired Lower + endurance sessions.
-          // Read once from the goal's training_prefs (fetched above) and apply at render time so the
-          // markdown export sorts paired Thursday sessions consistently for both strength_first and
-          // endurance_first athletes. Server no longer persists this; it's a derived render-time value.
-          orderingPref = readStrengthOrderingPreference(goal as any);
         }
       }
       if (!wizardMdLines.length) {

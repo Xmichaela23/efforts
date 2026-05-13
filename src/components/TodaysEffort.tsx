@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
-import { computeDayTimings, readStrengthOrderingPreference, type StrengthOrderingPreference } from '@/lib/pairing-timing';
+import { computeDayTimings } from '@/lib/pairing-timing';
+import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
@@ -122,12 +123,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [homeArcReady, setHomeArcReady] = useState(false);
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   const [baselines, setBaselines] = useState<any | null>(null);
-  // §6.5 ordering preference for same-day Lower + endurance pairing. Fetched from the active
-  // goal's training_prefs (keyed on the first workout's training_plan_id) and cached for the
-  // session. Drives `computeDayTimings` — defaults to 'endurance_first' until the fetch lands so
-  // first-paint sort is deterministic; once loaded, strength_first athletes see Lower above the
-  // quality_run/quality_bike partner on stacked Thursdays.
-  const [orderingPref, setOrderingPref] = useState<StrengthOrderingPreference>('endurance_first');
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locTried, setLocTried] = useState(false);
   const [cityName, setCityName] = useState<string | null>(null);
@@ -684,59 +679,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     });
   }, [unifiedItems]);
 
-  // Load the active goal's strength_ordering_preference once per training plan. Server no longer
-  // persists timing on planned_workouts (column never existed); we compute AM/PM at render time
-  // from sessions on the day + the athlete's pref. Keyed on the first dateWorkout's
-  // training_plan_id so the lookup follows the calendar selection if the user has multiple plans.
-  useEffect(() => {
-    const planId = dateWorkoutsMemo.find((w: any) => w?.training_plan_id)?.training_plan_id;
-    // TEMP DIAG (consolidation pre-flight). Remove after hypothesis verified.
-    console.log('[diag-pref] fetch-fire planId=', planId, 'dateWorkoutsMemo.length=', dateWorkoutsMemo.length, 'detailedPlans keys=', Object.keys(detailedPlans ?? {}).length);
-    if (!planId) {
-      setOrderingPref('endurance_first');
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const planFromCtx = detailedPlans?.[planId];
-        let goalId = planFromCtx?.goal_id as string | null | undefined;
-        if (!goalId) {
-          const { data: planRow } = await supabase
-            .from('plans')
-            .select('goal_id')
-            .eq('id', planId)
-            .maybeSingle();
-          goalId = planRow?.goal_id ?? null;
-        }
-        if (!goalId) {
-          // TEMP DIAG. Remove after hypothesis verified.
-          console.log('[diag-pref] fetch-resolve goalId-missing planId=', planId);
-          if (!cancelled) setOrderingPref('endurance_first');
-          return;
-        }
-        const { data: goalRow } = await supabase
-          .from('goals')
-          .select('training_prefs')
-          .eq('id', goalId)
-          .maybeSingle();
-        if (cancelled) {
-          // TEMP DIAG. Remove after hypothesis verified.
-          console.log('[diag-pref] fetch-resolve CANCELLED planId=', planId, 'goalId=', goalId);
-          return;
-        }
-        const parsedPref = readStrengthOrderingPreference(goalRow as { training_prefs?: unknown } | null);
-        // TEMP DIAG. Remove after hypothesis verified.
-        console.log('[diag-pref] fetch-resolve planId=', planId, 'goalId=', goalId, 'pref=', parsedPref, 'training_prefs.strength_ordering_preference=', (goalRow as { training_prefs?: { strength_ordering_preference?: unknown } } | null)?.training_prefs?.strength_ordering_preference);
-        setOrderingPref(parsedPref);
-      } catch (e) {
-        // TEMP DIAG. Remove after hypothesis verified.
-        console.log('[diag-pref] fetch-resolve THREW planId=', planId, 'err=', e);
-        if (!cancelled) setOrderingPref('endurance_first');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [dateWorkoutsMemo, detailedPlans]);
+  // §6.5 strength_ordering_preference resolution. Extract a primitive planId from the day's
+  // workouts so the hook below depends on a stable string, not an object that re-refs every
+  // render. Prior to consolidation, the fetch lived inline with `[dateWorkoutsMemo, detailedPlans]`
+  // as deps — both object refs that churned every render. The cleanup cancelled the in-flight
+  // fetch each time. DevTools Network tab showed 813 pending requests, fetch never landed,
+  // orderingPref stuck at 'endurance_first', strength_first athletes saw Run-above-Lower on
+  // stacked Thursdays. The shared hook centralizes the fetch + caches per planId.
+  const activePlanId = useMemo<string | null>(() => {
+    const found = dateWorkoutsMemo.find((w: any) => w?.training_plan_id)?.training_plan_id;
+    return typeof found === 'string' && found ? found : null;
+  }, [dateWorkoutsMemo]);
+  const { value: orderingPref } = useStrengthOrderingPreference(activePlanId);
 
   // FIXED: React to selectedDate prop changes properly - use a stable dependency
   useEffect(() => {
@@ -748,8 +702,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // planned_workouts). Compute at render time from the day's sessions + athlete's
     // `strength_ordering_preference`, then apply the same AM<PM stable sort.
     const timings = computeDayTimings(dateWorkoutsMemo, orderingPref);
-    // TEMP DIAG (consolidation pre-flight). Remove after hypothesis verified.
-    console.log('[diag-pref] sort-fire orderingPref=', orderingPref, 'activeDate=', activeDate, 'timings.size=', timings.size, 'dateWorkoutsMemo.types=', dateWorkoutsMemo.map((w: any) => `${w?.type}:${w?.name?.slice(0,30)}`));
     const rank = (w: any): number => {
       const t = timings.get(w) ?? w?.timing;
       if (t === 'AM') return 0;
