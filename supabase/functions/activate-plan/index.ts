@@ -420,6 +420,17 @@ Deno.serve(async (req) => {
     for (const wk of Object.keys(sessionsByWeek)) {
       const weekNum = parseInt(wk, 10)
       const sessions = Array.isArray(sessionsByWeek[wk]) ? sessionsByWeek[wk] : []
+      // TEMP DIAGNOSTIC (Issue 1 — race-week strength missing). Remove after diagnosis.
+      const strengthInWeek = sessions.filter((x: any) => {
+        const t = String(x?.discipline || x?.type || '').toLowerCase()
+        return t === 'strength'
+      })
+      console.log('[DIAG-activate-strength] week input from sessions_by_week', {
+        week: weekNum,
+        total_sessions: sessions.length,
+        strength_count: strengthInWeek.length,
+        strength_summary: strengthInWeek.map((x: any) => ({ day: x.day, name: x.name, type: x.type })),
+      })
       for (const s of sessions) {
         const dow = DAY_INDEX[String(s.day)] || 1
         // Anchor all scheduling to the Monday of the selected start week,
@@ -428,14 +439,29 @@ Deno.serve(async (req) => {
         if (weekNum === 1 && date < startDate) continue
 
         const rawDiscipline = String(s.discipline || s.type || '').toLowerCase()
+        const isStrengthDiag = rawDiscipline === 'strength'
         // Skip non-work sessions that cannot materialize into steps
         if (rawDiscipline === 'rest' || rawDiscipline === 'off' || rawDiscipline === 'recovery') {
+          // TEMP DIAGNOSTIC (Issue 1). Remove after diagnosis.
+          if (isStrengthDiag) {
+            console.log('[DIAG-activate-strength] FILTERED at rawDiscipline guard', { week: weekNum, day: s.day, name: s.name, rawDiscipline })
+          }
           continue
         }
         const hasMobility = Array.isArray((s as any)?.mobility_exercises) && (s as any).mobility_exercises.length > 0
         const mapped = mapType((s as any)?.discipline || (s as any)?.type, hasMobility)
         // Skip unknown/blank types instead of defaulting to run
-        if (!mapped) continue
+        if (!mapped) {
+          // TEMP DIAGNOSTIC (Issue 1). Remove after diagnosis.
+          if (isStrengthDiag) {
+            console.log('[DIAG-activate-strength] FILTERED at mapType=null', { week: weekNum, day: s.day, name: s.name })
+          }
+          continue
+        }
+        // TEMP DIAGNOSTIC (Issue 1). Remove after diagnosis. Log strength reaching insert.
+        if (isStrengthDiag) {
+          console.log('[DIAG-activate-strength] reaching planned_workouts insert', { week: weekNum, day: s.day, name: s.name, mapped, dedupe_key: `${weekNum}-${dow}-${date}-${mapped}` })
+        }
         
         // Deduplication: Check if we've already processed this session
         // (matches unique constraint: training_plan_id, week_number, day_number, date, type)

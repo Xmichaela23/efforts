@@ -1616,8 +1616,30 @@ export function buildWeek(
           ? [...athleteState.strength_optimizer_slots!].sort((a, b) => a.session_index - b.session_index)
           : athleteState.strength_optimizer_slots!;
       const slotsPlanned = slotsOrdered.slice(0, strFreq);
+      // TEMP DIAGNOSTIC (Issue 1 — W13/W17 Taper Priming missing). Remove after diagnosis.
+      console.log('[DIAG-strength] week placement attempt', {
+        weekNum,
+        phase,
+        isRecovery,
+        raceThisWeek: !!raceThisWeek,
+        strFreq,
+        slots_planned: slotsPlanned,
+        all_slots: athleteState.strength_optimizer_slots,
+      });
       for (const slot of slotsPlanned) {
         const strSlotOpt = grid.get(slot.weekday);
+        // TEMP DIAGNOSTIC (Issue 1). Remove after diagnosis.
+        console.log('[DIAG-strength] slot evaluation', {
+          weekNum,
+          phase,
+          slot_weekday: slot.weekday,
+          slot_session_index: slot.session_index,
+          slot_exists: !!strSlotOpt,
+          slot_isRest: strSlotOpt?.isRest,
+          existing_sessions_count: strSlotOpt?.sessions.length ?? null,
+          existing_session_kinds: strSlotOpt?.sessions.map((x) => x.type) ?? null,
+          gate_passes: !!(strSlotOpt && !strSlotOpt.isRest && strSlotOpt.sessions.length < 2),
+        });
         if (!strSlotOpt || strSlotOpt.isRest || strSlotOpt.sessions.length >= 2) continue;
         if (hasTri) {
           strSlotOpt.sessions.push(
@@ -1656,6 +1678,19 @@ export function buildWeek(
             }),
           );
         }
+        // TEMP DIAGNOSTIC (Issue 1). Remove after diagnosis.
+        const pushed = strSlotOpt.sessions[strSlotOpt.sessions.length - 1];
+        console.log('[DIAG-strength] session pushed to grid', {
+          weekNum,
+          phase,
+          slot_weekday: slot.weekday,
+          pushed_type: pushed?.type,
+          pushed_name: pushed?.name,
+          pushed_duration: pushed?.duration,
+          pushed_intensity_class: pushed?.intensity_class,
+          pushed_tags: pushed?.tags,
+          slot_sessions_after_push: strSlotOpt.sessions.map((x) => ({ type: x.type, name: x.name })),
+        });
       }
     } else {
     // Identify brick days in the current grid to pass to the protocol placement
@@ -1971,6 +2006,24 @@ export function buildWeek(
   // pairings (Lower strength + Quality Run / Quality Bike / Long Ride / Easy Run / Easy Bike).
   // Conformance validator (Task F) hard-fails missing metadata on these pairings.
   attachSameDayPairingMetadata(allSessions, athleteState);
+  // TEMP DIAGNOSTIC (Issue 1). Remove after diagnosis. Final week shape — does strength
+  // survive all post-placement steps (enforceHardEasy, enforce8020, matrix conflict resolver,
+  // schedule-collision pass)?
+  const strengthSessionsFinal = allSessions.filter((s) => s.type === 'strength');
+  console.log('[DIAG-strength] final week shape', {
+    weekNum,
+    phase,
+    isRecovery,
+    raceThisWeek: !!raceThisWeek,
+    total_sessions: allSessions.length,
+    strength_count: strengthSessionsFinal.length,
+    strength_sessions: strengthSessionsFinal.map((s) => ({
+      day: s.day,
+      name: s.name,
+      type: s.type,
+      timing: (s as { timing?: string }).timing,
+    })),
+  });
   return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs, conflictEvents);
 }
 
