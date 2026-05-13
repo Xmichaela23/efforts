@@ -22,6 +22,7 @@ import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
+import { computeDayTimings, readStrengthOrderingPreference } from '@/lib/pairing-timing';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -1639,6 +1640,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     if (!plan) return;
 
     let wizardMdLines: string[] = [];
+    let orderingPref: 'endurance_first' | 'strength_first' = 'endurance_first';
     try {
       const gid = plan.goal_id;
       if (gid && typeof gid === 'string') {
@@ -1647,7 +1649,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           .select('name, distance, target_date, priority, sport, training_prefs, notes')
           .eq('id', gid)
           .maybeSingle();
-        if (goal) wizardMdLines = formatWizardPrefsMarkdownLines(goal as any);
+        if (goal) {
+          wizardMdLines = formatWizardPrefsMarkdownLines(goal as any);
+          // §6.5 ordering preference drives the AM/PM split for paired Lower + endurance sessions.
+          // Read once from the goal's training_prefs (fetched above) and apply at render time so the
+          // markdown export sorts paired Thursday sessions consistently for both strength_first and
+          // endurance_first athletes. Server no longer persists this; it's a derived render-time value.
+          orderingPref = readStrengthOrderingPreference(goal as any);
+        }
       }
       if (!wizardMdLines.length) {
         wizardMdLines = formatPlanConfigPrefsMarkdownLines(plan.config);
@@ -1712,7 +1721,41 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
       for (const d of orderedDays) {
         lines.push(`### ${d}`);
-        const dayWorkouts = (groups[d] as any[]).slice().sort(markdownExportSessionOrder);
+        // §6.5 render-time AM/PM ordering. Compute timing per day from sessions + athlete pref,
+        // then sort by a closure that reads from the Map directly. Earlier version mutated
+        // `w.timing` and reused `markdownExportSessionOrder` but the mutation didn't take in the
+        // deployed bundle — TodaysEffort (which reads `timings.get(w)` directly) worked while
+        // the markdown export still sorted by discipline rank. Cause is unconfirmed but a closure
+        // bypasses any object-freeze / proxy stripping that could explain the divergence.
+        const dayWorkoutsRaw = (groups[d] as any[]).slice();
+        const timings = computeDayTimings(dayWorkoutsRaw, orderingPref);
+        const dayWorkouts = dayWorkoutsRaw.sort((a: any, b: any) => {
+          const timingRank = (w: any): number => {
+            const t = timings.get(w) ?? w?.timing
+              ?? (w?.workout_metadata && typeof w.workout_metadata === 'object' ? w.workout_metadata.timing : null);
+            if (t === 'AM') return 0;
+            if (t === 'PM') return 2;
+            return 1;
+          };
+          const tDelta = timingRank(a) - timingRank(b);
+          if (tDelta !== 0) return tDelta;
+          // Fallback to discipline rank — identical to markdownExportSessionOrder so the secondary
+          // sort key matches the original behavior for workouts not in a Lower+endurance pair.
+          const disciplineRank = (w: any): number => {
+            const t = String(w?.type || w?.discipline || '').toLowerCase();
+            const n = String(w?.name || '').toLowerCase();
+            if (t === 'swim' || /\bswim\b/.test(n)) return 0;
+            if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
+              return 1;
+            }
+            if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
+            if (t === 'strength') return 3;
+            return 4;
+          };
+          const dDelta = disciplineRank(a) - disciplineRank(b);
+          if (dDelta !== 0) return dDelta;
+          return String(a?.name || '').localeCompare(String(b?.name || ''));
+        });
         // Bricks emit as two session rows (bike leg + run leg) from session-factory; the export
         // merges them into one combined bullet ("Brick — Bike Xhr + Run Ymi") so a brick week
         // doesn't read as two unrelated easy sessions. Parse miles/hours from each leg's name
