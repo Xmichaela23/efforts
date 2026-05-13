@@ -419,3 +419,70 @@ Deno.test('brick matrix invariant: base phase always 0 (per protocol)', () => {
     assertEquals(cap, 0, `base cap should be 0 at hours=${hours}`);
   }
 });
+
+// ── §2.1 strength-load endurance-hours deduction ──────────────────────────────
+//
+// Hybrid (performance) athletes lose wall-clock to strength; tier lookup re-bases on the time
+// LEFT for swim/bike/run. Plan #59 regression case: 11hr declared hybrid emitted 12h19m total
+// (12% over) because tier `10-12 × 7d` prescribed 3/3/3 endurance ON TOP of 2× strength. After
+// §2.1, the same athlete tiers as `8-10` (9.5hr endurance after 1.5hr deduction) and gets 2/3/3.
+
+Deno.test('§2.1 deduction: Hybrid 11hr × 7d → endurance 9.5hr → tier 8-10 (was 10-12)', () => {
+  const out = compute({ weekly_hours_available: 11, days_per_week: 7, strength_intent: 'performance' });
+  assertEquals(out.tier_label, '8-10', 'hybrid loses one tier vs endurance-only at same declared hours');
+  assertEquals(out.swims_per_week, 2, '8-10 × 7d cell prescribes 2 swims (not 3) — matches budget');
+  assertEquals(out.strength_per_week, 2, '§7 still picks 2× from declared 11hr (intent unchanged)');
+  assert(out.notes.some((n) => /endurance 9\.50hr/.test(n) && /2× strength/.test(n)),
+    `expected note citing endurance hours + strength count; got ${JSON.stringify(out.notes)}`);
+});
+
+Deno.test('§2.1 deduction: Hybrid 11.5hr × 7d → endurance exactly 10.0hr → tier 10-12 (boundary stays up)', () => {
+  // 11.5 − 2×0.75 = 10.0 → tierLabelFor uses strict-less-than at upper bound, so 10.0 hits 10-12.
+  // Mathematically correct: at 11.5 declared, the athlete really does have ~10hr endurance, which
+  // fits the 10-12 prescription. No fix needed at this point on the curve.
+  const out = compute({ weekly_hours_available: 11.5, days_per_week: 7, strength_intent: 'performance' });
+  assertEquals(out.tier_label, '10-12');
+  assertEquals(out.swims_per_week, 3);
+});
+
+Deno.test('§2.1 deduction: Hybrid 10hr × 7d → endurance 8.5hr → tier 8-10', () => {
+  // §7 boundary: hours ≥10 fires 2× performance strength → 1.5hr deduction → 8.5 endurance.
+  const out = compute({ weekly_hours_available: 10, days_per_week: 7, strength_intent: 'performance' });
+  assertEquals(out.tier_label, '8-10');
+  assertEquals(out.strength_per_week, 2);
+});
+
+Deno.test('§2.1 deduction: Hybrid 9.99hr × 7d → §7 picks 1× → endurance 9.24hr → tier 8-10 (continuity)', () => {
+  // §7 boundary the other side: hours < 10 picks 1× performance → 0.75hr deduction → 9.24 endurance.
+  // Both sides of the §7 boundary land at tier `8-10` — no discontinuity in matrix prescription
+  // when declared hours crosses the 10hr mark for a hybrid athlete.
+  const out = compute({ weekly_hours_available: 9.99, days_per_week: 7, strength_intent: 'performance' });
+  assertEquals(out.tier_label, '8-10');
+  assertEquals(out.strength_per_week, 1);
+});
+
+Deno.test('§2.1 deduction: Endurance-only 11hr × 7d → no deduction → tier 10-12 (no regression)', () => {
+  // strength_intent='none' → 0× → 0hr deduction → endurance = declared = 11.0 → tier 10-12 unchanged.
+  // Belt-and-suspenders that the change is invisible to non-strength athletes at every tier.
+  const out = compute({ weekly_hours_available: 11, days_per_week: 7, strength_intent: 'none' });
+  assertEquals(out.tier_label, '10-12');
+  assertEquals(out.swims_per_week, 3);
+  assertEquals(out.strength_per_week, 0);
+});
+
+Deno.test('§2.1 deduction: Support 11hr × 7d → 1× → endurance 10.25hr → tier 10-12 (durability stays up vs hybrid)', () => {
+  // Support athletes do 1× strength (~45min) so deduction is 0.75. Endurance budget stays above
+  // the 10hr threshold and they keep the 10-12 prescription — matches time math (more endurance
+  // budget than a 2× hybrid at the same declared hours).
+  const out = compute({ weekly_hours_available: 11, days_per_week: 7, strength_intent: 'support' });
+  assertEquals(out.tier_label, '10-12');
+  assertEquals(out.strength_per_week, 1);
+});
+
+Deno.test('§2.1 deduction: Performance 14hr × 7d → 2× → endurance 12.5hr → tier 12-14 (high tier unchanged)', () => {
+  // 14 − 1.5 = 12.5 → still in 12-14 tier (< 14). Demonstrates the deduction doesn't
+  // over-aggressively re-tier athletes who have plenty of headroom.
+  const out = compute({ weekly_hours_available: 14, days_per_week: 7, strength_intent: 'performance' });
+  assertEquals(out.tier_label, '12-14');
+  assertEquals(out.strength_per_week, 2);
+});

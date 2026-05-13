@@ -215,6 +215,26 @@ function tierLabelFor(hours: number): TierLabel {
   return '14+';
 }
 
+/**
+ * Mirror of §7 strength-count logic for the §2.1 endurance-hours deduction. Kept as a separate
+ * helper (not extracted from §7) so §7 stays a pure last-step strength override; this version is
+ * a forward-look used only to size the wall-clock deduction before tier lookup. If §7 ever gains
+ * a 3× case the helper extends here without touching the tier-lookup arithmetic.
+ *
+ * Returns 0/1/2 today. `'support'` → 1× regardless of hours; `'performance'` → 1× under 10hr
+ * (no room for 2× lift + meaningful endurance), 2× otherwise. `'none'` and unset → 0 (no
+ * deduction; matches §7's tier-baseline fall-through which doesn't load wall-clock strength).
+ */
+function strengthCountFromIntent(
+  strength_intent: StrengthFreqIntent | undefined,
+  declared_hours: number,
+): 0 | 1 | 2 {
+  if (strength_intent === 'none') return 0;
+  if (strength_intent === 'performance') return declared_hours < 10 ? 1 : 2;
+  if (strength_intent === 'support') return 1;
+  return 0;
+}
+
 /** Clamp arbitrary day inputs to the matrix-supported {5, 6, 7} range. */
 function clampDaysForMatrix(days: DaysPerWeek | undefined): 5 | 6 | 7 {
   const d = days ?? 6;
@@ -242,14 +262,34 @@ export function computeSessionFrequencyDefaults(
   }
 
   const hours = inputs.weekly_hours_available;
-  const tier = tierLabelFor(hours);
+  // §2.1 strength-load endurance-hour adjustment for tier lookup.
+  //
+  // Two consumers of "hours" decide different things, and the right input differs:
+  //   - §7 strength count picks 1× vs 2× from declared hours — wall-clock honest about how much
+  //     time the athlete will spend lifting. Stays unchanged below.
+  //   - Tier lookup picks endurance prescription (swim/bike/run counts) from the time LEFT for
+  //     swim/bike/run after strength steals from the same wall-clock budget. Adjusted here.
+  //
+  // Without this split, a hybrid athlete declaring 11hr ends up with the same 3/3/3 endurance
+  // prescription as an endurance-only athlete at the same tier, then +1.5hr of strength bolted on
+  // top — Plan #59 emitted 12h19m for a declared 11hr/wk hybrid (12% over). Subtracting strength
+  // wall-clock here re-tiers a hybrid 11hr athlete to '8-10' (9.5hr endurance), matching the
+  // empirical budget. Endurance-only athletes are unaffected (deduction = 0).
+  //
+  // 0.75 hr/session is the canonical workout-time value — Plan #59 emit shows 35-50min strength
+  // sessions; 0.75 is the conservative midpoint (slight overcautious favours fit-in-budget).
+  // Scales by actual strength count, so a future 3× tier deducts 2.25hr without code change here.
+  const strengthCountForDeduction = strengthCountFromIntent(inputs.strength_intent, hours);
+  const STRENGTH_SESSION_HOURS = 0.75;
+  const enduranceHours = Math.max(0, hours - strengthCountForDeduction * STRENGTH_SESSION_HOURS);
+  const tier = tierLabelFor(enduranceHours);
   const requestedDays = (inputs.days_per_week ?? 6) as DaysPerWeek;
   const matrixDays = clampDaysForMatrix(requestedDays);
   const cell = sportMatrix[tier][matrixDays];
   const extras = sportExtras[tier];
 
   const notes: string[] = [
-    `sport=${sport}, tier=${tier} from ${hours}hr/week, days=${requestedDays} (matrix lookup at ${matrixDays}d)`,
+    `sport=${sport}, tier=${tier} from ${hours}hr/week (endurance ${enduranceHours.toFixed(2)}hr after ${strengthCountForDeduction}× strength × ${STRENGTH_SESSION_HOURS}hr), days=${requestedDays} (matrix lookup at ${matrixDays}d)`,
   ];
 
   // Gate-block: 14+ hr / 5 days has no reference-plan support. Compute fallback at 6d cell
