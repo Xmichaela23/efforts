@@ -2375,28 +2375,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         );
                         const firstWorkout = dayWorkouts[0];
                         const dateStr = firstWorkout?.date;
-                        if (dateStr === '2026-05-18') {
-                          // diag-divergence: compare to TodaysEffort for the same Monday.
-                          const diagTimings = computeDayTimings(groups[day], weekViewOrderingPref);
-                          // eslint-disable-next-line no-console
-                          console.log('[diag-div] AllPlansInterface weekly 2026-05-18', {
-                            orderingPref: weekViewOrderingPref,
-                            inputs: (groups[day] || []).map((w: any) => ({
-                              name: w?.name,
-                              type: w?.type,
-                              workout_type: w?.workout_type,
-                              discipline: w?.discipline,
-                              tags: w?.tags,
-                              source: w?.source ?? w?.__source,
-                              id: w?.id,
-                            })),
-                            timings: (groups[day] || []).map((w: any) => ({
-                              name: w?.name,
-                              timing: diagTimings.get(w) ?? w?.timing ?? null,
-                            })),
-                            sortedOrder: dayWorkouts.map((w: any) => w?.name),
-                          });
-                        }
                         const formattedDate = dateStr ? (() => {
                           try {
                             const d = new Date(dateStr + 'T00:00:00');

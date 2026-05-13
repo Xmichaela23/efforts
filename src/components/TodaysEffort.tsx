@@ -702,26 +702,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // planned_workouts). Compute at render time from the day's sessions + athlete's
     // `strength_ordering_preference`, then apply the same AM<PM stable sort.
     const timings = computeDayTimings(dateWorkoutsMemo, orderingPref);
-    if (activeDate === '2026-05-18') {
-      // diag-divergence: compare to AllPlansInterface weekly view for the same Monday.
-      // eslint-disable-next-line no-console
-      console.log('[diag-div] TodaysEffort 2026-05-18', {
-        orderingPref,
-        inputs: dateWorkoutsMemo.map((w: any) => ({
-          name: w?.name,
-          type: w?.type,
-          workout_type: w?.workout_type,
-          discipline: w?.discipline,
-          tags: w?.tags,
-          source: w?.source ?? w?.__source,
-          id: w?.id,
-        })),
-        timings: dateWorkoutsMemo.map((w: any) => ({
-          name: w?.name,
-          timing: timings.get(w) ?? w?.timing ?? null,
-        })),
-      });
-    }
     const rank = (w: any): number => {
       const t = timings.get(w) ?? w?.timing;
       if (t === 'AM') return 0;
