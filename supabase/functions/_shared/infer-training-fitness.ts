@@ -100,6 +100,16 @@ export function inferTrainingFitnessLevel(opts: {
   arc: ArcContext;
   structuralLoadHint?: 'low' | 'moderate' | 'normal';
   trainingIntent?: string | null;
+  /**
+   * Wizard-collected swim experience tier (`learning` / `steady` / `strong`).
+   * Persisted at `goals.training_prefs.swim_experience`. `learning` adds a -1
+   * score signal — same magnitude as `training_background_beginner_hint` —
+   * which nudges toward beginner WITHOUT overriding strong CTL/FTP/race signals.
+   * Ticket B / Issue 17: caps learner swim volume by feeding `training_fitness`,
+   * which `week-builder.ts:1092` consumes for swim slot template + volume band
+   * selection (cssAerobicSwim, swim-protocol-volumes, swim-program-templates).
+   */
+  wizardSwimExperienceTier?: string | null;
 }): InferTrainingFitnessResult {
   const reasons: string[] = [];
   const w = normWizardFitness(opts.wizardFitnessRaw);
@@ -168,6 +178,17 @@ export function inferTrainingFitnessLevel(opts: {
   if (trainingBackgroundBeginnerHint(opts.arc.training_background)) {
     score -= 1;
     reasons.push('training_background_beginner_hint');
+  }
+
+  // Ticket B / Issue 17. Wizard swim_experience='learning' is an athlete-explicit
+  // signal; treat as soft (-1) so it's symmetric with the training_background hint
+  // above and doesn't override strong CTL/FTP/race-history. Designed to push a
+  // borderline athlete from intermediate→beginner only when other signals also
+  // weak, which is the exact population the learner-volume cap should protect.
+  const swimExp = String(opts.wizardSwimExperienceTier ?? '').toLowerCase();
+  if (swimExp === 'learning') {
+    score -= 1;
+    reasons.push('wizard_swim_experience_learning');
   }
 
   const intent = String(opts.trainingIntent ?? '').toLowerCase();

@@ -78,3 +78,35 @@ Deno.test('inferTrainingFitnessLevel — first_race caps advanced', () => {
   });
   assertEquals(r.level, 'intermediate');
 });
+
+Deno.test('inferTrainingFitnessLevel — wizard swim_experience=learning nudges high-CTL athlete to intermediate', () => {
+  // CTL 62 (+2) + neutral swim history (0) + learning (-1) = score 1 → intermediate.
+  // Demonstrates the new soft signal nudges WITHOUT forcing beginner — a strong
+  // cyclist/runner who's learning swim doesn't get over-clamped on the global tier.
+  // Note: swim_training_from_workouts has 7 sessions (mid-range, neither ≥14 nor ≤1)
+  // so the swims90 score modifier is 0 — isolates the learning signal under test.
+  const r = inferTrainingFitnessLevel({
+    wizardFitnessRaw: 'intermediate',
+    currentCtl: 62,
+    arc: stubArc({
+      swim_training_from_workouts: { completed_swim_sessions_last_90_days: 7 } as any,
+    }),
+    wizardSwimExperienceTier: 'learning',
+  });
+  assertEquals(r.level, 'intermediate');
+  assertEquals(r.source, 'inferred');
+});
+
+Deno.test('inferTrainingFitnessLevel — swim_experience absent does not change behavior', () => {
+  // Control: same inputs as the test above minus the learning signal → advanced.
+  // CTL 62 (+2) + neutral swim history (0) = score 2 → advanced. Confirms the new
+  // wiring is opt-in: athletes who didn't declare swim_experience are unaffected.
+  const r = inferTrainingFitnessLevel({
+    wizardFitnessRaw: 'intermediate',
+    currentCtl: 62,
+    arc: stubArc({
+      swim_training_from_workouts: { completed_swim_sessions_last_90_days: 7 } as any,
+    }),
+  });
+  assertEquals(r.level, 'advanced');
+});

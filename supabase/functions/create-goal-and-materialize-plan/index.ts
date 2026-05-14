@@ -1487,6 +1487,8 @@ async function buildCombinedPlan(
     structuralLoadHint: combinedTransition?.structural_load_hint,
     trainingIntent:
       freshCombinedPrefs.training_intent != null ? String(freshCombinedPrefs.training_intent) : undefined,
+    wizardSwimExperienceTier:
+      freshCombinedPrefs.swim_experience != null ? String(freshCombinedPrefs.swim_experience) : undefined,
   });
 
   if (recentLoads.length === 0) {
