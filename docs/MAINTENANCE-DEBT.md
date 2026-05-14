@@ -30,15 +30,12 @@ This file replaces the inline "Maintenance debt" section in `docs/RUNNING-CYCLIN
 
 **The 13 errors group into 5 categories:**
 
-### Cat A — `performance.execution_score` not on local type (5 occurrences)
+### Cat A — `performance.execution_score` not on local type (5 occurrences) — ✅ DONE
 
-`performance` is locally typed as:
-```ts
-{ execution_adherence: number; power_adherence: number; duration_adherence: number; completed_steps: any; total_steps: any }
-```
-…but runtime constructs it with an additional `execution_score` field that downstream code reads. Type declaration is narrower than reality.
+**Resolved** in the Tier 3 item 10 commit (cycling cross-workout queries) on 2026-05-14. The new vs-similar code reads `performance.execution_score`, which surfaced this debt; fixed by adding `execution_score: executionAdherence` (alias of execution_adherence) to the performance object construction site at `analyze-cycling-workout/index.ts:1738`. Net: 5 pre-existing + 1 new error from cross-workout queries → 0. Same value, two field names — closes the structural narrowness gap without changing runtime semantics.
 
-**Fix:** add `execution_score: number` to the local type. ~1 line. Closes all 5 errors.
+Original problem (kept for institutional memory):
+> `performance` was locally typed as `{ execution_adherence: number; power_adherence: number; duration_adherence: number; completed_steps: any; total_steps: any }` but runtime constructs it with an additional `execution_score` field that downstream code reads. Type declaration was narrower than reality.
 
 ### Cat B — `trend_points` not in `VsSimilarV1` shared type (3 occurrences in `_shared/fact-packet/queries.ts`)
 

@@ -10,6 +10,17 @@ import {
   fetchCyclingGoalRaceCompletion,
   type CyclingGoalRaceCompletionMatch,
 } from '../_shared/cycling-goal-race-completion.ts';
+import {
+  assessCyclingLimiter,
+  fetchCyclingPRs,
+  fetchCyclingVsSimilar,
+  resolveWeightKg,
+} from '../_shared/cycling-v1/cross-workout-queries.ts';
+import type {
+  CyclingLimiterV1,
+  CyclingPRsV1,
+  CyclingVsSimilarV1,
+} from '../_shared/cycling-v1/cross-workout-types.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1478,20 +1489,23 @@ Deno.serve(async (req) => {
       throw new Error('No sensor data or computed data available');
     }
 
-    // Get user baselines (for FTP)
+    // Get user baselines (for FTP). Tier 3 item 10 also pulls `weight` for the W/kg
+    // limiter signal; without it we fall back to the NP-trend path in the limiter.
     let baselines = {};
     let userUnits = 'imperial';
+    let userWeight: number | null = null;
     try {
       const { data: userBaselines } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, units')
+        .select('performance_numbers, units, weight')
         .eq('user_id', workout.user_id)
         .single();
-      
+
       if (userBaselines?.units === 'metric' || userBaselines?.units === 'imperial') {
         userUnits = userBaselines.units;
       }
       baselines = userBaselines?.performance_numbers || {};
+      userWeight = typeof userBaselines?.weight === 'number' ? userBaselines.weight : null;
     } catch (error) {
       console.log('⚠️ No user baselines found');
     }
@@ -1723,6 +1737,12 @@ Deno.serve(async (req) => {
     
     const performance = {
       execution_adherence: executionAdherence,
+      // Alias: downstream consumers (coach Tier 4 work, Tier 3 #10 cross-workout
+      // queries, glance status_label) read `execution_score` to mirror running's
+      // analyzer field naming. Same value, two field names — closes the Cat A
+      // type-debt errors filed in MAINTENANCE-DEBT.md (analyze-cycling-workout's
+      // local performance type was narrower than what runtime constructs/reads).
+      execution_score: executionAdherence,
       power_adherence: powerAdherence,
       duration_adherence: durationAdherenceValue,
       completed_steps: workIntervals.length,
@@ -1940,6 +1960,113 @@ Deno.serve(async (req) => {
       cyclingGoalRaceMatch.courseStrategyZones ??
       ((existingAnalysis as Record<string, unknown> | null | undefined)?.course_strategy_zones ?? null);
 
+    // ── Tier 3 item 10 — cycling cross-workout queries (per D-010) ──────────
+    // Three signals: power-curve PRs (achievements_v1), vs-similar comparison
+    // (vs_similar_v1), and limiter signal (limiter_v1). Each is independently null
+    // when minimum data thresholds aren't met (5+ rides for PRs, 3+ matches for
+    // vs-similar, bodyweight+FTP+tri-context for W/kg path with NP-trend fallback).
+    let cyclingPRs: CyclingPRsV1 | null = null;
+    let cyclingVsSimilar: CyclingVsSimilarV1 | null = null;
+    let cyclingLimiter: CyclingLimiterV1 = { flag: 'none', source: 'insufficient_data', detail: 'Cross-workout queries skipped (analyzer error path).' };
+    try {
+      // §1 PRs — best 20-min / 5-min / 1-min on 90d + all-time windows.
+      cyclingPRs = await fetchCyclingPRs(supabase, {
+        userId: String((workout as any).user_id),
+        currentWorkoutId: workout_id!,
+      });
+
+      // §2 vs-similar — match on classified_type + duration ±20%.
+      const facts = (cyclingFactPacketV1 as any)?.facts ?? {};
+      cyclingVsSimilar = await fetchCyclingVsSimilar(supabase, {
+        userId: String((workout as any).user_id),
+        currentWorkoutId: workout_id!,
+        currentClassifiedType: String(facts.classified_type ?? 'unknown'),
+        currentDurationMin: Number(facts.total_duration_min ?? 0),
+        currentNp: Number.isFinite(facts.normalized_power) ? Number(facts.normalized_power) : null,
+        currentIf: Number.isFinite(facts.intensity_factor) ? Number(facts.intensity_factor) : null,
+        currentExecScore: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
+      });
+
+      // §3 Limiter — W/kg vs age-group norms (tri) or NP-trend fallback.
+      // Tri detection: prefer the goal-race match's distanceKey when this workout IS
+      // the goal race; otherwise check for any active tri 'event' goal.
+      let isTriAthlete = false;
+      let raceDistance: '70.3' | 'full' | null = null;
+      if (cyclingGoalRaceMatch.matched && cyclingGoalRaceMatch.distanceKey) {
+        isTriAthlete = true;
+        raceDistance = cyclingGoalRaceMatch.distanceKey;
+      } else {
+        try {
+          const { data: triGoals } = await supabase
+            .from('goals')
+            .select('id, sport, distance')
+            .eq('user_id', (workout as any).user_id)
+            .eq('goal_type', 'event')
+            .ilike('sport', '%tri%')
+            .limit(5);
+          if (Array.isArray(triGoals) && triGoals.length > 0) {
+            isTriAthlete = true;
+            // Pick the first match's distance for the W/kg norm. If multiple goals
+            // exist (e.g., 70.3 → full IM progression), the closest-upcoming would
+            // be more correct — but that's a goal-context refinement for later.
+            const dist = String(triGoals[0]?.distance ?? '').toLowerCase();
+            if (dist.includes('70.3') || dist.includes('half')) raceDistance = '70.3';
+            else if (dist.includes('full') || dist.includes('iron') || dist.includes('140.6')) raceDistance = 'full';
+          }
+        } catch (e) {
+          console.warn('[analyze-cycling-workout] tri-goal detection failed (non-fatal):', e);
+        }
+      }
+
+      // NP samples for the trend fallback. Two windows: recent ~14d + 90d baseline.
+      // Skipped silently if the query fails — limiter falls through to insufficient_data.
+      let recentNpSamples: number[] = [];
+      let ninetyDayNpSamples: number[] = [];
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const ninetyAgo = (() => {
+          const d = new Date(today + 'T00:00:00Z');
+          d.setUTCDate(d.getUTCDate() - 90);
+          return d.toISOString().slice(0, 10);
+        })();
+        const fourteenAgo = (() => {
+          const d = new Date(today + 'T00:00:00Z');
+          d.setUTCDate(d.getUTCDate() - 14);
+          return d.toISOString().slice(0, 10);
+        })();
+        const { data: npRows } = await supabase
+          .from('workouts')
+          .select('id, date, computed')
+          .eq('user_id', (workout as any).user_id)
+          .in('type', ['ride', 'cycling', 'bike'])
+          .eq('workout_status', 'completed')
+          .neq('id', workout_id)
+          .gte('date', ninetyAgo)
+          .order('date', { ascending: false })
+          .limit(120);
+        for (const r of (Array.isArray(npRows) ? npRows : [])) {
+          const np = Number((r as any)?.computed?.overall?.normalized_power);
+          if (!Number.isFinite(np) || np <= 0) continue;
+          ninetyDayNpSamples.push(np);
+          if (String(r.date) >= fourteenAgo) recentNpSamples.push(np);
+        }
+      } catch (e) {
+        console.warn('[analyze-cycling-workout] NP-samples fetch failed (non-fatal):', e);
+      }
+
+      cyclingLimiter = assessCyclingLimiter({
+        weightKg: resolveWeightKg(userWeight, userUnits),
+        ftpW,
+        isTriAthlete,
+        raceDistance,
+        recentNpSamples,
+        ninetyDayNpSamples,
+      });
+      console.log(`🚴 [CYCLING CROSS-WORKOUT] PRs sample=${cyclingPRs?.sample_size ?? 0}, vs-similar n=${cyclingVsSimilar?.sample_size ?? 0}, limiter flag=${cyclingLimiter.flag} source=${cyclingLimiter.source}`);
+    } catch (e) {
+      console.warn('[analyze-cycling-workout] cross-workout queries failed (non-fatal):', e);
+    }
+
     // Save analysis - matches running analysis structure exactly
     const analysisPayload = {
       _meta: {
@@ -1965,6 +2092,12 @@ Deno.serve(async (req) => {
       is_goal_race: cyclingGoalRaceMatch.matched === true,
       race_debrief_text: null,
       course_strategy_zones: courseStrategyZonesUsed,
+      // Tier 3 item 10 — cycling cross-workout queries (per D-010). Each independently
+      // null when minimum-data thresholds aren't met — see _shared/cycling-v1/
+      // cross-workout-types.ts for the shape and minimum-data semantics.
+      achievements_v1: cyclingPRs,
+      vs_similar_v1: cyclingVsSimilar,
+      limiter_v1: cyclingLimiter,
     };
 
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
