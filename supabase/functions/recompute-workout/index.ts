@@ -19,7 +19,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 function resolveAnalyzeEdgeFn(workoutType: string | null | undefined): string {
   const t = (workoutType ?? '').toLowerCase();
   if (t === 'run' || t === 'running') return 'analyze-running-workout';
-  if (t === 'ride' || t === 'cycling' || t === 'bike') return 'analyze-cycling-workout';
+  // Provider mappers normalize cycling activities to type='ride' upstream;
+  // 'cycling' and 'bike' synonyms previously listed here never fired in production data.
+  if (t === 'ride') return 'analyze-cycling-workout';
   if (t === 'strength' || t === 'strength_training') return 'analyze-strength-workout';
   if (t === 'swim' || t === 'swimming') return 'analyze-swim-workout';
   return 'analyze-running-workout';

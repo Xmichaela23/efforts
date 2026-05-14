@@ -41,9 +41,12 @@ function getAnalysisFunctionName(workoutType: string): string | null {
     case 'strength':
     case 'strength_training':
       return 'analyze-strength-workout';
+    // Provider mappers normalize cycling activities to type='ride' upstream;
+    // 'cycling' and 'bike' synonyms previously listed here never fired in production
+    // dispatch. (NOTE: getWorkoutTypesForFilter() below intentionally retains all 3
+    // synonyms — that's the query-side filter for historical rows that may carry
+    // pre-normalization type values.)
     case 'ride':
-    case 'cycling':
-    case 'bike':
       return 'analyze-cycling-workout';
     case 'swim':
     case 'swimming':

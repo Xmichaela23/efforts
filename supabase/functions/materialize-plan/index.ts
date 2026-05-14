@@ -18,6 +18,7 @@ import {
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay } from './exercise-config.ts';
 import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import { swimDrillDisplayName } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -2361,6 +2362,16 @@ Deno.serve(async (req) => {
         effort_paces: effortPaces || undefined,
         isMetric: ub?.units === 'metric',
       } as any;
+
+      // FTP via shared precedence helper. Quality-gated for plan baking — accepts learned
+      // (≥medium) > manual but REJECTS 'learned-low' (low-confidence values shouldn't get
+      // baked into multi-week plan targets). Documented behavior change: prior code used
+      // manual only (`...(ub?.performance_numbers || {})` spread sets baselines.ftp from
+      // manual); now high-confidence learned overrides stale manual entries.
+      const ftpResolved = resolveCurrentFtp(ub as any);
+      if (ftpResolved.source === 'learned' || ftpResolved.source === 'manual') {
+        (baselines as any).ftp = ftpResolved.value;
+      }
 
       // Strength 1RM: manual performance_numbers wins, then learned_fitness.strength_1rms, then defaults.
       const learned = (typeof ub?.learned_fitness === 'string' ? JSON.parse(ub.learned_fitness || '{}') : ub?.learned_fitness) || {};

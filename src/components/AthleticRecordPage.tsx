@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
 function fmtGoalClock(totalSec: number): string {
   const h = Math.floor(totalSec / 3600);
@@ -61,7 +62,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [pn, setPn] = useState<Record<string, unknown>>({});
-  const [learnedFtp, setLearnedFtp] = useState<number | null>(null);
+  const [resolvedFtp, setResolvedFtp] = useState<number | null>(null);
   const [longestRideSec, setLongestRideSec] = useState<number | null>(null);
   const [longestRideDate, setLongestRideDate] = useState<string | null>(null);
 
@@ -111,12 +112,11 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
       if (bl?.updated_at) setLastUpdated(String(bl.updated_at));
       const perf = (bl?.performance_numbers as Record<string, unknown>) || {};
       setPn(perf);
-      const lf = bl?.learned_fitness as { ride_ftp_estimated?: { value?: number } } | null;
-      setLearnedFtp(
-        typeof lf?.ride_ftp_estimated?.value === 'number' && lf.ride_ftp_estimated.value > 0
-          ? Math.round(lf.ride_ftp_estimated.value)
-          : null,
-      );
+      // FTP via shared precedence helper. Permissive (accepts learned medium+/manual/
+      // learned-low) — display surface benefits from any non-null FTP. Documented
+      // behavior change: prior code preferred manual over learned regardless of
+      // confidence; resolver prefers learned (≥medium) over manual.
+      setResolvedFtp(resolveCurrentFtp(bl as any).value);
 
       const rides = Array.isArray(rideResult.data) ? rideResult.data : [];
       let best = 0;
@@ -286,7 +286,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const hasContent =
     races.length > 0 ||
     (typeof pn.ftp === 'number' && pn.ftp > 0) ||
-    learnedFtp != null ||
+    resolvedFtp != null ||
     (typeof (pn.fiveK_pace || pn.fiveK) === 'string' && String(pn.fiveK_pace || pn.fiveK).trim() !== '') ||
     (typeof pn.swimPace100 === 'string' && (pn.swimPace100 as string).trim() !== '') ||
     typeof pn.squat === 'number' ||
@@ -295,7 +295,9 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     typeof pn.overheadPress1RM === 'number' ||
     longestRideSec != null;
 
-  const ftpDisplay = (typeof pn.ftp === 'number' && pn.ftp > 0 ? Math.round(pn.ftp) : null) ?? learnedFtp;
+  // Display reflects the resolved FTP (single source of truth via the precedence helper).
+  // Prior code: `pn.ftp ?? resolvedFtp` — manual-then-learned. Now learned (≥medium) wins.
+  const ftpDisplay = resolvedFtp;
   const fiveKDisplay = String(pn.fiveK_pace || pn.fiveK || '').trim();
   const marathonPrDisplay = useMemo(() => {
     const r = races.find(

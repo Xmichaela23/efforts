@@ -2,6 +2,7 @@
  * v1 triathlon (70.3-first) finish projection: deterministic, explainable splits for AL + goals.projection.
  */
 import type { AthleteIdentity, LearnedFitness } from './arc-context.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
 export type CourseData = {
   elevation_gain_m?: number;
@@ -367,7 +368,14 @@ export function projectRaceSplits(inputs: ProjectionInputs): RaceProjection {
   }
 
   const thr = learnedMetric(inputs.learned_fitness?.run_threshold_pace_sec_per_km);
-  const ftp = learnedMetric(inputs.learned_fitness?.ride_ftp_estimated);
+  // Quality-gated: race projections only accept high-quality auto-learned FTP (not manual,
+  // not low-confidence learned). Behavior matches the prior `learnedMetric()` call which
+  // rejected confidence !== 'medium' && !== 'high'. Resolver `source === 'learned'` enforces
+  // the same gate via the shared precedence helper.
+  const ftpResolved = resolveCurrentFtp({ learned_fitness: inputs.learned_fitness as any });
+  const ftp = ftpResolved.source === 'learned' && ftpResolved.value != null
+    ? { value: ftpResolved.value, ok: true }
+    : { value: 0, ok: false };
   const ls = learnedSwimPaceFromSessions(inputs.learned_fitness);
   const perfSw = performanceNumbersSwimSecPer100m(inputs.performance_numbers);
 

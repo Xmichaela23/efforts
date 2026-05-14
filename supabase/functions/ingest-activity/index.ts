@@ -1463,7 +1463,10 @@ Deno.serve(async (req)=>{
             const typeLower = String(workoutType).toLowerCase();
             if (typeLower === 'run' || typeLower === 'running') {
               analyzerFunction = 'analyze-running-workout';
-            } else if (typeLower === 'ride' || typeLower === 'cycling' || typeLower === 'bike') {
+            } else if (typeLower === 'ride') {
+              // Provider mappers (mapStravaToWorkout, mapGarminToWorkout, mapFitSportToAppType)
+              // all normalize cycling activities to type='ride' upstream. The 'cycling' and
+              // 'bike' synonyms previously listed here never fired in production data.
               analyzerFunction = 'analyze-cycling-workout';
             } else if (typeLower === 'strength' || typeLower === 'strength_training') {
               analyzerFunction = 'analyze-strength-workout';

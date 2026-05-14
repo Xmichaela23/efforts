@@ -1,17 +1,21 @@
 import type { GoalInsert } from '@/hooks/useGoals';
 import type { ArcContextPayload } from '@/lib/fetch-arc-context';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
 function inferLimiterFromArc(arc: ArcContextPayload): 'swim' | 'bike' | 'run' {
   const swim = arc.swim_training_from_workouts as
     | { completed_swim_sessions_last_90_days?: number }
     | undefined;
   if (swim && swim.completed_swim_sessions_last_90_days === 0) return 'swim';
-  const lf = arc.learned_fitness as Record<string, unknown> | null | undefined;
-  const ftp = lf?.ride_ftp_estimated as { confidence?: string } | undefined;
-  if (ftp && typeof ftp === 'object' && String(ftp.confidence || '').toLowerCase() === 'low') {
-    return 'bike';
-  }
+  // Bike limiter inference: `'learned-low'` source from the FTP precedence helper means
+  // learned FTP exists but is low-confidence AND there's no manual override — i.e., the
+  // engine has no high-quality cycling baseline. That's the signal for bike as limiter.
+  // Documented behavior change: prior code triggered bike on low-confidence learned even
+  // when manual FTP was present. Now manual override takes precedence (athlete who
+  // manually entered an FTP isn't bike-limited just because auto-learning is uncertain).
+  const ftpResolved = resolveCurrentFtp(arc as any);
+  if (ftpResolved.source === 'learned-low') return 'bike';
   return 'run';
 }
 

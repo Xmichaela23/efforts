@@ -35,6 +35,7 @@ import {
   type ExerciseRegistryRow,
 } from "../_shared/exercise-registry-lookup.ts";
 import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/session-load.ts";
+import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1112,7 +1113,9 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
   const dur = durationMinutes(w);
   const overall = w.computed?.overall ?? {};
   const analysis = w.computed?.analysis ?? {};
-  const ftp = baselines?.performance_numbers?.ftp ?? baselines?.learned_fitness?.cycling?.ftp;
+  // Permissive: any non-null FTP is better than skipping IF computation entirely.
+  // Prior code: `perf.ftp ?? learned.cycling.ftp` (right-hand was a dead path — never written).
+  const { value: ftp } = resolveCurrentFtp(baselines);
 
   const facts: Record<string, any> = {
     distance_m: Math.round(dist),

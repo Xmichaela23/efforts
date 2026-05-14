@@ -5,6 +5,7 @@
  */
 
 import type { ArcContext, CompletedEvent } from './arc-context.ts';
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 
 export type TrainingFitnessLevel = 'beginner' | 'intermediate' | 'advanced';
 
@@ -24,14 +25,11 @@ function normWizardFitness(raw: string | null | undefined): TrainingFitnessLevel
 }
 
 function ftpFromLearned(lf: Record<string, unknown> | null | undefined): number | null {
-  const m = lf?.ride_ftp_estimated;
-  if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
-  const o = m as { value?: unknown; confidence?: string };
-  const c = String(o.confidence || '').toLowerCase();
-  if (c === 'low') return null;
-  if (c !== 'medium' && c !== 'high') return null;
-  const v = Number(o.value);
-  return Number.isFinite(v) && v > 0 ? v : null;
+  // Quality-gated: training-fitness inference rejects manual + learned-low to preserve
+  // the existing `confidence >= medium` gate. Source must be exactly 'learned' (the
+  // resolver returns 'learned' only when confidence is medium or high).
+  const ftpResolved = resolveCurrentFtp({ learned_fitness: lf as any });
+  return ftpResolved.source === 'learned' ? ftpResolved.value : null;
 }
 
 function runThresholdSecPerKm(lf: Record<string, unknown> | null | undefined): number | null {

@@ -35,6 +35,7 @@ import {
   calculateTRIMPWorkload,
   calculateDurationWorkload,
 } from '../_shared/workload.ts'
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
 
 interface WorkoutData {
   type: 'run' | 'bike' | 'swim' | 'strength' | 'mobility';
@@ -293,21 +294,22 @@ serve(async (req) => {
             rideMaxHr = Number(learned.ride_max_hr_observed.value);
           }
           
-          // FTP from learned data (if available)
-          if (learned?.ride_ftp_estimated?.value) {
-            userFtp = Number(learned.ride_ftp_estimated.value);
-          }
         }
-        
+
         // Priority 2: Use manual performance_numbers (fallback)
         if (baseline?.performance_numbers) {
-          const perfNumbers = typeof baseline.performance_numbers === 'string' 
-            ? JSON.parse(baseline.performance_numbers) 
+          const perfNumbers = typeof baseline.performance_numbers === 'string'
+            ? JSON.parse(baseline.performance_numbers)
             : baseline.performance_numbers;
-          
-          // Only use manual FTP if we don't have learned FTP
-          if (!userFtp && perfNumbers?.ftp) {
-            userFtp = Number(perfNumbers.ftp);
+          // FTP resolved via shared precedence helper: learned (≥medium confidence) wins,
+          // else manual, else learned-low. Permissive — workload computation benefits
+          // from any non-null FTP. See src/lib/resolve-current-ftp.ts for full semantics.
+          const ftpResolved = resolveCurrentFtp({
+            learned_fitness: learned,
+            performance_numbers: perfNumbers,
+          });
+          if (ftpResolved.value) {
+            userFtp = ftpResolved.value;
           }
           
           // Manual threshold HR as fallback

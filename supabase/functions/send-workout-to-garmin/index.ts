@@ -2,6 +2,7 @@
 // Exports a planned workout to Garmin Connect
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
 
 type PlannedWorkout = {
   id: string
@@ -106,15 +107,21 @@ serve(async (req) => {
 
     // Fallback defaults and baselines (units + FTP)
     try {
+      // Bug fix (2026-05-13): prior query was `select('units, ftp')` which referenced a
+      // top-level `ftp` column that does NOT exist on `user_baselines` — FTP lives in the
+      // `performance_numbers` JSONB column. The select silently returned undefined for
+      // `ub.ftp`, so `user_ftp` was never set on the workout, so the % FTP → watts
+      // expansion at lines ~461-473 never fired and Garmin received no power targets.
+      // Now reads both performance_numbers + learned_fitness and resolves via the shared
+      // precedence helper. Permissive — any non-null FTP beats sending no power target.
       const { data: ub } = await supabase
         .from('user_baselines')
-        .select('units, ftp')
+        .select('units, performance_numbers, learned_fitness')
         .eq('user_id', userId)
         .single()
-      // Expose FTP for power % → watts mapping
-      const ftpNum = Number((ub as any)?.ftp)
-      if (Number.isFinite(ftpNum) && ftpNum > 0) {
-        ;(workout as any).user_ftp = Math.round(ftpNum)
+      const { value: resolvedFtp } = resolveCurrentFtp(ub as any)
+      if (resolvedFtp) {
+        ;(workout as any).user_ftp = Math.round(resolvedFtp)
       }
       const isSwim = String((workout as any)?.type || '').toLowerCase() === 'swim'
       const hasPool = isSwim && ((workout as any)?.pool_unit || (workout as any)?.pool_length_m)
