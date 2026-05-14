@@ -244,3 +244,153 @@ Deno.test('Bug A reproducer: per-session consistency — same plan, same resolve
   assertEquals(r2.performance_numbers.deadlift, r3.performance_numbers.deadlift);
   assertEquals(r1.performance_numbers.deadlift, 150);
 });
+
+// ── §6 Tier 1 item 2 — bike + run snapshot pinning ────────────────────────
+
+Deno.test('buildAthleteSnapshot: extracts bike FTP via resolveCurrentFtp (learned ≥medium wins)', () => {
+  const snap = buildAthleteSnapshot({
+    athleteState: {
+      learned_fitness: { ride_ftp_estimated: { value: 265, confidence: 'high' } },
+      performance_numbers: { ftp: 240 }, // manual would be ignored — learned-high wins per resolver
+    },
+  });
+  assertEquals(snap.bike?.ftp_w, 265);
+});
+
+Deno.test('buildAthleteSnapshot: extracts bike FTP from manual when no learned', () => {
+  const snap = buildAthleteSnapshot({
+    athleteState: {
+      learned_fitness: null,
+      performance_numbers: { ftp: 240 },
+    },
+  });
+  assertEquals(snap.bike?.ftp_w, 240);
+});
+
+Deno.test('buildAthleteSnapshot: bike null when no FTP signal at all', () => {
+  const snap = buildAthleteSnapshot({ athleteState: {} });
+  assertEquals(snap.bike, null);
+});
+
+Deno.test('buildAthleteSnapshot: extracts run paces from learned_fitness with km→mi conversion', () => {
+  // 240 sec/km × 1.609344 = 386.24… → rounds to 386 sec/mi (≈ 6:26/mi).
+  // 300 sec/km × 1.609344 = 482.80… → rounds to 483 sec/mi (≈ 8:03/mi).
+  const snap = buildAthleteSnapshot({
+    athleteState: {
+      learned_fitness: {
+        run_threshold_pace_sec_per_km: { value: 240, confidence: 'high' },
+        run_easy_pace_sec_per_km: { value: 300, confidence: 'medium' },
+      },
+    },
+  });
+  assertEquals(snap.run?.threshold_pace_sec_per_mi, 386);
+  assertEquals(snap.run?.easy_pace_sec_per_mi, 483);
+});
+
+Deno.test('buildAthleteSnapshot: run null when no learned paces present', () => {
+  const snap = buildAthleteSnapshot({ athleteState: { learned_fitness: {} } });
+  assertEquals(snap.run, null);
+});
+
+Deno.test('readAthleteSnapshotOrLive: pinned bike FTP wins over different live FTP', () => {
+  const planConfig = {
+    athlete_snapshot: {
+      schema_version: 1,
+      generated_at: new Date().toISOString(),
+      source: 'request',
+      performance_numbers: null,
+      bike: { ftp_w: 265 }, // pinned at plan-creation time
+      swim: null, run: null, equipment: null, intent: null, capacity: null, bio: null,
+    } satisfies AthleteSnapshotV1,
+  };
+  // Athlete updated FTP to 280 in baselines AFTER plan was created.
+  const live = {
+    performance_numbers: { ftp: 280 },
+    learned_fitness: { ride_ftp_estimated: { value: 290, confidence: 'high' } },
+  };
+  const resolved = readAthleteSnapshotOrLive(planConfig, live);
+  assertEquals(resolved.source, 'snapshot');
+  assertEquals(resolved.bike.ftp_w, 265, 'snapshot pin (265) wins over both live values (280, 290)');
+});
+
+Deno.test('readAthleteSnapshotOrLive: pinned run paces win over different live paces', () => {
+  const planConfig = {
+    athlete_snapshot: {
+      schema_version: 1,
+      generated_at: new Date().toISOString(),
+      source: 'request',
+      performance_numbers: null,
+      bike: null,
+      swim: null,
+      run: {
+        threshold_pace_sec_per_mi: 386,
+        easy_pace_sec_per_mi: 483,
+      },
+      equipment: null, intent: null, capacity: null, bio: null,
+    } satisfies AthleteSnapshotV1,
+  };
+  // Athlete's learned paces have shifted faster after plan creation.
+  const live = {
+    performance_numbers: null,
+    learned_fitness: {
+      run_threshold_pace_sec_per_km: { value: 220 }, // would be 354 sec/mi if read live
+      run_easy_pace_sec_per_km: { value: 280 },      // would be 451 sec/mi if read live
+    },
+  };
+  const resolved = readAthleteSnapshotOrLive(planConfig, live);
+  assertEquals(resolved.source, 'snapshot');
+  assertEquals(resolved.run.threshold_pace_sec_per_mi, 386, 'snapshot pin wins');
+  assertEquals(resolved.run.easy_pace_sec_per_mi, 483, 'snapshot pin wins');
+});
+
+Deno.test('readAthleteSnapshotOrLive: bike+run fall back to live cleanly when no snapshot', () => {
+  const live = {
+    performance_numbers: { ftp: 245 },
+    learned_fitness: {
+      ride_ftp_estimated: { value: 260, confidence: 'medium' },
+      run_threshold_pace_sec_per_km: { value: 250 },
+      run_easy_pace_sec_per_km: { value: 310 },
+    },
+  };
+  const resolved = readAthleteSnapshotOrLive(null, live, { logLegacyFallback: false });
+  assertEquals(resolved.source, 'live');
+  // Bike: resolver picks learned ≥medium over manual.
+  assertEquals(resolved.bike.ftp_w, 260);
+  // Run: 250 × 1.609344 → 402; 310 × 1.609344 → 499.
+  assertEquals(resolved.run.threshold_pace_sec_per_mi, 402);
+  assertEquals(resolved.run.easy_pace_sec_per_mi, 499);
+  assertEquals(resolved.run.fiveK_pace_sec_per_mi, null, 'no learned 5K pace path today');
+});
+
+Deno.test('readAthleteSnapshotOrLive: legacy with no FTP/pace signal at all returns nulls', () => {
+  const resolved = readAthleteSnapshotOrLive(null, { performance_numbers: null, learned_fitness: null }, { logLegacyFallback: false });
+  assertEquals(resolved.bike.ftp_w, null);
+  assertEquals(resolved.run.threshold_pace_sec_per_mi, null);
+  assertEquals(resolved.run.easy_pace_sec_per_mi, null);
+  assertEquals(resolved.run.fiveK_pace_sec_per_mi, null);
+});
+
+Deno.test('readAthleteSnapshotOrLive: per-category fallback — snapshot has bike but null run → run reads live', () => {
+  const planConfig = {
+    athlete_snapshot: {
+      schema_version: 1,
+      generated_at: new Date().toISOString(),
+      source: 'request',
+      performance_numbers: null,
+      bike: { ftp_w: 265 },
+      run: null, // dispatcher had no learned run paces at plan time
+      swim: null, equipment: null, intent: null, capacity: null, bio: null,
+    } satisfies AthleteSnapshotV1,
+  };
+  // Athlete subsequently logged enough run history to learn paces.
+  const live = {
+    performance_numbers: null,
+    learned_fitness: {
+      run_threshold_pace_sec_per_km: { value: 240 },
+    },
+  };
+  const resolved = readAthleteSnapshotOrLive(planConfig, live);
+  assertEquals(resolved.source, 'snapshot', 'overall source reflects snapshot present');
+  assertEquals(resolved.bike.ftp_w, 265, 'bike pinned');
+  assertEquals(resolved.run.threshold_pace_sec_per_mi, 386, 'run reads live since snapshot.run is null');
+});

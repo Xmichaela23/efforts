@@ -389,7 +389,28 @@ function parsePaceToSecPerMi(v: any): number | null {
 }
 
 function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'threshold'): number | null {
-  // PREFER effort_paces from PlanWizard (already in seconds per mile)
+  // §1 PREFER snapshot-pinned run paces (set by readAthleteSnapshotOrLive at the baselines-
+  // load block above). Highest priority so plans with a snapshot see frozen paces for the
+  // plan's lifetime even if learned_fitness updates mid-plan. Marathon doesn't have a
+  // snapshot field today; falls through to the existing chain below.
+  const snapPaces = (b as any)._snapshotRunPaces as
+    | { threshold_pace_sec_per_mi?: number | null; easy_pace_sec_per_mi?: number | null; fiveK_pace_sec_per_mi?: number | null }
+    | undefined;
+  if (snapPaces) {
+    if (which === 'easy' && snapPaces.easy_pace_sec_per_mi != null) {
+      console.log(`[Paces] Using snapshot easy: ${snapPaces.easy_pace_sec_per_mi}s/mi`);
+      return snapPaces.easy_pace_sec_per_mi;
+    }
+    if (which === 'threshold' && snapPaces.threshold_pace_sec_per_mi != null) {
+      console.log(`[Paces] Using snapshot threshold: ${snapPaces.threshold_pace_sec_per_mi}s/mi`);
+      return snapPaces.threshold_pace_sec_per_mi;
+    }
+    if (which === 'fivek' && snapPaces.fiveK_pace_sec_per_mi != null) {
+      console.log(`[Paces] Using snapshot 5K: ${snapPaces.fiveK_pace_sec_per_mi}s/mi`);
+      return snapPaces.fiveK_pace_sec_per_mi;
+    }
+  }
+  // §2 PREFER effort_paces from PlanWizard (already in seconds per mile)
   if (b.effort_paces) {
     if (which === 'fivek' && b.effort_paces.power) {
       console.log(`[Paces] Using effort_paces.power for 5K: ${b.effort_paces.power}s/mi`);
@@ -2447,7 +2468,27 @@ Deno.serve(async (req) => {
           if (resolved.performance_numbers.bench != null) (baselines as any).bench = resolved.performance_numbers.bench;
           if (resolved.performance_numbers.overheadPress1RM != null) (baselines as any).overheadPress1RM = resolved.performance_numbers.overheadPress1RM;
           if (resolved.performance_numbers.hipThrust != null) (baselines as any).hipThrust = resolved.performance_numbers.hipThrust;
-          console.log(`[materialize-plan] athlete-snapshot source=${resolved.source}`, resolved.performance_numbers);
+          // Bike snapshot pin overrides the live `resolveCurrentFtp(ub)` value set above.
+          // For plans with snapshots: frozen FTP for the plan's lifetime even if baselines
+          // change. For plans without snapshots: live resolver value flows through unchanged.
+          if (resolved.bike.ftp_w != null) (baselines as any).ftp = resolved.bike.ftp_w;
+          // Run pace pin: stash on baselines so `secPerMiFromBaseline` finds it at the
+          // highest-priority branch. Snapshot wins over PlanWizard effort_paces and
+          // legacy performance_numbers — same single-source-of-truth principle as bike.
+          // Field name prefixed with `_` to signal "internal materializer-only state",
+          // not part of the persisted Baselines schema.
+          if (
+            resolved.run.threshold_pace_sec_per_mi != null ||
+            resolved.run.easy_pace_sec_per_mi != null ||
+            resolved.run.fiveK_pace_sec_per_mi != null
+          ) {
+            (baselines as any)._snapshotRunPaces = resolved.run;
+          }
+          console.log(`[materialize-plan] athlete-snapshot source=${resolved.source}`, {
+            performance_numbers: resolved.performance_numbers,
+            bike: resolved.bike,
+            run: resolved.run,
+          });
         }
       } catch (e) {
         console.warn('[materialize-plan] athlete-snapshot read failed; using merged baselines:', e);

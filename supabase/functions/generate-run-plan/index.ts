@@ -292,20 +292,27 @@ Deno.serve(async (req: Request) => {
     // even if the athlete updates a 1RM after plan creation. v1 populates strength only;
     // bike / swim / run / equipment / intent / capacity / bio added in follow-up commits.
     let athleteSnapshotPerformanceNumbers: Record<string, unknown> | null = null;
+    let athleteSnapshotLearnedFitness: Record<string, unknown> | null = null;
     try {
       const { data: ubForSnap } = await supabase
         .from('user_baselines')
-        .select('performance_numbers')
+        .select('performance_numbers, learned_fitness')
         .eq('user_id', request.user_id)
         .maybeSingle();
       if (ubForSnap?.performance_numbers && typeof ubForSnap.performance_numbers === 'object') {
         athleteSnapshotPerformanceNumbers = ubForSnap.performance_numbers as Record<string, unknown>;
       }
+      if (ubForSnap?.learned_fitness && typeof ubForSnap.learned_fitness === 'object') {
+        athleteSnapshotLearnedFitness = ubForSnap.learned_fitness as Record<string, unknown>;
+      }
     } catch (e) {
       console.warn('[generate-run-plan] athlete snapshot baseline fetch failed:', e);
     }
     const athlete_snapshot = buildAthleteSnapshot({
-      athleteState: { performance_numbers: athleteSnapshotPerformanceNumbers },
+      athleteState: {
+        performance_numbers: athleteSnapshotPerformanceNumbers,
+        learned_fitness: athleteSnapshotLearnedFitness,
+      },
       source: 'request',
     });
 

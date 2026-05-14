@@ -1555,6 +1555,14 @@ async function buildCombinedPlan(
       ...(arcForCombined.performance_numbers
         ? { performance_numbers: arcForCombined.performance_numbers }
         : {}),
+      // Learned fitness signals (FTP estimate + run threshold/easy paces) — passed through
+      // so `buildAthleteSnapshot` can pin bike.ftp_w + run paces at plan-creation time
+      // (Tier 1 item 2 of the running→cycling delta map). Without this, the snapshot's
+      // bike/run fields stay null and downstream materialization re-reads live baselines
+      // (drift risk if athlete's learned values shift mid-plan).
+      ...(arcForCombined.learned_fitness
+        ? { learned_fitness: arcForCombined.learned_fitness }
+        : {}),
       has_cable_machine: hasCableForPlan,
       has_ghd: hasGHDForPlan,
       ...(projectedBikeHours != null ? { projected_bike_hours: projectedBikeHours } : {}),

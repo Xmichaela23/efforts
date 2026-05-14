@@ -1,3 +1,5 @@
+import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+
 /**
  * AthleteSnapshot — single source of truth for the athlete-input values used to build a plan.
  *
@@ -137,6 +139,16 @@ export type AthleteResolved = {
     overheadPress1RM: number | null;
     hipThrust: number | null;
   };
+  /** Cycling FTP resolved to absolute watts (or null when no baseline available). */
+  bike: {
+    ftp_w: number | null;
+  };
+  /** Running paces resolved to seconds per mile (or null per field). */
+  run: {
+    threshold_pace_sec_per_mi: number | null;
+    easy_pace_sec_per_mi: number | null;
+    fiveK_pace_sec_per_mi: number | null;
+  };
 };
 
 // ── Write helpers ───────────────────────────────────────────────────────────
@@ -157,12 +169,12 @@ export function buildAthleteSnapshot(input: {
     source: input.source ?? 'request',
 
     performance_numbers: extractPerformanceNumbers(state),
+    bike: extractBike(state),
+    run: extractRun(state),
 
     // Other categories deferred to follow-up commits — typed shape lands now so the snapshot
     // contract is stable; later commits populate fields without changing the type.
-    bike: null,
     swim: null,
-    run: null,
     equipment: null,
     intent: null,
     capacity: null,
@@ -212,6 +224,50 @@ function extractPerformanceNumbers(state: Record<string, unknown>): AthleteSnaps
   return Object.keys(out).length > 0 ? out : null;
 }
 
+/**
+ * Pull the resolved cycling FTP from the dispatcher's view of the athlete. Delegates to
+ * `resolveCurrentFtp()` (the canonical FTP precedence helper) so the snapshot freezes
+ * whatever the resolver would have returned at plan-creation time. If the resolver returns
+ * null (no learned ≥medium, no manual, no learned-low), the snapshot field is null too.
+ */
+function extractBike(state: Record<string, unknown>): AthleteSnapshotV1['bike'] {
+  // resolveCurrentFtp accepts a permissive BaselinesLike shape; the dispatcher state
+  // already carries `learned_fitness` and `performance_numbers` at the same keys.
+  const resolved = resolveCurrentFtp(state as Parameters<typeof resolveCurrentFtp>[0]);
+  return resolved.value != null ? { ftp_w: resolved.value } : null;
+}
+
+/**
+ * Pull learned run paces from the dispatcher's view, converting from sec/km (storage) to
+ * sec/mi (snapshot canonical). `learn-fitness-profile` writes paces as sec/km to
+ * `learned_fitness.run_threshold_pace_sec_per_km` and `run_easy_pace_sec_per_km`; the
+ * snapshot stores sec/mi to match `materialize-plan`'s pace API surface — see CLAUDE.md
+ * "Pace-unit footgun" for the units background. Manual run paces (effort_paces or
+ * performance_numbers) are NOT pinned here; the materializer reads those live.
+ */
+const KM_TO_MI = 1.609344;
+function extractRun(state: Record<string, unknown>): AthleteSnapshotV1['run'] {
+  const lf = state.learned_fitness;
+  if (!lf || typeof lf !== 'object' || Array.isArray(lf)) return null;
+  const lfRec = lf as Record<string, unknown>;
+  const out: NonNullable<AthleteSnapshotV1['run']> = {};
+
+  const thr = readLearnedSecPerKm(lfRec.run_threshold_pace_sec_per_km);
+  if (thr != null) out.threshold_pace_sec_per_mi = Math.round(thr * KM_TO_MI);
+
+  const easy = readLearnedSecPerKm(lfRec.run_easy_pace_sec_per_km);
+  if (easy != null) out.easy_pace_sec_per_mi = Math.round(easy * KM_TO_MI);
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function readLearnedSecPerKm(metric: unknown): number | null {
+  if (!metric || typeof metric !== 'object' || Array.isArray(metric)) return null;
+  const o = metric as { value?: unknown };
+  const v = Number(o.value);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
 // ── Read helpers ────────────────────────────────────────────────────────────
 
 /** Live-fallback shape (`user_baselines` row subset). Consumers pass what they already fetched. */
@@ -235,28 +291,43 @@ export function readAthleteSnapshotOrLive(
 ): AthleteResolved {
   const snapRaw = planConfig?.athlete_snapshot;
   const snap = isAthleteSnapshotV1(snapRaw) ? snapRaw : null;
+  const live = liveFallback ?? {};
 
-  if (snap && snap.performance_numbers) {
-    const pn = snap.performance_numbers;
-    return {
-      source: 'snapshot',
-      performance_numbers: {
-        deadlift: pn.deadlift ?? null,
-        squat: pn.squat ?? null,
-        bench: pn.bench ?? null,
-        overheadPress1RM: pn.overheadPress1RM ?? null,
-        hipThrust: pn.hipThrust ?? null,
-      },
-    };
-  }
+  // Per-category resolution: snapshot wins per category. A snapshot can populate one
+  // category (e.g., performance_numbers) while leaving another (bike) null — that null
+  // means the dispatcher had no value at plan time, so we fall back to live for that
+  // category. Each category is independent.
+  const performance_numbers = snap?.performance_numbers
+    ? {
+        deadlift: snap.performance_numbers.deadlift ?? null,
+        squat: snap.performance_numbers.squat ?? null,
+        bench: snap.performance_numbers.bench ?? null,
+        overheadPress1RM: snap.performance_numbers.overheadPress1RM ?? null,
+        hipThrust: snap.performance_numbers.hipThrust ?? null,
+      }
+    : resolveLivePerformanceNumbers(live);
+
+  const bike = snap?.bike
+    ? { ftp_w: snap.bike.ftp_w ?? null }
+    : resolveLiveBike(live);
+
+  const run = snap?.run
+    ? {
+        threshold_pace_sec_per_mi: snap.run.threshold_pace_sec_per_mi ?? null,
+        easy_pace_sec_per_mi: snap.run.easy_pace_sec_per_mi ?? null,
+        fiveK_pace_sec_per_mi: snap.run.fiveK_pace_sec_per_mi ?? null,
+      }
+    : resolveLiveRun(live);
 
   if (!snap && options?.logLegacyFallback !== false) {
     console.warn('[athlete-snapshot] no snapshot on plan; reading live baselines (legacy plan)');
   }
 
   return {
-    source: 'live',
-    performance_numbers: resolveLivePerformanceNumbers(liveFallback ?? {}),
+    source: snap ? 'snapshot' : 'live',
+    performance_numbers,
+    bike,
+    run,
   };
 }
 
@@ -300,5 +371,40 @@ function resolveLivePerformanceNumbers(
       learned.overhead_press,
     ),
     hipThrust: merge(pn.hipThrust ?? pn.hip_thrust, learned.hip_thrust),
+  };
+}
+
+/**
+ * Live-fallback for cycling FTP. Mirrors the snapshot path: delegates to
+ * `resolveCurrentFtp()` so the live and snapshot paths produce the same shape.
+ * Returns `{ ftp_w: null }` when no FTP available (vs throwing) so consumers can
+ * treat the resolved object uniformly.
+ */
+function resolveLiveBike(live: LiveBaselinesFallback): AthleteResolved['bike'] {
+  const resolved = resolveCurrentFtp({
+    learned_fitness: live.learned_fitness as Parameters<typeof resolveCurrentFtp>[0] extends { learned_fitness?: infer L } ? L : never,
+    performance_numbers: live.performance_numbers as Parameters<typeof resolveCurrentFtp>[0] extends { performance_numbers?: infer P } ? P : never,
+  });
+  return { ftp_w: resolved.value };
+}
+
+/**
+ * Live-fallback for run paces. Reads `learned_fitness.run_threshold_pace_sec_per_km` and
+ * `run_easy_pace_sec_per_km` and converts to sec/mi to match the snapshot canonical units.
+ * Manual run paces (`performance_numbers.fiveK_pace`, `effort_paces`) are NOT consulted
+ * here — those flow through `materialize-plan`'s existing `secPerMiFromBaseline` chain at
+ * lower priority. Symmetric with the snapshot path: pin only what `learn-fitness-profile`
+ * derived from workout history.
+ */
+function resolveLiveRun(live: LiveBaselinesFallback): AthleteResolved['run'] {
+  const lf = (live.learned_fitness && typeof live.learned_fitness === 'object' && !Array.isArray(live.learned_fitness)
+    ? live.learned_fitness
+    : {}) as Record<string, unknown>;
+  const thr = readLearnedSecPerKm(lf.run_threshold_pace_sec_per_km);
+  const easy = readLearnedSecPerKm(lf.run_easy_pace_sec_per_km);
+  return {
+    threshold_pace_sec_per_mi: thr != null ? Math.round(thr * KM_TO_MI) : null,
+    easy_pace_sec_per_mi: easy != null ? Math.round(easy * KM_TO_MI) : null,
+    fiveK_pace_sec_per_mi: null,
   };
 }

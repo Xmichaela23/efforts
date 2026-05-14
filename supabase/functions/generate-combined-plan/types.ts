@@ -132,6 +132,14 @@ export interface AthleteState {
    * resolves them to absolute weights (or falls back to BW-based estimates).
    */
   performance_numbers?: Record<string, unknown>;
+  /**
+   * Learned-from-workouts signals (FTP estimate + run threshold/easy paces). Passed through
+   * from create-goal-and-materialize-plan so `buildAthleteSnapshot` can pin bike + run
+   * baselines at plan creation. Without this field, snapshot bike/run categories remain
+   * null and the materializer falls back to re-reading live `user_baselines` (drift risk
+   * if athlete's learned values shift mid-plan).
+   */
+  learned_fitness?: Record<string, unknown>;
   /** Athlete bodyweight in pounds (for spec §5 conservative-default 1RM fallback). */
   bodyweight_lb?: number;
   /**
