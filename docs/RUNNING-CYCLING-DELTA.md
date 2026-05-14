@@ -263,34 +263,35 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 17. **Cycling power records (peak 1min/5min/20min)** *(N — no running analog directly; running shows distance-time records. Cycling-equivalent is power-duration. Needs product decision on which durations matter.)*
 18. **Cycling recent training volume display** *(D — same shape as missing running-recent-volume; both gap-for-both items in Performance screen)*
 19. **Coach-style FTP injection on Performance screen** *(D — already done; cycling renders FTP best while running renders 5K. Symmetric.)*
+20. **Snapshot-aware client normalizer (`src/services/plans/normalizer.ts`)** *(D — same precedence pattern as the server-side resolver shipped in Tier 1)*. Display-layer rendering issue: the client normalizer expands `%FTP → watts` and `%pace → range` independently of the server-side `materialize-plan`. It reads `baselines.performanceNumbers.ftp` directly (line 308, 898, 935) and `baselines.performanceNumbers.{fiveK_pace, easyPace, ...}` from whatever the caller passes — typically the live `user_baselines` row. After Tier 1 snapshot pinning shipped (commit `e18b3d56`), server-side materialized targets in `planned_workouts` are frozen at plan-creation time, but **client-side display via this normalizer still re-expands using live baselines** — so an athlete who updates FTP mid-plan sees the same description ↔ delivered drift class on rendering surfaces (TodaysEffort, AllPlansInterface, PlannedWorkoutSummary, PlanSelect, AppContext) that was just closed on the server. Fix: thread `plan.config.athlete_snapshot.bike.ftp_w` (and run pace equivalents) into the `Baselines` object the normalizer accepts; fall back to live `performance_numbers.ftp` for legacy plans without snapshot pins. Same shape as the server-side `readAthleteSnapshotOrLive()` precedence rule. Affects 5+ caller sites; centralized fix in `normalizer.ts`. Same architectural pattern as the multi-surface "Run — Tempo vs Run Intervals" label divergence already filed in `docs/ENGINE-STATE.md` "Known broken" — multiple display surfaces deriving the same render from different upstream paths, closed by routing through a snapshot-aware resolver.
 
 ### Tier 6 — Test coverage parity (depends on Tier 2-5)
 
-20. **Sport-specific session-factory unit tests** *(D — both sports lack these today. Pattern: pick `easyRun()`/`tempoRun()`/etc, write per-function expectations. Same shape per sport.)*
-21. **Periodization-approach tests** *(D — `base_first` vs `race_peak` running logic at week-builder:1368-1402 untested today; add tests for both sports' phase-quality selection.)*
-22. **Cycling analyzer test file** *(D — running's likely has one per analyze-running-workout patterns; cycling needs equivalent.)*
-23. **Pace + power range emission tests** *(N — needs sport-spec layer that defines what "correct" Z2/Z3/Z4 pace and what "correct" 88% sweet-spot watts look like. Probably builds on existing protocol docs.)*
+21. **Sport-specific session-factory unit tests** *(D — both sports lack these today. Pattern: pick `easyRun()`/`tempoRun()`/etc, write per-function expectations. Same shape per sport.)*
+22. **Periodization-approach tests** *(D — `base_first` vs `race_peak` running logic at week-builder:1368-1402 untested today; add tests for both sports' phase-quality selection.)*
+23. **Cycling analyzer test file** *(D — running's likely has one per analyze-running-workout patterns; cycling needs equivalent.)*
+24. **Pace + power range emission tests** *(N — needs sport-spec layer that defines what "correct" Z2/Z3/Z4 pace and what "correct" 88% sweet-spot watts look like. Probably builds on existing protocol docs.)*
 
 ### Tier 7 — Longitudinal + Arc parity (depends on Tier 2)
 
-24. **Cycling FTP-trend longitudinal signal** *(D — port `detectEasyPaceDrift` at longitudinal-signals.ts:100 to a `detectFtpDrift`)*. Cycling has efficiency-downtrend; lacks FTP-progression trend.
-25. **Cycling bike-volume trend signal** *(D — port `run_easy_hr_trend` shape at compute-snapshot:346-348 to a bike-volume trend)*
-26. **Arc `ride_pace_for_coach` equivalent** *(D — port the dual-units coach formatting at arc-context.ts:86-94 to a `ride_power_for_coach` exposing FTP and zone watts with a `_unit_note`)*
+25. **Cycling FTP-trend longitudinal signal** *(D — port `detectEasyPaceDrift` at longitudinal-signals.ts:100 to a `detectFtpDrift`)*. Cycling has efficiency-downtrend; lacks FTP-progression trend.
+26. **Cycling bike-volume trend signal** *(D — port `run_easy_hr_trend` shape at compute-snapshot:346-348 to a bike-volume trend)*
+27. **Arc `ride_pace_for_coach` equivalent** *(D — port the dual-units coach formatting at arc-context.ts:86-94 to a `ride_power_for_coach` exposing FTP and zone watts with a `_unit_note`)*
 
 ### Tier 8 — Cross-sport asymmetries to resolve via product decision (no clear D/N)
 
-27. **TSS computation for cycling** *(N — currently absent from the cycling pipeline per `docs/CYCLING-INGEST-AUDIT.md`. Workload uses TRIMP/IF; explicit TSS would align with cycling-coach mental model. Product call.)*
-28. **Race-spec quality intensity inversion** *(N — Surface 9 finding: run race-spec = race-pace, bike race-spec = VO2. Intentional or inconsistency? Product/coaching call.)*
-29. **Cycling sweet-spot for running** *(N — cycling has `sweetSpotBike()`; running has no sub-threshold sustained workout type. Probably intentional given run injury risk; worth confirming.)*
-30. **Sprint/openers for running** *(N — cycling has `bikeOpeners()`; running has no race-week sharpener equivalent. Probably intentional; worth confirming.)*
+28. **TSS computation for cycling** *(N — currently absent from the cycling pipeline per `docs/CYCLING-INGEST-AUDIT.md`. Workload uses TRIMP/IF; explicit TSS would align with cycling-coach mental model. Product call.)*
+29. **Race-spec quality intensity inversion** *(N — Surface 9 finding: run race-spec = race-pace, bike race-spec = VO2. Intentional or inconsistency? Product/coaching call.)*
+30. **Cycling sweet-spot for running** *(N — cycling has `sweetSpotBike()`; running has no sub-threshold sustained workout type. Probably intentional given run injury risk; worth confirming.)*
+31. **Sprint/openers for running** *(N — cycling has `bikeOpeners()`; running has no race-week sharpener equivalent. Probably intentional; worth confirming.)*
 
 ---
 
 ## Direct-port vs net-new summary
 
-**Direct ports (running has working reference implementation):** items 1-9, 11-12, 14-15, 18-22, 24-26 → **20 items** that can be ported with running as the template. Bulk of the work; well-scoped per item.
+**Direct ports (running has working reference implementation):** items 1-9, 11-12, 14-15, 18-23, 25-27 → **21 items** that can be ported with running as the template. Bulk of the work; well-scoped per item.
 
-**Net-new design (no running reference; needs product/eng decision):** items 5, 10, 13, 16-17, 23, 27-30 → **10 items** that need a design call before code. Cluster around: cycling's specific power-domain concepts (CP, W', power-curve PRs) that running doesn't have analogs for.
+**Net-new design (no running reference; needs product/eng decision):** items 5, 10, 13, 16-17, 24, 28-31 → **10 items** that need a design call before code. Cluster around: cycling's specific power-domain concepts (CP, W', power-curve PRs) that running doesn't have analogs for.
 
 **Recommended pickup sequence:**
 
