@@ -6,6 +6,10 @@ import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { formatLocalDate, mondayOfCalendarYmd, parseLocalDate } from '../_shared/parse-local-date.ts';
+import {
+  fetchCyclingGoalRaceCompletion,
+  type CyclingGoalRaceCompletionMatch,
+} from '../_shared/cycling-goal-race-completion.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -1897,6 +1901,40 @@ Deno.serve(async (req) => {
     });
     console.log('📝 [ADHERENCE SUMMARY] verdict:', adherenceSummary?.verdict ?? '(null)', 'technical_insights:', adherenceSummary?.technical_insights?.length ?? 0, 'plan_impact:', !!adherenceSummary?.plan_impact);
 
+    // Existing workout_analysis fetched UP HERE (was below analysisPayload pre-Tier-3-9)
+    // so the goal-race snapshot fallback for course_strategy_zones can read prior values
+    // when the current run doesn't find them. Mirrors running's prevWa pattern at
+    // analyze-running-workout/index.ts:2374-2382.
+    const { data: existingRowForMerge, error: existingRowErr } = await supabase
+      .from('workouts')
+      .select('workout_analysis')
+      .eq('id', workout_id)
+      .single();
+    if (existingRowErr) {
+      console.log('⚠️ Failed to read existing workout_analysis for cycling merge:', existingRowErr.message);
+    }
+    const existingAnalysis = (existingRowForMerge as any)?.workout_analysis || {};
+
+    // Tier 3 item 9 — cycling goal-race detection (structural ship). Matches when this
+    // workout is the bike leg of a tri goal on its target_date. `is_goal_race` flag
+    // mirrors running; `course_strategy_zones` snapshots the bike-leg pre-race plan
+    // (defense-in-depth: falls back to prior workout_analysis snapshot if available).
+    // `race_debrief_text` is null for now — LLM narrative deferred to a separate ship.
+    let cyclingGoalRaceMatch: CyclingGoalRaceCompletionMatch = { matched: false, eventName: '' };
+    try {
+      cyclingGoalRaceMatch = await fetchCyclingGoalRaceCompletion(
+        supabase,
+        String((workout as any).user_id),
+        workout as any,
+      );
+      console.log(`🏁 [CYCLING GOAL RACE] matched=${cyclingGoalRaceMatch.matched} distanceKey=${cyclingGoalRaceMatch.distanceKey ?? '(none)'} hasZones=${!!cyclingGoalRaceMatch.courseStrategyZones?.length}`);
+    } catch (e) {
+      console.warn('[analyze-cycling-workout] goal-race match failed:', e);
+    }
+    const courseStrategyZonesUsed =
+      cyclingGoalRaceMatch.courseStrategyZones ??
+      ((existingAnalysis as Record<string, unknown> | null | undefined)?.course_strategy_zones ?? null);
+
     // Save analysis - matches running analysis structure exactly
     const analysisPayload = {
       _meta: {
@@ -1915,21 +1953,17 @@ Deno.serve(async (req) => {
         time_outside_range_s: enhancedAnalysis.time_outside_range_s
       },
       adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact (mirrors running)
+      // Tier 3 item 9 — race-specific debrief structure (mirrors running's
+      // analyze-running-workout/index.ts:2663-2671 field names so consumers don't
+      // sport-branch). race_debrief_text stays null until the cycling-specific LLM
+      // prompt lands as a follow-up.
+      is_goal_race: cyclingGoalRaceMatch.matched === true,
+      race_debrief_text: null,
+      course_strategy_zones: courseStrategyZonesUsed,
     };
-    
+
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
     console.log(`  - granular_analysis.interval_breakdown: ${intervalBreakdown.length} intervals`);
-
-    // Contract: merge into existing workout_analysis (do not replace).
-    const { data: existingRowForMerge, error: existingRowErr } = await supabase
-      .from('workouts')
-      .select('workout_analysis')
-      .eq('id', workout_id)
-      .single();
-    if (existingRowErr) {
-      console.log('⚠️ Failed to read existing workout_analysis for cycling merge:', existingRowErr.message);
-    }
-    const existingAnalysis = (existingRowForMerge as any)?.workout_analysis || {};
 
     if (!ai_summary && typeof (existingAnalysis as any)?.ai_summary === 'string') {
       ai_summary = (existingAnalysis as any).ai_summary;
