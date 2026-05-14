@@ -46,7 +46,7 @@ function pctChange(current: number | null, baseline: number | null): number | nu
 // Types
 // ---------------------------------------------------------------------------
 
-interface FactRow {
+export interface FactRow {
   date: string;
   discipline: string;
   workload: number | null;
@@ -74,7 +74,7 @@ interface ExerciseRow {
 // Core aggregation
 // ---------------------------------------------------------------------------
 
-function aggregateWeek(facts: FactRow[]) {
+export function aggregateWeek(facts: FactRow[]) {
   let workloadTotal = 0;
   const workloadByDisc: Record<string, number> = {};
   const rpes: number[] = [];
@@ -94,6 +94,12 @@ function aggregateWeek(facts: FactRow[]) {
   // Ride signals
   const ridePowers: number[] = [];
   const rideEFs: number[] = [];
+  let longestRideDur = 0;
+  // Interval adherence accumulators — Tier 2 item 4 of running→cycling delta map.
+  // Mirrors `intervalHits` / `intervalTotals` at lines 90-91. Aggregated to a single
+  // weekly percentage in the return below, same shape as `runIntervalAdherence`.
+  const rideIntervalHits: number[] = [];
+  const rideIntervalTotals: number[] = [];
 
   // Strength
   let strengthVolume = 0;
@@ -139,6 +145,20 @@ function aggregateWeek(facts: FactRow[]) {
       if (typeof f.ride_facts.efficiency_factor === "number" && f.ride_facts.efficiency_factor > 0) {
         rideEFs.push(f.ride_facts.efficiency_factor);
       }
+      // Longest-ride duration tracking — Tier 2 item 3 of running→cycling delta map.
+      // Mirrors `longestRunDur` for `runLongRunDuration`; same Math.max-of-duration_minutes
+      // pattern. Used by downstream consumers (planning-context, end-plan-core,
+      // build-coaching-context) symmetrically with run_long_run_duration.
+      const dur = f.duration_minutes ?? 0;
+      if (dur > longestRideDur) longestRideDur = dur;
+      // Interval adherence — Tier 2 item 4 of running→cycling delta map. Mirrors the
+      // run block at lines ~123-126. Source field shape is identical
+      // (`intervals_hit` / `intervals_total` on the per-workout facts row, set by
+      // `compute-facts/buildRideFacts` from `w.computed.intervals` adherence_pct).
+      if (typeof f.ride_facts.intervals_hit === "number" && typeof f.ride_facts.intervals_total === "number") {
+        rideIntervalHits.push(f.ride_facts.intervals_hit);
+        rideIntervalTotals.push(f.ride_facts.intervals_total);
+      }
       if (f.ride_facts.time_in_zone) {
         for (const [k, v] of Object.entries(f.ride_facts.time_in_zone)) {
           if (typeof v === "number") zoneSeconds[k] = (zoneSeconds[k] ?? 0) + v;
@@ -154,6 +174,8 @@ function aggregateWeek(facts: FactRow[]) {
 
   const totalIntervalHits = intervalHits.reduce((a, b) => a + b, 0);
   const totalIntervalTargets = intervalTotals.reduce((a, b) => a + b, 0);
+  const totalRideIntervalHits = rideIntervalHits.reduce((a, b) => a + b, 0);
+  const totalRideIntervalTargets = rideIntervalTotals.reduce((a, b) => a + b, 0);
 
   // Intensity distribution: Z1-2 (easy/aerobic) vs Z3+ (tempo/threshold/VO2)
   const totalZoneSec = Object.values(zoneSeconds).reduce((a, b) => a + b, 0);
@@ -187,6 +209,10 @@ function aggregateWeek(facts: FactRow[]) {
     runEfficiency: avg(runEfficiencies),
     rideAvgPower: avg(ridePowers),
     rideEF: avg(rideEFs),
+    rideLongRideDuration: longestRideDur > 0 ? longestRideDur : null,
+    rideIntervalAdherence: totalRideIntervalTargets > 0
+      ? Math.round((totalRideIntervalHits / totalRideIntervalTargets) * 100)
+      : null,
     strengthVolume: strengthVolume > 0 ? strengthVolume : null,
     intensityDistribution,
   };
@@ -510,6 +536,8 @@ serve(async (req: Request) => {
 
       ride_avg_power: round(current.rideAvgPower),
       ride_efficiency_factor: round(current.rideEF, 2),
+      ride_long_ride_duration: current.rideLongRideDuration,
+      ride_interval_adherence: current.rideIntervalAdherence,
 
       avg_session_rpe: round(current.avgRPE),
       avg_readiness: current.avgReadiness,

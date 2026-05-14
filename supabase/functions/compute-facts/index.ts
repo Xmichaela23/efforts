@@ -1168,6 +1168,26 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
     facts.power_curve = analysis.power_curve ?? w.computed?.power_curve;
   }
 
+  // Interval adherence from computed.intervals — Tier 2 item 4 of running→cycling delta
+  // map. Mirrors the running implementation at line ~1094-1106 above. Same hit-window
+  // [85, 115] adherence rule. Cycling intervals carry `power_adherence_pct` (analog to
+  // running's `pace_adherence_pct`); both are stored on `w.computed.intervals[]` by
+  // compute-workout-summary + compute-workout-analysis. Non-work intervals (warm/cool/
+  // rest/recovery) are excluded from the count, same as running.
+  if (w.computed?.intervals && Array.isArray(w.computed.intervals)) {
+    const workIntervals = w.computed.intervals.filter(
+      (i: any) => i.planned_label && !/(warm|cool|rest|recovery)/i.test(i.planned_label)
+    );
+    if (workIntervals.length > 0) {
+      const hit = workIntervals.filter((i: any) => {
+        const adh = i.adherence_pct ?? i.power_adherence_pct ?? 100;
+        return adh >= 85 && adh <= 115;
+      }).length;
+      facts.intervals_hit = hit;
+      facts.intervals_total = workIntervals.length;
+    }
+  }
+
   return facts;
 }
 
