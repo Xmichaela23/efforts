@@ -1019,12 +1019,17 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
     : avgHR;
   const hrDrift = lateAvgHR - earlyAvgHR;
   
-  // Calculate HR zones if maxHR provided
+  // Calculate HR zones if maxHR provided. `zoneTime` declared at the function scope
+  // so the return statement below can reference it — was previously `const`-declared
+  // inside the `if (maxHR)` block, which made it block-scoped and threw ReferenceError
+  // at runtime on `zone_time: hrZones ? zoneTime : null` whenever maxHR was truthy.
+  // The error was masked by an upstream try/catch in the handler, producing analyses
+  // missing the zone_time field rather than failing visibly. Found via deno check
+  // surfacing TS2304 'Cannot find name zoneTime'; fix verified by empirical scope test.
   let hrZones = null;
+  const zoneTime: Record<string, number> = {};
   if (maxHR) {
     hrZones = calculateHeartRateZones(maxHR);
-    // Calculate time in each zone
-    const zoneTime: Record<string, number> = {};
     for (const hr of hrSamples) {
       if (hr <= hrZones.zone1.upper) zoneTime.zone1 = (zoneTime.zone1 || 0) + 1;
       else if (hr <= hrZones.zone2.upper) zoneTime.zone2 = (zoneTime.zone2 || 0) + 1;
@@ -1033,7 +1038,7 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
       else zoneTime.zone5 = (zoneTime.zone5 || 0) + 1;
     }
   }
-  
+
   return {
     available: true,
     average_hr: avgHR,
