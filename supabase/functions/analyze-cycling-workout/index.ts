@@ -165,6 +165,153 @@ interface WorkoutExecutionAnalysis {
   };
 }
 
+// =============================================================================
+// CYCLING ADHERENCE SUMMARY (Tier 3 item 7 of running→cycling delta map)
+// =============================================================================
+// Structured wrapper mirroring `analyze-running-workout`'s WorkoutAdherenceSummary
+// (analyze-running-workout/index.ts:3170-3175). Same shape — verdict + structured
+// technical_insights array + plan_impact — so client renderers don't need to
+// branch on sport for this surface.
+//
+// Cycling builds it from the inputs cycling already produces:
+//   - performance.execution_score / power_adherence / duration_adherence
+//   - intervalBreakdown (per-interval adherence_percentage)
+//   - cyclingFactPacketV1.facts (NP, IF, classified_type)
+//   - hrAnalysis (hr_drift_bpm + early_avg_hr → drift_pct)
+//
+// Running's equivalent is ~640 lines because it carries marathon goal-race branches,
+// terrain context, weather adjustments, etc. The cycling version is intentionally
+// smaller (~120 lines) — same SHAPE, no domain features that don't apply.
+
+export interface CyclingAdherenceSummary {
+  verdict: string;
+  technical_insights: { label: string; value: string }[];
+  plan_impact: { focus: string; outlook: string };
+}
+
+/**
+ * Pure function — testable in isolation. All inputs already exist in the cycling
+ * analyzer's working set; this wraps them into the shape running's adherence_summary
+ * has used since the structured-debrief work landed.
+ *
+ * Returns null when there are no work intervals (e.g., free ride, recovery spin) —
+ * matches running's behavior of suppressing structured summary for non-prescribed
+ * sessions where adherence has no anchor.
+ */
+export function generateCyclingAdherenceSummary(opts: {
+  performance: {
+    execution_score?: number | null;
+    execution_adherence?: number | null;
+    power_adherence?: number | null;
+    duration_adherence?: number | null;
+  } | null | undefined;
+  intervalBreakdown: Array<{ interval_type?: string; adherence_percentage?: number; adherence?: number }> | null | undefined;
+  factPacket: { facts?: { normalized_power?: number | null; intensity_factor?: number | null; classified_type?: string | null } | null } | null | undefined;
+  /** Computed from `hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr * 100`; null when HR unavailable. */
+  hrDriftPct: number | null;
+}): CyclingAdherenceSummary | null {
+  const intervals = Array.isArray(opts.intervalBreakdown) ? opts.intervalBreakdown : [];
+  const workIntervals = intervals.filter((i) => i?.interval_type === 'work');
+  if (workIntervals.length === 0) return null;
+
+  const exec = (opts.performance?.execution_score ?? opts.performance?.execution_adherence ?? null) as number | null;
+  const powerAdh = (opts.performance?.power_adherence ?? null) as number | null;
+
+  // Verdict (single-line summary). Same severity tiers running uses for status_label.
+  let verdict = 'Workout completed.';
+  if (typeof exec === 'number') {
+    if (exec >= 90) verdict = 'Excellent execution — power held steady through the prescribed work.';
+    else if (exec >= 80) verdict = 'Solid execution — power adherence was strong with minor variation.';
+    else if (exec >= 65) verdict = 'Acceptable execution — power drifted from target on some intervals.';
+    else verdict = 'Below target — power adherence was off; review pacing strategy or revisit FTP if pattern persists.';
+  }
+
+  const technical_insights: { label: string; value: string }[] = [];
+
+  if (typeof powerAdh === 'number') {
+    technical_insights.push({
+      label: 'Power adherence',
+      value: `${Math.round(powerAdh)}% of work-interval time within the prescribed power range.`,
+    });
+  }
+
+  // Per-interval hit rate. Same hit-window [85, 115] as running (analyze-running-workout
+  // uses the same threshold) and as compute-facts/buildRideFacts (intervals_hit logic).
+  const hits = workIntervals.filter((i) => {
+    const adh = i.adherence_percentage ?? i.adherence ?? 100;
+    return adh >= 85 && adh <= 115;
+  }).length;
+  technical_insights.push({
+    label: 'Interval execution',
+    value: `${hits} of ${workIntervals.length} work intervals on target (within ±15% of prescribed power).`,
+  });
+
+  // HR drift interpretation. Cycling stores drift_bpm + early/late HR; convert to %
+  // for the interpretation thresholds (which mirror running's drift bands).
+  if (typeof opts.hrDriftPct === 'number' && Number.isFinite(opts.hrDriftPct)) {
+    const drift = opts.hrDriftPct;
+    if (Math.abs(drift) < 3) {
+      technical_insights.push({
+        label: 'Cardiac drift',
+        value: `Heart rate stable (${drift > 0 ? '+' : ''}${drift.toFixed(1)}% drift). Aerobic system held steady throughout the ride.`,
+      });
+    } else if (drift >= 3 && drift < 8) {
+      technical_insights.push({
+        label: 'Cardiac drift',
+        value: `Moderate HR drift (+${drift.toFixed(1)}%) — power held but HR climbed in the second half. Heat, hydration, or accumulated fatigue worth checking.`,
+      });
+    } else if (drift >= 8) {
+      technical_insights.push({
+        label: 'Cardiac drift',
+        value: `Significant HR drift (+${drift.toFixed(1)}%). Indicates aerobic strain compounding through the ride; recovery may take longer than usual.`,
+      });
+    }
+  }
+
+  const facts = opts.factPacket?.facts;
+  if (facts && typeof facts.normalized_power === 'number' && typeof facts.intensity_factor === 'number') {
+    const ct = facts.classified_type ? String(facts.classified_type).replace(/_/g, ' ') : 'training stimulus';
+    technical_insights.push({
+      label: 'Intensity',
+      value: `Normalized power ${facts.normalized_power}W at IF ${facts.intensity_factor.toFixed(2)} — ${ct} effort.`,
+    });
+  }
+
+  // Plan impact. `focus` reflects what training adaptation this session targeted;
+  // `outlook` is forward-looking guidance for the next session/week.
+  const ctMap: Record<string, string> = {
+    recovery: 'Active recovery',
+    endurance: 'Aerobic base',
+    endurance_long: 'Long aerobic',
+    tempo: 'Tempo / muscular endurance',
+    sweet_spot: 'Sweet spot / FTP development',
+    threshold: 'Lactate threshold',
+    vo2: 'VO2max / max aerobic power',
+    anaerobic: 'Anaerobic capacity',
+    neuromuscular: 'Neuromuscular / sprint',
+    race_prep: 'Race preparation',
+    brick: 'Brick / multi-sport transition',
+  };
+  const focus = (facts?.classified_type && ctMap[facts.classified_type]) || 'General aerobic';
+
+  let outlook = 'Standard recovery sufficient before next quality session.';
+  if (typeof exec === 'number') {
+    if (exec >= 85) {
+      outlook = 'Quality session executed well — proceed with planned next session.';
+    } else if (exec >= 70) {
+      outlook = 'Adequate stimulus delivered. Standard recovery; review power targets if pattern persists.';
+    } else {
+      outlook = 'Suboptimal stimulus — consider adjusting next session intensity or extending recovery before the next hard ride.';
+    }
+  }
+
+  return {
+    verdict,
+    technical_insights,
+    plan_impact: { focus, outlook },
+  };
+}
+
 // Garmin-style execution scoring configuration
 // Tolerance guidelines for power:
 // - Quality/intervals: ±5% (tighter)
@@ -1730,6 +1877,26 @@ Deno.serve(async (req) => {
       power_variability: enhancedAnalysis.power_variability
     };
 
+    // Build structured adherence summary (Tier 3 item 7 — mirrors running's
+    // `adherence_summary` shape so client renderers don't sport-branch).
+    // HR drift % computed from cycling's hr_drift_bpm + early_avg_hr (cycling
+    // stores absolute beats; running stores percent — convert here for symmetry).
+    const cyclingHrDriftPct = (
+      hrAnalysis?.available &&
+      typeof hrAnalysis?.hr_drift_bpm === 'number' &&
+      typeof hrAnalysis?.early_avg_hr === 'number' &&
+      hrAnalysis.early_avg_hr > 0
+    )
+      ? (hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr) * 100
+      : null;
+    const adherenceSummary = generateCyclingAdherenceSummary({
+      performance,
+      intervalBreakdown,
+      factPacket: cyclingFactPacketV1,
+      hrDriftPct: cyclingHrDriftPct,
+    });
+    console.log('📝 [ADHERENCE SUMMARY] verdict:', adherenceSummary?.verdict ?? '(null)', 'technical_insights:', adherenceSummary?.technical_insights?.length ?? 0, 'plan_impact:', !!adherenceSummary?.plan_impact);
+
     // Save analysis - matches running analysis structure exactly
     const analysisPayload = {
       _meta: {
@@ -1746,7 +1913,8 @@ Deno.serve(async (req) => {
         duration_adherence: durationAdherenceValue,
         time_in_range_s: enhancedAnalysis.time_in_range_s,
         time_outside_range_s: enhancedAnalysis.time_outside_range_s
-      }
+      },
+      adherence_summary: adherenceSummary ?? null,  // Structured: verdict + technical_insights + plan_impact (mirrors running)
     };
     
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
@@ -1794,6 +1962,7 @@ Deno.serve(async (req) => {
       details: {
         fact_packet_v1: cyclingFactPacketV1 ?? null,
         flags_v1: cyclingFlagsV1 ?? null,
+        adherence_summary: adherenceSummary ?? null,
       },
       guards: {
         is_transition_window: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
