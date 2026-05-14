@@ -306,3 +306,23 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 ## When this doc becomes stale
 
 This is a snapshot of the running/cycling delta as of 2026-05-13. File line numbers will drift; the structural verdicts (cycling thinner than running everywhere except classified-type taxonomy and HR-drift longitudinal signal; both sports missing snapshot pinning) should hold until those fixes ship. Re-run a similar 5-agent dispatch after Tier 1-2 work lands to update the table.
+
+---
+
+## Maintenance debt (off-topic to delta map, parked here for tracking)
+
+Items not part of the running→cycling delta but surfaced during this work — recorded here until a dedicated maintenance-debt doc warrants creation.
+
+### Migration tracking divergence — `supabase/migrations/` vs `schema_migrations`
+
+**Status:** open, not blocking. Surfaced 2026-05-14 during Tier 2 items 3+4 deploy.
+
+**Problem:** Local `supabase/migrations/` has 35+ migration files going back to 2026-01-06 that the remote `schema_migrations` tracking shows as unapplied — but the schema is clearly in production (e.g., `athlete_snapshot.run_long_run_duration` lives in `20260221_create_deterministic_layer_tables.sql:107` and is actively read/written). The migrations were applied via the Supabase SQL editor or another path that bypassed `supabase migration up`, so the CLI-tracked state diverged from reality.
+
+**Why it bites:** `supabase db push` walks the unapplied list. If anyone runs it (especially in CI or a fresh environment seed), it will attempt to re-run all 35+ — many will no-op via `IF NOT EXISTS` guards but several `CREATE TABLE` / `CREATE FUNCTION` statements without those guards will throw, leaving the migration in a partial-applied state. Caught this session by inspecting `supabase migration list` before running `db push`; pivoted to applying the new ALTER TABLE statements directly via SQL editor.
+
+**Fix:** for each of the 35+ historical timestamps, run `supabase migration repair --status applied <timestamp>` to mark them as applied without re-running. After reconciliation, future `supabase db push` would only apply genuinely-new migrations.
+
+**Why deferred:** the workaround (apply new migrations via SQL editor when adding them) works fine for human-driven deploys. The pain point only arrives if/when someone wires migrations into CI or stands up a non-prod replica. Worth doing before either of those happen, but not blocking current development. Estimated time: 30-60 min to script the 35 repair commands and run them.
+
+**Cross-ref:** `docs/ENGINE-STATE.md` "Known broken" could be a better long-term home if a `MAINTENANCE-DEBT.md` is never created — same "filed, not blocking, here so it's not forgotten" semantics.
