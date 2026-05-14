@@ -1,0 +1,101 @@
+# Engine State
+
+A current snapshot of what's load-bearing, what's known broken, and what's believed-working but unverified. Read this BEFORE proposing changes — most "obvious" bugs were either already fixed (don't re-litigate), already filed (don't re-discover), or intentionally left in place (don't "fix").
+
+Last updated: 2026-05-13.
+
+---
+
+## Solid (don't re-litigate)
+
+Verified-working architecture and fixes. If you think one of these is broken, the bug is probably elsewhere — read the verification method before changing anything.
+
+### §6.1 cycling/running asymmetry — heavy Lower placement
+- **Spec:** `docs/STRENGTH-PROTOCOL.md` §6.1 (4f106a78), §6.1.5 consolidation gate widening (b189e7ca), phase-aware adjacency messaging (7715ff5d).
+- **Files:** `supabase/functions/_shared/schedule-session-constraints.ts`, `_shared/week-optimizer.ts`, `_shared/plan-generation-trade-offs.ts`.
+- **Behavior:** Heavy Lower (Strength Build 78-85%, Maintenance + Power 70-75%, Rebuild 72-80%) is never 24h-adjacent to Quality Run or Long Run; 48h gap minimum from Long Run on both sides; permitted 24h-adjacent to bike sessions per Wilson 2012 (running ES≈0.94 vs cycling ES≈0.32). Hypertrophy / Deload sub-maximal Lower has relaxed adjacency.
+- **Verification:** §6.1 conformance contract W-004..W-008 in STRENGTH-PROTOCOL.md §3.8. Test coverage in `supabase/functions/generate-combined-plan/same-day-pairing.test.ts`. Verified manually against multiple plan exports during the §6.1 pass.
+- **Open question:** is the heavy-Lower classification protocol-gated to performance, or load-magnitude-gated? See Q-003.
+
+### §7.3 post-race recovery week SKIP
+- **Spec:** `docs/STRENGTH-PROTOCOL.md` §7.3.
+- **File:** `supabase/functions/generate-combined-plan/week-builder.ts:~1569` — `if (phase === 'recovery') strFreq = 0`.
+- **Behavior:** Both hybrid REDUCE-default and durability SKIP-default mid-block 3:1 deloads keep their parent phase (`base` / `build` / `race_specific`) and emit reduced strength sessions. The dedicated post-race recovery week (`phase === 'recovery'` from `phase-structure.ts:289-309 insertRecoveryBlock`) is the only path that triggers the unconditional SKIP. Protocol-agnostic — works for hybrid AND durability.
+- **Verification:** Plan #59 W14 went from emitting Hypertrophy Deload Lower to SKIPPED post-fix (commit d42c1079). W4/W8/W12 mid-block deloads still emit reduced sessions as designed.
+
+### Option B endurance-hours deduction
+- **Spec:** `docs/SESSION-FREQUENCY-DEFAULTS.md` §2.1.
+- **File:** `src/lib/session-frequency-defaults.ts:228-236` (`strengthCountFromIntent`) + line 282-285 (deduction applied before tier lookup).
+- **Behavior:** Tier lookup uses endurance-adjusted hours (`declared - strength_count × 0.75hr`); §7 strength count keeps reading declared hours. Hybrid 11hr athlete re-tiers from `10-12` to `8-10` (Plan #59 regression fix, commit cf68cf43).
+- **Verification:** 7 deno tests in `supabase/functions/_shared/session-frequency-defaults.test.ts` covering hybrid 11hr/7d, hybrid 11.5hr/7d boundary, hybrid 10hr/7d boundary, hybrid 9.99hr/7d (no §7 discontinuity), endurance-only 11hr/7d (no regression), support 11hr/7d, performance 14hr/7d. All passing.
+- **Constant rationale:** see D-001.
+
+### `useStrengthOrderingPreference` hook + `orderDayWorkoutsByTimingThenDiscipline` helper
+- **Files:** `src/lib/use-strength-ordering-preference.ts` (hook + module-level cache + in-flight dedupe), `src/components/AllPlansInterface.tsx` (helper at top of file, plus two consumer call sites — markdown export at line ~1785 + weekly view at line ~2369), `src/components/TodaysEffort.tsx` (top cards at line ~693-704).
+- **Behavior:** One fetch path for `goals.training_prefs.strength_ordering_preference` (per planId). One sort helper. Three consumers (TodaysEffort top cards, AllPlansInterface weekly view, AllPlansInterface markdown export) all read from the same cache and apply the same sort. Dep-churn-proof — hook depends on the planId string only.
+- **Verification:** consolidation shipped in commits e41e7781 (hook) + 3770ad41 (weekly view fourth-consumer fix) on 2026-05-13. Verified manually that all three surfaces render Lower above Run on Thursday for strength_first hybrid athletes; markdown export and on-screen view cannot diverge by construction.
+- **Decisions:** see D-003, D-004, D-005, D-006.
+
+### `swim_experience='learning'` → soft -1 in `inferTrainingFitnessLevel`
+- **File:** `supabase/functions/_shared/infer-training-fitness.ts:~178` (`if (swimExp === 'learning') score -= 1`).
+- **Behavior:** Wizard-collected `training_prefs.swim_experience` is consulted by the training_fitness inference. Soft signal (-1), not hard clamp — bounded by score thresholds, won't over-clamp a strong cyclist/runner who's new to swim. Cascades into swim volume bands and per-session rep caps via existing consumers of `training_fitness`.
+- **Verification:** 2 new deno tests in `supabase/functions/_shared/infer-training-fitness.test.ts` (commit 0fd17ad9). 6 of 7 tests pass; the 1 failure is pre-existing on main, unrelated — see Q-006 / D-002.
+- **Decision:** see D-002.
+
+---
+
+## Known broken (filed, not blocking)
+
+Behaviors that are demonstrably wrong but intentionally deferred. Don't propose fixes unless you have new information — the deferral was a scoping call, and the list below documents the cost so the next implementer can pick up cleanly.
+
+### `scaledWeeklyTSS` reads declared hours, not endurance-adjusted
+- **Symptom:** Plan #60 (hybrid 11hr/7d build week) emit landed at 11h55m vs 11hr declared budget — 24min over after the §2.1 swim drop. Frequency matrix correctly drops a swim slot, but TSS budget remains at the 10-12 tier value, so remaining sessions absorb the freed TSS and grow longer (Friday swim was 1000yd pre-§2.1 → 3200yd CSS aerobic post-§2.1, redistributing freed budget into one larger swim).
+- **File:** `supabase/functions/generate-combined-plan/week-builder.ts:~674` (`scaledWeeklyTSS(phase, current_ctl, weekly_hours_available, tssMultiplier)`).
+- **Fix shape:** plumb `endurance_hours` out of `computeSessionFrequencyDefaults` as a new field on `SessionFrequencyDefaults`, pass it to `scaledWeeklyTSS` instead of declared hours.
+- **Predicted effect:** TSS budget scales to 8-10 tier (~550-650 build TSS, was ~700-800), session durations shorten proportionally, hybrid 11hr athlete lands at ~11h flat instead of 11h55m.
+- **Why deferred:** 24min/week overflow compounds across 12 build/peak weeks but is below the ship-blocking threshold. Filed in `docs/POLISH-PUNCH-LIST.md` §4.
+
+### `swim-protocol-volumes.ts` per-band ceilings may still be generous for beginners (Ticket B residual)
+- **Symptom:** Plan #60 W6 Friday CSS Aerobic 3200yd (51min); W7 Friday Technique Aerobic 3150yd (1h23m). Learner athlete; target is ≤2500yd aerobic / ≤2000yd threshold per session per Ticket B.
+- **Status post-2026-05-13:** swim_experience now flows through to `training_fitness` inference (commit 0fd17ad9), which feeds the band selection. This pulls the band selection toward beginner-tier when wizard explicitly says learning AND CTL signals are not strongly conflicting. Whether per-band ceilings are themselves tight enough for true learners is a separate, residual question — needs spot-check after deploy.
+- **Fix shape (if confirmed needed):** per-session ceiling logic in swim slot sizer — learner cap at ~2500 yd per session for aerobic, ~2000 yd for threshold.
+- **Why deferred:** new wiring's deploy-time effect not yet measured. Filed in `docs/POLISH-PUNCH-LIST.md` §4 item #133.
+
+### `limiter_sport` intensity-side handling not implemented
+- **Symptom:** spec at `docs/SESSION-FREQUENCY-DEFAULTS.md §4` says "Run limiter is handled through intensity, not frequency. Adding run sessions increases injury risk disproportionately. The engine addresses a run limiter by making existing run sessions more productive (longer long run, higher-quality intervals, strides on easy days) rather than adding a 4th session." Implementation today: frequency side is correctly a no-op for run limiter; intensity side has zero implementation. The +7% TSS allocation bump in `science.ts:268-278 getBaseDistribution()` is a percentage shift across all phases, not a per-session intensity boost.
+- **Files (where wiring would land):** `supabase/functions/generate-combined-plan/science.ts` (extend `brickRunTargetMiles()` and `longRunFloorHours()` to accept `limiterSport`), `session-factory.ts` (interval modulation), `week-builder.ts` (stride logic).
+- **Predicted effect:** ~+65-70 TSS/week for run-limiter athlete (long run +15-20%, quality run +1 tempo interval, strides on 1-2 easy runs).
+- **Why deferred:** multi-file medium-risk change; needs an architectural decision on whether the +7% TSS allocation stays additive with the new intensity dial or gets replaced by it. Documented in `docs/TICKET-B-WIRING-AUDIT.md` Field 2.
+
+### "Run — Tempo" vs "Run Intervals 4×1000m" label divergence
+- **Symptom:** Same workout renders with two different titles across surfaces. Today's Efforts uses the workout's stored `name` directly. `AllPlansInterface.tsx:881-885` and `PlannedWorkoutSummary.tsx:34-66` both use regex against `description`/`tags` but with slightly different heuristics. Compounded by Monday-May-18 swim title case ("Swim — Drills" vs "Race-Specific Aerobic Swim") which suggests the surfaces also read different upstream data shapes.
+- **Files:** `src/components/PlannedWorkoutSummary.tsx:34-66`, `src/components/AllPlansInterface.tsx:881-885`, `src/components/TodaysEffort.tsx` (uses `workout.name` directly).
+- **Fix shape:** consolidate the title-derivation into a single shared utility — same architectural pattern as the `useStrengthOrderingPreference` consolidation. Solving at the data layer (one canonical session name per workout, derived once at materialize time) is cleaner than patching label-by-label downstream.
+- **Why deferred:** predates the universal fixes; cosmetic, not protocol-violating; queued behind higher-signal work.
+
+---
+
+## Questioned (worth verifying)
+
+Believed-working but never explicitly verified. Listed here so the next session can pick up the verification cheaply, not so anyone re-implements.
+
+### §6.1 scoping — protocol-gated or load-gated?
+- **Question:** Does the heavy-Lower adjacency widening apply to **performance protocol** phases (Strength Build / M+P / Rebuild) only, or to **all sub-maximal-or-above Lower lifts** including durability MS phase (75-85% × 6-10 reps, equivalent load profile but different protocol path)?
+- **Why it matters:** if protocol-gated, durability MS Lower could land 24h-adjacent to a quality run without trade-off message. Affects every durability-protocol athlete.
+- **Verification approach:** read `_shared/week-optimizer.ts` heavy-Lower classifier; trace whether it reads protocol name or load magnitude. Probably ~30 minutes to confirm.
+- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 1 / Q-003.
+
+### Full IM §3.7 race-spec strength scaling
+- **Question:** Per `docs/STRENGTH-PROTOCOL.md §3.7`, Full IM race-specific phase strength drops to 1× upper-only at maintenance load, with halved power volume and no depth jumps. Race-spec frequency is `1` for Full IM (vs `2` for 70.3). Build phase is `1-2`. Commit cf5867fa claims "v2.1 close-out — Full IM scaling" but the implementation is not verified by static read.
+- **Why it matters:** Full IM hybrid athletes in race-spec phase. If the §3.7 modifier isn't actually wired, they get over-prescribed strength volume during race-spec — exactly when endurance recovery matters most.
+- **Verification approach:** read `_shared/strength-profiles.ts` (or wherever distance-aware session-factory branching lives); confirm race-distance × phase branching exists. Probably ~30 minutes.
+- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 4 / Q-004.
+
+---
+
+## When to update this doc
+
+Append to **Solid** when a fix ships and is verified.
+Append to **Known broken** when a bug surfaces and is intentionally deferred.
+Append to **Questioned** when a session ends with an unverified claim.
+Move items between sections as their state changes — promotion (Questioned → Solid) requires a verification method documented inline.

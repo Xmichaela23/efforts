@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Efforts** — triathlon training app. React + TypeScript on Vite/Netlify; Supabase (Postgres + Deno edge functions); iOS via Capacitor.
 
+## Context-priming for new sessions
+
+Before doing any non-trivial work, read these in order — they prevent re-litigating settled choices and re-discovering already-filed bugs:
+
+1. **`docs/ENGINE-STATE.md`** — current state. Three sections: Solid (don't re-litigate), Known broken (filed, not blocking), Questioned (worth verifying). If you think one of the Solid items is broken, the bug is probably elsewhere — read the verification method before changing anything.
+2. **`docs/DECISIONS-LOG.md`** — why things are the way they are. Numbered D-NNN. Records non-obvious design choices, coefficients picked deliberately, architectural patterns rejected. If you're about to reverse one of these, find the entry first and either supersede it explicitly (new D-NNN) or talk to the human.
+3. **`docs/OPEN-QUESTIONS.md`** — don't "fix" intentional behaviors. Numbered Q-NNN. Tagged cosmetic / intentional / unverified. The point of this doc is to stop the next session from "fixing" something that someone already considered and chose to leave.
+4. **`docs/POLISH-PUNCH-LIST.md`** — work queue. Read after the three above, since the punch list assumes the context they provide.
+
 ## Commands
 
 ```bash
@@ -25,6 +34,26 @@ No `npm test`. Some `*.test.ts` / `*.contract.test.ts` live under `supabase/func
 ## Deploy policy (the user does NOT deploy)
 
 After any change that affects production, ship it: deploy every edge function you touched plus its callers, and `git push origin main` (Netlify auto-deploys). Don't end a task with "you should deploy."
+
+## End-of-session protocol
+
+Before any session ends — when the human says "we're done," "closing the laptop," "good for today," "stopping here," or any equivalent — Claude Code MUST:
+
+1. Propose updates to `docs/ENGINE-STATE.md`, `docs/DECISIONS-LOG.md`, and `docs/OPEN-QUESTIONS.md` based on what shipped this session:
+   - **ENGINE-STATE.md:** new fixes go to **Solid** (with file paths + verification method); new known-broken bugs go to **Known broken** (with deferred-reason); new unverified claims go to **Questioned** (with verification approach).
+   - **DECISIONS-LOG.md:** new D-NNN entry per non-trivial design choice — coefficient picked deliberately, alternative pattern rejected, scoping call made.
+   - **OPEN-QUESTIONS.md:** new Q-NNN entry per behavior that was noticed and intentionally left, or per bug deferred with a reason.
+2. Show the proposed diff.
+3. Wait for human approval.
+4. Commit + push as `docs: end-of-session context update for YYYY-MM-DD`.
+
+Also update `docs/POLISH-PUNCH-LIST.md` if items closed (mark `[x]` with date) or new items were added during the session.
+
+If the human ends the session without triggering this, prompt before stopping:
+
+> "Before you go — should I update the context docs with what we shipped today?"
+
+This is the institutional-memory backbone. The next session reads what this session writes.
 
 ## Topology
 
