@@ -239,7 +239,7 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 
 3. **`ride_long_ride_duration` weekly aggregate** *(D — port from `run_long_run_duration` at compute-snapshot:89, 183, 504)*
 4. **`ride_interval_adherence` weekly aggregate** *(D — port from `run_interval_adherence` at compute-snapshot:91, 123-126, 184-186, 505)*. Requires `analyze-cycling-workout` to emit per-interval adherence first (depends on Tier 4 item 7 below).
-5. **`ride_easy_power_at_hr` baseline + trend** *(N — easy-power baseline doesn't exist in cycling estimation today; needs new estimation tier in `learn-fitness-profile/analyzeRides`)*. Mirror running's `run_easy_pace_at_hr` + `run_easy_hr_trend` pattern once the baseline exists.
+5. **`ride_easy_power` baseline + trend** *(D — derived from FTP per D-009; reclassified from N → D 2026-05-14)*. Per `docs/DECISIONS-LOG.md` D-009, easy-power baseline is the lower half of Coggan Zone 2 (56-65% of FTP). No new estimation pipeline — derived directly from `resolveCurrentFtp()` output. Implementation: ~1 helper function returning `{lower_w: ftp * 0.56, upper_w: ftp * 0.65}` + snapshot wiring + (optional) week-over-week trend on observed Z2 power if needed for coaching context. Field renamed from `ride_easy_power_at_hr` (the original net-new framing inferred from HR-gated samples) to `ride_easy_power` (FTP-derived band) to reflect the simpler design.
 6. **Migrate strength-style snapshot pinning pattern to bike + run** *(D — already-solved pattern at strength)*. Subsumed by Tier 1 item 1.
 
 ### Tier 3 — Workout analyzer parity (depends on Tier 1)
@@ -289,9 +289,9 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 
 ## Direct-port vs net-new summary
 
-**Direct ports (running has working reference implementation):** items 1-9, 11-12, 14-15, 18-23, 25-27 → **21 items** that can be ported with running as the template. Bulk of the work; well-scoped per item.
+**Direct ports (running has working reference implementation):** items 1-9, 11-12, 14-15, 18-23, 25-27 → **22 items** that can be ported with running as the template (item 5 reclassified N → D per D-009 on 2026-05-14). Bulk of the work; well-scoped per item.
 
-**Net-new design (no running reference; needs product/eng decision):** items 5, 10, 13, 16-17, 24, 28-31 → **10 items** that need a design call before code. Cluster around: cycling's specific power-domain concepts (CP, W', power-curve PRs) that running doesn't have analogs for.
+**Net-new design (no running reference; needs product/eng decision):** items 10, 13, 16-17, 24, 28-31 → **9 items** that need a design call before code. Cluster around: cycling's specific power-domain concepts (CP, W', power-curve PRs) that running doesn't have analogs for.
 
 **Recommended pickup sequence:**
 
