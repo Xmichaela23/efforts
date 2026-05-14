@@ -247,7 +247,7 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 7. **Cycling adherence verdict structure** *(D — port from running's `verdict + technical_insights + plan_impact` at analyze-running:2654 to analyze-cycling:1744-1749)*. Cycling has the data (power_adherence, duration_adherence, time_in_range); needs the structured wrapper.
 8. **Cycling per-interval adherence count** *(D — port from `intervals_hit / intervals_total` at compute-facts:1102-1103 to ride_facts)*. Required for Tier 2 item 4.
 9. **Cycling race-specific debrief structure** *(D — port from `race_debrief_text` + `course_strategy_zones` at analyze-running:2663-2671)*. Cycling needs `is_goal_race` gating + similar narrative generation.
-10. **Cycling cross-workout queries (trend, achievements, limiter)** *(N — running's `_shared/fact-packet/` is 38KB doing this; cycling-equivalent needs design — what's a "cycling achievement"? Power-curve PR? Best 20-min in 90 days? Needs product decision)*
+10. **Cycling cross-workout queries (trend, achievements, limiter)** *(D — design questions resolved per D-010 on 2026-05-14; reclassified N → D)*. Achievements: power-curve PRs from existing `computed.power_curve` (best 20-min FTP proxy, best 5-min VO2 proxy, best 1-min neuromuscular) on 90-day rolling + all-time windows. `vs_similar_v1`: match on `classified_type` + duration ±20%, compare against last 3 matching workouts. Limiter: W/kg-vs-age-group-norms by race distance for triathletes; power-trend-vs-90d-mean for non-tri cyclists. All four anchor to data the cycling pipeline already computes — no new estimation infrastructure needed. Implementation becomes a rolling-window aggregation port (running's `_shared/fact-packet/` is 38KB / ~1028 lines but most of it is running-specific concepts; cycling-equivalent will be smaller — estimated ~400-500 lines + tests).
 
 ### Tier 4 — Coach prompt parity (depends on Tier 2 + Tier 3)
 
@@ -289,9 +289,9 @@ Ordered by **dependency** (items that block others go first). For each item, **D
 
 ## Direct-port vs net-new summary
 
-**Direct ports (running has working reference implementation):** items 1-9, 11-12, 14-15, 18-23, 25-27 → **22 items** that can be ported with running as the template (item 5 reclassified N → D per D-009 on 2026-05-14). Bulk of the work; well-scoped per item.
+**Direct ports (running has working reference implementation OR design resolved):** items 1-12, 14-15, 18-23, 25-27 → **23 items** that can be ported with running as the template (items 5 + 10 reclassified N → D per D-009 + D-010 on 2026-05-14). Bulk of the work; well-scoped per item.
 
-**Net-new design (no running reference; needs product/eng decision):** items 10, 13, 16-17, 24, 28-31 → **9 items** that need a design call before code. Cluster around: cycling's specific power-domain concepts (CP, W', power-curve PRs) that running doesn't have analogs for.
+**Net-new design (no running reference; needs product/eng decision):** items 13, 16-17, 24, 28-31 → **8 items** that need a design call before code. Cluster around: coach prompt schema for cycling effort-paces (item 13), CP/W' race-readiness model (items 16, 17), and the four cross-sport asymmetries (items 28-31).
 
 **Recommended pickup sequence:**
 
