@@ -655,7 +655,7 @@ interface RideAnalysisResult {
   ftp_estimated: LearnedMetric | null;
 }
 
-function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
+export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   if (rides.length < 3) {
     return {
       easy_hr: null,
@@ -857,12 +857,25 @@ function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
       return duration >= 20 && duration <= 120;
     });
 
-    // Priority 1: Look for pre-calculated 20-min best power (already represents hard effort)
+    // Priority 1: Look for pre-calculated 20-min best power (already represents hard effort).
+    //
+    // Reads `computed.power_curve['20min']`, written by `compute-workout-analysis` at the
+    // partialComputed merge (~line 1900) via `calculatePowerCurve()` (rolling max-mean over
+    // valid power samples; see `compute-workout-analysis/index.ts:86-120`).
+    //
+    // Zero-stripping semantic: `power_curve['20min']` is the best 20 minutes of pedaling
+    // samples with zeros excluded — slightly optimistic vs a continuous 20-min test effort
+    // but correct for hilly outdoor rides where coasting samples would otherwise drag the
+    // window down. Athletes doing a flat indoor 20-min test get an honest reading; outdoor
+    // riders don't get penalized for descents.
+    //
+    // Prior code path read three fields (`computed.analysis.bests.power_20min`,
+    // `computed.analysis.power.best_20min`, `computed.bests.power_20min`) — none of which
+    // any writer in the codebase populates. Tier 1 silently never fired; estimation always
+    // fell through to Tier 2 (NP from hard efforts × 0.95). Removed.
     const bestsPower20: number[] = [];
     for (const r of sustainedPowerRides) {
-      const p20 = r.computed?.analysis?.bests?.power_20min 
-        || r.computed?.analysis?.power?.best_20min
-        || r.computed?.bests?.power_20min;
+      const p20 = r.computed?.power_curve?.['20min'];
       if (p20 && p20 > 50) {
         bestsPower20.push(p20);
       }
