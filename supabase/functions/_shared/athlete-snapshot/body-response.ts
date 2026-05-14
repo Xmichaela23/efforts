@@ -261,6 +261,44 @@ export function getRunningFatigueWeight(session: {
   return 0.3;
 }
 
+/**
+ * How much does this session contribute to cycling-specific fatigue?
+ * Mirror of `getRunningFatigueWeight` for Tier 4 item 11 of running→cycling delta map.
+ *
+ * Weight rationale:
+ * - ride: 1.0 — direct cycling load
+ * - run: 0.4 — eccentric leg loading carries over to cycling musculature; less than
+ *   ride 1:1 because the muscle-action profile differs (eccentric impact vs concentric
+ *   pedal stroke)
+ * - strength: lower-body 0.7 (same prime movers as cycling — quads, glutes, hams),
+ *   upper-body 0.2 (minimal cycling carryover beyond core stability), full-body 0.5
+ * - swim: 0.1 — low impact on cycling musculoskeletal system; the lat fatigue from
+ *   pulling doesn't reach the cycling-specific muscle groups
+ * - mobility: 0.0 — net-positive for recovery, no fatigue cost
+ * - other: 0.3 — generic catch-all
+ */
+export function getCyclingFatigueWeight(session: {
+  type: string;
+  name?: string;
+}): number {
+  const t = normType(session.type);
+  const nameLower = (session.name || '').toLowerCase();
+
+  if (t === 'ride') return 1.0;
+
+  if (t === 'strength') {
+    if (nameLower.includes('upper body') || nameLower.includes('upper-body')) return 0.2;
+    if (nameLower.includes('lower body') || nameLower.includes('lower-body') || nameLower.includes('leg')) return 0.7;
+    if (nameLower.includes('full body') || nameLower.includes('full-body')) return 0.5;
+    return 0.5;
+  }
+
+  if (t === 'run') return 0.4;
+  if (t === 'swim') return 0.1;
+  if (t === 'mobility') return 0.0;
+  return 0.3;
+}
+
 // ---------------------------------------------------------------------------
 // Build session observations from the ledger
 // ---------------------------------------------------------------------------
@@ -355,6 +393,9 @@ export function buildBodyResponse(
     actual_vs_planned_pct: number | null;
     acwr: number | null;
     running_acwr: number | null;
+    /** Cycling-weighted ACWR — Tier 4 item 11. Optional in input for backward-compat with callers
+     * that don't yet pass it; defaults to null in the emitted load_status. */
+    cycling_acwr?: number | null;
   },
   crossTraining: {
     interference: boolean;
@@ -522,6 +563,7 @@ export function buildBodyResponse(
       actual_vs_planned_pct: loadStatus.actual_vs_planned_pct,
       acwr: loadStatus.acwr,
       running_acwr: loadStatus.running_acwr,
+      cycling_acwr: loadStatus.cycling_acwr ?? null,
       run_only_week_load: runOnlyWeekLoad,
       run_only_week_load_pct: runOnlyWeekLoadPct,
       running_weighted_week_load: runningWeightedWeekLoad,

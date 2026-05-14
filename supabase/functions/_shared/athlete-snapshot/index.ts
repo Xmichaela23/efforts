@@ -11,7 +11,7 @@ export type { AthleteIdentity, PlanPosition, BodyResponse, Coaching } from './ty
 
 export { buildDailyLedger } from './daily-ledger.ts';
 export { buildIdentity, buildPlanPosition } from './identity.ts';
-export { buildBodyResponse, buildSessionObservations, getRunningFatigueWeight, resolveWeekPhase } from './body-response.ts';
+export { buildBodyResponse, buildSessionObservations, getCyclingFatigueWeight, getRunningFatigueWeight, resolveWeekPhase } from './body-response.ts';
 export type { BaselineNorms, WeekPhase, DisciplineMaturityInfo } from './body-response.ts';
 export { snapshotToPrompt, generateCoaching, COACHING_SYSTEM_PROMPT } from './coaching.ts';
 export type { SessionInterpretationForPrompt } from './coaching.ts';

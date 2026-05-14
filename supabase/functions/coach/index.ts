@@ -56,6 +56,7 @@ import {
   generateCoaching,
   snapshotToPrompt,
   getRunningFatigueWeight,
+  getCyclingFatigueWeight,
   assessAdaptation,
   adaptationSignalsToPrompt,
   type AthleteSnapshot,
@@ -1634,6 +1635,27 @@ Deno.serve(async (req) => {
       return { label: 'HR was elevated — possible fatigue', tone: 'danger' };
     };
 
+    /**
+     * Cycling efficiency label — Tier 4 item 14 of running→cycling delta map. Mirrors
+     * `runEfficiency` shape (label + tone). Cycling stores HR drift as a percentage
+     * (driftPct = (lateAvgHr - earlyAvgHr) / earlyAvgHr * 100). The thresholds match
+     * the cycling adherence summary's interpretation bands (analyze-cycling-workout's
+     * `generateCyclingAdherenceSummary` uses the same 3% / 8% breakpoints), so the
+     * coach's session-type breakdown and the per-workout debrief stay consistent.
+     *
+     * Bands chosen to align with running's tone semantics: positive when HR held with
+     * power, warning when HR climbed beyond normal physiological drift, danger when
+     * the ride was clearly aerobic-strained.
+     */
+    const rideEfficiency = (driftPct: number | null): { label: string | null; tone: 'positive' | 'warning' | 'danger' | 'neutral' } => {
+      if (driftPct == null) return { label: null, tone: 'neutral' };
+      const abs = Math.abs(driftPct);
+      if (abs <= 3) return { label: 'Held power efficiently', tone: 'positive' };
+      if (abs <= 5) return { label: 'Solid aerobic effort', tone: 'positive' };
+      if (abs <= 8) return { label: 'HR climbed more than usual', tone: 'warning' };
+      return { label: 'HR was elevated — likely aerobic strain', tone: 'danger' };
+    };
+
     const runSessionTypes7d: NonNullable<CoachWeekContextResponseV1['run_session_types_7d']> = (Object.keys(runAgg) as RunSessionType[])
       .filter((k) => runAgg[k].n > 0)
       .map((k) => {
@@ -1652,6 +1674,119 @@ Deno.serve(async (req) => {
           avg_z2_percent: avgArr(runAgg[k].z2pct, 0),
           avg_interval_hr_creep_bpm: avgArr(runAgg[k].creep, 1),
           avg_decoupling_pct: decouple,
+          efficiency_label: eff.label,
+          efficiency_tone: eff.tone,
+        };
+      })
+      .sort((a, b) => b.sample_size - a.sample_size);
+
+    // ── Tier 4 item 12 — cycling 7-day session-type breakdown ─────────────
+    // Mirrors the running aggregation above. Type detection reads
+    // workout_analysis.fact_packet_v1.facts.classified_type (the cycling-v1 taxonomy
+    // at _shared/cycling-v1/types.ts:3-15 — 12 categories, richer than running's 8).
+    // Aggregation pulls cycling-native signals from workout_analysis: power_adherence
+    // from adherence_analysis, hr_drift_pct + intensity_factor + normalized_power
+    // from fact_packet_v1.facts. efficiency_label/tone left as placeholder; item 14
+    // fills them in via the cycling efficiency_factor heuristic.
+    type RideSessionType =
+      | 'recovery' | 'endurance' | 'endurance_long' | 'tempo' | 'sweet_spot'
+      | 'threshold' | 'vo2' | 'anaerobic' | 'neuromuscular' | 'race_prep'
+      | 'brick' | 'unknown';
+    const RIDE_TYPE_LABELS: Record<string, string> = {
+      recovery: 'Recovery', endurance: 'Endurance', endurance_long: 'Long Ride',
+      tempo: 'Tempo', sweet_spot: 'Sweet Spot', threshold: 'Threshold',
+      vo2: 'VO2max', anaerobic: 'Anaerobic', neuromuscular: 'Neuromuscular',
+      race_prep: 'Race Prep', brick: 'Brick', unknown: 'Other',
+    };
+    const rideTypeFromWorkout = (wAny: any): RideSessionType => {
+      try {
+        const wa = parseJson((wAny as any)?.workout_analysis) || {};
+        const ct = String(wa?.fact_packet_v1?.facts?.classified_type || '').toLowerCase().trim();
+        const valid: Record<string, RideSessionType> = {
+          recovery: 'recovery', endurance: 'endurance', endurance_long: 'endurance_long',
+          tempo: 'tempo', sweet_spot: 'sweet_spot', threshold: 'threshold',
+          vo2: 'vo2', anaerobic: 'anaerobic', neuromuscular: 'neuromuscular',
+          race_prep: 'race_prep', brick: 'brick',
+        };
+        return valid[ct] ?? 'unknown';
+      } catch {
+        return 'unknown';
+      }
+    };
+    const rideAgg: Record<RideSessionType, {
+      n: number; exec: number[]; powerAdh: number[]; driftPct: number[];
+      ifs: number[]; nps: number[];
+    }> = {
+      recovery: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      endurance: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      endurance_long: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      tempo: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      sweet_spot: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      threshold: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      vo2: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      anaerobic: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      neuromuscular: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      race_prep: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      brick: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+      unknown: { n: 0, exec: [], powerAdh: [], driftPct: [], ifs: [], nps: [] },
+    };
+    for (const w of Array.isArray(recentWorkouts) ? recentWorkouts : []) {
+      if (String((w as any)?.workout_status || '').toLowerCase() !== 'completed') continue;
+      const t = String((w as any)?.type || '').toLowerCase();
+      if (t !== 'ride' && t !== 'cycling' && t !== 'bike') continue;
+      const rt = rideTypeFromWorkout(w as any);
+      rideAgg[rt].n += 1;
+      try {
+        const wa = parseJson((w as any)?.workout_analysis) || {};
+        const ex = safeNum(wa?.performance?.execution_score);
+        if (ex != null) rideAgg[rt].exec.push(ex);
+        const pa = safeNum(wa?.adherence_analysis?.power_adherence);
+        if (pa != null) rideAgg[rt].powerAdh.push(pa);
+        const facts = wa?.fact_packet_v1?.facts || {};
+        // hr_drift_pct: cycling stores it on ride_facts (compute-facts) but the analyzer
+        // also surfaces it as `hr_drift_bpm + early_avg_hr` on heart_rate_analysis. Compute
+        // the % the same way analyze-cycling-workout's adherence_summary does (Tier 3 item 7).
+        const hra = wa?.granular_analysis?.heart_rate_analysis || {};
+        const driftBpm = safeNum(hra?.hr_drift_bpm);
+        const earlyAvg = safeNum(hra?.early_avg_hr);
+        if (driftBpm != null && earlyAvg != null && earlyAvg > 0) {
+          rideAgg[rt].driftPct.push((driftBpm / earlyAvg) * 100);
+        }
+        const ifv = safeNum(facts.intensity_factor);
+        if (ifv != null) rideAgg[rt].ifs.push(ifv);
+        const np = safeNum(facts.normalized_power);
+        if (np != null) rideAgg[rt].nps.push(np);
+      } catch {
+        // ignore — partial data on the analysis row is normal during transition
+      }
+    }
+    const rideSessionTypes7d: NonNullable<CoachWeekContextResponseV1['ride_session_types_7d']> = (Object.keys(rideAgg) as RideSessionType[])
+      .filter((k) => rideAgg[k].n > 0)
+      .map((k) => {
+        const driftPct = avgArr(rideAgg[k].driftPct, 1);
+        const execScore = avgArr(rideAgg[k].exec, 0);
+        // Mirror running's interval-vs-steady branch: high-intensity cycling types use
+        // execution score (analog to running's intervals/hills); steady-state types use
+        // HR drift through `rideEfficiency`. Brick is a transition workout — drift is
+        // less meaningful, treat as steady-state for consistency.
+        const isPowerTargetedType =
+          k === 'vo2' || k === 'threshold' || k === 'anaerobic' ||
+          k === 'neuromuscular' || k === 'sweet_spot' || k === 'race_prep';
+        const eff = isPowerTargetedType
+          ? {
+              label: execScore != null ? `${execScore}% execution` : null,
+              tone: (execScore != null && execScore >= 85 ? 'positive' : execScore != null && execScore >= 70 ? 'warning' : 'neutral') as 'positive' | 'warning' | 'danger' | 'neutral',
+            }
+          : rideEfficiency(driftPct);
+        return {
+          type: k,
+          type_label: RIDE_TYPE_LABELS[k] || k,
+          sample_size: rideAgg[k].n,
+          avg_execution_score: execScore,
+          avg_power_adherence: avgArr(rideAgg[k].powerAdh, 0),
+          avg_hr_drift_pct: driftPct,
+          avg_intensity_factor: avgArr(rideAgg[k].ifs, 2),
+          avg_normalized_power: avgArr(rideAgg[k].nps, 0),
           efficiency_label: eff.label,
           efficiency_tone: eff.tone,
         };
@@ -2013,6 +2148,21 @@ Deno.serve(async (req) => {
     const chronic28RunLoad = weightedLoad(completedRolling);
     const runningAcwr = chronic28RunLoad > 0
       ? (acute7RunLoad / 7) / (chronic28RunLoad / 28)
+      : null;
+
+    // Cycling-weighted ACWR — Tier 4 item 11 of running→cycling delta map. Mirror of the
+    // running-weighted block above; uses `getCyclingFatigueWeight` to discount non-cycling
+    // modalities by their cycling-fatigue contribution (run 0.4 / lower-strength 0.7 /
+    // upper-strength 0.2 / swim 0.1 / mobility 0). Surfaced symmetrically with running_acwr
+    // in the coach response payload + body_response.load_status.cycling_acwr.
+    const weightedCyclingLoad = (rows: any[]) => rows.reduce((sum: number, r: any) => {
+      const w = getCyclingFatigueWeight({ type: String(r?.type || ''), name: String(r?.name || '') });
+      return sum + (safeNum(r?.workload_actual) || 0) * w;
+    }, 0);
+    const acute7CyclingLoad = weightedCyclingLoad(acute7Rows);
+    const chronic28CyclingLoad = weightedCyclingLoad(completedRolling);
+    const cyclingAcwr = chronic28CyclingLoad > 0
+      ? (acute7CyclingLoad / 7) / (chronic28CyclingLoad / 28)
       : null;
 
     // =========================================================================
@@ -3048,7 +3198,7 @@ Deno.serve(async (req) => {
         dailyLedger,
         snapshotNorms,
         isImperialForSnapshot,
-        { actual_vs_planned_pct: loadPct, acwr: acwr ?? null, running_acwr: runningAcwr },
+        { actual_vs_planned_pct: loadPct, acwr: acwr ?? null, running_acwr: runningAcwr, cycling_acwr: cyclingAcwr },
         {
           interference: weeklyResponseModel?.cross_domain?.interference_detected || false,
           detail: weeklyResponseModel?.cross_domain?.patterns?.[0]?.description || 'No interference detected.',
@@ -4237,6 +4387,10 @@ ${narrativeFacts.join('\n')}`;
 
     // Phase 3.5: Race readiness checklist (plan-aware)
     let marathon_readiness: CoachWeekContextResponseV1['marathon_readiness'];
+    // Tier 4 item 15 — declared here so it's visible in the outer scope where the
+    // response payload is constructed. Populated inside the `if (activePlan)` block
+    // below alongside the running planCtx; null when no active plan.
+    let cyclingLongRideContext: CoachWeekContextResponseV1['cycling_long_ride_context'] = null;
     try {
       // Build plan context for readiness thresholds
       let planCtx: PlanContext | null = null;
@@ -4314,6 +4468,74 @@ ${narrativeFacts.join('\n')}`;
           nextLongRunMi,
           nextLongRunDate,
         };
+
+        // ── Tier 4 item 15 — cycling long-ride context ────────────────────
+        // Mirrors the running block above with cycling units (hours, not miles)
+        // and a >=3 hr threshold for "long ride" (rough analog to running's >=10mi).
+        // Reads `total_duration_seconds` from planned_workouts (more reliable than
+        // regex-parsing the description; cycling stores planned ride duration as a
+        // structured column whereas the running block parses miles from text).
+        try {
+          const { data: allPlannedRides } = await supabase
+            .from('planned_workouts')
+            .select('date,type,total_duration_seconds,workload_planned')
+            .eq('training_plan_id', activePlan.id)
+            .eq('type', 'ride')
+            .order('date', { ascending: true });
+
+          let peakLongRideHr: number | null = null;
+          let nextLongRideHr: number | null = null;
+          let nextLongRideDate: string | null = null;
+          let longRideStillScheduled = false;
+          const weekHrs: Record<string, number> = {};
+
+          for (const pw of (allPlannedRides ?? [])) {
+            const sec = Number((pw as any)?.total_duration_seconds);
+            if (!Number.isFinite(sec) || sec <= 0) continue;
+            const hr = sec / 3600;
+
+            // Skip race day for peak calculations (matches running pattern).
+            if (raceDate && pw.date === raceDate) continue;
+            const isRaceWeek = raceWeekStart && pw.date >= raceWeekStart;
+
+            if (hr > (peakLongRideHr ?? 0)) peakLongRideHr = hr;
+
+            // Track upcoming long rides — >=3 hr is the cycling analog to running's
+            // >=10 mi threshold. 70.3 athletes typically peak at 3-4 hr long rides;
+            // full IM athletes at 5-6 hr. 3 hr catches the long-ride zone for both.
+            if (hr >= 3 && pw.date > asOfDate) {
+              longRideStillScheduled = true;
+              if (nextLongRideHr == null || pw.date < (nextLongRideDate ?? '9999')) {
+                nextLongRideHr = hr;
+                nextLongRideDate = pw.date;
+              }
+            }
+
+            if (!isRaceWeek) {
+              const d = new Date(pw.date + 'T12:00:00');
+              const epochDay = Math.floor(d.getTime() / 86400000);
+              const weekBucket = Math.floor((epochDay + 3) / 7); // +3 shifts epoch (Thu) to Mon
+              weekHrs[weekBucket] = (weekHrs[weekBucket] ?? 0) + hr;
+            }
+          }
+
+          const weekTotals = Object.values(weekHrs);
+          const peakWeekHr = weekTotals.length > 0 ? Math.max(...weekTotals) : null;
+          const avgWeekHr = weekTotals.length > 0 ? weekTotals.reduce((a, b) => a + b, 0) / weekTotals.length : null;
+
+          // Round for display — hour precision for longs, hour precision for weekly totals.
+          const round1 = (n: number | null) => n != null ? Math.round(n * 10) / 10 : null;
+          cyclingLongRideContext = {
+            peak_long_ride_hr: round1(peakLongRideHr),
+            peak_week_hr: round1(peakWeekHr),
+            avg_week_hr: round1(avgWeekHr),
+            long_ride_still_scheduled: longRideStillScheduled,
+            next_long_ride_hr: round1(nextLongRideHr),
+            next_long_ride_date: nextLongRideDate,
+          };
+        } catch (e) {
+          console.warn('[coach] cycling long-ride context build failed (non-fatal):', e);
+        }
       }
 
       const mr = await computeMarathonReadiness(userId, asOfDate, acwr ?? null, supabase, planCtx);
@@ -4529,6 +4751,7 @@ ${narrativeFacts.join('\n')}`;
           return 'rest now';
         })(),
         running_acwr: runningAcwr,
+        cycling_acwr: cyclingAcwr,
         run_only_week_load: athleteSnapshot?.body_response?.load_status?.run_only_week_load ?? null,
         run_only_week_load_pct: athleteSnapshot?.body_response?.load_status?.run_only_week_load_pct ?? null,
         running_weighted_week_load: athleteSnapshot?.body_response?.load_status?.running_weighted_week_load ?? null,
@@ -4668,6 +4891,8 @@ ${narrativeFacts.join('\n')}`;
           }))
         : undefined,
       run_session_types_7d: runSessionTypes7d,
+      ride_session_types_7d: rideSessionTypes7d,
+      cycling_long_ride_context: cyclingLongRideContext,
       response_model: weeklyResponseModel,
       race_finish_projection_v1: raceFinishProjectionV1,
       empty_state: weeklyResponseModel.empty_state ?? null,
@@ -4712,6 +4937,8 @@ ${narrativeFacts.join('\n')}`;
       baselines,
       baseline_drift_suggestions: baseline_drift_suggestions.length ? baseline_drift_suggestions : undefined,
       run_session_types_7d: runSessionTypes7d,
+      ride_session_types_7d: rideSessionTypes7d,
+      cycling_long_ride_context: cyclingLongRideContext,
       training_state,
       verdict: {
         code: v.code,

@@ -194,6 +194,8 @@ export type BodyResponse = {
     actual_vs_planned_pct: number | null;
     acwr: number | null;
     running_acwr: number | null;
+    /** Cycling-weighted ACWR — Tier 4 item 11 of running→cycling delta map. Mirrors `running_acwr` shape. */
+    cycling_acwr: number | null;
     run_only_week_load: number | null;
     run_only_week_load_pct: number | null;
     running_weighted_week_load: number | null;

@@ -47,6 +47,67 @@ export type RunSessionType7d = {
   efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
 };
 
+/**
+ * Cycling long-session context — Tier 4 item 15 of running→cycling delta map.
+ * Mirror of the running planCtx shape (peakLongRunMi, nextLongRunMi, etc.) using
+ * cycling units (hours) and a >=3 hr threshold for "long ride" (rough analog to
+ * running's >=10mi). Surfaces upcoming long rides so the coach narrative and any
+ * cycling race-readiness consumer (Tier 4 item 16, when it lands) can plan around
+ * the next big aerobic session.
+ */
+export type CyclingLongRideContext = {
+  /** Longest single planned ride in hours (excluding race day). */
+  peak_long_ride_hr: number | null;
+  /** Highest weekly ride volume in hours (excluding race week). */
+  peak_week_hr: number | null;
+  /** Average weekly ride volume in hours across non-race weeks. */
+  avg_week_hr: number | null;
+  /** True if at least one long ride (>=3 hr) is still scheduled after today. */
+  long_ride_still_scheduled: boolean;
+  /** Closest upcoming long ride duration in hours, or null if none scheduled. */
+  next_long_ride_hr: number | null;
+  /** Date of the next long ride (YYYY-MM-DD), or null if none scheduled. */
+  next_long_ride_date: string | null;
+};
+
+/**
+ * Cycling 7-day session-type breakdown — Tier 4 item 12 of running→cycling delta map.
+ * Mirrors RunSessionType7d shape with cycling-native signals. Type union uses the
+ * richer cycling-v1 classified_type taxonomy (12 categories vs running's 8) — see
+ * `_shared/cycling-v1/types.ts:3-15` for the source of truth.
+ *
+ * efficiency_label / efficiency_tone are placeholder (null / 'neutral') in item 12;
+ * item 14 fills them in via the cycling efficiency_factor heuristic.
+ */
+export type RideSessionType7d = {
+  type:
+    | 'recovery'
+    | 'endurance'
+    | 'endurance_long'
+    | 'tempo'
+    | 'sweet_spot'
+    | 'threshold'
+    | 'vo2'
+    | 'anaerobic'
+    | 'neuromuscular'
+    | 'race_prep'
+    | 'brick'
+    | 'unknown';
+  type_label: string;
+  sample_size: number;
+  avg_execution_score: number | null;
+  /** Cycling-native: % of work-interval time within prescribed power range. */
+  avg_power_adherence: number | null;
+  /** Cycling stores HR drift as % of early-half avg HR (different from running's bpm). */
+  avg_hr_drift_pct: number | null;
+  /** NP / FTP — quantifies effort vs threshold. */
+  avg_intensity_factor: number | null;
+  /** Average normalized power across rides of this type, in watts. */
+  avg_normalized_power: number | null;
+  efficiency_label: string | null;
+  efficiency_tone: 'positive' | 'warning' | 'danger' | 'neutral';
+};
+
 export type EvidenceItem = {
   code: string;
   label: string;
@@ -168,6 +229,12 @@ export type CoachWeekContextResponseV1 = {
     };
   };
   run_session_types_7d?: RunSessionType7d[];
+  /** Tier 4 item 12 of running→cycling delta map. Mirror of run_session_types_7d for rides. */
+  ride_session_types_7d?: RideSessionType7d[];
+  /** Tier 4 item 15 of running→cycling delta map. Mirror of running's planCtx fields
+   * (peakLongRunMi / nextLongRunMi / etc.) for cycling. Long rides are >= 3 hr.
+   * Cycling race-readiness (Tier 4 item 16) will read from this when it lands. */
+  cycling_long_ride_context?: CyclingLongRideContext | null;
   response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
   goal_context?: import('../_shared/goal-context.ts').GoalContext;
   goal_prediction?: import('../_shared/goal-predictor/index.ts').GoalPredictionResult;
@@ -341,6 +408,8 @@ export type CoachWeekContextResponseV1 = {
       acwr: number | null;
       label: string | null;
       running_acwr: number | null;
+      /** Tier 4 item 11 — cycling-weighted ACWR (mirror of running_acwr). */
+      cycling_acwr: number | null;
       run_only_week_load: number | null;
       run_only_week_load_pct: number | null;
       running_weighted_week_load: number | null;
@@ -380,6 +449,12 @@ export type CoachWeekContextResponseV1 = {
       detail: string;
     }>;
     run_session_types_7d?: RunSessionType7d[];
+  /** Tier 4 item 12 of running→cycling delta map. Mirror of run_session_types_7d for rides. */
+  ride_session_types_7d?: RideSessionType7d[];
+  /** Tier 4 item 15 of running→cycling delta map. Mirror of running's planCtx fields
+   * (peakLongRunMi / nextLongRunMi / etc.) for cycling. Long rides are >= 3 hr.
+   * Cycling race-readiness (Tier 4 item 16) will read from this when it lands. */
+  cycling_long_ride_context?: CyclingLongRideContext | null;
     response_model?: import('../_shared/response-model/types.ts').WeeklyResponseState;
     race_finish_projection_v1?: import('../_shared/resolve-server-predicted-finish.ts').RaceFinishProjectionV1 | null;
   };
