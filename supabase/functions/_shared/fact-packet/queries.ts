@@ -12,6 +12,8 @@ import {
   resolveOverallDistanceMi,
   resolveOverallPaceSecPerMi,
 } from './pace-resolution.ts';
+import { ACWR_RATIO_THRESHOLDS } from '../acwr-state.ts';
+import type { AcwrWeekIntent } from '../acwr-state.ts';
 
 type SupabaseLike = any;
 
@@ -553,11 +555,56 @@ export async function getNotableAchievements(
   }
 }
 
+/**
+ * Context-aware ACWR fatigue gate. The fact-packet `training_load` path used to
+ * push "Training stress trending up" on a raw `acwr_ratio > 1.1` calendar sum with
+ * no phase/transition/week-intent awareness — so it fired on a normal early-build
+ * ride after a marathon taper+recovery (the taper/recovery weeks deflate the 28d
+ * chronic denominator, mechanically inflating the ratio). The coach already
+ * suppresses this via `isAcwrFatiguedSignal` in `_shared/acwr-state.ts`; this path
+ * bypassed it. Equivalent logic, not a raw `isAcwrFatiguedSignal` call, because we
+ * must (a) keep the moderate/high two-tier the fact packet emits and (b) preserve
+ * the original 1.1/1.3 thresholds for normal/base weeks (isAcwrFatiguedSignal uses
+ * 1.3 for the non-build path, which would silently drop the moderate tier).
+ *
+ *  - transition window  → no flag (load ratios contaminated by the prior cycle)
+ *  - build/peak/baseline → only flag true overreaching (> build_elevated_max, 1.7),
+ *                          since elevated ACWR is expected while building
+ *  - otherwise (base/recovery/taper/unknown) → original 1.1 moderate / 1.3 high
+ */
+export function acwrFatigueSignal(
+  ratio: number | null | undefined,
+  isTransitionWindow: boolean = false,
+  weekIntent: AcwrWeekIntent | string | null = 'build',
+): { tier: 'high' | 'moderate'; message: string } | null {
+  const v = Number(ratio);
+  if (!Number.isFinite(v)) return null;
+  if (isTransitionWindow) return null;
+  const wi = weekIntent ?? 'build';
+  if (wi === 'build' || wi === 'peak' || wi === 'baseline') {
+    return v > ACWR_RATIO_THRESHOLDS.build_elevated_max
+      ? { tier: 'high', message: 'Training stress elevated — recovery matters' }
+      : null;
+  }
+  if (v > 1.3) return { tier: 'high', message: 'Training stress elevated — recovery matters' };
+  if (v > 1.1) return { tier: 'moderate', message: 'Training stress trending up' };
+  return null;
+}
+
 export async function getTrainingLoadContext(
   supabase: SupabaseLike,
-  params: { userId: string; workoutDateIso: string }
+  params: {
+    userId: string;
+    workoutDateIso: string;
+    /** Plan week intent for ACWR gating; defaults to 'build' (lenient) when unknown. */
+    weekIntent?: AcwrWeekIntent | string | null;
+    /** First 1–2 plan weeks: ACWR ratios are contaminated by the prior cycle. */
+    isTransitionWindow?: boolean;
+  }
 ): Promise<TrainingLoadV1 | null> {
   const { userId, workoutDateIso } = params;
+  const isTransitionWindow = params.isTransitionWindow ?? false;
+  const weekIntent = params.weekIntent ?? 'build';
   try {
     const workoutDate = toDateOnly(workoutDateIso);
     if (!workoutDate) return null;
@@ -777,8 +824,12 @@ export async function getTrainingLoadContext(
     if (week_load_pct != null && week_load_pct > 120) { flagsHigh.push(true); fatigue_evidence.push(`High training load this week (${week_load_pct}% of plan)`); }
     else if (week_load_pct != null && week_load_pct > 100) { flagsMod.push(true); fatigue_evidence.push(`Above-plan training load this week (${week_load_pct}%)`); }
 
-    if (acwr_ratio != null && acwr_ratio > 1.3) { flagsHigh.push(true); fatigue_evidence.push(`Training stress elevated — recovery matters`); }
-    else if (acwr_ratio != null && acwr_ratio > 1.1) { flagsMod.push(true); fatigue_evidence.push(`Training stress trending up`); }
+    const acwrSig = acwrFatigueSignal(acwr_ratio, isTransitionWindow, weekIntent);
+    if (acwrSig) {
+      if (acwrSig.tier === 'high') flagsHigh.push(true);
+      else flagsMod.push(true);
+      fatigue_evidence.push(acwrSig.message);
+    }
 
     const cumulative_fatigue: TrainingLoadV1['cumulative_fatigue'] =
       flagsHigh.length >= 2 ? 'high' :

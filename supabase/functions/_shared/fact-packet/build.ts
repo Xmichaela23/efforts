@@ -14,6 +14,7 @@ import {
   secondsToPaceString,
 } from './utils.ts';
 import { getComparableTypeKeys, getNotableAchievements, getPaceTrend, getSimilarWorkoutComparisons, getTrainingLoadContext, inferWorkoutTypeKey } from './queries.ts';
+import { isPlanTransitionWindowByWeekIndex } from '../plan-week.ts';
 import { assessStimulus } from './stimulus.ts';
 import { identifyPerformanceLimiter } from './limiter.ts';
 import { generateFlagsV1 } from './flags.ts';
@@ -385,7 +386,14 @@ export async function buildWorkoutFactPacketV1(args: {
     }),
     getPaceTrend(supabase, { userId: String(workout.user_id), workoutTypeKey: comparisonTypeKey, count: 8 }),
     getNotableAchievements(supabase, { userId: String(workout.user_id), currentWorkoutId: String(workout.id), workoutTypeKey, lookbackDays: 28 }),
-    workout?.date ? getTrainingLoadContext(supabase, { userId: String(workout.user_id), workoutDateIso: String(workout.date) }) : Promise.resolve(null),
+    workout?.date ? getTrainingLoadContext(supabase, {
+      userId: String(workout.user_id),
+      workoutDateIso: String(workout.date),
+      // Thread plan context so the ACWR fatigue flag matches the coach's
+      // transition/build-aware suppression instead of a raw >1.1 calendar sum.
+      weekIntent: weekIntent,
+      isTransitionWindow: isPlanTransitionWindowByWeekIndex(planContext?.weekIndex),
+    }) : Promise.resolve(null),
   ]);
 
   const hr_drift_bpm = (() => {
