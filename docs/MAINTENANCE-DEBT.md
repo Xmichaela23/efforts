@@ -100,9 +100,27 @@ consumer. Same class as the "Run — Tempo vs Run Intervals" divergence in
 **Fix (2026-05-14):**
 - Fix 1 (contract): `analyze-cycling-workout` explicitly nulls run-only keys in its
   payload so the spread-merge scrubs stale run analysis. Converts the silent merge-gap
-  into an explicit cross-sport scrub.
-- Fix 2 (display): `session-detail/build.ts` sport-guards the run-shaped reads
-  (`type === 'run'`) so even a dirty row can't render run copy on a ride.
+  into an explicit cross-sport scrub. Unit-tested (`_shared/cross-sport-key-scrub.test.ts`).
+- Fix 2 (display): `session-detail/build.ts` sport-guards the run-shaped reads so even
+  a dirty row can't render run copy on a ride. Three guard sites:
+  - 2a: `race_debrief_text` (`type === 'run' &&`, ~line 312).
+  - 2b: `workout-detail` goal-race mile-split debrief block (`isRunSession` gate).
+  - **2c (the actual symptom source): `buildAnalysisDetailRows` pacing-split block
+    (~lines 772-848).** This builds the "Pacing" row — `Negative split — pacing Ns/mi
+    faster`, `Fastest: Mile N at M:SS/mi`, structured `Work intervals faded Ns/mi`. It
+    reads `computed.analysis.events.splits.mi`, which `compute-workout-analysis`
+    populates for ANY GPS workout including a ride, so it rendered on the cycling
+    goal-race workout. `buildAnalysisDetailRows` had no discipline parameter at all;
+    fixed by threading a `sport` arg from the call site and bailing the whole
+    pace-per-mile block when `sport !== 'run'`.
+
+  **Process note for institutional memory:** the symptom string was first mis-traced
+  to `race_debrief_text` (2a) and the goal-race debrief block (2b) and "fixed" + shipped
+  in commit `0a358d49` — the UI still showed the bug because neither path generated the
+  rendered "Pacing" row. The real source (2c) is a separate, parameter-less helper.
+  Lesson: confirm the *exact rendered string's* generator (grep the literal copy →
+  `rows.push({ label: 'Pacing', … })`) before declaring a display-path root cause;
+  plausible adjacent paths are not proof.
 
 **Follow-up not in this pass:** the same scrub is needed in `analyze-swim-workout` and
 `analyze-strength-workout` (and run's analyzer should scrub cycling-only keys like

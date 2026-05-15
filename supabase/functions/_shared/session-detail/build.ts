@@ -387,6 +387,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         comp,
         !!perf?.gap_adjusted,
         intervals,
+        type,
       );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -747,7 +748,7 @@ function buildPlannedTotals(
 
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
-  intervals: IntervalRow[] = [],
+  intervals: IntervalRow[] = [], sport: string = '',
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -769,7 +770,17 @@ function buildAnalysisDetailRows(
 
 
 
+  // SPORT GUARD (2026-05-14): this entire block emits `s/mi` pace-per-mile copy —
+  // "Negative split — pacing Ns/mi faster", "Fastest: Mile N at M:SS/mi", structured
+  // "Work intervals faded Ns/mi". It reads `computed.analysis.events.splits.mi`, which
+  // compute-workout-analysis populates for ANY workout with a GPS distance series
+  // (including an Edge-1040 bike ride). With no discipline check it rendered run
+  // pacing copy on the cycling goal-race workout (the reported "Mile 9 at 2:51/mi"
+  // bug — actual source, distinct from race_debrief_text / the goal-race debrief
+  // block). Pace-per-mile is a running construct; cyclists get power/NP pacing
+  // elsewhere. Run-only. See docs/MAINTENANCE-DEBT.md "Cross-sport analysis-key bleed".
   try {
+    if (sport !== 'run') throw new Error('skip: pace-per-mile pacing is run-only');
     const ie = derived?.interval_execution;
     const isStructured = typeof ie?.total_steps === 'number' && ie.total_steps > 2;
 
