@@ -173,15 +173,15 @@ export async function generateCyclingAISummaryV1(
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
 ${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
-- Output ONE paragraph.
-- Be specific and grounded: reference 2-4 concrete details from the packet ONLY when they explain the outcome.
-- No filler. Avoid generic phrases like "effective", "overall", "moving forward", "ensure".
-- CRITICAL: Do not introduce any numbers, percentages, or time-in-zone claims that are not present verbatim in the packet.
-- If there is no planned intent, do not pretend there was a prescription; describe what the ride was physiologically.
-- Prefer the TOP FLAGS as the framing.
-- If cross_workout context is present, lead with it: a trend ("NP is trending up/down over N rides") or vs-similar comparison ("Xw above/below your typical [type] rides") is more valuable than any single-ride metric. Reference power_prs only when this ride set one. Use limiter.detail only as supporting context, never as the lede.
-- If plan.week_number is present, explicitly anchor where the athlete is in the plan (week number, phase/week_intent) before giving advice.
-- If plan_intent is null but plan.week_number is present, treat this as an unplanned session during a plan: include one sentence on impact using training_load, and suggest a concrete adjustment for upcoming training without adding new numbers.
+- MAX 2 sentences. Punchy, not exhaustive. Stop after the second sentence.
+- Lead with the SINGLE most notable finding, in this priority order: (1) a power PR set this ride, (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the NP trend across recent rides, (4) the limiter signal. Pick ONE lede — never a list of findings.
+- The second sentence (optional) adds the one piece of supporting context that explains the lede — nothing else.
+- Reference the specific numbers from the packet that support the lede.
+- Do NOT recap the power-zone / ftp_bins time breakdown, and do NOT explain ACWR or training-load math. The athlete sees those in the rows below — restating them wastes the narrative.
+- No filler. Avoid "effective", "overall", "moving forward", "ensure", "solid".
+- CRITICAL: Do not introduce any numbers or percentages that are not present verbatim in the packet.
+- If there is no planned intent, describe the ride physiologically; do not invent a prescription.
+- If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.
 
 PACKET (authoritative; do not compute outside it):
 ${packetStr}

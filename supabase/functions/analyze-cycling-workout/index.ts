@@ -2045,7 +2045,10 @@ Deno.serve(async (req) => {
         })();
         const { data: npRows } = await supabase
           .from('workouts')
-          .select('id, date, computed')
+          // Must fetch every column rideComputedNp inspects — NP commonly lives in
+          // weighted_average_watts / top-level normalized_power on ingested rides,
+          // not computed.overall. Selecting only `computed` starved the trend.
+          .select('id, date, computed, normalized_power, weighted_average_watts, metrics')
           .eq('user_id', (workout as any).user_id)
           .in('type', ['ride', 'cycling', 'bike'])
           .eq('workout_status', 'completed')
