@@ -996,9 +996,17 @@ function buildAnalysisDetailRows(
   // for rides — omitted). Labelled "Conditions" so the client relabels it TERRAIN.
   try {
     if (sport === 'ride') {
-      const elevM = Number(comp?.overall?.elevation_gain_m ?? comp?.overall?.elevation_gain);
+      // computed.overall.elevation_gain_m is frequently null for rides; the value
+      // actually lives on the activity lap (computed.analysis.events.laps[0]
+      // .total_elevation_gain, metres). Prefer overall when present, else the lap.
+      const lap0 = comp?.analysis?.events?.laps?.[0];
+      const elevM = Number(
+        comp?.overall?.elevation_gain_m ??
+          comp?.overall?.elevation_gain ??
+          lap0?.total_elevation_gain,
+      );
       if (Number.isFinite(elevM) && elevM > 15) {
-        rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft elevation gain` });
+        rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain` });
       }
     }
   } catch { /* */ }
