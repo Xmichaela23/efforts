@@ -388,6 +388,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         !!perf?.gap_adjusted,
         intervals,
         type,
+        (wa as any)?.vs_similar_v1 ?? null,
       );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -447,8 +448,44 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const pacingCV = fin((wa as any)?.analysis?.pacing_analysis?.pacing_variability?.coefficient_of_variation)
     ?? fin(granular?.pacing_analysis?.pacing_variability?.coefficient_of_variation);
 
+  // Cycling Insights fallback: when no LLM ai_summary exists (narrativeText/
+  // session_state_v1.narrative.text both null) a ride's Insights block was near-empty.
+  // Synthesize a deterministic narrative from the fact packet (NP/IF/classified_type/
+  // VI + HR + a flag). Template, not LLM — used only when the LLM summary is absent;
+  // a real ai_summary always wins. Run/swim/strength keep their existing path.
+  const cyclingNarrativeFallback = (() => {
+    if (type !== 'ride' || resolvedNarrative || isGoalRaceSession) return null;
+    const f = (factPacket?.facts || {}) as any;
+    const np = Number(f.normalized_power_w);
+    const ifv = Number(f.intensity_factor);
+    const vi = Number(f.variability_index);
+    const ct = f.classified_type ? String(f.classified_type).replace(/_/g, ' ') : null;
+    const dur = Number(f.total_duration_min);
+    const avgHr = Number(f.avg_hr);
+    const parts: string[] = [];
+    const lead = ct ? `${ct.charAt(0).toUpperCase()}${ct.slice(1)} ride` : 'Ride';
+    if (Number.isFinite(np) && np > 0 && Number.isFinite(ifv) && ifv > 0) {
+      parts.push(`${lead}: ${Math.round(np)}W normalized power at IF ${ifv.toFixed(2)}${Number.isFinite(dur) && dur > 0 ? ` over ${Math.round(dur)} min` : ''}.`);
+    } else if (Number.isFinite(dur) && dur > 0) {
+      parts.push(`${lead} — ${Math.round(dur)} min.`);
+    } else {
+      parts.push(`${lead}.`);
+    }
+    if (Number.isFinite(vi) && vi > 0) {
+      parts.push(vi <= 1.05
+        ? `Steady output (VI ${vi.toFixed(2)}) — well-controlled power.`
+        : `Variable output (VI ${vi.toFixed(2)}) — surgey power delivery.`);
+    }
+    if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`Avg HR ${Math.round(avgHr)} bpm.`);
+    const flag = Array.isArray(flagsV1)
+      ? flagsV1.find((x: any) => x && typeof x.message === 'string' && x.message.trim())
+      : null;
+    if (flag) parts.push(String(flag.message).trim());
+    return parts.length ? parts.join(' ') : null;
+  })();
+
   const performanceNarrativeText = mergeArcPerformanceNarrative({
-    analysisNarrative: resolvedNarrative,
+    analysisNarrative: resolvedNarrative || cyclingNarrativeFallback,
     isGoalRaceSession,
   });
 
@@ -535,6 +572,37 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     pacing: { coefficient_of_variation: pacingCV },
 
     trend: (() => {
+      // Cycling: NP series (higher = fitter). Reads the dated np_trend_v1 the
+      // analyzer persists (vs_similar_v1 is a delta-summary, not a series). Run
+      // logic below is untouched.
+      if (type === 'ride') {
+        try {
+          const npts = (wa as any)?.np_trend_v1?.points;
+          if (!Array.isArray(npts) || npts.length < 3) return null;
+          const sorted = [...npts].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+          const points = sorted
+            .map((p: any) => ({
+              date: String(p.date),
+              value: Number(p.value),
+              avg_hr: null,
+              is_current: !!p.is_current,
+              label: `${Math.round(Number(p.value))}W`,
+            }))
+            .filter((p) => Number.isFinite(p.value) && p.value > 0 && p.value < 1000);
+          if (points.length < 3) return null;
+          const mid = Math.ceil(points.length / 2);
+          const avgArr = (arr: typeof points) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
+          const firstHalfAvg = avgArr(points.slice(0, mid));
+          const secondHalfAvg = avgArr(points.slice(mid));
+          const delta = Math.round(secondHalfAvg - firstHalfAvg); // higher NP later = improving
+          const direction = delta > 3 ? 'improving' as const : delta < -3 ? 'declining' as const : 'stable' as const;
+          const absDelta = Math.abs(delta);
+          const summary = direction === 'stable'
+            ? `Consistent NP across ${points.length} rides`
+            : `${absDelta}W ${direction === 'improving' ? 'higher' : 'lower'} over ${points.length} rides`;
+          return { metric_label: 'Normalized power', unit: 'W', points, direction, summary, lower_is_better: false };
+        } catch { return null; }
+      }
       try {
         const pts = factPacket?.derived?.comparisons?.vs_similar?.trend_points;
         if (!Array.isArray(pts) || pts.length < 3) return null;
@@ -748,7 +816,7 @@ function buildPlannedTotals(
 
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
-  intervals: IntervalRow[] = [], sport: string = '',
+  intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -873,6 +941,82 @@ function buildAnalysisDetailRows(
     if (typeof np === 'number' && np > 0 && typeof ifv === 'number' && ifv > 0) {
       const ct = cf?.classified_type ? String(cf.classified_type).replace(/_/g, ' ') : 'training stimulus';
       rows.push({ label: 'Power', value: `Normalized power ${np}W at IF ${ifv.toFixed(2)} — ${ct} effort` });
+    }
+  } catch { /* */ }
+
+  // ── Cycling parity rows (ride only) ─────────────────────────────────────────
+  // Rides have no pace-per-mile / route-history / weather facts in the cycling fact
+  // packet, so the run-shaped HR-drift / Conditions blocks below no-op for rides.
+  // These emit the cycling equivalents from data already in the cycling fact packet
+  // (avg/max HR, ftp_bins) + completed computed (elevation) + vs_similar_v1. All
+  // route through analysis_details.rows, which the client renders verbatim and
+  // relabels Conditions→Terrain on elevation strings.
+
+  // Heart rate (cycling): no derived.hr_drift_bpm in the cycling packet, so surface
+  // avg/max instead of the run drift narrative.
+  try {
+    if (sport === 'ride') {
+      const f = (factPacket?.facts || {}) as any;
+      const avgHr = Number(f.avg_hr);
+      const maxHr = Number(f.max_hr);
+      const parts: string[] = [];
+      if (Number.isFinite(avgHr) && avgHr > 0) parts.push(`Avg ${Math.round(avgHr)} bpm`);
+      if (Number.isFinite(maxHr) && maxHr > 0) parts.push(`Max ${Math.round(maxHr)} bpm`);
+      if (parts.length > 0) rows.push({ label: 'Heart rate', value: parts.join(' · ') });
+    }
+  } catch { /* */ }
+
+  // Power zones: ftp_bins is minutes per %-FTP band (CyclingFtpBinsV1). Show the
+  // non-zero bands, biggest first, capped at 4 so the row stays scannable.
+  try {
+    if (sport === 'ride') {
+      const bins = (factPacket?.derived?.ftp_bins || null) as Record<string, number> | null;
+      if (bins && typeof bins === 'object') {
+        const label: Record<string, string> = {
+          lt_0_60_min: 'Recovery',
+          p0_60_0_75_min: 'Endurance',
+          p0_75_0_85_min: 'Tempo',
+          p0_85_0_95_min: 'Sweet spot',
+          p0_95_1_05_min: 'Threshold',
+          p1_05_1_20_min: 'VO2',
+          gt_1_20_min: 'Anaerobic',
+        };
+        const segs = Object.keys(label)
+          .map((k) => ({ name: label[k], min: Math.round(Number(bins[k]) || 0) }))
+          .filter((s) => s.min > 0)
+          .sort((a, b) => b.min - a.min)
+          .slice(0, 4)
+          .map((s) => `${s.name} ${s.min}m`);
+        if (segs.length > 0) rows.push({ label: 'Power zones', value: segs.join(' · ') });
+      }
+    }
+  } catch { /* */ }
+
+  // Terrain (cycling): elevation gain from completed computed (temp is not persisted
+  // for rides — omitted). Labelled "Conditions" so the client relabels it TERRAIN.
+  try {
+    if (sport === 'ride') {
+      const elevM = Number(comp?.overall?.elevation_gain_m ?? comp?.overall?.elevation_gain);
+      if (Number.isFinite(elevM) && elevM > 15) {
+        rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft elevation gain` });
+      }
+    }
+  } catch { /* */ }
+
+  // Trend (cycling): vs_similar_v1 is a delta-summary vs the athlete's typical ride
+  // of this type/duration (Tier 3 item 10 / D-010). Surfaced as a row so it renders
+  // even when the NP sparkline lacks ≥3 dated points.
+  try {
+    if (sport === 'ride' && vsSimilar && Number(vsSimilar.sample_size) >= 3) {
+      const ct = vsSimilar.matched_type ? String(vsSimilar.matched_type).replace(/_/g, ' ') : 'similar';
+      const seg: string[] = [];
+      const npD = Number(vsSimilar.np_delta_w);
+      const ifD = Number(vsSimilar.if_delta);
+      if (Number.isFinite(npD)) seg.push(`NP ${npD >= 0 ? '+' : ''}${Math.round(npD)}W vs typical ${ct}`);
+      if (Number.isFinite(ifD) && Math.abs(ifD) >= 0.01) seg.push(`IF ${ifD >= 0 ? '+' : ''}${ifD.toFixed(2)}`);
+      const asmt = typeof vsSimilar.assessment === 'string' ? vsSimilar.assessment.replace(/_/g, ' ') : null;
+      seg.push(`${Number(vsSimilar.sample_size)} similar${asmt ? ` (${asmt})` : ''}`);
+      if (seg.length > 0) rows.push({ label: 'Trend', value: seg.join(' · ') });
     }
   } catch { /* */ }
 

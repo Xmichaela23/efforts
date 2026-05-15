@@ -1969,6 +1969,9 @@ Deno.serve(async (req) => {
     let cyclingPRs: CyclingPRsV1 | null = null;
     let cyclingVsSimilar: CyclingVsSimilarV1 | null = null;
     let cyclingLimiter: CyclingLimiterV1 = { flag: 'none', source: 'insufficient_data', detail: 'Cross-workout queries skipped (analyzer error path).' };
+    // Declared at cross-workout scope (not inside the NP-samples try) so it's visible
+    // in the analysisPayload below — same scoping rule as cyclingVsSimilar/limiter.
+    let npTrendV1: { points: Array<{ date: string; value: number; is_current: boolean }> } | null = null;
     try {
       // §1 PRs — best 20-min / 5-min / 1-min on 90d + all-time windows.
       cyclingPRs = await fetchCyclingPRs(supabase, {
@@ -2023,6 +2026,13 @@ Deno.serve(async (req) => {
       // Skipped silently if the query fails — limiter falls through to insufficient_data.
       let recentNpSamples: number[] = [];
       let ninetyDayNpSamples: number[] = [];
+      // Dated NP series for the cycling Trend sparkline. The 90d query below already
+      // pulls {date, computed} per ride; running's trend reads a dated trend_points
+      // array, cycling had none (vs_similar_v1 is a delta-summary, not a series), so
+      // the chart could never render. Build the series here from data already fetched
+      // (no extra query) and persist as np_trend_v1 — independent of CyclingVsSimilarV1
+      // so its typed shape / tests don't ripple. (npTrendV1 declared at outer scope.)
+      const npDated: Array<{ date: string; np: number }> = [];
       try {
         const today = new Date().toISOString().slice(0, 10);
         const ninetyAgo = (() => {
@@ -2050,7 +2060,22 @@ Deno.serve(async (req) => {
           if (!Number.isFinite(np) || np <= 0) continue;
           ninetyDayNpSamples.push(np);
           if (String(r.date) >= fourteenAgo) recentNpSamples.push(np);
+          if (r?.date) npDated.push({ date: String(r.date), np: Math.round(np) });
         }
+        // Add the current ride as the is_current point, then sort ascending and
+        // cap to the most recent 12 so the sparkline stays readable.
+        const currentNp = Number(
+          cyclingFactPacketV1?.facts?.normalized_power_w ??
+            (workout as any)?.computed?.overall?.normalized_power,
+        );
+        const currentDate = String((workout as any)?.date || '');
+        const byDate = new Map<string, { date: string; value: number; is_current: boolean }>();
+        for (const d of npDated) byDate.set(d.date, { date: d.date, value: d.np, is_current: false });
+        if (Number.isFinite(currentNp) && currentNp > 0 && currentDate) {
+          byDate.set(currentDate, { date: currentDate, value: Math.round(currentNp), is_current: true });
+        }
+        const pts = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+        if (pts.length >= 3) npTrendV1 = { points: pts };
       } catch (e) {
         console.warn('[analyze-cycling-workout] NP-samples fetch failed (non-fatal):', e);
       }
@@ -2110,6 +2135,8 @@ Deno.serve(async (req) => {
       achievements_v1: cyclingPRs,
       vs_similar_v1: cyclingVsSimilar,
       limiter_v1: cyclingLimiter,
+      // Dated NP series for the cycling Trend sparkline (see npTrendV1 build above).
+      np_trend_v1: npTrendV1,
     };
 
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
