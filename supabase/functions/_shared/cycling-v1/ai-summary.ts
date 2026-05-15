@@ -26,7 +26,77 @@ function validateNoNewNumbers(summary: string, displayPacket: string): { ok: boo
   return { ok: true };
 }
 
-function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
+/**
+ * Compact, number-bearing cross-workout block for the AI summary — parity with
+ * analyze-running-workout, whose fact packet carries derived.comparisons before
+ * the summary runs. Surfacing these here (a) lets the narrative lead with the
+ * trend/comparison instead of a single-ride readout, and (b) whitelists their
+ * numbers for validateNoNewNumbers (which only allows tokens present in the
+ * serialized packet). Returns null when no cross-workout signal is meaningful.
+ */
+export function cyclingCrossWorkoutDisplay(cw: {
+  vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any;
+} | null | undefined): any | null {
+  if (!cw) return null;
+  const out: any = {};
+
+  const vs = cw.vsSimilar;
+  if (vs && vs.np_delta_w != null && Number.isFinite(Number(vs.np_delta_w))) {
+    out.vs_similar = {
+      matched_type: vs.matched_type ?? null,
+      sample_size: (vs.sample_size != null && Number.isFinite(Number(vs.sample_size))) ? Number(vs.sample_size) : null,
+      np_delta_w: Math.round(Number(vs.np_delta_w)),
+      if_delta: (vs.if_delta != null && Number.isFinite(Number(vs.if_delta))) ? Number(Number(vs.if_delta).toFixed(2)) : null,
+      assessment: typeof vs.assessment === 'string' ? vs.assessment : null,
+    };
+  }
+
+  const tr = cw.npTrend;
+  if (tr && Array.isArray(tr.points) && tr.points.length >= 3) {
+    const pts = [...tr.points]
+      .filter((p: any) => p && Number.isFinite(Number(p.value)))
+      .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+    if (pts.length >= 3) {
+      const mid = Math.ceil(pts.length / 2);
+      const avg = (arr: any[]) => arr.reduce((s, p) => s + Number(p.value), 0) / arr.length;
+      const delta = Math.round(avg(pts.slice(mid)) - avg(pts.slice(0, mid)));
+      out.np_trend = {
+        points: pts.length,
+        direction: delta > 3 ? 'improving' : delta < -3 ? 'declining' : 'stable',
+        delta_w: delta,
+      };
+    }
+  }
+
+  const prs = cw.achievements;
+  if (prs && prs.durations && typeof prs.durations === 'object') {
+    const ach: string[] = [];
+    for (const d of ['20min', '5min', '1min']) {
+      const e = (prs.durations as any)[d];
+      const at = e?.all_time_pr?.value;
+      const rc = e?.recent_pr?.value;
+      if (Number.isFinite(Number(at))) ach.push(`${d} ${Math.round(Number(at))}W all-time best`);
+      else if (Number.isFinite(Number(rc))) ach.push(`${d} ${Math.round(Number(rc))}W 90-day best`);
+    }
+    if (ach.length > 0) out.power_prs = ach;
+  }
+
+  const lim = cw.limiter;
+  if (lim && lim.flag && lim.flag !== 'none' && lim.source !== 'insufficient_data') {
+    out.limiter = {
+      flag: String(lim.flag),
+      detail: typeof lim.detail === 'string' ? lim.detail : null,
+    };
+  }
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function toDisplayPacket(
+  fp: CyclingFactPacketV1,
+  flags: CyclingFlagV1[],
+  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any } | null,
+): any {
   const f = fp.facts;
   const d = fp.derived;
   const tl = (d as any)?.training_load || null;
@@ -73,6 +143,7 @@ function toDisplayPacket(fp: CyclingFactPacketV1, flags: CyclingFlagV1[]): any {
       .sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 3)
       .map((x) => ({ type: x.type, category: x.category, message: x.message, priority: x.priority })),
+    cross_workout: cyclingCrossWorkoutDisplay(crossWorkout),
   };
 }
 
@@ -80,8 +151,9 @@ export async function generateCyclingAISummaryV1(
   factPacket: CyclingFactPacketV1,
   flags: CyclingFlagV1[],
   coachingContext?: string | null,
+  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any } | null,
 ): Promise<string | null> {
-  const display = toDisplayPacket(factPacket, flags);
+  const display = toDisplayPacket(factPacket, flags, crossWorkout);
   const packetStr = JSON.stringify(display, null, 2);
 
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
@@ -93,6 +165,7 @@ RULES:
 - CRITICAL: Do not introduce any numbers, percentages, or time-in-zone claims that are not present verbatim in the packet.
 - If there is no planned intent, do not pretend there was a prescription; describe what the ride was physiologically.
 - Prefer the TOP FLAGS as the framing.
+- If cross_workout context is present, lead with it: a trend ("NP is trending up/down over N rides") or vs-similar comparison ("Xw above/below your typical [type] rides") is more valuable than any single-ride metric. Reference power_prs only when this ride set one. Use limiter.detail only as supporting context, never as the lede.
 - If plan.week_number is present, explicitly anchor where the athlete is in the plan (week number, phase/week_intent) before giving advice.
 - If plan_intent is null but plan.week_number is present, treat this as an unplanned session during a plan: include one sentence on impact using training_load, and suggest a concrete adjustment for upcoming training without adding new numbers.
 

@@ -814,6 +814,47 @@ function buildPlannedTotals(
   return { duration_s: durS, distance_m: distM, avg_pace_s_per_mi: avgPace, swim_pace_per_100_s: swimPer100, swim_unit: swimUnit };
 }
 
+/**
+ * Cycling vs-similar context row from vs_similar_v1 (Tier 3 item 10 / D-010).
+ * vs_similar_v1 only carries np_delta_w (current − avg of matched rides), so the
+ * absolute "avg" NP is reconstructed as currentNp − np_delta_w. Spec format:
+ *   "NP {X}W vs {Y}W avg on similar {type} rides — {assessment}"
+ * Falls back to a delta phrasing when the current NP isn't available (we can't
+ * show absolute X/Y without it, but the comparison itself is still meaningful).
+ * Label is 'vs similar' (NOT 'Trend' — the Trend sparkline is the separate
+ * top-level `trend` contract field; a same-named analysis_details row is
+ * confusing). Watts use uppercase W for consistency with the rest of the
+ * cycling display (Power row, trend unit), not the spec's informal lowercase w.
+ * Gate: vs_similar_v1 not null (it is contractually null below 3 matches).
+ */
+export function formatCyclingVsSimilarRow(
+  vsSimilar: any,
+  currentNpW: number | null | undefined,
+): { label: string; value: string } | null {
+  if (!vsSimilar) return null;
+  // np_delta_w is `number | null` per contract; null = no delta → no row.
+  // (Number(null) === 0, so an explicit null check is required before the
+  // finite check, otherwise a null delta would render as a 0W comparison.)
+  if (vsSimilar.np_delta_w == null) return null;
+  const npD = Number(vsSimilar.np_delta_w);
+  if (!Number.isFinite(npD)) return null;
+  const type = vsSimilar.matched_type
+    ? `${String(vsSimilar.matched_type).replace(/_/g, ' ')} rides`
+    : 'similar rides';
+  const asmt = typeof vsSimilar.assessment === 'string' && vsSimilar.assessment
+    ? String(vsSimilar.assessment).replace(/_/g, ' ')
+    : null;
+  const tail = asmt ? ` — ${asmt}` : '';
+  const cur = Number(currentNpW);
+  if (Number.isFinite(cur) && cur > 0) {
+    const avg = Math.round(cur - npD);
+    return { label: 'vs similar', value: `NP ${Math.round(cur)}W vs ${avg}W avg on similar ${type}${tail}` };
+  }
+  // No current NP — can't show absolute X/Y; fall back to the signed delta.
+  const sign = npD >= 0 ? '+' : '';
+  return { label: 'vs similar', value: `NP ${sign}${Math.round(npD)}W vs avg on similar ${type}${tail}` };
+}
+
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
@@ -1011,20 +1052,12 @@ function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
-  // Trend (cycling): vs_similar_v1 is a delta-summary vs the athlete's typical ride
-  // of this type/duration (Tier 3 item 10 / D-010). Surfaced as a row so it renders
-  // even when the NP sparkline lacks ≥3 dated points.
+  // vs-similar context row from vs_similar_v1 (Tier 3 item 10 / D-010). Renders
+  // even when the NP sparkline lacks ≥3 dated points. See formatCyclingVsSimilarRow.
   try {
-    if (sport === 'ride' && vsSimilar && Number(vsSimilar.sample_size) >= 3) {
-      const ct = vsSimilar.matched_type ? String(vsSimilar.matched_type).replace(/_/g, ' ') : 'similar';
-      const seg: string[] = [];
-      const npD = Number(vsSimilar.np_delta_w);
-      const ifD = Number(vsSimilar.if_delta);
-      if (Number.isFinite(npD)) seg.push(`NP ${npD >= 0 ? '+' : ''}${Math.round(npD)}W vs typical ${ct}`);
-      if (Number.isFinite(ifD) && Math.abs(ifD) >= 0.01) seg.push(`IF ${ifD >= 0 ? '+' : ''}${ifD.toFixed(2)}`);
-      const asmt = typeof vsSimilar.assessment === 'string' ? vsSimilar.assessment.replace(/_/g, ' ') : null;
-      seg.push(`${Number(vsSimilar.sample_size)} similar${asmt ? ` (${asmt})` : ''}`);
-      if (seg.length > 0) rows.push({ label: 'Trend', value: seg.join(' · ') });
+    if (sport === 'ride') {
+      const row = formatCyclingVsSimilarRow(vsSimilar, factPacket?.facts?.normalized_power_w);
+      if (row) rows.push(row);
     }
   } catch { /* */ }
 

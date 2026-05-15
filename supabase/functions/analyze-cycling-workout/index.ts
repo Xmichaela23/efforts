@@ -1842,16 +1842,13 @@ Deno.serve(async (req) => {
     });
     const cyclingFlagsV1 = generateCyclingFlagsV1(cyclingFactPacketV1, trainingLoadContext);
 
+    // ai_summary is generated AFTER the cross-workout block below so the narrative
+    // can use vs_similar_v1 / achievements_v1 / np_trend_v1 / limiter_v1 (mirrors
+    // analyze-running-workout, whose fact packet carries comparisons before the
+    // summary runs). Generating here (the old position) produced a context-blind
+    // template-grade paragraph because none of that data existed yet.
     let ai_summary: string | null = null;
     let ai_summary_generated_at: string | null = null;
-    try {
-      ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null);
-      if (ai_summary) ai_summary_generated_at = new Date().toISOString();
-    } catch (e) {
-      console.log('⚠️ Cycling ai_summary generation failed:', e);
-      ai_summary = null;
-      ai_summary_generated_at = null;
-    }
 
     // Repair legacy 60x duration units bug in computed.overall.duration_s_moving when detected.
     try {
@@ -2091,6 +2088,22 @@ Deno.serve(async (req) => {
       console.log(`🚴 [CYCLING CROSS-WORKOUT] PRs sample=${cyclingPRs?.sample_size ?? 0}, vs-similar n=${cyclingVsSimilar?.sample_size ?? 0}, limiter flag=${cyclingLimiter.flag} source=${cyclingLimiter.source}`);
     } catch (e) {
       console.warn('[analyze-cycling-workout] cross-workout queries failed (non-fatal):', e);
+    }
+
+    // Cycling ai_summary — generated here so the narrative can lead with the
+    // cross-workout comparison/trend (parity with analyze-running-workout).
+    try {
+      ai_summary = await generateCyclingAISummaryV1(cyclingFactPacketV1, cyclingFlagsV1, null, {
+        vsSimilar: cyclingVsSimilar,
+        achievements: cyclingPRs,
+        npTrend: npTrendV1,
+        limiter: cyclingLimiter,
+      });
+      if (ai_summary) ai_summary_generated_at = new Date().toISOString();
+    } catch (e) {
+      console.log('⚠️ Cycling ai_summary generation failed:', e);
+      ai_summary = null;
+      ai_summary_generated_at = null;
     }
 
     // Save analysis - matches running analysis structure exactly
