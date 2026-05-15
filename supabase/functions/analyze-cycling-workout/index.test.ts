@@ -174,7 +174,7 @@ Deno.test('generateCyclingAdherenceSummary: intensity insight uses NP + IF + cla
     performance: { execution_score: 85 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
     factPacket: {
-      facts: { normalized_power: 245, intensity_factor: 0.92, classified_type: 'threshold' },
+      facts: { normalized_power_w: 245, intensity_factor: 0.92, classified_type: 'threshold' },
     },
     hrDriftPct: null,
   });
@@ -187,7 +187,7 @@ Deno.test('generateCyclingAdherenceSummary: intensity insight handles underscore
     performance: { execution_score: 85 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
     factPacket: {
-      facts: { normalized_power: 220, intensity_factor: 0.88, classified_type: 'sweet_spot' },
+      facts: { normalized_power_w: 220, intensity_factor: 0.88, classified_type: 'sweet_spot' },
     },
     hrDriftPct: null,
   });
@@ -201,7 +201,7 @@ Deno.test('generateCyclingAdherenceSummary: focus maps from classified_type', ()
   const r = generateCyclingAdherenceSummary({
     performance: { execution_score: 85 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-    factPacket: { facts: { normalized_power: 240, intensity_factor: 0.95, classified_type: 'vo2' } },
+    factPacket: { facts: { normalized_power_w: 240, intensity_factor: 0.95, classified_type: 'vo2' } },
     hrDriftPct: null,
   });
   assertEquals(r?.plan_impact.focus, 'VO2max / max aerobic power');
@@ -249,7 +249,7 @@ Deno.test('generateCyclingAdherenceSummary: returned object has the exact shape 
   const r = generateCyclingAdherenceSummary({
     performance: { execution_score: 85, power_adherence: 88 },
     intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-    factPacket: { facts: { normalized_power: 230, intensity_factor: 0.85, classified_type: 'tempo' } },
+    factPacket: { facts: { normalized_power_w: 230, intensity_factor: 0.85, classified_type: 'tempo' } },
     hrDriftPct: 4,
   });
   // Top-level keys match running's WorkoutAdherenceSummary interface.

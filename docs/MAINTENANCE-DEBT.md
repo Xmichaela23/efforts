@@ -130,6 +130,36 @@ second sport pair shows the symptom. Filed here so it's not lost.
 
 ---
 
+## Cycling NP field misnamed `normalized_power` vs persisted `normalized_power_w` — ✅ DONE
+
+**Status:** ✅ fixed 2026-05-15 (commit below). Found while diagnosing why the new
+cycling Power row never rendered on workout `4ddc3305`.
+
+**Problem:** `buildCyclingFactPacketV1` (`_shared/cycling-v1/build.ts:173`) persists
+normalized power into `fact_packet_v1.facts` under the key **`normalized_power_w`**
+(rounded int). But `analyze-cycling-workout/index.ts` read `facts.normalized_power`
+(no `_w`) in two places — the guard at `:288` and the value at `:292` — *and* declared
+the param type at `:225` as `normalized_power?: number` (also no `_w`). Because the
+type annotation matched the (wrong) reads, `strict: false` / `noImplicitAny` off meant
+no compile error ever surfaced. Net effect: the analyzer's "Intensity" technical
+insight (`Normalized power {NP}W at IF {x.xx} — {type} effort`) was **silently dead for
+every cycling workout** — the guard `typeof facts.normalized_power === 'number'` was
+always false. `session-detail/build.ts`'s new Power row mirrored the broken read and
+inherited the same defect.
+
+**Why it matters:** classic quietly-misnamed-field bug masked by a type annotation that
+agreed with the wrong code instead of the data producer. It silently suppressed a
+user-facing insight with zero error signal. Any future reader copying the analyzer's
+read pattern (as the Power row did) propagates the bug.
+
+**Fix (2026-05-15):** `facts.normalized_power` → `facts.normalized_power_w` at
+`index.ts:288` and `:292`; type at `:225` corrected to `normalized_power_w?`;
+`build.ts` Power row read corrected to `cf?.normalized_power_w` (dropped the now-redundant
+`Math.round` — the field is already a rounded int). Display fix (build.ts → workout-detail)
+is live without a recompute; the analyzer fix takes effect on next recompute.
+
+---
+
 ## When to add an entry
 
 Add to this doc when you find:

@@ -866,11 +866,13 @@ function buildAnalysisDetailRows(
   try {
     if (sport === 'run') throw new Error('skip: run gets the Pacing row');
     const cf = factPacket?.facts;
-    const np = cf?.normalized_power;
+    // fact_packet_v1.facts persists this as `normalized_power_w` (rounded int) —
+    // see _shared/cycling-v1/build.ts:173. NOT `normalized_power` (no such key).
+    const np = cf?.normalized_power_w;
     const ifv = cf?.intensity_factor;
     if (typeof np === 'number' && np > 0 && typeof ifv === 'number' && ifv > 0) {
       const ct = cf?.classified_type ? String(cf.classified_type).replace(/_/g, ' ') : 'training stimulus';
-      rows.push({ label: 'Power', value: `Normalized power ${Math.round(np)}W at IF ${ifv.toFixed(2)} — ${ct} effort` });
+      rows.push({ label: 'Power', value: `Normalized power ${np}W at IF ${ifv.toFixed(2)} — ${ct} effort` });
     }
   } catch { /* */ }
 

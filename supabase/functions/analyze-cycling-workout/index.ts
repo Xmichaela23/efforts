@@ -222,7 +222,7 @@ export function generateCyclingAdherenceSummary(opts: {
     duration_adherence?: number | null;
   } | null | undefined;
   intervalBreakdown: Array<{ interval_type?: string; adherence_percentage?: number; adherence?: number }> | null | undefined;
-  factPacket: { facts?: { normalized_power?: number | null; intensity_factor?: number | null; classified_type?: string | null } | null } | null | undefined;
+  factPacket: { facts?: { normalized_power_w?: number | null; intensity_factor?: number | null; classified_type?: string | null } | null } | null | undefined;
   /** Computed from `hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr * 100`; null when HR unavailable. */
   hrDriftPct: number | null;
 }): CyclingAdherenceSummary | null {
@@ -285,11 +285,11 @@ export function generateCyclingAdherenceSummary(opts: {
   }
 
   const facts = opts.factPacket?.facts;
-  if (facts && typeof facts.normalized_power === 'number' && typeof facts.intensity_factor === 'number') {
+  if (facts && typeof facts.normalized_power_w === 'number' && typeof facts.intensity_factor === 'number') {
     const ct = facts.classified_type ? String(facts.classified_type).replace(/_/g, ' ') : 'training stimulus';
     technical_insights.push({
       label: 'Intensity',
-      value: `Normalized power ${facts.normalized_power}W at IF ${facts.intensity_factor.toFixed(2)} — ${ct} effort.`,
+      value: `Normalized power ${facts.normalized_power_w}W at IF ${facts.intensity_factor.toFixed(2)} — ${ct} effort.`,
     });
   }
 
