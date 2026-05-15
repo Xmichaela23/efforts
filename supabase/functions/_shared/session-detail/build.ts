@@ -858,6 +858,22 @@ function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
+  // Cycling counterpart to the run Pacing row above: rides have no pace-per-mile
+  // construct, so surface NP/IF instead. Mirrors the analyzer's own technical
+  // insight (analyze-cycling-workout/index.ts:292) — same fields, same wording —
+  // so the Insights box isn't near-empty on a ride. Run is excluded (it gets the
+  // Pacing row); this fires for ride/other non-run sports with power data.
+  try {
+    if (sport === 'run') throw new Error('skip: run gets the Pacing row');
+    const cf = factPacket?.facts;
+    const np = cf?.normalized_power;
+    const ifv = cf?.intensity_factor;
+    if (typeof np === 'number' && np > 0 && typeof ifv === 'number' && ifv > 0) {
+      const ct = cf?.classified_type ? String(cf.classified_type).replace(/_/g, ' ') : 'training stimulus';
+      rows.push({ label: 'Power', value: `Normalized power ${Math.round(np)}W at IF ${ifv.toFixed(2)} — ${ct} effort` });
+    }
+  } catch { /* */ }
+
   try {
     const rawAbsDrift = typeof derived?.hr_drift_bpm === 'number' ? derived.hr_drift_bpm : null;
     const paceNormDrift = typeof (derived as any)?.pace_normalized_drift_bpm === 'number'
