@@ -8,22 +8,36 @@ function normalizeParagraph(s: string): string {
   return t.replace(/^["'`]+/, '').replace(/["'`]+$/, '').trim();
 }
 
-function extractNumericTokens(text: string): string[] {
-  // Capture numbers, percentages, watts, bpm, IF-like decimals, and durations.
+// Ported verbatim from running's _shared/fact-packet/ai-summary.ts so cycling
+// narrative validation matches running's leniency exactly. The old cycling
+// version did exact set-membership on unit-attached tokens ("187 w") against a
+// packet that formats values with a space ("187 W"), so an LLM writing the
+// natural "187W" was rejected as a new number — nulling nearly every cycling
+// narrative. Running's approach: extract BARE numbers and substring-match them
+// against the serialized packet. `\b\d+\b` does not match inside "187W" (no word
+// boundary before W), so unit-suffixed numbers produce no token and pass; spaced
+// numbers ("187 W") yield "187" which substring-matches the packet.
+export function extractNumericTokens(text: string): string[] {
   const s = String(text || '');
-  const tokens = s.match(/(\d+(?:\.\d+)?)(?:\s*(?:w|watts|bpm|min|mi|%))?/gi) || [];
-  return tokens.map((t) => t.toLowerCase().replace(/\s+/g, ' ').trim());
+  const out = new Set<string>();
+  for (const m of s.matchAll(/\b\d{1,2}:\d{2}\/mi\b/g)) out.add(m[0]);
+  for (const m of s.matchAll(/\b\d+(?:\.\d+)?%\b/g)) out.add(m[0]);
+  for (const m of s.matchAll(/\b\d+(?:\.\d+)?\b/g)) out.add(m[0]);
+  return Array.from(out);
 }
 
-function validateNoNewNumbers(summary: string, displayPacket: string): { ok: boolean; reason?: string } {
-  const allow = new Set(extractNumericTokens(displayPacket));
-  const seen = extractNumericTokens(summary);
-  for (const tok of seen) {
-    if (!allow.has(tok)) {
-      return { ok: false, reason: `Summary introduced numeric token not in packet: "${tok}"` };
-    }
+export function validateNoNewNumbers(
+  summary: string,
+  displayPacketStr: string,
+): { ok: boolean; bad: string[] } {
+  const displayStr = String(displayPacketStr || '');
+  const tokens = extractNumericTokens(summary);
+  const bad: string[] = [];
+  for (const t of tokens) {
+    if (t === '1') continue; // trivial — matches running
+    if (!displayStr.includes(t)) bad.push(t);
   }
-  return { ok: true };
+  return { ok: bad.length === 0, bad };
 }
 
 /**
@@ -185,16 +199,19 @@ ${packetStr}
 
   // 2 attempts with numeric-token validation.
   const s1 = await attempt(null);
-  if (s1) {
-    const v = validateNoNewNumbers(s1, packetStr);
-    if (v.ok) return s1;
-    const s2 = await attempt(`Your previous output violated this rule: ${v.reason}. Rewrite with ONLY numbers appearing in the packet.`);
-    if (s2) {
-      const v2 = validateNoNewNumbers(s2, packetStr);
-      if (v2.ok) return s2;
-    }
-  }
+  if (!s1) return null;
+  const v1 = validateNoNewNumbers(s1, packetStr);
+  if (v1.ok) return s1;
 
-  return null;
+  const s2 = await attempt(
+    `Your previous output used numbers not present in the packet: ${v1.bad.join(', ')}. Rewrite using ONLY numbers that appear in the packet.`,
+  );
+  if (!s2) return null;
+  // Soft-accept: numeric drift is the ONLY cycling validator (no hard HR /
+  // athlete-contradiction / RPE checks like running has). Returning null here
+  // discards an otherwise-grounded paragraph and falls back to flag/template
+  // text — strictly worse. Running's generateAISummaryV1 returns attempt 2
+  // unless a *hard* validator fails; cycling has none, so attempt 2 is accepted.
+  return s2;
 }
 

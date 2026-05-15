@@ -855,6 +855,30 @@ export function formatCyclingVsSimilarRow(
   return { label: 'vs similar', value: `NP ${sign}${Math.round(npD)}W vs avg on similar ${type}${tail}` };
 }
 
+/**
+ * Cycling PACING row — power progression across the structured ride's work
+ * intervals (the cycling analogue of running's pace-progression Pacing row).
+ * Source is the normalized `intervals` array (built from
+ * granular_analysis.interval_breakdown upstream), filtered to interval_type
+ * 'work' with a finite positive avg power. ≥2 work intervals → first → last
+ * avg power; null otherwise (steady/endurance rides have no work-interval
+ * progression and produce no row).
+ */
+export function formatCyclingPacingRow(
+  intervals: Array<{ interval_type?: string; executed?: { power_watts?: number | null } }> | null | undefined,
+): { label: string; value: string } | null {
+  if (!Array.isArray(intervals)) return null;
+  const work = intervals
+    .filter((iv) => String(iv?.interval_type) === 'work')
+    .map((iv) => Number(iv?.executed?.power_watts))
+    .filter((w) => Number.isFinite(w) && w > 0);
+  if (work.length < 2) return null;
+  return {
+    label: 'Pacing',
+    value: `Work intervals: ${Math.round(work[0])}W → ${Math.round(work[work.length - 1])}W`,
+  };
+}
+
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
@@ -1030,6 +1054,15 @@ function buildAnalysisDetailRows(
           .map((s) => `${s.name} ${s.min}m`);
         if (segs.length > 0) rows.push({ label: 'Power zones', value: segs.join(' · ') });
       }
+    }
+  } catch { /* */ }
+
+  // Pacing (cycling): power progression across structured work intervals — the
+  // cycling analogue of running's Pacing row. See formatCyclingPacingRow.
+  try {
+    if (sport === 'ride') {
+      const row = formatCyclingPacingRow(intervals);
+      if (row) rows.push(row);
     }
   } catch { /* */ }
 

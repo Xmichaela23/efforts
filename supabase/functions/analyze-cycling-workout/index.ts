@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
+import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
@@ -2053,18 +2054,22 @@ Deno.serve(async (req) => {
           .order('date', { ascending: false })
           .limit(120);
         for (const r of (Array.isArray(npRows) ? npRows : [])) {
-          const np = Number((r as any)?.computed?.overall?.normalized_power);
-          if (!Number.isFinite(np) || np <= 0) continue;
+          // Was `computed.overall.normalized_power` (no `_w`) — wrong field, so
+          // rides written with the canonical `normalized_power_w` resolved to
+          // NaN and the trend never reached 3 points. rideComputedNp tries `_w`
+          // first then the legacy alias (same fix pattern as commit cead4e9e).
+          const np = rideComputedNp(r);
+          if (np == null) continue;
           ninetyDayNpSamples.push(np);
           if (String(r.date) >= fourteenAgo) recentNpSamples.push(np);
-          if (r?.date) npDated.push({ date: String(r.date), np: Math.round(np) });
+          if (r?.date) npDated.push({ date: String(r.date), np });
         }
         // Add the current ride as the is_current point, then sort ascending and
         // cap to the most recent 12 so the sparkline stays readable.
-        const currentNp = Number(
-          cyclingFactPacketV1?.facts?.normalized_power_w ??
-            (workout as any)?.computed?.overall?.normalized_power,
-        );
+        const factsNp = Number(cyclingFactPacketV1?.facts?.normalized_power_w);
+        const currentNp = (Number.isFinite(factsNp) && factsNp > 0)
+          ? factsNp
+          : (rideComputedNp(workout) ?? NaN);
         const currentDate = String((workout as any)?.date || '');
         const byDate = new Map<string, { date: string; value: number; is_current: boolean }>();
         for (const d of npDated) byDate.set(d.date, { date: d.date, value: d.np, is_current: false });

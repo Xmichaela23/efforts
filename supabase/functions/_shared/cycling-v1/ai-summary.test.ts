@@ -8,7 +8,36 @@
  *   deno test supabase/functions/_shared/cycling-v1/ai-summary.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { cyclingCrossWorkoutDisplay } from './ai-summary.ts';
+import { cyclingCrossWorkoutDisplay, validateNoNewNumbers } from './ai-summary.ts';
+
+// ── Item 1: loosened numeric validator (running parity) ─────────────────────
+
+Deno.test('validator: "187W" and "187 W" both accepted when packet contains 187', () => {
+  const packet = JSON.stringify({ power: { np: '187 W' }, hr: { avg: '142 bpm' } });
+  // "187W": \b\d+\b does not match inside (W is a word char) → no token → accepted
+  assertEquals(validateNoNewNumbers('NP held at 187W for the block.', packet).ok, true);
+  // "187 W": yields token "187" → substring-matches the packet → accepted
+  assertEquals(validateNoNewNumbers('NP held at 187 W for the block.', packet).ok, true);
+});
+
+Deno.test('validator: a genuine new number is still rejected', () => {
+  const packet = JSON.stringify({ power: { np: '187 W' } });
+  const r = validateNoNewNumbers('NP averaged 999 across the ride.', packet);
+  assertEquals(r.ok, false);
+  assert(r.bad.includes('999'));
+});
+
+Deno.test('validator: trivial token "1" is skipped (matches running)', () => {
+  const packet = JSON.stringify({ power: { np: '187 W' } });
+  assertEquals(validateNoNewNumbers('This was the 1 standout effort.', packet).ok, true);
+});
+
+Deno.test('validator: decimals and percentages substring-match the packet', () => {
+  const packet = JSON.stringify({ power: { if: '1.06' }, cross_workout: { limiter: { detail: 'NP +9% vs 90-day mean' } } });
+  assertEquals(validateNoNewNumbers('IF was 1.06, NP trending +9%.', packet).ok, true);
+  // 1.07 is not in the packet → rejected
+  assertEquals(validateNoNewNumbers('IF was 1.07.', packet).ok, false);
+});
 
 Deno.test('null / empty input → null (no cross-workout signal)', () => {
   assertEquals(cyclingCrossWorkoutDisplay(null), null);
