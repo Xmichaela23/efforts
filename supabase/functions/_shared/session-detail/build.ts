@@ -309,7 +309,14 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const llmNarrative = (typeof narrativeText === 'string' && narrativeText.trim()) ||
     (typeof sessionState?.narrative?.text === 'string' ? sessionState.narrative.text.trim() : '') || null;
 
+  // Sport-guard: race_debrief_text + run-shaped narrative copy is run-only. Even if a
+  // dirty row has stale run analysis (historical mis-route surviving the analyzer
+  // spread-merge — see docs/MAINTENANCE-DEBT.md "Cross-sport analysis-key bleed"),
+  // never surface pace-per-mile / run-debrief copy on a non-run session. Fix 1 scrubs
+  // the data at write time; this is the defense-in-depth display guard so a row that
+  // hasn't been re-analyzed yet still can't render run copy on a ride/swim.
   const raceDebriefText =
+    type === 'run' &&
     typeof (wa as any).race_debrief_text === 'string' && String((wa as any).race_debrief_text).trim()
       ? String((wa as any).race_debrief_text).trim()
       : null;

@@ -21,6 +21,7 @@ import type {
   CyclingPRsV1,
   CyclingVsSimilarV1,
 } from '../_shared/cycling-v1/cross-workout-types.ts';
+import { runOnlyKeyScrub } from '../_shared/cross-sport-key-scrub.ts';
 
 // =============================================================================
 // ANALYZE-CYCLING-WORKOUT - CYCLING ANALYSIS EDGE FUNCTION
@@ -2075,6 +2076,17 @@ Deno.serve(async (req) => {
         generated_at: new Date().toISOString(),
         generator_version: "2.0.0"
       },
+      // Explicitly null run-only keys so the spread-merge below
+      // (`{ ...existingAnalysis, ...analysisPayload }`) doesn't preserve stale run
+      // analysis on cycling workouts. If this ride was ever analyzed by
+      // analyze-running-workout (historical mis-route / mis-classified recompute),
+      // these keys carry pace-per-mile splits + run verdict copy that the display
+      // layer renders ("Mile 9 at 2:51/mi" on a ride). The cycling payload otherwise
+      // has no corresponding keys, so the merge can't overwrite them — converting the
+      // silent merge-gap into an explicit cross-sport scrub. Centralized + unit-tested
+      // in _shared/cross-sport-key-scrub.ts; see docs/MAINTENANCE-DEBT.md
+      // "Cross-sport analysis-key bleed".
+      ...runOnlyKeyScrub(),
       granular_analysis: granularAnalysis,  // Same path as running for client compatibility
       performance: performance,
       detailed_analysis: detailedAnalysis,

@@ -643,9 +643,18 @@ async function runSessionDetailPipelineAndPersist(
       }
     }
 
-    // Goal race: generate LLM debrief narrative from actual per-mile data
-    if (sessionDetailV1) sessionDetailV1._rn_gate = `is_goal_race=${wa?.is_goal_race}`;
-    if (sessionDetailV1 && wa?.is_goal_race === true) {
+    // Goal race: generate LLM debrief narrative from actual per-mile data.
+    // SPORT GUARD (2026-05-14): this block synthesizes run-style mile splits +
+    // pace-per-mile from the workout's distance series and was gated ONLY on
+    // is_goal_race — never on sport. A cycling goal race (e.g. a 70.3 bike leg,
+    // is_goal_race=true via cyclingGoalRaceMatch) fell through to the series
+    // fallback at the next block and rendered "Mile 9 at 2:51/mi" on a ride.
+    // mile-by-mile pace is a running construct; cyclists get power/NP context
+    // elsewhere. Restrict to run only. See docs/MAINTENANCE-DEBT.md
+    // "Cross-sport analysis-key bleed".
+    const isRunSession = ['run', 'running'].includes(String((row as any)?.type || '').toLowerCase());
+    if (sessionDetailV1) sessionDetailV1._rn_gate = `is_goal_race=${wa?.is_goal_race} type=${(row as any)?.type} isRun=${isRunSession}`;
+    if (sessionDetailV1 && wa?.is_goal_race === true && isRunSession) {
       try {
         const raceData = wa?.race ?? {};
         // Primary source: pre-computed mile splits from analyze-running-workout

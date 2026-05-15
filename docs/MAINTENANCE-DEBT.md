@@ -72,6 +72,46 @@ const hrAnalysis = analyzeHeartRate(sensorData, intervals, baselines.max_heart_r
 
 ---
 
+## Cross-sport analysis-key bleed — spread-merge preserves stale foreign-discipline keys
+
+**Status:** 🔧 fix in progress (2026-05-14). Surfaced by a real bug: cycling workout
+`4ddc3305-b9ea-4ed1-9542-6865d88311b6` rendered running pacing copy ("130s/mi faster,
+Mile 9 at 2:51/mi") in the UI.
+
+**Problem:** All `analyze-{sport}-workout` functions merge into `workout_analysis`
+(`{ ...existingAnalysis, ...analysisPayload }`) rather than replacing — by design, to
+preserve cross-cutting fields. But when a workout is analyzed by the *wrong* sport's
+analyzer historically (mis-routed `type`, or a `recompute-workout` / `bulk-reanalyze`
+mis-classification), that analyzer's sport-specific keys get written. A later *correct*
+re-analysis can't overwrite keys it doesn't produce, so they persist:
+
+- `analyze-running-workout` writes `mile_by_mile_terrain`, `score_explanation`,
+  `summary`, top-level `classified_type`, `heart_rate_summary`, `recomputed_at`.
+- `analyze-cycling-workout`'s payload has none of those keys → spread-merge leaves them.
+- Display layer (`_shared/session-detail/build.ts` + `SessionNarrative.tsx` /
+  `UnifiedWorkoutView.tsx`) reads several of them without a discipline guard → run
+  pacing copy renders on a ride.
+
+**Why it matters:** any sport pair has this exposure (run↔ride↔swim↔strength). The
+display fix only patches one screen; the data fix stops bad data propagating to *every*
+consumer. Same class as the "Run — Tempo vs Run Intervals" divergence in
+`docs/ENGINE-STATE.md` (multiple surfaces, one bad upstream source).
+
+**Fix (2026-05-14):**
+- Fix 1 (contract): `analyze-cycling-workout` explicitly nulls run-only keys in its
+  payload so the spread-merge scrubs stale run analysis. Converts the silent merge-gap
+  into an explicit cross-sport scrub.
+- Fix 2 (display): `session-detail/build.ts` sport-guards the run-shaped reads
+  (`type === 'run'`) so even a dirty row can't render run copy on a ride.
+
+**Follow-up not in this pass:** the same scrub is needed in `analyze-swim-workout` and
+`analyze-strength-workout` (and run's analyzer should scrub cycling-only keys like
+`fact_packet_v1` power facts / `limiter_v1` / `achievements_v1`). A shared
+`stripForeignDisciplineKeys(discipline)` helper would generalize this — deferred until a
+second sport pair shows the symptom. Filed here so it's not lost.
+
+---
+
 ## When to add an entry
 
 Add to this doc when you find:
