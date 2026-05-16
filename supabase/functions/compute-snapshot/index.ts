@@ -559,6 +559,53 @@ serve(async (req: Request) => {
 
     if (uErr) throw uErr;
 
+    // Cycling CTL/ATL/TSB (design Build Order #9). Sourced from
+    // workout_analysis.fitness_v1 (#7) — the most recent ride on/before the
+    // week end carries current fitness/fatigue/form (CTL/ATL/TSB are
+    // point-in-time cumulative values). Written via a SEPARATE guarded update,
+    // NOT folded into the main snapshot upsert above, so a missing column
+    // (migration applied manually via SQL editor — migration-tracking
+    // divergence) cannot break the snapshot. Fully non-fatal.
+    try {
+      const { data: fitRows } = await supabase
+        .from("workouts")
+        .select("workout_analysis, date")
+        .eq("user_id", userId)
+        .in("type", ["ride", "cycling", "bike"])
+        .eq("workout_status", "completed")
+        .lte("date", rangeEnd)
+        .order("date", { ascending: false })
+        .limit(20);
+      let ctl: number | null = null;
+      let atl: number | null = null;
+      let tsb: number | null = null;
+      for (const r of (Array.isArray(fitRows) ? fitRows : [])) {
+        const f = (r as any)?.workout_analysis?.fitness_v1;
+        const c = Number(f?.ctl);
+        const a = Number(f?.atl);
+        if (f && Number.isFinite(c) && Number.isFinite(a)) {
+          ctl = Math.round(c);
+          atl = Math.round(a);
+          const tb = Number(f?.tsb);
+          tsb = Number.isFinite(tb) ? Math.round(tb) : Math.round(c - a);
+          break; // newest ride with fitness_v1 = current point-in-time fitness
+        }
+      }
+      if (ctl != null && atl != null) {
+        const { error: fErr } = await supabase
+          .from("athlete_snapshot")
+          .update({ ctl, atl, tsb })
+          .eq("user_id", userId)
+          .eq("week_start", targetWeek);
+        if (fErr) throw fErr;
+      }
+    } catch (e: any) {
+      console.warn(
+        "[compute-snapshot] CTL/ATL/TSB update skipped (non-fatal — columns may be unmigrated):",
+        e?.message ?? e,
+      );
+    }
+
     return new Response(
       JSON.stringify({ success: true, week_start: targetWeek, snapshot }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },

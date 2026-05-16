@@ -182,6 +182,14 @@ export interface ArcContext {
   active_plan: ActivePlanSummary | null;
 
   latest_snapshot: AthleteSnapshot | null;
+  /**
+   * Cycling fitness/fatigue/form derived from the latest snapshot's CTL/ATL/TSB
+   * columns (design Build Order #9 — sourced from workout_analysis.fitness_v1
+   * by compute-snapshot). Null when no CTL/ATL on the snapshot (pre-migration,
+   * or athlete has no rides with fitness_v1). `form` band matches the cycling
+   * ai_summary narrative slice (TSB ≥ +5 fresh, ≤ -10 fatigued, else neutral).
+   */
+  cycling_fitness: { ctl: number; atl: number; tsb: number; form: 'fresh' | 'neutral' | 'fatigued' } | null;
   athlete_memory: AthleteMemorySummary | null;
 
   /**
@@ -226,6 +234,7 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
     })),
     athlete_memory: null,
     latest_snapshot: null,
+    cycling_fitness: null,
     swim_training_from_workouts: null,
     active_plan: null,
     recent_completed_events: [],
@@ -908,6 +917,27 @@ export async function getArcContext(
     }
   }
 
+  // Derive cycling fitness/fatigue/form from the snapshot CTL/ATL/TSB columns
+  // (design Build Order #9). select('*') already pulls these once the migration
+  // is applied + compute-snapshot writes them; null until then. Same TSB band
+  // as the ai_summary narrative slice (cyclingCrossWorkoutDisplay) for
+  // cross-surface consistency.
+  let cycling_fitness: ArcContext['cycling_fitness'] = null;
+  if (latest_snapshot) {
+    const ctl = Number((latest_snapshot as any).ctl);
+    const atl = Number((latest_snapshot as any).atl);
+    if (Number.isFinite(ctl) && Number.isFinite(atl)) {
+      const tsbRaw = Number((latest_snapshot as any).tsb);
+      const tsb = Number.isFinite(tsbRaw) ? Math.round(tsbRaw) : Math.round(ctl - atl);
+      cycling_fitness = {
+        ctl: Math.round(ctl),
+        atl: Math.round(atl),
+        tsb,
+        form: tsb >= 5 ? 'fresh' : tsb <= -10 ? 'fatigued' : 'neutral',
+      };
+    }
+  }
+
   let athlete_memory: AthleteMemorySummary | null = null;
   if (memoryRes?.error) {
     console.warn('[getArcContext] athlete_memory', memoryRes.error.message);
@@ -1016,6 +1046,7 @@ export async function getArcContext(
     recent_completed_events,
     active_plan,
     latest_snapshot,
+    cycling_fitness,
     athlete_memory,
     swim_training_from_workouts,
     gear,
