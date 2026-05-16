@@ -2045,12 +2045,18 @@ Deno.serve(async (req) => {
           d.setUTCDate(d.getUTCDate() - 14);
           return d.toISOString().slice(0, 10);
         })();
-        const { data: npRows } = await supabase
+        const { data: npRows, error: npErr } = await supabase
           .from('workouts')
-          // Must fetch every column rideComputedNp inspects — NP commonly lives in
-          // weighted_average_watts / top-level normalized_power on ingested rides,
-          // not computed.overall. Selecting only `computed` starved the trend.
-          .select('id, date, computed, normalized_power, weighted_average_watts, metrics')
+          // Select ONLY `id, date, computed`. The whole `computed` JSONB carries
+          // everything rideComputedNp needs — canonical
+          // computed.analysis.power.normalized_power (mirrors compute-facts:1124)
+          // plus computed.overall.* fallbacks. A prior change broadened this to
+          // also select normalized_power / weighted_average_watts / metrics as
+          // sibling columns; those may not exist on `workouts`, and PostgREST
+          // 400s the ENTIRE query if any selected column is unknown — leaving
+          // npRows null and the trend silently empty even though the data is in
+          // `computed`. Stay on the proven-safe projection.
+          .select('id, date, computed')
           .eq('user_id', (workout as any).user_id)
           .in('type', ['ride', 'cycling', 'bike'])
           .eq('workout_status', 'completed')
@@ -2058,6 +2064,9 @@ Deno.serve(async (req) => {
           .gte('date', ninetyAgo)
           .order('date', { ascending: false })
           .limit(120);
+        if (npErr) {
+          console.warn('[analyze-cycling-workout] np_trend rows fetch failed (trend will be empty):', npErr.message);
+        }
         for (const r of (Array.isArray(npRows) ? npRows : [])) {
           // Was `computed.overall.normalized_power` (no `_w`) — wrong field, so
           // rides written with the canonical `normalized_power_w` resolved to
