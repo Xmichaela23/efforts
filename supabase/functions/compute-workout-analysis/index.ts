@@ -3,6 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
+import { computeRideEfficiency, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 
 const ANALYSIS_VERSION = 'v0.1.8'; // elevation + NP + swim pace (no sample timeout)
 
@@ -1396,6 +1397,16 @@ Deno.serve(async (req) => {
         if (pctTimePedaling != null) b.pct_time_pedaling = pctTimePedaling;
         return Object.keys(b).length ? b : undefined;
       })(),
+      // HR-at-power + aerobic decoupling (design Build Order #4). Rides only;
+      // pairs the index-aligned hr_bpm/power_watts/time_s series. Pure logic in
+      // _shared/cycling-v1/ride-physiology.ts.
+      efficiency: (isRide && hasRows)
+        ? (computeRideEfficiency(time_s, hr_bpm, power_watts, normalizedPower) ?? undefined)
+        : undefined,
+      // VAM / climbing rate (design Build Order #5). Rides only.
+      climbing: (isRide && hasRows)
+        ? (computeRideVam(time_s, elevation_m, grade_percent) ?? undefined)
+        : undefined,
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
