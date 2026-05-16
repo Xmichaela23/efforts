@@ -1980,7 +1980,9 @@ Deno.serve(async (req) => {
     // query as npTrendV1 (no new query, table, migration or function); reads
     // computed.power_curve['20min'] per ride. Declared at cross-workout scope
     // (same hoist as npTrendV1) so it's visible in analysisPayload.
-    let pwr20TrendV1: { points: Array<{ date: string; value: number; is_current: boolean }> } | null = null;
+    let pwr20TrendV1:
+      | { points: Array<{ date: string; value: number; is_current: boolean }>; classified_type: string }
+      | null = null;
     // CTL/ATL/TSB fitness model — design Build Order #7. Built from
     // computed.analysis.power.tss (#3) over the same 90d query; cross-workout
     // scope so it's visible in analysisPayload (same hoist as the trend series).
@@ -2070,8 +2072,9 @@ Deno.serve(async (req) => {
           // sibling columns; those may not exist on `workouts`, and PostgREST
           // 400s the ENTIRE query if any selected column is unknown — leaving
           // npRows null and the trend silently empty even though the data is in
-          // `computed`. Stay on the proven-safe projection.
-          .select('id, date, computed')
+          // `computed`. workout_analysis added so pwr20_trend can be filtered to
+          // the current ride's classified_type (fact_packet_v1.facts.classified_type).
+          .select('id, date, computed, workout_analysis')
           .eq('user_id', (workout as any).user_id)
           .in('type', ['ride', 'cycling', 'bike'])
           .eq('workout_status', 'completed')
@@ -2082,6 +2085,15 @@ Deno.serve(async (req) => {
         if (npErr) {
           console.warn('[analyze-cycling-workout] np_trend rows fetch failed (trend will be empty):', npErr.message);
         }
+        // Mode-aware TREND: the 20-min-power series is filtered to the current
+        // ride's classified_type so the sparkline compares like-for-like (a vo2
+        // 20-min best vs prior vo2 20-min bests, not vs an endurance ride).
+        // 'unknown'/absent → null = no meaningful same-type set → series stays
+        // under the ≥3 gate and build.ts falls back to np_trend.
+        const curType = (cyclingFactPacketV1?.facts?.classified_type &&
+          String(cyclingFactPacketV1.facts.classified_type).toLowerCase() !== 'unknown')
+          ? String(cyclingFactPacketV1.facts.classified_type).toLowerCase()
+          : null;
         for (const r of (Array.isArray(npRows) ? npRows : [])) {
           // Was `computed.overall.normalized_power` (no `_w`) — wrong field, so
           // rides written with the canonical `normalized_power_w` resolved to
@@ -2091,7 +2103,16 @@ Deno.serve(async (req) => {
           // 20-min power best for this historical ride (design Mode 2 series).
           // Independent of NP availability — collected even if `np == null`.
           const w20h = Number((r as any)?.computed?.power_curve?.['20min']);
-          if (r?.date && Number.isFinite(w20h) && w20h > 0) {
+          // Same-classified_type filter. Canonical source is
+          // workout_analysis.fact_packet_v1.facts.classified_type; top-level
+          // workout_analysis.classified_type is the fallback (it's nulled by the
+          // cross-sport scrub on some rows, so the fact-packet path is primary).
+          const histType = (() => {
+            const wa = (r as any)?.workout_analysis;
+            const t = wa?.fact_packet_v1?.facts?.classified_type ?? wa?.classified_type ?? null;
+            return t ? String(t).toLowerCase() : null;
+          })();
+          if (r?.date && Number.isFinite(w20h) && w20h > 0 && curType && histType === curType) {
             pwr20Dated.push({ date: String(r.date), w20: Math.round(w20h) });
           }
           // Daily TSS for the CTL/ATL model (design #7) — sum if multiple
@@ -2130,7 +2151,10 @@ Deno.serve(async (req) => {
           w20ByDate.set(currentDate, { date: currentDate, value: Math.round(curW20), is_current: true });
         }
         const w20pts = Array.from(w20ByDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
-        if (w20pts.length >= 3) pwr20TrendV1 = { points: w20pts };
+        // ≥3 SAME-TYPE rides required (current ride is always same-type, so
+        // ≥3 means ≥2 prior of this type). Under that, pwr20TrendV1 stays null
+        // and build.ts pickCyclingTrendSeries falls back to np_trend_v1.
+        if (w20pts.length >= 3 && curType) pwr20TrendV1 = { points: w20pts, classified_type: curType };
 
         // CTL/ATL/TSB (design #7): dense daily TSS series across the 90d query
         // window (rest days = 0), including the current ride's own TSS.

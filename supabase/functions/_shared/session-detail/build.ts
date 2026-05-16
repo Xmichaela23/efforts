@@ -596,7 +596,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         try {
           const picked = pickCyclingTrendSeries(wa);
           if (!picked) return null;
-          const { points: series, metricLabel, noun } = picked;
+          const { points: series, metricLabel, noun, rideType } = picked;
           const sorted = [...series].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
           const points = sorted
             .map((p: any) => ({
@@ -615,9 +615,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           const delta = Math.round(secondHalfAvg - firstHalfAvg); // higher later = improving
           const direction = delta > 3 ? 'improving' as const : delta < -3 ? 'declining' as const : 'stable' as const;
           const absDelta = Math.abs(delta);
+          const typeWord = rideType ? `${rideType} ` : '';
           const summary = direction === 'stable'
-            ? `Consistent ${noun} across ${points.length} rides`
-            : `${absDelta}W ${direction === 'improving' ? 'higher' : 'lower'} over ${points.length} rides`;
+            ? `Consistent ${noun} across ${points.length} ${typeWord}rides`
+            : `${absDelta}W ${direction === 'improving' ? 'higher' : 'lower'} over ${points.length} ${typeWord}rides`;
           return { metric_label: metricLabel, unit: 'W', points, direction, summary, lower_is_better: false };
         } catch { return null; }
       }
@@ -844,15 +845,24 @@ function buildPlannedTotals(
  */
 export function pickCyclingTrendSeries(
   wa: unknown,
-): { points: any[]; metricLabel: string; noun: string } | null {
+): { points: any[]; metricLabel: string; noun: string; rideType: string | null } | null {
   const w = (wa ?? null) as any;
   const pwr20 = w?.pwr20_trend_v1?.points;
   if (Array.isArray(pwr20) && pwr20.length >= 3) {
-    return { points: pwr20, metricLabel: 'Best 20-min power', noun: '20-min power' };
+    // pwr20_trend_v1 is filtered to one classified_type by the analyzer;
+    // surface it so the summary reads "over N vo2 rides".
+    const ct = w?.pwr20_trend_v1?.classified_type;
+    return {
+      points: pwr20,
+      metricLabel: 'Best 20-min power',
+      noun: '20-min power',
+      rideType: ct ? String(ct).replace(/_/g, ' ') : null,
+    };
   }
   const nptr = w?.np_trend_v1?.points;
   if (Array.isArray(nptr) && nptr.length >= 3) {
-    return { points: nptr, metricLabel: 'Normalized power', noun: 'NP' };
+    // Fallback: NP series is NOT type-filtered (mixed ride types) — no type word.
+    return { points: nptr, metricLabel: 'Normalized power', noun: 'NP', rideType: null };
   }
   return null;
 }

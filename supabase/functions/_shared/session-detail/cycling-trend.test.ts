@@ -21,10 +21,23 @@ Deno.test('prefers pwr20_trend_v1 when it has ≥3 points (doc Mode 2 resolution
   assertEquals(r.points.length, 4);
 });
 
-Deno.test('falls back to np_trend_v1 when pwr20 absent or <3 (no regression)', () => {
+Deno.test('surfaces pwr20 classified_type as rideType (underscores → spaces)', () => {
+  assertEquals(
+    pickCyclingTrendSeries({ pwr20_trend_v1: { points: pts(10), classified_type: 'vo2' } })!.rideType,
+    'vo2',
+  );
+  assertEquals(
+    pickCyclingTrendSeries({ pwr20_trend_v1: { points: pts(5), classified_type: 'sweet_spot' } })!.rideType,
+    'sweet spot',
+  );
+  // No classified_type on the series → rideType null (no type word in summary)
+  assertEquals(pickCyclingTrendSeries({ pwr20_trend_v1: { points: pts(4) } })!.rideType, null);
+});
+
+Deno.test('falls back to np_trend_v1 when pwr20 absent or <3 (no regression); NP is never type-labelled', () => {
   assertEquals(
     pickCyclingTrendSeries({ np_trend_v1: { points: pts(3) } }),
-    { points: pts(3), metricLabel: 'Normalized power', noun: 'NP' },
+    { points: pts(3), metricLabel: 'Normalized power', noun: 'NP', rideType: null },
   );
   // pwr20 present but only 2 points → still fall back to NP
   const r = pickCyclingTrendSeries({
