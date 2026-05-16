@@ -1478,7 +1478,8 @@ Deno.serve(async (req) => {
       .from('workouts')
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
-        planned_id, user_id, date, moving_time, duration, distance, workout_status, workload_actual, workload_planned
+        planned_id, user_id, date, moving_time, duration, distance, workout_status, workload_actual, workload_planned,
+        achievements
       `)
       .eq('id', workout_id)
       .single();
