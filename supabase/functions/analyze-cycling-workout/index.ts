@@ -1972,6 +1972,12 @@ Deno.serve(async (req) => {
     // Declared at cross-workout scope (not inside the NP-samples try) so it's visible
     // in the analysisPayload below — same scoping rule as cyclingVsSimilar/limiter.
     let npTrendV1: { points: Array<{ date: string; value: number; is_current: boolean }> } | null = null;
+    // 20-min power best dated series — design Build Order #1 Mode 2 ("20-min
+    // power best over last 90 days"). Built in the SAME historical loop / SAME
+    // query as npTrendV1 (no new query, table, migration or function); reads
+    // computed.power_curve['20min'] per ride. Declared at cross-workout scope
+    // (same hoist as npTrendV1) so it's visible in analysisPayload.
+    let pwr20TrendV1: { points: Array<{ date: string; value: number; is_current: boolean }> } | null = null;
     try {
       // §1 PRs — best 20-min / 5-min / 1-min on 90d + all-time windows.
       cyclingPRs = await fetchCyclingPRs(supabase, {
@@ -2033,6 +2039,7 @@ Deno.serve(async (req) => {
       // (no extra query) and persist as np_trend_v1 — independent of CyclingVsSimilarV1
       // so its typed shape / tests don't ripple. (npTrendV1 declared at outer scope.)
       const npDated: Array<{ date: string; np: number }> = [];
+      const pwr20Dated: Array<{ date: string; w20: number }> = [];
       try {
         const today = new Date().toISOString().slice(0, 10);
         const ninetyAgo = (() => {
@@ -2073,6 +2080,12 @@ Deno.serve(async (req) => {
           // NaN and the trend never reached 3 points. rideComputedNp tries `_w`
           // first then the legacy alias (same fix pattern as commit cead4e9e).
           const np = rideComputedNp(r);
+          // 20-min power best for this historical ride (design Mode 2 series).
+          // Independent of NP availability — collected even if `np == null`.
+          const w20h = Number((r as any)?.computed?.power_curve?.['20min']);
+          if (r?.date && Number.isFinite(w20h) && w20h > 0) {
+            pwr20Dated.push({ date: String(r.date), w20: Math.round(w20h) });
+          }
           if (np == null) continue;
           ninetyDayNpSamples.push(np);
           if (String(r.date) >= fourteenAgo) recentNpSamples.push(np);
@@ -2092,6 +2105,17 @@ Deno.serve(async (req) => {
         }
         const pts = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
         if (pts.length >= 3) npTrendV1 = { points: pts };
+
+        // 20-min power best dated series (design Mode 2). Same shape / same ≥3
+        // gate as npTrendV1; current ride's 20-min from its own computed.
+        const curW20 = Number((workout as any)?.computed?.power_curve?.['20min']);
+        const w20ByDate = new Map<string, { date: string; value: number; is_current: boolean }>();
+        for (const d of pwr20Dated) w20ByDate.set(d.date, { date: d.date, value: d.w20, is_current: false });
+        if (Number.isFinite(curW20) && curW20 > 0 && currentDate) {
+          w20ByDate.set(currentDate, { date: currentDate, value: Math.round(curW20), is_current: true });
+        }
+        const w20pts = Array.from(w20ByDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+        if (w20pts.length >= 3) pwr20TrendV1 = { points: w20pts };
       } catch (e) {
         console.warn('[analyze-cycling-workout] NP-samples fetch failed (non-fatal):', e);
       }
@@ -2183,6 +2207,7 @@ Deno.serve(async (req) => {
       limiter_v1: cyclingLimiter,
       // Dated NP series for the cycling Trend sparkline (see npTrendV1 build above).
       np_trend_v1: npTrendV1,
+      pwr20_trend_v1: pwr20TrendV1,
     };
 
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
