@@ -2252,6 +2252,7 @@ Deno.serve(async (req) => {
         achievements: cyclingPRs,
         npTrend: npTrendV1,
         limiter: cyclingLimiter,
+        fitness: fitnessV1, // design #9 — CTL/ATL/TSB into the INSIGHTS narrative
       }, arc_narrative_for_summary);
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
     } catch (e) {

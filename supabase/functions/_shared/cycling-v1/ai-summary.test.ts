@@ -158,3 +158,35 @@ Deno.test('combined signals merge into one block', () => {
   assertEquals(out.vs_similar.np_delta_w, -8);
   assertEquals(out.limiter.flag, 'stable');
 });
+
+// ── #9: fitness (CTL/ATL/TSB) exposed into the narrative cross-workout block ──
+
+Deno.test('cyclingCrossWorkoutDisplay: fitness → ctl/atl/tsb + TrainingPeaks form band', () => {
+  // TSB >= +5 → fresh
+  assertEquals(
+    cyclingCrossWorkoutDisplay({ fitness: { ctl: 70, atl: 55, tsb: 15, tss_today: 88 } })!.fitness,
+    { ctl: 70, atl: 55, tsb: 15, form: 'fresh', tss_today: 88 },
+  );
+  // TSB <= -10 → fatigued
+  assertEquals(
+    cyclingCrossWorkoutDisplay({ fitness: { ctl: 80, atl: 100, tsb: -20, tss_today: 130 } })!.fitness.form,
+    'fatigued',
+  );
+  // between → neutral
+  assertEquals(
+    cyclingCrossWorkoutDisplay({ fitness: { ctl: 60, atl: 60, tsb: 0, tss_today: null } })!.fitness.form,
+    'neutral',
+  );
+});
+
+Deno.test('cyclingCrossWorkoutDisplay: missing/invalid fitness → no fitness key', () => {
+  assertEquals(cyclingCrossWorkoutDisplay({ fitness: null }), null);
+  assertEquals(cyclingCrossWorkoutDisplay({ fitness: { ctl: 'x', atl: 50 } }), null);
+  // fitness coexists with other cross-workout signals
+  const out = cyclingCrossWorkoutDisplay({
+    fitness: { ctl: 65, atl: 60, tsb: 5, tss_today: 90 },
+    limiter: { flag: 'trending_up', source: 'np_trend', detail: 'NP +9%' },
+  })!;
+  assert(out.fitness && out.limiter);
+  assertEquals(out.fitness.form, 'fresh');
+});

@@ -79,10 +79,28 @@ export function validateNoNewNumbers(
  * serialized packet). Returns null when no cross-workout signal is meaningful.
  */
 export function cyclingCrossWorkoutDisplay(cw: {
-  vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any;
+  vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any;
 } | null | undefined): any | null {
   if (!cw) return null;
   const out: any = {};
+
+  // Fitness (design Build Order #9 — Arc exposure into the per-workout INSIGHTS
+  // narrative). CTL/ATL/TSB from fitness_v1 (#7). Numbers land in the packet so
+  // validateNoNewNumbers whitelists them; `form` is the standard TrainingPeaks
+  // TSB band (conservative thresholds, documented).
+  const fit = cw.fitness;
+  if (fit && Number.isFinite(Number(fit.ctl)) && Number.isFinite(Number(fit.atl))) {
+    const tsb = Number(fit.tsb);
+    out.fitness = {
+      ctl: Math.round(Number(fit.ctl)),
+      atl: Math.round(Number(fit.atl)),
+      tsb: Number.isFinite(tsb) ? Math.round(tsb) : null,
+      form: !Number.isFinite(tsb) ? null : (tsb >= 5 ? 'fresh' : tsb <= -10 ? 'fatigued' : 'neutral'),
+      tss_today: (fit.tss_today != null && Number.isFinite(Number(fit.tss_today)))
+        ? Math.round(Number(fit.tss_today))
+        : null,
+    };
+  }
 
   const vs = cw.vsSimilar;
   if (vs && vs.np_delta_w != null && Number.isFinite(Number(vs.np_delta_w))) {
@@ -139,7 +157,7 @@ export function cyclingCrossWorkoutDisplay(cw: {
 function toDisplayPacket(
   fp: CyclingFactPacketV1,
   flags: CyclingFlagV1[],
-  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any } | null,
+  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any } | null,
 ): any {
   const f = fp.facts;
   const d = fp.derived;
@@ -195,7 +213,7 @@ export async function generateCyclingAISummaryV1(
   factPacket: CyclingFactPacketV1,
   flags: CyclingFlagV1[],
   coachingContext?: string | null,
-  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any } | null,
+  crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any } | null,
   arcNarrative?: ArcNarrativeContextV1 | null,
 ): Promise<string | null> {
   const display = toDisplayPacket(factPacket, flags, crossWorkout);
