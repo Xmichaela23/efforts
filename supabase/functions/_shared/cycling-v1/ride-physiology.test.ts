@@ -6,7 +6,32 @@
  *   deno test supabase/functions/_shared/cycling-v1/ride-physiology.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { computeRideEfficiency, computeRideVam } from './ride-physiology.ts';
+import { computeRideEfficiency, computeRideTss, computeRideVam } from './ride-physiology.ts';
+
+// ── computeRideTss (NP-based Coggan; design Build Order #3) ──────────────────
+
+Deno.test('tss: 1 h exactly at FTP → IF 1.0 → TSS 100', () => {
+  assertEquals(computeRideTss(250, 250, 3600), 100);
+});
+
+Deno.test('tss: standard NP-based formula (duration/3600 · IF² · 100)', () => {
+  // NP 240, FTP 250 → IF 0.96 ; 1 h → 0.96² · 100 = 92.16 → 92
+  assertEquals(computeRideTss(240, 250, 3600), 92);
+  // 2 h at IF 0.7 (NP 175 / FTP 250) → 2 · 0.49 · 100 = 98
+  assertEquals(computeRideTss(175, 250, 7200), 98);
+});
+
+Deno.test('tss: invalid NP / FTP / duration → null (key omitted)', () => {
+  assertEquals(computeRideTss(0, 250, 3600), null);
+  assertEquals(computeRideTss(-10, 250, 3600), null);
+  assertEquals(computeRideTss(240, 0, 3600), null);
+  assertEquals(computeRideTss(240, 250, 0), null);
+  assertEquals(computeRideTss(240, 250, -5), null);
+  assertEquals(computeRideTss(null, 250, 3600), null);
+  assertEquals(computeRideTss(240, null, 3600), null);
+  assertEquals(computeRideTss(240, 250, null), null);
+  assertEquals(computeRideTss(NaN, 250, 3600), null);
+});
 
 // ── computeRideEfficiency ───────────────────────────────────────────────────
 

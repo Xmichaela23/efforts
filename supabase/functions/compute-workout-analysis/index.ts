@@ -3,7 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
-import { computeRideEfficiency, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
+import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
 
 const ANALYSIS_VERSION = 'v0.1.8'; // elevation + NP + swim pace (no sample timeout)
 
@@ -1392,6 +1392,13 @@ Deno.serve(async (req) => {
           b.normalized_power = Math.round(normalizedPower);
           b.variability_index = variabilityIndex;
           b.intensity_factor = intensityFactor;
+          // NP-based TSS (design Build Order #3; decision resolved in-doc to
+          // NP-based). Duration = recorded span of the sample series the NP was
+          // computed over — consistent (the doc prioritizes consistency over
+          // precision for the CTL/ATL trend that builds on this).
+          const durSec = time_s.length >= 2 ? (time_s[time_s.length - 1] - time_s[0]) : 0;
+          const tss = computeRideTss(normalizedPower, userFtp, durSec);
+          if (tss != null) b.tss = tss;
         }
         if (avgPowerPedalingW != null) b.avg_power_pedaling_w = avgPowerPedalingW;
         if (pctTimePedaling != null) b.pct_time_pedaling = pctTimePedaling;

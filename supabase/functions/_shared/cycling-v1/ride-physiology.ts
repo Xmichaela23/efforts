@@ -40,6 +40,35 @@ export type RideClimbing = {
   climb_time_s: number;
 };
 
+/**
+ * NP-based Training Stress Score — design Build Order #3. The doc's Open
+ * Questions resolves the only TSS decision in-doc: "Minimum viable TSS:
+ * simplified NP-based TSS … (NP-based is sufficient for CTL/ATL trend;
+ * precision matters less than consistency.)" — so this is the standard Coggan
+ * NP-based formula, NOT xPower/BikeScore.
+ *
+ *   IF  = NP / FTP
+ *   TSS = (duration_s · NP · IF) / (FTP · 3600) · 100  ==  (duration_s/3600)·IF²·100
+ *
+ * Returns rounded integer TSS, or null when NP/FTP/duration aren't usable
+ * (caller omits the key — consistent with the rest of the power block).
+ */
+export function computeRideTss(
+  npW: number | null | undefined,
+  ftpW: number | null | undefined,
+  durationSec: number | null | undefined,
+): number | null {
+  const np = Number(npW);
+  const ftp = Number(ftpW);
+  const dur = Number(durationSec);
+  if (!Number.isFinite(np) || np <= 0) return null;
+  if (!Number.isFinite(ftp) || ftp <= 0) return null;
+  if (!Number.isFinite(dur) || dur <= 0) return null;
+  const intensityFactor = np / ftp;
+  const tss = (dur / 3600) * intensityFactor * intensityFactor * 100;
+  return Number.isFinite(tss) ? Math.round(tss) : null;
+}
+
 const mean = (a: number[]): number => a.reduce((s, x) => s + x, 0) / a.length;
 
 export function computeRideEfficiency(
