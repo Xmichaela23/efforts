@@ -18,7 +18,21 @@ export function arcNumericAllowList(
 }
 
 function normalizeParagraph(s: string): string {
-  const t = String(s || '').replace(/\s+/g, ' ').trim();
+  // Strip markdown the LLM sometimes emits (e.g. **bold**) — it renders as
+  // literal asterisks in the UI. Mirrors the syntax strips in the codebase's
+  // canonical stripMarkdown (_shared/athlete-snapshot/coaching.ts:429):
+  // bold/italic/heading/list-bullet. The coaching-specific section-label
+  // strips there (HEADLINE/NARRATIVE/…) don't apply to a one-paragraph ride
+  // summary, so they're omitted. Done before whitespace-collapse so the
+  // line-anchored heading/bullet patterns still see original newlines.
+  // (running's fact-packet/ai-summary.ts has no markdown strip; this follows
+  // the established stripMarkdown pattern instead.)
+  const stripped = String(s || '')
+    .replace(/\*\*/g, '')
+    .replace(/\*/g, '')
+    .replace(/^#+\s*/gm, '')
+    .replace(/^[-]\s+/gm, '');
+  const t = stripped.replace(/\s+/g, ' ').trim();
   if (!t) return '';
   // Strip wrapping quotes/brackets if model returns them.
   return t.replace(/^["'`]+/, '').replace(/["'`]+$/, '').trim();
