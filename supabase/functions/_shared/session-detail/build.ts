@@ -922,6 +922,52 @@ export function formatCyclingPacingRow(
   };
 }
 
+/**
+ * EFFICIENCY row from computed.analysis.efficiency (the block compute-workout-
+ * analysis writes via ride-physiology.computeRideEfficiency). Reads the ACTUAL
+ * persisted keys efficiency_factor + aerobic_decoupling_pct. (The request named
+ * the decoupling field generically; the shipped shape uses
+ * `aerobic_decoupling_pct` — Friel aerobic decoupling %. Documented deviation.)
+ * Gate: BOTH finite — decoupling is only present for steady efforts ≥20 min, so
+ * short/interval rides correctly produce no row. Label literal per request.
+ */
+export function formatCyclingEfficiencyRow(
+  efficiency: unknown,
+): { label: string; value: string } | null {
+  const e = (efficiency ?? null) as any;
+  if (!e || typeof e !== 'object') return null;
+  // Explicit null/undefined check before Number(): aerobic_decoupling_pct is
+  // optional (absent on short/interval rides; may round-trip as null through
+  // JSONB) and Number(null) === 0 would otherwise render a bogus "0% HR
+  // decoupling" row. Same Number(null) trap class as the vs-similar fix.
+  if (e.efficiency_factor == null || e.aerobic_decoupling_pct == null) return null;
+  const ef = Number(e.efficiency_factor);
+  const dec = Number(e.aerobic_decoupling_pct);
+  if (!Number.isFinite(ef) || !Number.isFinite(dec)) return null;
+  return { label: 'EFFICIENCY', value: `EF ${ef} · ${dec}% HR decoupling` };
+}
+
+/**
+ * CLIMBING row from computed.analysis.climbing (ride-physiology.computeRideVam).
+ * The request named the fields `vertical_ascent_rate_m_per_h` / `total_ascent_m`;
+ * the shipped shape persists `vam_m_per_h` / `climb_ascent_m` — read the real
+ * keys (the requested names would resolve undefined and the row would never
+ * render). Documented deviation. Gate: VAM finite and > 0 (flat rides have no
+ * climbing block at all — computeRideVam returns null below 30 m / 120 s).
+ * Label literal per request.
+ */
+export function formatCyclingClimbingRow(
+  climbing: unknown,
+): { label: string; value: string } | null {
+  const c = (climbing ?? null) as any;
+  if (!c || typeof c !== 'object') return null;
+  const vam = Number(c.vam_m_per_h);
+  if (!Number.isFinite(vam) || vam <= 0) return null;
+  const ascent = Number(c.climb_ascent_m);
+  const ascentStr = Number.isFinite(ascent) ? ` · ${Math.round(ascent)}m gain` : '';
+  return { label: 'CLIMBING', value: `VAM ${Math.round(vam)} m/h${ascentStr}` };
+}
+
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
@@ -1074,6 +1120,15 @@ function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
+  // Efficiency (cycling): HR-at-power EF + Friel aerobic decoupling from
+  // computed.analysis.efficiency. Placed after Heart rate per spec.
+  try {
+    if (sport === 'ride') {
+      const row = formatCyclingEfficiencyRow(comp?.analysis?.efficiency);
+      if (row) rows.push(row);
+    }
+  } catch { /* */ }
+
   // Power zones: ftp_bins is minutes per %-FTP band (CyclingFtpBinsV1). Show the
   // non-zero bands, biggest first, capped at 4 so the row stays scannable.
   try {
@@ -1125,6 +1180,15 @@ function buildAnalysisDetailRows(
       if (Number.isFinite(elevM) && elevM > 15) {
         rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain` });
       }
+    }
+  } catch { /* */ }
+
+  // Climbing (cycling): VAM + ascent from computed.analysis.climbing. Placed
+  // after Terrain (the Conditions row above) per spec.
+  try {
+    if (sport === 'ride') {
+      const row = formatCyclingClimbingRow(comp?.analysis?.climbing);
+      if (row) rows.push(row);
     }
   } catch { /* */ }
 
