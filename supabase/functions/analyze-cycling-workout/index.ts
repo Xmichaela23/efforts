@@ -1974,14 +1974,14 @@ Deno.serve(async (req) => {
     let cyclingLimiter: CyclingLimiterV1 = { flag: 'none', source: 'insufficient_data', detail: 'Cross-workout queries skipped (analyzer error path).' };
     // Declared at cross-workout scope (not inside the NP-samples try) so it's visible
     // in the analysisPayload below — same scoping rule as cyclingVsSimilar/limiter.
-    let npTrendV1: { points: Array<{ date: string; value: number; is_current: boolean }> } | null = null;
+    let npTrendV1: { points: Array<{ date: string; value: number; avg_hr: number | null; is_current: boolean }> } | null = null;
     // 20-min power best dated series — design Build Order #1 Mode 2 ("20-min
     // power best over last 90 days"). Built in the SAME historical loop / SAME
     // query as npTrendV1 (no new query, table, migration or function); reads
     // computed.power_curve['20min'] per ride. Declared at cross-workout scope
     // (same hoist as npTrendV1) so it's visible in analysisPayload.
     let pwr20TrendV1:
-      | { points: Array<{ date: string; value: number; is_current: boolean }>; classified_type: string }
+      | { points: Array<{ date: string; value: number; avg_hr: number | null; is_current: boolean }>; classified_type: string }
       | null = null;
     // CTL/ATL/TSB fitness model — design Build Order #7. Built from
     // computed.analysis.power.tss (#3) over the same 90d query; cross-workout
@@ -2047,8 +2047,8 @@ Deno.serve(async (req) => {
       // the chart could never render. Build the series here from data already fetched
       // (no extra query) and persist as np_trend_v1 — independent of CyclingVsSimilarV1
       // so its typed shape / tests don't ripple. (npTrendV1 declared at outer scope.)
-      const npDated: Array<{ date: string; np: number }> = [];
-      const pwr20Dated: Array<{ date: string; w20: number }> = [];
+      const npDated: Array<{ date: string; np: number; hr: number | null }> = [];
+      const pwr20Dated: Array<{ date: string; w20: number; hr: number | null }> = [];
       const tssByDate = new Map<string, number>(); // design #7: daily TSS sum
       try {
         const today = new Date().toISOString().slice(0, 10);
@@ -2103,6 +2103,12 @@ Deno.serve(async (req) => {
           // 20-min power best for this historical ride (design Mode 2 series).
           // Independent of NP availability — collected even if `np == null`.
           const w20h = Number((r as any)?.computed?.power_curve?.['20min']);
+          // Avg HR for the dual-line TREND (design #1b — mirrors running's
+          // pace+HR sparkline). Source: computed.overall.avg_hr.
+          const hrH = (() => {
+            const h = Number((r as any)?.computed?.overall?.avg_hr);
+            return Number.isFinite(h) && h > 0 ? Math.round(h) : null;
+          })();
           // Same-classified_type filter. Canonical source is
           // workout_analysis.fact_packet_v1.facts.classified_type; top-level
           // workout_analysis.classified_type is the fallback (it's nulled by the
@@ -2113,7 +2119,7 @@ Deno.serve(async (req) => {
             return t ? String(t).toLowerCase() : null;
           })();
           if (r?.date && Number.isFinite(w20h) && w20h > 0 && curType && histType === curType) {
-            pwr20Dated.push({ date: String(r.date), w20: Math.round(w20h) });
+            pwr20Dated.push({ date: String(r.date), w20: Math.round(w20h), hr: hrH });
           }
           // Daily TSS for the CTL/ATL model (design #7) — sum if multiple
           // rides share a date.
@@ -2125,7 +2131,7 @@ Deno.serve(async (req) => {
           if (np == null) continue;
           ninetyDayNpSamples.push(np);
           if (String(r.date) >= fourteenAgo) recentNpSamples.push(np);
-          if (r?.date) npDated.push({ date: String(r.date), np });
+          if (r?.date) npDated.push({ date: String(r.date), np, hr: hrH });
         }
         // Add the current ride as the is_current point, then sort ascending and
         // cap to the most recent 12 so the sparkline stays readable.
@@ -2134,10 +2140,17 @@ Deno.serve(async (req) => {
           ? factsNp
           : (rideComputedNp(workout) ?? NaN);
         const currentDate = String((workout as any)?.date || '');
-        const byDate = new Map<string, { date: string; value: number; is_current: boolean }>();
-        for (const d of npDated) byDate.set(d.date, { date: d.date, value: d.np, is_current: false });
+        // Current ride avg HR for the dual-line TREND is_current point (design #1b).
+        const currentHr = (() => {
+          const h = Number(
+            cyclingFactPacketV1?.facts?.avg_hr ?? (workout as any)?.computed?.overall?.avg_hr,
+          );
+          return Number.isFinite(h) && h > 0 ? Math.round(h) : null;
+        })();
+        const byDate = new Map<string, { date: string; value: number; avg_hr: number | null; is_current: boolean }>();
+        for (const d of npDated) byDate.set(d.date, { date: d.date, value: d.np, avg_hr: d.hr, is_current: false });
         if (Number.isFinite(currentNp) && currentNp > 0 && currentDate) {
-          byDate.set(currentDate, { date: currentDate, value: Math.round(currentNp), is_current: true });
+          byDate.set(currentDate, { date: currentDate, value: Math.round(currentNp), avg_hr: currentHr, is_current: true });
         }
         const pts = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
         if (pts.length >= 3) npTrendV1 = { points: pts };
@@ -2145,10 +2158,10 @@ Deno.serve(async (req) => {
         // 20-min power best dated series (design Mode 2). Same shape / same ≥3
         // gate as npTrendV1; current ride's 20-min from its own computed.
         const curW20 = Number((workout as any)?.computed?.power_curve?.['20min']);
-        const w20ByDate = new Map<string, { date: string; value: number; is_current: boolean }>();
-        for (const d of pwr20Dated) w20ByDate.set(d.date, { date: d.date, value: d.w20, is_current: false });
+        const w20ByDate = new Map<string, { date: string; value: number; avg_hr: number | null; is_current: boolean }>();
+        for (const d of pwr20Dated) w20ByDate.set(d.date, { date: d.date, value: d.w20, avg_hr: d.hr, is_current: false });
         if (Number.isFinite(curW20) && curW20 > 0 && currentDate) {
-          w20ByDate.set(currentDate, { date: currentDate, value: Math.round(curW20), is_current: true });
+          w20ByDate.set(currentDate, { date: currentDate, value: Math.round(curW20), avg_hr: currentHr, is_current: true });
         }
         const w20pts = Array.from(w20ByDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
         // ≥3 SAME-TYPE rides required (current ride is always same-type, so

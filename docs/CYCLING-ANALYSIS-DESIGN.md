@@ -147,6 +147,7 @@ Arc surfaces this into:
 
 ### Immediate (no new infrastructure)
 1. **Mode-aware TREND**: replace the single raw NP sparkline with mode selection. The "unplanned, no segments" path (20-min power best) is fully backed by `achievements_v1` today.
+1b. **HR line on the cycling TREND** — mirror running's pace + HR dual-line sparkline (`build.ts` run branch reads `trend_point.avg_hr`; the `trend.points[].avg_hr` contract field already exists). Cycling's `pwr20_trend_v1` / `np_trend_v1` series must carry `avg_hr` per ride (source: `computed.overall.avg_hr`; current ride from the fact packet) so the client draws the dashed HR overlay alongside power. No new infrastructure — same data already fetched.
 2. **Mode detection** (plan-linked vs unplanned): the linked-plan-session signal already exists in `fact_packet_v1.derived.plan_context`; wire the branch.
 
 ### Short term (new infrastructure, scoped)

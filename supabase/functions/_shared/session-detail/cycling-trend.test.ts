@@ -55,3 +55,16 @@ Deno.test('neither series usable → null', () => {
   assertEquals(pickCyclingTrendSeries({ pwr20_trend_v1: { points: pts(2) } }), null);
   assertEquals(pickCyclingTrendSeries({ np_trend_v1: { points: [] } }), null);
 });
+
+Deno.test('#1b: pickCyclingTrendSeries passes avg_hr through on points (dual-line)', () => {
+  const withHr = [
+    { date: '2026-03-01', value: 250, avg_hr: 150, is_current: false },
+    { date: '2026-03-08', value: 256, avg_hr: 148, is_current: false },
+    { date: '2026-03-15', value: 262, avg_hr: 145, is_current: true },
+  ];
+  const r = pickCyclingTrendSeries({ pwr20_trend_v1: { points: withHr, classified_type: 'vo2' } })!;
+  assertEquals(r.points.map((p: any) => p.avg_hr), [150, 148, 145]);
+  // np fallback also carries whatever avg_hr the analyzer wrote
+  const n = pickCyclingTrendSeries({ np_trend_v1: { points: withHr } })!;
+  assertEquals(n.points[0].avg_hr, 150);
+});

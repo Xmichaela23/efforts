@@ -602,7 +602,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
             .map((p: any) => ({
               date: String(p.date),
               value: Number(p.value),
-              avg_hr: null,
+              // Dual-line TREND (design #1b) — mirrors running build.ts run
+              // branch (`avg_hr: p.avg_hr != null ? Number(p.avg_hr) : null`).
+              // Cycling series now carry avg_hr per ride; the client draws the
+              // dashed HR overlay alongside power.
+              avg_hr: p.avg_hr != null && Number.isFinite(Number(p.avg_hr)) ? Number(p.avg_hr) : null,
               is_current: !!p.is_current,
               label: `${Math.round(Number(p.value))}W`,
             }))
