@@ -6,7 +6,36 @@
  *   deno test supabase/functions/_shared/cycling-v1/ride-physiology.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { computeRideEfficiency, computeRideTss, computeRideVam } from './ride-physiology.ts';
+import { computeCtlAtl, computeRideEfficiency, computeRideTss, computeRideVam } from './ride-physiology.ts';
+
+// ── computeCtlAtl (PMC; design Build Order #7) ──────────────────────────────
+
+Deno.test('ctl/atl: sustained constant TSS → CTL≈ATL≈TSS, TSB≈0', () => {
+  const r = computeCtlAtl(Array.from({ length: 400 }, () => 100))!;
+  assertEquals(r.ctl, 100);
+  assertEquals(r.atl, 100);
+  assertEquals(r.tsb, 0);
+});
+
+Deno.test('ctl/atl: ramp → ATL outruns CTL → negative TSB (fatigued)', () => {
+  // 0 baseline then a hard block: ATL (7d) rises faster than CTL (42d).
+  const r = computeCtlAtl([...Array(60).fill(50), ...Array(14).fill(150)])!;
+  assert(r.atl > r.ctl);
+  assert(r.tsb < 0);
+});
+
+Deno.test('ctl/atl: taper (TSS→0) → ATL falls faster → positive TSB (fresh)', () => {
+  const r = computeCtlAtl([...Array(60).fill(100), ...Array(10).fill(0)])!;
+  assert(r.atl < r.ctl);
+  assert(r.tsb > 0);
+});
+
+Deno.test('ctl/atl: rest days (0) counted; non-finite coerced to 0; empty → null', () => {
+  assertEquals(computeCtlAtl([]), null);
+  assertEquals(computeCtlAtl('x' as any), null);
+  const r = computeCtlAtl([100, 0, 0, NaN as any, 100])!;
+  assert(r.ctl >= 0 && r.atl >= 0); // no NaN propagation
+});
 
 // ── computeRideTss (NP-based Coggan; design Build Order #3) ──────────────────
 

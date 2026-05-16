@@ -69,6 +69,44 @@ export function computeRideTss(
   return Number.isFinite(tss) ? Math.round(tss) : null;
 }
 
+export type RideFitness = {
+  /** Chronic Training Load — 42-day exponentially-weighted TSS (fitness). */
+  ctl: number;
+  /** Acute Training Load — 7-day exponentially-weighted TSS (fatigue). */
+  atl: number;
+  /** Training Stress Balance = CTL − ATL (form: positive = fresh). */
+  tsb: number;
+};
+
+/**
+ * CTL / ATL / TSB — design Build Order #7. Standard Performance Management
+ * Chart impulse-response: exponential moving averages of daily TSS with the
+ * conventional 42-day (chronic) and 7-day (acute) time constants. Input is a
+ * chronological one-value-per-day TSS array (rest days = 0); seeded from 0,
+ * which under-weights early days but converges — acceptable for the trend
+ * signal (the doc resolves TSS to "consistency over precision"). TSB uses
+ * end-of-series CTL−ATL (current form). Returns rounded values, or null on
+ * empty input.
+ */
+export function computeCtlAtl(dailyTss: ReadonlyArray<number>): RideFitness | null {
+  if (!Array.isArray(dailyTss) || dailyTss.length === 0) return null;
+  const kCtl = 1 - Math.exp(-1 / 42);
+  const kAtl = 1 - Math.exp(-1 / 7);
+  let ctl = 0;
+  let atl = 0;
+  for (const raw of dailyTss) {
+    const t = Number(raw);
+    const tss = Number.isFinite(t) && t > 0 ? t : 0;
+    ctl += (tss - ctl) * kCtl;
+    atl += (tss - atl) * kAtl;
+  }
+  return {
+    ctl: Math.round(ctl),
+    atl: Math.round(atl),
+    tsb: Math.round(ctl - atl),
+  };
+}
+
 const mean = (a: number[]): number => a.reduce((s, x) => s + x, 0) / a.length;
 
 export function computeRideEfficiency(

@@ -4,6 +4,7 @@ import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
 import { detectClimbSegments, parseStravaSegmentEfforts } from '../_shared/cycling-v1/segments.ts';
+import { computeCtlAtl } from '../_shared/cycling-v1/ride-physiology.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
@@ -1979,6 +1980,10 @@ Deno.serve(async (req) => {
     // computed.power_curve['20min'] per ride. Declared at cross-workout scope
     // (same hoist as npTrendV1) so it's visible in analysisPayload.
     let pwr20TrendV1: { points: Array<{ date: string; value: number; is_current: boolean }> } | null = null;
+    // CTL/ATL/TSB fitness model — design Build Order #7. Built from
+    // computed.analysis.power.tss (#3) over the same 90d query; cross-workout
+    // scope so it's visible in analysisPayload (same hoist as the trend series).
+    let fitnessV1: { ctl: number; atl: number; tsb: number; tss_today: number | null } | null = null;
     try {
       // §1 PRs — best 20-min / 5-min / 1-min on 90d + all-time windows.
       cyclingPRs = await fetchCyclingPRs(supabase, {
@@ -2041,6 +2046,7 @@ Deno.serve(async (req) => {
       // so its typed shape / tests don't ripple. (npTrendV1 declared at outer scope.)
       const npDated: Array<{ date: string; np: number }> = [];
       const pwr20Dated: Array<{ date: string; w20: number }> = [];
+      const tssByDate = new Map<string, number>(); // design #7: daily TSS sum
       try {
         const today = new Date().toISOString().slice(0, 10);
         const ninetyAgo = (() => {
@@ -2087,6 +2093,13 @@ Deno.serve(async (req) => {
           if (r?.date && Number.isFinite(w20h) && w20h > 0) {
             pwr20Dated.push({ date: String(r.date), w20: Math.round(w20h) });
           }
+          // Daily TSS for the CTL/ATL model (design #7) — sum if multiple
+          // rides share a date.
+          const tssH = Number((r as any)?.computed?.analysis?.power?.tss);
+          if (r?.date && Number.isFinite(tssH) && tssH > 0) {
+            const dk = String(r.date).slice(0, 10);
+            tssByDate.set(dk, (tssByDate.get(dk) || 0) + tssH);
+          }
           if (np == null) continue;
           ninetyDayNpSamples.push(np);
           if (String(r.date) >= fourteenAgo) recentNpSamples.push(np);
@@ -2117,6 +2130,35 @@ Deno.serve(async (req) => {
         }
         const w20pts = Array.from(w20ByDate.values()).sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
         if (w20pts.length >= 3) pwr20TrendV1 = { points: w20pts };
+
+        // CTL/ATL/TSB (design #7): dense daily TSS series across the 90d query
+        // window (rest days = 0), including the current ride's own TSS.
+        try {
+          const curTss = Number((workout as any)?.computed?.analysis?.power?.tss);
+          if (Number.isFinite(curTss) && curTss > 0 && currentDate) {
+            const ck = currentDate.slice(0, 10);
+            tssByDate.set(ck, (tssByDate.get(ck) || 0) + curTss);
+          }
+          const dayMs = 86400000;
+          const start = new Date(ninetyAgo + 'T00:00:00Z').getTime();
+          const end = new Date(today + 'T00:00:00Z').getTime();
+          if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
+            const daily: number[] = [];
+            for (let ms = start; ms <= end; ms += dayMs) {
+              const dk = new Date(ms).toISOString().slice(0, 10);
+              daily.push(tssByDate.get(dk) || 0);
+            }
+            const fit = computeCtlAtl(daily);
+            if (fit) {
+              fitnessV1 = {
+                ctl: fit.ctl,
+                atl: fit.atl,
+                tsb: fit.tsb,
+                tss_today: Number.isFinite(curTss) && curTss > 0 ? Math.round(curTss) : null,
+              };
+            }
+          }
+        } catch { /* non-fatal */ }
       } catch (e) {
         console.warn('[analyze-cycling-workout] NP-samples fetch failed (non-fatal):', e);
       }
@@ -2263,6 +2305,7 @@ Deno.serve(async (req) => {
       // Dated NP series for the cycling Trend sparkline (see npTrendV1 build above).
       np_trend_v1: npTrendV1,
       pwr20_trend_v1: pwr20TrendV1,
+      fitness_v1: fitnessV1,
     };
 
     console.log(`✅ Analysis payload structure:`, Object.keys(analysisPayload));
