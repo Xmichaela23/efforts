@@ -1,5 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
+import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
+import { arcModeSystemAddon, arcNarrativeFactBlock } from '../_shared/arc-narrative-ai-appendix.ts';
 
 /**
  * =============================================================================
@@ -1556,13 +1559,27 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   console.log(`📊 SESSION RPE: ${sessionRPEData ? 'Available' : 'Not provided'}`);
   console.log(`📊 READINESS: ${readinessData ? 'Available' : 'Not provided'}`);
 
+  // Temporal Arc frame (post-race recovery / taper / race proximity / plan
+  // phase) — same resolution + guard as analyze-running-workout:1985-1988.
+  let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
+  try {
+    const wdSlice = String(workout?.date || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && workout?.user_id) {
+      const arc = await getArcContext(supabase, workout.user_id as string, `${wdSlice}T12:00:00.000Z`);
+      arc_narrative_for_summary = arc.arc_narrative_context ?? null;
+      console.log(`[analyze-strength-workout] arc_narrative mode=${arc_narrative_for_summary?.mode ?? 'n/a'} days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'}`);
+    }
+  } catch (arcSummErr) {
+    console.warn('[analyze-strength-workout] arc_narrative_for_summary skipped:', arcSummErr);
+  }
+
   // Generate enhanced insights using GPT-4
   const insights = await generateEnhancedStrengthInsights(
-    workout, 
-    exerciseAdherence, 
-    overallAdherence, 
-    progressionData, 
-    planMetadata, 
+    workout,
+    exerciseAdherence,
+    overallAdherence,
+    progressionData,
+    planMetadata,
     userUnits,
     sessionRPEData,
     readinessData,
@@ -1571,6 +1588,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
     rirProgression,
     volumeAnalysis,
     dataQuality,
+    arc_narrative_for_summary,
   );
   
   return {
@@ -1607,6 +1625,7 @@ async function generateEnhancedStrengthInsights(
   rirProgression: any,
   volumeAnalysis: any,
   dataQuality: any,
+  arcNarrative: ArcNarrativeContextV1 | null = null,
 ): Promise<string[]> {
   if (!Deno.env.get('ANTHROPIC_API_KEY')) {
     return ['AI analysis not available - ANTHROPIC_API_KEY not configured'];
@@ -2268,8 +2287,12 @@ REQUIRED SECTIONS (generate ALL of these):
    - CRITICAL: Contextualize ALL recommendations with readiness data AND plan phase
    - CRITICAL: Reference what's coming next week in plan
 
-CRITICAL: Avoid contradictory statements. Be extremely specific with numbers.`,
-      user: context,
+CRITICAL: Avoid contradictory statements. Be extremely specific with numbers.${arcNarrative ? arcModeSystemAddon(arcNarrative) : ''}`,
+      user: (arcNarrative
+        ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
+          arcNarrativeFactBlock(arcNarrative) +
+          '\n\n'
+        : '') + context,
       maxTokens: 2000,
       temperature: 0.3,
       model: 'sonnet',

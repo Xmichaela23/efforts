@@ -8,7 +8,46 @@
  *   deno test supabase/functions/_shared/cycling-v1/ai-summary.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { cyclingCrossWorkoutDisplay, validateNoNewNumbers } from './ai-summary.ts';
+import { arcNumericAllowList, cyclingCrossWorkoutDisplay, validateNoNewNumbers } from './ai-summary.ts';
+
+// ── Arc temporal context: numeric allow-list (so Arc citations aren't rejected) ──
+
+const NC: any = {
+  focus_date: '2026-05-14',
+  mode: 'recovery_read',
+  last_goal_race: { name: 'Ojai Marathon', distance: 'marathon', target_date: '2026-04-19' },
+  days_since_last_goal_race: 25,
+  runs_since_last_race: 4,
+  next_primary_goal: { name: 'Santa Cruz 70.3', distance: '70.3', target_date: '2026-09-13', priority: 'A' },
+  days_until_next_goal_race: 122,
+  days_until_next_block_start: 30,
+  assumed_block_lead_weeks: 12,
+  plan_phase_normalized: 'recovery',
+};
+
+Deno.test('arcNumericAllowList: null/undefined → empty string', () => {
+  assertEquals(arcNumericAllowList(null), '');
+  assertEquals(arcNumericAllowList(undefined), '');
+});
+
+Deno.test('arcNumericAllowList: populated nc carries the Arc numbers + identifiers', () => {
+  const s = arcNumericAllowList(NC);
+  assert(s.includes('25'), 'days_since should be present');
+  assert(s.includes('Ojai Marathon'), 'last race name should be present');
+  assert(s.includes('2026-04-19'), 'race date should be present');
+  assert(s.includes('recovery_read'), 'mode should be present');
+});
+
+Deno.test('validator: an Arc-grounded number is rejected without the Arc allow-list, accepted with it', () => {
+  const packet = JSON.stringify({ power: { np: '187 W' } }); // no "25" here
+  // Without Arc allow → "25" is a hallucinated number
+  assertEquals(validateNoNewNumbers('About 25 days after Ojai, this was an easy spin.', packet).ok, false);
+  // With Arc allow appended (exactly what generateCyclingAISummaryV1 does) → accepted
+  assertEquals(
+    validateNoNewNumbers('About 25 days after Ojai, this was an easy spin.', packet + arcNumericAllowList(NC)).ok,
+    true,
+  );
+});
 
 // ── Item 1: loosened numeric validator (running parity) ─────────────────────
 

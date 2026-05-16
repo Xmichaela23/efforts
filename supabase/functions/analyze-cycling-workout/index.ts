@@ -3,6 +3,8 @@ import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
+import { getArcContext } from '../_shared/arc-context.ts';
+import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
 import { fetchPlanContextForWorkout } from '../_shared/plan-context.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
@@ -2098,6 +2100,20 @@ Deno.serve(async (req) => {
       console.warn('[analyze-cycling-workout] cross-workout queries failed (non-fatal):', e);
     }
 
+    // Temporal Arc frame (post-race recovery / taper / race proximity / plan
+    // phase) — same resolution + guard as analyze-running-workout:1985-1988.
+    let arc_narrative_for_summary: ArcNarrativeContextV1 | null = null;
+    try {
+      const wdSlice = String((workout as any).date || '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(wdSlice) && (workout as any).user_id) {
+        const arc = await getArcContext(supabase as any, (workout as any).user_id as string, `${wdSlice}T12:00:00.000Z`);
+        arc_narrative_for_summary = arc.arc_narrative_context ?? null;
+        console.log(`[analyze-cycling-workout] arc_narrative workout=${workout_id} mode=${arc_narrative_for_summary?.mode ?? 'n/a'} days_since_last_race=${arc_narrative_for_summary?.days_since_last_goal_race ?? 'n/a'}`);
+      }
+    } catch (arcSummErr) {
+      console.warn('[analyze-cycling-workout] arc_narrative_for_summary skipped:', arcSummErr);
+    }
+
     // Cycling ai_summary — generated here so the narrative can lead with the
     // cross-workout comparison/trend (parity with analyze-running-workout).
     try {
@@ -2106,7 +2122,7 @@ Deno.serve(async (req) => {
         achievements: cyclingPRs,
         npTrend: npTrendV1,
         limiter: cyclingLimiter,
-      });
+      }, arc_narrative_for_summary);
       if (ai_summary) ai_summary_generated_at = new Date().toISOString();
     } catch (e) {
       console.log('⚠️ Cycling ai_summary generation failed:', e);

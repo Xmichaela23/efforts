@@ -1,5 +1,21 @@
 import type { CyclingFactPacketV1, CyclingFlagV1 } from './types.ts';
 import { callLLM } from '../llm.ts';
+import type { ArcNarrativeContextV1 } from '../arc-narrative-state.ts';
+import { arcModeSystemAddon, arcNarrativeFactBlock } from '../arc-narrative-ai-appendix.ts';
+
+/**
+ * Numbers the LLM may legitimately cite from the temporal Arc frame (days
+ * since/until a race, target dates, priority, focus date). Appended to the
+ * validator's allow-source so an Arc-grounded sentence ("about 25 days after
+ * Ojai") is not rejected as a hallucinated number. Mirrors running's
+ * `numericAllowAnchors` (_shared/fact-packet/ai-summary.ts).
+ */
+export function arcNumericAllowList(
+  arcNarrative: ArcNarrativeContextV1 | null | undefined,
+): string {
+  if (!arcNarrative) return '';
+  return '\n' + arcNarrativeFactBlock(arcNarrative) + '\n' + JSON.stringify(arcNarrative);
+}
 
 function normalizeParagraph(s: string): string {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
@@ -166,9 +182,16 @@ export async function generateCyclingAISummaryV1(
   flags: CyclingFlagV1[],
   coachingContext?: string | null,
   crossWorkout?: { vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any } | null,
+  arcNarrative?: ArcNarrativeContextV1 | null,
 ): Promise<string | null> {
   const display = toDisplayPacket(factPacket, flags, crossWorkout);
   const packetStr = JSON.stringify(display, null, 2);
+  // Temporal Arc frame (post-race recovery / taper / race proximity / plan
+  // phase) — consumed the same way running does: fact block in the user
+  // message, mode addon on the system prompt. Numbers from it are whitelisted
+  // via arcNumericAllowList so Arc-grounded citations aren't rejected.
+  const arcFacts = arcNarrative ? arcNarrativeFactBlock(arcNarrative) : '';
+  const allowStr = packetStr + arcNumericAllowList(arcNarrative);
 
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
 ${coachingContext ? `\n${coachingContext}\n` : ''}
@@ -187,24 +210,37 @@ PACKET (authoritative; do not compute outside it):
 ${packetStr}
 `;
 
-  const attempt = async (extraSystem: string | null): Promise<string | null> => {
+  // System is constant across attempts (base + Arc mode addon, matching
+  // running's systemPrompt construction); the user message varies on retry.
+  const systemPrompt =
+    'You are a precise endurance coach. Follow the rules exactly.' +
+    (arcNarrative ? arcModeSystemAddon(arcNarrative) : '');
+  const userBase =
+    (arcFacts
+      ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
+        arcFacts +
+        '\n\n'
+      : '') + prompt;
+
+  const attempt = async (userMsg: string): Promise<string | null> => {
     const text = await callLLM({
-      system: extraSystem ?? 'You are a precise endurance coach. Follow the rules exactly.',
-      user: prompt,
+      system: systemPrompt,
+      user: userMsg,
       temperature: 0.2,
       maxTokens: 220,
     });
     return text ? normalizeParagraph(text) : null;
   };
 
-  // 2 attempts with numeric-token validation.
-  const s1 = await attempt(null);
+  // 2 attempts with numeric-token validation (allow-list includes Arc numbers).
+  const s1 = await attempt(userBase);
   if (!s1) return null;
-  const v1 = validateNoNewNumbers(s1, packetStr);
+  const v1 = validateNoNewNumbers(s1, allowStr);
   if (v1.ok) return s1;
 
   const s2 = await attempt(
-    `Your previous output used numbers not present in the packet: ${v1.bad.join(', ')}. Rewrite using ONLY numbers that appear in the packet.`,
+    userBase +
+      `\n\nYour previous output used numbers not present in the packet: ${v1.bad.join(', ')}. Rewrite using ONLY numbers that appear in the packet or the TEMPORAL ARC CONTEXT.`,
   );
   if (!s2) return null;
   // Soft-accept: numeric drift is the ONLY cycling validator (no hard HR /
