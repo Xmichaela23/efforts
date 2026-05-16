@@ -38,38 +38,59 @@ Deno.test('null / 0 / negative / missing → null (skipped in the loop)', () => 
   assertEquals(rideComputedNp(undefined), null);
 });
 
+Deno.test('canonical computed.analysis.power.normalized_power resolves (the real-data case)', () => {
+  // This is where compute-workout-analysis:1391 actually writes ride NP and
+  // where compute-facts:1124 reads it. The resolver previously never looked
+  // here, so every historical row resolved null and np_trend stayed null even
+  // after recompute on real data.
+  assertEquals(
+    rideComputedNp({ computed: { analysis: { power: { normalized_power: 226.4 } } } }),
+    226,
+  );
+});
+
 Deno.test('NP outside computed.overall resolves (the real-world starvation case)', () => {
-  // Ingested rides commonly carry NP here, NOT in computed.overall. Before the
-  // broadened chain these all returned null → trend never reached 3 points.
-  assertEquals(rideComputedNp({ normalized_power: 233 }), 233);
+  assertEquals(rideComputedNp({ normalized_power: 233 }), 233); // top-level column
   assertEquals(rideComputedNp({ metrics: { normalized_power: 244 } }), 244);
   assertEquals(rideComputedNp({ weighted_average_watts: 251 }), 251); // Garmin/Strava standard
 });
 
-Deno.test('resolution precedence follows the analyzer chain', () => {
-  // computed.overall._w wins over everything below it.
+Deno.test('precedence mirrors compute-facts:1124 (w.normalized_power ?? analysis.power)', () => {
+  // Canonical #1: top-level normalized_power wins over everything else.
   assertEquals(
     rideComputedNp({
-      computed: { overall: { normalized_power_w: 300 } },
       normalized_power: 199,
+      computed: { analysis: { power: { normalized_power: 240 } }, overall: { normalized_power_w: 300 } },
       weighted_average_watts: 150,
     }),
-    300,
+    199,
   );
-  // weighted_average_watts is the last resort, used only when all else absent.
+  // Canonical #2: computed.analysis.power.normalized_power wins over the
+  // computed.overall.* / metrics / weighted_average_watts fallbacks.
+  assertEquals(
+    rideComputedNp({
+      computed: { analysis: { power: { normalized_power: 240 } }, overall: { normalized_power_w: 300 } },
+      weighted_average_watts: 150,
+    }),
+    240,
+  );
+  // Within the fallbacks: overall._w beats overall.normalized_power.
+  assertEquals(
+    rideComputedNp({ computed: { overall: { normalized_power_w: 250, normalized_power: 199 } } }),
+    250,
+  );
+  // weighted_average_watts is the last resort.
   assertEquals(
     rideComputedNp({ computed: { overall: {} }, metrics: {}, weighted_average_watts: 260 }),
     260,
   );
-  // top-level normalized_power beats weighted_average_watts.
-  assertEquals(rideComputedNp({ normalized_power: 240, weighted_average_watts: 199 }), 240);
 });
 
 Deno.test('a mixed-source 3-ride history all resolve → trend clears the 3-point gate', () => {
   const rows = [
-    { computed: { overall: { normalized_power_w: 205 } } },
-    { weighted_average_watts: 212 },                 // ingested, no computed.overall
-    { computed: { overall: { normalized_power: 220 } } },
+    { computed: { analysis: { power: { normalized_power: 205 } } } }, // canonical real-data shape
+    { weighted_average_watts: 212 },                                   // ingested fallback
+    { computed: { overall: { normalized_power: 220 } } },              // legacy overall
   ];
   const resolved = rows.map(rideComputedNp).filter((n): n is number => n != null);
   assertEquals(resolved, [205, 212, 220]);
