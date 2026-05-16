@@ -572,14 +572,32 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     pacing: { coefficient_of_variation: pacingCV },
 
     trend: (() => {
-      // Cycling: NP series (higher = fitter). Reads the dated np_trend_v1 the
-      // analyzer persists (vs_similar_v1 is a delta-summary, not a series). Run
-      // logic below is untouched.
+      // Cycling: mode-aware TREND (design Build Order #1). The doc's resolved
+      // table maps "unplanned, no segments" (the dominant case) → 20-min power
+      // best over 90 days. So prefer pwr20_trend_v1 (Item D) as the primary
+      // series; fall back to np_trend_v1 so an already-populated NP sparkline
+      // never regresses.
+      //
+      // Autonomous-tier scope (conservative, documented): the other rows of the
+      // doc's TREND table are NOT separately selectable here —
+      //  - Mode 1 "power adherence trend across same session type this block":
+      //    that per-block series is not persisted (needs infra outside the
+      //    autonomous tier).
+      //  - Mode 3/4 segment/race-course series: Build Order #6/#8, skipped;
+      //    segment presence is also invisible at the display layer (build.ts
+      //    has no `achievements`).
+      //  - "No power data → HR-decoupling trend": the per-ride decoupling metric
+      //    now exists (Item B) but a cross-ride decoupling *series* would need
+      //    the same analyzer persistence as np_trend (not in scope).
+      // Mode classification itself shipped as the standalone primitive in
+      // _shared/cycling-v1/analysis-mode.ts (Build Order #2) for when those
+      // series land. Run logic below is untouched.
       if (type === 'ride') {
         try {
-          const npts = (wa as any)?.np_trend_v1?.points;
-          if (!Array.isArray(npts) || npts.length < 3) return null;
-          const sorted = [...npts].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
+          const picked = pickCyclingTrendSeries(wa);
+          if (!picked) return null;
+          const { points: series, metricLabel, noun } = picked;
+          const sorted = [...series].sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
           const points = sorted
             .map((p: any) => ({
               date: String(p.date),
@@ -594,13 +612,13 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           const avgArr = (arr: typeof points) => arr.reduce((s, p) => s + p.value, 0) / arr.length;
           const firstHalfAvg = avgArr(points.slice(0, mid));
           const secondHalfAvg = avgArr(points.slice(mid));
-          const delta = Math.round(secondHalfAvg - firstHalfAvg); // higher NP later = improving
+          const delta = Math.round(secondHalfAvg - firstHalfAvg); // higher later = improving
           const direction = delta > 3 ? 'improving' as const : delta < -3 ? 'declining' as const : 'stable' as const;
           const absDelta = Math.abs(delta);
           const summary = direction === 'stable'
-            ? `Consistent NP across ${points.length} rides`
+            ? `Consistent ${noun} across ${points.length} rides`
             : `${absDelta}W ${direction === 'improving' ? 'higher' : 'lower'} over ${points.length} rides`;
-          return { metric_label: 'Normalized power', unit: 'W', points, direction, summary, lower_is_better: false };
+          return { metric_label: metricLabel, unit: 'W', points, direction, summary, lower_is_better: false };
         } catch { return null; }
       }
       try {
@@ -812,6 +830,31 @@ function buildPlannedTotals(
     return null;
   })();
   return { duration_s: durS, distance_m: distM, avg_pace_s_per_mi: avgPace, swim_pace_per_100_s: swimPer100, swim_unit: swimUnit };
+}
+
+/**
+ * Mode-aware cycling TREND series selection (design Build Order #1). The doc's
+ * resolved TREND table maps the dominant "unplanned, no segments" case to the
+ * 20-min power best over 90 days, so pwr20_trend_v1 (Item D) is the primary
+ * series; np_trend_v1 is the fallback so an already-populated NP sparkline
+ * never regresses. Other TREND-table rows (Mode 1 block-adherence, Mode 3/4
+ * segment series, no-power decoupling series) require persistence outside the
+ * autonomous tier and are documented at the call site. Returns the chosen
+ * dated points (≥3) + display labels, or null.
+ */
+export function pickCyclingTrendSeries(
+  wa: unknown,
+): { points: any[]; metricLabel: string; noun: string } | null {
+  const w = (wa ?? null) as any;
+  const pwr20 = w?.pwr20_trend_v1?.points;
+  if (Array.isArray(pwr20) && pwr20.length >= 3) {
+    return { points: pwr20, metricLabel: 'Best 20-min power', noun: '20-min power' };
+  }
+  const nptr = w?.np_trend_v1?.points;
+  if (Array.isArray(nptr) && nptr.length >= 3) {
+    return { points: nptr, metricLabel: 'Normalized power', noun: 'NP' };
+  }
+  return null;
 }
 
 /**
