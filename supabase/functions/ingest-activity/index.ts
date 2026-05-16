@@ -433,6 +433,10 @@ function mapStravaToWorkout(activity, userId) {
           achievements: e.achievements,
           average_watts: e.average_watts,
           average_heartrate: e.average_heartrate,
+          // Stable Strava segment id — additively captured (design Build Order
+          // #6) so cross-ride matching can key on it for FUTURE rides; legacy
+          // rows lack it and fall back to the name+distance fingerprint.
+          segment_id: e.segment?.id ?? null,
           // GPS track indices for map visualization
           start_index: e.start_index,
           end_index: e.end_index

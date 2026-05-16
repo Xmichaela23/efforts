@@ -3,6 +3,7 @@ import { buildCyclingFactPacketV1 } from '../_shared/cycling-v1/build.ts';
 import { generateCyclingFlagsV1 } from '../_shared/cycling-v1/flags.ts';
 import { generateCyclingAISummaryV1 } from '../_shared/cycling-v1/ai-summary.ts';
 import { rideComputedNp } from '../_shared/cycling-v1/np-trend.ts';
+import { detectClimbSegments, parseStravaSegmentEfforts } from '../_shared/cycling-v1/segments.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { getTrainingLoadContext } from '../_shared/fact-packet/queries.ts';
@@ -2131,6 +2132,60 @@ Deno.serve(async (req) => {
       console.log(`🚴 [CYCLING CROSS-WORKOUT] PRs sample=${cyclingPRs?.sample_size ?? 0}, vs-similar n=${cyclingVsSimilar?.sample_size ?? 0}, limiter flag=${cyclingLimiter.flag} source=${cyclingLimiter.source}`);
     } catch (e) {
       console.warn('[analyze-cycling-workout] cross-workout queries failed (non-fatal):', e);
+    }
+
+    // Segment history — design Build Order #6. Strava segment efforts from
+    // workouts.achievements + synthetic Garmin climbs from the grade/elevation
+    // series → cycling_segment_history (its own table per the unblock decision).
+    // Fully non-fatal: the table is applied via the SQL editor (migration-
+    // tracking divergence — see docs/MAINTENANCE-DEBT.md), so a missing table
+    // or any error must NOT break analysis. Clean-replace per workout so
+    // re-analyze is idempotent.
+    try {
+      const w: any = workout;
+      const series = w?.computed?.analysis?.series || {};
+      const efforts = [
+        ...parseStravaSegmentEfforts(w?.achievements),
+        ...detectClimbSegments(
+          Array.isArray(series.time_s) ? series.time_s : [],
+          Array.isArray(series.elevation_m) ? series.elevation_m : [],
+          Array.isArray(series.grade_percent) ? series.grade_percent : [],
+        ),
+      ];
+      if (efforts.length > 0 && workout_id && w?.user_id && w?.date) {
+        const dateOnly = String(w.date).slice(0, 10);
+        const seen = new Set<string>();
+        const rows = efforts
+          .filter((e) => {
+            const k = `${e.source}|${e.segment_key}`;
+            if (seen.has(k)) return false; // unique(workout_id,segment_key,source)
+            seen.add(k);
+            return true;
+          })
+          .map((e) => ({
+            user_id: String(w.user_id),
+            workout_id: String(workout_id),
+            source: e.source,
+            segment_key: e.segment_key,
+            segment_id: e.segment_id,
+            segment_name: e.segment_name,
+            date: dateOnly,
+            elapsed_time_s: e.elapsed_time_s,
+            moving_time_s: e.moving_time_s,
+            distance_m: e.distance_m,
+            avg_power_w: e.avg_power_w,
+            avg_hr_bpm: e.avg_hr_bpm,
+            climb_gain_m: e.climb_gain_m,
+            climb_vam_m_per_h: e.climb_vam_m_per_h,
+          }));
+        const del = await supabase.from('cycling_segment_history').delete().eq('workout_id', String(workout_id));
+        if (del.error) throw del.error;
+        const ins = await supabase.from('cycling_segment_history').insert(rows);
+        if (ins.error) throw ins.error;
+        console.log(`🚵 [SEGMENT HISTORY] wrote ${rows.length} efforts for workout ${workout_id}`);
+      }
+    } catch (e: any) {
+      console.warn('[analyze-cycling-workout] segment-history upsert skipped (non-fatal — table may be unmigrated):', e?.message ?? e);
     }
 
     // Temporal Arc frame (post-race recovery / taper / race proximity / plan
