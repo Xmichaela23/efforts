@@ -1,10 +1,15 @@
 # Session Context — Cycling Analysis Build (handoff)
 
-**Last updated:** 2026-05-17. **Scope:** the cycling-analysis arc — running→cycling parity, intent-aware analysis, segment intelligence, Arc integration. This is the live handoff doc; pair with `docs/CYCLING-ANALYSIS-DESIGN.md` (the work order) and `docs/RUNNING-CYCLING-DELTA.md` (the upstream 31-item delta).
+**Last updated:** 2026-05-17. **Status:** cycling-analysis arc **PAUSED 2026-05-17** — correctness pass complete, moving to a new app section (see §6 for the resumable state). **Scope:** the cycling-analysis arc — running→cycling parity, intent-aware analysis, segment intelligence, Arc integration. This is the live handoff doc; pair with `docs/CYCLING-ANALYSIS-DESIGN.md` (the work order) and `docs/RUNNING-CYCLING-DELTA.md` (the upstream 31-item delta).
 
 ---
 
 ## 1. What was built (commit hashes, newest first)
+
+**2026-05-17 — Performance-tab display polish**
+- `91ea2078` sport-aware TREND legend — "power" for rides, "pace" for runs (was hardcoded "pace"). Distinguishes via `trend.unit === 'W'`; `RouteSparkline` left as pace (running route). Client-only.
+- `6bf574d4` cycling TREND requires ≥5 same-type rides for the chart; 3–4 → one-line text ("N {type} rides · {first}W → {last}W · HR improving|declining|consistent"). Cycling-only (`trend.unit==='W'`); running keeps ≥3. build.ts adds `ride_type`; <3 floor kept so 3–4 still reach the client. workout-detail + client.
+- `80b4c285` + `8e83e5df` POWER ZONES shows all zones (was top-4 → total didn't sum to ride). Bands >2 min individually + "+Xm other" anchored to `facts.total_duration_min` so the row accounts for un-binned coasting (`computeFtpBinsMinutes` skips pw≤0). Display-time only (workout-detail); no backfill.
 
 **2026-05-17 (latest) — narrative trend-series match + Arc-secondary lede guard**
 - `36a7e792` INSIGHTS trend now mirrors the TREND row's series: `cyclingCrossWorkoutDisplay` prefers type-filtered `pwr20Trend` (→ `cross_workout.trend.ride_count`/`ride_type`, e.g. "3 climbing rides") else `np_trend` (full count, no type) — the same selection as `pickCyclingTrendSeries`. Was always np_trend → narrative said "11 rides" while the row showed "3 climbing rides". `pwr20TrendV1` threaded into the cross-workout payload; display key `np_trend` → `trend`.
@@ -81,7 +86,7 @@
 ## 4. Known bugs & workarounds
 
 - **TREND HR line not drawing** → root cause = open item #1 (historical `avg_hr` resolves null). Workaround: none; label still shows current-ride bpm. Fix = broaden the read + SELECT.
-- **pwr20_trend_v1 null on reclassified rides** → root cause = open item #2 (single recompute insufficient). Workaround: recompute multiple same-type rides so ≥3 have the new stored `classified_type`.
+- **pwr20_trend_v1 null on reclassified rides** → RESOLVED 2026-05-17: wide backfill (`verify-cycling-vi-if-fix.mjs --all`, `83d07fdb`) re-derived every in-window ride's stored `classified_type`; ≥3 same-type exist per common type. Re-run `--all` after any future classifier-input change.
 - **Migration-tracking divergence** → never `supabase db push`; apply new migrations via the SQL editor. Both new tables/columns this session (`cycling_segment_history`, `athlete_snapshot.ctl/atl/tsb`) applied manually; all code touching them is non-fatal/guarded so functions deploy safely pre-migration.
 - **Pre-existing unrelated test fail:** `inferTrainingFitnessLevel` (`infer-training-fitness.test.ts`) — fails independent of all this work; suite is "green" at 628 pass / 1 fail.
 
@@ -99,12 +104,17 @@
 
 ---
 
-## 6. Next session — immediate steps
+## 6. Arc status & resumable handoff (PAUSED 2026-05-17)
 
-1. **Fix open item #1** (avg_hr historical resolution + SELECT) — small, well-scoped, unblocks the TREND HR line. Same pattern as the `normalized_power_w` / `achievements` / np_trend SELECT fixes.
-2. **Run the #2 backfill** — re-analyze the athlete's recent rides so type-filtered `pwr20_trend_v1` populates; then verify the climbing TREND on `0dbfd4e4` / the Lida ride.
-3. Verify end-to-end on a recomputed ride: `classified_type='climbing'`, fresh narrative (not stale), stat line + TERRAIN temp, dual-line TREND.
-4. Then reassess #8 (GPX) and the #9 remainder against product priorities.
+The correctness pass is **complete and verified**: IF/VI canonical-source (D-015), VI-gate elevation source (D-016), PR attribution + Efforts-scoped language, narrative trend-series match + deterministic Arc-lede guard, TREND ≥5/text gate, POWER-ZONES full-duration, sport-aware legend — all shipped, deployed, and propagated by the wide backfill (final: 30/30, **0/30 Arc-lede**, IF/VI 26/26 consistent, banned-language 0/30). Build Order #1–#7 + #9 done.
+
+**When the arc resumes, the genuinely remaining items (priority order):**
+1. **Open item #1 / Q-007 (P1, code defect, fix-ready):** historical `avg_hr` resolves null → TREND dashed HR line never draws. Add `avg_heart_rate` to the `analyze-cycling-workout` cross-workout SELECT + resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Smallest unblock; same SELECT-projection class as the `normalized_power_w`/`achievements`/`elevation_gain` fixes.
+2. **#8 race-course segment matching (P2, blocked):** needs race-course GPX geometry — product decision owed (GPS-track matcher vs Strava-only). Q-009.
+3. **#9 remainder (P3):** power-curve-trend + HR-at-power-trend into Arc/snapshot (non-CTL slice).
+4. **#10 / #11 (product-deferred):** segment leaderboards; W′ depletion modelling.
+
+**Tooling:** `scripts/verify-cycling-vi-if-fix.mjs --all [--days N]` is the committed mechanism to re-propagate ANY future analyzer/classifier-input change across ride history (recompute chain via service role; reports reclassifications + IF/VI convergence). Re-run it after touching the analyzer.
 
 ---
 

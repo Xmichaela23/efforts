@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 17, 2026 (cycling fact-packet IF/VI canonical-source + VI-gate elevation-source fixes)
+Last updated: May 17, 2026 (cycling-analysis arc paused — correctness pass complete; see docs/SESSION-CONTEXT.md §6)
 
 ---
 
@@ -211,9 +211,9 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 
 ---
 
-## Cycling analysis build (2026-05-14 → 16)
+## Cycling analysis build (2026-05-14 → 17) — PAUSED, correctness pass complete
 
-Separate workstream from items 1–5 (running→cycling parity + intent-aware analysis). Work order: `docs/CYCLING-ANALYSIS-DESIGN.md`; full state: `docs/SESSION-CONTEXT.md`.
+Separate workstream from items 1–5 (running→cycling parity + intent-aware analysis). Work order: `docs/CYCLING-ANALYSIS-DESIGN.md`; full state + resumable handoff: `docs/SESSION-CONTEXT.md` §6.
 
 ### Done
 - [x] Build Order #1 mode-aware TREND + `pwr20_trend_v1` — `1c841615`/`82c68fe9` (2026-05-15)
@@ -229,6 +229,11 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 - [x] dist/dur/temp stat line + TERRAIN temp — `a739961f`
 - [x] fact-packet IF/VI from canonical `computed.analysis.power.*` (was recomputing off unpopulated `computed.overall.*` → provider/device power; classifier gated on wrong numbers) — `6941a236` + verify/backfill script `fae293e7` (2026-05-17). Verified: 8 affected rides reconverged; 2 reclassified. See D-015 / ENGINE-STATE Solid.
 - [x] VI-gate elevation density from total `workouts.elevation_gain`, not grade≥3% `climb_ascent_m` (under-reported on rolling terrain, straddled the 40 ft/mi gate) — `bdf2cde2` (2026-05-17). Supersedes D-011's elevation-source tradeoff → D-016. Verified: May-10 `60304656` → `tempo`→`climbing`.
+- [x] sport-aware TREND legend ("power" rides / "pace" runs; was hardcoded "pace") — `91ea2078` (2026-05-17). Client-only.
+- [x] PR attribution — `set_on_current_ride`/`current_value` so the narrative can't claim prior-ride bests were set today; Efforts-scoped language ("best in Efforts", never "all-time"/"personal best") — `a0ca4158` (2026-05-17). See SESSION-CONTEXT §7.
+- [x] cycling TREND ≥5 same-type rides for the chart; 3–4 → one-line text summary; cycling-only — `6bf574d4` (2026-05-17)
+- [x] POWER ZONES shows all zones; total anchored to ride duration so un-binned coasting → "+Xm other" (was top-4, total didn't sum) — `80b4c285` + `8e83e5df` (2026-05-17)
+- [x] narrative trend mirrors the TREND row's series (pwr20 type-filtered else np_trend) + deterministic Arc-secondary lede guard (power-first, `ledeOpensWithArcFrame` + corrective retry) — `36a7e792` + `dcaa9f08` + `da7dbce8` (2026-05-17). Verified 0/30 Arc-lede. See SESSION-CONTEXT §7.
 
 ### Open
 - [ ] **P1** historical `avg_hr` resolves null → TREND HR line never draws (fix-ready; Q-007, SESSION-CONTEXT #1)

@@ -66,6 +66,13 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **Verification:** May-10 ride `60304656` recomputed post-deploy → reclassified `tempo` → `climbing` (325 m total → 46.5 ft/mi; was 249 m climb-seg → 35.6 ft/mi); VI/IF stayed canonical (fpVI 1.13 = capVI). `build.test.ts` +3 (60304656 fix / climb-seg fallback / total-gain precedence); cycling-v1 suite green (86 pass).
 - **Decision:** see D-016 (supersedes D-011 elevation-source only).
 
+### Cycling Performance-tab display & narrative correctness (2026-05-17 — arc close-out)
+- **Files/commits:** sport-aware TREND legend `91ea2078`; TREND ≥5-or-text gate `6bf574d4`; POWER-ZONES all-zones + duration-anchored total `80b4c285`/`8e83e5df`; PR attribution + Efforts-scoped language `a0ca4158`; narrative trend-series match + deterministic Arc-lede guard `36a7e792`/`dcaa9f08`/`da7dbce8`. Touch `_shared/cycling-v1/ai-summary.ts` + `cross-workout-{types,queries}.ts`, `_shared/session-detail/build.ts`, `src/components/SessionNarrative.tsx`, `analyze-cycling-workout`.
+- **Behavior:** TREND legend says "power" for rides; the chart needs ≥5 same-type rides (3–4 → text), cycling-only (running unchanged); POWER-ZONES shows every zone with the total accounting for full ride duration (un-binned coasting → "+Xm other"); the narrative cites the SAME trend series the TREND row shows and never leads with PR/recovery/taper framing (`set_on_current_ride` gates "set this ride"; `ledeOpensWithArcFrame` + corrective retry gates the lede; language is Efforts-scoped).
+- **Verification:** `scripts/verify-cycling-vi-if-fix.mjs --all` (180 d / 30 rides) re-run after each change — final 30/30, 0 failed, **0/30 Arc-lede**, IF/VI 26/26 consistent, banned-language 0/30, the 1 PR claim correctly attributed (`60304656`/`54e8fd86`). cycling-v1 suite 94 pass; session-detail 24 pass.
+- **Footguns (don't re-litigate):** `docs/SESSION-CONTEXT.md` §7 — narrative trend MUST mirror `pickCyclingTrendSeries` (don't revert to always-np_trend); the Arc lede guard is deterministic by design (don't delete it / don't "fix" it in the shared `arc-narrative-ai-appendix.ts` — would change running); `achievements_v1` PRs are prior-ride; `computed.overall.*` has no overall power; `climb_ascent_m` ≠ total gain.
+- **Decision:** D-015, D-016 (no new D-NNN — display/narrative fixes were single-sane-implementation).
+
 ---
 
 ## Known broken (filed, not blocking)
