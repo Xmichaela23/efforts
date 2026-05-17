@@ -2,8 +2,9 @@
  * Type definitions for cycling cross-workout queries — Tier 3 item 10 of running→cycling
  * delta map. Settled by D-010 (see docs/DECISIONS-LOG.md):
  *   1. Achievements = power-curve PRs (best 20-min FTP proxy / best 5-min VO2 proxy /
- *      best 1-min neuromuscular). 90-day rolling for "recent" + all-time for "personal
- *      best" — surface both.
+ *      best 1-min neuromuscular). 90-day rolling for "recent" + best-across-synced-rides
+ *      ("best in Efforts") — surface both. NOT a true all-time/lifetime PR: Efforts only
+ *      sees synced rides, so this is the recorded best, not the athlete's career best.
  *   2. vs-similar = match on classified_type + duration ±20%; compare against last 3.
  *   3. Limiter (triathletes) = W/kg vs age-group norms by race distance.
  *   4. Limiter (non-tri / no bodyweight) = NP trend vs 90-day mean.
@@ -26,18 +27,40 @@ export type CyclingPREntry = {
 };
 
 /**
- * Power-curve PRs across the athlete's ride history. `recent_pr` = best within last 90
- * days; `all_time_pr` = best ever. Both are null when the athlete has no rides at this
- * duration; the whole `CyclingPRsV1` is null when `sample_size < 5` (insufficient data
- * to be meaningful per D-010 minimum-data guards).
+ * One duration's PR picture. `recent_pr` = best within last 90 days; `all_time_pr` =
+ * best across all synced rides ("best in Efforts" — NOT a lifetime/career PR; Efforts
+ * only sees synced rides). Both are computed EXCLUDING the current workout, so they are
+ * always PRIOR-ride bests. `current_value` is this ride's value at the duration and
+ * `set_on_current_ride` says whether this ride set/tied the recorded best — the only
+ * fields a consumer may use to claim "set this ride".
+ */
+export type CyclingPRDurationEntry = {
+  recent_pr: CyclingPREntry | null;
+  all_time_pr: CyclingPREntry | null;
+  /** This ride's power_curve value at this duration (W); null if absent/zero. */
+  current_value: number | null;
+  /**
+   * True iff this ride set or tied the recorded best at this duration —
+   * `current_value` present AND (no prior best OR current_value >= prior best).
+   * PR-attribution guard: only when this is true may the narrative say the PR
+   * was "set this ride". recent_pr/all_time_pr alone are prior-ride bests.
+   */
+  set_on_current_ride: boolean;
+};
+
+/**
+ * Power-curve PRs across the athlete's synced ride history. `recent_pr` = best within
+ * last 90 days; `all_time_pr` = best across synced rides (the recorded best — NOT a
+ * lifetime PR). Entries are null when the athlete has no prior rides at that duration;
+ * the whole `CyclingPRsV1` is null when `sample_size < 5` (insufficient data per D-010).
  */
 export type CyclingPRsV1 = {
   /** Total ride count considered (excluding current workout). */
   sample_size: number;
   durations: {
-    '1min': { recent_pr: CyclingPREntry | null; all_time_pr: CyclingPREntry | null };
-    '5min': { recent_pr: CyclingPREntry | null; all_time_pr: CyclingPREntry | null };
-    '20min': { recent_pr: CyclingPREntry | null; all_time_pr: CyclingPREntry | null };
+    '1min': CyclingPRDurationEntry;
+    '5min': CyclingPRDurationEntry;
+    '20min': CyclingPRDurationEntry;
   };
 };
 

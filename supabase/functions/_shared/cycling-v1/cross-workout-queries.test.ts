@@ -126,6 +126,64 @@ Deno.test('fetchCyclingPRs: skips rides with missing or zero power_curve entries
   assertEquals(r, null, 'invalid rides filtered out → sample size below threshold → null');
 });
 
+// ── §1b PR attribution (set_on_current_ride / current_value) ────────────────
+
+function priorRidesStub() {
+  // 5 prior rides; best prior 20min = 280 (old-pr), best 1min absent on all.
+  return makeSupabaseStub({
+    workouts: [
+      { id: 'old-pr', date: daysAgoIso(180), computed: { power_curve: { '20min': 280, '5min': 350 } } },
+      { id: 'r2', date: daysAgoIso(30), computed: { power_curve: { '20min': 265, '5min': 340 } } },
+      { id: 'r3', date: daysAgoIso(45), computed: { power_curve: { '20min': 250, '5min': 320 } } },
+      { id: 'r4', date: daysAgoIso(60), computed: { power_curve: { '20min': 245, '5min': 310 } } },
+      { id: 'r5', date: daysAgoIso(75), computed: { power_curve: { '20min': 248, '5min': 315 } } },
+    ],
+  });
+}
+
+Deno.test('fetchCyclingPRs: current ride beats prior best → set_on_current_ride true', async () => {
+  const r = await fetchCyclingPRs(priorRidesStub(), {
+    userId: 'u1', currentWorkoutId: 'cur',
+    currentPowerCurve: { '20min': 290, '5min': 345 },
+  });
+  assert(r != null);
+  assertEquals(r.durations['20min'].all_time_pr?.value, 280); // prior-ride best, unchanged
+  assertEquals(r.durations['20min'].current_value, 290);
+  assertEquals(r.durations['20min'].set_on_current_ride, true); // 290 ≥ 280
+  // 5min: 345 < prior best 350 → NOT set this ride
+  assertEquals(r.durations['5min'].current_value, 345);
+  assertEquals(r.durations['5min'].set_on_current_ride, false);
+});
+
+Deno.test('fetchCyclingPRs: current ride below prior best → set_on_current_ride false (the bug)', async () => {
+  const r = await fetchCyclingPRs(priorRidesStub(), {
+    userId: 'u1', currentWorkoutId: 'cur',
+    currentPowerCurve: { '20min': 270 },
+  });
+  assert(r != null);
+  assertEquals(r.durations['20min'].current_value, 270);
+  assertEquals(r.durations['20min'].set_on_current_ride, false); // 270 < 280 prior best
+});
+
+Deno.test('fetchCyclingPRs: no prior best at a duration but current has it → set_on_current_ride true', async () => {
+  const r = await fetchCyclingPRs(priorRidesStub(), {
+    userId: 'u1', currentWorkoutId: 'cur',
+    currentPowerCurve: { '1min': 600 }, // no prior ride has 1min
+  });
+  assert(r != null);
+  assertEquals(r.durations['1min'].all_time_pr, null);
+  assertEquals(r.durations['1min'].current_value, 600);
+  assertEquals(r.durations['1min'].set_on_current_ride, true);
+});
+
+Deno.test('fetchCyclingPRs: no currentPowerCurve → current_value null, set_on_current_ride false', async () => {
+  const r = await fetchCyclingPRs(priorRidesStub(), { userId: 'u1', currentWorkoutId: 'cur' });
+  assert(r != null);
+  assertEquals(r.durations['20min'].current_value, null);
+  assertEquals(r.durations['20min'].set_on_current_ride, false);
+  assertEquals(r.durations['20min'].all_time_pr?.value, 280); // unchanged behavior
+});
+
 // ── §2 fetchCyclingVsSimilar ───────────────────────────────────────────────
 
 Deno.test('fetchCyclingVsSimilar: returns null when fewer than 3 matching rides', async () => {

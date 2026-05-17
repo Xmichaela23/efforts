@@ -126,18 +126,42 @@ Deno.test('np_trend: near-flat series → stable', () => {
   assertEquals(out?.np_trend?.direction, 'stable');
 });
 
-Deno.test('achievements → power_prs strings (all-time preferred over 90-day)', () => {
+Deno.test('achievements → PRs split by attribution; Efforts-scoped language', () => {
   const out = cyclingCrossWorkoutDisplay({
     achievements: {
       sample_size: 12,
       durations: {
-        '20min': { recent_pr: { value: 250 }, all_time_pr: { value: 268 } },
-        '5min': { recent_pr: { value: 320 }, all_time_pr: null },
-        '1min': { recent_pr: null, all_time_pr: null },
+        // current ride beat the prior best → set THIS ride
+        '20min': { recent_pr: { value: 250 }, all_time_pr: { value: 268 }, current_value: 275, set_on_current_ride: true },
+        // current ride below prior best → prior-ride best, NOT today
+        '5min': { recent_pr: { value: 320 }, all_time_pr: { value: 330 }, current_value: 300, set_on_current_ride: false },
+        '1min': { recent_pr: null, all_time_pr: null, current_value: null, set_on_current_ride: false },
       },
     },
   });
-  assertEquals(out, { power_prs: ['20min 268W all-time best', '5min 320W 90-day best'] });
+  assertEquals(out, {
+    power_prs_set_this_ride: ['20min 275W — new best in Efforts, set THIS ride'],
+    power_bests_in_efforts: ['5min 330W — best in Efforts (set on a PRIOR ride, not today)'],
+  });
+  // Language guard: no "all-time"/"personal best" anywhere; Efforts-scoped.
+  const s = JSON.stringify(out);
+  assertEquals(/all-time|personal best|lifetime/i.test(s), false);
+  assertEquals(s.includes('best in Efforts'), true);
+});
+
+Deno.test('achievements: no current-ride PR → only prior bests, no set-this-ride key (the attribution bug)', () => {
+  const out = cyclingCrossWorkoutDisplay({
+    achievements: {
+      sample_size: 8,
+      durations: {
+        '20min': { recent_pr: { value: 250 }, all_time_pr: { value: 268 }, current_value: 240, set_on_current_ride: false },
+        '5min': { recent_pr: null, all_time_pr: null, current_value: null, set_on_current_ride: false },
+        '1min': { recent_pr: null, all_time_pr: null, current_value: null, set_on_current_ride: false },
+      },
+    },
+  });
+  assertEquals(out, { power_bests_in_efforts: ['20min 268W — best in Efforts (set on a PRIOR ride, not today)'] });
+  assertEquals((out as any).power_prs_set_this_ride, undefined); // LLM cannot claim a PR today
 });
 
 Deno.test('limiter: actionable flag included; none / insufficient_data dropped', () => {

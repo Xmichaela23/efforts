@@ -21,6 +21,7 @@
 import type {
   CyclingLimiterV1,
   CyclingPRDuration,
+  CyclingPRDurationEntry,
   CyclingPREntry,
   CyclingPRsV1,
   CyclingVsSimilarV1,
@@ -85,6 +86,12 @@ export async function fetchCyclingPRs(
   params: {
     userId: string;
     currentWorkoutId: string;
+    /**
+     * The current ride's `computed.power_curve` (W per duration). Used only for
+     * PR attribution — the query still EXCLUDES the current workout, so
+     * recent/all-time bests stay prior-ride; this decides set_on_current_ride.
+     */
+    currentPowerCurve?: Record<string, number> | null;
   },
 ): Promise<CyclingPRsV1 | null> {
   try {
@@ -134,21 +141,29 @@ export async function fetchCyclingPRs(
 
     const recent = all.filter((r) => r.date >= recentCutoff);
 
+    const curPc = (params.currentPowerCurve && typeof params.currentPowerCurve === 'object')
+      ? params.currentPowerCurve
+      : null;
+
+    const entryFor = (duration: CyclingPRDuration): CyclingPRDurationEntry => {
+      const all_time_pr = findBestAt(all, duration);
+      const recent_pr = findBestAt(recent, duration);
+      const cv = curPc ? safeNum((curPc as any)[duration]) : null;
+      const current_value = (cv != null && cv > 0) ? cv : null;
+      // `all`/`recent` exclude the current workout (query `.neq`), so
+      // all_time_pr is the best PRIOR ride. This ride set/tied the recorded
+      // best iff its value ≥ that prior best (or there is no prior best).
+      const set_on_current_ride =
+        current_value != null && (all_time_pr == null || current_value >= all_time_pr.value);
+      return { recent_pr, all_time_pr, current_value, set_on_current_ride };
+    };
+
     return {
       sample_size: all.length,
       durations: {
-        '1min': {
-          recent_pr: findBestAt(recent, '1min'),
-          all_time_pr: findBestAt(all, '1min'),
-        },
-        '5min': {
-          recent_pr: findBestAt(recent, '5min'),
-          all_time_pr: findBestAt(all, '5min'),
-        },
-        '20min': {
-          recent_pr: findBestAt(recent, '20min'),
-          all_time_pr: findBestAt(all, '20min'),
-        },
+        '1min': entryFor('1min'),
+        '5min': entryFor('5min'),
+        '20min': entryFor('20min'),
       },
     };
   } catch (e) {

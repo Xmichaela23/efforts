@@ -130,17 +130,30 @@ export function cyclingCrossWorkoutDisplay(cw: {
     }
   }
 
+  // Power PRs — split by attribution so the narrative can't claim a prior-ride
+  // best was set today (set_on_current_ride is the only "set this ride" signal;
+  // fetchCyclingPRs excludes the current workout). Language is Efforts-scoped:
+  // "best in Efforts", never "all-time"/"personal best" (synced rides only).
   const prs = cw.achievements;
   if (prs && prs.durations && typeof prs.durations === 'object') {
-    const ach: string[] = [];
+    const setThisRide: string[] = [];
+    const recordedBests: string[] = [];
     for (const d of ['20min', '5min', '1min']) {
       const e = (prs.durations as any)[d];
-      const at = e?.all_time_pr?.value;
-      const rc = e?.recent_pr?.value;
-      if (Number.isFinite(Number(at))) ach.push(`${d} ${Math.round(Number(at))}W all-time best`);
-      else if (Number.isFinite(Number(rc))) ach.push(`${d} ${Math.round(Number(rc))}W 90-day best`);
+      if (!e) continue;
+      const cur = Number(e.current_value);
+      const at = Number(e?.all_time_pr?.value);
+      const rc = Number(e?.recent_pr?.value);
+      if (e.set_on_current_ride === true && Number.isFinite(cur) && cur > 0) {
+        setThisRide.push(`${d} ${Math.round(cur)}W — new best in Efforts, set THIS ride`);
+      } else if (Number.isFinite(at) && at > 0) {
+        recordedBests.push(`${d} ${Math.round(at)}W — best in Efforts (set on a PRIOR ride, not today)`);
+      } else if (Number.isFinite(rc) && rc > 0) {
+        recordedBests.push(`${d} ${Math.round(rc)}W — best in Efforts, last 90 days (PRIOR ride, not today)`);
+      }
     }
-    if (ach.length > 0) out.power_prs = ach;
+    if (setThisRide.length > 0) out.power_prs_set_this_ride = setThisRide;
+    if (recordedBests.length > 0) out.power_bests_in_efforts = recordedBests;
   }
 
   const lim = cw.limiter;
@@ -229,11 +242,12 @@ export async function generateCyclingAISummaryV1(
 ${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
 - MAX 2 sentences. Punchy, not exhaustive. Stop after the second sentence.
-- Lead with the SINGLE most notable finding, in this priority order: (1) a power PR set this ride, (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the NP trend across recent rides, (4) the limiter signal. Pick ONE lede — never a list of findings.
+- Lead with the SINGLE most notable finding, in this priority order: (1) a power PR set THIS ride — ONLY if cross_workout.power_prs_set_this_ride is present (those were set on this ride). cross_workout.power_bests_in_efforts are PRIOR-ride bests: you may mention one as context, but NEVER say or imply the athlete set it today. (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the NP trend across recent rides, (4) the limiter signal. Pick ONE lede — never a list of findings.
 - The second sentence (optional) adds the one piece of supporting context that explains the lede — nothing else.
 - Reference the specific numbers from the packet that support the lede.
 - Do NOT recap the power-zone / ftp_bins time breakdown, and do NOT explain ACWR or training-load math. The athlete sees those in the rows below — restating them wastes the narrative.
 - No filler. Avoid "effective", "overall", "moving forward", "ensure", "solid".
+- Efforts only sees synced rides. When referencing a power best, say "best in Efforts" or "your recorded best" — NEVER "all-time best", "personal best", "lifetime best", "PR ever", or any phrasing that implies a career record.
 - CRITICAL: Do not introduce any numbers or percentages that are not present verbatim in the packet.
 - If there is no planned intent, describe the ride physiologically; do not invent a prescription.
 - If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.

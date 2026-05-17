@@ -2020,6 +2020,13 @@ Deno.serve(async (req) => {
       cyclingPRs = await fetchCyclingPRs(supabase, {
         userId: String((workout as any).user_id),
         currentWorkoutId: workout_id!,
+        // PR attribution: lets fetchCyclingPRs flag set_on_current_ride so the
+        // narrative doesn't claim prior-ride bests were set today. The query
+        // still excludes this workout — this is the only current-ride input.
+        currentPowerCurve: ((workout as any)?.computed?.power_curve &&
+          typeof (workout as any).computed.power_curve === 'object')
+          ? (workout as any).computed.power_curve
+          : null,
       });
 
       // §2 vs-similar — match on classified_type + duration ±20%.
