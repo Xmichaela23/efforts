@@ -2324,6 +2324,10 @@ Deno.serve(async (req) => {
         vsSimilar: cyclingVsSimilar,
         achievements: cyclingPRs,
         npTrend: npTrendV1,
+        // Type-filtered 20-min-power series — lets the narrative mirror the
+        // TREND row's series selection (pwr20 if same-type ≥3, else np_trend)
+        // so the cited ride count/type match what the row shows.
+        pwr20Trend: pwr20TrendV1,
         limiter: cyclingLimiter,
         fitness: fitnessV1, // design #9 — CTL/ATL/TSB into the INSIGHTS narrative
       }, arc_narrative_for_summary);

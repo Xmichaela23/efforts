@@ -79,7 +79,7 @@ export function validateNoNewNumbers(
  * serialized packet). Returns null when no cross-workout signal is meaningful.
  */
 export function cyclingCrossWorkoutDisplay(cw: {
-  vsSimilar?: any; achievements?: any; npTrend?: any; limiter?: any; fitness?: any;
+  vsSimilar?: any; achievements?: any; npTrend?: any; pwr20Trend?: any; limiter?: any; fitness?: any;
 } | null | undefined): any | null {
   if (!cw) return null;
   const out: any = {};
@@ -113,17 +113,32 @@ export function cyclingCrossWorkoutDisplay(cw: {
     };
   }
 
-  const tr = cw.npTrend;
-  if (tr && Array.isArray(tr.points) && tr.points.length >= 3) {
-    const pts = [...tr.points]
+  // Trend — MUST mirror the TREND row's series selection (pickCyclingTrendSeries
+  // in _shared/session-detail/build.ts): prefer the type-filtered pwr20 series
+  // (≥3 same-type rides) so the narrative's ride count + type match the row;
+  // else fall back to the full np_trend (all rides, no type). Previously this
+  // always used np_trend → narrative said "11 rides" while the row showed
+  // "3 climbing rides". Cite cross_workout.trend.ride_count/ride_type verbatim.
+  const pwr20 = cw.pwr20Trend;
+  const npt = cw.npTrend;
+  const sel =
+    (pwr20 && Array.isArray(pwr20.points) && pwr20.points.length >= 3)
+      ? { metric: '20-min power', points: pwr20.points, rideType: pwr20.classified_type ?? null }
+      : (npt && Array.isArray(npt.points) && npt.points.length >= 3)
+        ? { metric: 'NP', points: npt.points, rideType: null as string | null }
+        : null;
+  if (sel) {
+    const pts = [...sel.points]
       .filter((p: any) => p && Number.isFinite(Number(p.value)))
       .sort((a: any, b: any) => String(a.date).localeCompare(String(b.date)));
     if (pts.length >= 3) {
       const mid = Math.ceil(pts.length / 2);
       const avg = (arr: any[]) => arr.reduce((s, p) => s + Number(p.value), 0) / arr.length;
       const delta = Math.round(avg(pts.slice(mid)) - avg(pts.slice(0, mid)));
-      out.np_trend = {
-        points: pts.length,
+      out.trend = {
+        metric: sel.metric,
+        ride_count: pts.length,
+        ride_type: sel.rideType, // e.g. 'climbing' (type-filtered) or null (np_trend, all rides)
         direction: delta > 3 ? 'improving' : delta < -3 ? 'declining' : 'stable',
         delta_w: delta,
       };
@@ -242,7 +257,8 @@ export async function generateCyclingAISummaryV1(
 ${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
 - MAX 2 sentences. Punchy, not exhaustive. Stop after the second sentence.
-- Lead with the SINGLE most notable finding, in this priority order: (1) a power PR set THIS ride — ONLY if cross_workout.power_prs_set_this_ride is present (those were set on this ride). cross_workout.power_bests_in_efforts are PRIOR-ride bests: you may mention one as context, but NEVER say or imply the athlete set it today. (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the NP trend across recent rides, (4) the limiter signal. Pick ONE lede — never a list of findings.
+- The LEDE (first sentence) is ALWAYS the single most notable POWER/FITNESS signal from THIS ride, in this priority order: (1) a power PR set THIS ride — ONLY if cross_workout.power_prs_set_this_ride is present (those were set on this ride). cross_workout.power_bests_in_efforts are PRIOR-ride bests: you may mention one as context, but NEVER say or imply the athlete set it today. (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the power trend cross_workout.trend — describe it EXACTLY as "{ride_count} {ride_type} rides" when ride_type is present, else "{ride_count} rides"; never cite a different ride total, (4) the limiter signal. Pick ONE lede — never a list of findings.
+- TEMPORAL/ARC CONTEXT (days since/until a race, recovery/taper/comeback framing) is SECONDARY for a ride: it may appear ONLY in the second sentence as supporting context, NEVER as the opening words or the lede. Even when a temporal-arc instruction asks for a comeback/recovery frame, on a ride that frame goes in the SECOND sentence — sentence one is the power/fitness signal above.
 - The second sentence (optional) adds the one piece of supporting context that explains the lede — nothing else.
 - Reference the specific numbers from the packet that support the lede.
 - Do NOT recap the power-zone / ftp_bins time breakdown, and do NOT explain ACWR or training-load math. The athlete sees those in the rows below — restating them wastes the narrative.
@@ -263,7 +279,7 @@ ${packetStr}
     (arcNarrative ? arcModeSystemAddon(arcNarrative) : '');
   const userBase =
     (arcFacts
-      ? 'TEMPORAL ARC CONTEXT (do not contradict; paraphrase for the athlete — these are facts for THIS workout date, not invented load):\n' +
+      ? 'TEMPORAL ARC CONTEXT (SECONDARY framing — supporting context for the second sentence only, NEVER the lede or opening words; do not contradict; paraphrase — these are facts for THIS workout date, not invented load):\n' +
         arcFacts +
         '\n\n'
       : '') + prompt;

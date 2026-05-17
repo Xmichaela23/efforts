@@ -96,7 +96,7 @@ Deno.test('vs_similar → shaped block; null np_delta_w drops it (Number(null)==
   assertEquals(cyclingCrossWorkoutDisplay({ vsSimilar: { matched_type: 'threshold', np_delta_w: null } }), null);
 });
 
-Deno.test('np_trend: ≥3 points → direction + delta_w; <3 points → omitted', () => {
+Deno.test('trend: np_trend fallback → metric NP, ride_type null, count/direction/delta', () => {
   const improving = cyclingCrossWorkoutDisplay({
     npTrend: { points: [
       { date: '2026-04-01', value: 200 },
@@ -105,16 +105,19 @@ Deno.test('np_trend: ≥3 points → direction + delta_w; <3 points → omitted'
       { date: '2026-04-22', value: 240, is_current: true },
     ] },
   });
-  assert(improving?.np_trend);
-  assertEquals(improving.np_trend.points, 4);
-  assertEquals(improving.np_trend.direction, 'improving');
+  assert(improving?.trend);
+  assertEquals(improving.trend.metric, 'NP');
+  assertEquals(improving.trend.ride_count, 4);
+  assertEquals(improving.trend.ride_type, null);
+  assertEquals(improving.trend.direction, 'improving');
   // first half avg (200,210)=205; second half (230,240)=235; delta +30
-  assertEquals(improving.np_trend.delta_w, 30);
+  assertEquals(improving.trend.delta_w, 30);
 
+  // <3 np points and no pwr20 → no trend at all
   assertEquals(cyclingCrossWorkoutDisplay({ npTrend: { points: [{ date: '2026-04-01', value: 200 }, { date: '2026-04-08', value: 210 }] } }), null);
 });
 
-Deno.test('np_trend: near-flat series → stable', () => {
+Deno.test('trend: near-flat series → stable', () => {
   const out = cyclingCrossWorkoutDisplay({
     npTrend: { points: [
       { date: '2026-04-01', value: 220 },
@@ -123,7 +126,27 @@ Deno.test('np_trend: near-flat series → stable', () => {
       { date: '2026-04-22', value: 222 },
     ] },
   });
-  assertEquals(out?.np_trend?.direction, 'stable');
+  assertEquals(out?.trend?.direction, 'stable');
+});
+
+Deno.test('trend: type-filtered pwr20 preferred over np_trend (the 11-vs-3 bug)', () => {
+  const out = cyclingCrossWorkoutDisplay({
+    // np_trend has 11 rides (old narrative said "11 rides"); pwr20 has 3 climbing
+    // (what the TREND row shows). The narrative must follow pwr20.
+    npTrend: { points: Array.from({ length: 11 }, (_, i) => ({ date: `2026-03-${String(i + 1).padStart(2, '0')}`, value: 200 + i })) },
+    pwr20Trend: {
+      classified_type: 'climbing',
+      points: [
+        { date: '2026-04-01', value: 240 },
+        { date: '2026-04-08', value: 250 },
+        { date: '2026-04-15', value: 262, is_current: true },
+      ],
+    },
+  });
+  assert(out?.trend);
+  assertEquals(out.trend.metric, '20-min power');
+  assertEquals(out.trend.ride_count, 3); // NOT 11
+  assertEquals(out.trend.ride_type, 'climbing'); // matches the TREND row
 });
 
 Deno.test('achievements → PRs split by attribution; Efforts-scoped language', () => {
