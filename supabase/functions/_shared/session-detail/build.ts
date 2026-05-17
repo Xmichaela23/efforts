@@ -632,7 +632,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           const summary = direction === 'stable'
             ? `Consistent ${noun} across ${points.length} ${typeWord}rides`
             : `${absDelta}W ${direction === 'improving' ? 'higher' : 'lower'} over ${points.length} ${typeWord}rides`;
-          return { metric_label: metricLabel, unit: 'W', points, direction, summary, lower_is_better: false };
+          // ride_type: discrete type word for the client's text-only TREND
+          // fallback (3–4 same-type rides → text, ≥5 → chart). null on the
+          // np_trend fallback (not type-filtered). Floor stays <3 so 3–4-point
+          // trends still reach the client for the text path.
+          return { metric_label: metricLabel, unit: 'W', points, direction, summary, lower_is_better: false, ride_type: rideType };
         } catch { return null; }
       }
       try {

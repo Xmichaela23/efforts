@@ -15,6 +15,7 @@ type TrendData = {
   direction: 'improving' | 'declining' | 'stable';
   summary: string;
   lower_is_better?: boolean;
+  ride_type?: string | null; // cycling: classified-type word for the text-only TREND fallback
 };
 
 type NextSession = {
@@ -122,6 +123,38 @@ interface SessionNarrativeProps {
 function TrendSparkline({ trend }: { trend: TrendData }) {
   const pts = trend.points;
   if (pts.length < 3) return null;
+
+  // Cycling TREND: require ≥5 same-type rides for the sparkline. With 3–4
+  // points the data is too thin for a chart, so show a one-line text summary
+  // instead — this gate covers BOTH the power and HR lines (no chart at all
+  // under 5). Running (unit '/mi') keeps its existing ≥3 chart behavior.
+  const isCyclingTrend = trend.unit === 'W';
+  if (isCyclingTrend && pts.length < 5) {
+    const typeWord = trend.ride_type ? `${trend.ride_type} ` : '';
+    const firstV = Math.round(pts[0].value);
+    const lastV = Math.round(pts[pts.length - 1].value);
+    const hrVals = pts
+      .map((p) => (p as any).avg_hr)
+      .filter((v: any): v is number => typeof v === 'number' && Number.isFinite(v));
+    let hrClause = '';
+    if (hrVals.length >= 2) {
+      const mid = Math.ceil(hrVals.length / 2);
+      const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
+      // Lower HR later = improving (same direction as the chart's HR scaling).
+      const d = avg(hrVals.slice(mid)) - avg(hrVals.slice(0, mid));
+      const dir = d <= -2 ? 'improving' : d >= 2 ? 'declining' : 'consistent';
+      hrClause = ` · HR ${dir}`;
+    }
+    const line = `${pts.length} ${typeWord}rides · ${firstV}W → ${lastV}W${hrClause}`;
+    return (
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Trend</span>
+        </div>
+        <div className="mt-1 text-xs text-gray-400">{line}</div>
+      </div>
+    );
+  }
 
   const values = pts.map((p) => p.value);
   const maxV = Math.max(...values);
