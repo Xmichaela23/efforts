@@ -90,6 +90,10 @@ export type SessionDetailInput = {
   readinessUnavailable?: boolean;
   /** From `getArcContext` + `buildArcPerformanceBridge` in workout-detail. */
   arcPerformance?: ArcPerformanceBridgeV1 | null;
+  /** Ride-start temperature °F from workouts.weather_data (temperature_start_f
+   *  ?? temperature), resolved in workout-detail. The contract had no weather
+   *  field — added for the cycling Performance stat line + TERRAIN row. */
+  weatherTempF?: number | null;
 };
 
 export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1 {
@@ -109,6 +113,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     narrativeText,
     loadStatus,
     completedComputed,
+    weatherTempF,
     completedRefinedType,
     nextSession,
     readinessSnapshot,
@@ -389,6 +394,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         intervals,
         type,
         (wa as any)?.vs_similar_v1 ?? null,
+        (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF)) ? Math.round(weatherTempF) : null,
       );
 
   // ── Adherence narrative ────────────────────────────────────────────────────
@@ -546,6 +552,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
 
     completed_totals: completedTotals,
     planned_totals: plannedTotals,
+    weather: (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
+      ? { temperature_f: Math.round(weatherTempF) }
+      : null,
 
     analysis_details: { rows: analysisDetailRows },
 
@@ -985,6 +994,7 @@ export function formatCyclingClimbingRow(
 function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
+  weatherTempF: number | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1192,7 +1202,10 @@ function buildAnalysisDetailRows(
           lap0?.total_elevation_gain,
       );
       if (Number.isFinite(elevM) && elevM > 15) {
-        rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain` });
+        const tempSuffix = (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
+          ? ` · ${Math.round(weatherTempF)}°F`
+          : '';
+        rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain${tempSuffix}` });
       }
     }
   } catch { /* */ }

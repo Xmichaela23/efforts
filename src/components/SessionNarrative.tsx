@@ -76,6 +76,8 @@ interface SessionNarrativeProps {
       current_phase: string | null;
     } | null;
     summary?: { title?: string; bullets?: string[] };
+    completed_totals?: { duration_s?: number | null; distance_m?: number | null };
+    weather?: { temperature_f?: number | null } | null;
     analysis_details?: { rows?: Array<{ label: string; value: string }> };
     adherence?: {
       technical_insights?: Array<{ label: string; value: string }>;
@@ -506,6 +508,29 @@ export default function SessionNarrative({
           {recomputing ? 'Recomputing…' : 'Recompute analysis'}
         </button>
       </div>
+      {(() => {
+        // Stat line above INSIGHTS: distance · duration · temperature.
+        // distance/duration from session_detail_v1.completed_totals; temperature
+        // from session_detail_v1.weather (workouts.weather_data, same source as
+        // the Details tab).
+        const distM = sd?.completed_totals?.distance_m;
+        const durS = sd?.completed_totals?.duration_s;
+        const tF = sd?.weather?.temperature_f;
+        const parts: string[] = [];
+        if (typeof distM === 'number' && distM > 0) parts.push(`${(distM / 1609.34).toFixed(1)} mi`);
+        if (typeof durS === 'number' && durS > 0) {
+          const h = Math.floor(durS / 3600);
+          const m = Math.floor((durS % 3600) / 60);
+          const s = Math.round(durS % 60);
+          parts.push(h > 0
+            ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+            : `${m}:${String(s).padStart(2, '0')}`);
+        }
+        if (typeof tF === 'number' && Number.isFinite(tF)) parts.push(`${Math.round(tF)}°F`);
+        return parts.length > 0
+          ? <div className="text-sm font-medium text-gray-300">{parts.join(' · ')}</div>
+          : null;
+      })()}
       {hasRaceDebrief && (
         <div className="space-y-4">
           {raceDebriefSections ? (

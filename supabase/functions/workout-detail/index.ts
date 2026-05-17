@@ -616,6 +616,17 @@ async function runSessionDetailPipelineAndPersist(
       readinessSnapshot: readinessUnavailable ? null : readinessSnapshot,
       readinessUnavailable,
       arcPerformance,
+      // Ride-start temperature from workouts.weather_data (same source the
+      // Details tab uses) → session_detail_v1.weather for the cycling
+      // Performance stat line + TERRAIN row. temperature_start_f ?? temperature.
+      weatherTempF: (() => {
+        const raw = (row as any)?.weather_data;
+        const wd = raw
+          ? (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : raw)
+          : null;
+        const t = Number(wd?.temperature_start_f ?? wd?.temperature);
+        return Number.isFinite(t) ? Math.round(t) : null;
+      })(),
     });
 
     if (sessionDetailV1?.race?.is_goal_race) {

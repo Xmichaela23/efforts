@@ -157,6 +157,10 @@ export type SessionDetailV1 = {
     swim_pace_per_100_s: number | null;
     swim_unit: 'yd' | 'm' | null;
   };
+  /** Ride-start temperature from workouts.weather_data (temperature_start_f ??
+   *  temperature). null when no weather data. Used by the cycling Performance
+   *  stat line and the TERRAIN row. */
+  weather: { temperature_f: number | null } | null;
 
   // ── Analysis details (SessionNarrative "Analysis Details" panel) ──────────
   /** Display-ready insight rows. Server picks + formats from fact_packet, flags, adherence_summary. */
