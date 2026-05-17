@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 17, 2026 (cycling fact-packet IF/VI canonical-source fix)
+Last updated: May 17, 2026 (cycling fact-packet IF/VI canonical-source + VI-gate elevation-source fixes)
 
 ---
 
@@ -228,6 +228,7 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 - [x] VI-gate ride classifier + `'climbing'` type — `d6832a6b`/`fd16ef5a`
 - [x] dist/dur/temp stat line + TERRAIN temp — `a739961f`
 - [x] fact-packet IF/VI from canonical `computed.analysis.power.*` (was recomputing off unpopulated `computed.overall.*` → provider/device power; classifier gated on wrong numbers) — `6941a236` + verify/backfill script `fae293e7` (2026-05-17). Verified: 8 affected rides reconverged; 2 reclassified. See D-015 / ENGINE-STATE Solid.
+- [x] VI-gate elevation density from total `workouts.elevation_gain`, not grade≥3% `climb_ascent_m` (under-reported on rolling terrain, straddled the 40 ft/mi gate) — `bdf2cde2` (2026-05-17). Supersedes D-011's elevation-source tradeoff → D-016. Verified: May-10 `60304656` → `tempo`→`climbing`.
 
 ### Open
 - [ ] **P1** historical `avg_hr` resolves null → TREND HR line never draws (fix-ready; Q-007, SESSION-CONTEXT #1)

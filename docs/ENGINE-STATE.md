@@ -60,6 +60,12 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **Verification:** `scripts/verify-cycling-vi-if-fix.mjs` selects rides by the actual fact-packet-vs-canonical divergence and replays the recompute chain. Verified run 2026-05-17: 8 affected rides (120 d), all converged to exact match; `60304656` vo2→tempo and `4375a709` endurance_long→threshold reclassified on the corrected numbers. `_shared/cycling-v1/build.test.ts` (4 tests) + full cycling-v1 suite green (83 pass).
 - **Decision:** see D-015.
 
+### Cycling VI-gate elevation density from total `workouts.elevation_gain`
+- **Files:** `_shared/cycling-v1/build.ts` (`elevationGainPerMi` now uses `elevationGainM`; climb_ascent_m fallback only), `analyze-cycling-workout/index.ts` (`elevation_gain` added to workout SELECT + passed through). Commit `bdf2cde2`, 2026-05-17.
+- **Behavior:** the classifier's ≥40 ft/mi elevation-density gate sources ascent from total ride elevation gain, not grade≥3% climb-segment ascent (which under-reported on rolling terrain and straddled the gate wrong). Supersedes D-011's elevation-source tradeoff.
+- **Verification:** May-10 ride `60304656` recomputed post-deploy → reclassified `tempo` → `climbing` (325 m total → 46.5 ft/mi; was 249 m climb-seg → 35.6 ft/mi); VI/IF stayed canonical (fpVI 1.13 = capVI). `build.test.ts` +3 (60304656 fix / climb-seg fallback / total-gain precedence); cycling-v1 suite green (86 pass).
+- **Decision:** see D-016 (supersedes D-011 elevation-source only).
+
 ---
 
 ## Known broken (filed, not blocking)
