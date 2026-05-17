@@ -1158,10 +1158,13 @@ function buildAnalysisDetailRows(
   } catch { /* */ }
 
   // Power zones: ftp_bins is minutes per %-FTP band (CyclingFtpBinsV1). Show
-  // meaningful bands (>2 min) biggest-first and roll the small remainder into
+  // meaningful bands (>2 min) biggest-first and roll the remainder into
   // "+Xm other" so the displayed total accounts for the FULL ride duration.
-  // (Was capped at top-4, which silently dropped whole zones — the row's total
-  // then didn't match ride time, which read as misleading.)
+  // Two sources of "missing" time: (a) small non-zero bands ≤2 min; (b) the
+  // bins only count PEDALING — computeFtpBinsMinutes skips pw≤0, so coasting/
+  // descending time (20+ min on a climbing route) is never binned. Anchor the
+  // remainder to facts.total_duration_min so the row total matches the header
+  // duration. (Was also capped at top-4, which silently dropped whole zones.)
   try {
     if (sport === 'ride') {
       const bins = (factPacket?.derived?.ftp_bins || null) as Record<string, number> | null;
@@ -1184,9 +1187,15 @@ function buildAnalysisDetailRows(
         // no band clears 2 min (tiny / evenly split ride), show all non-zero.
         const majors = nonZero.filter((s) => s.min > 2);
         const shown = majors.length > 0 ? majors : nonZero;
-        const otherMin = nonZero
+        // (a) small non-shown non-zero bands + (b) un-binned coasting/rounding
+        // drift (ride duration − total binned pedaling minutes), clamped ≥0.
+        const smallRemainder = nonZero
           .filter((s) => !shown.includes(s))
           .reduce((sum, s) => sum + s.min, 0);
+        const binnedTotal = nonZero.reduce((sum, s) => sum + s.min, 0);
+        const rideMin = Math.round(Number((factPacket as any)?.facts?.total_duration_min) || 0);
+        const unbinned = rideMin > 0 ? Math.max(0, rideMin - binnedTotal) : 0;
+        const otherMin = smallRemainder + unbinned;
         const segs = shown.map((s) => `${s.name} ${s.min}m`);
         if (otherMin > 0) segs.push(`+${otherMin}m other`);
         if (segs.length > 0) rows.push({ label: 'Power zones', value: segs.join(' · ') });
