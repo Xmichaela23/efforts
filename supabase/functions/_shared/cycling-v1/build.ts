@@ -44,17 +44,18 @@ export function fallbackClassifyIntent(args: {
 
   // VI gate (audit fix): on a high-variability ride NP ≫ avg power, so IF
   // (NP/FTP) is inflated by terrain/surges and is NOT a valid structured-
-  // intensity proxy. A steady threshold/vo2 effort has VI ≈ 1.0–1.05; VI ≥ 1.15
-  // means terrain/group/unstructured. Gate floor IF ≥ 0.85 (resolved with
-  // product — the spec's 0.88 conflicted with the IF-0.85 acceptance case;
-  // 0.85 keeps all four cases consistent) so only HARD-looking variable rides
-  // are rerouted (low-IF variable spins still fall through to recovery/
-  // endurance below). Climbing when elevation density ≥ 40 ft/mi, else tempo.
-  // Runs BEFORE the IF-based branches; structured rides (VI < 1.15) are
-  // unaffected and keep the existing logic.
+  // intensity proxy. A steady threshold/vo2 effort has VI ≈ 1.0–1.05; VI ≥ 1.10
+  // means terrain/group/unstructured. (Threshold lowered 1.15 → 1.10: the
+  // Lida/Flintridge climb — 1,629 ft / 21.6 mi, IF 1.02 — has VI 1.11 and was
+  // still mislabeled 'threshold' at the 1.15 cut.) Gate floor IF ≥ 0.85
+  // (resolved with product earlier) so only HARD-looking variable rides are
+  // rerouted (low-IF variable spins still fall through to recovery/endurance
+  // below). Climbing when elevation density ≥ 40 ft/mi, else tempo. Runs
+  // BEFORE the IF-based branches; structured rides (VI < 1.10) are unaffected
+  // and keep the existing logic.
   const vi = coerceNumber(variabilityIndex);
   const epm = coerceNumber(elevationGainPerMi);
-  if (vi != null && vi >= 1.15 && if0 >= 0.85) {
+  if (vi != null && vi >= 1.10 && if0 >= 0.85) {
     return (epm != null && epm >= 40) ? 'climbing' : 'tempo';
   }
 

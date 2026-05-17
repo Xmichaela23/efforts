@@ -138,11 +138,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       
       console.log('🔄 [UnifiedWorkoutView] Refreshing workout data after auto-attach or realtime update...');
       try {
-        // Select only scalar columns — omit heavy JSONB blobs (computed, workout_analysis, gps_trackpoints)
-        // to avoid statement timeout on large analysis rows
+        // Scalar columns + workout_analysis. workout_analysis must be selected
+        // here: this is the post-recompute refresh, and omitting it (former
+        // behavior) left the client showing the STALE pre-recompute analysis —
+        // classified_type / narrative never updated after a recompute. The
+        // heavier `computed` / `gps_trackpoints` blobs stay omitted to avoid
+        // statement timeout on large rows.
         const { data: refreshedWorkout, error } = await supabase
           .from('workouts')
-          .select('id,user_id,date,type,workout_status,planned_id,name,rpe,gear_id,moving_time,elapsed_time,duration,distance,avg_heart_rate,max_heart_rate,elevation_gain,elevation_loss,updated_at,workout_metadata')
+          .select('id,user_id,date,type,workout_status,planned_id,name,rpe,gear_id,moving_time,elapsed_time,duration,distance,avg_heart_rate,max_heart_rate,elevation_gain,elevation_loss,updated_at,workout_metadata,workout_analysis')
           .eq('id', workout.id)
           .single();
         

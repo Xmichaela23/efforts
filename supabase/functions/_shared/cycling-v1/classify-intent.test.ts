@@ -2,9 +2,9 @@
  * Tests for fallbackClassifyIntent — the cycling ride classifier's VI gate
  * (audit fix). High VI ⇒ NP-inflated IF is not a valid structured-intensity
  * proxy ⇒ reroute hard variable rides to climbing/tempo instead of
- * threshold/vo2. Gate: VI ≥ 1.15 AND IF ≥ 0.85 (floor resolved with product;
- * spec's 0.88 conflicted with the IF-0.85 acceptance case). climbing when
- * elevation density ≥ 40 ft/mi, else tempo. VI < 1.15 → existing logic.
+ * threshold/vo2. Gate: VI ≥ 1.10 AND IF ≥ 0.85 (VI cut lowered 1.15 → 1.10 —
+ * the Lida/Flintridge climb has VI 1.11 and was still mislabeled threshold).
+ * climbing when elevation density ≥ 40 ft/mi, else tempo. VI < 1.10 → existing.
  *
  * Run: deno test supabase/functions/_shared/cycling-v1/classify-intent.test.ts --no-check
  */
@@ -20,15 +20,19 @@ Deno.test('VI 1.3, IF 1.02, 75 ft/mi → climbing (NOT threshold — the audit b
   assertEquals(C(1.02, 1.3, 75), 'climbing');
 });
 
-Deno.test('VI 1.0, IF 1.02, 5 ft/mi → threshold (structured ride, VI<1.15 bypasses gate, unchanged)', () => {
+Deno.test('VI 1.0, IF 1.02, 5 ft/mi → threshold (structured ride, VI<1.10 bypasses gate, unchanged)', () => {
   assertEquals(C(1.02, 1.0, 5), 'threshold');
+});
+
+Deno.test('Lida/Flintridge regression: VI 1.11, IF 1.02, 75 ft/mi → climbing (was threshold at 1.15 cut)', () => {
+  assertEquals(C(1.02, 1.11, 75), 'climbing');
 });
 
 Deno.test('VI 1.2, IF 0.85, 30 ft/mi → tempo (variable but not climbing; gate floor IF≥0.85)', () => {
   assertEquals(C(0.85, 1.2, 30), 'tempo');
 });
 
-Deno.test('VI 1.0, IF 0.70 → endurance (low-IF, VI<1.15 bypasses gate)', () => {
+Deno.test('VI 1.0, IF 0.70 → endurance (low-IF, VI<1.10 bypasses gate)', () => {
   // Spec listed "VI 1.0, IF 0.75 → endurance (unchanged)"; existing code maps
   // IF exactly 0.75 → 'tempo' (build.ts `if0 >= 0.75 && if0 < 0.82`). That
   // endurance/tempo boundary is pre-existing and out of scope ("no other
@@ -44,10 +48,11 @@ Deno.test('high VI but easy IF (variable recovery/group spin) is NOT rerouted', 
   assertEquals(C(0.55, 1.3, 60), 'recovery');
 });
 
-Deno.test('VI exactly 1.15 with IF 0.95, climbing terrain → climbing (boundary inclusive)', () => {
-  assertEquals(C(0.95, 1.15, 50), 'climbing');
-  // Same VI/IF but flat → tempo (elevation density < 40)
-  assertEquals(C(0.95, 1.15, 12), 'tempo');
+Deno.test('VI boundary is 1.10 inclusive; 1.09 bypasses the gate', () => {
+  assertEquals(C(0.95, 1.10, 50), 'climbing'); // VI == 1.10 → gate fires, climb terrain
+  assertEquals(C(0.95, 1.10, 12), 'tempo');    // VI == 1.10 → gate fires, flat → tempo
+  // VI 1.09 < 1.10 → gate skipped → existing IF logic (IF 1.02 ≥ 0.95 → threshold)
+  assertEquals(C(1.02, 1.09, 75), 'threshold');
 });
 
 Deno.test('null VI / null elevation degrade safely (no gate → existing logic)', () => {
