@@ -176,6 +176,11 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
   // HR label for today
   const todayHr = (pts[pts.length - 1] as any).avg_hr as number | null;
 
+  // Sport-aware legend: the cycling TREND plots power (trend.unit === 'W',
+  // built in _shared/session-detail/build.ts:635); running plots pace
+  // (unit '/mi', build.ts:669). "pace" was hardcoded — wrong for rides.
+  const seriesLabel = trend.unit === 'W' ? 'power' : 'pace';
+
   return (
     <div>
       <div className="flex items-center gap-2">
@@ -212,7 +217,7 @@ function TrendSparkline({ trend }: { trend: TrendData }) {
           <div className="flex items-center gap-3 mt-1" style={{ maxWidth: 280 }}>
             <span className="flex items-center gap-1 text-[10px]" style={{ color }}>
               <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={color} strokeWidth="1.5" opacity="0.8" /></svg>
-              pace
+              {seriesLabel}
             </span>
             <span className="flex items-center gap-1 text-[10px] text-orange-400">
               <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#fb923c" strokeWidth="1" strokeDasharray="3 2" opacity="0.8" /></svg>
