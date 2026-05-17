@@ -8,7 +8,7 @@
  *   deno test supabase/functions/_shared/cycling-v1/ai-summary.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { arcNumericAllowList, cyclingCrossWorkoutDisplay, ledeOpensWithArcFrame, validateNoNewNumbers } from './ai-summary.ts';
+import { arcNumericAllowList, cyclingCrossWorkoutDisplay, ledeOpensWithArcFrame, summaryHasJargon, validateNoNewNumbers } from './ai-summary.ts';
 
 // ── Arc temporal context: numeric allow-list (so Arc citations aren't rejected) ──
 
@@ -85,6 +85,23 @@ Deno.test('lede guard: power/fitness opener → OK (incl. Arc as trailing clause
   assertEquals(ledeOpensWithArcFrame('Your 20-min power dropped 8W across your last four threshold rides.'), false);
   // Power lede, Arc correctly demoted to the trailing clause — must NOT flag.
   assertEquals(ledeOpensWithArcFrame('You set a new 5-min best of 224W on this climbing ride, seven days into recovery from the Ojai Marathon.'), false);
+});
+
+Deno.test('jargon guard: banned labels/abbrevs (incl. numbers, ACWR/TSB) → violation', () => {
+  assertEquals(summaryHasJargon('The 1.17 variability index shows natural undulation.'), true);
+  assertEquals(summaryHasJargon('the 0.82 intensity factor suggests you were above zone.'), true);
+  assertEquals(summaryHasJargon('Held threshold with an IF of 1.01 on this ride.'), true);
+  assertEquals(summaryHasJargon('EF 1.214 with 1.3% HR decoupling over the back half.'), true);
+  assertEquals(summaryHasJargon('your acute-to-chronic workload ratio sits at 1.95 (high risk).'), true);
+  assertEquals(summaryHasJargon('training stress balance is -19 and the ACWR is high.'), true);
+});
+
+Deno.test('jargon guard: plain-language translation → OK (NP watt kept)', () => {
+  assertEquals(summaryHasJargon('178 W normalized power — your effective output once surges smooth out — held at threshold.'), false);
+  assertEquals(summaryHasJargon('You rode at threshold with natural power variation from the climbing terrain.'), false);
+  assertEquals(summaryHasJargon('Heart rate stayed controlled as the power held, a sign your aerobic efficiency is holding.'), false);
+  // lowercase English "if" must NOT trip the case-sensitive abbrev check
+  assertEquals(summaryHasJargon('Strong day, especially if you were carrying fatigue.'), false);
 });
 
 Deno.test('validator: decimals and percentages substring-match the packet', () => {

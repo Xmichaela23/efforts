@@ -32,6 +32,26 @@ export function ledeOpensWithArcFrame(summary: string): boolean {
   return arcLead.test(opener) && !powerTok.test(opener);
 }
 
+/**
+ * Jargon guard (INSIGHTS plain-language brief): the narrative must translate
+ * IF / VI / HR-decoupling / EF — never print the label or its number — and
+ * must not recap ACWR / TSB / workload-ratio (already a prompt rule; same
+ * data-readout class). Returns true when banned jargon is present → a
+ * violation to correct on retry. Deterministic backstop because prompt
+ * wording alone left ~30 % of rides still emitting "the 1.17 variability
+ * index" / "the 0.82 intensity factor". Exported for unit testing.
+ * (Abbrev check is case-sensitive so the English word "if" never trips it;
+ * "VI"/"EF"/"IF"/"NP"... all-caps as metric labels do.)
+ */
+export function summaryHasJargon(summary: string): boolean {
+  const t = String(summary || '');
+  if (/\b(intensity factor|variability index|efficiency factor|decoupling|acute[- ]to[- ]chronic|workload ratio|training stress balance)\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(IF|VI|EF|ACWR|TSB)\b/.test(t)) return true; // case-sensitive: all-caps metric labels
+  return false;
+}
+
 function normalizeParagraph(s: string): string {
   // Strip markdown the LLM sometimes emits (e.g. **bold**) — it renders as
   // literal asterisks in the UI. Mirrors the syntax strips in the codebase's
@@ -314,16 +334,18 @@ ${packetStr}
     return text ? normalizeParagraph(text) : null;
   };
 
-  // 2 attempts. Validators: numeric-token drift (allow-list includes Arc
-  // numbers) AND the lede guard (sentence one must open on a power/fitness
-  // signal, not Arc/recovery/taper/fatigue framing — deterministic backstop
-  // for the prompt rule since the shared arcModeSystemAddon pushes the other
-  // way). Both corrections are folded into the single retry.
+  // 2 attempts. Validators (deterministic backstops for prompt rules the LLM
+  // doesn't reliably follow): numeric-token drift; the lede guard (sentence
+  // one opens on a power/fitness signal, not Arc framing — the shared
+  // arcModeSystemAddon pushes the other way); the jargon guard (plain-language
+  // brief — no IF/VI/EF/decoupling/ACWR/TSB labels-or-numbers). All failing
+  // corrections fold into the single retry.
   const s1 = await attempt(userBase);
   if (!s1) return null;
   const v1 = validateNoNewNumbers(s1, allowStr);
   const lede1 = ledeOpensWithArcFrame(s1);
-  if (v1.ok && !lede1) return s1;
+  const jargon1 = summaryHasJargon(s1);
+  if (v1.ok && !lede1 && !jargon1) return s1;
 
   const corrections: string[] = [];
   if (!v1.ok) {
@@ -333,7 +355,12 @@ ${packetStr}
   }
   if (lede1) {
     corrections.push(
-      "opened with race-timing / recovery / taper / fatigue framing; the FIRST words of sentence one MUST be a power/fitness signal from THIS ride (a PR, the vs-similar Xw delta, the power trend, or this ride's NP/IF) — move any Arc/temporal context to a trailing clause in sentence two",
+      "opened with race-timing / recovery / taper / fatigue framing; the FIRST words of sentence one MUST be a power/fitness signal from THIS ride (a PR, the vs-similar Xw delta, the power trend, or this ride's normalized power + a plain intensity read) — move any Arc/temporal context to a trailing clause later in the paragraph",
+    );
+  }
+  if (jargon1) {
+    corrections.push(
+      'printed banned jargon (intensity factor / IF, variability index / VI, HR decoupling, efficiency factor / EF, ACWR / TSB / workload ratio) or their numbers; translate ALL of them into plain language — describe the intensity instead of IF, the power character instead of VI, the HR-vs-power read instead of decoupling/EF — and do not recap workload-ratio/TSB math. Only normalized power keeps its watt number',
     );
   }
   const s2 = await attempt(
