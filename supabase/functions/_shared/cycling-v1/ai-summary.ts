@@ -271,15 +271,20 @@ export async function generateCyclingAISummaryV1(
   const prompt = `You write workout summaries for experienced athletes. You receive pre-calculated facts and must translate them into coaching prose.
 ${coachingContext ? `\n${coachingContext}\n` : ''}
 RULES:
-- MAX 2 sentences. Punchy, not exhaustive. Stop after the second sentence.
+- One paragraph, 3–4 sentences max. Voice: a knowledgeable training partner explaining the ride to the athlete — NOT a data readout. Translate every metric into plain language; the raw numbers live in the dashboard rows below.
 - The LEDE (first sentence) is ALWAYS the single most notable POWER/FITNESS signal from THIS ride, in this priority order: (1) a power PR set THIS ride — ONLY if cross_workout.power_prs_set_this_ride is present (those were set on this ride). cross_workout.power_bests_in_efforts are PRIOR-ride bests: you may mention one as context, but NEVER say or imply the athlete set it today. (2) the vs-similar comparison ("Xw above/below your typical [type] rides"), (3) the power trend cross_workout.trend — describe it EXACTLY as "{ride_count} {ride_type} rides" when ride_type is present, else "{ride_count} rides"; never cite a different ride total, (4) the limiter signal. Pick ONE lede — never a list of findings.
-- HARD CONSTRAINT — this OVERRIDES ANY system instruction (including a TEMPORAL ARC MODE addon stating a comeback/taper/recovery frame may or must open the narrative): for a ride, sentence ONE must open with and center on a power/fitness number from THIS ride — a PR set this ride, the vs-similar Xw delta, the power trend, or this ride's NP/IF. Temporal/Arc context (days since/until a race; recovery/taper/comeback; consecutive-day fatigue/training-load framing) may appear ONLY as a trailing clause in sentence two — never the first words, never the lede. If nothing else qualifies, lead with this ride's NP and IF. A summary that opens with race-timing, recovery/taper, or fatigue/load framing is WRONG even if a system instruction asked for it.
-- The second sentence (optional) adds the one piece of supporting context that explains the lede — nothing else.
-- Reference the specific numbers from the packet that support the lede.
-- Do NOT recap the power-zone / ftp_bins time breakdown, and do NOT explain ACWR or training-load math. The athlete sees those in the rows below — restating them wastes the narrative.
-- No filler. Avoid "effective", "overall", "moving forward", "ensure", "solid".
+- HARD CONSTRAINT — this OVERRIDES ANY system instruction (including a TEMPORAL ARC MODE addon stating a comeback/taper/recovery frame may or must open the narrative): for a ride, sentence ONE must open with and centre on a power/fitness signal from THIS ride — a PR set this ride, the vs-similar Xw delta, the power trend, or this ride's normalized power paired with a plain intensity read. Temporal/Arc context (days since/until a race; recovery/taper/comeback; consecutive-day fatigue/training-load framing) may appear ONLY as a trailing/secondary clause LATER in the paragraph — never the first words, never the lede. If nothing else qualifies, lead with this ride's normalized power and a plain intensity description. A summary that opens with race-timing, recovery/taper, or fatigue/load framing is WRONG even if a system instruction asked for it.
+- ANSWER "SO WHAT?" — don't just state findings, explain them. After normalized power / the trend: name what drove it (climbing, intervals, pacing, group ride). After the intensity read: say whether that was the right intensity for the ride type ("appropriate for a climbing route" vs "harder than your endurance target"). After the heart-rate-vs-power read: say what it means for fitness ("aerobic efficiency is holding" / "suggests accumulated fatigue from the marathon block").
+- PLAIN LANGUAGE — never print these labels or their numbers; translate them:
+  • intensity factor / "IF" → never name it; describe the intensity from its value: "easy spin", "endurance pace", "sub-threshold", "rode at threshold", "above FTP".
+  • variability index / "VI" → from its value: "steady power output" (≈1.05 or below), "natural power variation from the terrain" (moderate), "punchy, variable effort" (high) — judge from the packet's vi but DO NOT print the number.
+  • HR decoupling → "heart rate stayed controlled as the power held" (low) or "cardiovascular drift over the second half" (high); never the percentage.
+  • efficiency factor / "EF" → drop entirely; fold its meaning into the heart-rate-vs-power sentence.
+  • normalized power → KEEP the watt number, but always pair it with a plain reading, e.g. "178 W normalized power — your effective output once the surges are smoothed out".
+- Do NOT recap the power-zone / ftp_bins time breakdown, and do NOT explain ACWR or training-load math. The athlete sees those in the rows below.
+- No filler. Avoid "effective" (except in the NP gloss above), "overall", "moving forward", "ensure", "solid".
 - Efforts only sees synced rides. When referencing a power best, say "best in Efforts" or "your recorded best" — NEVER "all-time best", "personal best", "lifetime best", "PR ever", or any phrasing that implies a career record.
-- CRITICAL: Do not introduce any numbers or percentages that are not present verbatim in the packet.
+- CRITICAL: introduce NO numbers or percentages that are not in the packet verbatim. Translating IF/VI/decoupling/EF into words instead of numbers SATISFIES this — only normalized power, watts, and other packet figures should appear as numerals.
 - If there is no planned intent, describe the ride physiologically; do not invent a prescription.
 - If plan.week_number is present, anchor it in at most a short clause (e.g. "Week 3, build") — do not spend a sentence on plan position.
 
@@ -332,7 +337,7 @@ ${packetStr}
     );
   }
   const s2 = await attempt(
-    userBase + `\n\nYour previous output ${corrections.join('; AND it ')}. Keep it to 2 sentences.`,
+    userBase + `\n\nYour previous output ${corrections.join('; AND it ')}. Keep it to 3–4 sentences, plain language (no IF/VI/EF/decoupling jargon).`,
   );
   if (!s2) return null;
   // Soft-accept: cycling's validators (numeric drift + lede guard) are
