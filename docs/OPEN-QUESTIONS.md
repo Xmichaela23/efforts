@@ -90,6 +90,33 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-007 — Cycling TREND historical `avg_hr` resolves null (HR line never draws)
+
+- **Status:** deferred bug, fix-ready, scoped for next session.
+- **Why it exists:** the `pwr20`/`np_trend` historical loop (`analyze-cycling-workout:~2108`) reads `r.computed.overall.avg_hr`, which is frequently null (set only from an `hr_bpm` sample series). The reliable per-ride avg HR is the `workouts.avg_heart_rate` column, which the loop's SELECT (`:2077`, `id, date, computed, workout_analysis`) doesn't fetch. So all historical TREND points get `avg_hr: null` → `TrendSparkline`'s `hasHr (≥3)` gate fails → the dashed HR line never draws (label still shows current-ride bpm).
+- **Fix:** add `avg_heart_rate` to the SELECT; resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Same projection/field-source footgun class as the `normalized_power_w` / `achievements` / np_trend SELECT fixes.
+- **Cross-ref:** `docs/ENGINE-STATE.md` Known broken; `docs/SESSION-CONTEXT.md` open item #1.
+
+---
+
+## Q-008 — Type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill
+
+- **Status:** deferred (process, not a code defect) — needs an eng/product call.
+- **Why it exists:** `pwr20_trend_v1` is filtered to rides whose **stored** `classified_type` matches the current ride's. After the VI-gate classifier change, recomputing one ride re-derives only that ride's type; historical rides keep their stale stored type until they too are re-analyzed. So a single recompute can't reach the ≥3-same-type threshold and the series stays null.
+- **Open question:** should the backfill be a one-off script over recent rides, or a triggered re-analysis job? No code change resolves it without that decision.
+- **Cross-ref:** `docs/SESSION-CONTEXT.md` open item #2.
+
+---
+
+## Q-009 — Race-course segment matching: GPS-track matcher vs "Strava-only segment intelligence"
+
+- **Status:** blocked on a product decision (Build Order #8).
+- **Why it exists:** #8 needs course-segment geometry extracted from race-course GPX (Data-Dependency ❌); it was not among the decisions that unblocked #6. The doc itself flags the Garmin GPS-track matcher as the "highest-leverage open question." The forward hook (`cycling_segment_history.race_course_relevant`) is in place.
+- **Open question:** build the GPS-track matcher (universal, larger) or accept "segment intelligence is a Strava-connected feature" as a permanent product boundary? Decide before #8 proceeds — do not fabricate a name-match heuristic.
+- **Cross-ref:** `docs/CYCLING-ANALYSIS-DESIGN.md` Primary Constraint; `docs/SESSION-CONTEXT.md` open item #3.
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:

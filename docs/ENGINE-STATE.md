@@ -42,6 +42,18 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **Verification:** 2 new deno tests in `supabase/functions/_shared/infer-training-fitness.test.ts` (commit 0fd17ad9). 6 of 7 tests pass; the 1 failure is pre-existing on main, unrelated — see Q-006 / D-002.
 - **Decision:** see D-002.
 
+### Cycling Performance tab at running parity
+- **Files:** `_shared/session-detail/build.ts`, `_shared/cycling-v1/*`, `analyze-cycling-workout`, `workout-detail` (+ client `SessionNarrative.tsx`). Commits `25167b90`→`a739961f` (2026-05-14→16).
+- **Behavior:** Cycling INSIGHTS (arc-aware LLM), mode-aware + classified_type-filtered TREND with dual pace+HR line, EFFICIENCY, CLIMBING/VAM, POWER ZONES, PACING, TERRAIN (+temp), vs-similar, and a dist/dur/temp stat line — at parity with running's Performance tab.
+- **Verification:** recompute a ride → reload Performance tab; confirm rows render and `classified_type` reflects the VI gate. Pure helpers unit-tested (`classify-intent`, `ride-physiology`, `cycling-trend`, `segments`, `analysis-mode`); suite 628 pass / 1 pre-existing-unrelated fail.
+- **Decision:** see D-011..D-014; design `docs/CYCLING-ANALYSIS-DESIGN.md`.
+
+### Intent-aware cycling analysis (Build Order #1–#7, #9)
+- **Files/data:** NP-TSS `computed.analysis.power.tss`; CTL/ATL/TSB `workout_analysis.fitness_v1` + `athlete_snapshot.{ctl,atl,tsb}` + `ArcContext.cycling_fitness`; HR-at-power/decoupling + VAM in `computed.analysis.{efficiency,climbing}`; segment ingestion `cycling_segment_history`.
+- **Behavior:** per-ride TSS, PMC fitness/fatigue/form, aerobic efficiency + climbing-rate metrics, Strava+Garmin-climb segment history. Both migrations applied via SQL editor; all table access guarded.
+- **Verification:** `docs/SESSION-CONTEXT.md` §6 checklist.
+- **Decision:** D-011..D-014.
+
 ---
 
 ## Known broken (filed, not blocking)
@@ -72,6 +84,23 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 - **Files:** `src/components/PlannedWorkoutSummary.tsx:34-66`, `src/components/AllPlansInterface.tsx:881-885`, `src/components/TodaysEffort.tsx` (uses `workout.name` directly).
 - **Fix shape:** consolidate the title-derivation into a single shared utility — same architectural pattern as the `useStrengthOrderingPreference` consolidation. Solving at the data layer (one canonical session name per workout, derived once at materialize time) is cleaner than patching label-by-label downstream.
 - **Why deferred:** predates the universal fixes; cosmetic, not protocol-violating; queued behind higher-signal work.
+
+### Cycling TREND dashed HR line never draws (historical `avg_hr` null)
+- **Symptom:** cycling TREND shows the power line + current-ride "· {bpm}" label but no dashed HR line.
+- **File:** `analyze-cycling-workout/index.ts:~2108` reads `r.computed.overall.avg_hr` (frequently null); SELECT at `:2077` omits the reliable `workouts.avg_heart_rate` column. → all historical TREND points `avg_hr: null` → `SessionNarrative.tsx` `TrendSparkline` `hasHr (≥3)` gate fails.
+- **Fix shape:** add `avg_heart_rate` to the SELECT; resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Same projection/field-source footgun class as `cead4e9e`/`41d1582d`/`f9efb893`.
+- **Why deferred:** end-of-session; small scoped fix. See Q-007 / SESSION-CONTEXT open item #1.
+
+### Type-filtered `pwr20_trend_v1` won't populate from a single recompute
+- **Symptom:** `pwr20_trend_v1` null on a reclassified ride despite `computed.power_curve['20min']` existing.
+- **Cause:** the series filters historical rides by their **stored** `classified_type`; post-VI-gate, a single recompute re-derives only the current ride — historical rides keep stale stored types until re-analyzed. Not a code defect.
+- **Fix shape:** historical re-analysis backfill across recent rides. See Q-008 / SESSION-CONTEXT open item #2.
+- **Why deferred:** process/scope decision owed (one-off script vs triggered job).
+
+### #8 race-course segment matching — blocked on GPX dependency
+- **Symptom:** no race-course-relevant tagging on segment history.
+- **Cause:** needs course-segment geometry from race-course GPX (Data-Dependency ❌); not in the #6 unblock decisions. Forward hook `cycling_segment_history.race_course_relevant` is in place.
+- **Why deferred:** documented blocker; product decision owed (GPS-track matcher vs Strava-only). See Q-009 / `docs/CYCLING-ANALYSIS-DESIGN.md`.
 
 ---
 

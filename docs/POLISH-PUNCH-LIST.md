@@ -211,6 +211,32 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 
 ---
 
+## Cycling analysis build (2026-05-14 → 16)
+
+Separate workstream from items 1–5 (running→cycling parity + intent-aware analysis). Work order: `docs/CYCLING-ANALYSIS-DESIGN.md`; full state: `docs/SESSION-CONTEXT.md`.
+
+### Done
+- [x] Build Order #1 mode-aware TREND + `pwr20_trend_v1` — `1c841615`/`82c68fe9` (2026-05-15)
+- [x] #1b TREND dual pace+HR line — `71e82dbb` (2026-05-16)
+- [x] #2 analysis-mode primitive — `7a2fed7f`
+- [x] #3 NP-based TSS — `a5947290`
+- [x] #4 HR-at-power + decoupling, #5 VAM — `61851fba`
+- [x] #6 segment ingestion + `cycling_segment_history` + Garmin climbs — `685987cb` (+ SELECT fix `41d1582d`)
+- [x] #7 CTL/ATL/TSB PMC model — `a42331cc`
+- [x] #9 Arc exposure of CTL/ATL/TSB (narrative + snapshot + arc-context) — `66dad9d9` + `f2cb068c`
+- [x] TREND type-filter by classified_type — `04eb2b52`
+- [x] VI-gate ride classifier + `'climbing'` type — `d6832a6b`/`fd16ef5a`
+- [x] dist/dur/temp stat line + TERRAIN temp — `a739961f`
+
+### Open
+- [ ] **P1** historical `avg_hr` resolves null → TREND HR line never draws (fix-ready; Q-007, SESSION-CONTEXT #1)
+- [ ] **P1** type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill (Q-008, SESSION-CONTEXT #2)
+- [ ] **P2** #8 race-course matching — blocked on GPX geometry / product decision (Q-009)
+- [ ] **P3** #9 remainder — power-curve-trend + HR-at-power-trend into Arc/snapshot
+- [ ] deferred (product): #10 segment leaderboards, #11 W′ depletion modelling
+
+---
+
 ## Done = launchable
 
 When items 1-5 are all 100% and background items are closed, the app ships every flow clean. No new features past this point. Polish only.
