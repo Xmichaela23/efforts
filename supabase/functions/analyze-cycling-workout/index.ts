@@ -2109,7 +2109,10 @@ Deno.serve(async (req) => {
           // npRows null and the trend silently empty even though the data is in
           // `computed`. workout_analysis added so pwr20_trend can be filtered to
           // the current ride's classified_type (fact_packet_v1.facts.classified_type).
-          .select('id, date, computed, workout_analysis')
+          // avg_heart_rate is a REAL workouts column (compute-facts reads it),
+          // added for the historical HR resolve below (Q-007) — do NOT strip
+          // it as a projection-footgun candidate, it exists.
+          .select('id, date, computed, workout_analysis, avg_heart_rate')
           .eq('user_id', (workout as any).user_id)
           .in('type', ['ride', 'cycling', 'bike'])
           .eq('workout_status', 'completed')
@@ -2139,10 +2142,24 @@ Deno.serve(async (req) => {
           // Independent of NP availability — collected even if `np == null`.
           const w20h = Number((r as any)?.computed?.power_curve?.['20min']);
           // Avg HR for the dual-line TREND (design #1b — mirrors running's
-          // pace+HR sparkline). Source: computed.overall.avg_hr.
+          // pace+HR sparkline). computed.overall.avg_hr is frequently null
+          // (only set from an hr_bpm series), so the dashed HR line never had
+          // ≥3 points. Resolve through the fact packet then the reliable
+          // workouts.avg_heart_rate column (added to the SELECT above) — same
+          // SELECT-projection class as the normalized_power_w / achievements /
+          // elevation_gain fixes. Each candidate guarded individually (a stored
+          // 0/null must fall through, not short-circuit — Number(null)===0). Q-007.
           const hrH = (() => {
-            const h = Number((r as any)?.computed?.overall?.avg_hr);
-            return Number.isFinite(h) && h > 0 ? Math.round(h) : null;
+            const cands = [
+              (r as any)?.computed?.overall?.avg_hr,
+              (r as any)?.workout_analysis?.fact_packet_v1?.facts?.avg_hr,
+              (r as any)?.avg_heart_rate,
+            ];
+            for (const c of cands) {
+              const h = Number(c);
+              if (Number.isFinite(h) && h > 0) return Math.round(h);
+            }
+            return null;
           })();
           // Same-classified_type filter. Canonical source is
           // workout_analysis.fact_packet_v1.facts.classified_type; top-level
