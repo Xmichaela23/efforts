@@ -89,3 +89,45 @@ Deno.test('non-finite / non-positive overrides are ignored (fall back to recompu
   assertEquals(pkt.facts.variability_index, 0.88); // recompute
   assertEquals(pkt.facts.intensity_factor, 0.7); // recompute
 });
+
+// ── Elevation-density gate source: total elevation_gain, not climb-segment ────
+// D-016 (supersedes D-011): the gate must read total ride elevation gain, not
+// grade≥3% climb-segment ascent — the latter under-reports on rolling terrain.
+// Real case: May-10 ride 60304656 — 22.92 mi, 325 m total gain (46.5 ft/mi →
+// climbing) vs 249 m climb-segment ascent (35.6 ft/mi → would be tempo).
+
+// 36883 m ≈ 22.92 mi (the actual 60304656 distance). VI 1.13 / IF 1.075 fire
+// the gate (VI ≥ 1.10 ∧ IF ≥ 0.85), so only the elevation branch decides.
+const may10 = {
+  workout: { computed: { overall: { duration_s_moving: 3600, distance_m: 36883 }, analysis: { climbing: { climb_ascent_m: 249 } } } },
+  plannedWorkout: null,
+  powerSamplesW: new Array(30).fill(175),
+  avgPowerW: 200,
+  normalizedPowerW: 175,
+  ftpW: 250,
+  avgHr: null,
+  maxHr: null,
+  variabilityIndexOverride: 1.13,
+  intensityFactorOverride: 1.075,
+};
+
+Deno.test('total elevation_gain (325 m → 46.5 ft/mi) → climbing (the 60304656 fix)', () => {
+  const pkt = buildCyclingFactPacketV1({ ...may10, elevationGainM: 325 });
+  assertEquals(pkt.facts.classified_type, 'climbing');
+});
+
+Deno.test('climb-segment fallback (249 m → 35.6 ft/mi) when total gain absent → tempo (the old bug)', () => {
+  const pkt = buildCyclingFactPacketV1({ ...may10, elevationGainM: null });
+  assertEquals(pkt.facts.classified_type, 'tempo'); // gate fires but epm < 40
+});
+
+Deno.test('total elevation_gain is preferred over climb_ascent_m when both present', () => {
+  // Total gain 100 m → 14.3 ft/mi (< 40 → tempo); climb_ascent_m 400 m would be
+  // 57 ft/mi (climbing). 'tempo' proves elevationGainM wins the precedence.
+  const pkt = buildCyclingFactPacketV1({
+    ...may10,
+    workout: { computed: { overall: { duration_s_moving: 3600, distance_m: 36883 }, analysis: { climbing: { climb_ascent_m: 400 } } } },
+    elevationGainM: 100,
+  });
+  assertEquals(pkt.facts.classified_type, 'tempo');
+});

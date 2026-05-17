@@ -1478,7 +1478,7 @@ Deno.serve(async (req) => {
       .from('workouts')
       .select(`
         id, type, sensor_data, computed, time_series_data, garmin_data,
-        planned_id, user_id, date, moving_time, duration, distance, workout_status, workload_actual, workload_planned,
+        planned_id, user_id, date, moving_time, duration, distance, elevation_gain, workout_status, workload_actual, workload_planned,
         achievements
       `)
       .eq('id', workout_id)
@@ -1861,6 +1861,12 @@ Deno.serve(async (req) => {
       normalizedPowerW: normalizedPower || null,
       variabilityIndexOverride: canonicalVariabilityIndex,
       intensityFactorOverride: canonicalIntensityFactor,
+      // Total ride elevation gain (metres) for the classifier's elevation
+      // density gate — `workouts.elevation_gain`, added to the SELECT above.
+      elevationGainM: (() => {
+        const v = Number((workout as any)?.elevation_gain);
+        return Number.isFinite(v) && v > 0 ? v : null;
+      })(),
       avgHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.average_hr ?? (hrAnalysis as any)?.average_heart_rate) : null,
       maxHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.max_hr ?? (hrAnalysis as any)?.max_heart_rate) : null,
       ftpW,

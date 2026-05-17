@@ -95,6 +95,10 @@ export function buildCyclingFactPacketV1(args: {
   // below for why.
   variabilityIndexOverride?: number | null;
   intensityFactorOverride?: number | null;
+  // Total ride elevation gain in metres (`workouts.elevation_gain`). Primary
+  // source for the classifier's elevation-density gate — see the
+  // elevationGainPerMi block + D-016.
+  elevationGainM?: number | null;
   avgHr: number | null;
   maxHr: number | null;
   ftpW: number | null;
@@ -110,6 +114,7 @@ export function buildCyclingFactPacketV1(args: {
     normalizedPowerW,
     variabilityIndexOverride,
     intensityFactorOverride,
+    elevationGainM,
     avgHr,
     maxHr,
     ftpW,
@@ -189,14 +194,20 @@ export function buildCyclingFactPacketV1(args: {
   const planIntent = normalizePlanIntent(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? null);
   const ftpBins = (ftp != null && ftp > 0) ? computeFtpBinsMinutes({ powerSamplesW, ftpW: ftp }) : null;
 
-  // Elevation density (ft/mi) for the VI gate. Source per spec:
-  // computed.analysis.climbing (climb_ascent_m = grade≥3% ascent over the ride,
-  // metres). m→ft / total ride miles → a climbing-density proxy. NOTE: this is
-  // climb-segment ascent, not total ride gain, so it under-reports vs a raw
-  // total-gain/distance figure on rolling terrain — directionally correct and
-  // the spec-named source; documented.
+  // Elevation density (ft/mi) for the VI gate. Source: TOTAL ride elevation
+  // gain (`workouts.elevation_gain`, metres) passed in as elevationGainM,
+  // converted m→ft / total ride miles. Supersedes the earlier
+  // `computed.analysis.climbing.climb_ascent_m` (grade≥3% climb-segment ascent)
+  // source — climb-segment ascent under-reports on rolling terrain and
+  // straddled the 40 ft/mi gate wrong (May-10 60304656: 249 m climb-seg →
+  // 35.6 ft/mi → 'tempo', but 325 m total gain → 46.5 ft/mi → 'climbing',
+  // correct for a ~1,066 ft / 22.9 mi ride). Falls back to climb_ascent_m only
+  // when total gain is absent — degrade, not regress. See D-016 (supersedes
+  // D-011's elevation-source tradeoff).
   const elevationGainPerMi = (() => {
-    const ascentM = coerceNumber(workout?.computed?.analysis?.climbing?.climb_ascent_m);
+    const totalM = coerceNumber(elevationGainM);
+    const climbSegM = coerceNumber(workout?.computed?.analysis?.climbing?.climb_ascent_m);
+    const ascentM = (totalM != null && totalM > 0) ? totalM : climbSegM;
     if (ascentM == null || ascentM <= 0 || distMi == null || distMi <= 0) return null;
     return (ascentM * 3.28084) / distMi;
   })();
