@@ -301,7 +301,7 @@ RULES:
   • HR decoupling → "heart rate stayed controlled as the power held" (low) or "cardiovascular drift over the second half" (high); never the percentage.
   • efficiency factor / "EF" → drop entirely; fold its meaning into the heart-rate-vs-power sentence.
   • normalized power → KEEP the watt number, but always pair it with a plain reading, e.g. "178 W normalized power — your effective output once the surges are smoothed out".
-- Do NOT recap the power-zone / ftp_bins time breakdown, and do NOT explain ACWR or training-load math. The athlete sees those in the rows below.
+- HARD BAN on training-load math in the prose: no "acute-to-chronic"/ACWR, no workload "X%", no TSS number, no TSB/"training stress balance", no ftp_bins/power-zone time breakdown — neither the label nor the number. If load matters, say it in words only with NO figures: "your recent training load is high — recovery is the priority" / "you're well-rested for this". The athlete sees the numbers in the rows below.
 - No filler. Avoid "effective" (except in the NP gloss above), "overall", "moving forward", "ensure", "solid".
 - Efforts only sees synced rides. When referencing a power best, say "best in Efforts" or "your recorded best" — NEVER "all-time best", "personal best", "lifetime best", "PR ever", or any phrasing that implies a career record.
 - CRITICAL: introduce NO numbers or percentages that are not in the packet verbatim. Translating IF/VI/decoupling/EF into words instead of numbers SATISFIES this — only normalized power, watts, and other packet figures should appear as numerals.
@@ -360,7 +360,7 @@ ${packetStr}
   }
   if (jargon1) {
     corrections.push(
-      'printed banned jargon (intensity factor / IF, variability index / VI, HR decoupling, efficiency factor / EF, ACWR / TSB / workload ratio) or their numbers; translate ALL of them into plain language — describe the intensity instead of IF, the power character instead of VI, the HR-vs-power read instead of decoupling/EF — and do not recap workload-ratio/TSB math. Only normalized power keeps its watt number',
+      'printed banned jargon. DELETE every occurrence — and its number, including parenthetical asides like "(1.40 VI)" — of: intensity factor/IF, variability index/VI, HR decoupling, efficiency factor/EF, acute-to-chronic/ACWR, workload "X%", TSS, TSB/training stress balance. Replace each with its plain meaning in words only (intensity → "rode at threshold" etc.; VI → power character; decoupling/EF → the HR-vs-power read; load/ACWR/TSB → "recent load is high, recovery matters" with NO figure). The ONLY numerals allowed are normalized power watts and other packet figures',
     );
   }
   const s2 = await attempt(
