@@ -1,16 +1,23 @@
 #!/usr/bin/env node
 /**
- * Verify the cycling fact-packet IF/VI canonical-source fix.
+ * Verify / backfill the cycling fact-packet classifier inputs.
  *
- * Selects ride workouts where the STORED fact packet's variability_index /
- * intensity_factor disagree with computed.analysis.power.* (the canonical
- * analyzer values) — i.e. exactly the rides the fix targets, found by the
- * discrepancy itself rather than by guessing IDs. For each, replays the
- * recompute-workout chain (compute-workout-analysis → analyze-cycling-workout)
- * with the service-role token, then re-reads and asserts the fact packet now
- * matches the canonical numbers. Prints classified_type before → after.
+ * Default mode: selects ride workouts where the STORED fact packet's
+ * variability_index / intensity_factor disagree with computed.analysis.power.*
+ * (the canonical analyzer values) — the rides the IF/VI fix (D-015) targets,
+ * found by the discrepancy itself rather than by guessing IDs.
  *
- * Usage: node scripts/verify-cycling-vi-if-fix.mjs [--limit N] [--days N] [--dry-run]
+ * --all (wide backfill): process EVERY ride in the window, not just discrepant
+ * ones. Use after a classifier-input change (e.g. D-016 elevation source) so
+ * every ride's stored classified_type is re-derived — needed for the
+ * type-filtered pwr20_trend_v1 to reach ≥3 same-type rides (Q-008 / SESSION-
+ * CONTEXT #2).
+ *
+ * Both modes replay the recompute-workout chain (compute-workout-analysis →
+ * analyze-cycling-workout) with the service-role token, then re-read and report
+ * classified_type before → after and fact-packet-vs-canonical convergence.
+ *
+ * Usage: node scripts/verify-cycling-vi-if-fix.mjs [--all] [--limit N] [--days N] [--dry-run]
  */
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
@@ -26,7 +33,8 @@ const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !KEY) { console.error('❌ Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY'); process.exit(1); }
 
 const args = process.argv.slice(2);
-const limit = args.includes('--limit') ? parseInt(args[args.indexOf('--limit') + 1]) || 10 : 10;
+const all = args.includes('--all');
+const limit = args.includes('--limit') ? parseInt(args[args.indexOf('--limit') + 1]) || 10 : (all ? 1000 : 10);
 const days = args.includes('--days') ? parseInt(args[args.indexOf('--days') + 1]) || 120 : 120;
 const dryRun = args.includes('--dry-run');
 
@@ -42,7 +50,7 @@ async function fetchRides() {
     .eq('type', 'ride')
     .gte('date', sinceIso)
     .order('date', { ascending: false })
-    .limit(400);
+    .limit(1000);
   if (error) { console.error('❌ query error:', error); process.exit(1); }
   return data || [];
 }
@@ -80,51 +88,68 @@ function printRow(m) {
 }
 
 async function main() {
-  console.log(`🔍 ride workouts, last ${days}d, fact-packet VI/IF vs computed.analysis.power.*\n`);
-  const rows = (await fetchRides()).map(rowMetrics)
-    .filter((m) => m.capVi != null || m.capIf != null) // fix only applies where canonical exists
-    .filter((m) => differs(m.fpVi, m.capVi) || differs(m.fpIf, m.capIf));
+  const modeLabel = all
+    ? 'ALL rides (wide backfill — re-derive every stored classified_type)'
+    : 'discrepancy only (fact-packet VI/IF vs computed.analysis.power.*)';
+  console.log(`🔍 ride workouts, last ${days}d — ${modeLabel}\n`);
 
-  if (rows.length === 0) { console.log('✅ No discrepant rides found — nothing to verify (or already consistent).'); return; }
+  const allRows = (await fetchRides()).map(rowMetrics);
+  const candidates = all
+    ? allRows
+    : allRows
+        .filter((m) => m.capVi != null || m.capIf != null) // fix only applies where canonical exists
+        .filter((m) => differs(m.fpVi, m.capVi) || differs(m.fpIf, m.capIf));
 
-  const target = rows.slice(0, limit);
-  console.log(`Found ${rows.length} discrepant ride(s); verifying ${target.length}:\n`);
-  console.log('BEFORE:'); target.forEach(printRow);
+  if (candidates.length === 0) { console.log('✅ Nothing to process.'); return; }
 
-  if (dryRun) { console.log('\n[DRY RUN] no recompute performed.'); return; }
+  const target = candidates.slice(0, limit);
+  console.log(`Scope: ${allRows.length} ride(s) in window; ${candidates.length} selected; processing ${target.length}.\n`);
+  if (!all) { console.log('BEFORE:'); target.forEach(printRow); console.log(''); }
 
-  console.log('\n♻️  recompute chain (compute-workout-analysis → analyze-cycling-workout)…');
-  for (const m of target) {
-    process.stdout.write(`  ${m.id.slice(0, 8)} … `);
+  if (dryRun) { console.log('[DRY RUN] no recompute performed.'); return; }
+
+  console.log('♻️  recompute chain (compute-workout-analysis → analyze-cycling-workout)…');
+  let ok = 0, fail = 0;
+  for (let i = 0; i < target.length; i++) {
+    const m = target[i];
+    process.stdout.write(`  [${i + 1}/${target.length}] ${m.id.slice(0, 8)} … `);
     try {
       await invoke('compute-workout-analysis', m.id);
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 350));
       await invoke('analyze-cycling-workout', m.id);
-      console.log('done');
-    } catch (e) { console.log(`FAILED: ${e.message}`); }
-    await new Promise((r) => setTimeout(r, 600));
+      ok++; console.log('done');
+    } catch (e) { fail++; console.log(`FAILED: ${e.message}`); }
+    await new Promise((r) => setTimeout(r, 500));
   }
+  console.log(`\nrecompute: ${ok} ok, ${fail} failed.`);
 
-  await new Promise((r) => setTimeout(r, 1500));
-  const afterRows = (await fetchRides()).map(rowMetrics);
-  const byId = new Map(afterRows.map((m) => [m.id, m]));
+  await new Promise((r) => setTimeout(r, 2000));
+  const byId = new Map((await fetchRides()).map(rowMetrics).map((m) => [m.id, m]));
 
-  console.log('\nAFTER:');
-  let allMatch = true;
+  const reclassified = [];
+  let stillDiverge = 0, capChecked = 0, missing = 0;
   for (const before of target) {
     const a = byId.get(before.id);
-    if (!a) { console.log(`  ${before.id.slice(0, 8)} — not found post-recompute`); allMatch = false; continue; }
-    printRow(a);
-    const matched = !differs(a.fpVi, a.capVi) && !differs(a.fpIf, a.capIf);
-    if (!matched) allMatch = false;
-    console.log(
-      `      classified_type: ${before.fpType ?? 'null'} → ${a.fpType ?? 'null'}` +
-      `${before.fpType !== a.fpType ? '  (RECLASSIFIED)' : ''}` +
-      `   fact-packet now ${matched ? 'matches' : 'STILL DIFFERS from'} canonical`
-    );
+    if (!a) { missing++; continue; }
+    if (before.fpType !== a.fpType) {
+      reclassified.push({ id: a.id.slice(0, 8), date: a.date, from: before.fpType ?? 'null', to: a.fpType ?? 'null' });
+    }
+    if (a.capVi != null || a.capIf != null) {
+      capChecked++;
+      if (differs(a.fpVi, a.capVi) || differs(a.fpIf, a.capIf)) stillDiverge++;
+    }
   }
-  console.log(`\n${allMatch ? '✅ All verified rides: fact packet now == computed.analysis.power.*' : '❌ Some rides still diverge — investigate.'}`);
-  process.exit(allMatch ? 0 : 1);
+
+  console.log(`\n── Reclassifications (${reclassified.length}/${target.length}) ──`);
+  for (const r of reclassified) console.log(`  ${r.id}  ${pad(r.date, 11)}  ${pad(r.from, 13)} → ${r.to}`);
+  if (reclassified.length === 0) console.log('  (none — stored types already reflected the current logic)');
+
+  console.log(`\nfact-packet vs canonical: ${capChecked - stillDiverge}/${capChecked} match (${stillDiverge} still diverge)${missing ? `; ${missing} not found post-recompute` : ''}.`);
+  const clean = stillDiverge === 0 && fail === 0 && missing === 0;
+  console.log(clean
+    ? '✅ Backfill complete; all cap-present rides consistent.'
+    : '❌ Investigate: failures / divergence / missing rows above.');
+  process.exit(clean ? 0 : 1);
 }
 
 main().catch((e) => { console.error('❌ Fatal:', e); process.exit(1); });
