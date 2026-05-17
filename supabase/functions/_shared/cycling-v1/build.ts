@@ -90,6 +90,11 @@ export function buildCyclingFactPacketV1(args: {
   powerSamplesW: number[];
   avgPowerW: number | null;
   normalizedPowerW: number | null;
+  // Canonical VI/IF from computed.analysis.power.* (compute-workout-analysis).
+  // When finite, these win over recomputing from NP/avg — see the IF/VI block
+  // below for why.
+  variabilityIndexOverride?: number | null;
+  intensityFactorOverride?: number | null;
   avgHr: number | null;
   maxHr: number | null;
   ftpW: number | null;
@@ -103,6 +108,8 @@ export function buildCyclingFactPacketV1(args: {
     powerSamplesW,
     avgPowerW,
     normalizedPowerW,
+    variabilityIndexOverride,
+    intensityFactorOverride,
     avgHr,
     maxHr,
     ftpW,
@@ -158,8 +165,26 @@ export function buildCyclingFactPacketV1(args: {
   const ftp = coerceNumber(ftpW);
   const np = coerceNumber(normalizedPowerW);
   const ap = coerceNumber(avgPowerW);
-  const intensityFactor = (ftp != null && np != null && ftp > 0) ? (np / ftp) : null;
-  const variabilityIndex = (ap != null && np != null && ap > 0) ? (np / ap) : null;
+
+  // IF/VI: prefer the canonical values from computed.analysis.power.* (the same
+  // source compute-facts:1124 trusts). compute-workout-analysis derives NP/VI/IF
+  // over the full ride sample series; recomputing them here from NP/avg sourced
+  // via the (overall-level-unpopulated) computed.overall.* chain fell through to
+  // provider/device power and disagreed with the analyzer — e.g. Apr-11 ride
+  // 0473be77: analyzer VI 1.53 / IF 0.95 vs fact-packet 1.12 / 0.78, so the
+  // classifier's VI/IF gate reasoned over different numbers than the ride data.
+  // Override wins when finite & positive; otherwise recompute (FTP-missing rides
+  // have no canonical IF — degrade per-metric, not all-or-nothing).
+  const ifOverride = coerceNumber(intensityFactorOverride);
+  const viOverride = coerceNumber(variabilityIndexOverride);
+  const intensityFactor =
+    ifOverride != null && ifOverride > 0
+      ? ifOverride
+      : (ftp != null && np != null && ftp > 0) ? (np / ftp) : null;
+  const variabilityIndex =
+    viOverride != null && viOverride > 0
+      ? viOverride
+      : (ap != null && np != null && ap > 0) ? (np / ap) : null;
 
   const planIntent = normalizePlanIntent(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? null);
   const ftpBins = (ftp != null && ftp > 0) ? computeFtpBinsMinutes({ powerSamplesW, ftpW: ftp }) : null;

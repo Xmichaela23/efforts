@@ -1789,6 +1789,12 @@ Deno.serve(async (req) => {
     })();
     const normalizedPower = (() => {
       const v = Number(
+        // Canonical: compute-workout-analysis's full-series NP. computed.overall.*
+        // is never populated at the overall level (compute-workout-summary writes
+        // power only per-interval/segment) so it always fell through to provider/
+        // device power, which disagreed with the analyzer. analysis.power is the
+        // same source compute-facts:1124 trusts.
+        (workout as any)?.computed?.analysis?.power?.normalized_power ??
         (workout as any)?.computed?.overall?.normalized_power_w ??
         (workout as any)?.computed?.overall?.normalized_power ??
         (workout as any)?.normalized_power ??
@@ -1797,6 +1803,20 @@ Deno.serve(async (req) => {
       );
       if (Number.isFinite(v) && v >= 0) return Math.round(v);
       return calculateNormalizedPower(powerSamples);
+    })();
+
+    // Canonical VI/IF from computed.analysis.power.* — passed straight through to
+    // the fact packet as overrides so the packet (and the classifier's VI/IF
+    // gate) reason over the analyzer's full-series numbers, not a re-derivation
+    // from provider/device avg/NP. Null when the analyzer didn't write them
+    // (e.g. FTP missing at analysis time) → fact packet recomputes per-metric.
+    const canonicalVariabilityIndex = (() => {
+      const v = Number((workout as any)?.computed?.analysis?.power?.variability_index);
+      return Number.isFinite(v) && v > 0 ? v : null;
+    })();
+    const canonicalIntensityFactor = (() => {
+      const v = Number((workout as any)?.computed?.analysis?.power?.intensity_factor);
+      return Number.isFinite(v) && v > 0 ? v : null;
     })();
 
     let trainingLoadContext: any | null = null;
@@ -1839,6 +1859,8 @@ Deno.serve(async (req) => {
       powerSamplesW: powerSamples as number[],
       avgPowerW: avgPower || null,
       normalizedPowerW: normalizedPower || null,
+      variabilityIndexOverride: canonicalVariabilityIndex,
+      intensityFactorOverride: canonicalIntensityFactor,
       avgHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.average_hr ?? (hrAnalysis as any)?.average_heart_rate) : null,
       maxHr: (hrAnalysis as any)?.available ? Number((hrAnalysis as any)?.max_hr ?? (hrAnalysis as any)?.max_heart_rate) : null,
       ftpW,
