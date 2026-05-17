@@ -30,15 +30,33 @@ function normalizePlanIntent(x: any): CyclingIntentV1 | null {
   return (allowed as string[]).includes(k) ? (k as CyclingIntentV1) : null;
 }
 
-function fallbackClassifyIntent(args: {
+export function fallbackClassifyIntent(args: {
   intensityFactor: number | null;
   ftpBinsMin: any | null;
   totalDurationMin: number | null;
+  variabilityIndex: number | null;
+  elevationGainPerMi: number | null;
 }): CyclingIntentV1 {
-  const { intensityFactor, ftpBinsMin, totalDurationMin } = args;
+  const { intensityFactor, ftpBinsMin, totalDurationMin, variabilityIndex, elevationGainPerMi } = args;
   const if0 = coerceNumber(intensityFactor);
   const dur = coerceNumber(totalDurationMin);
   if (if0 == null) return 'unknown';
+
+  // VI gate (audit fix): on a high-variability ride NP ≫ avg power, so IF
+  // (NP/FTP) is inflated by terrain/surges and is NOT a valid structured-
+  // intensity proxy. A steady threshold/vo2 effort has VI ≈ 1.0–1.05; VI ≥ 1.15
+  // means terrain/group/unstructured. Gate floor IF ≥ 0.85 (resolved with
+  // product — the spec's 0.88 conflicted with the IF-0.85 acceptance case;
+  // 0.85 keeps all four cases consistent) so only HARD-looking variable rides
+  // are rerouted (low-IF variable spins still fall through to recovery/
+  // endurance below). Climbing when elevation density ≥ 40 ft/mi, else tempo.
+  // Runs BEFORE the IF-based branches; structured rides (VI < 1.15) are
+  // unaffected and keep the existing logic.
+  const vi = coerceNumber(variabilityIndex);
+  const epm = coerceNumber(elevationGainPerMi);
+  if (vi != null && vi >= 1.15 && if0 >= 0.85) {
+    return (epm != null && epm >= 40) ? 'climbing' : 'tempo';
+  }
 
   // Long endurance heuristic.
   if (dur != null && dur >= 120 && if0 < 0.75) return 'endurance_long';
@@ -145,9 +163,27 @@ export function buildCyclingFactPacketV1(args: {
   const planIntent = normalizePlanIntent(plannedWorkout?.workout_type ?? plannedWorkout?.type ?? null);
   const ftpBins = (ftp != null && ftp > 0) ? computeFtpBinsMinutes({ powerSamplesW, ftpW: ftp }) : null;
 
+  // Elevation density (ft/mi) for the VI gate. Source per spec:
+  // computed.analysis.climbing (climb_ascent_m = grade≥3% ascent over the ride,
+  // metres). m→ft / total ride miles → a climbing-density proxy. NOTE: this is
+  // climb-segment ascent, not total ride gain, so it under-reports vs a raw
+  // total-gain/distance figure on rolling terrain — directionally correct and
+  // the spec-named source; documented.
+  const elevationGainPerMi = (() => {
+    const ascentM = coerceNumber(workout?.computed?.analysis?.climbing?.climb_ascent_m);
+    if (ascentM == null || ascentM <= 0 || distMi == null || distMi <= 0) return null;
+    return (ascentM * 3.28084) / distMi;
+  })();
+
   const classified_type: CyclingIntentV1 =
     planIntent ||
-    fallbackClassifyIntent({ intensityFactor, ftpBinsMin: ftpBins, totalDurationMin: durMin });
+    fallbackClassifyIntent({
+      intensityFactor,
+      ftpBinsMin: ftpBins,
+      totalDurationMin: durMin,
+      variabilityIndex,
+      elevationGainPerMi,
+    });
 
   const executed_intensity = classifyExecutedIntensity({ intensityFactor, ftpBins });
 

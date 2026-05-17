@@ -7,6 +7,7 @@ export type CyclingIntentV1 =
   | 'tempo'
   | 'sweet_spot'
   | 'threshold'
+  | 'climbing'
   | 'vo2'
   | 'anaerobic'
   | 'neuromuscular'
