@@ -101,11 +101,10 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ## Q-008 — Type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill
 
-- **Status:** process question RESOLVED 2026-05-17 (one-off script); residual = run it broadly.
-- **Why it exists:** `pwr20_trend_v1` is filtered to rides whose **stored** `classified_type` matches the current ride's. After the VI-gate classifier change, recomputing one ride re-derives only that ride's type; historical rides keep their stale stored type until they too are re-analyzed. So a single recompute can't reach the ≥3-same-type threshold and the series stays null.
-- **Open question (answered):** one-off script over recent rides, not a triggered job. `scripts/verify-cycling-vi-if-fix.mjs` (committed `fae293e7`) is that script — it replays the full recompute chain (compute-workout-analysis → analyze-cycling-workout) via the service-role token, refreshing each ride's stored `classified_type` as a side effect. Run this session on the 8 VI/IF-discrepant rides (those types are now fresh).
-- **Residual:** the script was run on the discrepancy set, not the athlete's full recent history, so the ≥3-same-type threshold may still be unmet for some types. Re-run with a broader selection (drop the discrepancy filter / widen `--days`) to fully populate the type-filtered trend. No further decision owed.
-- **Cross-ref:** `docs/SESSION-CONTEXT.md` open item #2; D-015 (the underlying VI/IF-source fix this rode in on).
+- **Status:** RESOLVED 2026-05-17 — one-off script, run wide.
+- **Why it existed:** `pwr20_trend_v1` is filtered to rides whose **stored** `classified_type` matches the current ride's. After the VI-gate classifier change, recomputing one ride re-derives only that ride's type; historical rides keep their stale stored type until they too are re-analyzed. So a single recompute can't reach the ≥3-same-type threshold and the series stays null.
+- **Resolution:** one-off script over recent rides (not a triggered job). `scripts/verify-cycling-vi-if-fix.mjs --all` (committed `fae293e7`, `--all` mode `83d07fdb`) replays the full recompute chain via the service-role token, re-deriving every stored `classified_type`. Wide run 2026-05-17 (180 d, 30 rides, 0 failed, 26/26 cap-present consistent): 16 historical rides went `null → type`; post-backfill distribution = recovery 6 / threshold 6 / climbing 6 / endurance 5 / tempo 4 (all ≥3, pwr20-eligible) / vo2 2 / sweet_spot 1, **zero null**. vo2/sweet_spot below 3 only because the athlete logged few such rides — not a backfill gap.
+- **Cross-ref:** `docs/SESSION-CONTEXT.md` open item #2 (closed); D-015 (VI/IF-source) + D-016 (elevation-source), the classifier-input fixes this backfill propagated.
 
 ---
 

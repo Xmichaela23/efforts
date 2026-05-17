@@ -107,7 +107,7 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 - **Symptom:** `pwr20_trend_v1` null on a reclassified ride despite `computed.power_curve['20min']` existing.
 - **Cause:** the series filters historical rides by their **stored** `classified_type`; post-VI-gate, a single recompute re-derives only the current ride — historical rides keep stale stored types until re-analyzed. Not a code defect.
 - **Fix shape:** historical re-analysis backfill across recent rides. See Q-008 / SESSION-CONTEXT open item #2.
-- **Status (2026-05-17):** process/scope decision resolved — one-off script. `scripts/verify-cycling-vi-if-fix.mjs` is the committed backfill mechanism (full recompute chain via service role); it was run on the 8 VI/IF-discrepant rides this session, which also refreshed their stored `classified_type`. Residual: a broader re-analyze pass so ≥3 same-type rides exist per type for the athlete's recent history.
+- **RESOLVED (2026-05-17):** one-off script, run wide. `scripts/verify-cycling-vi-if-fix.mjs --all` (`fae293e7` + `--all` `83d07fdb`) replays the full recompute chain via service role. Wide run: 180 d / 30 rides, 0 failed, 26/26 cap-present consistent; 16 historical `null → type`; post-backfill every ride in-window has a stored type and recovery/threshold/climbing/endurance/tempo each ≥3 (pwr20-eligible). No longer broken; kept here as the data-caveat record (a fresh single recompute still only re-derives one ride — re-run `--all` after future classifier-input changes). See Q-008.
 
 ### #8 race-course segment matching — blocked on GPX dependency
 - **Symptom:** no race-course-relevant tagging on segment history.

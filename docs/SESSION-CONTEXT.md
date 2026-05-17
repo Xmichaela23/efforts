@@ -6,8 +6,9 @@
 
 ## 1. What was built (commit hashes, newest first)
 
-**2026-05-17 (later) — VI-gate elevation source**
+**2026-05-17 (later) — VI-gate elevation source + wide backfill**
 - `bdf2cde2` classifier's elevation-density gate now sources ascent from total `workouts.elevation_gain` (passed as `elevationGainM`), not `computed.analysis.climbing.climb_ascent_m` (grade≥3% climb-segment ascent — under-reported on rolling terrain, straddled the 40 ft/mi gate wrong). `elevation_gain` added to the analyze-cycling-workout workout SELECT; climb_ascent_m kept as fallback. **Supersedes D-011's elevation-source tradeoff → D-016.** `build.test.ts` +3 (86 suite pass). Deployed. Verified: May-10 `60304656` recomputed → `tempo` → `climbing`.
+- `83d07fdb` `scripts/verify-cycling-vi-if-fix.mjs --all` wide-backfill mode. Ran wide (180 d, 30 rides, 0 failed): 16 historical `null → type`, 26/26 cap-present consistent, every in-window ride now has a stored `classified_type` (recovery/threshold/climbing/endurance/tempo each ≥3 → pwr20-eligible). **Closes open item #2 / Q-008.**
 
 **2026-05-17 — fact-packet IF/VI canonical-source fix**
 - `6941a236` cycling fact packet now sources IF/VI from `computed.analysis.power.{intensity_factor,variability_index}` (the source `compute-facts:1124` trusts) instead of recomputing from NP/avg resolved via `computed.overall.*` — which `compute-workout-summary` never writes at the overall level, so it fell through to provider/device power and the classifier's VI/IF gate reasoned over numbers disconnected from the ride. `analyze-cycling-workout` extracts canonical VI/IF + prefers `analysis.power.normalized_power` for NP; `buildCyclingFactPacketV1` takes optional `variabilityIndexOverride`/`intensityFactorOverride` (finite & positive win for facts + classifier + `executed_intensity`, else per-metric recompute). `build.test.ts` added (4 tests); cycling-v1 suite green (83). Deployed `analyze-cycling-workout`.
@@ -61,7 +62,7 @@
 ## 3. Open items (priority order)
 
 1. **avg_hr historical field bug (P1, code defect).** `pwr20`/`np_trend` historical loop reads `r.computed.overall.avg_hr` (frequently null) — should resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`, and add `avg_heart_rate` to the SELECT (`analyze-cycling-workout:2077`). Until fixed, the TREND dashed HR line never draws (≥3-HR-point gate in `TrendSparkline`).
-2. **pwr20 type-filter backfill (P1, process — mechanism shipped).** Type-filtered `pwr20_trend_v1` can't populate from a single recompute — historical rides keep stale stored `classified_type`. The backfill script now exists (`scripts/verify-cycling-vi-if-fix.mjs`, `fae293e7`) and was run on the 8 VI/IF-discrepant rides this session. **Residual:** run it broadly (drop the discrepancy filter / widen `--days`) so ≥3 same-type rides exist per type for the athlete's recent history. No code defect; no decision owed.
+2. **pwr20 type-filter backfill — ✅ RESOLVED 2026-05-17.** `scripts/verify-cycling-vi-if-fix.mjs --all` (`83d07fdb`) run wide (180 d, 30 rides, 0 failed): every in-window ride now has a stored `classified_type`; recovery/threshold/climbing/endurance/tempo each ≥3 (pwr20-eligible). Re-run `--all` after any future classifier-input change. See Q-008.
 3. **#8 race-course segment matching (P2, blocked).** Needs course-segment geometry from race-course GPX (Data-Dependency ❌); not in the unblock decisions. `cycling_segment_history.race_course_relevant` hook is in place.
 4. **#9 remainder (P3).** Power-curve-trend + HR-at-power-trend into Arc/snapshot (the non-CTL slice of #9).
 5. **#10 / #11 (deferred — product).** Segment leaderboards; W′ depletion modelling.

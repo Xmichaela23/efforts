@@ -232,7 +232,7 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 
 ### Open
 - [ ] **P1** historical `avg_hr` resolves null → TREND HR line never draws (fix-ready; Q-007, SESSION-CONTEXT #1)
-- [~] **P1** type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill (Q-008, SESSION-CONTEXT #2) — backfill mechanism shipped (`scripts/verify-cycling-vi-if-fix.mjs`, `fae293e7`) and run on the 8 VI/IF-discrepant rides; residual = run it broadly across recent rides so ≥3 same-type exist per type
+- [x] type-filtered `pwr20_trend_v1` historical re-analysis backfill (Q-008, SESSION-CONTEXT #2) — `scripts/verify-cycling-vi-if-fix.mjs --all` (`fae293e7` + `--all` `83d07fdb`) run wide 2026-05-17 (180 d, 30 rides, 0 failed): every in-window ride now has a stored `classified_type`; recovery/threshold/climbing/endurance/tempo each ≥3 (pwr20-eligible)
 - [ ] **P2** #8 race-course matching — blocked on GPX geometry / product decision (Q-009)
 - [ ] **P3** #9 remainder — power-curve-trend + HR-at-power-trend into Arc/snapshot
 - [ ] deferred (product): #10 segment leaderboards, #11 W′ depletion modelling
