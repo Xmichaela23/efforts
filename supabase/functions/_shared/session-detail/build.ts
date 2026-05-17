@@ -1157,8 +1157,11 @@ function buildAnalysisDetailRows(
     }
   } catch { /* */ }
 
-  // Power zones: ftp_bins is minutes per %-FTP band (CyclingFtpBinsV1). Show the
-  // non-zero bands, biggest first, capped at 4 so the row stays scannable.
+  // Power zones: ftp_bins is minutes per %-FTP band (CyclingFtpBinsV1). Show
+  // meaningful bands (>2 min) biggest-first and roll the small remainder into
+  // "+Xm other" so the displayed total accounts for the FULL ride duration.
+  // (Was capped at top-4, which silently dropped whole zones — the row's total
+  // then didn't match ride time, which read as misleading.)
   try {
     if (sport === 'ride') {
       const bins = (factPacket?.derived?.ftp_bins || null) as Record<string, number> | null;
@@ -1172,12 +1175,20 @@ function buildAnalysisDetailRows(
           p1_05_1_20_min: 'VO2',
           gt_1_20_min: 'Anaerobic',
         };
-        const segs = Object.keys(label)
+        const nonZero = Object.keys(label)
           .map((k) => ({ name: label[k], min: Math.round(Number(bins[k]) || 0) }))
           .filter((s) => s.min > 0)
-          .sort((a, b) => b.min - a.min)
-          .slice(0, 4)
-          .map((s) => `${s.name} ${s.min}m`);
+          .sort((a, b) => b.min - a.min);
+        // Bands >2 min shown individually; the rest (≤2 min) aggregate into
+        // "+Xm other" so nothing is dropped and the total ≈ ride duration. If
+        // no band clears 2 min (tiny / evenly split ride), show all non-zero.
+        const majors = nonZero.filter((s) => s.min > 2);
+        const shown = majors.length > 0 ? majors : nonZero;
+        const otherMin = nonZero
+          .filter((s) => !shown.includes(s))
+          .reduce((sum, s) => sum + s.min, 0);
+        const segs = shown.map((s) => `${s.name} ${s.min}m`);
+        if (otherMin > 0) segs.push(`+${otherMin}m other`);
         if (segs.length > 0) rows.push({ label: 'Power zones', value: segs.join(' · ') });
       }
     }
