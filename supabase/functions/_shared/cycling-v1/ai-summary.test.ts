@@ -8,7 +8,7 @@
  *   deno test supabase/functions/_shared/cycling-v1/ai-summary.test.ts --no-check
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { arcNumericAllowList, cyclingCrossWorkoutDisplay, validateNoNewNumbers } from './ai-summary.ts';
+import { arcNumericAllowList, cyclingCrossWorkoutDisplay, ledeOpensWithArcFrame, validateNoNewNumbers } from './ai-summary.ts';
 
 // ── Arc temporal context: numeric allow-list (so Arc citations aren't rejected) ──
 
@@ -69,6 +69,22 @@ Deno.test('validator: a genuine new number is still rejected', () => {
 Deno.test('validator: trivial token "1" is skipped (matches running)', () => {
   const packet = JSON.stringify({ power: { np: '187 W' } });
   assertEquals(validateNoNewNumbers('This was the 1 standout effort.', packet).ok, true);
+});
+
+Deno.test('lede guard: Arc/recovery/taper/fatigue opener (no power token) → violation', () => {
+  // The 60304656 case — opens with race-timing, power number comes later.
+  assertEquals(ledeOpensWithArcFrame("You're three weeks out from Ojai Marathon, and this 90-minute climbing ride landed at 189W NP."), true);
+  assertEquals(ledeOpensWithArcFrame('You are sitting in a taper phase — this climbing ride held 185W.'), true);
+  assertEquals(ledeOpensWithArcFrame('Recovery phase carrying high fatigue from 14 consecutive training days, so today was easy.'), true);
+  assertEquals(ledeOpensWithArcFrame('Seven days into recovery from the Ojai Marathon, you spun easy.'), true);
+});
+
+Deno.test('lede guard: power/fitness opener → OK (incl. Arc as trailing clause)', () => {
+  assertEquals(ledeOpensWithArcFrame('Your normalized power of 134W sits 46W above your 12-ride average.'), false);
+  assertEquals(ledeOpensWithArcFrame('At 84W NP over 57 minutes, this was a true recovery spin.'), false);
+  assertEquals(ledeOpensWithArcFrame('Your 20-min power dropped 8W across your last four threshold rides.'), false);
+  // Power lede, Arc correctly demoted to the trailing clause — must NOT flag.
+  assertEquals(ledeOpensWithArcFrame('You set a new 5-min best of 224W on this climbing ride, seven days into recovery from the Ojai Marathon.'), false);
 });
 
 Deno.test('validator: decimals and percentages substring-match the packet', () => {

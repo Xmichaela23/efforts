@@ -17,6 +17,21 @@ export function arcNumericAllowList(
   return '\n' + arcNarrativeFactBlock(arcNarrative) + '\n' + JSON.stringify(arcNarrative);
 }
 
+/**
+ * Lede guard (Issue 2): a cycling summary's first clause must center on a
+ * power/fitness signal from THIS ride — NOT Arc/temporal/recovery/taper/load
+ * framing — even when the shared arcModeSystemAddon (system prompt) demands a
+ * comeback-frame open. Returns true when the opening clause leads with that
+ * framing and carries no power token → a violation to correct on retry.
+ * Exported for unit testing.
+ */
+export function ledeOpensWithArcFrame(summary: string): boolean {
+  const opener = String(summary || '').split(/[—,.;:]/)[0] || '';
+  const arcLead = /\b(days?|weeks?|months?)\s+(out|since|into|after)\b|recovery (from|phase|week)|taper|comeback|re-entry|bridging|consecutive (training )?days|combined load|carrying (high |elevated )?fatigue|sitting (in|at)\b|out from (the )?\w/i;
+  const powerTok = /\d\s*W\b|\bNP\b|\bIF\b|\bPR\b|\bFTP\b|watt|above your|below your|\bup\s+\d|\bdown\s+\d|best (of|in)\b/i;
+  return arcLead.test(opener) && !powerTok.test(opener);
+}
+
 function normalizeParagraph(s: string): string {
   // Strip markdown the LLM sometimes emits (e.g. **bold**) — it renders as
   // literal asterisks in the UI. Mirrors the syntax strips in the codebase's
@@ -294,22 +309,38 @@ ${packetStr}
     return text ? normalizeParagraph(text) : null;
   };
 
-  // 2 attempts with numeric-token validation (allow-list includes Arc numbers).
+  // 2 attempts. Validators: numeric-token drift (allow-list includes Arc
+  // numbers) AND the lede guard (sentence one must open on a power/fitness
+  // signal, not Arc/recovery/taper/fatigue framing — deterministic backstop
+  // for the prompt rule since the shared arcModeSystemAddon pushes the other
+  // way). Both corrections are folded into the single retry.
   const s1 = await attempt(userBase);
   if (!s1) return null;
   const v1 = validateNoNewNumbers(s1, allowStr);
-  if (v1.ok) return s1;
+  const lede1 = ledeOpensWithArcFrame(s1);
+  if (v1.ok && !lede1) return s1;
 
+  const corrections: string[] = [];
+  if (!v1.ok) {
+    corrections.push(
+      `used numbers not present in the packet (${v1.bad.join(', ')}); rewrite using ONLY numbers that appear in the packet or the TEMPORAL ARC CONTEXT`,
+    );
+  }
+  if (lede1) {
+    corrections.push(
+      "opened with race-timing / recovery / taper / fatigue framing; the FIRST words of sentence one MUST be a power/fitness signal from THIS ride (a PR, the vs-similar Xw delta, the power trend, or this ride's NP/IF) — move any Arc/temporal context to a trailing clause in sentence two",
+    );
+  }
   const s2 = await attempt(
-    userBase +
-      `\n\nYour previous output used numbers not present in the packet: ${v1.bad.join(', ')}. Rewrite using ONLY numbers that appear in the packet or the TEMPORAL ARC CONTEXT.`,
+    userBase + `\n\nYour previous output ${corrections.join('; AND it ')}. Keep it to 2 sentences.`,
   );
   if (!s2) return null;
-  // Soft-accept: numeric drift is the ONLY cycling validator (no hard HR /
-  // athlete-contradiction / RPE checks like running has). Returning null here
-  // discards an otherwise-grounded paragraph and falls back to flag/template
-  // text — strictly worse. Running's generateAISummaryV1 returns attempt 2
-  // unless a *hard* validator fails; cycling has none, so attempt 2 is accepted.
+  // Soft-accept: cycling's validators (numeric drift + lede guard) are
+  // retry-corrected then accepted — neither is a hard reject. Returning null
+  // here discards an otherwise-grounded paragraph and falls back to flag/
+  // template text — strictly worse. Running's generateAISummaryV1 returns
+  // attempt 2 unless a *hard* validator fails; cycling has none, so attempt
+  // 2 is accepted (the retry instruction fixes the stubborn lede in practice).
   return s2;
 }
 
