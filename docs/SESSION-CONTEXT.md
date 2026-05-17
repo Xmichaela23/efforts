@@ -1,10 +1,14 @@
 # Session Context — Cycling Analysis Build (handoff)
 
-**Last updated:** 2026-05-16. **Scope:** the cycling-analysis arc — running→cycling parity, intent-aware analysis, segment intelligence, Arc integration. This is the live handoff doc; pair with `docs/CYCLING-ANALYSIS-DESIGN.md` (the work order) and `docs/RUNNING-CYCLING-DELTA.md` (the upstream 31-item delta).
+**Last updated:** 2026-05-17. **Scope:** the cycling-analysis arc — running→cycling parity, intent-aware analysis, segment intelligence, Arc integration. This is the live handoff doc; pair with `docs/CYCLING-ANALYSIS-DESIGN.md` (the work order) and `docs/RUNNING-CYCLING-DELTA.md` (the upstream 31-item delta).
 
 ---
 
 ## 1. What was built (commit hashes, newest first)
+
+**2026-05-17 — fact-packet IF/VI canonical-source fix**
+- `6941a236` cycling fact packet now sources IF/VI from `computed.analysis.power.{intensity_factor,variability_index}` (the source `compute-facts:1124` trusts) instead of recomputing from NP/avg resolved via `computed.overall.*` — which `compute-workout-summary` never writes at the overall level, so it fell through to provider/device power and the classifier's VI/IF gate reasoned over numbers disconnected from the ride. `analyze-cycling-workout` extracts canonical VI/IF + prefers `analysis.power.normalized_power` for NP; `buildCyclingFactPacketV1` takes optional `variabilityIndexOverride`/`intensityFactorOverride` (finite & positive win for facts + classifier + `executed_intensity`, else per-metric recompute). `build.test.ts` added (4 tests); cycling-v1 suite green (83). Deployed `analyze-cycling-workout`.
+- `fae293e7` `scripts/verify-cycling-vi-if-fix.mjs` — selects rides by the actual fact-packet-vs-canonical divergence, replays the recompute chain via service role, asserts convergence. Doubles as the Q-008 / item-#2 backfill. Verified run: 8 affected rides (120 d) all reconverged to exact match; `60304656` vo2→tempo, `4375a709` endurance_long→threshold reclassified. (Decision D-015.)
 
 **2026-05-16 — design Build Order + classifier + display polish**
 - `a739961f` distance/duration/temperature on the cycling Performance tab — stat line above INSIGHTS + `· {N}°F` on TERRAIN (contract extension: `session_detail_v1.weather`).
@@ -46,7 +50,7 @@
 - **Arc context** — bike side now non-trivial: `ArcContext.cycling_fitness {ctl,atl,tsb,form}` derived from snapshot columns (`f2cb068c`); `arc_narrative_context` threaded into cycling+strength analyzers (`e5c695a6`); fitness also surfaced into the per-workout INSIGHTS narrative (`66dad9d9`). Power-curve-trend / HR-at-power-trend into Arc are NOT wired (deferred slice of #9).
 - **Cycling pipeline** — full running parity for Performance tab: Insights (LLM, arc-aware), TREND (mode-aware, type-filtered, dual pace+HR line), EFFICIENCY, CLIMBING (VAM), POWER ZONES, PACING, TERRAIN (elev + temp), vs-similar, stat line (dist/dur/temp). NP/IF/TSS/efficiency/VAM all in `computed.analysis.*`.
 - **Segment history** — `cycling_segment_history` table created (migration applied via SQL editor, confirmed). analyze-cycling-workout non-fatally upserts Strava `segment_efforts` + Garmin synthetic climbs. **Cross-ride trending/race-course matching NOT built** (#8 blocked).
-- **Classifier** — `fallbackClassifyIntent` now has a VI gate (VI≥1.10 ∧ IF≥0.85 → `climbing` if ≥40 ft/mi else `tempo`) ahead of the IF branches; `'climbing'` added to `CyclingIntentV1`. Plan-linked rides still use `plan_intent`.
+- **Classifier** — `fallbackClassifyIntent` now has a VI gate (VI≥1.10 ∧ IF≥0.85 → `climbing` if ≥40 ft/mi else `tempo`) ahead of the IF branches; `'climbing'` added to `CyclingIntentV1`. Plan-linked rides still use `plan_intent`. **The VI/IF the gate reads are now the canonical `computed.analysis.power.*` values (D-015), not a fact-packet recompute** — pre-2026-05-17 stored classifications were gated on provider/device power and are only corrected on re-analyze.
 - **CTL/ATL/TSB** — PMC model (`computeCtlAtl`, 42d/7d EWMA) in `ride-physiology.ts`; per-ride `workout_analysis.fitness_v1`; mirrored into `athlete_snapshot.{ctl,atl,tsb}` (guarded write) and `ArcContext.cycling_fitness`. Migration applied.
 
 ---
@@ -54,7 +58,7 @@
 ## 3. Open items (priority order)
 
 1. **avg_hr historical field bug (P1, code defect).** `pwr20`/`np_trend` historical loop reads `r.computed.overall.avg_hr` (frequently null) — should resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`, and add `avg_heart_rate` to the SELECT (`analyze-cycling-workout:2077`). Until fixed, the TREND dashed HR line never draws (≥3-HR-point gate in `TrendSparkline`).
-2. **pwr20 type-filter backfill (P1, process).** Type-filtered `pwr20_trend_v1` can't populate from a single recompute — historical rides keep stale stored `classified_type`. Needs a re-analyze backfill across recent rides so their stored type reflects the VI gate. No code defect; a backfill script/run.
+2. **pwr20 type-filter backfill (P1, process — mechanism shipped).** Type-filtered `pwr20_trend_v1` can't populate from a single recompute — historical rides keep stale stored `classified_type`. The backfill script now exists (`scripts/verify-cycling-vi-if-fix.mjs`, `fae293e7`) and was run on the 8 VI/IF-discrepant rides this session. **Residual:** run it broadly (drop the discrepancy filter / widen `--days`) so ≥3 same-type rides exist per type for the athlete's recent history. No code defect; no decision owed.
 3. **#8 race-course segment matching (P2, blocked).** Needs course-segment geometry from race-course GPX (Data-Dependency ❌); not in the unblock decisions. `cycling_segment_history.race_course_relevant` hook is in place.
 4. **#9 remainder (P3).** Power-curve-trend + HR-at-power-trend into Arc/snapshot (the non-CTL slice of #9).
 5. **#10 / #11 (deferred — product).** Segment leaderboards; W′ depletion modelling.
@@ -94,6 +98,7 @@
 ## 7. Footguns & gotchas
 
 - **`normalized_power` vs `normalized_power_w`** — canonical ride NP is `computed.analysis.power.normalized_power` per `compute-facts:1124`; the `_w` vs non-`_w` divergence has bitten the trend resolver 3×. Use `rideComputedNp` (the established resolver).
+- **`computed.overall.*` has no overall power for rides** — `compute-workout-summary` writes `avg_power_w`/`normalized_power_w` only per-interval/segment, never on the `computed.overall` object. Any resolver that leads with `computed.overall.normalized_power_w ?? computed.overall.avg_power_w` silently falls through to provider/device fields. This caused the fact-packet IF/VI bug (D-015); fact-packet IF/VI now come from `computed.analysis.power.*` overrides. Don't reintroduce a `computed.overall.*`-first power resolver.
 - **SELECT-projection bugs** — repeatedly, code reads a column the query didn't fetch (`achievements`, `np_trend`, now `avg_heart_rate`). When adding a field read in analyze-cycling-workout's cross-workout loop, **check the `.select(...)` includes it**. PostgREST 400s the *entire* query if any selected column is unknown.
 - **`Number(null) === 0`** — guard `x == null` BEFORE `Number(x)`/`Number.isFinite` (bit `vs_similar.np_delta_w`, `aerobic_decoupling_pct`, classifier null-IF).
 - **classified_type location** — canonical is `workout_analysis.fact_packet_v1.facts.classified_type`; top-level `workout_analysis.classified_type` is the scrub-affected fallback; NOT in `computed`.

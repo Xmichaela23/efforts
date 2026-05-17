@@ -2,7 +2,7 @@
 
 A current snapshot of what's load-bearing, what's known broken, and what's believed-working but unverified. Read this BEFORE proposing changes — most "obvious" bugs were either already fixed (don't re-litigate), already filed (don't re-discover), or intentionally left in place (don't "fix").
 
-Last updated: 2026-05-13.
+Last updated: 2026-05-17.
 
 ---
 
@@ -54,6 +54,12 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **Verification:** `docs/SESSION-CONTEXT.md` §6 checklist.
 - **Decision:** D-011..D-014.
 
+### Cycling fact-packet IF/VI sourced from canonical `computed.analysis.power.*`
+- **Files:** `analyze-cycling-workout/index.ts:~1790` (NP resolver now prefers `computed.analysis.power.normalized_power`; new canonical VI/IF extraction passed as overrides), `_shared/cycling-v1/build.ts` (`buildCyclingFactPacketV1` optional `variabilityIndexOverride`/`intensityFactorOverride` — finite & positive overrides win for `facts`, the classifier gate, and `executed_intensity`, else per-metric recompute). Commits `6941a236` (fix) + `fae293e7` (verify/backfill script), 2026-05-17.
+- **Behavior:** the packet previously recomputed IF (NP/FTP) and VI (NP/avg) from NP/avg resolved via `computed.overall.*` — which `compute-workout-summary` never writes at the overall level (power is written only per-interval/segment), so it fell through to provider/device power and disagreed with the analyzer. IF/VI now come from `computed.analysis.power.{intensity_factor,variability_index}` (the source `compute-facts:1124` trusts); the classifier's VI≥1.10 ∧ IF≥0.85 gate and downstream TSS/executed_intensity reason over the analyzer's full-series numbers.
+- **Verification:** `scripts/verify-cycling-vi-if-fix.mjs` selects rides by the actual fact-packet-vs-canonical divergence and replays the recompute chain. Verified run 2026-05-17: 8 affected rides (120 d), all converged to exact match; `60304656` vo2→tempo and `4375a709` endurance_long→threshold reclassified on the corrected numbers. `_shared/cycling-v1/build.test.ts` (4 tests) + full cycling-v1 suite green (83 pass).
+- **Decision:** see D-015.
+
 ---
 
 ## Known broken (filed, not blocking)
@@ -95,7 +101,7 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 - **Symptom:** `pwr20_trend_v1` null on a reclassified ride despite `computed.power_curve['20min']` existing.
 - **Cause:** the series filters historical rides by their **stored** `classified_type`; post-VI-gate, a single recompute re-derives only the current ride — historical rides keep stale stored types until re-analyzed. Not a code defect.
 - **Fix shape:** historical re-analysis backfill across recent rides. See Q-008 / SESSION-CONTEXT open item #2.
-- **Why deferred:** process/scope decision owed (one-off script vs triggered job).
+- **Status (2026-05-17):** process/scope decision resolved — one-off script. `scripts/verify-cycling-vi-if-fix.mjs` is the committed backfill mechanism (full recompute chain via service role); it was run on the 8 VI/IF-discrepant rides this session, which also refreshed their stored `classified_type`. Residual: a broader re-analyze pass so ≥3 same-type rides exist per type for the athlete's recent history.
 
 ### #8 race-course segment matching — blocked on GPX dependency
 - **Symptom:** no race-course-relevant tagging on segment history.

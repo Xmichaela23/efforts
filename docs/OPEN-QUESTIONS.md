@@ -101,10 +101,11 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ## Q-008 — Type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill
 
-- **Status:** deferred (process, not a code defect) — needs an eng/product call.
+- **Status:** process question RESOLVED 2026-05-17 (one-off script); residual = run it broadly.
 - **Why it exists:** `pwr20_trend_v1` is filtered to rides whose **stored** `classified_type` matches the current ride's. After the VI-gate classifier change, recomputing one ride re-derives only that ride's type; historical rides keep their stale stored type until they too are re-analyzed. So a single recompute can't reach the ≥3-same-type threshold and the series stays null.
-- **Open question:** should the backfill be a one-off script over recent rides, or a triggered re-analysis job? No code change resolves it without that decision.
-- **Cross-ref:** `docs/SESSION-CONTEXT.md` open item #2.
+- **Open question (answered):** one-off script over recent rides, not a triggered job. `scripts/verify-cycling-vi-if-fix.mjs` (committed `fae293e7`) is that script — it replays the full recompute chain (compute-workout-analysis → analyze-cycling-workout) via the service-role token, refreshing each ride's stored `classified_type` as a side effect. Run this session on the 8 VI/IF-discrepant rides (those types are now fresh).
+- **Residual:** the script was run on the discrepancy set, not the athlete's full recent history, so the ≥3-same-type threshold may still be unmet for some types. Re-run with a broader selection (drop the discrepancy filter / widen `--days`) to fully populate the type-filtered trend. No further decision owed.
+- **Cross-ref:** `docs/SESSION-CONTEXT.md` open item #2; D-015 (the underlying VI/IF-source fix this rode in on).
 
 ---
 

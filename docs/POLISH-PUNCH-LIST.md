@@ -2,7 +2,7 @@
 
 Tracking the work to get the app from "engine works" to "every flow ships clean." No new features past this point. Only finish what's started.
 
-Last updated: May 11, 2026 (eod — Theme A shipped)
+Last updated: May 17, 2026 (cycling fact-packet IF/VI canonical-source fix)
 
 ---
 
@@ -227,10 +227,11 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 - [x] TREND type-filter by classified_type — `04eb2b52`
 - [x] VI-gate ride classifier + `'climbing'` type — `d6832a6b`/`fd16ef5a`
 - [x] dist/dur/temp stat line + TERRAIN temp — `a739961f`
+- [x] fact-packet IF/VI from canonical `computed.analysis.power.*` (was recomputing off unpopulated `computed.overall.*` → provider/device power; classifier gated on wrong numbers) — `6941a236` + verify/backfill script `fae293e7` (2026-05-17). Verified: 8 affected rides reconverged; 2 reclassified. See D-015 / ENGINE-STATE Solid.
 
 ### Open
 - [ ] **P1** historical `avg_hr` resolves null → TREND HR line never draws (fix-ready; Q-007, SESSION-CONTEXT #1)
-- [ ] **P1** type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill (Q-008, SESSION-CONTEXT #2)
+- [~] **P1** type-filtered `pwr20_trend_v1` needs a historical re-analysis backfill (Q-008, SESSION-CONTEXT #2) — backfill mechanism shipped (`scripts/verify-cycling-vi-if-fix.mjs`, `fae293e7`) and run on the 8 VI/IF-discrepant rides; residual = run it broadly across recent rides so ≥3 same-type exist per type
 - [ ] **P2** #8 race-course matching — blocked on GPX geometry / product decision (Q-009)
 - [ ] **P3** #9 remainder — power-curve-trend + HR-at-power-trend into Arc/snapshot
 - [ ] deferred (product): #10 segment leaderboards, #11 W′ depletion modelling
