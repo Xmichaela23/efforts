@@ -901,7 +901,21 @@ function backfillTriTrainingPrefsDefenseInDepth(
     }
   }
 
+  // #131 / Bugs 1&2: `optimal.preferred_days.strength` is ALWAYS engine-chosen
+  // placement (the wizard pin enters the optimizer as an INPUT preference, not
+  // as this output key; pinRestore above never touches strength). Persisting it
+  // in `preferred_days` made engine defaults surface as "Athlete preference".
+  // Engine strength now travels only via `strength_optimizer_slots` (labeled
+  // "scheduled by app" in the export). A genuine wizard pin lives separately in
+  // `trainingPrefs.strength_preferred_days` and is unaffected.
+  const engineStrengthSlots = (merged as Record<string, unknown>).strength;
+  delete (merged as Record<string, unknown>).strength;
   trainingPrefs.preferred_days = merged;
+  if (Array.isArray(engineStrengthSlots) && engineStrengthSlots.length > 0) {
+    trainingPrefs.strength_optimizer_slots = engineStrengthSlots;
+  } else {
+    delete (trainingPrefs as Record<string, unknown>).strength_optimizer_slots;
+  }
   if (used_co_equal_1x_fallback) {
     trainingPrefs.co_equal_strength_provisional_1x = true;
     notes.push('co_equal_strength_provisional_1x=true (optimizer 1× recovery week)');

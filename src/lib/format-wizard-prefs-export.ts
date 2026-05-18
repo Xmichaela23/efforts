@@ -219,6 +219,7 @@ const KEY_ORDER = [
   'strength_frequency',
   'preferred_days',
   'strength_preferred_days',
+  'strength_optimizer_slots',
   'prior_similar_race',
   'swim_intent',
   'swim_experience',
@@ -328,6 +329,18 @@ export function formatWizardPrefsMarkdownLines(goal: {
       if (sub.length) {
         out.push(`- **Preferred days:**`);
         sub.forEach((l) => out.push(l));
+      }
+      continue;
+    }
+    // #131 / Bugs 1&2: engine-CHOSEN strength placement (the optimizer scheduled
+    // these — the athlete did NOT pin them). Surfaced under its own label so it
+    // is never confused with an athlete preference. A genuine wizard strength
+    // pin (rare) still renders via `strength_preferred_days` as "Strength:".
+    if (key === 'strength_optimizer_slots') {
+      used.add(key);
+      if (Array.isArray(val)) {
+        const parts = val.map((x) => formatStrengthOrDayToken(x)).filter(Boolean);
+        if (parts.length) out.push(`- **Strength (scheduled by app):** ${parts.join(', ')}`);
       }
       continue;
     }

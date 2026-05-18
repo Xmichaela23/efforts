@@ -60,21 +60,48 @@ Deno.test('Bug 2: only user-pinned days surface when individual pin fields are s
   assert(!lines.some((l) => /\*\*Strength:/i.test(l)), `expected engine-derived strength suppressed — got ${JSON.stringify(lines)}`);
 });
 
-Deno.test('Bug 2: strength surfaced when strength_preferred_days is set', () => {
+Deno.test('Bugs 1&2 (#131): engine-chosen strength → "scheduled by app", NOT a preference', () => {
+  // Post-fix shape: reconcile:276 no longer writes strength into the pin field,
+  // create-goal:904 strips engine `preferred_days.strength` and persists
+  // `strength_optimizer_slots`. So an engine-scheduled goal has the slots but
+  // NO strength_preferred_days and NO preferred_days.strength.
+  const out = formatWizardPrefsMarkdownLines({
+    sport: 'triathlon',
+    training_prefs: {
+      strength_optimizer_slots: [
+        { weekday: 'wednesday', kind: 'lower_body_strength' },
+        { weekday: 'friday', kind: 'upper_body_strength' },
+      ],
+      preferred_days: { long_run: 'sunday' }, // engine strength stripped upstream
+    },
+  });
+  // Engine placement surfaces under its own label, top-level (not "Preferred days").
+  assert(
+    out.some((l) => /Strength \(scheduled by app\):.*wednesday \(lower body\).*friday \(upper body\)/i.test(l)),
+    `expected "scheduled by app" line — got ${JSON.stringify(out)}`,
+  );
+  // It must NOT masquerade as an athlete preference.
+  assert(!out.some((l) => /^- \*\*Strength:\*\*/i.test(l)), `engine strength must not show as "Strength:" — got ${JSON.stringify(out)}`);
+  assert(
+    !preferredDaysLines(out).some((l) => /Strength/i.test(l)),
+    `engine strength must not appear under "Preferred days" — got ${JSON.stringify(preferredDaysLines(out))}`,
+  );
+});
+
+Deno.test('Bug 2 (#131): a GENUINE wizard strength pin still surfaces as an athlete choice', () => {
+  // strength_preferred_days set by the wizard, no optimizer slots → real pin.
   const out = formatWizardPrefsMarkdownLines({
     sport: 'triathlon',
     training_prefs: {
       strength_preferred_days: ['monday', 'thursday'],
-      preferred_days: {
-        long_run: 'sunday',
-        strength: [{ weekday: 'monday', kind: 'upper_body_strength' }, { weekday: 'thursday', kind: 'lower_body_strength' }],
-      },
     },
   });
-  const lines = preferredDaysLines(out);
-  assert(lines.some((l) => /Strength:.*monday \(upper body\)/i.test(l)), `expected strength kept — got ${JSON.stringify(lines)}`);
-  // long_run has no corresponding long_run_day pin → suppressed (engine-derived).
-  assert(!lines.some((l) => /Long Run:/i.test(l)), `expected long_run suppressed (no long_run_day pin) — got ${JSON.stringify(lines)}`);
+  assert(
+    out.some((l) => /Strength Preferred Days:.*monday.*thursday/i.test(l)),
+    `expected genuine wizard pin surfaced — got ${JSON.stringify(out)}`,
+  );
+  // Not relabeled as engine-scheduled.
+  assert(!out.some((l) => /scheduled by app/i.test(l)), `genuine pin must not be "scheduled by app" — got ${JSON.stringify(out)}`);
 });
 
 Deno.test('Bug 2: swim surfaced when any swim_*_day is set', () => {

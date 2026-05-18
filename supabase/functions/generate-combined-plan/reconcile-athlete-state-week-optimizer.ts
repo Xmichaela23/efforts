@@ -273,7 +273,12 @@ export function reconcileAthleteStateWithWeekOptimizer(state: AthleteState): Ath
     ...(pd.swim?.[0] != null ? { swim_easy_day: dayNameToSunIndex(pd.swim[0]) } : {}),
     ...(pd.swim?.[1] != null ? { swim_quality_day: dayNameToSunIndex(pd.swim[1]) } : {}),
     ...(pd.swim?.[2] != null ? { swim_third_day: dayNameToSunIndex(pd.swim[2]) } : {}),
-    ...(strength_slots.length ? { strength_preferred_days: strength_slots.map((s) => s.weekday) } : {}),
+    // #131 / Bugs 1&2: do NOT write engine-chosen strength days into
+    // `strength_preferred_days` — that field is the genuine WIZARD pin
+    // (carried in via `...state`; sourced at :86/175/195). Engine placement
+    // lives ONLY in `strength_optimizer_slots` (:266). Conflating them made
+    // engine defaults surface as "Athlete preference" in plan exports and
+    // emitted incoherent "preferred day rejected" trade-offs.
     ...(used_co_equal_1x_fallback ? { strength_sessions_cap: 1 } : {}),
     ...(strength_slots.length >= 2 ? { strength_intent: 'performance' } : {}),
   };
