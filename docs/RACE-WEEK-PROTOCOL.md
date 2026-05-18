@@ -1,6 +1,6 @@
 # RACE-WEEK PROTOCOL
 
-> **Status: AUDIT-DERIVED DRAFT — 2026-05-18.** Sections 1–4 are the *verified current contract* (cited file:line, read-only audit). Sections 5–11 enumerate **GAPS** and the **DECISIONS NEEDED** before any code. This doc is written *before* code per `docs/POLISH-PUNCH-LIST.md` "Race-week protocol audit". Nothing here changes behavior yet.
+> **Status: DECISIONS RESOLVED — 2026-05-18.** Sections 1–4 are the *verified current contract* (cited file:line, read-only audit). §5 lists the contract gaps; **§8 is the now-prescriptive resolved spec** (product-owner decisions locked 2026-05-18). Implementation plan follows separately — **doc before code, no code until that plan is reviewed.** Nothing here changes behavior yet.
 
 ---
 
@@ -29,8 +29,8 @@ The **race-week**, **taper-into-race transition**, and **post-race handoff** for
 ## 1. Definitions & ground truth
 
 - **Race week** — the plan week `W` such that some `RaceAnchor.planWeek === W` (`week-builder.ts:602`). Currently the only race-week predicate in the generation engine.
-- **A-race** — the primary goal (`Priority A`); the macrocycle terminates on its race day.
-- **B-race** — a chronologically-earlier secondary race; the plan recovers and rebuilds *through* it toward the A-race.
+- **A-race** — the primary goal (`Priority A`); the macrocycle terminates on its race day. **Protected above everything else.**
+- **B-race** — a chronologically-earlier secondary race; the plan recovers and rebuilds *through* it toward the A-race. Treated as a hard training day the athlete races.
 
 ### 1.1 Reference-plan ground truth (do not re-derive from memory)
 For the two-70.3 reference plan (Santa Cruz = **A-race**, Northern California/Redding = **B-race**, plan start 2026-05-18), realized in `~/Downloads/…multi-sport-plan (48).md` and `(73).md`:
@@ -43,7 +43,7 @@ For the two-70.3 reference plan (Santa Cruz = **A-race**, Northern California/Re
 | 15–16 | inter-race rebuild | `rebuild` | `(73).md:700-799` "Rebuild Week 1/2" |
 | **17** | **A-race week** | `taper` | `(73).md:802-821` race-day `IRONMAN 70.3 Santa Cruz` |
 
-> **Caveat (flagged):** `POLISH-PUNCH-LIST.md:172` and `rebuild-phase.test.ts:46` use **Week 14 (B) / Week 18 (A)** — those are *synthetic test-fixture* week numbers (hardcoded `event_date 2026-08-15`/`2026-09-12`, `startDate 2026-05-11`), **not** the reference plan. The realized contract is **B=13, A=17**. POLISH:172 also misattributes the race-week-brick-0 cap to commit `e0aad332`; it was introduced by **`5d8f1577`** ("two tri races by calendar order"). Both POLISH:172 errors are tracked in §10.
+> **Caveat (flagged):** `POLISH-PUNCH-LIST.md:172` and `rebuild-phase.test.ts:46` use **Week 14 (B) / Week 18 (A)** — those are *synthetic test-fixture* week numbers (hardcoded `event_date 2026-08-15`/`2026-09-12`, `startDate 2026-05-11`), **not** the reference plan. The realized contract is **B=13, A=17**. POLISH:172's earlier brick-cap attribution to `e0aad332` was wrong; it was introduced by **`5d8f1577`** ("two tri races by calendar order"). Both POLISH:172 errors were corrected 2026-05-18 (commit `2b448bff`).
 
 ---
 
@@ -60,7 +60,7 @@ Race-week behavior is **emergent**, not first-class. Three implicit mechanisms:
 
 ## 3. Current race-week load-shaping contract (verified)
 
-All keyed off `raceThisWeek` (symmetric for B and A — there is no divergence today):
+All keyed off `raceThisWeek` (symmetric for B and A — there is no divergence today; **§8.1 changes this**):
 
 | Behavior | Code | Effect |
 |---|---|---|
@@ -68,7 +68,7 @@ All keyed off `raceThisWeek` (symmetric for B and A — there is no divergence t
 | Long-run cap | `week-builder.ts:795-798` | `min(…,45)` min, `clamp(3,mi,5)` |
 | Long-ride cap | `week-builder.ts:847-849` | `min(…,1.0)` h |
 | Long-day floors excluded | `index.ts:234,299` `raceWeekNums` | Race weeks exempt from long-day enforcement |
-| Swim substitution | `session-factory.ts:1094-1099` | Any **`phase==='taper'`** threshold swim → `raceWeekActivationSwim` (800 yd, 4×50 build) — *fires on taper phase, not strictly race-week* |
+| Swim substitution | `session-factory.ts:1094-1099` | Any **`phase==='taper'`** threshold swim → `raceWeekActivationSwim` — *fires on taper phase, not strictly race-week* (**§8.6 scopes this to race-week**) |
 | Bike openers | `session-factory.ts:514-521` | Race-week opener ride |
 
 ### 3.1 Post-race handoff (the one explicit piece)
@@ -80,82 +80,96 @@ Two chronological tri races → `phase-structure.ts:127-153`: `buildSingleEventB
 
 `week-builder.ts:1843-1851`:
 - `type:'race'`; `tags:['tri_race','race_day','event','no_extra_training']`; `zone_targets:'race'`.
-- `duration = projMin = n.includes('santa cruz') ? 320 : 330` — **event-name string match, not distance/projection-driven**.
+- `duration = projMin = n.includes('santa cruz') ? 320 : 330` — **event-name string match, not distance/projection-driven** (**§8.3 fixes this**).
 - `tss = round(estimateSessionTSS('race','MODERATE',projMin) * 0.9)` — no athlete-projection input.
-- `description` = literal `'Swim 1.2mi → Bike 56mi → Run 13.1mi'` — **70.3-hardcoded regardless of actual race distance**.
-- Emitted **only when `slot && !slot.isRest`** — if the race-day grid slot is rest, the race session is **silently dropped**; no validator asserts otherwise.
+- `description` = literal `'Swim 1.2mi → Bike 56mi → Run 13.1mi'` — **70.3-hardcoded regardless of actual race distance** (**§8.3**).
+- Emitted **only when `slot && !slot.isRest`** — if the race-day grid slot is rest, the race session is **silently dropped** (**§8.4 makes this a hard guarantee**).
 
 ---
 
-## 5. CONTRACT GAPS — the spec's decision agenda
+## 5. Contract gaps (analysis → resolved in §8)
 
-Each gap: *current behavior (cited)* → *why a gap* → **DECISION NEEDED**.
+Each gap: *current behavior (cited)* → *why a gap* → **resolution pointer**.
 
 ### Gap 1 — No first-class race-week / B-vs-A concept
-`raceThisWeek` is anonymous; `RaceAnchor` has no `priority`; `isRaceWeek` is preview-only. The engine *physically cannot* apply different rules to a B-race week vs an A-race week.
-**DECISION NEEDED:** Should `RaceAnchor` carry `priority` and should `PhaseBlock`/`GeneratedWeek` carry an explicit `race_week: 'A'|'B'|null`? Which behaviors must legitimately differ (see Gap 5)?
+`raceThisWeek` anonymous; `RaceAnchor` has no `priority`; `isRaceWeek` preview-only. The engine *physically cannot* apply different rules to a B-race week vs an A-race week. **RESOLVED → §8.1.**
 
-### Gap 2 — Taper-into-race transition asymmetry is not honored
-`taperWeeks`: A-70.3 = 2, B-70.3 = 1 (`science.ts:321-369`). But `buildAbbreviatedBlocks` compresses the A-taper to **1 week** when only 1 pre-race week remains after rebuild (`phase-structure.ts:404` `Math.min(taperWeeks, totalWeeks)`). Realized: B-taper (Wk13) and A-taper (Wk17) are **structurally identical 1-week tapers**, contradicting the §3.6 / STRENGTH §3.7 intent of a longer, more protected A-taper.
-**DECISION NEEDED:** Should the spec mandate a *minimum A-race taper length* that the rebuild window must yield to (i.e., compress **rebuild**, not the A-taper)?
+### Gap 2 — Taper-into-race asymmetry not honored
+`taperWeeks` A-70.3=2 / B-70.3=1, but `buildAbbreviatedBlocks` compresses the A-taper to 1 wk via `Math.min(taperWeeks, totalWeeks)` (`phase-structure.ts:404`). Realized B-taper and A-taper are structurally identical. **RESOLVED → §8.2.**
 
-### Gap 3 — Race-day session shape is hardcoded & non-distance-aware
-`projMin` via `n.includes('santa cruz')`; description literal 70.3. A sprint / full-IM race emits a wrong description and a name-string-dependent duration.
-**DECISION NEEDED:** Canonical race-day contract — duration source (distance/projection, not name), TSS source, description templating by distance, tag set.
+### Gap 3 — Race-day session hardcoded & non-distance-aware
+`projMin` via `n.includes('santa cruz')`; description literal 70.3. Sprint/full-IM emit wrong shape. **RESOLVED → §8.3.**
 
 ### Gap 4 — Race-day session not guaranteed to materialize
-Emitted only if the race-day slot is non-rest (`week-builder.ts:1840`); silently dropped otherwise. No validator check that every `raceAnchor.planWeek` contains a `type:'race'` session on `dayName`.
-**DECISION NEEDED:** Must the race-day session always materialize independent of slot state? Add a validator assertion (see Gap 9)?
+Emitted only if race-day slot non-rest (`week-builder.ts:1840`); silently dropped otherwise; no validator. **RESOLVED → §8.4.**
 
-### Gap 5 — Post-B-race rebuild handoff: correct but unspecified & edge-fragile
-Rebuild emits only when `windowWeeks ≥ 2` (`phase-structure.ts:334`), capped `windowWeeks-1` (`:342`). The short-window case (`POLISH-PUNCH-LIST.md:74`, open) **skips rebuild entirely** — athlete drops from B-recovery straight into A-base with no bridge. The *endurance* rebuild shape (sport distribution, 0.85× TSS, 0.85× long-day) has **no prose spec**; it lives only in `phase-structure.ts:373-386` + scattered consumers. (Strength rebuild is owned by STRENGTH §7.4 — reference, do not restate.)
-**DECISION NEEDED:** Minimum-rebuild guarantee + short-window policy; a single prose spec for the endurance rebuild shape.
+### Gap 5 — Post-B rebuild handoff correct but unspecified & edge-fragile
+Rebuild emits only `windowWeeks ≥ 2`; short-window case skips rebuild entirely (`POLISH-PUNCH-LIST.md:74`). Endurance rebuild shape has no prose spec. **RESOLVED → §8.5.**
 
 ### Gap 6 — Activation-swim substitution scoped to `phase==='taper'`, not race-week
-`session-factory.ts:1097` substitutes in *any* taper week, broader than race week — could fire in a multi-week A-taper's first week where SWIM §4.4 still wants Race-Spec Light, not pure activation. Also explains the **export-48 → 73 change**: `(48).md:580,706` show `Swim Threshold — 800 yd`; `(73).md:663,816` show `Race-Week Activation Swim — 800 yd` (substitution shipped between the two exports).
-**DECISION NEEDED:** Scope the trigger to race-week (vs taper-phase); reconcile with SWIM §4.4 multi-week A-taper; lock which export (48 threshold vs 73 activation) is correct.
+`session-factory.ts:1097` fires in *any* taper week; broader than race week. Explains export-48 (threshold) → 73 (activation) change. **RESOLVED → §8.6.**
 
 ### Gap 7 — Docs vs realized-export drift
-`PLAN-GENERATION-TEST-MATRIX.md:48` describes race weeks as "taper Wed, race Sun, no quality sessions" but is silent on the realized Mon Race-Specific Aerobic Swim + Tue Bike Openers + Fri Activation Swim. `SWIM-PROTOCOL.md §4.3` hardcodes "race-specific phase weeks 11-14" which does not match realized phase weeks — descriptive drift.
-**DECISION NEEDED:** Document the canonical realized race-week session list; mark SWIM §4.3 week-numbers explicitly non-binding.
+`PLAN-GENERATION-TEST-MATRIX.md:48` incomplete; `SWIM-PROTOCOL.md §4.3` "weeks 11-14" descriptive drift. **RESOLVED → §8.6.**
 
 ### Gap 8 — Test coverage gap
-Only race-week coverage: `long-day-volume-floors.test.ts:229,585` (asserts floors *not* enforced in race week) and `rebuild-phase.test.ts:46` (synthetic wk14/18 phase-block layout). **Zero** tests of: race-day session shape/tags/duration, the activation-swim substitution, B-vs-A taper differentiation, race-day-always-present, or end-to-end realized weeks 13/17. No `_shared/*.test.ts` covers race weeks.
-**DECISION NEEDED:** Minimum race-week regression test set the spec requires.
+Only `long-day-volume-floors.test.ts:229,585` + synthetic `rebuild-phase.test.ts:46`. Zero tests of race-day shape, substitution, B-vs-A taper, race-day-always-present, end-to-end realized weeks. **RESOLVED → §8.6.**
 
 ### Gap 9 — No validator race-week check
-`validator.ts` has 12 checks; none assert race-day presence, race-week brick=0, race-week long-day caps, or B→recovery→rebuild→A week-level ordering (Check 6 `checkTapersPresent` / Check 8 `checkPostRaceRecovery` are phase-block-level only). Every race-week invariant is enforced inline in `week-builder.ts` with no independent gate.
-**DECISION NEEDED:** Which race-week invariants get a validator check.
+`validator.ts` 12 checks; none race-week-specific. Every invariant inline in `week-builder.ts`, no independent gate. **RESOLVED → §8.6.**
 
 ---
 
 ## 6. Known drifts to fix-or-flag
 
-1. **`POLISH-PUNCH-LIST.md:172`** — (a) "Week 14 (B-race) / Week 18 (A-race)" → realized is **B=13, A=17** (14/18 are test-fixture numbers); (b) race-week-brick-0 attributed to `e0aad332` → actually `5d8f1577`. *Correcting POLISH:172 is a separate gated doc edit — flagged, not yet done.*
-2. **`SWIM-PROTOCOL.md §4.3`** — "race-specific phase weeks 11-14" is descriptive drift; does not match realized phase weeks. Mark non-binding.
-3. **`PLAN-GENERATION-TEST-MATRIX.md:48`** — incomplete race-week structure description (omits Mon swim / Tue openers / Fri activation).
+1. **`POLISH-PUNCH-LIST.md:172`** — week numbers (14/18→**13/17**) and brick-cap attribution (`e0aad332`→**`5d8f1577`**) **corrected 2026-05-18 (`2b448bff`)**; item bumped `[ ]`→`[~]`.
+2. **`SWIM-PROTOCOL.md §4.3`** — "race-specific phase weeks 11-14" descriptive drift; **§8.6 marks non-binding**.
+3. **`PLAN-GENERATION-TEST-MATRIX.md:48`** — incomplete race-week structure description; **§8.6 completes it**.
 
 ---
 
 ## 7. Code reference index (read before touching race-week behavior)
 
-- `phase-structure.ts:45-50` `planWeekForCalendarEvent`; `:104-107` totalWeeks clamp; `:116-125` `raceAnchors`; `:127-153` two-tri handoff; `:231-271` `buildSingleEventBlocks`; `:334-342` rebuild-weeks cap; `:355-387` `insertRebuildBlock`; `:389-421` `buildAbbreviatedBlocks`.
+- `phase-structure.ts:45-50` `planWeekForCalendarEvent`; `:104-107` totalWeeks clamp; `:116-125` `raceAnchors`; `:127-153` two-tri handoff; `:231-271` `buildSingleEventBlocks`; `:334-342` rebuild-weeks cap; `:355-387` `insertRebuildBlock`; `:389-421` `buildAbbreviatedBlocks` (`:404` A-taper compression).
 - `science.ts:321-369` `taperWeeks`; `:371-425` `recoveryDaysPostRace`.
-- `week-builder.ts:602` `raceThisWeek`; `:765` `effectiveBricks`; `:795-798`/`:847-849` race-week caps; `:1836-1861` race-day overlay.
+- `week-builder.ts:602` `raceThisWeek`; `:765` `effectiveBricks`; `:795-798`/`:847-849` race-week caps; `:1836-1861` race-day overlay (`:1840` rest-slot gate, `:1843-1851` hardcoded shape).
 - `session-factory.ts:514-521` bike openers; `:596-626` `raceWeekActivationSwim`; `:1094-1099` taper→activation substitution.
 - `index.ts:234,299` `raceWeekNums`; `:557` preview-only `isRaceWeek`.
 - `validator.ts:109-161` taper/post-race checks (no race-week check).
 
 ---
 
-## 8. Open questions for the next session (decision-ordered)
+## 8. RESOLVED SPEC DECISIONS (2026-05-18)
 
-1. First-class race-week class & A/B flag — yes/no, and shape (Gap 1).
-2. Minimum A-race taper guarantee vs rebuild compression (Gap 2).
-3. Canonical race-day session contract (Gap 3) + always-materialize guarantee (Gap 4).
-4. Minimum-rebuild guarantee + endurance-rebuild prose spec (Gap 5).
-5. Activation-swim trigger scoping + export-48-vs-73 lock (Gap 6).
-6. Validator + regression-test minimums (Gaps 8, 9).
-7. Doc-drift corrections (§6) — gated edits.
+Product-owner decisions, locked. This section is **prescriptive**. Implementation plan follows separately (doc before code).
 
-*No code is written until the §8 decisions are made. This doc is the agenda, not the answers.*
+### §8.1 — First-class A/B race-week differentiation (Gap 1) ✅
+- `RaceAnchor` carries `priority: 'A' | 'B'` (from the goal's priority). `PhaseBlock` and `GeneratedWeek` carry `race_week: 'A' | 'B' | null`.
+- **A-race week — full taper protection.** Multi-week protected taper (§8.2), distance-aware race-day overlay (§8.3), brick=0, long-day caps, no new stimulus, race-week activation swim. The plan protects the A-race week and its taper **above everything else** (Santa Cruz is the goal).
+- **B-race week — "a hard training day you happen to race."** The B-race is embedded in the build: **no multi-week protected taper** (the athlete races through accumulated training fatigue), short recovery after (existing 1-week 70.3-B recovery), then rebuild toward A; the B-block is **subordinate to the A-build**.
+- **Race-day safety applies to BOTH (locked interpretation):** the race-day session always materializes (§8.4), brick=0 on the actual race day, and **no extra training is stacked on race day** — you cannot train on top of a raced 70.3 regardless of priority. The A/B difference is in the *surrounding weeks' load shaping* (taper depth, recovery depth, subordination), **not** in piling training onto B-race day.
+
+### §8.2 — A-race taper is inviolable (Gap 2) ✅
+- The A-race taper gets its full distance-driven `taperWeeks` allocation (70.3 A = 2). It is **never** compressed. The rebuild window between B-recovery and A-taper absorbs any shortfall (subject to the §8.5 minimum).
+- **Compression priority order:** A-taper (inviolable) > minimum rebuild (≥1 wk, §8.5) > post-B recovery (distance-fixed) > all other weeks absorb.
+- Replaces the current `Math.min(taperWeeks, totalWeeks)` A-taper compression in `buildAbbreviatedBlocks` (`phase-structure.ts:404`).
+
+### §8.3 — Distance-aware race-day session (Gap 3) ✅
+- Race-day `duration`, `tss`, and `description` derive from the **race distance/type** (sprint / Olympic / 70.3 / full IM), never an event-name string. Remove `n.includes('santa cruz')` (`week-builder.ts:1843-1851`).
+- **Duration:** distance→projected-finish table, refined by athlete projection when available. **Description:** templated per distance (swim/bike/run leg distances by race type). **TSS:** `estimateSessionTSS('race','MODERATE', distanceDuration)`. Adding a sprint or a full IM "just works."
+
+### §8.4 — Race-day session hard guarantee (Gap 4) ✅
+- For every `RaceAnchor` (A **and** B), exactly one `type:'race'` session MUST materialize on `RaceAnchor.dayName` in `RaceAnchor.planWeek`, **independent of the grid slot's rest state**. Remove/override the `slot && !slot.isRest` gate (`week-builder.ts:1840`). **Silent omission on race day is unacceptable.**
+- Enforced by a **hard** validator check (§8.6/Gap 9): generation hard-fails if any `raceAnchor.planWeek` lacks exactly one race session on `dayName`.
+
+### §8.5 — Minimum rebuild guarantee (Gap 5) ✅
+- **≥ 1 week** of `rebuild` phase always exists between post-B recovery and A-race base/taper. **Never** B-recovery → A-base directly. If the window is tight, compress per the §8.2 order — rebuild floors at 1 week; the A-taper never yields.
+- The endurance rebuild shape (currently implicit, `phase-structure.ts:373-386`) gets a prose spec (sport distribution, 0.85× TSS, 0.85× long-day). Strength rebuild stays owned by `STRENGTH-PROTOCOL.md §7.4` (reference, not restated).
+
+### §8.6 — Technical cleanup, reasonable defaults (Gaps 6–9) ✅
+- **Gap 6 (activation swim):** scope the `taper`-phase threshold-swim → activation-swim substitution (`session-factory.ts:1094-1099`) to **race week only**. Non-race weeks of a multi-week A-taper keep SWIM §4.4 Race-Spec Light. Locks export-73 (activation in race week) as correct, scoped.
+- **Gap 9 (validator):** add race-week validator checks — (a) race-day session present (§8.4, hard-fail), (b) race-week brick=0, (c) race-week long-day caps respected, (d) B→recovery→rebuild→A week-level ordering.
+- **Gap 8 (tests):** minimum regression set — race-day shape/tags/duration *by distance* (sprint/Oly/70.3/IM), activation-swim race-week-only, A-vs-B taper differentiation, race-day-always-present (incl. rest-slot edge), end-to-end realized two-70.3 weeks 13/17.
+- **Gap 7 (doc drift):** mark `SWIM-PROTOCOL.md §4.3` "weeks 11-14" explicitly non-binding; complete `PLAN-GENERATION-TEST-MATRIX.md:48` with the realized race-week session list.
+
+*Decisions locked 2026-05-18. Implementation: doc before code — no code until the session implementation plan is reviewed and approved.*
