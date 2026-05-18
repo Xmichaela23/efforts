@@ -160,7 +160,20 @@ export function useConflictResolutionLoop({
     setSaveBanner(null);
 
     if (fnErr || !data || (data as { success?: boolean }).success !== true) {
-      // Preview failed — fall through to real save rather than blocking the athlete.
+      const d = data as { error?: string; error_code?: string } | null;
+      const code = d?.error_code || (fnErr as { code?: string } | null)?.code;
+      // Issue 2: a deterministic athlete-actionable failure (e.g. races too
+      // close for a protected A-taper) will fail identically on the real save —
+      // surface the actionable message now instead of silently burning a second
+      // round-trip through doFinalSave.
+      if (code === 'race_week_infeasible') {
+        setSending(false);
+        setSaveBanner(null);
+        setError(d?.error || 'Your races are too close together to build a valid plan — move the B-race earlier or pick a later A-race date.');
+        return;
+      }
+      // Other / transient preview failures — fall through to the real save
+      // rather than blocking the athlete.
       await doFinalSave();
       return;
     }

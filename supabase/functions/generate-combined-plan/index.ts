@@ -13,6 +13,7 @@ import type { CombinedPlanRequest, GoalInput, AthleteState, AthleteMemory } from
 import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-structure.ts';
 import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
 import { validatePlan, failedChecks, findMissingRaceDaySessions } from './validator.ts';
+import { classifyCombinedPlanError } from './classify-error.ts';
 import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
@@ -639,7 +640,11 @@ Deno.serve(async (req: Request) => {
 
   } catch (e) {
     console.error('[combined-plan] Unhandled error:', e);
-    return json({ success: false, error: String(e) }, 500);
+    // Issue 2: race-week §8.x hard-fails are athlete-actionable, not internal
+    // bugs — classify with a stable code + 422 (stays !resp.ok so the wrapper
+    // propagates it). e.message drops the leaked "Error: " prefix.
+    const c = classifyCombinedPlanError(e);
+    return json({ success: false, error: c.error, error_code: c.error_code }, c.status);
   }
 });
 

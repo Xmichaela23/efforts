@@ -462,7 +462,16 @@ async function invokeFunction(functionsBaseUrl: string, serviceKey: string, name
 
   if (!resp.ok) {
     const detail = coerceErrorDetailToString(payload, `${name} failed (${resp.status})`);
-    throw new AppError('downstream_function_failed', detail, 400);
+    // Issue 2: propagate an actionable downstream classification (e.g.
+    // race_week_infeasible) instead of flattening every failure to a generic
+    // 400/downstream_function_failed, and preserve the real downstream status so
+    // the response body's http_status is truthful. The top-level catch still
+    // emits HTTP 200 with this code/message (load-bearing client contract).
+    const downstreamCode = (payload as { error_code?: unknown } | null)?.error_code;
+    const code = typeof downstreamCode === 'string' && downstreamCode.trim()
+      ? downstreamCode
+      : 'downstream_function_failed';
+    throw new AppError(code, detail, resp.status);
   }
   return payload;
 }
