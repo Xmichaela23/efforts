@@ -242,6 +242,7 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 - [ ] **P2** #8 race-course matching — blocked on GPX geometry / product decision (Q-009)
 - [ ] **P3** #9 remainder — power-curve-trend + HR-at-power-trend into Arc/snapshot
 - [ ] deferred (product): #10 segment leaderboards, #11 W′ depletion modelling
+- [ ] **P3 cosmetic** EFFICIENCY/POWER dashboard rows still technical (IF/EF/decoupling) — inconsistent with the now-plain-language INSIGHTS; + INSIGHTS closing-clause hedge. Deferred, not urgent — `_shared/session-detail/build.ts`, workout-detail-only, no backfill (Q-010)
 
 ---
 

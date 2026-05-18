@@ -117,6 +117,8 @@ The correctness pass is **complete and verified** and there are now **ZERO open 
 2. **#9 remainder (P3):** power-curve-trend + HR-at-power-trend into Arc/snapshot (non-CTL slice).
 3. **#10 / #11 (product-deferred):** segment leaderboards; W′ depletion modelling.
 
+**Known cosmetic (deferred, not a code defect — so "zero open code items" still holds):** EFFICIENCY/POWER dashboard rows keep technical jargon (IF/EF/decoupling), now inconsistent with the plain-language INSIGHTS; + a hedgy INSIGHTS closing clause. INSIGHTS-only was the deliberate brief boundary. Tracked in Q-010 / POLISH (P3 cosmetic). Not urgent.
+
 **Tooling:** `scripts/verify-cycling-vi-if-fix.mjs --all [--days N]` is the committed mechanism to re-propagate ANY future analyzer/classifier-input change across ride history (recompute chain via service role; reports reclassifications + IF/VI convergence). Re-run it after touching the analyzer.
 
 ---
