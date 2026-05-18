@@ -73,6 +73,13 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **Footguns (don't re-litigate):** `docs/SESSION-CONTEXT.md` §7 — narrative trend MUST mirror `pickCyclingTrendSeries` (don't revert to always-np_trend); the lede + jargon guards are deterministic by design (don't delete them / don't "fix" the lede in the shared `arc-narrative-ai-appendix.ts` — would change running); the 3-guard stack shares ONE retry budget (don't split per-guard or cut the attempt count — degrades the others); `achievements_v1` PRs are prior-ride; `computed.overall.*` has no overall power; `climb_ascent_m` ≠ total gain.
 - **Decision:** D-015, D-016 (no new D-NNN — display/narrative fixes were single-sane-implementation).
 
+### Plan-gen strength provenance split (Bugs 1&2 / #131)
+- **Files/commits:** `reconcile-athlete-state-week-optimizer.ts:276` (stop engine→`strength_preferred_days`), `create-goal-and-materialize-plan/index.ts:~904` (strip engine `preferred_days.strength`, persist `trainingPrefs.strength_optimizer_slots`), `src/lib/format-wizard-prefs-export.ts` ("Strength (scheduled by app):" path). Commit `71611501`, 2026-05-17. D-017.
+- **Behavior:** `strength_preferred_days` / `preferred_days.strength` carry ONLY a genuine wizard pin; engine-chosen strength placement lives ONLY in `strength_optimizer_slots` and exports as "scheduled by app", never as an athlete preference. The optimizer is no longer fed phantom strength prefs → no bogus "preferred day rejected" strength trade-offs (root-fixed at source, not composer-suppressed).
+- **Verification:** export test +2 (engine→scheduled-by-app; genuine pin still surfaces) flipped from the leak-encoding test; suites green — format-wizard-prefs-export 6, plan-generation-trade-offs 30, week-optimizer.anchor-contract 25, generate-combined-plan 158, all 0 failed; client build clean. End-to-end (live multi-sport regen) NOT yet observed.
+- **Footgun (don't re-litigate):** never re-introduce an engine→`strength_preferred_days` or engine→`preferred_days.strength` write (reconcile:276 *was* exactly that bug). Engine strength = `strength_optimizer_slots`. `freshCombinedPrefs` is re-derived from `goal.training_prefs` (NOT the gcp response) — the `:904` strip is what keeps it wizard-only; don't "thread the gcp response" thinking it matters.
+- **Decision:** D-017.
+
 ---
 
 ## Known broken (filed, not blocking)
