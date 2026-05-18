@@ -236,7 +236,7 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 - [x] narrative trend mirrors the TREND row's series (pwr20 type-filtered else np_trend) + deterministic Arc-secondary lede guard (power-first, `ledeOpensWithArcFrame` + corrective retry) — `36a7e792` + `dcaa9f08` + `da7dbce8` (2026-05-17). Verified 0/30 Arc-lede. See SESSION-CONTEXT §7.
 
 ### Open
-- [ ] **P1** historical `avg_hr` resolves null → TREND HR line never draws (fix-ready; Q-007, SESSION-CONTEXT #1)
+- [x] historical `avg_hr` resolves null → TREND HR line never draws — `4177c05c` (2026-05-17). Loop SELECT + `hrH` resolve `computed.overall.avg_hr ?? fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`; backfill verified 26/26 trends draw the dashed line. Q-007 closed.
 - [x] type-filtered `pwr20_trend_v1` historical re-analysis backfill (Q-008, SESSION-CONTEXT #2) — `scripts/verify-cycling-vi-if-fix.mjs --all` (`fae293e7` + `--all` `83d07fdb`) run wide 2026-05-17 (180 d, 30 rides, 0 failed): every in-window ride now has a stored `classified_type`; recovery/threshold/climbing/endurance/tempo each ≥3 (pwr20-eligible)
 - [ ] **P2** #8 race-course matching — blocked on GPX geometry / product decision (Q-009)
 - [ ] **P3** #9 remainder — power-curve-trend + HR-at-power-trend into Arc/snapshot

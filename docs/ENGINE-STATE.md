@@ -108,7 +108,7 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 - **Symptom:** cycling TREND shows the power line + current-ride "· {bpm}" label but no dashed HR line.
 - **File:** `analyze-cycling-workout/index.ts:~2108` reads `r.computed.overall.avg_hr` (frequently null); SELECT at `:2077` omits the reliable `workouts.avg_heart_rate` column. → all historical TREND points `avg_hr: null` → `SessionNarrative.tsx` `TrendSparkline` `hasHr (≥3)` gate fails.
 - **Fix shape:** add `avg_heart_rate` to the SELECT; resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Same projection/field-source footgun class as `cead4e9e`/`41d1582d`/`f9efb893`.
-- **Why deferred:** end-of-session; small scoped fix. See Q-007 / SESSION-CONTEXT open item #1.
+- **RESOLVED (2026-05-17, `4177c05c`):** added `avg_heart_rate` to the loop SELECT; `hrH` resolves `computed.overall.avg_hr ?? fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate` (each candidate guarded). Wide backfill verified 26/26 rides-with-a-trend now have ≥3 HR points → dashed line draws. Kept here as the was-broken record (Known-broken doubles as the fix log, per the pwr20 precedent). Q-007 closed.
 
 ### Type-filtered `pwr20_trend_v1` won't populate from a single recompute
 - **Symptom:** `pwr20_trend_v1` null on a reclassified ride despite `computed.power_curve['20min']` existing.

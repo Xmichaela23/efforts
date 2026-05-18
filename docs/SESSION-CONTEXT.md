@@ -75,7 +75,7 @@
 
 ## 3. Open items (priority order)
 
-1. **avg_hr historical field bug (P1, code defect).** `pwr20`/`np_trend` historical loop reads `r.computed.overall.avg_hr` (frequently null) — should resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`, and add `avg_heart_rate` to the SELECT (`analyze-cycling-workout:2077`). Until fixed, the TREND dashed HR line never draws (≥3-HR-point gate in `TrendSparkline`).
+1. **avg_hr historical field bug — ✅ RESOLVED 2026-05-17 (`4177c05c`).** Loop SELECT now fetches `avg_heart_rate`; `hrH` resolves `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Wide backfill verified 26/26 rides-with-a-trend have ≥3 HR points → the dashed HR line draws. (Q-007 closed.)
 2. **pwr20 type-filter backfill — ✅ RESOLVED 2026-05-17.** `scripts/verify-cycling-vi-if-fix.mjs --all` (`83d07fdb`) run wide (180 d, 30 rides, 0 failed): every in-window ride now has a stored `classified_type`; recovery/threshold/climbing/endurance/tempo each ≥3 (pwr20-eligible). Re-run `--all` after any future classifier-input change. See Q-008.
 3. **#8 race-course segment matching (P2, blocked).** Needs course-segment geometry from race-course GPX (Data-Dependency ❌); not in the unblock decisions. `cycling_segment_history.race_course_relevant` hook is in place.
 4. **#9 remainder (P3).** Power-curve-trend + HR-at-power-trend into Arc/snapshot (the non-CTL slice of #9).
@@ -85,7 +85,7 @@
 
 ## 4. Known bugs & workarounds
 
-- **TREND HR line not drawing** → root cause = open item #1 (historical `avg_hr` resolves null). Workaround: none; label still shows current-ride bpm. Fix = broaden the read + SELECT.
+- **TREND HR line not drawing** → RESOLVED 2026-05-17 (`4177c05c`): loop SELECT + `hrH` broadened (Q-007 / §3 #1); backfill verified 26/26 rides-with-a-trend now draw the dashed line.
 - **pwr20_trend_v1 null on reclassified rides** → RESOLVED 2026-05-17: wide backfill (`verify-cycling-vi-if-fix.mjs --all`, `83d07fdb`) re-derived every in-window ride's stored `classified_type`; ≥3 same-type exist per common type. Re-run `--all` after any future classifier-input change.
 - **Migration-tracking divergence** → never `supabase db push`; apply new migrations via the SQL editor. Both new tables/columns this session (`cycling_segment_history`, `athlete_snapshot.ctl/atl/tsb`) applied manually; all code touching them is non-fatal/guarded so functions deploy safely pre-migration.
 - **Pre-existing unrelated test fail:** `inferTrainingFitnessLevel` (`infer-training-fitness.test.ts`) — fails independent of all this work; suite is "green" at 628 pass / 1 fail.
@@ -106,13 +106,12 @@
 
 ## 6. Arc status & resumable handoff (PAUSED 2026-05-17)
 
-The correctness pass is **complete and verified**: IF/VI canonical-source (D-015), VI-gate elevation source (D-016), PR attribution + Efforts-scoped language, narrative trend-series match + deterministic Arc-lede guard, TREND ≥5/text gate, POWER-ZONES full-duration, sport-aware legend — all shipped, deployed, and propagated by the wide backfill (final: 30/30, **0/30 Arc-lede**, IF/VI 26/26 consistent, banned-language 0/30). Build Order #1–#7 + #9 done.
+The correctness pass is **complete and verified** and there are now **ZERO open code items**: IF/VI canonical-source (D-015), VI-gate elevation source (D-016), PR attribution + Efforts-scoped language, narrative trend-series match + deterministic Arc-lede guard, TREND ≥5/text gate, POWER-ZONES full-duration, sport-aware legend, and the historical `avg_hr` / TREND HR-line fix (Q-007, `4177c05c`) — all shipped, deployed, and propagated by the wide backfill (final: 30/30, **0/30 Arc-lede**, IF/VI 26/26 consistent, banned-language 0/30, **26/26 trends draw the dashed HR line**). Build Order #1–#7 + #9 done.
 
-**When the arc resumes, the genuinely remaining items (priority order):**
-1. **Open item #1 / Q-007 (P1, code defect, fix-ready):** historical `avg_hr` resolves null → TREND dashed HR line never draws. Add `avg_heart_rate` to the `analyze-cycling-workout` cross-workout SELECT + resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Smallest unblock; same SELECT-projection class as the `normalized_power_w`/`achievements`/`elevation_gain` fixes.
-2. **#8 race-course segment matching (P2, blocked):** needs race-course GPX geometry — product decision owed (GPS-track matcher vs Strava-only). Q-009.
-3. **#9 remainder (P3):** power-curve-trend + HR-at-power-trend into Arc/snapshot (non-CTL slice).
-4. **#10 / #11 (product-deferred):** segment leaderboards; W′ depletion modelling.
+**When the arc resumes, only PRODUCT-DEFERRED items remain (no code defects):**
+1. **#8 race-course segment matching (P2, blocked):** needs race-course GPX geometry — product decision owed (GPS-track matcher vs Strava-only). Q-009.
+2. **#9 remainder (P3):** power-curve-trend + HR-at-power-trend into Arc/snapshot (non-CTL slice).
+3. **#10 / #11 (product-deferred):** segment leaderboards; W′ depletion modelling.
 
 **Tooling:** `scripts/verify-cycling-vi-if-fix.mjs --all [--days N]` is the committed mechanism to re-propagate ANY future analyzer/classifier-input change across ride history (recompute chain via service role; reports reclassifications + IF/VI convergence). Re-run it after touching the analyzer.
 

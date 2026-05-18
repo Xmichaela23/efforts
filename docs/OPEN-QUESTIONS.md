@@ -92,10 +92,10 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ## Q-007 — Cycling TREND historical `avg_hr` resolves null (HR line never draws)
 
-- **Status:** deferred bug, fix-ready, scoped for next session.
-- **Why it exists:** the `pwr20`/`np_trend` historical loop (`analyze-cycling-workout:~2108`) reads `r.computed.overall.avg_hr`, which is frequently null (set only from an `hr_bpm` sample series). The reliable per-ride avg HR is the `workouts.avg_heart_rate` column, which the loop's SELECT (`:2077`, `id, date, computed, workout_analysis`) doesn't fetch. So all historical TREND points get `avg_hr: null` → `TrendSparkline`'s `hasHr (≥3)` gate fails → the dashed HR line never draws (label still shows current-ride bpm).
-- **Fix:** add `avg_heart_rate` to the SELECT; resolve `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`. Same projection/field-source footgun class as the `normalized_power_w` / `achievements` / np_trend SELECT fixes.
-- **Cross-ref:** `docs/ENGINE-STATE.md` Known broken; `docs/SESSION-CONTEXT.md` open item #1.
+- **Status:** RESOLVED 2026-05-17 (`4177c05c`).
+- **Why it existed:** the `pwr20`/`np_trend` historical loop read only `r.computed.overall.avg_hr`, frequently null (set only from an `hr_bpm` sample series); the loop SELECT didn't fetch the reliable `workouts.avg_heart_rate` column. All historical TREND points got `avg_hr: null` → `TrendSparkline`'s `hasHr (≥3)` gate failed → the dashed HR line never drew (label still showed current-ride bpm).
+- **Resolution:** added `avg_heart_rate` to the loop SELECT; `hrH` now resolves `computed.overall.avg_hr ?? workout_analysis.fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate` (each candidate guarded individually so a stored 0/null falls through — `Number(null)===0`). Same SELECT-projection class as the `normalized_power_w`/`achievements`/`elevation_gain` fixes. Wide backfill verified: **26/26 rides with a TREND series now have ≥3 HR points** → the dashed line draws on every one.
+- **Cross-ref:** `docs/ENGINE-STATE.md` (resolved); `docs/SESSION-CONTEXT.md` §6.
 
 ---
 
