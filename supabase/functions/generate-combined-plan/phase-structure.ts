@@ -170,16 +170,34 @@ export function buildPhaseTimeline(
       const recStart = w1 + 1;
       const recEnd = w1 + recW;
       insertRecoveryBlock(recStart, recEnd, g1.id, blocks, athleteState);
-      // Rebuild before the next goal's abbreviated cycle — preserves pre-race progression so
-      // strength/swim/long-day consumers don't read week 1 of the new goal as fresh-start base.
-      const windowWks = w2 - recEnd;
-      const rebuildWks = rebuildWeeksAfterRace(g1.distance, recW, windowWks);
+      // §8.2/§8.5 (RACE-WEEK-PROTOCOL): allocate BACKWARD from the A-race. The
+      // A-taper is reserved FIRST at its full distance-driven width and is NEVER
+      // compressed; ≥1 rebuild week always exists (§8.5); post-B recovery is
+      // distance-fixed. Priority: A-taper > rebuild(≥1) > recovery > the
+      // abbreviated base/race_specific remainder absorbs whatever is left.
+      const aTaperWks = taperWeeks(g2.distance, g2.priority);
+      const windowWks = w2 - recEnd; // weeks between recovery end and the A-race
+      // Decision A (2026-05-18): if recovery + ≥1 rebuild + the FULL A-taper
+      // cannot fit, hard-fail (symmetric with the §8.1 chronology guard) rather
+      // than silently shipping a degraded A-race taper.
+      if (windowWks < aTaperWks + 1) {
+        throw new Error(
+          `[race-week §8.2/§8.5] B-race "${g1.event_name}" (${g1.event_date}) is too close ` +
+            `to A-race "${g2.event_name}" (${g2.event_date}): only ${windowWks} week(s) ` +
+            `between post-B recovery and the A-race, but a protected A-race needs ≥1 ` +
+            `rebuild week + a full ${aTaperWks}-week taper. Move the B-race earlier, drop ` +
+            `it, or choose a later A-race date.`,
+        );
+      }
+      const maxRebuild = windowWks - aTaperWks; // weeks left after reserving the A-taper
+      const rebuildWks = Math.max(
+        1, // §8.5: minimum one rebuild week
+        Math.min(rebuildWeeksAfterRace(g1.distance, recW, windowWks), maxRebuild), // §8.2: never eat the A-taper
+      );
       const rebuildStart = recEnd + 1;
       const rebuildEnd = recEnd + rebuildWks;
-      if (rebuildWks > 0) {
-        insertRebuildBlock(rebuildStart, rebuildEnd, g2, blocks, athleteState, recW);
-      }
-      // Second race: build + taper in remaining weeks (no quality after w1 in this plan)
+      insertRebuildBlock(rebuildStart, rebuildEnd, g2, blocks, athleteState, recW);
+      // Second race: abbreviated base/race_specific + the FULL reserved A-taper.
       const secondStart = rebuildEnd + 1;
       if (secondStart <= w2) {
         buildAbbreviatedBlocks(g2, secondStart, w2, blocks, athleteState);
@@ -437,11 +455,15 @@ function buildAbbreviatedBlocks(
   const totalWeeks = endWeek - startWeek + 1;
   if (totalWeeks < 1) return;
   const dist = getBaseDistribution(goal.sport, goal.distance, as.limiter_sport as Sport | undefined, as.swim_intent, as.swim_load_source);
-  // Use as many taper weeks as the distance requires, up to the full available window.
-  // Math.floor(totalWeeks * 0.45) would give 0 for a 2-week window (floors 0.9 → 0),
-  // leaving week 19 as race_specific and firing VO2max 1 week before an A-race.
-  // Correct behavior: if fewer weeks are available than the distance calls for, taper all of them.
-  const taperWks = Math.min(taperWeeks(goal.distance, goal.priority), totalWeeks);
+  // §8.2 (RACE-WEEK-PROTOCOL): the A-taper is the FULL distance-driven width and is
+  // never compressed. The two-tri handoff reserves it (and hard-fails if recovery +
+  // ≥1 rebuild + this taper cannot fit). If a window shorter than the taper ever
+  // reaches here (the sequential-A callers), the `preTaperEnd < startWeek`
+  // early-return below makes the WHOLE window a taper — base/race_specific absorb,
+  // never the taper. (Behaviorally identical to the prior Math.min(): when
+  // totalWeeks ≥ taperWeeks both give taperWeeks; when shorter both hit the
+  // early-return. The Math.min was redundant with that guard.)
+  const taperWks = taperWeeks(goal.distance, goal.priority);
   const taperStartWeek = endWeek - taperWks + 1;
   const preTaperEnd = taperStartWeek - 1;
   if (preTaperEnd < startWeek) {

@@ -13,7 +13,7 @@
  *   deno test --no-lock --allow-all supabase/functions/generate-combined-plan/rebuild-phase.test.ts
  */
 
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals, assertThrows } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildPhaseTimeline, blockForWeek } from './phase-structure.ts';
 import { BRICKS_PER_WEEK, longRideFloorHours, longRunFloorMiles } from './science.ts';
 import { getProtocolVolumeBand, normalizePhaseToSwimProtocolBand } from './swim-protocol-volumes.ts';
@@ -81,24 +81,30 @@ Deno.test('rebuild emission: 18-week plan with B-race week 14 + A-race week 18 e
   assertEquals(w15.weeksSinceRaceIncludingRebuild, 1);
   assertEquals(w15.primaryGoalId, 'g1', 'recovery still tagged to the race that just finished');
 
-  // Weeks 16-17: rebuild for g2, weeksSinceRaceIncludingRebuild = 2, 3
+  // §8.2/§8.5 (RACE-WEEK-PROTOCOL): Week 16 is the SINGLE rebuild week for g2
+  // (rebuild floored at 1; the A-taper is reserved at its full 70.3-A 2wk width).
   assertEquals(w16.phase, 'rebuild', 'week 16 should be rebuild (post-recovery ramp)');
   assertEquals(w16.isRecovery, false);
   assertEquals(w16.primaryGoalId, 'g2', 'rebuild serves the next goal');
   assertEquals(w16.weeksSinceRaceIncludingRebuild, 2);
   assertEquals(w16.tssMultiplier, 0.85);
 
-  assertEquals(w17.phase, 'rebuild', 'week 17 should be rebuild week 2');
-  assertEquals(w17.weeksSinceRaceIncludingRebuild, 3);
+  // §8.2: week 17 is now A-taper week 1 of 2 (full 70.3-A taper, never
+  // compressed) — NOT a second rebuild week. Taper carries no post-race counter.
+  assertEquals(w17.phase, 'taper', 'week 17 = A-taper wk1 of 2 (§8.2 full 70.3-A taper)');
+  assertEquals(w17.weeksSinceRaceIncludingRebuild, undefined, 'taper weeks carry no post-race counter');
+  assertEquals(w17.primaryGoalId, 'g2', 'A-taper serves g2');
 
-  // Week 18: taper for g2
+  // Week 18: A-taper week 2 of 2 for g2
   assertEquals(w18.phase, 'taper', 'week 18 should be taper for the A-race');
   assertEquals(w18.primaryGoalId, 'g2');
 });
 
-Deno.test('rebuild emission: short post-B-race window (2 weeks) skips rebuild — leaves room for taper', () => {
-  // B-race week 14, A-race week 16. Window after recovery = 1 week → not enough for rebuild + taper.
-  // Rebuild = 0; abbreviated block fills the window directly.
+Deno.test('rebuild emission: infeasible B→A window hard-fails (§8.2/§8.5)', () => {
+  // B-race week 14, A-race week 16 — only ~1 week between post-B recovery and the
+  // A-race. §8.2 (A-taper inviolable: 70.3-A = 2wk) + §8.5 (rebuild ≥1) +
+  // distance-fixed recovery cannot all fit → hard-fail (Decision A, 2026-05-18),
+  // symmetric with the §8.1 chronology guard. Silent A-taper degradation is gone.
   const goals: GoalInput[] = [
     {
       id: 'g1',
@@ -111,16 +117,18 @@ Deno.test('rebuild emission: short post-B-race window (2 weeks) skips rebuild �
     {
       id: 'g2',
       event_name: 'A-race 70.3',
-      event_date: '2026-08-29', // 2 weeks after B-race
+      event_date: '2026-08-29', // 2 weeks after B-race — too close
       distance: '70.3',
       sport: 'triathlon',
       priority: 'A',
     },
   ];
   const startDate = new Date('2026-05-11T12:00:00Z');
-  const { blocks } = buildPhaseTimeline(goals, startDate, makeAthleteState());
-  const rebuildWeeks = blocks.filter((b) => b.phase === 'rebuild');
-  assertEquals(rebuildWeeks.length, 0, 'tight schedule should not insert rebuild');
+  assertThrows(
+    () => buildPhaseTimeline(goals, startDate, makeAthleteState()),
+    Error,
+    '[race-week §8.2/§8.5]',
+  );
 });
 
 Deno.test('rebuild emission: sequential non-tri A-races (full new macrocycle) do NOT get rebuild — base IS the ramp', () => {
