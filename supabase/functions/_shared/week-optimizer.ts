@@ -1601,9 +1601,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             );
           }
           if (stacking) {
-            trade_offs.push(
-              `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
-            );
+            // Bug 1 Piece B Slice 2: do NOT emit the QR+lower consolidation line
+            // here (sibling of the Slice 1 deletion at :1237). Canonical-pattern
+            // time; the builder may later split the day. Realized-accurate owner
+            // is `collectQualityRunLowerBodyTradeOffs` (week-builder.ts). Coverage
+            // gate verified: the builder emits whenever the realized plan actually
+            // has QR+lower consolidated. (`stacking` stays load-bearing for the
+            // PM-timing `place(... 'lower_body_strength' ...)` call above.)
             // Day-agnostic divergence message: only emit when the athlete pinned days that the
             // engine couldn't honor. Otherwise the realized placement IS the plan — no "moved from"
             // baseline to reference.
@@ -1753,9 +1757,11 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
             );
           }
           if (stacking) {
-            trade_offs.push(
-              `lower_body_strength stacked with quality_run on ${tfDay(lowerDay)} (AM run / PM lift) — consolidated hard day per EXPERIENCE MODIFIER (performance + co-equal strength).`,
-            );
+            // Bug 1 Piece B Slice 2: dead twin of the co-equal-branch deletion
+            // above — `stacking` requires isCoEq while this `else` branch requires
+            // !isCoEq, so this never fires; removed only so the literal exists
+            // nowhere in production. Realized-accurate owner is
+            // `collectQualityRunLowerBodyTradeOffs` (week-builder.ts).
             // Day-agnostic divergence message (same pattern as the co-equal branch upstream).
             const upperDiverges = upperDay && preferredUpperDayNc && upperDay !== preferredUpperDayNc;
             const lowerDiverges = preferredLowerDayNc && lowerDay !== preferredLowerDayNc;
