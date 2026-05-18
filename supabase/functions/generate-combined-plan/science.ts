@@ -155,6 +155,58 @@ export function brickRunTargetMiles(distance: TriRaceDistance, phase: string): n
   return Math.min(8, Math.max(1.5, Math.round(raw * 2) / 2));
 }
 
+/**
+ * §8.3 (RACE-WEEK-PROTOCOL): distance-aware race-day session spec. Replaces the
+ * prior event-name string match (`event_name.includes('santa cruz') ? 320 : 330`)
+ * + 70.3-hardcoded description. Keyed on the normalized distance tokens emitted by
+ * create-goal-and-materialize-plan `normalizeDistance` ('sprint'|'olympic'|'70.3'|
+ * 'ironman'), plus the science.ts aliases ('half'→70.3, 'full'/'140.6'→ironman).
+ * Unknown / missing → 70.3 (engine-wide default convention, matching
+ * expectedBikeDurationHours / brickRunTargetMiles defaults).
+ *
+ * Phase 2 scope decision (2026-05-18): distance-table only. Athlete-projection
+ * refinement is intentionally deferred — only `projected_bike_hours` reaches the
+ * overlay today; full RaceProjection threading is a follow-up (RACE-WEEK §8.3).
+ *
+ * Default durations: 70.3 anchored to the prior hardcoded 330 for continuity;
+ * sprint/olympic/ironman are mid-pack finish defaults (tunable constants).
+ */
+const RACE_DAY_TABLE: Record<
+  'sprint' | 'olympic' | '70.3' | 'ironman',
+  { swim_mi: number; bike_mi: number; run_mi: number; duration_min: number }
+> = {
+  sprint:  { swim_mi: 0.47, bike_mi: 12.4, run_mi: 3.1,  duration_min: 90 },
+  olympic: { swim_mi: 0.93, bike_mi: 24.8, run_mi: 6.2,  duration_min: 165 },
+  '70.3':  { swim_mi: 1.2,  bike_mi: 56,   run_mi: 13.1, duration_min: 330 },
+  ironman: { swim_mi: 2.4,  bike_mi: 112,  run_mi: 26.2, duration_min: 760 },
+};
+
+export function raceDaySessionSpec(distance: TriRaceDistance): {
+  duration_min: number;
+  tss: number;
+  description: string;
+  legs: { swim_mi: number; bike_mi: number; run_mi: number };
+} {
+  const d = String(distance || '').toLowerCase().trim();
+  const key: keyof typeof RACE_DAY_TABLE =
+    d === 'sprint' ? 'sprint' :
+    d === 'olympic' ? 'olympic' :
+    (d === 'ironman' || d === 'full' || d === '140.6') ? 'ironman' :
+    (d === '70.3' || d === 'half') ? '70.3' :
+    '70.3'; // unknown / missing → 70.3 (engine-wide default convention)
+  const row = RACE_DAY_TABLE[key];
+  const tss = Math.round(estimateSessionTSS('race', 'MODERATE', row.duration_min) * 0.9);
+  const description =
+    `Race day. Swim ${row.swim_mi}mi → Bike ${row.bike_mi}mi → Run ${row.run_mi}mi. ` +
+    `No add-on training; execute pacing and fueling.`;
+  return {
+    duration_min: row.duration_min,
+    tss,
+    description,
+    legs: { swim_mi: row.swim_mi, bike_mi: row.bike_mi, run_mi: row.run_mi },
+  };
+}
+
 /** Minimum long-run mileage by race distance and calendar phase (after TSS-derived miles). */
 export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): number {
   const peakTarget: Record<string, number> = {

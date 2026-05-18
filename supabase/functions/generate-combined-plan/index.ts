@@ -12,7 +12,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import type { CombinedPlanRequest, GoalInput, AthleteState, AthleteMemory } from './types.ts';
 import { buildPhaseTimeline, applyLoadingPattern, blockForWeek } from './phase-structure.ts';
 import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
-import { validatePlan, failedChecks } from './validator.ts';
+import { validatePlan, failedChecks, findMissingRaceDaySessions } from './validator.ts';
 import { scaledWeeklyTSS } from './science.ts';
 import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { resolveWeekConflicts, type WeekConflictContext } from '../_shared/week-conflict-resolver.ts';
@@ -324,6 +324,25 @@ Deno.serve(async (req: Request) => {
           gw.week_trade_offs = [...(gw.week_trade_offs ?? []), ...msgs];
         }
       }
+    }
+
+    // ── §8.4 hard guarantee: race-day session must always materialize ───────
+    // Internal engine invariant (RACE-WEEK-PROTOCOL §8.4): every RaceAnchor's
+    // plan week must contain exactly one type:'race' session on its dayName for
+    // that goal. A breach means the engine produced a plan with a missing or
+    // duplicate race day — abort rather than ship it silently. Distinct from
+    // (and stricter than) the soft validatePlan flow below.
+    const raceDayViolations = findMissingRaceDaySessions(generatedWeeks, raceAnchors);
+    if (raceDayViolations.length > 0) {
+      console.error('[combined-plan] §8.4 race-day invariant violated:', raceDayViolations);
+      return json(
+        {
+          success: false,
+          error: `[race-week §8.4] race-day session invariant violated: ${raceDayViolations.join('; ')}`,
+          race_day_violations: raceDayViolations,
+        },
+        500,
+      );
     }
 
     // ── Validate ───────────────────────────────────────────────────────────

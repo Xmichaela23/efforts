@@ -51,6 +51,7 @@ import {
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS, TSS_PER_HOUR,
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
+  raceDaySessionSpec,
   PHASE_TSS_RANGES,
   type TriRaceDistance,
 } from './science.ts';
@@ -1835,24 +1836,26 @@ export function buildWeek(
     }
   }
 
-  // ── Race day (chronological tri B + A) — one session; replaces anything else that day
+  // ── Race day (chronological tri B + A) — one session; replaces anything else
+  // that day. §8.4: ALWAYS materializes on the anchor's dayName, even if that
+  // day is a rest day (silent omission on race day is unacceptable; the
+  // hard-fail guard in index.ts aborts generation if this is ever missed).
+  // §8.3: distance-aware shape via raceDaySessionSpec — no event-name match.
   if (raceThisWeek) {
     const d = raceThisWeek.dayName;
     const slot = grid.get(d);
-    if (slot && !slot.isRest) {
+    if (slot) {
       const gRace = goals.find((g) => g.id === raceThisWeek.goalId) ?? primaryGoal;
-      const n = (gRace.event_name || '').toLowerCase();
-      const projMin = n.includes('santa cruz') ? 320 : 330;
-      const rawT = Math.round(estimateSessionTSS('race', 'MODERATE', projMin) * 0.9);
+      const spec = raceDaySessionSpec(gRace.distance as TriRaceDistance);
+      slot.isRest = false; // §8.4: a race day is never a rest day
       slot.sessions = [{
         day: d,
         type: 'race',
         name: gRace.event_name,
-        description:
-          'Race day. Swim 1.2mi → Bike 56mi → Run 13.1mi. No add-on training; execute pacing and fueling.',
-        duration: projMin,
-        tss: rawT,
-        weighted_tss: weightedTSS('race', rawT),
+        description: spec.description,
+        duration: spec.duration_min,
+        tss: spec.tss,
+        weighted_tss: weightedTSS('race', spec.tss),
         intensity_class: 'MODERATE',
         steps_preset: [],
         tags: ['tri_race', 'race_day', 'event', 'no_extra_training'],

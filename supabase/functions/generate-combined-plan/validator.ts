@@ -5,7 +5,7 @@
 // the plan is rejected and the caller receives an error.
 
 import type {
-  GeneratedWeek, PhaseBlock, PlanValidation, AthleteState,
+  GeneratedWeek, PhaseBlock, PlanValidation, AthleteState, RaceAnchor,
 } from './types.ts';
 import {
   MAINTENANCE_FLOORS, rampThresholds, projectedCTL,
@@ -282,4 +282,38 @@ export function failedChecks(v: PlanValidation): string[] {
   return Object.entries(v)
     .filter(([, ok]) => !ok)
     .map(([key]) => key);
+}
+
+// ── §8.4 (RACE-WEEK-PROTOCOL): race-day session hard guarantee ───────────────
+// Standalone predicate — deliberately NOT part of the soft validatePlan flow
+// (every check there is advisory: console.warn + proceed). Returns a
+// human-readable violation per RaceAnchor whose plan week does not contain
+// EXACTLY ONE type:'race' session on the anchor's dayName for that goal.
+// generate-combined-plan/index.ts enforces this as a hard-fail (aborts
+// generation) — silent omission of a race day is unacceptable (§8.4). Soft
+// validatePlan cannot express a hard-fail and does not receive raceAnchors.
+export function findMissingRaceDaySessions(
+  weeks: GeneratedWeek[],
+  raceAnchors: RaceAnchor[],
+): string[] {
+  const violations: string[] = [];
+  for (const a of raceAnchors) {
+    const wk = weeks.find((w) => w.weekNum === a.planWeek);
+    if (!wk) {
+      violations.push(
+        `week ${a.planWeek} (race "${a.eventName}", ${a.eventDate}) was not generated`,
+      );
+      continue;
+    }
+    const races = (wk.sessions ?? []).filter(
+      (s) => s.type === 'race' && s.day === a.dayName && s.serves_goal === a.goalId,
+    );
+    if (races.length !== 1) {
+      violations.push(
+        `week ${a.planWeek} ${a.dayName} (race "${a.eventName}") has ${races.length} ` +
+          `race session(s) for goal ${a.goalId}; expected exactly 1`,
+      );
+    }
+  }
+  return violations;
 }
