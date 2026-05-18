@@ -148,3 +148,57 @@ export function readStrengthOrderingPreference(
   }
   return 'endurance_first';
 }
+
+/**
+ * Orders a single day's stacked sessions: by AM/PM timing (`computeDayTimings`,
+ * driven by the athlete's `strength_ordering_preference`) then a stable
+ * discipline-rank tiebreaker (swim < bike < run < strength) then name. The
+ * single source of truth for every day-stacked render surface — AllPlansInterface
+ * weekly view + markdown export, and WorkoutCalendar cells. Previously a private
+ * copy in AllPlansInterface; surfaces that didn't call it (the weekly calendar)
+ * diverged silently (Thursday rendered Strength-above-Run for endurance_first).
+ *
+ * `getWorkout` maps a list item to its workout-shaped payload — default identity
+ * for plain workout arrays; pass `(e) => e?._src` for CalendarEvent wrappers.
+ * Pure; `[...].map(identity)` preserves element refs so `computeDayTimings`'
+ * element-keyed Map resolves correctly under any accessor.
+ */
+export function orderDayWorkoutsByTimingThenDiscipline<W>(
+  workouts: W[],
+  orderingPref: StrengthOrderingPreference,
+  getWorkout: (w: W) => any = (w) => w,
+): W[] {
+  if (!Array.isArray(workouts) || workouts.length <= 1) {
+    return Array.isArray(workouts) ? workouts.slice() : [];
+  }
+  const sorted = workouts.slice();
+  const timings = computeDayTimings(sorted.map(getWorkout), orderingPref);
+  const timingRank = (w: W): number => {
+    const gw = getWorkout(w);
+    const t = timings.get(gw) ?? gw?.timing
+      ?? (gw?.workout_metadata && typeof gw.workout_metadata === 'object' ? gw.workout_metadata.timing : null);
+    if (t === 'AM') return 0;
+    if (t === 'PM') return 2;
+    return 1;
+  };
+  const disciplineRank = (w: W): number => {
+    const gw = getWorkout(w);
+    const t = String(gw?.type || gw?.discipline || '').toLowerCase();
+    const n = String(gw?.name || '').toLowerCase();
+    if (t === 'swim' || /\bswim\b/.test(n)) return 0;
+    if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
+      return 1;
+    }
+    if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
+    if (t === 'strength') return 3;
+    return 4;
+  };
+  sorted.sort((a, b) => {
+    const tDelta = timingRank(a) - timingRank(b);
+    if (tDelta !== 0) return tDelta;
+    const dDelta = disciplineRank(a) - disciplineRank(b);
+    if (dDelta !== 0) return dDelta;
+    return String(getWorkout(a)?.name || '').localeCompare(String(getWorkout(b)?.name || ''));
+  });
+  return sorted;
+}

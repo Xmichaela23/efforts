@@ -16,6 +16,8 @@ import LoadBar from '@/components/LoadBar';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
 import { formatPlannedSwimDistanceChip } from '@/utils/swimPlanTokens';
+import { orderDayWorkoutsByTimingThenDiscipline } from '@/lib/pairing-timing';
+import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -771,6 +773,17 @@ export default function WorkoutCalendar({
     return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider, _src: ev._src }));
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
+  // Day-stacked ordering (Bug: calendar cells ignored strength_ordering_preference —
+  // 4th consumer the May-13 consolidation never wired up). One week-level dominant
+  // planId (single-plan weeks are the overwhelmingly common case; same first-found
+  // approximation TodaysEffort accepts per-day). Pref drives the shared
+  // orderDayWorkoutsByTimingThenDiscipline helper applied per day-cell below.
+  const weekPlanId = useMemo<string | null>(() => {
+    const found = events.find((e: any) => e?._src?.training_plan_id)?._src?.training_plan_id;
+    return typeof found === 'string' && found ? found : null;
+  }, [events]);
+  const { value: weekOrderingPref } = useStrengthOrderingPreference(weekPlanId);
+
   const handleDayClick = useCallback((day: Date) => {
     const dateStr = toDateOnlyString(day);
     onDateSelect && onDateSelect(dateStr);
@@ -960,7 +973,11 @@ export default function WorkoutCalendar({
       <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto)', gap: 4, flexShrink: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
-          const items = map.get(key) ?? [];
+          const items = orderDayWorkoutsByTimingThenDiscipline(
+            map.get(key) ?? [],
+            weekOrderingPref,
+            (e: any) => e?._src,
+          );
           const isToday = toDateOnlyString(new Date()) === key;
           const isSelected = !!selectedDate && selectedDate === key;
           const isActiveDay = isToday || isSelected;

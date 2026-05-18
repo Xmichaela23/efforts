@@ -22,7 +22,7 @@ import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
-import { computeDayTimings, type StrengthOrderingPreference } from '@/lib/pairing-timing';
+import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
 import {
   fetchStrengthOrderingPreference,
   useStrengthOrderingPreference,
@@ -206,51 +206,9 @@ interface AllPlansInterfaceProps {
   showCompleted?: boolean;
 }
 
-/**
- * Order one day's workouts the same way every consumer in this file should: by
- * AM/PM timing first (which already encodes `strength_ordering_preference` via
- * `computeDayTimings`), then by discipline rank as a stable tiebreaker, then by
- * name. Two consumers below depend on this — the rendered weekly view and the
- * markdown export — and they previously diverged silently when the weekly view
- * skipped the sort entirely (Thursday rendered Run-above-Lower for a
- * strength_first athlete). Single helper, single source of truth.
- */
-function orderDayWorkoutsByTimingThenDiscipline(
-  workouts: any[],
-  orderingPref: StrengthOrderingPreference,
-): any[] {
-  if (!Array.isArray(workouts) || workouts.length <= 1) {
-    return Array.isArray(workouts) ? workouts.slice() : [];
-  }
-  const sorted = workouts.slice();
-  const timings = computeDayTimings(sorted, orderingPref);
-  const timingRank = (w: any): number => {
-    const t = timings.get(w) ?? w?.timing
-      ?? (w?.workout_metadata && typeof w.workout_metadata === 'object' ? w.workout_metadata.timing : null);
-    if (t === 'AM') return 0;
-    if (t === 'PM') return 2;
-    return 1;
-  };
-  const disciplineRank = (w: any): number => {
-    const t = String(w?.type || w?.discipline || '').toLowerCase();
-    const n = String(w?.name || '').toLowerCase();
-    if (t === 'swim' || /\bswim\b/.test(n)) return 0;
-    if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
-      return 1;
-    }
-    if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
-    if (t === 'strength') return 3;
-    return 4;
-  };
-  sorted.sort((a, b) => {
-    const tDelta = timingRank(a) - timingRank(b);
-    if (tDelta !== 0) return tDelta;
-    const dDelta = disciplineRank(a) - disciplineRank(b);
-    if (dDelta !== 0) return dDelta;
-    return String(a?.name || '').localeCompare(String(b?.name || ''));
-  });
-  return sorted;
-}
+// `orderDayWorkoutsByTimingThenDiscipline` moved to `@/lib/pairing-timing`
+// (single source of truth — now also consumed by WorkoutCalendar; was a private
+// copy here that other day-stacked surfaces silently diverged from). Imported above.
 
 const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   onClose, 
