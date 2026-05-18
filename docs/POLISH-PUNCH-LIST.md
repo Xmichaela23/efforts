@@ -234,6 +234,7 @@ Separate workstream from items 1–5 (running→cycling parity + intent-aware an
 - [x] cycling TREND ≥5 same-type rides for the chart; 3–4 → one-line text summary; cycling-only — `6bf574d4` (2026-05-17)
 - [x] POWER ZONES shows all zones; total anchored to ride duration so un-binned coasting → "+Xm other" (was top-4, total didn't sum) — `80b4c285` + `8e83e5df` (2026-05-17)
 - [x] narrative trend mirrors the TREND row's series (pwr20 type-filtered else np_trend) + deterministic Arc-secondary lede guard (power-first, `ledeOpensWithArcFrame` + corrective retry) — `36a7e792` + `dcaa9f08` + `da7dbce8` (2026-05-17). Verified 0/30 Arc-lede. See SESSION-CONTEXT §7.
+- [x] INSIGHTS plain-language polish — translate IF/VI/EF/HR-decoupling/ACWR/TSB to plain words + "so what" context + 3–4 sentences; deterministic `summaryHasJargon` guard folded into the combined retry — `98c04e2f` + `d6da072c` + `d02abfe4` (2026-05-17). Verified jargon 0/30. See SESSION-CONTEXT §7 (3-guard-stack footgun).
 
 ### Open
 - [x] historical `avg_hr` resolves null → TREND HR line never draws — `4177c05c` (2026-05-17). Loop SELECT + `hrH` resolve `computed.overall.avg_hr ?? fact_packet_v1.facts.avg_hr ?? r.avg_heart_rate`; backfill verified 26/26 trends draw the dashed line. Q-007 closed.
