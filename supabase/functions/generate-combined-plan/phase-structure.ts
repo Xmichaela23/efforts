@@ -86,6 +86,14 @@ export function buildPhaseTimeline(
   athleteState: AthleteState,
 ): { blocks: PhaseBlock[]; totalWeeks: number; raceAnchors: RaceAnchor[] } {
 
+  // §8.1: capture the GENUINE user-set priority-A tri goal BEFORE the no-A
+  // fallback below mutates sortedGoals[0].priority (shared object refs). The
+  // chronology guard must fire only on real user misconfiguration, never the
+  // synthetic default.
+  const isTriGoal = (g: GoalInput) =>
+    ['triathlon', 'tri'].includes(String(g.sport || '').toLowerCase());
+  const genuineATriId = goals.find((g) => g.priority === 'A' && isTriGoal(g))?.id ?? null;
+
   // Sort A-priority goals by date, then B, then C
   const priority = { A: 0, B: 1, C: 2 };
   const sortedGoals = [...goals].sort((a, b) => {
@@ -113,6 +121,11 @@ export function buildPhaseTimeline(
     .filter(g => ['triathlon', 'tri'].includes(String(g.sport || '').toLowerCase()))
     .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
 
+  // §8.1: the A-race is the genuine user priority-A tri; absent that, the
+  // chronologically-last tri is the season goal (prior calendar-order behavior).
+  const chronoLastTri = chronoTri[chronoTri.length - 1];
+  const aTriId = genuineATriId ?? chronoLastTri?.id ?? null;
+
   const raceAnchors: RaceAnchor[] = chronoTri.map((g) => {
     const pw = planWeekForCalendarEvent(startDate, g.event_date);
     return {
@@ -121,12 +134,32 @@ export function buildPhaseTimeline(
       eventDate: g.event_date,
       planWeek: pw,
       dayName: eventDayNameFromIso(g.event_date),
+      // §8.1: 'A' = the A-race (genuine user priority-A tri, else season-final
+      // tri); every other race is 'B' (secondary / raced-through).
+      priority: g.id === aTriId ? 'A' : 'B',
     };
   });
 
   if (chronoTri.length >= 2) {
+    // §8.1 (RACE-WEEK-PROTOCOL): A/B is priority-driven, NOT calendar-order.
+    // Chronology guard (decision 2026-05-18): if the GENUINE user priority-A
+    // race is not the chronologically-last tri race, hard-fail rather than
+    // silently mis-plan (a B-race must not fall after the A-race). When the
+    // user set no priority-A tri, the season-final tri is the de-facto A
+    // (prior calendar-order behavior — no regression, no guard).
+    const genuineATri = genuineATriId
+      ? chronoTri.find((g) => g.id === genuineATriId)
+      : undefined;
+    if (genuineATri && genuineATri.id !== chronoLastTri.id) {
+      throw new Error(
+        `[race-week §8.1] priority-A race "${genuineATri.event_name}" ` +
+          `(${genuineATri.event_date}) is not the chronologically-last race ` +
+          `("${chronoLastTri.event_name}", ${chronoLastTri.event_date}); a B-race ` +
+          `cannot fall after the A-race. Fix goal priorities or event dates.`,
+      );
+    }
     const g1 = chronoTri[0];
-    const g2 = chronoTri[1];
+    const g2 = chronoTri.find((g) => g.id === aTriId) ?? chronoTri[1];
     const w1 = planWeekForCalendarEvent(startDate, g1.event_date);
     const w2 = planWeekForCalendarEvent(startDate, g2.event_date);
     if (w1 >= 1 && w2 > w1) {
@@ -222,6 +255,13 @@ export function buildPhaseTimeline(
 
   // Ensure we have blocks covering all weeks
   fillGaps(blocks, totalWeeks, lastAGoal, athleteState);
+
+  // §8.1 carriage (Phase 1): tag the block covering each race week with that
+  // race's A/B priority. Annotation only — no consumer reads it yet (Phase 3).
+  for (const a of raceAnchors) {
+    const blk = blocks.find((b) => a.planWeek >= b.startWeek && a.planWeek <= b.endWeek);
+    if (blk) blk.race_week = a.priority;
+  }
 
   return { blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), totalWeeks, raceAnchors };
 }

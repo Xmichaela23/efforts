@@ -528,6 +528,7 @@ function computeWeekMetrics(
   isRecovery: boolean,
   weekTradeOffs?: string[],
   conflictEvents?: ConflictEvent[],
+  raceWeek?: 'A' | 'B' | null,
 ): GeneratedWeek {
   const sport_raw_tss: Record<Sport, number> = { run: 0, bike: 0, swim: 0, strength: 0, race: 0 };
   let total_raw = 0, total_weighted = 0, z12min = 0, z3min = 0;
@@ -565,6 +566,7 @@ function computeWeekMetrics(
     zone1_2_minutes: Math.round(z12min),
     zone3_plus_minutes: Math.round(z3min),
     eighty_twenty_ratio: totalMin > 0 ? z12min / totalMin : 1,
+    ...(raceWeek ? { race_week: raceWeek } : {}),
     ...(mergedTradeOffs.length > 0 ? { week_trade_offs: mergedTradeOffs } : {}),
     ...(conflictEvents && conflictEvents.length > 0 ? { conflict_events: conflictEvents } : {}),
   };
@@ -1971,7 +1973,7 @@ export function buildWeek(
   // pairings (Lower strength + Quality Run / Quality Bike / Long Ride / Easy Run / Easy Bike).
   // Conformance validator (Task F) hard-fails missing metadata on these pairings.
   attachSameDayPairingMetadata(allSessions, athleteState);
-  return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs, conflictEvents);
+  return computeWeekMetrics(allSessions, weekNum, phase, isRecovery, mergedTradeOffs, conflictEvents, raceThisWeek?.priority ?? null);
 }
 
 /**

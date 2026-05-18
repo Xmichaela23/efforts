@@ -338,6 +338,12 @@ export interface PhaseBlock {
    * higher-level "how far past the race am I" tag for diagnostics + future consumers).
    */
   weeksSinceRaceIncludingRebuild?: number;
+  /**
+   * §8.1 carriage (Phase 1): 'A'|'B' when this block covers a race week (from the
+   * covering RaceAnchor's priority); null/undefined otherwise. Carriage only —
+   * no consumer reads it for load shaping yet (that is Phase 3).
+   */
+  race_week?: 'A' | 'B' | null;
 }
 
 export interface EventRelationship {
@@ -352,6 +358,12 @@ export interface RaceAnchor {
   eventDate: string; // YYYY-MM-DD
   planWeek: number; // 1-based
   dayName: string; // e.g. "Saturday" — matches `DAYS_OF_WEEK` in week-builder
+  /**
+   * §8.1 (RACE-WEEK-PROTOCOL): 'A' = the priority-A race (full taper protection,
+   * macrocycle terminus); 'B' = secondary / "raced through" (priority 'B' or 'C'
+   * both map to 'B'). Priority-driven, not calendar-order — see buildPhaseTimeline.
+   */
+  priority: 'A' | 'B';
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
@@ -473,6 +485,12 @@ export interface GeneratedWeek {
   week_trade_offs?: string[];
   /** Structured conflicts / resolutions for resolver + Arc (week-builder only today). */
   conflict_events?: ConflictEvent[];
+  /**
+   * §8.1 carriage (Phase 1): 'A'|'B' when this week IS a race week (weekNum ===
+   * a RaceAnchor.planWeek), from that anchor's priority; null otherwise. Carriage
+   * only — no load-shaping consumer yet (Phase 3).
+   */
+  race_week?: 'A' | 'B' | null;
 }
 
 // ── Output ───────────────────────────────────────────────────────────────────
