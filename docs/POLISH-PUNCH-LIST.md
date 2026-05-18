@@ -208,6 +208,7 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 - [ ] Brick session not appearing in plan export markdown
 - [ ] Schedule Adjustments panel should hide when generation_trade_offs is empty after filtering
 - [ ] Bypass-path audit for strength_intent normalization
+- [ ] **`phase-structure.ts:97-102` no-user-A `totalWeeks` truncation** — when no goal is genuinely priority-A, `:100` mutates `sortedGoals[0].priority='A'` (priority-then-date sort ⇒ the *earliest* goal), so `lastAGoal`/`aRaceWeek`/`totalWeeks` (`:104-107`) are computed from the *earlier* race → a no-user-A multi-tri plan can truncate before the later (season-final) race. **Discovered during race-week Phase 1 (`4a63f44e`); pre-existing, NOT introduced there.** Not blocking — real plans set a priority-A goal; Phase 1's genuine-priority capture sidesteps it for A/B *tagging* but does not fix the `totalWeeks` path. Fix is risky: the `:97-102` mutation also feeds the non-tri / `aGoals` branches, so it needs a scoped fix (derive `lastAGoal` from the chronologically-last goal, or stop mutating shared refs) + its own regression set. Candidate for race-week Phase 4 cleanup or a standalone ticket.
 
 ---
 
