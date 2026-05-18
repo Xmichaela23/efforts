@@ -192,7 +192,13 @@ export function humanizeScheduleTradeOffLine(raw: string): string {
   }
 
   s = s.replace(/^CO_EQUAL_STRENGTH:\s*/i, '');
-  s = s.replace(/\bEXPERIENCE_MODIFIER\b/g, 'intentional same-day pairing');
+  // Bug 1 Piece B: strip engine-internal jargon (SCHEDULING-RULES §7.4 — engine
+  // language stays in code). Covers BOTH `EXPERIENCE_MODIFIER` (underscore) and
+  // the space form `EXPERIENCE MODIFIER` (week-optimizer.ts:1601/1753), and the
+  // `(preferred N)` spacing-preference index (week-optimizer.ts:1506/1626). Line
+  // stays surfaced — only the jargon token is removed (D-017: strip, not suppress).
+  s = s.replace(/\bEXPERIENCE[ _]MODIFIER\b/g, 'intentional same-day pairing');
+  s = s.replace(/\s*\(preferred\s+\d+\)/gi, '');
 
   const pref = /^(\w+):\s*/.exec(s);
   if (pref && ['quality_bike', 'quality_run', 'easy_bike', 'easy_run'].includes(pref[1])) {

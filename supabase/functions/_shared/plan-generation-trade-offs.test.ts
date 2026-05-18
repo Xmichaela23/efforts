@@ -353,6 +353,11 @@ Deno.test('Bug 1: spacing-relaxed line also realigned', () => {
     enriched.trade_offs.some((t) => /upper on Tuesday/i.test(t) && /lower on Friday/i.test(t)),
     `expected spacing line rewritten — got ${JSON.stringify(enriched.trade_offs)}`,
   );
+  // Bug 1 Piece B: the `(preferred N)` engine-internal index must be stripped.
+  assert(
+    !enriched.trade_offs.some((t) => /\(preferred\s+\d+\)/i.test(t)),
+    `expected (preferred N) jargon stripped — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
 });
 
 Deno.test('Bug 1: rewrite deduplicates two lines that collapse to the same realized text', () => {
@@ -446,6 +451,16 @@ Deno.test('§6.5: omitting strengthOrderingPreference defaults to endurance_firs
   assert(
     enriched.trade_offs.some((t) => /AM run \/ PM lift/i.test(t)),
     `expected "AM run / PM lift" preserved when preference omitted — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+  // Bug 1 Piece B: this fixture is the space-form `EXPERIENCE MODIFIER` case —
+  // Change 2's humanize must strip it (covers BOTH underscore and space forms).
+  assert(
+    !enriched.trade_offs.some((t) => /EXPERIENCE[ _]MODIFIER/i.test(t)),
+    `expected space-form "EXPERIENCE MODIFIER" jargon stripped — got ${JSON.stringify(enriched.trade_offs)}`,
+  );
+  assert(
+    enriched.trade_offs.some((t) => /intentional same-day pairing/i.test(t)),
+    `expected "EXPERIENCE MODIFIER" → "intentional same-day pairing" — got ${JSON.stringify(enriched.trade_offs)}`,
   );
 });
 

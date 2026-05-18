@@ -1234,9 +1234,13 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
         place(days, d, 'lower_body_strength', { timing: 'PM' });
         qualityRunDay = d;
         consolidatedQrLowerDay = d;
-        trade_offs.push(
-          `quality_run + lower_body_strength consolidated on ${tfDay(d)} (AM run / PM lift) — performance + co-equal; no standalone quality_run slot (EXPERIENCE_MODIFIER).`,
-        );
+        // Bug 1 Piece B / D-017 follow-up: do NOT emit a consolidation trade-off
+        // here. This fires at canonical-pattern time; the builder can later split
+        // the day (`enforceHardEasy(grid, allowConsolidatedHardException=false)`),
+        // so this string named a day that may not realize (stale duplicate vs the
+        // builder-side, realized-accurate `collectQualityRunLowerBodyTradeOffs`,
+        // which owns this message). Coverage gate verified: the builder emits
+        // whenever the realized plan actually has QR+lower consolidated.
         break;
       }
     }

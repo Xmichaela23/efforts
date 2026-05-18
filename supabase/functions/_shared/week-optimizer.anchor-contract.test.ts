@@ -502,13 +502,19 @@ Deno.test({
       `expected lower on Thursday (consolidated AM/PM with quality_run); got ${JSON.stringify(lowerSlot)}`,
     );
 
-    // Consolidated hard-day trade-off (existing message) must fire.
+    // Bug 1 Piece B (D-017 follow-up): the OPTIMIZER no longer emits the
+    // consolidation trade-off — it fired at canonical-pattern time and could
+    // name a day the builder later split. The realized-accurate message is now
+    // owned solely by the builder-side `collectQualityRunLowerBodyTradeOffs`
+    // (not exercised by this optimizer-only unit). Placement is unchanged —
+    // the lower=Thursday / 2×-strength assertions above prove consolidation
+    // still happens; only the stale duplicate string is gone here.
     const consolidatedHit = week.trade_offs.some((t) =>
       /consolidated/i.test(String(t)) && /AM run \/ PM lift/i.test(String(t))
     );
     assert(
-      consolidatedHit,
-      `expected consolidated-hard-day trade-off; got: ${JSON.stringify(week.trade_offs)}`,
+      !consolidatedHit,
+      `optimizer must NOT emit the consolidation trade-off (builder-side owns it; Bug 1 Piece B); got: ${JSON.stringify(week.trade_offs)}`,
     );
 
     // §4.21 HARD/SOFT trade-off must NOT fire — placement is CLEAN.
