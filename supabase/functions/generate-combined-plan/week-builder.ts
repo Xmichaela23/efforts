@@ -1869,9 +1869,22 @@ export function buildWeek(
   }
 
   // ── Step 4: Hard/Easy enforcement ────────────────────────────────────────
-  // Consolidated hard day (quality run + lower body same day) removed — splits stress across days
-  // and reduces injury risk (hard intervals + heavy lower-body same PM is a poor default).
-  const allowConsolidatedHardException = false;
+  // Theme B Slice 2b (#3 / CONSOLIDATED-MODE §4 #3, §7). Default-OFF: a consolidated
+  // QR+lower hard day splits stress poorly for most athletes (hard intervals + heavy
+  // lower-body same PM). The builder is the AUTHORITATIVE §7 gate (the optimizer is
+  // phase-blind by design) — grant the exception ONLY for a consolidated-mode athlete
+  // in a genuine ≥2×-strength build phase, explicitly excluding race week + taper /
+  // recovery / rebuild (R-1: rebuild is NOT auto-inert — strFreqForPhase returns 2 for
+  // 'rebuild'; CONSOLIDATED-MODE §7's "natural gate" wording is corrected at close-out).
+  // Separated/unset → false ⇒ every athlete still gets today's QR+lower MODERATE
+  // downgrade (zero shipped-path change; the literal was false for everyone incl. perf+co-eq).
+  const allowConsolidatedHardException =
+    athleteState.integration_mode === 'consolidated' &&
+    !raceThisWeek &&
+    phase !== 'taper' &&
+    phase !== 'recovery' &&
+    phase !== 'rebuild' &&
+    strFreq >= 2;
   enforceHardEasy(grid, allowConsolidatedHardException);
 
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
