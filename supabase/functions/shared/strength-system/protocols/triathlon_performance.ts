@@ -724,14 +724,15 @@ function perfBaseUpper(
       target_rir: rir,
     });
     // §3.3 pattern coverage: vertical push is required across the week's upper sessions; OHP
-    // anchors the base session per S-003 (separate progression curve — see notes at OHP entries).
+    // anchors the base session per S-003. Ramps on the within-phase %1RM table like every
+    // other compound — STRENGTH-PROTOCOL §3.1/P-003 has NO OHP carve-out (the prior flat
+    // 72% / "shoulder mechanics" rationale was fabricated; see OHP-progression close-out).
     ex.push({
       name: 'Standing Barbell Overhead Press',
       sets: 3,
       reps: '8-10',
-      weight: '72% 1RM',
+      weight: `${basePct}% 1RM`,
       target_rir: rir,
-      notes: 'Vertical push — shoulder mechanics anchor (flat curve, not basePct)',
     });
     if (hasCable) {
       ex.push({
@@ -778,7 +779,8 @@ function perfBaseUpper(
       ...(dbCtx.hasBench ? {} : { notes: 'No bench — floor press substitute (limited ROM; squeeze hard at lockout)' }),
     });
     // §3.3 pattern coverage: DB tier vertical push via DB Shoulder Press (S-003).
-    const ohp = dbPrescription({ pctOfBarbell1RM: 0.72, oneRMLb: dbCtx.overhead1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
+    // OHP ramps on the base table like the barbell branch (no flat carve-out).
+    const ohp = dbPrescription({ pctOfBarbell1RM: basePct / 100, oneRMLb: dbCtx.overhead1RM, baseReps: '8-10', dbMaxLb: dbCtx.dbMaxLb });
     if (ohp.capped) cappedAny = true;
     ex.push({
       name: 'DB Shoulder Press',
@@ -1000,7 +1002,7 @@ function perfBuildUpper(
       name: 'Standing Barbell Overhead Press',
       sets: 3,
       reps: '5-6',
-      weight: '72% 1RM',
+      weight: `${buildPct}% 1RM`,
       target_rir: rir,
     });
   } else {

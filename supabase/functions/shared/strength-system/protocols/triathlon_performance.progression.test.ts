@@ -101,6 +101,18 @@ Deno.test('base hypertrophy: row + bench track the same progression', () => {
   }
 });
 
+Deno.test('base hypertrophy: OHP ramps with the base table (regression: the flat-80lb bug)', () => {
+  // The reported bug: OHP flat at 80 lb across base W1-9 while every other lift
+  // progressed. OHP now tracks the base %1RM table (S-003 required compound;
+  // STRENGTH-PROTOCOL §3.1/P-003 — no OHP carve-out). Locks both barbell + DB.
+  const expected = [65, 68, 70, 72];
+  for (let wip = 1; wip <= 4; wip++) {
+    const sessions = triathlonPerformanceProtocol.createWeekSessions(ctxWithPhase('base', wip));
+    const ohp = find(upperOf(sessions), /Overhead Press/i);
+    assertEquals(ohp?.weight, `${expected[wip - 1]}% 1RM`, `OHP base wip=${wip}`);
+  }
+});
+
 Deno.test('base hypertrophy: description quotes the emitted %1RM literally', () => {
   for (const wip of [1, 2, 3, 4]) {
     const pct = [65, 68, 70, 72][wip - 1];
@@ -152,13 +164,16 @@ Deno.test('build: row tracks the same progression (bench anchor preserved)', () 
   }
 });
 
-Deno.test('build: OHP stays flat at 72% (secondary lift — different anchor, different curve)', () => {
-  // Shoulder mechanics tolerate a different progression curve; per spec the within-phase table
-  // applies to main compounds (deadlift/squat/row/bench). OHP keeps its baseline.
-  for (const wip of [1, 2, 3, 4]) {
+Deno.test('build: OHP ramps with the build table like other compounds (STRENGTH-PROTOCOL §3.1/P-003 — no OHP carve-out)', () => {
+  // OHP is a required compound (S-003) and progresses on the within-phase %1RM
+  // table like deadlift/squat/row/bench. The prior "flat 72%, per spec" lock was
+  // a FABRICATED rationale — the spec has no OHP exception (OHP-progression fix,
+  // 2026-05-19; see DECISIONS-LOG close-out).
+  const expected = [78, 80, 83, 85];
+  for (let wip = 1; wip <= 4; wip++) {
     const sessions = triathlonPerformanceProtocol.createWeekSessions(ctxWithPhase('build', wip));
     const ohp = find(upperOf(sessions), /Overhead Press/i);
-    assertEquals(ohp?.weight, '72% 1RM', `OHP build wip=${wip} should stay flat at 72`);
+    assertEquals(ohp?.weight, `${expected[wip - 1]}% 1RM`, `OHP build wip=${wip}`);
   }
 });
 
