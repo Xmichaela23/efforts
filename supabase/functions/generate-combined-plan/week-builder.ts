@@ -1890,7 +1890,7 @@ export function buildWeek(
   // ── Step 5: 80/20 compliance ──────────────────────────────────────────────
   const week8020TradeOffs = enforce8020(grid, phase);
 
-  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid), bikeQualityDay, athleteState);
+  const qrLbTradeOffStrings = collectQualityRunLowerBodyTradeOffs(gridSessions(grid), bikeQualityDay, athleteState, allowConsolidatedHardException);
 
   // Same-day product matrix: validate what we ship; attempt strength-only auto-fix; always log if still bad.
   // Performance + co-equal strength athletes may combine quality_run AM + lower_body PM (EXPERIENCE_MODIFIER).
@@ -2131,6 +2131,7 @@ function collectQualityRunLowerBodyTradeOffs(
   sessions: PlannedSession[],
   _bikeQualityDayResolved: string,
   athleteState: AthleteState,
+  allowConsolidatedHardException: boolean,
 ): string[] {
   const byDay = new Map<string, PlannedSession[]>();
   for (const s of sessions) {
@@ -2154,6 +2155,27 @@ function collectQualityRunLowerBodyTradeOffs(
         : 'run before lifting when stacked';
       return [
         `Concentrated load day — lower-body strength landed the same day as your mid-week quality run (${orderingClause}). Intentional pairing around anchors / co-equal spacing. Concentrated load day with a recovery day after — better for both adaptations than splitting across adjacent days.`,
+      ];
+    }
+  }
+  // Theme B Slice 3 (CONSOLIDATED-MODE §6, D-018): inverse trade-off. The
+  // same-day case returned above, so mutual exclusivity is structural. If a
+  // consolidated-mode athlete's consolidation was NOT realized this week
+  // (anchors / recovery / the §7 split kept QR and lower apart), explain the
+  // separated fallback. `allowConsolidatedHardException` IS the Slice-2b §7
+  // gate (integration_mode==='consolidated' && !raceThisWeek && phase ∉
+  // {taper,recovery,rebuild} && strFreq>=2) — single source of truth;
+  // builder-only, no optimizer emit (D-018 sole-owner).
+  if (allowConsolidatedHardException) {
+    const hasQualityRunSomewhere = sessions.some(
+      (s) => s.type === 'run' && (s.tags?.includes('quality') ?? false),
+    );
+    const hasLowerBodySomewhere = sessions.some(
+      (s) => s.type === 'strength' && (s.tags?.includes('lower_body') ?? false),
+    );
+    if (hasQualityRunSomewhere && hasLowerBodySomewhere) {
+      return [
+        `Separated load — kept your mid-week quality run and lower-body strength on different days this week (anchors / recovery rules blocked the consolidated hard day). The 24h-apart arrangement protects both adaptations as the fallback when same-day pairing wasn't possible.`,
       ];
     }
   }
