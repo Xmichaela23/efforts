@@ -93,6 +93,7 @@ Swim volume is **not flat across a phase**. Each slot's yardage ramps **linearly
 - Base yardage is **0.8×** the build-ramp curve; taper is a fixed **0.6×** scale (no ramp); recovery returns its band (no ramp).
 - `weekInPhase` **must** be the recovery-non-resetting in-phase position (`weekInPhaseForTimeline(phaseBlocks, weekNum, block)`) — **never** `weekNum − block.startWeek + 1` / `weekInBlock`, which per **ADR 0002** is always `1` and silently flattens the ramp (this rule exists so that defect cannot regress).
 - Applies to **base, build, and race-specific** (all three use this `phaseProgress` mechanism). §4.2/§4.3 inherit this rule; taper/recovery excepted as above.
+- **Endpoint mapping (resolve path):** in `swim-protocol-volumes.ts:resolveSwimSlotYardsWithBudget`, the (`distance`, `fitness`, `phase`, `session_type`) **band IS the envelope** — `START = band_floor` (`getProtocolFloor`), `PEAK = band_ceil` (`getProtocolCeiling`). Final yards = `roundYards(lerp(band_floor, band_ceil, phaseProgress(weekInPhase, rampWeeks)))`. The per-slot `*_START_YDS`/`*_PEAK_YDS` constants in `_shared/swim-program-templates.ts` define the **preliminary** template (shape across slots/distances/phases) consumed upstream; the band-lerp here is the final, ratified value. Floor/ceil functions are untouched — band as envelope, ramp interpolates within.
 
 ### 4.2 Build phase (weeks 7-10)
 

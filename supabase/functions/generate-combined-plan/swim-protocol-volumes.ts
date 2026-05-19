@@ -4,7 +4,16 @@
  */
 
 import type { Phase } from './types.ts';
-import type { SwimDistanceKey, SwimSessionType, SwimSlotTemplate } from '../_shared/swim-program-templates.ts';
+import {
+  BUILD_RAMP_WEEKS,
+  RACE_SPECIFIC_RAMP_WEEKS,
+  lerp,
+  phaseProgress,
+  roundYards,
+  type SwimDistanceKey,
+  type SwimSessionType,
+  type SwimSlotTemplate,
+} from '../_shared/swim-program-templates.ts';
 import {
   enduranceOverdistanceWindowActive,
   type SwimTrainingFitness,
@@ -377,6 +386,15 @@ export function resolveSwimSlotYardsWithBudget(opts: {
     swimSlotIndex: i,
   });
 
+  // SWIM-PROTOCOL §4.1 — within-phase ramp.
+  // Band IS the envelope: START = band_floor, PEAK = band_ceil. Final yards =
+  // lerp(floor, ceil, phaseProgress(weekInPhase, rampWeeks)). Taper/recovery
+  // skip the ramp (taper has its own scaled band; recovery returns its band).
+  const rampWeeks =
+    opts.phase === 'race_specific' ? RACE_SPECIFIC_RAMP_WEEKS : BUILD_RAMP_WEEKS;
+  const useBandLerp =
+    opts.phase === 'base' || opts.phase === 'build' || opts.phase === 'race_specific';
+
   const clampAll = (): void => {
     for (let i = 0; i < yards.length; i++) {
       const t = templates[i]!;
@@ -384,7 +402,11 @@ export function resolveSwimSlotYardsWithBudget(opts: {
       const ceil = getProtocolCeiling(opts.distance, opts.fitness, opts.phase, t.session_type, {
         weekInPhase: opts.weekInPhase,
       });
-      yards[i] = Math.min(ceil, Math.max(floor, yards[i]!));
+      if (useBandLerp) {
+        yards[i] = roundYards(lerp(floor, ceil, phaseProgress(opts.weekInPhase, rampWeeks)));
+      } else {
+        yards[i] = Math.min(ceil, Math.max(floor, yards[i]!));
+      }
       yards[i] = snapProtocolYards(yards[i]!, t.session_type);
       yards[i] = Math.min(ceil, Math.max(floor, yards[i]!));
     }

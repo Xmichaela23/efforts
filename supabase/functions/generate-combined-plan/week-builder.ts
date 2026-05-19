@@ -1128,6 +1128,14 @@ export function buildWeek(
     swimSingleRecovery &&
     shouldMaintainTwoSwimsInRecovery(athleteState.swim_experience, trainFitness, swimAnchorSlots);
 
+  // SWIM-PROTOCOL §4.1 within-phase volume ramp: recovery-non-resetting in-phase
+  // week index, mirroring weekInPhaseForBrick (:758-760). `weekInBlock` is ALWAYS
+  // 1 (ADR 0002) — passing it flattened the base/build/race_specific swim ramp
+  // (the dormant designed curve never advanced). This is that fix.
+  const swimWeekInPhase = options?.phaseBlocks?.length
+    ? weekInPhaseForTimeline(options.phaseBlocks, weekNum, block)
+    : 1;
+
   let swimTemplates: SwimSlotTemplate[];
   if (!hasTri) {
     swimTemplates = [];
@@ -1136,7 +1144,7 @@ export function buildWeek(
   } else if (swimSingleRecovery) {
     swimTemplates = [getRecoverySwimTemplate()];
   } else {
-    swimTemplates = getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, weekInBlock, {
+    swimTemplates = getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, swimWeekInPhase, {
       athleteFitness: trainFitness,
       planWeekNumber: weekNum,
     });
@@ -1144,7 +1152,7 @@ export function buildWeek(
       swimIntent: swimTemplatesIntent,
       phase,
       swimDistance,
-      weekInBlock,
+      swimWeekInPhase,
       swimAnchorSlots,
       swimProgramAnchorSlots,
       athlete_swim_intent_raw: athleteState.swim_intent,
@@ -1183,7 +1191,7 @@ export function buildWeek(
     distance: swimDistance,
     fitness: trainFitness,
     phase,
-    weekInPhase: weekInBlock,
+    weekInPhase: swimWeekInPhase,
     swim_anchor_slot_count: swimAnchorSlots,
     ...(athleteState.structural_load_hint === 'low' &&
       inRecoveryRebuildTransition &&
@@ -1210,7 +1218,7 @@ export function buildWeek(
     primaryGoal,
     athleteState,
     phase,
-    weekInPhase: weekInBlock,
+    weekInPhase: swimWeekInPhase,
     hasTri,
     swimSingleRecovery,
     swimPct,
@@ -1225,7 +1233,7 @@ export function buildWeek(
       raceDistance: swimDistance,
       athleteFitness: trainFitness,
       phase,
-      weekInPhase: weekInBlock,
+      weekInPhase: swimWeekInPhase,
       sessionType: 'endurance',
     });
   });

@@ -80,8 +80,8 @@ const BASE_VS_BUILD_YARD_SCALE = 0.8;
 const TAPER_YARD_SCALE = 0.6;
 
 /** Weeks over which build targets ramp from start → peak (1-indexed weekInPhase). */
-const BUILD_RAMP_WEEKS = 6;
-const RACE_SPECIFIC_RAMP_WEEKS = 4;
+export const BUILD_RAMP_WEEKS = 6;
+export const RACE_SPECIFIC_RAMP_WEEKS = 4;
 // ── 70.3 focus: slot order = [quality day, easy/technique day, third day] ─────
 const FOCUS_70_3_SLOT_META: Omit<SwimSlotTemplate, 'target_yards'>[] = [
   {
@@ -127,18 +127,18 @@ function clamp01(t: number): number {
   return t;
 }
 
-function lerp(a: number, b: number, t: number): number {
+export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
 /** 1-based week index → [0,1] progress within phase ramp. */
-function phaseProgress(weekInPhase: number, rampWeeks: number): number {
+export function phaseProgress(weekInPhase: number, rampWeeks: number): number {
   const w = Math.max(1, Math.round(weekInPhase));
   if (rampWeeks <= 1) return 1;
   return clamp01((w - 1) / (rampWeeks - 1));
 }
 
-function roundYards(n: number): number {
+export function roundYards(n: number): number {
   return Math.max(200, Math.round(n / 50) * 50);
 }
 
