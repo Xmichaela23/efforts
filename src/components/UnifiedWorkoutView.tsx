@@ -221,6 +221,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     hydratedPlanned,
     setHydratedPlanned,
     currentPlannedId,
+    setCurrentPlannedId,
     isLinked,
   } = usePlannedWorkoutLink({
     workout,

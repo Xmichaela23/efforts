@@ -41,6 +41,7 @@ export function usePlannedWorkoutLink({
   hydratedPlanned: any | null;
   setHydratedPlanned: Dispatch<SetStateAction<any | null>>;
   currentPlannedId: string | null;
+  setCurrentPlannedId: Dispatch<SetStateAction<string | null>>;
   isLinked: boolean;
 } {
   const [currentPlannedId, setCurrentPlannedId] = useState<string | null>((workout as any)?.planned_id || null);
@@ -195,5 +196,5 @@ export function usePlannedWorkoutLink({
     );
   }, [updatedWorkoutData, workout, currentPlannedId, linkedPlanned]);
 
-  return { linkedPlanned, setLinkedPlanned, hydratedPlanned, setHydratedPlanned, currentPlannedId, isLinked };
+  return { linkedPlanned, setLinkedPlanned, hydratedPlanned, setHydratedPlanned, currentPlannedId, setCurrentPlannedId, isLinked };
 }
