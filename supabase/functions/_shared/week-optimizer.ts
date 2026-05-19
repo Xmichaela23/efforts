@@ -409,8 +409,12 @@ function canPlaceWithModifier(
   // chose `strength_first` ordering preference ALSO unlock this consolidation regardless of
   // training_intent. They opted into the consolidation trade-off via the wizard. Endurance_first
   // (default) preserves stricter separation per user directive.
+  // Theme B Slice 2 (#1a): additive OR-branch — `integration_mode==='consolidated'`
+  // unlocks same-day QR+lower for any athlete. Existing perf+co-equal / strength_first
+  // clause unchanged (parens explicit); separated/unset → byte-identical.
   const allowConsolidation =
-    isCoEq && (isPerf || athlete.strength_ordering_preference === 'strength_first');
+    (isCoEq && (isPerf || athlete.strength_ordering_preference === 'strength_first'))
+    || athlete.integration_mode === 'consolidated';
   if (allowConsolidation) {
     if (kind === 'lower_body_strength' && there === 'quality_run') return true;
     if (kind === 'quality_run' && there === 'lower_body_strength') return true;
@@ -1177,7 +1181,16 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     }
 
     const preferredQr = inputs.preferences.quality_run;
-    if (preferredQr && !qualityRunDay) {
+    const strengthFreqEarly = inputs.preferences.strength_frequency;
+    // Theme B Slice 2 (#2): a consolidated athlete gets QR+lower SAME-DAY as the
+    // PREFERRED placement — skip the separated preferred-QR block so the
+    // consolidation block below runs first. Byte-identical when false (separated/
+    // unset, incl. perf+co-equal who never set integration_mode → order unchanged,
+    // anchor-contract :196 lock holds). §7 phase carve-out is builder-authoritative
+    // (optimizer is phase-blind); only strFreq>=2 gates here.
+    const consolidatedPreferred =
+      inputs.athlete.integration_mode === 'consolidated' && strengthFreqEarly >= 2;
+    if (preferredQr && !qualityRunDay && !consolidatedPreferred) {
       if (
         !blockedQr.has(preferredQr) &&
         canPlace(days, preferredQr, 'quality_run') &&
@@ -1192,8 +1205,6 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
       }
     }
 
-    const strengthFreqEarly = inputs.preferences.strength_frequency;
-
     // §6.1.5 optimizer preference 1 — consolidation (AM quality_run / PM lower same calendar
     // day, §5.2 matrix). Gate widened per v2.1-plus-§6.1 refinement:
     //   - `isPerf && isCoEq` — original performance+co-equal path (Race the clock + Hybrid)
@@ -1202,9 +1213,10 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
     //     consolidation trade-off. `endurance_first` (default) preserves separation per their
     //     stated race-performance prioritization.
     // §4.5 forbids quality_run on the calendar day after quality_bike — do not use day-after-QB here.
+    // Theme B Slice 2 (#1b): additive OR-branch (mirror of #1a).
     const allowConsolidation =
-      isCoEq &&
-      (isPerf || inputs.athlete.strength_ordering_preference === 'strength_first');
+      (isCoEq && (isPerf || inputs.athlete.strength_ordering_preference === 'strength_first'))
+      || inputs.athlete.integration_mode === 'consolidated';
     if (
       !qualityRunDay &&
       allowConsolidation &&
@@ -1249,6 +1261,10 @@ export function deriveOptimalWeek(inputs: WeekOptimizerInputs): OptimalWeek {
 
     if (!qualityRunDay) {
       const prio: DayName[] = [];
+      // Theme B Slice 2 (R-3): a consolidated athlete whose consolidation was
+      // blocked still gets their preferred quality_run day (separated) — try it
+      // first. Inert when !consolidatedPreferred (separated/unset → byte-identical).
+      if (consolidatedPreferred && preferredQr) prio.push(preferredQr);
       if (qualityBikeDay) {
         prio.push(nDaysAfter(qualityBikeDay, 2));
         prio.push(dayBefore(qualityBikeDay));
