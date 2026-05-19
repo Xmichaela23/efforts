@@ -203,6 +203,10 @@ function buildWeekOptimizerInputs(state: AthleteState): WeekOptimizerInputs | nu
       ...(state.strength_ordering_preference
         ? { strength_ordering_preference: state.strength_ordering_preference }
         : {}),
+      // Theme B Slice 1: thread inert (no week-optimizer consumption until Slice 2).
+      ...(state.integration_mode
+        ? { integration_mode: state.integration_mode }
+        : {}),
       ...(state.swim_intent ? { swim_intent: state.swim_intent } : {}),
       weeks_into_plan: 8,
     },

@@ -107,6 +107,8 @@ export interface AthleteState {
    * regardless of preference (the Long Ride 6h+ post rule overrides — §6.1).
    */
   strength_ordering_preference?: 'endurance_first' | 'strength_first';
+  /** Theme B: 'separated' (default §4.21) vs 'consolidated' (§5.2 same-day QR+lower preferred). Slice 1 = inert thread; no §4 consumption until Slice 2. */
+  integration_mode?: 'separated' | 'consolidated';
   /** Tri swim program from goal training_prefs: focus vs race-support (placement/volume in later steps). */
   swim_intent?: 'focus' | 'race';
   /**

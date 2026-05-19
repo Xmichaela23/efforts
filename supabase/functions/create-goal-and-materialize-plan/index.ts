@@ -1701,6 +1701,13 @@ async function buildCombinedPlan(
         (freshCombinedPrefs as Record<string, unknown>).strength_ordering_preference === 'strength_first'
           ? 'strength_first' as const
           : 'endurance_first' as const,
+      // Theme B (CONSOLIDATED-MODE §9): unconditional default 'separated' —
+      // legacy / non-asking goals thread inert until the wizard step (Slice 4);
+      // no engine reads it until Slice 2. Mirrors the SOP resolution above.
+      integration_mode:
+        (freshCombinedPrefs as Record<string, unknown>).integration_mode === 'consolidated'
+          ? 'consolidated' as const
+          : 'separated' as const,
       ...(freshCombinedPrefs.swim_intent ? { swim_intent: freshCombinedPrefs.swim_intent } : {}),
       ...(freshCombinedPrefs.swim_load_source ? { swim_load_source: freshCombinedPrefs.swim_load_source } : {}),
       ...((): { swim_experience?: string } => {

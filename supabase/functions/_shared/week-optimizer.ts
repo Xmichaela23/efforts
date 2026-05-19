@@ -213,6 +213,8 @@ export interface WeekOptimizerInputs {
      * stricter separation — that athlete explicitly opted for race-performance prioritization.
      */
     strength_ordering_preference?: 'endurance_first' | 'strength_first';
+    /** Theme B: 'separated' | 'consolidated'. Type only in Slice 1 — no §4 gate consumption until Slice 2. */
+    integration_mode?: 'separated' | 'consolidated';
     /** Tri swim program (prefs); week-builder / templates use in Step 2+. */
     swim_intent?: 'focus' | 'race';
     /** Affects swim quality timing default: weeks 1–6 → easy-only swims unless masters anchor; 7+ → quality enabled. */
