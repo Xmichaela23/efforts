@@ -508,6 +508,10 @@ export interface PlanValidation {
   run_impact_multiplier_applied: boolean;
   no_same_sport_hard_stacking: boolean;
   phase_progression_valid: boolean;
+  /** §8.6 Gap 9 — soft race-week regression guards (advisory; console.warn only). */
+  race_week_no_brick: boolean;
+  race_week_long_day_caps: boolean;
+  race_week_block_ordering: boolean;
 }
 
 export interface CombinedPlanOutput {

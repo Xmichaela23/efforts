@@ -15,6 +15,11 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { swimSessionFromTemplate } from './session-factory.ts';
+import {
+  checkRaceWeekNoBrick,
+  checkRaceWeekLongDayCaps,
+  checkRaceWeekBlockOrdering,
+} from './validator.ts';
 
 // Minimal threshold template — swimSessionFromTemplate reads session_type +
 // target_yards; --no-check tolerates the loose cast (matches sibling tests).
@@ -67,4 +72,32 @@ Deno.test('Gap 6 — non-taper phase ignores isRaceWeek (phase guard intact)', (
     !s.name.includes('Activation'),
     `activation is taper-phase-only; a build-week threshold must stay threshold; got "${s.name}"`,
   );
+});
+
+// ── Gap 9 (b/c/d): soft race-week validator regression guards ───────────────
+
+const sess = (tags: string[], duration = 30) => ({ tags, duration, type: 'run', day: 'Sunday' });
+const wk = (race_week: 'A' | 'B' | null, phase: string, sessions: unknown[] = []) =>
+  ({ weekNum: 1, race_week, phase, sessions } as any);
+
+Deno.test('Gap 9b — race-week no-brick: pass when clean / non-race brick ignored; fail on race-week brick', () => {
+  assertEquals(checkRaceWeekNoBrick([wk('A', 'taper', [sess(['race'])]), wk(null, 'build', [sess(['brick'])])]), true);
+  assertEquals(checkRaceWeekNoBrick([wk('B', 'taper', [sess(['brick'])])]), false);
+});
+
+Deno.test('Gap 9c — race-week long-day caps: absence=PASS, at-cap=PASS, over-cap=FAIL, non-race ignored', () => {
+  assertEquals(checkRaceWeekLongDayCaps([wk('A', 'taper', [sess(['race'])])]), true, 'no long day = pass');
+  assertEquals(checkRaceWeekLongDayCaps([wk('A', 'taper', [sess(['long_run'], 45)])]), true, 'long_run 45 = pass');
+  assertEquals(checkRaceWeekLongDayCaps([wk('A', 'taper', [sess(['long_ride'], 60)])]), true, 'long_ride 60 = pass');
+  assertEquals(checkRaceWeekLongDayCaps([wk('B', 'taper', [sess(['long_run'], 60)])]), false, 'long_run 60 = fail');
+  assertEquals(checkRaceWeekLongDayCaps([wk('A', 'taper', [sess(['long_ride'], 90)])]), false, 'long_ride 90 = fail');
+  assertEquals(checkRaceWeekLongDayCaps([wk(null, 'build', [sess(['long_run'], 180)])]), true, 'non-race ignored');
+});
+
+Deno.test('Gap 9d — block ordering: B→recovery→rebuild→A pass; missing rebuild / wrong order fail; no-B vacuous pass', () => {
+  const ok = [wk('B', 'taper'), wk(null, 'recovery'), wk(null, 'rebuild'), wk('A', 'taper')];
+  assertEquals(checkRaceWeekBlockOrdering(ok), true);
+  assertEquals(checkRaceWeekBlockOrdering([wk('B', 'taper'), wk(null, 'recovery'), wk('A', 'taper')]), false, 'no rebuild between');
+  assertEquals(checkRaceWeekBlockOrdering([wk('B', 'taper'), wk(null, 'rebuild'), wk(null, 'recovery'), wk('A', 'taper')]), false, 'rebuild before recovery');
+  assertEquals(checkRaceWeekBlockOrdering([wk('A', 'taper'), wk(null, 'base')]), true, 'single-race / no B = vacuous pass');
 });

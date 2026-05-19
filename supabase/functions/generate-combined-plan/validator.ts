@@ -252,6 +252,52 @@ function checkPhaseProgression(blocks: PhaseBlock[]): boolean {
 
 // ── Master validation ─────────────────────────────────────────────────────────
 
+// ── §8.6 Gap 9 (b/c/d): soft race-week regression guards ─────────────────────
+// Advisory only (like the 12 checks above: failedChecks → console.warn at
+// index.ts, generation proceeds). They guard invariants ALREADY enforced inline
+// in week-builder.ts / phase-structure.ts, against future-refactor regressions —
+// not new hard gates (race-day-present, the only hard one, ships separately as
+// findMissingRaceDaySessions). Read GeneratedWeek.race_week (Phase-1 carriage):
+// no validatePlan signature change. Exported for unit-test parity with
+// findMissingRaceDaySessions.
+
+// (b) Race weeks carry no brick (week-builder.ts: effectiveBricks = raceThisWeek ? 0).
+export function checkRaceWeekNoBrick(weeks: GeneratedWeek[]): boolean {
+  for (const w of weeks) {
+    if (w.race_week == null) continue;
+    if (w.sessions.some((s) => (s.tags || []).includes('brick'))) return false;
+  }
+  return true;
+}
+
+// (c) §3.6 race-week long-day caps: long_run ≤45min, long_ride ≤60min.
+// ABSENCE = PASS — a race week legitimately has no separate long day (the race
+// replaces it; bricks are zeroed). Only a present-and-over-cap long day fails.
+export function checkRaceWeekLongDayCaps(weeks: GeneratedWeek[]): boolean {
+  for (const w of weeks) {
+    if (w.race_week == null) continue;
+    for (const s of w.sessions) {
+      const tags = s.tags || [];
+      if (tags.includes('long_run') && s.duration > 45) return false;
+      if (tags.includes('long_ride') && s.duration > 60) return false;
+    }
+  }
+  return true;
+}
+
+// (d) §8.5 week-level ordering: B-race week → ≥1 recovery → ≥1 rebuild → A-race
+// week (never B-recovery straight into the A base/taper). No B-race = vacuous PASS.
+export function checkRaceWeekBlockOrdering(weeks: GeneratedWeek[]): boolean {
+  const bIdx = weeks.findIndex((w) => w.race_week === 'B');
+  const aIdx = weeks.findIndex((w) => w.race_week === 'A');
+  if (bIdx < 0 || aIdx < 0 || aIdx <= bIdx) return true;
+  const between = weeks.slice(bIdx + 1, aIdx);
+  const recIdx = between.findIndex((w) => w.phase === 'recovery');
+  const rebIdx = between.findIndex((w) => w.phase === 'rebuild');
+  if (recIdx < 0 || rebIdx < 0) return false;
+  return recIdx < rebIdx;
+}
+
 export function validatePlan(
   weeks: GeneratedWeek[],
   blocks: PhaseBlock[],
@@ -274,6 +320,9 @@ export function validatePlan(
     run_impact_multiplier_applied: checkRunMultiplierApplied(weeks),
     no_same_sport_hard_stacking:  checkNoSameSportHardStacking(weeks),
     phase_progression_valid:      checkPhaseProgression(blocks),
+    race_week_no_brick:           checkRaceWeekNoBrick(weeks),
+    race_week_long_day_caps:      checkRaceWeekLongDayCaps(weeks),
+    race_week_block_ordering:     checkRaceWeekBlockOrdering(weeks),
   };
 }
 
