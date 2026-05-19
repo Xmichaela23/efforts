@@ -68,31 +68,47 @@ export function resolveSwimDrillPhase(phaseName: string): SwimDrillPhase {
 
 /** Phase-specific drill pools (existing `swim_drills_*` tokens only; no pull/paddles). */
 const SWIM_DRILL_POOLS: Record<SwimDrillPhase, readonly string[]> = {
-  // Base: technique-forward — snorkel isolates body position without breathing interruption.
+  // Base: technique-forward — SWIM-PROTOCOL §6.2 base primaries (Catch-Up, Fingertip Drag,
+  // Single-Arm, 6-3-6) + retained fist/kick/snorkel_freeswim for pool depth; snorkel
+  // isolates body position without breathing interruption.
   base: [
     'swim_drills_4x50yd_catchup',
     'swim_drills_4x50yd_fingertipdrag',
+    'swim_drills_4x50yd_singlearm',
+    'swim_drills_4x50yd_616',
     'swim_drills_4x50yd_fist',
     'swim_drills_4x50yd_kick',
     'swim_drills_4x50yd_snorkel_freeswim',
     'swim_drills_2x50yd_catchup',
     'swim_drills_2x50yd_fingertipdrag',
   ],
-  // Build: maintain technique under accumulating load; snorkel at longer interval for efficiency focus.
+  // Build: SWIM-PROTOCOL §6.2 build primaries (Fist Swim, Sculling, Zipper) + retained
+  // catchup/fingertipdrag for maintenance; snorkel at longer interval for efficiency focus.
+  // scull/scullfront are pull-buoy-gated — filterSwimDrillTokensByGear drops them when
+  // the athlete has no buoy.
   build: [
     'swim_drills_4x50yd_catchup',
     'swim_drills_4x50yd_fist',
+    'swim_drills_4x50yd_scull',
+    'swim_drills_4x50yd_scullfront',
+    'swim_drills_4x50yd_zipper',
     'swim_drills_2x100yd_snorkel_freeswim',
     'swim_drills_2x50yd_fingertipdrag',
     'swim_drills_2x50yd_catchup',
   ],
-  // Peak / race-specific: familiar patterns + open-water sighting (race specificity).
+  // Peak / race-specific: SWIM-PROTOCOL §6.2 — Sighting + Single-Arm race rotation
+  // ("Race skills under fatigue"); familiar patterns retained.
   peak: [
     'swim_drills_2x50yd_catchup',
     'swim_drills_2x50yd_fingertipdrag',
     'swim_drills_2x50yd_sighting',
+    'swim_drills_2x50yd_singlearm',
   ],
-  taper: ['swim_drills_2x50yd_catchup'],
+  // Taper: SWIM-PROTOCOL §6.2 — light reminders only (Catch-Up + Fingertip Drag).
+  taper: [
+    'swim_drills_2x50yd_catchup',
+    'swim_drills_2x50yd_fingertipdrag',
+  ],
 };
 
 // ── Equipment annotation ──────────────────────────────────────────────────────
