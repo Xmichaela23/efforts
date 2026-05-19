@@ -1057,6 +1057,10 @@ export function swimSessionFromTemplate(
     athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
     swimThresholdPace?: string | null;
     enduranceOverdistanceNote?: boolean;
+    /** §8.6 Gap 6: true only when this week IS a RaceAnchor week. Gates the
+     *  threshold→activation substitution to the actual race week (a multi-week
+     *  A-taper's earlier week(s) must keep Race-Spec Light, not de-load early). */
+    isRaceWeek?: boolean;
   },
 ): PlannedSession {
   const dk: SwimDistanceKey = opts?.swimRaceDistanceKey ?? '70.3';
@@ -1091,10 +1095,13 @@ export function swimSessionFromTemplate(
     target_yards_template: template.target_yards,
   });
   const created: PlannedSession = ((): PlannedSession => {
-    // §7.1 / plan #56 audit item 11: race-week (`taper` phase) threshold swim 2 days before
-    // race is contrary to taper physiology. Substitute to a 600-800 yd aerobic activation
-    // (4×50 build accelerations + easy aerobic) regardless of which day in race week.
-    if (effectiveType === 'threshold' && phase === 'taper') {
+    // §7.1 / plan #56 audit item 11 + RACE-WEEK-PROTOCOL §8.6 (Gap 6): a threshold
+    // swim ~2 days before the race is contrary to taper physiology — substitute to a
+    // 600-800 yd aerobic activation (4×50 build accelerations + easy aerobic).
+    // SCOPED TO THE ACTUAL RACE WEEK ONLY (`opts.isRaceWeek`): after Phase 3 the
+    // A-taper is genuinely 2 weeks; its earlier (non-race) week must keep SWIM §4.4
+    // Race-Spec Light / threshold — do NOT de-load swim a week early.
+    if (effectiveType === 'threshold' && phase === 'taper' && opts?.isRaceWeek) {
       const activationYards = Math.max(600, Math.min(800, yards));
       return raceWeekActivationSwim(day, activationYards, goalId, swimEquipment);
     }

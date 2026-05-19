@@ -1230,6 +1230,9 @@ export function buildWeek(
     });
   });
   const swimFromTplOpts = (template: SwimSlotTemplate, yards: number) => ({
+    // §8.6 Gap 6: scope the threshold→activation swim substitution to the ACTUAL
+    // race week (not every taper week). raceThisWeek is in scope from this buildWeek.
+    isRaceWeek: Boolean(raceThisWeek),
     swimRaceDistanceKey: swimDistance,
     athleteFitness: trainFitness,
     swimThresholdPace: athleteState.swim_threshold_pace ?? null,
