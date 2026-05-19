@@ -86,6 +86,14 @@ Per research consensus (USA Triathlon, MyProCoach, 220 Triathlon), 2-3 swim sess
 
 **Drill ratio:** Higher (see §2 by experience level). Drills target catch, recovery, rotation, body position.
 
+**Volume ramp (within-phase progression — ratifies the engine's dormant designed curve, 2026-05-19):**
+Swim volume is **not flat across a phase**. Each slot's yardage ramps **linearly from a phase START to a phase PEAK** (both inside the band ranges in the table above), as a function of the **in-phase week index**:
+`progress = clamp01((weekInPhase − 1) / (rampWeeks − 1))`, then `yards = round-to-50(lerp(START, PEAK, progress))`.
+- Ramp window: **base & build = 6 weeks**, **race-specific = 4 weeks**. `weekInPhase` beyond the window clamps at PEAK.
+- Base yardage is **0.8×** the build-ramp curve; taper is a fixed **0.6×** scale (no ramp); recovery returns its band (no ramp).
+- `weekInPhase` **must** be the recovery-non-resetting in-phase position (`weekInPhaseForTimeline(phaseBlocks, weekNum, block)`) — **never** `weekNum − block.startWeek + 1` / `weekInBlock`, which per **ADR 0002** is always `1` and silently flattens the ramp (this rule exists so that defect cannot regress).
+- Applies to **base, build, and race-specific** (all three use this `phaseProgress` mechanism). §4.2/§4.3 inherit this rule; taper/recovery excepted as above.
+
 ### 4.2 Build phase (weeks 7-10)
 
 **Focus:** Threshold development, sustained CSS work.
