@@ -1,6 +1,6 @@
 # RACE-WEEK PROTOCOL
 
-> **Status: DECISIONS RESOLVED — 2026-05-18.** Sections 1–4 are the *verified current contract* (cited file:line, read-only audit). §5 lists the contract gaps; **§8 is the now-prescriptive resolved spec** (product-owner decisions locked 2026-05-18). Implementation plan follows separately — **doc before code, no code until that plan is reviewed.** Nothing here changes behavior yet.
+> **Status: IMPLEMENTED & SHIPPED — 2026-05-18 (Phases 1–4 complete).** §8 (the locked spec) is fully implemented and deployed: Phase 1 `4a63f44e` (§8.1 A/B + chronology guard) · Phase 2 `9c393119` (§8.3 distance-aware race day + §8.4 hard guarantee) · Phase 3 `7221b8d5` (§8.2 A-taper inviolable + §8.5 min-rebuild + Decision-A hard-fail) · Phase 4 `f7580ec5`/`3076ba72`/`0b54318d`/`95bd017e` (§8.6 Gap 6 / 9b-d / 8-T6 / 7). Locked rationale → DECISIONS-LOG **D-019**; verified-state → ENGINE-STATE "Solid → Race-week protocol (Phases 1–4)". §1–4 remain the verified current contract; §5 is the (now-closed) gap analysis.
 
 ---
 
@@ -139,9 +139,9 @@ Only `long-day-volume-floors.test.ts:229,585` + synthetic `rebuild-phase.test.ts
 
 ---
 
-## 8. RESOLVED SPEC DECISIONS (2026-05-18)
+## 8. RESOLVED SPEC DECISIONS — IMPLEMENTED & SHIPPED (Phases 1–4, 2026-05-18)
 
-Product-owner decisions, locked. This section is **prescriptive**. Implementation plan follows separately (doc before code).
+Product-owner decisions, locked **and implemented**. Phase→commit map in the §0 banner; locked rationale in DECISIONS-LOG **D-019**; verified-state in ENGINE-STATE "Solid → Race-week protocol (Phases 1–4)". The §8.x items below are the **shipped contract**, not pending work.
 
 ### §8.1 — First-class A/B race-week differentiation (Gap 1) ✅
 - `RaceAnchor` carries `priority: 'A' | 'B'` (from the goal's priority). `PhaseBlock` and `GeneratedWeek` carry `race_week: 'A' | 'B' | null`.
