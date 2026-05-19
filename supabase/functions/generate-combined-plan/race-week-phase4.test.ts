@@ -19,7 +19,11 @@ import {
   checkRaceWeekNoBrick,
   checkRaceWeekLongDayCaps,
   checkRaceWeekBlockOrdering,
+  findMissingRaceDaySessions,
 } from './validator.ts';
+import { buildPhaseTimeline, blockForWeek } from './phase-structure.ts';
+import { buildWeek } from './week-builder.ts';
+import type { AthleteState, GoalInput } from './types.ts';
 
 // Minimal threshold template — swimSessionFromTemplate reads session_type +
 // target_yards; --no-check tolerates the loose cast (matches sibling tests).
@@ -100,4 +104,73 @@ Deno.test('Gap 9d — block ordering: B→recovery→rebuild→A pass; missing r
   assertEquals(checkRaceWeekBlockOrdering([wk('B', 'taper'), wk(null, 'recovery'), wk('A', 'taper')]), false, 'no rebuild between');
   assertEquals(checkRaceWeekBlockOrdering([wk('B', 'taper'), wk(null, 'rebuild'), wk(null, 'recovery'), wk('A', 'taper')]), false, 'rebuild before recovery');
   assertEquals(checkRaceWeekBlockOrdering([wk('A', 'taper'), wk(null, 'base')]), true, 'single-race / no B = vacuous pass');
+});
+
+// ── Gap 8 / T6 — end-to-end realized two-70.3 (B=13 / A=17) session content ──
+// The genuinely-additive E2E: existing phase3 tests use the SYNTHETIC B=14/A=18
+// fixture; none assert the REALIZED B=13/A=17 plan's per-week session content.
+// Geometry = the user's verified live plan (NorCal B 2026-08-16, Santa Cruz A
+// 2026-09-13, start 2026-05-18 → w1=13, w2=17, totalWeeks=17).
+
+function makeAthleteStateE2E(): AthleteState {
+  return {
+    current_ctl: 60, weekly_hours_available: 10, loading_pattern: '3:1',
+    limiter_sport: 'run', rest_days: [0, 1, 2, 3, 4, 5, 6],
+    long_run_day: 0, long_ride_day: 6, swim_easy_day: 1, swim_quality_day: 4,
+    run_quality_day: 3, bike_quality_day: 2, bike_easy_day: 3,
+    training_intent: 'performance', tri_approach: 'race_peak', strength_intent: 'performance',
+  } as AthleteState;
+}
+
+Deno.test('Gap 8 / T6 — realized two-70.3 B=13/A=17: phases, race sessions, brick=0, validators', () => {
+  const goals: GoalInput[] = [
+    { id: 'b', event_name: 'IRONMAN 70.3 Northern California', event_date: '2026-08-16', distance: '70.3', sport: 'triathlon', priority: 'B' },
+    { id: 'a', event_name: 'IRONMAN 70.3 Santa Cruz', event_date: '2026-09-13', distance: '70.3', sport: 'triathlon', priority: 'A' },
+  ];
+  const startDate = new Date('2026-05-18T12:00:00Z');
+  const { blocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, makeAthleteStateE2E());
+
+  // Realized geometry contract (regression lock; distinct from the synthetic 14/18 fixture).
+  assertEquals(totalWeeks, 17);
+  assertEquals(raceAnchors.find((x) => x.goalId === 'b')!.planWeek, 13, 'B-race = wk13');
+  assertEquals(raceAnchors.find((x) => x.goalId === 'a')!.planWeek, 17, 'A-race = wk17');
+
+  const expectedPhase: Record<number, string> = { 13: 'taper', 14: 'recovery', 15: 'rebuild', 16: 'taper', 17: 'taper' };
+  const built: any[] = [];
+  let prev = 300;
+  for (let w = 13; w <= 17; w++) {
+    assertEquals(blockForWeek(blocks, w).phase, expectedPhase[w], `wk${w} phase`);
+    const week = buildWeek(w, blockForWeek(blocks, w), prev, goals, makeAthleteStateE2E(), undefined, {
+      totalWeeks, raceAnchors, phaseBlocks: blocks,
+    });
+    prev = week.total_weighted_tss;
+    built.push(week);
+  }
+  const [w13, w14, w15, w16, w17] = built;
+
+  // race_week carriage (Phase-1) on the REALIZED weeks
+  assertEquals(w13.race_week, 'B');
+  assertEquals(w17.race_week, 'A');
+  assert(!w14.race_week && !w15.race_week && !w16.race_week, 'wk14-16 are not race weeks');
+
+  // Exactly one race session in 13 & 17 with the §4 tag set, none elsewhere
+  const RACE_TAGS = ['tri_race', 'race_day', 'event', 'no_extra_training'];
+  for (const [wk_, goalId, lbl] of [[w13, 'b', 'B'], [w17, 'a', 'A']] as const) {
+    const races = wk_.sessions.filter((s: any) => s.type === 'race');
+    assertEquals(races.length, 1, `${lbl}-race week: exactly one race session`);
+    assertEquals(races[0].serves_goal, goalId);
+    for (const t of RACE_TAGS) assert((races[0].tags || []).includes(t), `${lbl}-race tag ${t}`);
+  }
+  for (const [wk_, lbl] of [[w14, '14'], [w15, '15'], [w16, '16']] as const) {
+    assertEquals(wk_.sessions.filter((s: any) => s.type === 'race').length, 0, `wk${lbl} has no race session`);
+  }
+
+  // brick=0 in both race weeks; Phase-2 hard guarantee holds; Slice-2 soft guards pass
+  for (const wk_ of [w13, w17]) {
+    assertEquals(wk_.sessions.filter((s: any) => (s.tags || []).includes('brick')).length, 0);
+  }
+  assertEquals(findMissingRaceDaySessions(built, raceAnchors), []);
+  assertEquals(checkRaceWeekNoBrick(built), true);
+  assertEquals(checkRaceWeekLongDayCaps(built), true);
+  assertEquals(checkRaceWeekBlockOrdering(built), true);
 });
