@@ -143,6 +143,13 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 - **Cause:** needs course-segment geometry from race-course GPX (Data-Dependency ❌); not in the #6 unblock decisions. Forward hook `cycling_segment_history.race_course_relevant` is in place.
 - **Why deferred:** documented blocker; product decision owed (GPS-track matcher vs Strava-only). See Q-009 / `docs/CYCLING-ANALYSIS-DESIGN.md`.
 
+### `inferTrainingFitnessLevel` — `swims90 ≤ 1` penalty fires on null arc data, flips high-CTL athletes to intermediate
+- **Symptom:** `supabase/functions/_shared/infer-training-fitness.test.ts:52` (`'high CTL → advanced when wizard intermediate'`) fails — expects `level: 'advanced'`, gets `'intermediate'`. Surfaced 2026-05-19 during swim Phase 1 (`c1c94cec`) gate sweep; full sweep otherwise 360/1 in `_shared/`. Confirmed pre-existing — failure persists with all swim Phase 1 edits stashed (`6/1` in isolated re-run).
+- **Cause:** `infer-training-fitness.ts:157-165` resolves `swims90 = arc.swim_training_from_workouts?.completed_swim_sessions_last_90_days ?? 0`. The `?? 0` coalesces a null/missing field into a hard zero, which then trips `if (swims90 <= 1 && swims90 >= 0) { score -= 1; }`. Fixture has `swim_training_from_workouts: null` → score becomes CTL≥58 (+2) + swims90≤1 (-1) = 1 → 'intermediate'. Pre-existing test asserted on the pre-penalty scoring; the swims90 penalty was added later without reconciling against this fixture.
+- **Production implication:** any athlete with `arc.swim_training_from_workouts == null` (no Garmin/Strava swim history yet, or wizard-only signup) gets a -1 score in inference, which feeds `training_fitness` → `week-builder.ts:1092` swim band selection. The test failure is the visible tip of a real one-tier-down drift for sparse-swim-history athletes.
+- **Fix shape:** treat `null`/`undefined` arc data as "unknown" rather than "zero" — gate the `swims90 ≤ 1` branch on `swim_training_from_workouts != null` (the arc actually has a row, recorded zero sessions). Either fix the function (production-correct) or update the test fixture to populate `swim_training_from_workouts` (test-only — leaves drift in production). The function fix is the right one.
+- **Why deferred:** out of swim-arc scope (Phase 0/1 ratified §4.1; Phase 2/3 are drill pools + drill rotation, not the fitness inference). Single-file fix; can pick up cleanly as a follow-up. Captured 2026-05-19 during the band-lerp gate (commit `c1c94cec`).
+
 ---
 
 ## Questioned (worth verifying)
