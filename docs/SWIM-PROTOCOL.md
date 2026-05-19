@@ -98,7 +98,9 @@ Per research consensus (USA Triathlon, MyProCoach, 220 Triathlon), 2-3 swim sess
 
 **Drill ratio:** Reduced. Drills now serve as warm-up patterning, not main sets.
 
-### 4.3 Race-specific phase (weeks 11-14)
+### 4.3 Race-specific phase (weeks 11-14 of a typical single-race 17-18wk plan — illustrative, non-binding)
+
+> **Non-binding week numbers (Gap 7 / `RACE-WEEK-PROTOCOL.md §8.6`):** the engine assigns the race-specific block by plan *position*, not fixed weeks 11-14. Two-race plans realize different weeks — e.g. the reference two-70.3 plan has B-race = wk13, A-race = wk17 (see `docs/RACE-WEEK-PROTOCOL.md §1.1`). Do not treat "weeks 11-14" as a contract.
 
 **Focus:** Race rehearsal, open water skills, pacing at race effort.
 

@@ -45,7 +45,7 @@ Expand the existing 186-test contract suite to cover invariants that must hold f
 - Substitution chains fire correctly (e.g., no DB Bench Press when no bench)
 - Phase transitions are coherent (no base → race_specific without build between)
 - Post-race rebuild lands in expected ranges (rebuild × 0.90-0.95 of pre-race peak)
-- Race weeks have correct structure (taper Wed, race Sun, no quality sessions)
+- Race weeks have correct structure (realized contract, RACE-WEEK-PROTOCOL §8): `phase=taper`; exactly one `type:'race'` session on the anchor day tagged `[tri_race, race_day, event, no_extra_training]`; no quality sessions; **brick=0**; long-day caps (`long_run` ≤45min, `long_ride` ≤60min); race-week-**only** activation swim (a multi-week A-taper's earlier week keeps SWIM §4.4 Race-Spec Light, NOT activation); week-level ordering B-race → ≥1 recovery → ≥1 rebuild → A-race. Reference two-70.3: B-race = wk13, A-race = wk17 (NOT the synthetic B=14/A=18 test fixture — see RACE-WEEK-PROTOCOL §1.1).
 - Weekly TSS within sanity bounds for the hours tier
 - Trade-off messages refer only to fields that exist
 - Drill tokens render with display names, not raw underscored strings
