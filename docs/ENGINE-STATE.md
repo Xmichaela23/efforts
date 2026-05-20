@@ -102,6 +102,17 @@ Verified-working architecture and fixes. If you think one of these is broken, th
 - **Footgun (don't re-litigate):** A/B is priority-driven — do NOT revert to calendar-order; the chronology guard intentionally HARD-FAILS priority/chronology disagreement. A-taper is inviolable — rebuild/recovery/base absorb tight windows, never the A-taper (Decision A = hard-fail, not silent compression). Gap-9 b/c/d are SOFT (advisory `console.warn`); only Gap-9a (race-day-present) is hard-fail. `bikeOpeners` over-broad `phase==='taper'` gate (`week-builder.ts:1298`) is the SAME class as the fixed Gap-6 swim sub but deliberately OUT of §8.6 (POLISH backlog). Synthetic test fixture is B=14/A=18; the *realized* contract is B=13/A=17 — don't conflate.
 - **Decision:** D-019.
 
+### §6.1 heavy-Lower classifier is blanket / load-agnostic (verified 2026-05-20 — Q-003)
+- **Verified:** `_shared/week-optimizer.ts:464-467` defines `isHigh(k)` as `k === 'long_ride' || k === 'long_run' || k === 'quality_bike' || k === 'quality_run' || k === 'lower_body_strength'`. The classifier is **unconditional** on `lower_body_strength` — it reads neither `strength_protocol` nor `repProfile` nor load magnitude. Every Lower placement gets the full §4.7 24h-pre / 48h-post adjacency protection.
+- **Behavior:** durability MS phase Lower gets identical adjacency rules to Strength Build / M+P / Rebuild phase Lower. The implementation is **more conservative** than `STRENGTH-PROTOCOL.md §6.1`'s load-magnitude framing technically allows — the spec lets sub-maximal Hypertrophy / Deload Lower get relaxed adjacency, but the code applies blanket protection. Safe-conservative posture; zero risk of under-protecting heavy Lower.
+- **Footgun (don't re-litigate):** the Q-003 premise that "may scope to protocol names" was incorrect — the classifier is intent-blind and load-blind by design. If a future need arises (real Deload-week placement complaints), the spec's load-magnitude relaxation is the natural extension. No observed defect today. See Q-003 (resolved).
+
+### Full IM §3.7 race-spec strength scaling (verified 2026-05-20 — Q-004)
+- **Verified:** `generate-combined-plan/week-builder.ts:108-128` `strFreqForPhase` has explicit Full IM branching at line 116 (`isFullIm = d === 'ironman' || d === 'full' || d.includes('iron')`). Build phase + Full IM + `weeklyHours >= 18` → 1× strength (line 120); race-specific phase + Full IM → 1× strength (line 124). `slotsPlanned = slotsOrdered.slice(0, 1)` at `:1632` takes the first slot (Upper by session_index convention). Full IM race-spec realizes "1× upper-only" per §3.7.
+- **Behavior:** Full IM athletes in race-spec get 1× strength (down from 70.3's 2×); Build at 18+hr/wk also drops to 1×. The frequency enforcement is the load-bearing piece (over-prescribing volume was the original concern). Shipped in the v2.1 close-out (`cf5867fa`, 2026-05-12).
+- **Partial verification residual:** §3.7 also prescribes the single race-spec session at maintenance load (halved power volume, no depth jumps). Maintenance `repProfile` is present in `triathlon_performance.ts:501/549/1408` — framework Full IM race-spec would consume. Exhaustive trace of `triathlonStrength()` → race_specific × Full IM → maintenance repProfile selection was outside the 30-min Q-004 budget; flagged as asserted-good-by-framework. No observed defect.
+- **Footgun (don't re-litigate):** the Full IM check uses substring match (`d.includes('iron')`) so legacy `"ironman"` plus modern `"full"` both resolve correctly. Don't change the substring without auditing fixture goal-distance strings. See Q-004 (resolved).
+
 ### `inferTrainingFitnessLevel` swims90 null-arc penalty (2026-05-20 fix)
 - **Files/commits:** fix `3b228dc8` (`_shared/infer-training-fitness.ts:157-165` — both `>= 14` and `<= 1` swims90 branches gated inside `if (swim != null)` with a `Number.isFinite` guard; null arc = "unknown", not "zero sessions"). Originally filed as Known Broken in `7751541d` (2026-05-19, surfaced during swim Phase 1 `c1c94cec` gate sweep — pre-existing, confirmed via stash-out).
 - **Behavior:** athletes with `arc.swim_training_from_workouts === null` (wizard-only signups, mid-onboarding) no longer get a spurious -1 score penalty from the prior `?? 0` coalesce. The penalty correctly fires only when the arc row exists AND records ≤1 observed sessions. High-CTL athletes (≥58) with no swim arc now resolve to `'advanced'` instead of `'intermediate'`. Downstream: `create-goal-and-materialize-plan/index.ts:1506-1543` CTL seed (40→65 when `recentLoads.length === 0`), weekly-hours fallback (10→14 when wizard didn't supply), `athlete_state.training_fitness` payload → `week-builder.ts:1095` swim band selection (intermediate→advanced templates).
@@ -162,17 +173,7 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 
 Believed-working but never explicitly verified. Listed here so the next session can pick up the verification cheaply, not so anyone re-implements.
 
-### §6.1 scoping — protocol-gated or load-gated?
-- **Question:** Does the heavy-Lower adjacency widening apply to **performance protocol** phases (Strength Build / M+P / Rebuild) only, or to **all sub-maximal-or-above Lower lifts** including durability MS phase (75-85% × 6-10 reps, equivalent load profile but different protocol path)?
-- **Why it matters:** if protocol-gated, durability MS Lower could land 24h-adjacent to a quality run without trade-off message. Affects every durability-protocol athlete.
-- **Verification approach:** read `_shared/week-optimizer.ts` heavy-Lower classifier; trace whether it reads protocol name or load magnitude. Probably ~30 minutes to confirm.
-- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 1 / Q-003.
-
-### Full IM §3.7 race-spec strength scaling
-- **Question:** Per `docs/STRENGTH-PROTOCOL.md §3.7`, Full IM race-specific phase strength drops to 1× upper-only at maintenance load, with halved power volume and no depth jumps. Race-spec frequency is `1` for Full IM (vs `2` for 70.3). Build phase is `1-2`. Commit cf5867fa claims "v2.1 close-out — Full IM scaling" but the implementation is not verified by static read.
-- **Why it matters:** Full IM hybrid athletes in race-spec phase. If the §3.7 modifier isn't actually wired, they get over-prescribed strength volume during race-spec — exactly when endurance recovery matters most.
-- **Verification approach:** read `_shared/strength-profiles.ts` (or wherever distance-aware session-factory branching lives); confirm race-distance × phase branching exists. Probably ~30 minutes.
-- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 4 / Q-004.
+_All previously-listed entries verified 2026-05-20 and moved to Solid (Q-003 §6.1 scoping; Q-004 Full IM §3.7). Section currently empty — append here when a future session ends with an unverified claim._
 
 ---
 

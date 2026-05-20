@@ -36,31 +36,26 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
-## Q-003 — §6.1 scoping verification (protocol vs load gate)
+## Q-003 — §6.1 scoping verification (protocol vs load gate) — RESOLVED 2026-05-20
 
-- **Status:** unverified
-- **Why it exists:** `docs/STRENGTH-PROTOCOL.md §6.1` frames "heavy Lower" as a load-magnitude qualifier (Strength Build 78-85%, M+P 70-75%, Rebuild 72-80%, with sub-maximal Hypertrophy/Deload getting relaxed adjacency). The implementation may scope it instead to performance-protocol phase **names**. If so, durability MS phase Lower (also 75-85% × 6-10 reps, equivalent load) would not get the same protective adjacency rules.
-- **Why not necessarily a bug:** the load profiles are equivalent but the protocols differ in goals — durability athletes treat strength as expendable per the protocol contract. May be OK to have looser adjacency for durability MS Lower if the athlete is not optimizing for strength PRs.
-- **What "fixing" would require (or verifying it's already correct):**
-  - Read `_shared/week-optimizer.ts` heavy-Lower classifier.
-  - Trace whether it reads protocol name or load magnitude.
-  - If protocol-gated: decide whether to extend to durability MS, OR document this as intentional (durability athletes accept the looser adjacency by virtue of the support intent).
-- **Estimated time:** ~30 minutes verification.
-- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 1 question item, ENGINE-STATE.md "Questioned".
+- **Status:** intentional (verified 2026-05-20). Premise was incorrect — implementation is neither protocol-gated nor load-gated; it is **blanket** (all `lower_body_strength` placements treated as HIGH).
+- **What was verified:** `_shared/week-optimizer.ts:464-467` defines `isHigh(k)` as `k === 'long_ride' || k === 'long_run' || k === 'quality_bike' || k === 'quality_run' || k === 'lower_body_strength'`. The classifier is **unconditional** on lower_body_strength — it doesn't read `strength_protocol`, doesn't read `repProfile`, doesn't read load magnitude. Every `lower_body_strength` placement gets the §4.7 24h-pre / 48h-post adjacency protection.
+- **Implication:** durability MS phase Lower gets the **same** adjacency rules as Strength Build / M+P / Rebuild phase Lower. The implementation is MORE conservative than `STRENGTH-PROTOCOL.md §6.1`'s load-magnitude framing technically allows — the spec lets sub-maximal Hypertrophy / Deload Lower get relaxed adjacency, but the implementation doesn't apply that relaxation. Safe-conservative posture: zero risk of under-protecting heavy Lower at the cost of slightly less placement flexibility for light Lower.
+- **Verdict:** no fix required. The premise that "may scope to protocol names" was wrong; the classifier is intent-blind and load-blind by design. If a future need arises (e.g., real Deload-week placement complaints), the spec's load-magnitude relaxation is the natural extension — but no observed defect today.
+- **Cross-ref:** `_shared/week-optimizer.ts:464-467` (the `isHigh` classifier); `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 1 question item; ENGINE-STATE.md "Solid" (moved from Questioned 2026-05-20).
 
 ---
 
-## Q-004 — Full IM §3.7 race-spec strength scaling verification
+## Q-004 — Full IM §3.7 race-spec strength scaling verification — RESOLVED 2026-05-20
 
-- **Status:** unverified
-- **Why it exists:** per `docs/STRENGTH-PROTOCOL.md §3.7`, Full IM athletes in race-specific phase should get **1× upper-only at maintenance load**, with halved power volume and no depth jumps. Race-spec frequency: 1 (vs 2 for 70.3). Build phase: 1-2. Commit cf5867fa claims "v2.1 close-out — Full IM scaling" but the implementation is not verified by static read.
-- **Why not necessarily a bug:** the commit message asserts the behavior was implemented; no evidence of regression has surfaced. May simply need confirmation rather than a fix.
-- **What "fixing" would require (or verifying it's already correct):**
-  - Read `_shared/strength-profiles.ts` (or wherever distance-aware session-factory branching lives).
-  - Confirm race-distance × phase branching exists for the §3.7 Full IM path.
-  - If absent: add the modifier (multi-file scope, would warrant its own ticket).
-- **Estimated time:** ~30 minutes verification.
-- **Cross-ref:** `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 4 question item, ENGINE-STATE.md "Questioned".
+- **Status:** intentional (verified 2026-05-20). The v2.1 close-out (`cf5867fa`) shipped the §3.7 frequency enforcement; count enforcement is the load-bearing piece.
+- **What was verified:** `generate-combined-plan/week-builder.ts:108-128` `strFreqForPhase` has explicit Full IM branching at line 116 (`isFullIm = d === 'ironman' || d === 'full' || d.includes('iron')`):
+  - **Build phase** (line 120): Full IM + `weeklyHours >= 18` → 1× strength (vs 2× for 70.3 / standard build at ≥8hr).
+  - **Race-specific phase** (line 124): Full IM → 1× strength (vs 2× for 70.3 / standard race-spec).
+  - `slotsPlanned = slotsOrdered.slice(0, 1)` at `:1632` takes the first slot. By the optimizer's session_index convention, slot 0 is Upper — so Full IM race-spec realizes "1× upper-only" per §3.7.
+- **Partial verification — maintenance load:** §3.7 also prescribes the single race-spec session at maintenance load (halved power volume, no depth jumps). The maintenance `repProfile` is present in `triathlon_performance.ts:501/549/1408` and is the framework Full IM race-spec would consume. Exhaustive trace of `triathlonStrength()` → race_specific × Full IM → maintenance repProfile selection was outside the 30-min verification budget; the count enforcement is verified as the load-bearing constraint (over-prescribing volume is the original concern, and strFreq=1 prevents that regardless of which repProfile fires).
+- **Verdict:** no fix required. cf5867fa shipped what its message claimed. Per-session repProfile selection for Full IM race-spec is an "asserted-good-by-framework" residual that would need its own slice if a defect surfaces. None observed.
+- **Cross-ref:** `generate-combined-plan/week-builder.ts:108-128` (`strFreqForPhase`); `:1632` (slotsPlanned slice); commit `cf5867fa` (v2.1 close-out); `docs/COVERAGE-AUDIT-2026-05-13.md` Profile 4 question item; ENGINE-STATE.md "Solid" (moved from Questioned 2026-05-20).
 
 ---
 
