@@ -537,6 +537,7 @@ export function speedSwim(
   drillSlotSalt: number = 0,
   phase?: string,
   swimEquipment?: string[] | null,
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -550,6 +551,7 @@ export function speedSwim(
     phase,
     sessionKind: 'threshold',
     swimGearLabels: swimEquipment,
+    athleteFitness,
   });
   const fastBudget = Math.round(main * 0.58);
   let fastReps = Math.min(22, Math.max(10, Math.round(fastBudget / 50)));
@@ -637,6 +639,7 @@ export function thresholdSwim(
   drillSlotSalt: number = 0,
   phase?: string,
   swimEquipment?: string[] | null,
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -650,6 +653,7 @@ export function thresholdSwim(
     phase,
     sessionKind: 'threshold',
     swimGearLabels: swimEquipment,
+    athleteFitness,
   });
   const threshReps = Math.max(4, Math.round((main * 0.55) / 100));
   const aeroReps   = Math.max(3, Math.round((main * 0.45) / 150));
@@ -718,6 +722,7 @@ export function cssAerobicSwim(
     phase,
     sessionKind: 'css_aerobic',
     swimGearLabels: options?.swimEquipment,
+    athleteFitness: options?.athleteFitness,
   });
   const raceSupport = options?.raceSupport ?? false;
   const repCap = cssHundredsRepHardCap(options?.athleteFitness, planWeek);
@@ -786,6 +791,7 @@ export function easySwim(
   phase?: string,
   techniqueDrillEmphasis = false,
   swimEquipment?: string[] | null,
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdEasy(totalYards);
   const wu = 300;
@@ -800,6 +806,7 @@ export function easySwim(
     sessionKind: 'easy',
     techniqueDrillEmphasis,
     swimGearLabels: swimEquipment,
+    athleteFitness,
   });
   const reps = Math.max(4, Math.round(mainYards / 150));
   const dur = Math.round(totalYards / 35); // ~35 yd/min for easy
@@ -991,6 +998,7 @@ export function enduranceSwim(
     sessionKind: 'easy',
     techniqueDrillEmphasis: false,
     swimGearLabels: swimEquipment,
+    athleteFitness,
   });
   const mainRounded = Math.max(200, Math.round(main / 50) * 50);
 
@@ -1107,14 +1115,14 @@ export function swimSessionFromTemplate(
     }
     switch (effectiveType) {
       case 'threshold':
-        return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
+        return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness);
       case 'css_aerobic':
         return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
           swimEquipment,
           athleteFitness: opts?.athleteFitness,
         });
       case 'technique_aerobic':
-        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment);
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment, opts?.athleteFitness);
       case 'race_specific_aerobic':
         return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
           raceSupport: true,
@@ -1122,7 +1130,7 @@ export function swimSessionFromTemplate(
           athleteFitness: opts?.athleteFitness,
         });
       case 'speed':
-        return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment);
+        return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness);
       case 'kick_focused':
         return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined, swimEquipment);
       case 'pull_focused':
@@ -1152,9 +1160,9 @@ export function swimSessionFromTemplate(
         if (template.recovery_learner_easy_structure) {
           return recoveryEasySwim(day, yards, goalId);
         }
-        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness);
       default:
-        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment);
+        return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness);
     }
   })();
   console.log('[session-factory] created swim session', {

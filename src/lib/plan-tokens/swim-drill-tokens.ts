@@ -256,17 +256,59 @@ const SWIM_DRILL_KIND_SALT: Record<SwimDrillSessionKind, number> = {
   threshold: 11,
 };
 
+/**
+ * SWIM-PROTOCOL §6.3 fitness-tier biasing (Slice 3d, 2026-05-19).
+ *
+ * - Beginner "can repeat foundation drills more often" — §6.2 base primaries
+ *   (catchup / fingertipdrag / singlearm / 616) get a -1 sort offset so the
+ *   picker prefers them when they fit budget.
+ * - Competitive "focus on race-specific drills only" — sighting gets a -1
+ *   sort offset (only fires in peak phase where sighting is in the pool).
+ *
+ * Intermediate tier is unbiased — preserves prior behavior exactly.
+ */
+const FOUNDATION_DRILL_SUFFIXES: Set<string> = new Set([
+  'catchup', 'fingertipdrag', 'singlearm', '616',
+]);
+const RACE_SPECIFIC_DRILL_SUFFIXES: Set<string> = new Set(['sighting']);
+
+function drillSuffixForBias(token: string): string | null {
+  const m = String(token).match(
+    /^swim_drills_\d+x\d+(?:yd|m)_(.+?)(?:_r\d+)?(?:_(?:fins|board|buoy|snorkel))?$/i,
+  );
+  return m ? m[1].toLowerCase() : null;
+}
+
+function tierBias(
+  token: string,
+  fitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
+): number {
+  if (!fitness || fitness === 'intermediate') return 0;
+  const suffix = drillSuffixForBias(token);
+  if (!suffix) return 0;
+  if (fitness === 'beginner' && FOUNDATION_DRILL_SUFFIXES.has(suffix)) return -1;
+  if (fitness === 'advanced' && RACE_SPECIFIC_DRILL_SUFFIXES.has(suffix)) return -1;
+  return 0;
+}
+
 function pickFirstDrillFittingBudget(
   eligible: string[],
   planWeek: number,
   salt: number,
   mainBudgetYd: number,
+  fitness?: 'beginner' | 'intermediate' | 'advanced',
 ): { tok: string; dy: number } | null {
   if (!eligible.length) return null;
   const n = eligible.length;
   const start = (planWeek * 3 + salt) % n;
   const rotated = rotatePool(eligible, start);
-  const ranked = [...rotated].sort((a, b) => swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b));
+  // §6.3 fitness-tier bias as primary sort key; smallest-yards-first as secondary.
+  const ranked = [...rotated].sort((a, b) => {
+    const ab = tierBias(a, fitness);
+    const bb = tierBias(b, fitness);
+    if (ab !== bb) return ab - bb;
+    return swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b);
+  });
 
   for (const tok of ranked) {
     const dy = swimDrillYardsFromToken(tok);
@@ -310,6 +352,8 @@ export function pickSwimDrillInset(opts: {
   sessionKind: SwimDrillSessionKind;
   techniqueDrillEmphasis?: boolean;
   swimGearLabels?: string[] | null;
+  /** SWIM-PROTOCOL §6.3 fitness-tier biasing — beginner→foundation drills, advanced→race-specific (Slice 3d). */
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
 }): { mainBudgetYd: number; drillTokens: string[] } {
   let mainBudgetYd = opts.totalYards - opts.wuYd - opts.cdYd;
   const planWeek = opts.planWeek;
@@ -332,7 +376,13 @@ export function pickSwimDrillInset(opts: {
     const n = eligible.length;
     const start = n ? (planWeek * 3 + salt) % n : 0;
     const rotated = n ? rotatePool(eligible, start) : [];
-    const ranked = [...rotated].sort((a, b) => swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b));
+    // §6.3 fitness-tier bias as primary sort key; smallest-yards-first as secondary.
+    const ranked = [...rotated].sort((a, b) => {
+      const ab = tierBias(a, opts.athleteFitness);
+      const bb = tierBias(b, opts.athleteFitness);
+      if (ab !== bb) return ab - bb;
+      return swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b);
+    });
     const chosen: string[] = [];
     const usedPhases = new Set<SwimDrillStrokePhase>();
     let budget = mainBudgetYd;
@@ -382,7 +432,9 @@ export function pickSwimDrillInset(opts: {
 
   // Path B — SWIM-PROTOCOL §5.2 / §5.3 / §5.4 / §5.7 / §5.10: single drill per session.
   // §6.3's "rotates 2-3 drills" is temporal rotation across sessions; per-session count is 1 here.
-  const picked = pickFirstDrillFittingBudget(eligible, planWeek, salt, mainBudgetYd);
+  // Fitness-tier bias applies here too (Slice 3d): the ONE drill the athlete sees in
+  // a threshold/CSS session reflects their experience tier.
+  const picked = pickFirstDrillFittingBudget(eligible, planWeek, salt, mainBudgetYd, opts.athleteFitness);
   if (!picked) return { mainBudgetYd, drillTokens: [] };
   return { mainBudgetYd: mainBudgetYd - picked.dy, drillTokens: [picked.tok] };
 }

@@ -346,6 +346,81 @@ Deno.test('pickSwimDrillInset Path A (§5.1): distinct-phase pairing — no two 
   }
 });
 
+// ── §9 fitness-tier biasing (Slice 3d) ───────────────────────────────────────
+
+Deno.test('pickSwimDrillInset §6.3 beginner bias: ≥1 foundation drill in technique easy (base)', () => {
+  // §6.3 "Beginner sessions can repeat foundation drills more often" — picker
+  // biases toward §6.2 base primaries: catchup, fingertipdrag, singlearm, 616.
+  const result = pickSwimDrillInset({
+    totalYards: 3200,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 4,
+    drillSlotSalt: 0,
+    phase: 'base',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+    athleteFitness: 'beginner',
+  });
+  assert(result.drillTokens.length >= 2, `expected ≥2 drills; got ${result.drillTokens.length}`);
+  const foundationSuffixes = new Set(['catchup', 'fingertipdrag', 'singlearm', '616']);
+  const hasFoundation = result.drillTokens.some((t) => {
+    const m = String(t).match(/^swim_drills_\d+x\d+(?:yd|m)_(.+?)$/i);
+    return m && foundationSuffixes.has(m[1].toLowerCase());
+  });
+  assert(hasFoundation, `beginner technique easy must pick ≥1 foundation drill; got [${result.drillTokens.join(', ')}]`);
+});
+
+Deno.test('pickSwimDrillInset §6.3 advanced bias: sighting picked in peak phase when available', () => {
+  // §6.3 "Competitive sessions ... focus on race-specific drills only" —
+  // advanced bias prefers sighting when in the eligible pool (peak phase).
+  const result = pickSwimDrillInset({
+    totalYards: 3200,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 3,
+    drillSlotSalt: 0,
+    phase: 'race_specific',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+    athleteFitness: 'advanced',
+  });
+  assert(result.drillTokens.length >= 1, `expected ≥1 drill; got ${result.drillTokens.length}`);
+  const hasSighting = result.drillTokens.some((t) => /_sighting(?:_|$)/.test(t));
+  assert(hasSighting, `advanced peak technique easy must pick sighting; got [${result.drillTokens.join(', ')}]`);
+});
+
+Deno.test('pickSwimDrillInset §6.3 intermediate: no tier bias (existing behavior preserved)', () => {
+  // Intermediate tier produces identical output to omitting athleteFitness —
+  // this locks the no-regression contract for the existing default behavior.
+  const withInter = pickSwimDrillInset({
+    totalYards: 3200,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 4,
+    drillSlotSalt: 0,
+    phase: 'base',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+    athleteFitness: 'intermediate',
+  });
+  const withoutFitness = pickSwimDrillInset({
+    totalYards: 3200,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 4,
+    drillSlotSalt: 0,
+    phase: 'base',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+  });
+  assertEquals(withInter.drillTokens, withoutFitness.drillTokens);
+});
+
 Deno.test('pickSwimDrillInset Path A (§5.1): fallback fills ≥2 drills even when distinct-phase exhausts', () => {
   // Pool-diversity stress test — even if the gear filter were to leave the pool
   // dominated by one phase, the permissive 2nd pass must still reach ≥1 drill
