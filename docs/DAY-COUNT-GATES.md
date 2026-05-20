@@ -56,7 +56,17 @@ The session count comes from the **frequency matrix** (`src/lib/session-frequenc
 - **Soft warn (rows 4-6):** wizard surfaces the math + the four options, but allows submit ([continue] proceeds with the trade-off path).
 - **OK (row 7):** silent pass — the existing engine-side trade-off rails (drop-and-trade-off in `_shared/week-optimizer.ts:1330, 1431, 1470, 1705, 1807, 1902`) handle any edge cases that slip through.
 
-**Resolution precedence:** rows match top-down. Row 1 fires before Row 2 (more specific first); Row 3 captures the broad `<5 + performance` case after Row 1's more specific check fails. This ordering matters when wiring the gate function.
+**Resolution precedence — specificity-first, NOT literal row-number order.** The table above is listed in reader-friendly order (BLOCK rows first, then WARN, then OK). The implementation must check rows in **specificity-first** order so carve-out rows (5, 6) catch their cases BEFORE the broader rows (2, 3) would. The resolution sequence is:
+
+1. **Row 1** — 5d + co-eq + separated → BLOCK (most specific 5d block).
+2. **Row 5** — 5d + co-eq + consolidated → WARN (consolidated carve-out for 5d co-eq; must fire before Row 2).
+3. **Row 4** — 6d + co-eq + separated → WARN.
+4. **Row 6** — <5d + co-eq + any → WARN (co-eq carve-out for <5d; must fire before Row 3).
+5. **Row 2** — 5d + perf (catches non-co-eq performance at 5d, after Rows 1 & 5 handled co-eq cases) → BLOCK.
+6. **Row 3** — <5d + perf (catches non-co-eq performance at <5d, after Row 6 handled co-eq) → BLOCK.
+7. **Row 7** — catch-all OK.
+
+The semantic rationale: co-equal athletes have explicitly opted into concurrent-training complexity and earn a SOFT WARN escape hatch (Row 5 / 6); non-co-equal performance athletes at low day counts are typically misconfigured (declared performance training without strength as a co-priority) and earn the harder BLOCK (Row 2 / 3). The reader-friendly row numbers are stable contract identifiers — the resolution sequence above governs implementation.
 
 **The matrix is intentionally one-sided** — only Performance-intent and Co-equal-strength athletes hit it. Completion/first-race/comeback and support-strength athletes silently pass (Row 7); the engine's existing trade-off path is appropriate for those populations (they EXPECTED some flexibility when they declared lower training intent).
 
