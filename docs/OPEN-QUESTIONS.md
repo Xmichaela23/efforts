@@ -59,17 +59,12 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
-## Q-005 — `scaledWeeklyTSS` reads declared hours
+## Q-005 — `scaledWeeklyTSS` reads declared hours — RESOLVED 2026-05-20
 
-- **Status:** intentional (deferred), known issue
-- **Why it exists:** Plan #60 W6 build week landed at 11h55m vs 11hr budget — 24min over after the §2.1 swim drop. Frequency matrix correctly drops a swim slot, but `scaledWeeklyTSS()` reads declared hours (11hr) not endurance-adjusted (9.5hr), so TSS budget remains at the 10-12 tier (~700-800 build TSS). Remaining sessions absorb the freed TSS and grow longer.
-- **Why not a blocking bug:** 24min/week overflow is below the ship-blocking threshold. Compounds across 12 build/peak weeks but doesn't violate any hard contract. Fix is straightforward (plumb `endurance_hours` out of `computeSessionFrequencyDefaults` as a new field, pass to `scaledWeeklyTSS`) but was scoped out of the §2.1 ship to keep that commit reviewable.
-- **What "fixing" would require:**
-  - Add `endurance_hours: number` to the `SessionFrequencyDefaults` interface.
-  - Set it from the existing local `enduranceHours` value in `computeSessionFrequencyDefaults`.
-  - Read it in `week-builder.ts:~674` and pass to `scaledWeeklyTSS()` in place of `weekly_hours_available`.
-- **Predicted effect:** TSS budget scales to 8-10 tier (~550-650 build TSS), session durations shorten proportionally, hybrid 11hr athlete lands at ~11h flat instead of 11h55m.
-- **Cross-ref:** ENGINE-STATE.md "Known broken", `docs/POLISH-PUNCH-LIST.md §4`.
+- **Status:** RESOLVED 2026-05-20 (`2a9deab5`, D-021). Fix shipped exactly as the documented shape — `endurance_hours` field added to `SessionFrequencyDefaults`, threaded into `scaledWeeklyTSS` at `week-builder.ts:677` with a defensive fallback for the reconciler short-circuit path; mirrored in `index.ts:481` for `plan_contract_v1.weekly_tss_target`.
+- **Verification:** 3 pin tests in `_shared/session-frequency-defaults.test.ts` (hybrid 11hr→9.5; endurance-only equals declared; defensive non-negative clamp) → 71/0. Full `_shared/` sweep 369/0; `generate-combined-plan/` 194/0. Deployed `generate-combined-plan`.
+- **Production effect:** hybrid athletes regenerating post-deploy see ~15-20% TSS reduction at tier boundary (intended). Endurance-only athletes unaffected.
+- **Cross-ref:** D-021 (decision record); ENGINE-STATE.md Solid (moved from Known broken 2026-05-20); commit `2a9deab5`. The footgun: do NOT conflate `endurance_hours` with `hours_per_week` — declared hours stay the wizard/workout-time budget; endurance hours are the TSS-budgeting axis only.
 
 ---
 
