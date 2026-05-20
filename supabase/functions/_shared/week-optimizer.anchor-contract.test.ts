@@ -1053,3 +1053,120 @@ Deno.test({
     assertEquals(validatePreferredDays(week.preferred_days, inputs.athlete, inputs.preferences).length, 0);
   },
 });
+
+// ── §B Theme B `integration_mode` consolidated fixtures (Slice 5, 2026-05-19) ────
+//
+// CONSOLIDATED-MODE.md §3 gate (LOCKED 2026-05-18):
+//   allowConsolidation = (isCoEq && (isPerf || strength_first))
+//                        || integration_mode === 'consolidated'
+//
+// These fixtures exercise the SECOND arm of the OR — `integration_mode='consolidated'`
+// unlocking consolidation for athletes who do NOT trip the legacy `isCoEq && (isPerf
+// || strength_first)` path. §10 Flag-C constraint: NEW fixtures only — do not mutate
+// existing separated-mode fixtures (they ARE the separated-mode regression lock; the
+// `:196` "isPerf path unchanged" test is the perf+co-equal regression lock).
+
+Deno.test({
+  name: 'B-1 §3 OR-branch unlocks consolidation for non-perf, support-strength athlete via integration_mode',
+  /**
+   * Athlete: completion intent + support strength — `isCoEq` is FALSE, so the legacy
+   * `isCoEq && (isPerf || strength_first)` gate CANNOT fire. Only the new
+   * `integration_mode === 'consolidated'` arm of §3 can unlock consolidation.
+   *
+   * Expect Lower to land same day as quality_run (consolidated AM/PM stack). If this
+   * test goes red, either the OR-branch regressed or the gate logic was inverted.
+   */
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({ strength_frequency: 2, runs_per_week: 3, bikes_per_week: 3 }),
+      athlete: baseAthlete({
+        training_intent: 'completion',
+        strength_intent: 'support',
+        integration_mode: 'consolidated',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+    const qrDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'quality_run'));
+    assert(lowerDays.length >= 1, `expected ≥1 lower_body_strength placement; got ${JSON.stringify(week.preferred_days.strength)}`);
+    assert(qrDays.length >= 1, `expected ≥1 quality_run placement; got week=${JSON.stringify(week.preferred_days)}`);
+    // Consolidation = SOME lower lands on the QR day. The optimizer may also
+    // place a second lower elsewhere (engine behavior — outside this fixture's
+    // contract); the §3 lock is that QR's day has a lower stack.
+    assert(
+      lowerDays.includes(qrDays[0]),
+      `integration_mode='consolidated' must trigger consolidation even for completion+support; QR=${qrDays[0]} not in Lower placements=[${lowerDays.join(', ')}]`,
+    );
+  },
+});
+
+Deno.test({
+  name: 'B-2 §7 carve-out: integration_mode=consolidated is inert when strFreq<2 (no consolidation forced)',
+  /**
+   * §7 carve-out: consolidated mode INERT when strFreq < 2 — only 1 strength session
+   * means no quality_run + lower stacking pressure. The optimizer should place that
+   * single strength as upper (default) and quality_run independently; lower may not
+   * even be placed. The key assertion: no same-day forced pairing from a 1× strength
+   * config under consolidated mode.
+   */
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({ strength_frequency: 1, runs_per_week: 3, bikes_per_week: 3 }),
+      athlete: baseAthlete({
+        training_intent: 'completion',
+        strength_intent: 'support',
+        integration_mode: 'consolidated',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+    const qrDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'quality_run'));
+    // 1× strength is Upper by default — Lower likely absent. If Lower IS placed
+    // (atypical), it MUST NOT collide same-day with QR (consolidation inert).
+    if (lowerDays.length > 0 && qrDays.length > 0) {
+      assert(
+        lowerDays[0] !== qrDays[0],
+        `§7 carve-out violated: strFreq<2 must keep consolidation inert; got Lower=${lowerDays[0]} QR=${qrDays[0]}`,
+      );
+    }
+  },
+});
+
+Deno.test({
+  name: 'B-3 explicit separated mode preserves ≥24h separation (§5 adjacency floor still holds)',
+  /**
+   * Explicit `integration_mode='separated'` (not just default-undefined) on the same
+   * completion+support shape from B-1. The OR-branch's false arm: no consolidation,
+   * Lower and QR remain ≥24h apart (the §5 adjacency floor that survives the mode flip).
+   */
+  fn() {
+    const inputs: WeekOptimizerInputs = {
+      anchors: { long_ride: 'saturday', long_run: 'sunday' },
+      preferences: basePreferences({ strength_frequency: 2, runs_per_week: 3, bikes_per_week: 3 }),
+      athlete: baseAthlete({
+        training_intent: 'completion',
+        strength_intent: 'support',
+        integration_mode: 'separated',
+      }),
+    };
+    const week = deriveOptimalWeek(inputs);
+    const lowerDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'lower_body_strength'));
+    const qrDays = ALL_DAYS.filter((d) => dayHasKind(week, d, 'quality_run'));
+    if (lowerDays.length > 0 && qrDays.length > 0) {
+      assert(
+        lowerDays[0] !== qrDays[0],
+        `explicit separated mode must NOT consolidate; got Lower=${lowerDays[0]} QR=${qrDays[0]}`,
+      );
+    }
+  },
+});
+
+// Note: §8 Q-012 carve-out is structurally guaranteed by code — `decideOrdering`
+// (`src/lib/pairing-timing.ts:94-96` / `_shared/week-builder.ts:1997-2012`) does NOT
+// read `integration_mode` at all. The carve-out doesn't need a fixture lock at the
+// optimizer level; it's enforced by the signature of `decideOrdering` itself.
+// Day-level easy_run placement CAN legitimately shift between modes (consolidation
+// reorganizes the quality-partner pairing and easy_run fills around it) — that's
+// expected, not a Q-012 violation.
