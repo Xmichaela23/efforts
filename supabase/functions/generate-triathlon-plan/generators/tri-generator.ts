@@ -843,6 +843,7 @@ export class TriathlonGenerator {
         phase: phase.name,
         sessionKind: 'easy',
         swimGearLabels: this.params.swim_equipment,
+        athleteFitness: this.params.fitness,
       });
       const rep100 = Math.max(1, Math.floor(main / 100));
       const tags = ['aerobic_swim'];
@@ -879,6 +880,7 @@ export class TriathlonGenerator {
           phase: phase.name,
           sessionKind: 'css_aerobic',
           swimGearLabels: this.params.swim_equipment,
+          athleteFitness: this.params.fitness,
         });
         const sets = Math.max(5, Math.round(main / 100));
         const tags = ['css_aerobic', 'swim_intervals', 'race_specific'];
@@ -911,6 +913,7 @@ export class TriathlonGenerator {
         phase: phase.name,
         sessionKind: 'css_aerobic',
         swimGearLabels: this.params.swim_equipment,
+        athleteFitness: this.params.fitness,
       });
       const reps = Math.max(4, Math.floor(contAdj / 100));
       const drillLead =
@@ -944,6 +947,7 @@ export class TriathlonGenerator {
         phase: phase.name,
         sessionKind: 'threshold',
         swimGearLabels: this.params.swim_equipment,
+        athleteFitness: this.params.fitness,
       });
       const sets = Math.max(6, Math.round(main / 100));
       const tags = ['css_threshold', 'swim_intervals', 'hard_swim', 'threshold'];
@@ -976,6 +980,7 @@ export class TriathlonGenerator {
       phase: phase.name,
       sessionKind: 'easy',
       swimGearLabels: this.params.swim_equipment,
+      athleteFitness: this.params.fitness,
     });
     const sets = Math.max(4, Math.round(main / 150));
     const tags = ['aerobic_swim', 'swim_build'];
@@ -1010,6 +1015,7 @@ export class TriathlonGenerator {
       phase: phase.name,
       sessionKind: 'easy',
       swimGearLabels: this.params.swim_equipment,
+      athleteFitness: this.params.fitness,
     });
     const reps = Math.max(3, Math.round(main / 100));
     const tags = ['easy_swim'];

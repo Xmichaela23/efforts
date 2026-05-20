@@ -140,7 +140,7 @@ Behaviors that are demonstrably wrong but intentionally deferred. Don't propose 
 
 ### `limiter_sport` intensity-side handling not implemented
 - **Symptom:** spec at `docs/SESSION-FREQUENCY-DEFAULTS.md §4` says "Run limiter is handled through intensity, not frequency. Adding run sessions increases injury risk disproportionately. The engine addresses a run limiter by making existing run sessions more productive (longer long run, higher-quality intervals, strides on easy days) rather than adding a 4th session." Implementation today: frequency side is correctly a no-op for run limiter; intensity side has zero implementation. The +7% TSS allocation bump in `science.ts:268-278 getBaseDistribution()` is a percentage shift across all phases, not a per-session intensity boost.
-- **Files (where wiring would land):** `supabase/functions/generate-combined-plan/science.ts` (extend `brickRunTargetMiles()` and `longRunFloorHours()` to accept `limiterSport`), `session-factory.ts` (interval modulation), `week-builder.ts` (stride logic).
+- **Files (where wiring would land):** `supabase/functions/generate-combined-plan/science.ts` (extend `brickRunTargetMiles()` and `longRunFloorMiles()` to accept `limiterSport` — note: the cycling mirror is `longRideFloorHours`; do not confuse), `session-factory.ts` (interval modulation), `week-builder.ts` (stride logic).
 - **Predicted effect:** ~+65-70 TSS/week for run-limiter athlete (long run +15-20%, quality run +1 tempo interval, strides on 1-2 easy runs).
 - **Why deferred:** multi-file medium-risk change; needs an architectural decision on whether the +7% TSS allocation stays additive with the new intensity dial or gets replaced by it. Documented in `docs/TICKET-B-WIRING-AUDIT.md` Field 2.
 
