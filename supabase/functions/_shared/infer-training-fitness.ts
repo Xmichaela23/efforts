@@ -154,14 +154,25 @@ export function inferTrainingFitnessLevel(opts: {
     reasons.push('run_threshold_fast');
   }
 
+  // Treat a missing arc.swim_training_from_workouts row as UNKNOWN — not zero.
+  // The prior `?? 0` coalesced null/undefined into a hard zero, which then
+  // tripped the `<= 1` penalty for any athlete without recorded swim history
+  // (wizard-only signups, mid-onboarding), incorrectly nudging high-CTL
+  // athletes one tier down. Both branches now require the arc row to exist
+  // AND the count to be a finite numeric value (defensive guard mirrors
+  // ftpFromLearned / runThresholdSecPerKm patterns above).
   const swim = opts.arc.swim_training_from_workouts;
-  const swims90 = swim?.completed_swim_sessions_last_90_days ?? 0;
-  if (swims90 >= 14) {
-    score += 1;
-    reasons.push('swim_sessions_90d_ge_14');
-  } else if (swims90 <= 1 && swims90 >= 0) {
-    score -= 1;
-    reasons.push('swim_sessions_90d_le_1');
+  if (swim != null) {
+    const swims90 = Number(swim.completed_swim_sessions_last_90_days);
+    if (Number.isFinite(swims90)) {
+      if (swims90 >= 14) {
+        score += 1;
+        reasons.push('swim_sessions_90d_ge_14');
+      } else if (swims90 <= 1 && swims90 >= 0) {
+        score -= 1;
+        reasons.push('swim_sessions_90d_le_1');
+      }
+    }
   }
 
   const racePts = completedEventStrength(opts.arc.recent_completed_events);
