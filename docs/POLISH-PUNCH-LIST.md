@@ -178,6 +178,9 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 - [ ] New `docs/CONSOLIDATED-MODE.md` spec parallel to §4.21 separated mode.
 
 ### Theme C — Wizard gates and minimum-day warnings
+
+> **Spec lifted to `docs/DAY-COUNT-GATES.md` (2026-05-20).** The matrix below is the punch-list version; the authoritative contract (with rationale, math, carve-out matrix, and phased plan) lives in the spec doc. Read it before implementing.
+
 - [ ] Day-count gate matrix at wizard (after distribution philosophy question):
   - Hard block: 5d + Co-equal + Separated; 5d + Performance + Any; <5d + Performance
   - Soft warn: 6d + Co-equal + Separated; 5d + Co-equal + Consolidated; <5d + Co-equal
