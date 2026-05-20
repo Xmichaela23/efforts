@@ -277,6 +277,42 @@ export function getProtocolFloor(
   return floor;
 }
 
+/**
+ * Ticket B learner per-session cap (2026-05-20). Beginner 70.3/full athletes
+ * get a per-session yardage ceiling tighter than the band table allows —
+ * 2500yd aerobic / 2000yd threshold per session. Closes the residual Known
+ * Broken from `docs/ENGINE-STATE.md`. Sprint/olympic beginner bmax is already
+ * below 2500 (or only marginally above, ≤300yd) and out of documented scope.
+ *
+ * Returns null when no learner cap applies.
+ */
+function learnerSessionCap(
+  distance: SwimDistanceKey,
+  fitness: SwimTrainingFitness,
+  sessionType: SwimSessionType,
+): number | null {
+  if (fitness !== 'beginner') return null;
+  if (distance !== '70.3' && distance !== 'full') return null;
+  switch (sessionType) {
+    case 'threshold':
+    case 'speed':
+      return 2000;
+    case 'css_aerobic':
+    case 'race_specific_aerobic':
+    case 'technique_aerobic':
+    case 'endurance':
+    case 'kick_focused':
+    case 'pull_focused':
+      return 2500;
+    case 'easy':
+      // The existing race-distance-relative cap (`raceYd * 0.5`) is already
+      // well below 2500 for 70.3 (1050) and full (2000). No tightening needed.
+      return null;
+    default:
+      return 2500;
+  }
+}
+
 /** Per-session protocol maximum yards (includes OD endurance ceiling + easy cap vs race distance). */
 export function getProtocolCeiling(
   distance: SwimDistanceKey,
@@ -290,6 +326,7 @@ export function getProtocolCeiling(
   const raceYd = raceCourseSwimYards(distance);
   const weekInPhase = opts?.weekInPhase ?? 1;
 
+  let ceiling: number;
   switch (sessionType) {
     case 'endurance':
       if (
@@ -300,16 +337,20 @@ export function getProtocolCeiling(
           weekInPhase,
         })
       ) {
-        return 4600;
+        ceiling = 4600;
+      } else {
+        ceiling = snapProtocolYards(bmax, sessionType);
       }
-      return snapProtocolYards(bmax, sessionType);
+      break;
     case 'easy':
-      return snapProtocolYards(
+      ceiling = snapProtocolYards(
         Math.min(Math.round(bmax * 0.88), Math.round(raceYd * 0.5)),
         sessionType,
       );
+      break;
     case 'technique_aerobic':
-      return snapProtocolYards(Math.min(bmax, Math.round(bmax * 0.98)), sessionType);
+      ceiling = snapProtocolYards(Math.min(bmax, Math.round(bmax * 0.98)), sessionType);
+      break;
     case 'kick_focused':
     case 'pull_focused':
     case 'threshold':
@@ -317,8 +358,19 @@ export function getProtocolCeiling(
     case 'css_aerobic':
     case 'race_specific_aerobic':
     default:
-      return snapProtocolYards(bmax, sessionType);
+      ceiling = snapProtocolYards(bmax, sessionType);
+      break;
   }
+
+  // Ticket B learner cap applies AFTER the base ceiling so the OD window's
+  // 4600yd is also gated for beginner 70.3/full — beginners never hit OD volume
+  // regardless of phase. Sprint/olympic beginners and all intermediate/advanced
+  // athletes pass through unchanged.
+  const learnerCap = learnerSessionCap(distance, fitness, sessionType);
+  if (learnerCap != null) {
+    ceiling = Math.min(ceiling, snapProtocolYards(learnerCap, sessionType));
+  }
+  return ceiling;
 }
 
 function swimSlotDropTier(st: SwimSessionType): number {

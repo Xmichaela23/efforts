@@ -165,3 +165,83 @@ Deno.test('SWIM_VOLUME_RANGES has all distance × fitness × phase keys', () => 
     }
   }
 });
+
+// ── Ticket B learner per-session cap (2026-05-20) ────────────────────────────
+//
+// Beginner 70.3/full athletes get a per-session yardage ceiling tighter than
+// the band table allows: 2500yd aerobic / 2000yd threshold. Closes the
+// residual Known Broken from ENGINE-STATE; sprint/olympic and intermediate/
+// advanced athletes pass through unchanged.
+
+Deno.test('Ticket B: beginner 70.3 css_aerobic capped at 2500yd (was bmax 2800-3000)', () => {
+  // Without the cap, 70.3 beginner build bmax = 2800 → ceiling 2800; race-spec
+  // bmax = 3000 → ceiling 3000. Both clip to 2500 under the learner cap.
+  const buildCeil = getProtocolCeiling('70.3', 'beginner', 'build', 'css_aerobic');
+  const rsCeil = getProtocolCeiling('70.3', 'beginner', 'race_specific', 'css_aerobic');
+  assertEquals(buildCeil, 2500);
+  assertEquals(rsCeil, 2500);
+});
+
+Deno.test('Ticket B: beginner 70.3 threshold/speed capped at 2000yd', () => {
+  assertEquals(getProtocolCeiling('70.3', 'beginner', 'build', 'threshold'), 2000);
+  assertEquals(getProtocolCeiling('70.3', 'beginner', 'race_specific', 'speed'), 2000);
+});
+
+Deno.test('Ticket B: beginner full distance aerobic capped at 2500yd (bmax 3200-4000)', () => {
+  // Full beginner band maxes are 3200 (base) / 3800 (build) / 4000 (race-spec).
+  // Cap bites hard here — up to 38% reduction.
+  assertEquals(getProtocolCeiling('full', 'beginner', 'base', 'css_aerobic'), 2500);
+  assertEquals(getProtocolCeiling('full', 'beginner', 'build', 'technique_aerobic'), 2500);
+  assertEquals(getProtocolCeiling('full', 'beginner', 'race_specific', 'race_specific_aerobic'), 2500);
+});
+
+Deno.test('Ticket B: beginner full endurance OD window gated by learner cap (NOT 4600)', () => {
+  // OD window normally returns 4600 regardless of fitness; the learner cap
+  // overrides so beginner 70.3/full never hit OD volume.
+  const fullBegOD = getProtocolCeiling('full', 'beginner', 'build', 'endurance', { weekInPhase: 4 });
+  assertEquals(fullBegOD, 2500, `beginner full+build+OD must clip to 2500; got ${fullBegOD}`);
+});
+
+Deno.test('Ticket B: beginner kick_focused / pull_focused also capped at 2500yd', () => {
+  assertEquals(getProtocolCeiling('70.3', 'beginner', 'build', 'kick_focused'), 2500);
+  assertEquals(getProtocolCeiling('70.3', 'beginner', 'build', 'pull_focused'), 2500);
+});
+
+Deno.test('Ticket B: beginner 70.3 easy unchanged (raceYd × 0.5 = 1050 already below 2500)', () => {
+  // The existing race-distance-relative cap is well below the Ticket B target;
+  // no learner cap needed for easy.
+  const easyCeil = getProtocolCeiling('70.3', 'beginner', 'build', 'easy');
+  // 70.3 raceYd = 2100, raceYd*0.5 = 1050; bmax*0.88 = 2464. min → 1050. Snapped → 1050.
+  assertEquals(easyCeil, 1050);
+});
+
+Deno.test('Ticket B: sprint beginner unchanged (out of documented scope)', () => {
+  // Sprint beginner bmax is already low (1500 base, 1800 build, 2000 race-spec).
+  // Documented scope is 70.3/full only; sprint pass-through preserved.
+  const sprintBeg = getProtocolCeiling('sprint', 'beginner', 'build', 'css_aerobic');
+  // Sprint beginner build bmax = 1800. Ceiling = snapProtocolYards(1800) = 1800.
+  assertEquals(sprintBeg, 1800);
+});
+
+Deno.test('Ticket B: olympic beginner unchanged (out of documented scope)', () => {
+  // Olympic beginner build bmax = 2600 → ceiling 2600 (no cap applied).
+  // Marginally over Ticket B target but excluded per documented scope.
+  const olyBeg = getProtocolCeiling('olympic', 'beginner', 'build', 'css_aerobic');
+  assertEquals(olyBeg, 2600);
+});
+
+Deno.test('Ticket B: intermediate 70.3 unchanged (cap is beginner-only)', () => {
+  // 70.3 intermediate build bmax = 3200 → ceiling 3200. The Plan #60 W6 athlete
+  // (high-CTL learner resolving to intermediate) still hits 3200 here — Q-006's
+  // structural fix (separate swim_fitness tier) is the proper closure for that
+  // edge population; the Ticket B cap targets athletes who DO resolve to beginner.
+  const intCeil = getProtocolCeiling('70.3', 'intermediate', 'build', 'css_aerobic');
+  assertEquals(intCeil, 3200);
+});
+
+Deno.test('Ticket B: advanced full endurance OD window still hits 4600 (cap is beginner-only)', () => {
+  // Locks the no-regression contract: advanced athletes still get the OD window's
+  // 4600yd endurance ceiling. The learner cap MUST NOT bleed into advanced.
+  const advFullOD = getProtocolCeiling('full', 'advanced', 'build', 'endurance', { weekInPhase: 4 });
+  assertEquals(advFullOD, 4600);
+});

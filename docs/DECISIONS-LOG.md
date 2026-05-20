@@ -298,6 +298,31 @@ Numbered D-001, D-002, … in order of recording. Entries are not removed; if a 
 
 ---
 
+## D-022 — Ticket B learner per-session ceiling cap (70.3/full beginners only, OD window gated)
+
+- **Date:** 2026-05-20 (commit will be appended at ship; original Ticket B filing in `docs/POLISH-PUNCH-LIST.md §4 item #133`; mirrored as ENGINE-STATE Known Broken `swim-protocol-volumes.ts per-band ceilings...`; Task 3 audit 2026-05-20 confirmed still applicable post-recent-arcs)
+- **Decision:** add a learner per-session yardage ceiling cap in `getProtocolCeiling()` (`generate-combined-plan/swim-protocol-volumes.ts`). For `fitness === 'beginner' && distance ∈ {'70.3', 'full'}`:
+  - **Aerobic** (`css_aerobic`, `race_specific_aerobic`, `technique_aerobic`, `endurance`, `kick_focused`, `pull_focused`): cap at **2500yd**.
+  - **Threshold** (`threshold`, `speed`): cap at **2000yd**.
+  - **`easy`**: no learner cap (the existing `raceYd × 0.5` cap is already well below 2500 — 1050 for 70.3, 2000 for full).
+  - Implementation: `learnerSessionCap()` helper returns the cap or null; applied via `Math.min(ceiling, snapProtocolYards(learnerCap, sessionType))` AFTER the base ceiling switch, so the endurance OD window's 4600yd is also gated (beginner 70.3/full athletes never hit OD volume regardless of phase). Intermediate/advanced and sprint/olympic athletes pass through unchanged.
+- **Effect (per band table snapshot):**
+  - 70.3 beginner aerobic: 2800-3000 → 2500 (−4% to −17%).
+  - Full beginner aerobic: 3200-4000 → 2500 (−22% to −38%).
+  - 70.3/full beginner threshold: typically 200-800yd reduction.
+  - 70.3/full beginner endurance OD window: 4600 → 2500 (gated).
+  - Intermediate/advanced / sprint/olympic / easy: **zero change**.
+- **Alternatives considered / rejected:**
+  - **Extend to Olympic distance** (beginner Olympic build bmax 2600, race-spec 2800 — borderline over 2500). Rejected (user-locked documented-scope). Faithful to ENGINE-STATE filing + POLISH-PUNCH-LIST `{'70.3', 'full'}` language; marginal benefit (100-300yd) over Ticket B target. Easier to justify scope in DECISIONS-LOG. Extend if Olympic athlete complaints surface.
+  - **Lower the band-table `bmax` values** for beginner 70.3/full instead of adding a per-session ceiling clamp. Rejected — the band table is used by `getProtocolFloor` and `floorsFor()` / `shrinkDiscretionary()` for weekly aggregation. Lowering bmax would tighten floors too, double-counting the constraint. Per-session ceiling clamp is the surgical change.
+  - **Apply the cap to the band-lerp's ceil endpoint** in `resolveSwimSlotYardsWithBudget`'s clamp instead of `getProtocolCeiling`. Rejected — same effect but spreads the policy across two functions. `getProtocolCeiling` is the canonical per-session-ceiling source of truth; the lerp reads from it.
+  - **Extend the cap to intermediate tier** (would close Plan #60 W6 directly — the documented athlete resolves to intermediate, not beginner, per Q-006). Rejected — Plan #60 W6's specific population is a Q-006 concern (high-CTL learner with `swim_experience='learning'` resolving to intermediate because CTL+2 + learning-1 = +1 score). The proper closure of that case is Q-006's structural fix (separate `swim_fitness` tier override), NOT extending the Ticket B cap to all intermediate athletes (which would over-tighten real intermediate athletes who legitimately train at 3000+yd aerobic).
+- **Why:** beginner 70.3/full athletes were getting up to 3200-4000yd aerobic sessions in build/race-spec — well above the Ticket B coaching target (≤2500yd aerobic / ≤2000yd threshold per session). The 0fd17ad9 `swim_experience='learning'` wiring + 2026-05-20 swims90 fix (`3b228dc8`) closed the score-arithmetic path (genuine beginners now correctly resolve to beginner tier), but the per-band ceilings themselves were never the target of those fixes. Ticket B's residual concern was always the per-session yardage; this Q closes it.
+- **Tradeoff accepted:** Plan #60 W6's documented athlete (high-CTL learner resolving to intermediate) is NOT closed by this fix — that case is Q-006's territory. The Ticket B cap closes the population that DOES resolve to beginner. Olympic beginners (band 2600-2800) are marginally over the Ticket B target but excluded per documented scope; defer to follow-up if needed.
+- **Footgun:** the learner cap is a `Math.min` overlay applied AFTER the base ceiling — it cannot RAISE the ceiling, only lower it. If a future band table lowers 70.3/full beginner bmax below 2500/2000, the cap becomes a no-op naturally (correct behavior; the cap is a ceiling, not a target). Do NOT change the helper to set the ceiling unconditionally — it must remain a clamp. Endurance OD window is intentionally gated for beginners; do NOT re-elevate beginners into the OD path on the assumption they need 4600yd weeks (the protocol explicitly prescribes lower per-session yards for learners). See Q-005 / D-021 (companion intensity-budget fix), ENGINE-STATE Solid "swim-protocol-volumes Ticket B learner per-session cap (2026-05-20 fix)".
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
