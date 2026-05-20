@@ -80,7 +80,7 @@ For each numbered item:
 
 ## 2. Swim program 100%
 
-**Status:** ~70% — drill rendering + sighting + equipment line shipped, content gaps remain
+**Status:** ~80% — Phases 0-3 (§4.1 ramp, §6.2 pools, §6.3 hierarchy + pairing + tier biasing) shipped 2026-05-19; content gaps remain
 
 ### Done
 - [x] Drill display names lookup
@@ -89,11 +89,11 @@ For each numbered item:
 - [x] Per-session gear summary line
 
 ### Open
-- [ ] Week 7 build week showing 1,750yd recovery-level volume — bug
+- [x] Week 7 build week showing 1,750yd recovery-level volume — bug *(2026-05-19, `c1c94cec` Phase 1 band-lerp + weekInPhase wiring; mechanism locked by `swim-volume-ramp.test.ts` on base, identical for build)*
 - [ ] Race-Specific Aerobic sessions too short (1,000yd) — should scale 1,500-2,500yd by phase
-- [ ] Drill rotation only working in Technique Aerobic sessions
+- [x] Drill rotation only working in Technique Aerobic sessions *(2026-05-19, Slice 3a `e723d246` ratified §6.3 ↔ §5 hierarchy — Path B drill rotation in threshold/CSS/race-spec/etc. is now per-spec single-drill, not a bug)*
 - [ ] Equipment line duplicating on some sessions
-- [ ] Wire new drill tokens (Single-Arm, 6-3-6, Zipper, Sculling) into session generators
+- [x] Wire new drill tokens (Single-Arm, 6-3-6, Zipper, Sculling) into session generators *(2026-05-19, Phase 2 `ef91c2ee` — singlearm/616/scull/scullfront/zipper added to base/build pools; singlearm to peak; fingertipdrag to taper)*
 - [ ] Add missing session types: Swim Time Trial, Open Water Skills, Mixed/Fartlek, Race-Pace Sustained
 - [ ] Standardize all swim intensity references to CSS percentages
 
