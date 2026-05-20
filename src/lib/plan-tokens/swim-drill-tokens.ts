@@ -143,6 +143,53 @@ export const DRILL_EQUIPMENT_MAP: Record<string, DrillEquipment> = {
   doggypaddle:      { required: [], optional: [] },
 };
 
+// ── Stroke-phase annotation (SWIM-PROTOCOL §6.1 column 2) ─────────────────────
+
+/**
+ * Canonical stroke phases targeted by each drill, per `docs/SWIM-PROTOCOL.md §6.1`.
+ * Consumed by Path A's §6.3 distinct-phase pairing rule (Slice 3b, 2026-05-19).
+ */
+export type SwimDrillStrokePhase =
+  | 'timing'
+  | 'recovery'
+  | 'catch'
+  | 'rotation'
+  | 'body_position'
+  | 'race_specific';
+
+/**
+ * Drill suffix → primary stroke phase per SWIM-PROTOCOL §6.1.
+ * `snorkel_freeswim` and `doggypaddle` are not in the §6.1 table — assigned by
+ * coaching role (snorkel removes breathing turnover → body position; doggypaddle
+ * isolates the catch pathway per `SWIM_DRILL_CUE`).
+ */
+export const SWIM_DRILL_STROKE_PHASE: Record<string, SwimDrillStrokePhase> = {
+  catchup: 'timing',
+  fingertipdrag: 'recovery',
+  fist: 'catch',
+  singlearm: 'rotation',
+  '616': 'rotation',
+  zipper: 'recovery',
+  scull: 'catch',
+  scullfront: 'catch',
+  sighting: 'race_specific',
+  kick: 'body_position',
+  snorkel_freeswim: 'body_position',
+  doggypaddle: 'catch',
+};
+
+/**
+ * Returns the §6.1 stroke phase for a `swim_drills_*` token, or null when the
+ * suffix isn't mapped. Tolerant of trailing `_r\d+` rest and `_equip` markers.
+ */
+export function swimDrillStrokePhase(token: string): SwimDrillStrokePhase | null {
+  const m = String(token).match(
+    /^swim_drills_\d+x\d+(?:yd|m)_(.+?)(?:_r\d+)?(?:_(?:fins|board|buoy|snorkel))?$/i,
+  );
+  if (!m) return null;
+  return SWIM_DRILL_STROKE_PHASE[m[1].toLowerCase()] ?? null;
+}
+
 /**
  * Normalize Training Baselines swimming chips (`equipment.swimming`) to canonical gear keys
  * used in `DRILL_EQUIPMENT_MAP.required`.
@@ -287,18 +334,42 @@ export function pickSwimDrillInset(opts: {
     const rotated = n ? rotatePool(eligible, start) : [];
     const ranked = [...rotated].sort((a, b) => swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b));
     const chosen: string[] = [];
+    const usedPhases = new Set<SwimDrillStrokePhase>();
     let budget = mainBudgetYd;
     const firstRemainderFloor =
       mainBudgetYd < 520 ? SWIM_DRILL_COMPACT_FLOOR_YD : SWIM_DRILL_MAIN_FLOOR_YD;
+    // First pass: SWIM-PROTOCOL §6.3 strict-distinct stroke-phase rule.
+    // Skip a candidate when its §6.1 phase is already represented in chosen.
     for (const tok of ranked) {
       if (chosen.length >= 3) break;
       const dy = swimDrillYardsFromToken(tok);
       if (dy <= 0) continue;
+      const phase = swimDrillStrokePhase(tok);
+      if (phase && usedPhases.has(phase)) continue;
       const nextFloor =
         chosen.length === 0 ? firstRemainderFloor : SWIM_DRILL_COMPACT_FLOOR_YD;
       if (budget - dy >= nextFloor) {
         chosen.push(tok);
+        if (phase) usedPhases.add(phase);
         budget -= dy;
+      }
+    }
+    // Permissive 2nd pass: when pool diversity / gear filtering starves the
+    // distinct-phase pass below the §5.1 2-3-drill count, fill remaining slots
+    // without the phase gate. The 2-3 count is the bigger training lever; the
+    // pairing rule is variety polish.
+    if (chosen.length < 2) {
+      for (const tok of ranked) {
+        if (chosen.length >= 3) break;
+        if (chosen.includes(tok)) continue;
+        const dy = swimDrillYardsFromToken(tok);
+        if (dy <= 0) continue;
+        const nextFloor =
+          chosen.length === 0 ? firstRemainderFloor : SWIM_DRILL_COMPACT_FLOOR_YD;
+        if (budget - dy >= nextFloor) {
+          chosen.push(tok);
+          budget -= dy;
+        }
       }
     }
     if (chosen.length) return { mainBudgetYd: budget, drillTokens: chosen };

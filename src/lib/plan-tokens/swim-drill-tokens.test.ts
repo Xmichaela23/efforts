@@ -10,11 +10,14 @@ import {
   buildSwimGearLine,
   DRILL_EQUIPMENT_MAP,
   filterSwimDrillTokensByGear,
+  pickSwimDrillInset,
   resolveSwimSessionTypeForGear,
   swimDrillBlockAthleteCopy,
   swimDrillDisplayName,
   swimDrillDisplayNameFromToken,
+  swimDrillStrokePhase,
   SWIM_DRILL_ALIAS,
+  SWIM_DRILL_STROKE_PHASE,
   SWIM_DRILL_TOKEN_POOL,
   swimGearNormalized,
 } from './swim-drill-tokens.ts';
@@ -280,4 +283,84 @@ Deno.test('sighting: passes gear filter (no required equipment)', () => {
   const tokens = ['swim_drills_4x50yd_sighting'];
   const filtered = filterSwimDrillTokensByGear(tokens, swimGearNormalized([]));
   assertEquals(filtered, tokens);
+});
+
+// ── §8 stroke-phase metadata + §6.3 distinct-phase pairing (Slice 3b) ────────
+
+Deno.test('swimDrillStrokePhase: maps §6.1 drills to canonical phases', () => {
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_catchup'), 'timing');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_fingertipdrag'), 'recovery');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_fist'), 'catch');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_singlearm'), 'rotation');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_616'), 'rotation');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_zipper'), 'recovery');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_scull'), 'catch');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_scullfront'), 'catch');
+  assertEquals(swimDrillStrokePhase('swim_drills_2x50yd_sighting'), 'race_specific');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_kick'), 'body_position');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_snorkel_freeswim'), 'body_position');
+});
+
+Deno.test('swimDrillStrokePhase: tolerates trailing rest/equipment markers', () => {
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_catchup_r15'), 'timing');
+  assertEquals(swimDrillStrokePhase('swim_drills_4x50yd_scull_buoy'), 'catch');
+});
+
+Deno.test('swimDrillStrokePhase: non-drill token → null', () => {
+  assertEquals(swimDrillStrokePhase('swim_warmup_300yd_easy'), null);
+});
+
+Deno.test('SWIM_DRILL_STROKE_PHASE: every DRILL_EQUIPMENT_MAP suffix is categorized', () => {
+  for (const suffix of Object.keys(DRILL_EQUIPMENT_MAP)) {
+    assert(
+      SWIM_DRILL_STROKE_PHASE[suffix] !== undefined,
+      `drill suffix "${suffix}" is in DRILL_EQUIPMENT_MAP but missing a stroke-phase mapping`,
+    );
+  }
+});
+
+Deno.test('pickSwimDrillInset Path A (§5.1): distinct-phase pairing — no two drills share a §6.1 stroke phase', () => {
+  // Technique easy with a generous budget (the technique session that emits 2-3 drills).
+  // Base pool post-Phase 2 includes catchup (timing), fingertipdrag (recovery), singlearm
+  // (rotation), 616 (rotation), fist (catch), kick (body_position) — the naive ranked
+  // walk would pick catchup 2×50 + fingertipdrag 2×50 + catchup 4×50 (timing/recovery/timing)
+  // pre-Slice 3b. Asserts the §6.3 rule prevents that pairing.
+  const result = pickSwimDrillInset({
+    totalYards: 3200,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 4,
+    drillSlotSalt: 0,
+    phase: 'base',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+  });
+  assert(result.drillTokens.length >= 2, `expected ≥2 drills in a technique easy session; got ${result.drillTokens.length}`);
+  const phases = result.drillTokens.map((t) => swimDrillStrokePhase(t));
+  const seen = new Set<string>();
+  for (const p of phases) {
+    if (p == null) continue;
+    assert(!seen.has(p), `§6.3 violation: stroke phase "${p}" appears twice in [${phases.join(', ')}] (tokens: [${result.drillTokens.join(', ')}])`);
+    seen.add(p);
+  }
+});
+
+Deno.test('pickSwimDrillInset Path A (§5.1): fallback fills ≥2 drills even when distinct-phase exhausts', () => {
+  // Pool-diversity stress test — even if the gear filter were to leave the pool
+  // dominated by one phase, the permissive 2nd pass must still reach ≥1 drill
+  // (and ≥2 when budget allows). Uses default gear (no filter), so this exercises
+  // the success path. The companion assertion: 0 drills only when budget too tight.
+  const result = pickSwimDrillInset({
+    totalYards: 3200,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'base',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+  });
+  assert(result.drillTokens.length >= 2, `expected ≥2 drills under §5.1 with generous budget; got ${result.drillTokens.length}`);
 });
