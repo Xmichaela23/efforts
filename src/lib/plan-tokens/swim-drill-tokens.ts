@@ -236,8 +236,22 @@ function pickFirstDrillFittingBudget(
 
 /**
  * Shared drill inset for combined-plan `session-factory` and tri `tri-generator`.
- * Honors swim gear from baselines, prefers smallest drill reps when time/yards are tight,
- * and stacks up to three drills on technique-emphasis easy swims when budget allows.
+ *
+ * Per-session drill **count** is governed by `docs/SWIM-PROTOCOL.md §5` per-type
+ * prescriptions — these are authoritative; §6.3's "rotates 2-3 drills" is the
+ * global default (temporal rotation across sessions, NOT multiple drills within
+ * one session). See §6.3 ratification note (Phase 3 Slice 3a, 2026-05-19).
+ *
+ *   §5.1 Technique Aerobic        → 2-3 drills (150-300yd) — Path A below
+ *   §5.2 CSS Aerobic              → 1 drill ("short drill block 100-150yd")
+ *   §5.3 Threshold                → 1 drill (100yd)
+ *   §5.4 Race-Specific Aerobic    → 1 drill (sighting 100-200yd)
+ *   §5.7 Mixed/Fartlek            → 1 drill (100yd)
+ *   §5.10 Race-Pace Sustained     → 1 drill (100yd)
+ *
+ * Honors swim gear from baselines, prefers smallest drill reps when time/yards
+ * are tight, and stacks up to three drills on technique-emphasis easy swims
+ * when budget allows.
  */
 export function pickSwimDrillInset(opts: {
   totalYards: number;
@@ -261,6 +275,7 @@ export function pickSwimDrillInset(opts: {
   const salt = opts.drillSlotSalt + SWIM_DRILL_KIND_SALT[opts.sessionKind];
 
   if (opts.techniqueDrillEmphasis && opts.sessionKind === 'easy') {
+    // Path A — SWIM-PROTOCOL §5.1 Technique Aerobic: 2-3 drills (150-300yd).
     // Technique swims must keep drills even when weekly scaling pins totals near the easy floor (~800–900 yd):
     // legacy gate used MAIN_FLOOR+50 on total main budget, which stripped every drill from typical technique sessions.
     const techniqueMinMain = SWIM_DRILL_COMPACT_FLOOR_YD + 100;
@@ -294,6 +309,8 @@ export function pickSwimDrillInset(opts: {
     return { mainBudgetYd, drillTokens: [] };
   }
 
+  // Path B — SWIM-PROTOCOL §5.2 / §5.3 / §5.4 / §5.7 / §5.10: single drill per session.
+  // §6.3's "rotates 2-3 drills" is temporal rotation across sessions; per-session count is 1 here.
   const picked = pickFirstDrillFittingBudget(eligible, planWeek, salt, mainBudgetYd);
   if (!picked) return { mainBudgetYd, drillTokens: [] };
   return { mainBudgetYd: mainBudgetYd - picked.dy, drillTokens: [picked.tok] };

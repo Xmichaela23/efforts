@@ -224,10 +224,12 @@ No long sets. No threshold work. Final swim 2-3 days before race.
 
 ### 6.3 Drill selection rules
 
-Each session rotates 2-3 drills from the phase-appropriate pool. Selection rules:
+The per-session drill **count** is set by §5 per-type prescriptions (typically 1 drill; 2-3 for Technique Aerobic per §5.1). §6.3 governs **selection within that count** — how the picker rotates drills across sessions and pairs them within a session. "Rotates" below refers to temporal variation across sessions, not multiple drills within one session. §5 per-type counts are **authoritative**; §6.3's "2-3" is the global default for cases §5 doesn't specify (ratified 2026-05-19, Phase 3 Slice 3a).
+
+Selection rules:
 
 - Never repeat the same drill across consecutive sessions (variety)
-- Pair drills that target different stroke phases (don't pair two catch drills)
+- When ≥2 drills are emitted in one session (per §5.1 Technique Aerobic), pair drills that target different stroke phases (don't pair two catch drills)
 - Beginner sessions can repeat foundation drills more often (mastery requires repetition)
 - Competitive sessions minimize drill volume, focus on race-specific drills only
 - Drill yardage scaled by experience level (see §2 ratio table)

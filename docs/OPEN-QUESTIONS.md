@@ -171,6 +171,26 @@ Numbered Q-001, Q-002, … in order of recording. Each entry is tagged with stat
 
 ---
 
+## Q-015 — §6.3 "never repeat across consecutive sessions" relies on rotation salts, not recent-pick memory — accepted collision risk (Phase 3 Slice 3c deferred)
+
+- **Status:** intentional (Phase 3 Slice 3c, deferred 2026-05-19). Scoped out of Phase 3 to ship the spec-compliant picker faster.
+- **Why it exists:** `pickSwimDrillInset` (`src/lib/plan-tokens/swim-drill-tokens.ts:242`) rotates the eligible pool via `(planWeek * 3 + salt) % n` where `salt = drillSlotSalt + SWIM_DRILL_KIND_SALT[sessionKind]`. Different session kinds within a week get distinct salts (easy=0, css_aerobic=5, threshold=11), and the `*3` factor distributes the start index across weeks. But there's no tracking of recently-emitted drills — at adversarial salt × pool-size combinations, the same drill can re-appear across consecutive weeks for the same session kind.
+- **Why not blocking:** pool sizes post-Phase 2 are 9 (base) / 8 (build) / 4 (peak) / 2 (taper). Collisions are infrequent in practice, and the cost is one occasional repeat — not a training-quality issue, just a §6.3 variety-rule whisper. The peak/taper pools are small enough that some repetition is unavoidable regardless.
+- **What "fixing" would require (Slice 3c, deferred):** thread `prevWeekDrillTokens` through `buildWeek` options (the same in-memory pattern as `phaseBlocks`); have `pickSwimDrillInset` drop tokens that appear in the previous week's drill set before salt-rotation. Zero schema impact. Limitation: doesn't survive partial rebuilds or single-week regenerations — but those are rare. Locked posture (if picked up): **in-memory per-build** (the user's explicit preference 2026-05-19 over a persisted `planned_workouts.computed` field).
+- **Cross-ref:** Phase 3 Slice 3a commit (this commit's hash); `src/lib/plan-tokens/swim-drill-tokens.ts:212` (`pickFirstDrillFittingBudget`), `:242` (`pickSwimDrillInset`); `docs/SWIM-PROTOCOL.md §6.3`.
+
+---
+
+## Q-016 — §2 drill/swim ratio scaling (drill yardage by intent × experience) not implemented (Phase 3 Slice 3e deferred)
+
+- **Status:** intentional (Phase 3 Slice 3e, deferred 2026-05-19). Scoped out of Phase 3 as the highest-risk piece; warrants its own investigate-first arc.
+- **Why it exists:** `docs/SWIM-PROTOCOL.md §2` prescribes drill/swim ratios from 75/25 (race-adequate + learning) down to 10/90 (race-adequate or performance + competitive). `pickSwimDrillInset` (`src/lib/plan-tokens/swim-drill-tokens.ts:242`) is athlete-experience-blind — drill yardage is fully token-static (4×50yd = 200yd, 2×50yd = 100yd, etc.). No `training_fitness` input to the picker; no ratio enforcement.
+- **Why not blocking:** per-token drill yards (50-150yd typical) are aerobically inconsequential vs the 1500-3500yd main sets the protocol's session-count + band-volume layers already differentiate by experience (Slice 1 band-lerp at `c1c94cec`, fitness-tier band selection at `week-builder.ts:1092`). The drill block size matters for stroke-mechanic emphasis, not for training-load distribution; learners get more frequent technique aerobic sessions instead.
+- **What "fixing" would require (Slice 3e, deferred):** new token variants for high-ratio learners (e.g. `swim_drills_6x50yd_<name>` at 300yd, `swim_drills_8x50yd_<name>` at 400yd); materialize-plan regex tolerance update (`materialize-plan/index.ts:1806` already accepts `\d+`); drill-yardage tier table mapping `(intent, experience) → multiplier`; threading `training_fitness` into `pickSwimDrillInset`. Investigate-first arc with its own slicing — drill-yards-by-tier intersects with the band-volume protocol and needs explicit scoping against double-counting.
+- **Cross-ref:** `docs/SWIM-PROTOCOL.md §2 ratio table` (lines 46-53); Phase 3 Slice 3a commit; `src/lib/plan-tokens/swim-drill-tokens.ts:242`; `materialize-plan/index.ts:1806` (drill regex).
+
+---
+
 ## When to add an entry
 
 Add a new Q-NNN when:
