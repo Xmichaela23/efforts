@@ -486,3 +486,31 @@ Deno.test('§2.1 deduction: Performance 14hr × 7d → 2× → endurance 12.5hr 
   assertEquals(out.tier_label, '12-14');
   assertEquals(out.strength_per_week, 2);
 });
+
+// ── Q-005 / D-021: endurance_hours field exposed on output ────────────────────
+//
+// Plumbs the §2.1 endurance-hours intermediate into the return shape so
+// downstream TSS budgeting (week-builder's scaledWeeklyTSS) can re-base on
+// time actually available for swim/bike/run. Three asserts lock the contract:
+// (a) hybrid 2× deduction lands at expected 9.5; (b) endurance-only athletes
+// see endurance_hours === hours_per_week; (c) low-hour edge defensive clamp.
+
+Deno.test('Q-005: endurance_hours exposed on output (hybrid 11hr/7d × 2× perf strength)', () => {
+  const out = compute({ weekly_hours_available: 11, days_per_week: 7, strength_intent: 'performance' });
+  assertEquals(out.endurance_hours, 9.5, '11 − 2×0.75 = 9.5');
+  assertEquals(out.hours_per_week, 11, 'declared hours unchanged');
+});
+
+Deno.test('Q-005: endurance_hours equals declared for endurance-only athletes', () => {
+  const out = compute({ weekly_hours_available: 11, days_per_week: 7, strength_intent: 'none' });
+  assertEquals(out.endurance_hours, 11);
+  assertEquals(out.hours_per_week, 11);
+});
+
+Deno.test('Q-005: endurance_hours never negative (defensive Math.max(0, …) clamp)', () => {
+  // Edge case: 1hr declared + 2× perf strength would yield −0.5 raw; clamped to 0.
+  // Validates that the existing defensive clamp at session-frequency-defaults.ts:284
+  // (Math.max(0, ...)) holds — no negative budget can leak to scaledWeeklyTSS.
+  const out = compute({ weekly_hours_available: 1, days_per_week: 5, strength_intent: 'performance' });
+  assert(out.endurance_hours >= 0);
+});

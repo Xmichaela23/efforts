@@ -478,7 +478,15 @@ Deno.serve(async (req: Request) => {
       duration_weeks: effectiveTotalWeeks,
       loading_pattern: loadingPattern,
       weekly_tss_target: Math.round(
-        scaledWeeklyTSS('build', state.current_ctl, state.weekly_hours_available, 1.0)
+        // Q-005 / D-021: mirror week-builder's endurance-hours-based budget so the
+        // persisted plan_contract_v1.weekly_tss_target matches the actual per-week
+        // budget. Without this the contract value over-reports for hybrid athletes.
+        scaledWeeklyTSS(
+          'build',
+          state.current_ctl,
+          scheduleState.session_frequency_defaults?.endurance_hours ?? state.weekly_hours_available,
+          1.0,
+        )
       ),
       phases: blocks
         .filter((b, i, arr) => i === 0 || b.phase !== arr[i - 1].phase || b.primaryGoalId !== arr[i - 1].primaryGoalId)

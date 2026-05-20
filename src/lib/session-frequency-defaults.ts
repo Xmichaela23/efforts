@@ -103,6 +103,14 @@ export interface SessionFrequencyDefaults {
    */
   bricks_per_week_by_phase: Record<FrequencyPhase, 0 | 1 | 2>;
   hours_per_week: number;
+  /**
+   * Endurance-only hours after §2.1 strength-load deduction (declared hours minus
+   * `strength_count × 0.75 hr`). Used by downstream TSS budgeting (`scaledWeeklyTSS`
+   * in `generate-combined-plan/week-builder.ts`) so the weekly load target re-bases
+   * on time actually available for swim/bike/run — matching the tier already chosen
+   * here. For endurance-only athletes this equals `hours_per_week`. See Q-005 / D-021.
+   */
+  endurance_hours: number;
   tier_label: '5-7' | '8-10' | '10-12' | '12-14' | '14+';
   days_per_week: DaysPerWeek;
   /** 'derived' = engine-computed default; 'override' = athlete override. */
@@ -376,6 +384,7 @@ export function computeSessionFrequencyDefaults(
     strength_per_week: strength,
     bricks_per_week_by_phase: extras.bricksByPhase,
     hours_per_week: hours,
+    endurance_hours: enduranceHours,
     tier_label: tier,
     days_per_week: requestedDays,
     source: 'derived',

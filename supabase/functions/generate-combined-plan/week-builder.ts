@@ -673,8 +673,15 @@ export function buildWeek(
     weekNum === 2 &&
     inRecoveryRebuildTransition;
 
-  // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier)
-  const baseTSS = scaledWeeklyTSS(phase, athleteState.current_ctl, athleteState.weekly_hours_available, block.tssMultiplier);
+  // Weekly TSS budget for this week (scaled by phase, CTL, hours, tss multiplier).
+  // Q-005 / D-021: budget scales on endurance hours (post-§2.1 strength deduction)
+  // so hybrid athletes don't have remaining sessions absorb the freed TSS after a
+  // swim/strength slot drop. Falls back to declared hours when the reconciler
+  // short-circuited (no-long-run path → `session_frequency_defaults` undefined).
+  const budgetHours =
+    athleteState.session_frequency_defaults?.endurance_hours
+    ?? athleteState.weekly_hours_available;
+  const baseTSS = scaledWeeklyTSS(phase, athleteState.current_ctl, budgetHours, block.tssMultiplier);
 
   // §1.3 ramp rate check: ensure budget doesn't spike CTL dangerously
   const { moderate: moderateRamp } = rampThresholds(athleteState.current_ctl);
