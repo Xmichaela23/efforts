@@ -349,7 +349,112 @@ Every swim session emits the "Pool gear" line (already shipped):
 
 ---
 
-## 10. Implementation pointers + research references
+## 10. Fitness-tier session-type selection
+
+### 10.1 Principle
+
+Session types are gated by **swim fitness tier**, not just by phase. A learning swimmer in build phase still needs technique-forward aerobic work; the threshold + race-specific rotation that drives intermediate/advanced athletes is inappropriate for beginners regardless of phase.
+
+The current implementation (`_shared/swim-program-templates.ts: raceTwoSwimRotationSlotMeta` for the race-intent path, `FOCUS_70_3_SLOT_META` for the focus-intent path) treats per-slot session type as a pure function of `planWeek % 4` (race intent) or fixed slot meta (focus intent). `athleteFitness` modulates **yardage** through `protocolMidVolumeMultiplier` but does NOT change **session type**.
+
+This section codifies fitness-tier–driven session selection. The **volume** layer (Ticket-B per-session cap, D-022; `swim_fitness` clamp, D-024) already handles beginners on the volume axis. §10 closes the equivalent gap on the **type** axis. The two layers are orthogonal and compose.
+
+### 10.2 Session-type matrix by tier
+
+| Swim fitness | Allowed session types | Banned session types |
+|---|---|---|
+| **Beginner** | Technique Aerobic (§5.1), CSS Aerobic (§5.2 — light density), Recovery (§5.11), Kick-Focused (§5.6), Pull-Focused (§5.5 — gear permitting) | Threshold (§5.3), Race-Specific Aerobic (§5.4), Race-Pace Sustained (§5.10), Time Trial (§5.8), Mixed/Fartlek (§5.7 with Z3-Z4 segments), Open Water Skills (§5.9 — defer to Masters coach per §2) |
+| **Intermediate** | All §5.x types | None |
+| **Advanced** | All §5.x types | None |
+
+**Rationale:**
+- **Threshold (§5.3)** at CSS − 2s presupposes the athlete has a calibrated CSS *and* the stroke mechanics to hold pace under fatigue. A learning swimmer has neither; the prescription degenerates into "swim fast and break form" (counter-productive) or "swim slow and miss the dose" (under-stimulus). Technique Aerobic + CSS Aerobic at Z2 covers the same energy band without the form penalty.
+- **Race-Specific Aerobic (§5.4)** is race rehearsal — useless before race-relevant pace has stabilized. The drill-forward Technique Aerobic at equivalent yardage is a strict upgrade for the learner population.
+- **Race-Pace Sustained (§5.10) + Time Trial (§5.8)** — same logic. No CSS = no pace target = no rehearsal value.
+- **Mixed/Fartlek (§5.7)** with Z3-Z4 segments is downstream of threshold-fluency; a beginner-tier variant could exist (Z2 with form-breaks) but is out of this slice's scope.
+- **Open Water Skills (§5.9)** — sighting + race-start surges before stroke economy is established trains compensatory patterns. Defer to the Masters coach the wizard already recommends for learners (§2).
+
+### 10.3 Beginner rotation variant (race-intent path)
+
+For 2-swim weeks with `swim_fitness === 'beginner'`, the existing 4-week rotation at `_shared/swim-program-templates.ts:224-261 raceTwoSwimRotationSlotMeta` produces:
+
+| planWeek % 4 | Slot 0 (quality day) | Slot 1 (easy day) |
+|---|---|---|
+| 1 | threshold | race_specific_aerobic |
+| 2 | threshold | pull_focused |
+| 3 | technique_aerobic | race_specific_aerobic |
+| 0 | threshold | speed |
+
+The beginner variant substitutes the banned types per §10.2 via a fixed substitution map:
+
+| Banned type | Beginner substitution |
+|---|---|
+| threshold | css_aerobic |
+| race_specific_aerobic | technique_aerobic |
+| speed | technique_aerobic |
+| _allowed pass-through:_ pull_focused, technique_aerobic, css_aerobic, kick_focused, recovery | (unchanged) |
+
+Realized beginner rotation:
+
+| planWeek % 4 | Slot 0 (quality day) | Slot 1 (easy day) |
+|---|---|---|
+| 1 | **css_aerobic** | **technique_aerobic** |
+| 2 | **css_aerobic** | pull_focused |
+| 3 | technique_aerobic | **technique_aerobic** |
+| 0 | **css_aerobic** | **technique_aerobic** |
+
+**Plan #78 closure:** Week 1 (planWeek % 4 = 1) for `swim_fitness='beginner'` now emits `[css_aerobic, technique_aerobic]` instead of `[threshold, race_specific_aerobic]`. The drill-forward technique aerobic + the lower-intensity CSS aerobic match what §10.2 prescribes for the learner population.
+
+### 10.4 Beginner rotation variant (focus-intent path)
+
+For 3-swim weeks with `swim_fitness === 'beginner'`, the existing focus-intent slot meta (`_shared/swim-program-templates.ts:86-102 FOCUS_70_3_SLOT_META`) produces `[threshold, technique_aerobic, css_aerobic]` baseline (with slot 1 alternating pull/kick across phases per the existing logic at `:436-466`).
+
+Beginner variant: `[css_aerobic, technique_aerobic, recovery]`. Substitution rule:
+- Slot 0: threshold → css_aerobic (per §10.3 map).
+- Slot 1: technique_aerobic unchanged (allowed); the existing pull/kick phase-alternation logic stays applicable since pull_focused / kick_focused are both allowed for beginners (§10.2).
+- Slot 2: css_aerobic → recovery. The third weekly touch for a learning swimmer is most usefully a low-stress technique reinforcement at 600-1000yd (per §5.11), not a third density block.
+
+The phase-driven pull/kick rotation on slot 1 (build kick alternation, race-specific pull weeks) is preserved unchanged for beginners — those types are §10.2-allowed.
+
+### 10.5 Volume layer unchanged (composes with D-022 / D-024)
+
+The Ticket-B per-session cap (D-022) and the `swim_fitness` override (D-024) handle the **volume** axis. After this spec ships, beginners get:
+1. Different SESSION TYPES per §10.3 / §10.4 (this slice).
+2. The same per-session yardage caps the volume layer already enforces (`learnerSessionCap` at 2000yd threshold / 2500yd aerobic — but since beginners no longer get threshold sessions, the 2000yd cap is functionally dead-code for the §10.3 path; the 2500yd aerobic cap remains live).
+
+Both layers compose without coordination — type substitution happens at template selection (`getSwimSlotTemplates`), yardage capping happens at the resolver (`getProtocolCeiling` → `resolveSwimSlotYardsWithBudget`). The capping path doesn't care that the upstream substituted the type; it caps whatever ends up in the slot.
+
+### 10.6 Anti-regression rule (must not break intermediate/advanced)
+
+The `raceTwoSwimRotationSlotMeta` function and the `FOCUS_70_3_SLOT_META` constant **must stay untouched** for `swim_fitness ∈ {intermediate, advanced}`. The implementation must be **additive**: new beginner-only variants selected at the dispatch level. Touching the existing rotations would risk regressing the swim arc's locked behavior (D-020 — within-phase ramp, §6.2 drill pools, §6.3 hierarchy).
+
+**Required implementation shape:**
+- New `raceTwoSwimRotationSlotMetaForBeginner(planWeek): Omit<SwimSlotTemplate, 'target_yards'>[]` in `_shared/swim-program-templates.ts`, or a pure substitution helper applied to the existing meta output.
+- New `FOCUS_70_3_SLOT_META_BEGINNER` constant, or an equivalent substitution applied at the focus-intent path.
+- `getSwimSlotTemplates` dispatches on `opts.athleteFitness === 'beginner'` to the beginner variants; falls through to the existing rotation otherwise.
+- **Pin tests (mandatory):**
+  - Beginner Week-1 race-intent → `[css_aerobic, technique_aerobic]` (Plan #78 closure regression lock).
+  - Intermediate Week-1 race-intent → `[threshold, race_specific_aerobic]` unchanged (no-regression lock).
+  - Advanced Week-1 race-intent → `[threshold, race_specific_aerobic]` unchanged (no-regression lock).
+  - Beginner focus-intent → `[css_aerobic, technique_aerobic, recovery]`.
+  - Intermediate focus-intent → `[threshold, technique_aerobic, css_aerobic]` unchanged.
+
+### 10.7 What this section does NOT do
+
+- Does not change phase definitions (§4.1–§4.4). The phase still drives which slot mix is active; §10 only modifies the per-slot session TYPES when the athlete is a beginner.
+- Does not change volume bands or per-session ceilings (`swim-protocol-volumes.ts` is unchanged).
+- Does not change drill rotation rules (§6.2 / §6.3). Drills still pull from the phase pool; the §6.3 fitness-tier drill biasing (D-020 Slice 3d, `f53bbf34`) is a separate concern at a different layer (drill picker, not session type).
+- Does not back-fill production plans. Standard opt-in-via-regenerate posture.
+- Does not change the strong-swimmer side. `swim_fitness === 'advanced'` already uses the full rotation; the symmetry that D-024 introduced on the volume axis (strong → advanced clamp) means a beginner-global / strong-swim athlete already gets the advanced rotation today. No change needed for the strong side.
+- Does not introduce a comeback-specific path. Comeback athletes resolve via the soft `training_fitness` signal in `inferTrainingFitnessLevel` (training_intent='comeback' → score -1) and aren't touched by the `swim_fitness` clamp. The tier-only framing is sufficient for this slice; a comeback-specific session-type variant would be a separate spec slice if a real need surfaces.
+
+### 10.8 Distance-agnostic
+
+§10.3 and §10.4 describe the 70.3 rotation explicitly because the 70.3 templates are the named structures in `_shared/swim-program-templates.ts` (`raceTwoSwimRotationSlotMeta`, `FOCUS_70_3_SLOT_META`). The same code paths serve **sprint, olympic, and full IM** distances — those distances flow through `getSwimSlotTemplates` via the same rotation logic, with `normalizeSwimProgramDistance` defaulting unknown labels to `70.3`. The beginner substitutions defined here therefore apply **uniformly across all race distances**: a beginner-tier athlete in a sprint, olympic, 70.3, or full IM plan gets the same session-type substitution map (`threshold → css_aerobic`, `race_specific_aerobic → technique_aerobic`, `speed → technique_aerobic`). Distance affects yardage via the per-band tables but does NOT modify the type-substitution rule.
+
+---
+
+## 11. Implementation pointers + research references
 
 ### 10.1 Files that need to read this spec
 
@@ -381,7 +486,7 @@ This spec follows the same architecture as `STRENGTH-PROTOCOL.md`:
 
 ---
 
-## 11. Research references
+## 12. Research references
 
 - **CSS methodology:** Costill, Maglischo, Richardson — developed CSS as the swim-equivalent of FTP/lactate threshold. Used by World Aquatics, Triathlon Australia, British Swimming as primary training intensity metric. CSS = 200m / (T400 - T200).
 - **Frequency consensus:** USA Triathlon (2-3 swims/week for age-groupers), MyProCoach Half IRONMAN plans (minimum 2 swims/week), 220 Triathlon (frequency over duration: "2×30min better than 1×60min"). Research shows drop from 4 to 2-3 sessions does not reduce gains for age-group triathletes.
