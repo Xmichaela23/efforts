@@ -796,18 +796,70 @@ export function cssAerobicSwim(
   );
 }
 
-/** Learning-swimmer recovery: compact Z1–Z2 100s (no drill inset — keeps session short). */
+/**
+ * Recovery swim. Intermediate/advanced: compact Z1–Z2 100s, no drill inset
+ * (keeps the session short — fatigue-flush over technique). Beginner:
+ * drill-led structure per SWIM-PROTOCOL §5.11 beginner variant —
+ * `WU 200 → 4 × (50 drill + 50 full stroke) → CD 200`, single foundation
+ * drill chosen via the picker. Beginner recovery is essentially a low-
+ * volume technique session, not a fatigue-relief session.
+ */
 export function recoveryEasySwim(
   day: string,
   totalYards: number,
   goalId: string,
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+  phase?: string,
+  swimEquipment?: string[] | null,
 ): PlannedSession {
   totalYards = Math.max(650, Math.min(1200, snapSwimSessionTotalYdEasy(totalYards)));
   const wu = 200;
   const cd = 200;
+  const dur = Math.round(totalYards / 34);
+
+  // SWIM-PROTOCOL §5.11 beginner variant — drill-led structure.
+  if (athleteFitness === 'beginner' && planWeek != null) {
+    const { drillTokens } = pickSwimDrillInset({
+      totalYards,
+      wuYd: wu,
+      cdYd: cd,
+      planWeek,
+      drillSlotSalt,
+      phase,
+      sessionKind: 'recovery',
+      swimGearLabels: swimEquipment,
+      athleteFitness: 'beginner',
+    });
+    if (drillTokens.length > 0) {
+      // Each repeat alternates 50yd drill / 50yd full stroke. The drill block in
+      // the token list represents the drill side of the alternation; main repeats
+      // pair with full-stroke 50s. Spec: 4 × (50 drill + 50 stroke) ≈ 400yd main.
+      const drillCopy = swimDrillBlockAthleteCopy(drillTokens);
+      const tags = ['easy', 'aerobic', 'swim', 'recovery_swim', 'swim_drills', 'technique_swim'];
+      return session(
+        day,
+        'swim',
+        `Recovery Swim — ${totalYards} yd`,
+        appendPoolGearLine(
+          `Warm up ${wu} yd easy. ${drillCopy} 4 × (50 yd drill + 50 yd full stroke easy) at Z1 — drill side reinforces the cue, full-stroke side carries it into normal swimming. Cool down ${cd} yd.`,
+          drillTokens,
+          swimEquipment,
+        ),
+        dur,
+        'EASY',
+        [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_4x100yd_easy_r20`, `swim_cooldown_${cd}yd`],
+        tags,
+        'Z1',
+        goalId,
+      );
+    }
+  }
+
+  // Intermediate / advanced (and beginner-with-no-plan-context fallback) — original behavior preserved.
   const mainBudget = Math.max(250, totalYards - wu - cd);
   const reps = Math.max(3, Math.min(8, Math.round(mainBudget / 100)));
-  const dur = Math.round(totalYards / 34);
   return session(
     day,
     'swim',
@@ -959,15 +1011,41 @@ export function pullFocusedSwim(
   swimThresholdPace?: string | null,
   athleteFitness: 'beginner' | 'intermediate' | 'advanced' = 'intermediate',
   swimEquipment?: string[] | null,
+  planWeek?: number,
+  drillSlotSalt: number = 0,
+  phase?: string,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
   const cd = 200;
   const integrationYd = 400;
-  let spare = totalYards - wu - cd - integrationYd;
-  spare = Math.max(400, spare);
+
+  // SWIM-PROTOCOL §5.5 — emit a drill block before the pull repeats. Spec
+  // baseline: 100yd intermediate/advanced; beginner variant: 200yd 2-drill
+  // one-focus. Drives through pickSwimDrillInset's beginner override for
+  // sessionKind='pull_focused' when athleteFitness='beginner'; falls through
+  // to Path B (single drill ~100yd) for intermediate/advanced.
+  const { mainBudgetYd: postDrillBudget, drillTokens } = (planWeek != null)
+    ? pickSwimDrillInset({
+        totalYards,
+        wuYd: wu,
+        cdYd: cd + integrationYd, // treat integration as cooldown-like for budget math
+        planWeek,
+        drillSlotSalt,
+        phase,
+        sessionKind: 'pull_focused',
+        swimGearLabels: swimEquipment,
+        athleteFitness,
+      })
+    : { mainBudgetYd: totalYards - wu - cd - integrationYd, drillTokens: [] as string[] };
+
+  let spare = Math.max(400, postDrillBudget);
   let pullReps = Math.min(14, Math.max(6, Math.round(spare / 100)));
   while (pullReps > 6 && pullReps * 100 > spare) pullReps -= 1;
+  // Beginner variant: lighter pull volume per §5.5 — 4-6 × 100yd.
+  if (athleteFitness === 'beginner') {
+    pullReps = Math.min(6, Math.max(4, pullReps));
+  }
 
   const longCourse = raceDistance === '70.3' || raceDistance === 'full';
   const cssSec = resolveCssSecPer100Yd(swimThresholdPace ?? undefined);
@@ -982,7 +1060,12 @@ export function pullFocusedSwim(
 
   const tags: string[] = ['quality', 'pull_focus_swim', 'swim', 'moderate', 'req:buoy'];
   if (athleteFitness !== 'beginner') tags.push('optional:paddles');
+  if (drillTokens.length) tags.push('swim_drills');
 
+  const drillLead =
+    drillTokens.length > 0
+      ? `${swimDrillBlockAthleteCopy(drillTokens)} `
+      : '';
   const pullCopy = `${pullReps}×100 yd pull with buoy at moderate aerobic rhythm (Z3; sustainable steady turnover). 20 sec rest — high-elbow catch feel without kicking.`;
   const integrateCopy =
     '4×100 yd full stroke easy aerobic — reconnect kick and rotation after pull isolation.';
@@ -992,8 +1075,8 @@ export function pullFocusedSwim(
     'swim',
     `Pull-Focused Swim — ${totalYards} yd`,
     appendPoolGearLine(
-      `Warm up ${wu} yd easy. ${pullCopy} ${integrateCopy} Cool down ${cd} yd. ${paddlesCue}${formCue}`,
-      [],
+      `Warm up ${wu} yd easy. ${drillLead}${pullCopy} ${integrateCopy} Cool down ${cd} yd. ${paddlesCue}${formCue}`,
+      drillTokens,
       swimEquipment,
       ['pull buoy'],
     ),
@@ -1001,6 +1084,7 @@ export function pullFocusedSwim(
     'MODERATE',
     [
       `swim_warmup_${wu}yd_easy`,
+      ...drillTokens,
       `swim_pull_${pullReps}x100yd_r20_buoy`,
       `swim_aerobic_4x100yd_easy_r15`,
       `swim_cooldown_${cd}yd`,
@@ -1182,6 +1266,9 @@ export function swimSessionFromTemplate(
           opts?.swimThresholdPace ?? undefined,
           opts?.athleteFitness ?? 'intermediate',
           swimEquipment,
+          planWeek,
+          drillSlotSalt,
+          phase,
         );
       case 'endurance':
         return enduranceSwim(
@@ -1198,7 +1285,16 @@ export function swimSessionFromTemplate(
         );
       case 'easy':
         if (template.recovery_learner_easy_structure) {
-          return recoveryEasySwim(day, yards, goalId);
+          return recoveryEasySwim(
+            day,
+            yards,
+            goalId,
+            opts?.athleteFitness,
+            planWeek,
+            drillSlotSalt,
+            phase,
+            swimEquipment,
+          );
         }
         return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, false, swimEquipment, opts?.athleteFitness);
       default:

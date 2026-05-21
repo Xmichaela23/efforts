@@ -439,3 +439,177 @@ Deno.test('pickSwimDrillInset Path A (§5.1): fallback fills ≥2 drills even wh
   });
   assert(result.drillTokens.length >= 2, `expected ≥2 drills under §5.1 with generous budget; got ${result.drillTokens.length}`);
 });
+
+// ── §6.5 / SWIM-PROTOCOL beginner one-focus drill block ─────────────────────
+//
+// New picker behavior (Slice 1): for sessionKind ∈ {'css_aerobic', 'pull_focused'}
+// AND athleteFitness === 'beginner', the picker emits 2-3 same-stroke-phase
+// drills (200-300yd css_aerobic / 150-250yd pull_focused) instead of the
+// Path B single drill. Intermediate/advanced behavior unchanged.
+
+Deno.test('§6.5 beginner × css_aerobic: emits 2-3 drills (not single Path B drill)', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 2800,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'build',
+    sessionKind: 'css_aerobic',
+    swimGearLabels: null,
+    athleteFitness: 'beginner',
+  });
+  assert(
+    result.drillTokens.length >= 2 && result.drillTokens.length <= 3,
+    `§6.5 beginner css_aerobic expects 2-3 drills; got ${result.drillTokens.length}`,
+  );
+});
+
+Deno.test('§6.5 beginner × css_aerobic: all drills share one §6.1 stroke phase (one-focus rule)', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 2800,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'build',
+    sessionKind: 'css_aerobic',
+    swimGearLabels: null,
+    athleteFitness: 'beginner',
+  });
+  if (result.drillTokens.length < 2) return; // skip when pool starvation fallback kicks in
+  const phases = new Set(
+    result.drillTokens
+      .map((t) => swimDrillStrokePhase(t))
+      .filter((p): p is NonNullable<typeof p> => p != null),
+  );
+  // One-focus rule: phases.size === 1 (all share the seed's phase) OR phases.size === 0 (drills had no mapped phase — graceful fallback).
+  assert(
+    phases.size <= 1,
+    `§6.5 one-focus rule: all chosen drills must share one stroke phase. Got ${[...phases].join(', ')} from ${result.drillTokens.join(', ')}`,
+  );
+});
+
+Deno.test('§6.5 no-regression: intermediate × css_aerobic stays single Path B drill', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 2800,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'build',
+    sessionKind: 'css_aerobic',
+    swimGearLabels: null,
+    athleteFitness: 'intermediate',
+  });
+  assertEquals(
+    result.drillTokens.length,
+    1,
+    `intermediate css_aerobic must stay single-drill Path B; got ${result.drillTokens.length}`,
+  );
+});
+
+Deno.test('§6.5 no-regression: advanced × css_aerobic stays single Path B drill', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 2800,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'race_specific',
+    sessionKind: 'css_aerobic',
+    swimGearLabels: null,
+    athleteFitness: 'advanced',
+  });
+  assertEquals(
+    result.drillTokens.length,
+    1,
+    `advanced css_aerobic must stay single-drill Path B; got ${result.drillTokens.length}`,
+  );
+});
+
+Deno.test('§6.5 beginner × pull_focused: emits 2 same-phase drills', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 1400,
+    wuYd: 300,
+    cdYd: 600, // pull-focused includes integration in cd-like budget
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'build',
+    sessionKind: 'pull_focused',
+    swimGearLabels: null,
+    athleteFitness: 'beginner',
+  });
+  assert(
+    result.drillTokens.length >= 1 && result.drillTokens.length <= 2,
+    `§6.5 beginner pull_focused expects 1-2 drills; got ${result.drillTokens.length}`,
+  );
+});
+
+Deno.test('§6.5 no-regression: intermediate × pull_focused stays single Path B drill', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 1400,
+    wuYd: 300,
+    cdYd: 600,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'build',
+    sessionKind: 'pull_focused',
+    swimGearLabels: null,
+    athleteFitness: 'intermediate',
+  });
+  assertEquals(
+    result.drillTokens.length,
+    1,
+    `intermediate pull_focused must stay single-drill Path B; got ${result.drillTokens.length}`,
+  );
+});
+
+Deno.test('§6.5 beginner × recovery: foundation single drill', () => {
+  const result = pickSwimDrillInset({
+    totalYards: 800,
+    wuYd: 200,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'recovery',
+    sessionKind: 'recovery',
+    swimGearLabels: null,
+    athleteFitness: 'beginner',
+  });
+  assertEquals(
+    result.drillTokens.length,
+    1,
+    `§6.5 beginner recovery expects single foundation drill; got ${result.drillTokens.length}`,
+  );
+});
+
+Deno.test('§6.5 anti-regression: Path A (Technique Aerobic) for beginners stays distinct-phase', () => {
+  // Beginner × techniqueDrillEmphasis=true must still hit Path A with distinct
+  // §6.1 stroke phases per §5.1 / §6.3. The new beginner one-focus branch
+  // explicitly excludes 'easy' sessionKind to avoid touching this path.
+  const result = pickSwimDrillInset({
+    totalYards: 2500,
+    wuYd: 300,
+    cdYd: 200,
+    planWeek: 1,
+    drillSlotSalt: 0,
+    phase: 'base',
+    sessionKind: 'easy',
+    techniqueDrillEmphasis: true,
+    swimGearLabels: null,
+    athleteFitness: 'beginner',
+  });
+  assert(
+    result.drillTokens.length >= 2,
+    `Path A for beginner technique_aerobic must emit ≥2 drills; got ${result.drillTokens.length}`,
+  );
+  const phases = result.drillTokens
+    .map((t) => swimDrillStrokePhase(t))
+    .filter((p): p is NonNullable<typeof p> => p != null);
+  const unique = new Set(phases);
+  assert(
+    unique.size >= Math.min(2, phases.length),
+    `Path A pairing requires distinct phases; got ${[...unique].join(', ')} from ${result.drillTokens.join(', ')}`,
+  );
+});

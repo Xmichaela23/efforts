@@ -248,12 +248,25 @@ export const SWIM_DRILL_MAIN_FLOOR_YD = 350;
 /** When only short drill reps fit, allow a slightly smaller main remainder (time-efficient sessions). */
 export const SWIM_DRILL_COMPACT_FLOOR_YD = 260;
 
-export type SwimDrillSessionKind = 'easy' | 'css_aerobic' | 'threshold';
+export type SwimDrillSessionKind =
+  | 'easy'
+  | 'css_aerobic'
+  | 'threshold'
+  // SWIM-PROTOCOL §5.5 / §6.5 — pull_focused gets an explicit kind so the picker
+  // can emit a drill block per spec (current pullFocusedSwim hardcodes no drills).
+  // Beginner pull-focused uses the §6.5 one-focus path; intermediate/advanced use
+  // Path B single drill.
+  | 'pull_focused'
+  // SWIM-PROTOCOL §5.11 / §6.5 — recovery for beginners is drill-led per the
+  // beginner variant; non-beginners get no drill block (caller skips the picker).
+  | 'recovery';
 
 const SWIM_DRILL_KIND_SALT: Record<SwimDrillSessionKind, number> = {
   easy: 0,
   css_aerobic: 5,
   threshold: 11,
+  pull_focused: 17,
+  recovery: 23,
 };
 
 /**
@@ -289,6 +302,99 @@ function tierBias(
   if (fitness === 'beginner' && FOUNDATION_DRILL_SUFFIXES.has(suffix)) return -1;
   if (fitness === 'advanced' && RACE_SPECIFIC_DRILL_SUFFIXES.has(suffix)) return -1;
   return 0;
+}
+
+/**
+ * SWIM-PROTOCOL §6.5 beginner one-focus drill block.
+ *
+ * Fires for beginner × css_aerobic (§5.2 / D-025 substitution target) and
+ * beginner × pull_focused (§5.5). Picks 2-3 drills sharing ONE §6.1 stroke
+ * phase (catch, recovery, rotation, etc.) — inverse of Path A's distinct-
+ * phase pairing. Foundation-biased via tierBias. Smallest-yards-first as
+ * tiebreaker so 2-3 drills fit the 200-300yd target band.
+ *
+ * Permissive fallback: when same-phase pairing starves the count below 2
+ * (e.g., only one foundation drill matches the first drill's phase given
+ * the pool/gear constraints), the picker fills remaining slots without the
+ * same-phase gate — the 2-3 count is the bigger training lever; the
+ * one-focus rule is the polish.
+ *
+ * Returns `null` if no drill block fits the budget (caller falls back to
+ * the standard Path B single-drill picker).
+ */
+function pickBeginnerOneFocusDrillBlock(opts: {
+  eligible: string[];
+  planWeek: number;
+  salt: number;
+  mainBudgetYd: number;
+  targetMin: number;
+  targetMax: number;
+  countCap: number;
+}): { drillTokens: string[]; consumedYd: number } | null {
+  const { eligible, planWeek, salt, mainBudgetYd, targetMin, targetMax, countCap } = opts;
+  if (!eligible.length) return null;
+  const n = eligible.length;
+  const start = (planWeek * 3 + salt) % n;
+  const rotated = rotatePool(eligible, start);
+  // Foundation bias as primary sort key (beginners), smallest-yards-first secondary.
+  const ranked = [...rotated].sort((a, b) => {
+    const ab = tierBias(a, 'beginner');
+    const bb = tierBias(b, 'beginner');
+    if (ab !== bb) return ab - bb;
+    return swimDrillYardsFromToken(a) - swimDrillYardsFromToken(b);
+  });
+
+  // Pass 1: pick the seed drill (largest-yards foundation OR smallest-yards
+  // foundation depending on budget headroom — start with smallest so the
+  // remaining 1-2 drills have room).
+  let firstPhase: SwimDrillStrokePhase | null = null;
+  const chosen: string[] = [];
+  let budget = mainBudgetYd;
+  let consumed = 0;
+  for (const tok of ranked) {
+    const dy = swimDrillYardsFromToken(tok);
+    if (dy <= 0) continue;
+    if (budget - dy < SWIM_DRILL_COMPACT_FLOOR_YD) continue;
+    chosen.push(tok);
+    firstPhase = swimDrillStrokePhase(tok);
+    budget -= dy;
+    consumed += dy;
+    break;
+  }
+  if (chosen.length === 0) return null;
+
+  // Pass 2: pick additional drills with the SAME stroke phase as the seed.
+  for (const tok of ranked) {
+    if (chosen.length >= countCap) break;
+    if (chosen.includes(tok)) continue;
+    if (consumed >= targetMax) break;
+    const phase = swimDrillStrokePhase(tok);
+    if (firstPhase != null && phase !== firstPhase) continue;
+    const dy = swimDrillYardsFromToken(tok);
+    if (dy <= 0) continue;
+    if (budget - dy < SWIM_DRILL_COMPACT_FLOOR_YD) continue;
+    chosen.push(tok);
+    budget -= dy;
+    consumed += dy;
+  }
+
+  // Permissive fallback: if pool/gear filtering starved the same-phase pass,
+  // fill remaining slots without the phase gate to keep the count near target.
+  if (chosen.length < 2 && consumed < targetMin) {
+    for (const tok of ranked) {
+      if (chosen.length >= countCap) break;
+      if (chosen.includes(tok)) continue;
+      if (consumed >= targetMax) break;
+      const dy = swimDrillYardsFromToken(tok);
+      if (dy <= 0) continue;
+      if (budget - dy < SWIM_DRILL_COMPACT_FLOOR_YD) continue;
+      chosen.push(tok);
+      budget -= dy;
+      consumed += dy;
+    }
+  }
+
+  return { drillTokens: chosen, consumedYd: consumed };
 }
 
 function pickFirstDrillFittingBudget(
@@ -430,7 +536,39 @@ export function pickSwimDrillInset(opts: {
     return { mainBudgetYd, drillTokens: [] };
   }
 
+  // SWIM-PROTOCOL §6.5 beginner one-focus path. Fires for:
+  //   - beginner × css_aerobic (§5.2 / D-025 substitution target): 2-3 drills,
+  //     200-300yd, ONE stroke phase per session.
+  //   - beginner × pull_focused (§5.5 beginner variant): 2 drills, ~200yd,
+  //     ONE stroke phase (foundation only — no sculling, no fist swim).
+  // Anti-regression: intermediate/advanced fall through to Path B unchanged.
+  if (
+    opts.athleteFitness === 'beginner' &&
+    (opts.sessionKind === 'css_aerobic' || opts.sessionKind === 'pull_focused')
+  ) {
+    const oneFocus = pickBeginnerOneFocusDrillBlock({
+      eligible,
+      planWeek,
+      salt,
+      mainBudgetYd,
+      targetMin: opts.sessionKind === 'pull_focused' ? 150 : 200,
+      targetMax: opts.sessionKind === 'pull_focused' ? 250 : 300,
+      countCap: opts.sessionKind === 'pull_focused' ? 2 : 3,
+    });
+    if (oneFocus && oneFocus.drillTokens.length > 0) {
+      return {
+        mainBudgetYd: mainBudgetYd - oneFocus.consumedYd,
+        drillTokens: oneFocus.drillTokens,
+      };
+    }
+    // Graceful fallback to Path B single-drill if the one-focus block can't be
+    // assembled (e.g. pool diversity / gear constraints starved the eligible set).
+  }
+
   // Path B — SWIM-PROTOCOL §5.2 / §5.3 / §5.4 / §5.7 / §5.10: single drill per session.
+  // Also serves: §5.5 Pull-Focused (intermediate/advanced — 1 drill 100yd per spec);
+  // §5.11 Recovery (beginner only — single foundation drill; non-beginners skip the
+  // picker entirely upstream).
   // §6.3's "rotates 2-3 drills" is temporal rotation across sessions; per-session count is 1 here.
   // Fitness-tier bias applies here too (Slice 3d): the ONE drill the athlete sees in
   // a threshold/CSS session reflects their experience tier.
