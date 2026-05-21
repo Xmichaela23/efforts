@@ -75,8 +75,11 @@ Deno.test('RUN §4.5: base-block long_run mileage ramps week-over-week (weekInPh
   assert(baseWeeks.length >= 2, `expected ≥2 base weeks in ramp window; got ${JSON.stringify(baseWeeks)}`);
 
   const early = baseWeeks[0];
-  const later = baseWeeks.find((b) => b.wip > early.wip);
-  assert(later, `expected a later base week with a higher in-phase index; got ${JSON.stringify(baseWeeks)}`);
+  // Pick a `later` week with wip ≥ 3 so that the ramp's half-mile rounding actually advances
+  // miles week-over-week (post-Phase-3 lift the 0.65–0.75 endpoint band for 70.3 means wip 1
+  // and wip 2 both round to 8.5mi; wip 3 lifts to 9.0mi). Locks the ramp mechanism end-to-end.
+  const later = baseWeeks.find((b) => b.wip >= 3);
+  assert(later, `expected a later base week with wip ≥ 3; got ${JSON.stringify(baseWeeks)}`);
   assert(later!.wip > early.wip, 'sanity: weekInPhaseForTimeline must advance across base weeks (the fixed mechanism)');
 
   let prev = 300;

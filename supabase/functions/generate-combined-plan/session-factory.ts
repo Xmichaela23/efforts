@@ -200,6 +200,41 @@ export function easyRun(day: string, miles: number, goalId: string): PlannedSess
   );
 }
 
+/**
+ * RUN-PROTOCOL §5.8 — append a stride block to an easy run as a first-class
+ * neuromuscular modifier. Pure: returns a new session, does not mutate input.
+ * Token `strides_NxYs` is resolved into work + walk-recovery steps by
+ * `materialize-plan/index.ts:1222-1257`; +5 min wall-clock accounts for the
+ * stride block (mirrors the legacy `tri-generator.ts:596` convention).
+ * Intensity stays EASY — strides are accelerations, not speedwork; TSS is
+ * re-derived from the longer duration via the same helper the engine uses.
+ */
+export function addStridesToEasyRun(
+  session: PlannedSession,
+  opts?: { reps?: number; sec?: number },
+): PlannedSession {
+  const reps = opts?.reps ?? 4;
+  const sec = opts?.sec ?? 20;
+  const milesMatch = String(session.name ?? '').match(/—\s*(\d+(?:\.\d+)?)\s*mi/);
+  const miles = milesMatch ? milesMatch[1] : '';
+  const newName = miles ? `Easy Run + Strides — ${miles} mi` : 'Easy Run + Strides';
+  const strideCopy =
+    ` After the cool-down, ${reps} × ${sec} sec strides at ~5K pace effort with 30 sec walk recovery. ` +
+    `Strides wake up fast-twitch fibers and improve running economy — not speedwork; relaxed and fast.`;
+  const newDuration = (session.duration ?? 0) + 5;
+  const newTss = estimateSessionTSS(session.type, session.intensity_class, newDuration);
+  return {
+    ...session,
+    name: newName,
+    description: `${session.description}${strideCopy}`,
+    duration: newDuration,
+    tss: newTss,
+    weighted_tss: weightedTSS(session.type, newTss),
+    steps_preset: [...(session.steps_preset ?? []), `strides_${reps}x${sec}s`],
+    tags: Array.from(new Set([...(session.tags ?? []), 'strides'])),
+  };
+}
+
 export function tempoRun(day: string, miles: number, warmupMiles: number, goalId: string): PlannedSession {
   const totalMiles = warmupMiles * 2 + miles;
   const dur = Math.round(totalMiles * 8.5);

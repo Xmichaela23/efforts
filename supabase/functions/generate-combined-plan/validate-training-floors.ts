@@ -303,7 +303,7 @@ export type EvaluateLongDayFloorsOpts = {
 /**
  * Map the current training phase to the phase whose floor caps history-derived adjustments.
  * Closes the over-prescription gap where an early-base athlete with a high recent-volume
- * history would be capped at race-distance peak (11 mi for 70.3), telling them to run race
+ * history would be capped at race-distance peak (13 mi for 70.3), telling them to run race
  * distance in week 1 of base. The cap should be the NEXT phase's peak — base caps at build,
  * build caps at race-specific. Race-specific is its own ceiling.
  *
@@ -391,8 +391,10 @@ function maxLongRideMinutes(week: GeneratedWeek): number {
     // replace the standalone long_ride with a brick (bike + run off-the-bike). If the brick's
     // bike leg meets or exceeds the floor, the long-ride durability box is checked. Counting it
     // here keeps observed-vs-floor honest: brick bike = 2.5h vs build floor 2.5h → no warning,
-    // not "no long ride scheduled (observed=0)". Bike-leg only — the brick's run portion is
-    // ≤ 25 min and represents transition stimulus, not bike endurance.
+    // not "no long ride scheduled (observed=0)". Bike-leg only — this function measures
+    // long-ride volume; the brick's run portion is a meaningful run stimulus per RUN-PROTOCOL
+    // §5.7 (70.3 race-spec brick run = 5.5mi / ~55 min), but it doesn't belong in long-ride
+    // accounting regardless of its length.
     const isBrickBike = tags.includes('brick') && (s.type === 'bike' || tags.includes('bike'));
     if (!tags.includes('long_ride') && !isBrickBike) continue;
     const dur = Number(s.duration) || 0;

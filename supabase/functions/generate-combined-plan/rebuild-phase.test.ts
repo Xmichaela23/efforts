@@ -199,10 +199,10 @@ Deno.test('rebuild emission: weeksSinceRaceIncludingRebuild is monotonic across 
 
 // ── §2 science.ts: long-day floors honor rebuild ────────────────────────────
 
-Deno.test('long-run floor: 70.3 rebuild = 9.5mi (continues build progression, not base reset)', () => {
-  // Pre-race build was 9.5mi (11 × 0.85). Rebuild reads through build multiplier so the long-run
-  // ramp continues post-race instead of dropping to 8.5mi (base × 0.75).
-  assertEquals(longRunFloorMiles('70.3', 'rebuild'), 9.5);
+Deno.test('long-run floor: 70.3 rebuild = 11mi (continues build progression, not base reset)', () => {
+  // Pre-race build was 11mi (13 × 0.85, Phase 3 lift). Rebuild reads through build multiplier so
+  // the long-run ramp continues post-race instead of dropping to 10mi (base × 0.75).
+  assertEquals(longRunFloorMiles('70.3', 'rebuild'), 11);
 });
 
 Deno.test('long-ride floor: 70.3 rebuild = 2.5h (continues build progression)', () => {

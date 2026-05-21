@@ -256,19 +256,19 @@ function roundHalfMile(mi: number): number {
   return Math.round(mi * 2) / 2;
 }
 
-/** Distance-keyed long-run peak target (mi). Phase 1 keeps existing peaks; Phase 3 lifts 70.3 to 13. */
+/** Distance-keyed long-run peak target (mi). 70.3 = 13mi per RUN-PROTOCOL §4.5 LOCKED 2026-05-20 (lifted from 11 in Phase 3). */
 function longRunPeakTarget(distance: TriRaceDistance): number {
   const peakTarget: Record<string, number> = {
     sprint: 4.0,
     olympic: 7.0,
-    '70.3': 11.0,
-    half: 11.0,
+    '70.3': 13.0,
+    half: 13.0,
     ironman: 18.0,
     full: 18.0,
-    half_marathon: 11.0,
+    half_marathon: 13.0,
     marathon: 18.0,
   };
-  return peakTarget[distance] ?? 11.0;
+  return peakTarget[distance] ?? 13.0;
 }
 
 /** Race-run distance (mi) used by brick-run ramp and brick floor math. */
@@ -345,17 +345,20 @@ export function racePacePeakMiles(distance: TriRaceDistance): number {
 
 /** Minimum long-run mileage by race distance and calendar phase (after TSS-derived miles). */
 export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): number {
+  // Phase 3 lift (2026-05-21 per RUN-PROTOCOL §4.5 LOCKED 2026-05-20): 70.3 11 → 13.
+  // Must move in lockstep with `longRunPeakTarget` above — Phase 1 deliberately
+  // preserved the legacy values, Phase 3 lifts both together.
   const peakTarget: Record<string, number> = {
     sprint: 4.0,
     olympic: 7.0,
-    '70.3': 11.0,
-    half: 11.0,
+    '70.3': 13.0,
+    half: 13.0,
     ironman: 18.0,
     full: 18.0,
-    half_marathon: 11.0,
+    half_marathon: 13.0,
     marathon: 18.0,
   };
-  const peak = peakTarget[distance] ?? 11.0;
+  const peak = peakTarget[distance] ?? 13.0;
 
   const multiplier = (() => {
     switch (phase) {

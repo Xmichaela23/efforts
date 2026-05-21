@@ -63,6 +63,7 @@ import {
 import type { DayOfWeek } from './science.ts';
 import {
   longRun, easyRun, tempoRun, intervalRun, vo2Run, marathonPaceRun, racePaceRun,
+  addStridesToEasyRun,
   longRide, easyBike, bikeOpeners,
   groupRideQualityBikeSession, groupRideSession,
   swimSessionFromTemplate,
@@ -140,6 +141,33 @@ export function weekInPhaseForTimeline(phaseBlocks: PhaseBlock[], weekNum: numbe
     } else break;
   }
   return n;
+}
+
+/**
+ * RUN-PROTOCOL §5.8 stride injection predicate. Strides fire on the easy run
+ * for performance-intent athletes in build / race_specific / taper, plus late
+ * base (wip≥4 per §4.1's "optional"). Never in race week (§5.8 — overrides
+ * §9.1's "race-day priming" reading), recovery, or post-race rebuild weeks.
+ * `limiter_sport='run'` is deliberately not consulted — Phase 4 of this arc
+ * adds an additional dose for run-limiter athletes on top of this base.
+ */
+export function shouldInjectStridesOnEasyRun(params: {
+  phase: Phase;
+  runWeekInPhase: number;
+  raceThisWeek: boolean;
+  isRecovery: boolean;
+  recoveryRebuildWeek1: boolean;
+  recoveryRebuildWeek2EasyRunOnly: boolean;
+  training_intent: string | null | undefined;
+}): boolean {
+  if (params.raceThisWeek) return false;
+  if (params.isRecovery) return false;
+  if (params.recoveryRebuildWeek1) return false;
+  if (params.recoveryRebuildWeek2EasyRunOnly) return false;
+  if (String(params.training_intent ?? '').toLowerCase() !== 'performance') return false;
+  if (params.phase === 'build' || params.phase === 'race_specific' || params.phase === 'taper') return true;
+  if (params.phase === 'base' && params.runWeekInPhase >= 4) return true;
+  return false;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -816,6 +844,18 @@ export function buildWeek(
     : 1;
   const runRampWeeks = rampWeeksForPhase(phase);
 
+  // RUN-PROTOCOL §5.8 stride gate, computed once per week — true at sites 4/5/6
+  // when phase + intent + non-race-week / non-recovery preconditions all hold.
+  const stridesOnEasyRun = shouldInjectStridesOnEasyRun({
+    phase,
+    runWeekInPhase,
+    raceThisWeek: !!raceThisWeek,
+    isRecovery,
+    recoveryRebuildWeek1,
+    recoveryRebuildWeek2EasyRunOnly,
+    training_intent: athleteState.training_intent,
+  });
+
   if (hasTri && !raceThisWeek && !isRecovery) {
     // Long-run within-phase ramp (RUN-PROTOCOL §4.5). Lerps START → PEAK for
     // base/build/race_specific; delegates to peak-of-phase floor for
@@ -1402,7 +1442,8 @@ export function buildWeek(
         runQualitySlot!.sessions.push(easyRun(runQualityDay, easyMi, servedGoal));
       } else if (phase === 'taper') {
         const taperRunMi = Math.max(4, Math.round(longRunMiles * 0.40));
-        runQualitySlot!.sessions.push(easyRun(runQualityDay, taperRunMi, servedGoal));
+        const taperEasy = easyRun(runQualityDay, taperRunMi, servedGoal);
+        runQualitySlot!.sessions.push(stridesOnEasyRun ? addStridesToEasyRun(taperEasy) : taperEasy);
       } else if (hasTri && weeksToRace <= 3 && useBrickThisWeek) {
         // Late-race brick week: brick carries race-sim; mid-week run = threshold maintenance only.
         const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
@@ -1539,7 +1580,8 @@ export function buildWeek(
     const easyMi = isRecovery
       ? Math.max(2, Math.round(longRunMiles * 0.30))
       : Math.max(4, Math.round(longRunMiles * 0.40));
-    thursdayRunSlot!.sessions.push(easyRun('Thursday', easyMi, servedGoal));
+    const thuEasy = easyRun('Thursday', easyMi, servedGoal);
+    thursdayRunSlot!.sessions.push(stridesOnEasyRun ? addStridesToEasyRun(thuEasy) : thuEasy);
   }
 
   // ── Second swim slot (easy / technique / race-specific aerobic from template) ─
@@ -1588,7 +1630,8 @@ export function buildWeek(
       const easyMi = recoveryRebuildWeek1
         ? Math.min(30, Math.max(3, Math.round(longRunMiles * 0.35)))
         : Math.max(3, Math.round(longRunMiles * 0.30));
-      runEasySlot!.sessions.push(easyRun(runEasyDay, easyMi, servedGoal));
+      const midEasy = easyRun(runEasyDay, easyMi, servedGoal);
+      runEasySlot!.sessions.push(stridesOnEasyRun ? addStridesToEasyRun(midEasy) : midEasy);
     }
   }
 
