@@ -21,6 +21,7 @@ import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
+import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
 import {
@@ -869,41 +870,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               };
               const { overrides: displayOverridesFromTags, pace_annotation: paceAnnoFromTags } = parseDisplayOverridesFromTags();
               const expandSpecFromTags = parseExpandSpecFromTags();
-              const buildName = (): string => {
-                if (discipline === 'strength') return 'Strength';
-                // Bricks: preserve the source session's distinctive name (e.g.,
-                // "Brick — Bike 2.5 hr" or "Brick — Run 4 mi off the bike" from session-factory).
-                // Without this, the generic tag-based path below returns "Ride" / "Run" for
-                // brick legs because bricks don't carry `long_ride` / `long_run` tags, which
-                // erases the brick semantics from the export.
-                if (hasTag('brick')) {
-                  const orig = String((s as any).name ?? '').trim();
-                  if (/^Brick\b/i.test(orig)) return orig;
-                  if (mappedType === 'ride') return 'Brick — Bike';
-                  if (mappedType === 'run') return 'Brick — Run off the bike';
-                }
-                if (mappedType === 'ride') {
-                  if (hasTag('long_ride')) return 'Ride — Long Ride';
-                  if (contains('vo2')) return 'Ride — VO2';
-                  if (contains('threshold') || contains('thr_')) return 'Ride — Threshold';
-                  if (contains('sweet spot') || /\bss(p)?\b/.test(lowerText) || contains('ss_')) return 'Ride — Sweet Spot';
-                  if (contains('recovery')) return 'Ride — Recovery';
-                  if (contains('endurance') || contains('z2')) return 'Ride — Endurance';
-                  return 'Ride';
-                }
-                if (mappedType === 'run') {
-                  if (hasTag('long_run')) return 'Run — Long Run';
-                  if (contains('tempo')) return 'Run — Tempo';
-                  if (contains('interval') || /\b\d+x\d+/.test(lowerText)) return 'Run — Intervals';
-                  return 'Run';
-                }
-                if (mappedType === 'swim') {
-                  if (hasTag('opt_kind:technique') || contains('technique') || contains('drills')) return 'Swim — Technique';
-                  return 'Swim — Endurance';
-                }
-                return [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
-              };
-              const name = buildName();
+              // Delegates to the shared canonical title helper (`src/lib/derive-workout-title.ts`),
+              // the single source of truth across PlannedWorkoutSummary / AllPlansInterface /
+              // TodaysEffort. The helper consumes `s` directly — its WorkoutLike shape covers
+              // every field the prior `buildName` consulted (name / type / description / tags /
+              // steps_preset / workout_structure.title). Closes the ENGINE-STATE Known Broken
+              // label-divergence entry.
+              const name = deriveWorkoutTitle(s as any);
               const stepsSummary = summarizeSteps((s as any).steps_preset);
               const stepsPreset = (s as any).steps_preset as string[] | undefined;
               const estFromSteps = estimateMinutesFromSteps(stepsPreset);

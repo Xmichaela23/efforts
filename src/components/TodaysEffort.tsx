@@ -11,6 +11,7 @@ import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkCol
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
+import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
@@ -1477,59 +1478,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const compactMetrics = showEnduranceDetails ? getCompactEnduranceMetrics(workout) : [];
 
                 const title = (() => {
-                  const type = String(workout.type || '').toLowerCase();
-                  const desc = String(workout.description || '').toLowerCase();
-                  const steps = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                  if (type === 'strength') {
-                    const stTitle = String((workout as any)?.workout_structure?.title || '').trim();
-                    const name = stTitle || workout.name;
-                    if (name && name.trim() && name.toLowerCase() !== 'strength') {
-                      const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
-                      if (hasDateSuffix) return name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim() || 'Strength';
-                      return name;
-                    }
-                    if (/squat|deadlift|bench|ohp/.test(desc)) return 'Strength — Compounds';
-                    if (/chin|row|pull|lunge|accessor/i.test(desc)) return 'Strength — Accessory';
-                    if (/core/.test(desc)) return 'Strength — Core';
-                    return 'Strength';
-                  }
-                  if (type === 'run') {
-                    const joined = steps.join(' ').toLowerCase();
-                    if (/longrun_/.test(joined)) return 'Run — Long';
-                    if (/tempo_/.test(joined)) return 'Run — Tempo';
-                    if (/interval_/.test(joined)) return 'Run — Intervals';
-                    return 'Run';
-                  }
-                  if (type === 'ride') {
-                    const joined = steps.join(' ').toLowerCase();
-                    if (/bike_vo2_/.test(joined)) return 'Ride — VO2';
-                    if (/bike_thr_/.test(joined)) return 'Ride — Threshold';
-                    if (/bike_ss_/.test(joined)) return 'Ride — Sweet Spot';
-                    if (/bike_endurance_/.test(joined)) return 'Ride — Endurance';
-                    return 'Ride';
-                  }
-                  if (type === 'swim') {
-                    const joined = steps.join(' ').toLowerCase();
-                    const label = plannedSwimSessionLabel(workout as any);
-                    const drillLike = /drill|technique|swim_drills_|swim_technique_/.test(desc + joined);
-                    if (drillLike && !/drill|technique/i.test(label)) return 'Swim — Drills';
-                    return label;
-                  }
-                  if (type === 'pilates_yoga') {
-                    const nameLower = String(workout.name || '').toLowerCase();
-                    const descLower = String(workout.description || '').toLowerCase();
-                    const combined = (nameLower + ' ' + descLower).toLowerCase();
-                    if (/yoga/i.test(combined)) return 'Yoga';
-                    if (/pilates/i.test(combined)) return 'Pilates';
-                    return workout.name || 'Pilates/Yoga';
-                  }
-                  const name = workout.name;
-                  if (name) {
-                    const hasDateSuffix = / - \d{1,2}\/\d{1,2}\/\d{4}$/.test(name);
-                    if (hasDateSuffix) return name.replace(/ - \d{1,2}\/\d{1,2}\/\d{4}$/, '').trim();
-                    return name;
-                  }
-                  return getDisplaySport(workout);
+                  // Delegates to the shared canonical title helper — single source of truth
+                  // across PlannedWorkoutSummary / AllPlansInterface / TodaysEffort. Closes the
+                  // ENGINE-STATE Known Broken label-divergence entry.
+                  const derived = deriveWorkoutTitle(workout as any);
+                  return derived || getDisplaySport(workout);
                 })();
 
                 const skipSubtitle = (() => {
@@ -1763,10 +1716,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   {(() => {
                     const w = selectedPlannedWorkout;
                     if (!w) return 'Planned Workout';
-                    const type = String(w.type || w.workout_type || '').toLowerCase();
-                    const name = w.name || w.title || '';
-                    if (name && name.toLowerCase() !== type) return name;
-                    return type.charAt(0).toUpperCase() + type.slice(1);
+                    // Same shared helper as the chip surface above — both reach the same
+                    // canonical title for any given workout. Closes the divergence the
+                    // ENGINE-STATE Known Broken entry filed.
+                    return deriveWorkoutTitle(w as any);
                   })()}
                 </DrawerTitle>
                 <DrawerDescription className="text-white/60 font-light">

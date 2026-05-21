@@ -12,6 +12,7 @@ import {
   stripTrailingSwimDistanceFromTitle,
   sumSwimYardsFromStepsPresetTokens,
 } from '@/utils/swimPlanTokens';
+import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -31,54 +32,11 @@ const formatDuration = (minutes: number) => {
   return `${totalMins}:00`;
 };
 
+// Delegates to the shared canonical title helper (`src/lib/derive-workout-title.ts`),
+// the single source of truth across PlannedWorkoutSummary / AllPlansInterface /
+// TodaysEffort. Closes the ENGINE-STATE Known Broken label-divergence entry.
 function getTitle(workout: any): string {
-  const st = String((workout as any)?.workout_structure?.title || (workout as any)?.workout_title || '').trim();
-  if (st) return st;
-  const nm = (workout.name || '');
-  const t = String(workout.type || '').toLowerCase();
-  const desc = String(workout.rendered_description || workout.description || '');
-  const tags = Array.isArray(workout.tags) ? (workout.tags as any[]).map((x: any) => String(x).toLowerCase()) : [];
-  const lower = desc.toLowerCase();
-  if (t === 'ride') {
-    if (tags.includes('group_ride') || /group\s*ride/.test(lower)) return 'Group Ride';
-    if (tags.includes('long_ride')) return 'Ride — Long Ride';
-    if (/vo2/.test(lower)) return 'Ride — VO2';
-    if (/threshold|thr_/.test(lower)) return 'Ride — Threshold';
-    if (/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot';
-    if (/recovery/.test(lower)) return 'Ride — Recovery';
-    if (/endurance|z2/.test(lower)) return 'Ride — Endurance';
-    return nm || 'Ride';
-  }
-  if (t === 'run') {
-    if (tags.includes('long_run')) return 'Run — Long Run';
-    if (/tempo/.test(lower)) return 'Run — Tempo';
-    if (/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals';
-    return nm || 'Run';
-  }
-  if (t === 'swim') {
-    const wsTit = String((workout as any)?.workout_structure?.title || '').trim();
-    const primary = wsTit || nm;
-    const base = stripTrailingSwimDistanceFromTitle(primary);
-    if (tags.includes('opt_kind:technique') || /drills|technique/.test(lower)) {
-      return base || 'Swim — Technique';
-    }
-    return base || 'Swim — Endurance';
-  }
-  if (t === 'strength') return nm || 'Strength';
-  if (t === 'mobility') return nm || 'Mobility';
-  if (t === 'pilates_yoga') {
-    // Just return "Pilates" or "Yoga" - specific type goes in description
-    const nameLower = String(nm || '').toLowerCase();
-    const descLower = String(desc || '').toLowerCase();
-    const combined = (nameLower + ' ' + descLower).toLowerCase();
-    
-    // Determine if it's yoga or pilates
-    if (/yoga/i.test(combined)) return 'Yoga';
-    if (/pilates/i.test(combined)) return 'Pilates';
-    
-    return nm || 'Pilates/Yoga';
-  }
-  return nm || 'Session';
+  return deriveWorkoutTitle(workout);
 }
 
 function parseComputed(workout: any): any | null {
