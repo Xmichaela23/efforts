@@ -857,11 +857,21 @@ export function buildWeek(
   });
 
   if (hasTri && !raceThisWeek && !isRecovery) {
-    // Long-run within-phase ramp (RUN-PROTOCOL §4.5). Lerps START → PEAK for
-    // base/build/race_specific; delegates to peak-of-phase floor for
-    // rebuild/taper/recovery (which are short windows / capped externally).
-    const longRunFloor = longRunMilesForWeek(primaryGoal.distance, phase, runWeekInPhase, runRampWeeks);
-    longRunMiles = Math.max(longRunMiles, longRunFloor);
+    // Long-run within-phase ramp (RUN-PROTOCOL §4.5). The lerp is the
+    // CANONICAL value for base/build/race_specific phases — the protocol's
+    // realized progression (e.g. 70.3 base 8.5 → 10mi) IS the prescription,
+    // not a floor. `longRunMilesForWeek` itself delegates to the peak-of-
+    // phase floor for rebuild/taper/recovery (short windows; capped
+    // externally by the explicit Math.min clamps below).
+    //
+    // Pre-fix this was `Math.max(longRunMiles, longRunFromRamp)` — treating
+    // the lerp as a floor and the TSS-derived `longRunMiles` from line 832
+    // as the candidate. For high-budget athletes, the TSS-derived value
+    // naturally hits the lerp's PEAK endpoint every week, so `Math.max`
+    // collapsed the ramp to a flat peak-of-phase value (Plan #78 audit).
+    // Post-fix the lerp IS canonical; long-run volume is anchored to race
+    // distance, not budget. See D-NNN.
+    longRunMiles = longRunMilesForWeek(primaryGoal.distance, phase, runWeekInPhase, runRampWeeks);
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
 

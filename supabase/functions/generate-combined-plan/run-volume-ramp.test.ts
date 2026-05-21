@@ -17,7 +17,7 @@
  *     supabase/functions/generate-combined-plan/run-volume-ramp.test.ts
  */
 
-import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildPhaseTimeline, blockForWeek } from './phase-structure.ts';
 import { buildWeek, weekInPhaseForTimeline } from './week-builder.ts';
 import type { AthleteState, GoalInput } from './types.ts';
@@ -47,6 +47,12 @@ type SessionLite = { day: string; type: string; name: string; tags?: string[]; d
 
 const findLongRun = (wk: { sessions: SessionLite[] }) =>
   wk.sessions.find((s) => s.type === 'run' && (s.tags?.includes('long_run') ?? false));
+
+/** Parse miles from a "Long Run — X mi" / "Long Run — X.Y mi" name. */
+const longRunMilesFromName = (name: string): number | null => {
+  const m = String(name ?? '').match(/—\s*(\d+(?:\.\d+)?)\s*mi/i);
+  return m ? Number(m[1]) : null;
+};
 
 /** Extract interval rep count from session name like "Run Intervals — 4×1000m". */
 const intervalReps = (wk: { sessions: SessionLite[] }): number | null => {
@@ -106,6 +112,83 @@ Deno.test('RUN §4.5: base-block long_run mileage ramps week-over-week (weekInPh
     durL > durE,
     `RUN §4.5 ramp: base wk${later!.w} (wip=${later!.wip}) long_run duration (${durL}min) must exceed ` +
       `wk${early.w} (wip=${early.wip}) duration (${durE}min) — flat ⇒ the weekInBlock≡1 bug regressed`,
+  );
+});
+
+Deno.test('RUN §4.5 CANONICAL: lerp output IS the realized long-run mileage (NOT a floor under TSS budget)', () => {
+  // Plan #78 reproducer — pre-fix, the engine treated `longRunMilesForWeek`
+  // as a `Math.max` floor against the TSS-derived value, which collapsed the
+  // ramp to a flat peak-of-phase value for high-budget athletes (TSS-derived
+  // miles naturally hit ~10mi every base week → ramp invisible). Post-fix,
+  // the lerp is canonical: long-run volume is anchored to race distance, not
+  // budget. See D-NNN.
+  //
+  // Asserts EXACT mileage at the lerp output (8.5 at wip=1 for 70.3 base),
+  // not just monotonic increase. The prior "ramps week-over-week" test
+  // passes by accident on a low-TSS fixture; this one fails pre-fix
+  // regardless of fixture TSS.
+  const goals: GoalInput[] = [
+    { id: 'a', event_name: 'A 70.3', event_date: '2026-09-13', distance: '70.3', sport: 'triathlon', priority: 'A' },
+  ];
+  const startDate = new Date('2026-05-18T12:00:00Z');
+  // High-budget athlete fixture (closely matches Plan #78 demographics — CTL
+  // ~60, 11 weekly hours, intermediate, performance/race_peak). TSS-derived
+  // long-run miles would land at ~10mi every base week pre-fix.
+  const athlete = {
+    current_ctl: 60,
+    weekly_hours_available: 11,
+    loading_pattern: '3:1',
+    limiter_sport: 'run',
+    rest_days: [1],
+    long_run_day: 0,
+    long_ride_day: 6,
+    swim_easy_day: 1,
+    swim_quality_day: 4,
+    run_quality_day: 3,
+    bike_quality_day: 2,
+    bike_easy_day: 3,
+    training_intent: 'performance',
+    tri_approach: 'race_peak',
+    strength_intent: 'performance',
+    swim_intent: 'focus',
+    training_fitness: 'intermediate',
+  } as AthleteState;
+  const { blocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, athlete);
+
+  // Find base weeks at specific wip values.
+  const baseWeekAt = (target: number): { w: number; wip: number } | null => {
+    for (let w = 1; w <= totalWeeks; w++) {
+      const blk = blockForWeek(blocks, w);
+      if (blk.phase !== 'base') continue;
+      const wip = weekInPhaseForTimeline(blocks, w, blk);
+      if (wip === target) return { w, wip };
+    }
+    return null;
+  };
+  const wip1 = baseWeekAt(1);
+  assert(wip1, 'expected a base week with wip=1');
+
+  let prev = 500;
+  const build = (w: number) => {
+    const wk = buildWeek(w, blockForWeek(blocks, w), prev, goals, athlete, undefined, {
+      totalWeeks, raceAnchors, phaseBlocks: blocks,
+    }) as unknown as { sessions: SessionLite[]; total_weighted_tss: number };
+    prev = wk.total_weighted_tss;
+    return wk;
+  };
+  const wk1 = build(wip1!.w);
+  const lr1 = findLongRun(wk1);
+  assert(lr1, `wip=1 base week must have a long_run`);
+  const miles1 = longRunMilesFromName(lr1!.name);
+  assert(miles1 != null, `expected miles in long_run name; got "${lr1!.name}"`);
+
+  // Per RUN-PROTOCOL §4.5: 70.3 base wip=1 → 0.65 × 13 = 8.45 → roundHalfMile = 8.5mi.
+  // Pre-fix this would have been 10 (TSS-derived value, with lerp 8.5 acting as a no-op floor).
+  assertEquals(
+    miles1,
+    8.5,
+    `RUN §4.5 canonical contract: base wip=1 must be 8.5mi (lerp output), got ${miles1}mi — ` +
+      `pre-fix the Math.max floor collapsed the ramp to a flat peak-of-phase value`,
   );
 });
 
