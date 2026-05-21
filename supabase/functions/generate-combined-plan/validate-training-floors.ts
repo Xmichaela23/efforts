@@ -7,15 +7,35 @@
  * (lower weekly budget + shrink long-run miles).
  */
 
-import type { GeneratedWeek, AthleteState, Phase, PlannedSession, Sport } from './types.ts';
+import type { GeneratedWeek, AthleteState, Phase, PhaseBlock, PlannedSession, Sport } from './types.ts';
 import {
   DAYS_OF_WEEK,
   estimateSessionTSS,
   longRideFloorHours,
   longRunFloorMiles,
+  longRunMilesForWeek,
+  rampWeeksForPhase,
   weightedTSS,
   type TriRaceDistance,
 } from './science.ts';
+import { blockForWeek } from './phase-structure.ts';
+
+/**
+ * Local mirror of `week-builder.ts: weekInPhaseForTimeline` — inlined to avoid
+ * a circular import (`week-builder.ts` imports from this file). Identical
+ * semantics: count backwards from `weekNum`, incrementing for each prior week
+ * in the same phase + primaryGoalId, stopping at the first non-matching week.
+ * Returns 1 for the first week of a phase block.
+ */
+function weekInPhaseInline(phaseBlocks: PhaseBlock[], weekNum: number, block: PhaseBlock): number {
+  let n = 1;
+  for (let w = weekNum - 1; w >= 1; w--) {
+    const b = blockForWeek(phaseBlocks, w);
+    if (b.phase === block.phase && b.primaryGoalId === block.primaryGoalId) n++;
+    else break;
+  }
+  return n;
+}
 
 /**
  * Sanity ceiling on long-run raw TSS share — applied to **all** phases (no phase variation) for
@@ -298,6 +318,13 @@ export type EvaluateLongDayFloorsOpts = {
   recentLongestRunMi?: number;
   /** Longest ride duration (hours) in the last 30 days. Same logic for the cycling side. */
   recentLongestRideHr?: number;
+  /**
+   * D-027: phase blocks for within-phase-aware floor computation. When provided, the spec floor
+   * follows the lerp's within-phase ramp instead of the peak-of-phase value (matches the D-026
+   * canonical contract at the week-builder layer). When omitted, falls back to peak-of-phase
+   * (legacy behavior; preserves tests that don't thread phaseBlocks).
+   */
+  phaseBlocks?: PhaseBlock[];
 };
 
 /**
@@ -342,8 +369,23 @@ export function effectiveLongRunFloorMiles(
   distance: TriRaceDistance,
   phase: Phase,
   recentLongestRunMi: number,
+  /**
+   * D-027: within-phase-aware spec floor. When BOTH `weekInPhase` AND `rampWeeks`
+   * are provided, the spec floor routes through `longRunMilesForWeek` — the same
+   * canonical lerp the week-builder uses (D-026). When either is omitted, falls
+   * back to `longRunFloorMiles` (peak-of-phase) for backward compat. This
+   * threading is what lets the validator's `enforceLongDayFloors` (which
+   * previously bumped 8.5mi → 10mi for 70.3 base wk 1 because the peak-of-
+   * phase floor matched the lerp's PEAK endpoint) follow the lerp's
+   * within-phase ramp instead. History-aware fromRecent path is unchanged —
+   * still protects high-recent-volume athletes from under-prescription.
+   */
+  weekInPhase?: number,
+  rampWeeks?: number,
 ): number {
-  const spec = longRunFloorMiles(distance, phase);
+  const spec = weekInPhase != null && rampWeeks != null
+    ? longRunMilesForWeek(distance, phase, weekInPhase, rampWeeks)
+    : longRunFloorMiles(distance, phase);
   const peakCap = longRunFloorMiles(distance, nextPhaseForLongDayFloorCap(phase));
   const fromRecent = Math.max(0, recentLongestRunMi) * 0.5;
   const raw = Math.max(spec, fromRecent);
@@ -428,10 +470,21 @@ export function evaluateLongDayVolumeFloors(
     if (raceWeeks.has(w.weekNum)) continue;
 
     // Long run — applies to both single-sport (run) and tri.
+    // D-027: thread weekInPhase + rampWeeks when phaseBlocks are available so
+    // the soft validator floor follows the lerp instead of peak-of-phase.
+    let wipSoft: number | undefined;
+    let rwSoft: number | undefined;
+    if (opts.phaseBlocks?.length) {
+      const blk = blockForWeek(opts.phaseBlocks, w.weekNum);
+      wipSoft = weekInPhaseInline(opts.phaseBlocks, w.weekNum, blk);
+      rwSoft = rampWeeksForPhase(w.phase);
+    }
     const lrFloorMi = effectiveLongRunFloorMiles(
       opts.primaryDistance,
       w.phase,
       opts.recentLongestRunMi ?? 0,
+      wipSoft,
+      rwSoft,
     );
     if (lrFloorMi > 0) {
       const lrMin = maxLongRunMinutes(w);
@@ -610,6 +663,13 @@ export type EnforceLongDayFloorsOpts = {
   recentLongestRunMi?: number;
   /** Longest ride duration (hours) in the last 30 days. See {@link effectiveLongRideFloorHours}. */
   recentLongestRideHr?: number;
+  /**
+   * D-027: phase blocks for within-phase-aware floor computation. When provided, `enforceLongDayFloors`
+   * routes the spec floor through `longRunMilesForWeek` per-week so the enforcer follows the lerp
+   * instead of the peak-of-phase value (matches D-026). When omitted, falls back to peak-of-phase
+   * (legacy behavior; preserves tests that don't thread phaseBlocks).
+   */
+  phaseBlocks?: PhaseBlock[];
 };
 
 /**
@@ -632,10 +692,24 @@ export function enforceLongDayFloors(
     if (raceWeeks.has(w.weekNum)) continue;
 
     // Long run — applies to both single-sport (run) and tri.
+    // D-027: thread weekInPhase + rampWeeks when phaseBlocks are available so
+    // the hard enforcer follows the lerp instead of peak-of-phase. Pre-fix
+    // this enforcer was the second `Math.max` floor that flattened the §4.5
+    // within-phase ramp to peak-of-phase even after Bundle B made the
+    // week-builder canonical.
+    let wipHard: number | undefined;
+    let rwHard: number | undefined;
+    if (opts.phaseBlocks?.length) {
+      const blk = blockForWeek(opts.phaseBlocks, w.weekNum);
+      wipHard = weekInPhaseInline(opts.phaseBlocks, w.weekNum, blk);
+      rwHard = rampWeeksForPhase(w.phase);
+    }
     const lrFloorMi = effectiveLongRunFloorMiles(
       opts.primaryDistance,
       w.phase,
       opts.recentLongestRunMi ?? 0,
+      wipHard,
+      rwHard,
     );
     if (lrFloorMi > 0) {
       const lrSession = findLongRunSessionInWeek(w);

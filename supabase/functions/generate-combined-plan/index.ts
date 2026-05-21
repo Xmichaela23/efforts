@@ -229,12 +229,19 @@ Deno.serve(async (req: Request) => {
     // below their physiological minimums (`longRideFloorHours` / `longRunFloorMiles`).
     // The effective floor is history-aware: `max(specFloor, recent_longest × 0.5)` so athletes
     // who already log longer sessions don't get capped to the generic spec floor.
+    // D-027: pass phaseBlocks so the validator's effective long-run floor is
+    // within-phase-aware (follows the lerp's ramp instead of peak-of-phase).
+    // `blocks` is mutated by the rebuild loop below (tightenPhaseBlocksForFloorRebuild
+    // returns a new array); reconstruct the opts object inside the loop if needed.
+    // For the initial pass and the steady-state case, the current `blocks` reference
+    // is correct.
     const longDayFloorOpts = {
       hasTri: hasTriGoal,
       primaryDistance: (goals.find((g) => g.priority === 'A') ?? goals[0]).distance,
       raceWeekNums: raceAnchors.map((a) => a.planWeek),
       recentLongestRunMi: state.recent_longest_run_mi ?? 0,
       recentLongestRideHr: state.recent_longest_ride_hr ?? 0,
+      phaseBlocks: blocks,
     };
     // Run enforcement unconditionally before validation — long-day floors are guaranteed hard
     // contracts (rebuild floor must hit 2.5h for 70.3 regardless of whether other validators
@@ -250,12 +257,15 @@ Deno.serve(async (req: Request) => {
       physiologicalFloorRebuiltOnce = true;
       floorPass += 1;
       generatedWeeks = generateAllWeeks(blocks, 'normal');
+      // D-027: refresh phaseBlocks reference after the rebuild reassignment.
+      longDayFloorOpts.phaseBlocks = blocks;
       enforceLongDayFloors(generatedWeeks, longDayFloorOpts);
       floors = validateTrainingFloors(generatedWeeks, floorOpts);
     }
     if (!floors.ok) {
       physiologicalFloorRebuiltOnce = true;
       generatedWeeks = generateAllWeeks(blocks, 'deep');
+      longDayFloorOpts.phaseBlocks = blocks;
       enforceLongDayFloors(generatedWeeks, longDayFloorOpts);
       floors = validateTrainingFloors(generatedWeeks, floorOpts);
       floorPass += 1;
@@ -300,6 +310,8 @@ Deno.serve(async (req: Request) => {
         raceWeekNums: raceAnchors.map((a) => a.planWeek),
         recentLongestRunMi: state.recent_longest_run_mi ?? 0,
         recentLongestRideHr: state.recent_longest_ride_hr ?? 0,
+        // D-027: within-phase-aware soft validator floor; matches the hard enforcer.
+        phaseBlocks: blocks,
       });
       if (longDayWarnings.length > 0) {
         console.warn(

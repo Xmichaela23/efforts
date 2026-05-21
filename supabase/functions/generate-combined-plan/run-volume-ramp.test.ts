@@ -20,7 +20,8 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { buildPhaseTimeline, blockForWeek } from './phase-structure.ts';
 import { buildWeek, weekInPhaseForTimeline } from './week-builder.ts';
-import type { AthleteState, GoalInput } from './types.ts';
+import { enforceLongDayFloors } from './validate-training-floors.ts';
+import type { AthleteState, GeneratedWeek, GoalInput } from './types.ts';
 
 function makeAthleteState(): AthleteState {
   return {
@@ -189,6 +190,156 @@ Deno.test('RUN §4.5 CANONICAL: lerp output IS the realized long-run mileage (NO
     8.5,
     `RUN §4.5 canonical contract: base wip=1 must be 8.5mi (lerp output), got ${miles1}mi — ` +
       `pre-fix the Math.max floor collapsed the ramp to a flat peak-of-phase value`,
+  );
+});
+
+Deno.test('RUN §4.5 + D-027: lerp value SURVIVES enforceLongDayFloors (end-to-end Plan #78 chain)', () => {
+  // Plan #78 end-to-end. Bundle B fixed the week-builder Math.max floor; this
+  // test additionally exercises `enforceLongDayFloors` to lock the D-027 fix
+  // — the validator's effective floor must now follow the lerp (when
+  // phaseBlocks are threaded) instead of peak-of-phase. Pre-D-027, the
+  // validator bumped the lerp's 8.5mi UP to 10mi (peak-of-base) because
+  // longRunFloorMiles('70.3', 'base') = 10. This test fails pre-D-027 even
+  // though Bundle B is in place.
+  const goals: GoalInput[] = [
+    { id: 'a', event_name: 'A 70.3', event_date: '2026-09-13', distance: '70.3', sport: 'triathlon', priority: 'A' },
+  ];
+  const startDate = new Date('2026-05-18T12:00:00Z');
+  const athlete = {
+    current_ctl: 60,
+    weekly_hours_available: 11,
+    loading_pattern: '3:1',
+    limiter_sport: 'run',
+    rest_days: [1],
+    long_run_day: 0,
+    long_ride_day: 6,
+    swim_easy_day: 1,
+    swim_quality_day: 4,
+    run_quality_day: 3,
+    bike_quality_day: 2,
+    bike_easy_day: 3,
+    training_intent: 'performance',
+    tri_approach: 'race_peak',
+    strength_intent: 'performance',
+    swim_intent: 'focus',
+    training_fitness: 'intermediate',
+  } as AthleteState;
+  const { blocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, athlete);
+
+  const baseWeekAt = (target: number): { w: number; wip: number } | null => {
+    for (let w = 1; w <= totalWeeks; w++) {
+      const blk = blockForWeek(blocks, w);
+      if (blk.phase !== 'base') continue;
+      const wip = weekInPhaseForTimeline(blocks, w, blk);
+      if (wip === target) return { w, wip };
+    }
+    return null;
+  };
+  const wip1 = baseWeekAt(1);
+  assert(wip1, 'expected a base week with wip=1');
+
+  // Build a GeneratedWeek for wip=1 (mirrors how index.ts drives the full chain).
+  let prev = 500;
+  const wk = buildWeek(wip1!.w, blockForWeek(blocks, wip1!.w), prev, goals, athlete, undefined, {
+    totalWeeks, raceAnchors, phaseBlocks: blocks,
+  }) as unknown as GeneratedWeek;
+  prev = wk.total_weighted_tss;
+
+  // Run the hard enforcer with phaseBlocks threaded — the D-027 fix path.
+  // recentLongestRunMi=0 (new athlete) — history-aware bump doesn't fire;
+  // pure spec-floor behavior should follow the lerp.
+  enforceLongDayFloors([wk], {
+    hasTri: true,
+    primaryDistance: '70.3',
+    raceWeekNums: raceAnchors.map((a) => a.planWeek),
+    recentLongestRunMi: 0,
+    recentLongestRideHr: 0,
+    phaseBlocks: blocks,
+  });
+
+  // Find the long_run AFTER enforcement.
+  const lrAfter = (wk.sessions as unknown as SessionLite[])
+    .find((s) => s.type === 'run' && (s.tags?.includes('long_run') ?? false));
+  assert(lrAfter, `long_run must survive enforcement; got sessions=${JSON.stringify(wk.sessions.map((s) => s.type))}`);
+  const milesAfter = longRunMilesFromName(lrAfter!.name);
+  assert(milesAfter != null, `expected miles in long_run name; got "${lrAfter!.name}"`);
+  assertEquals(
+    milesAfter,
+    8.5,
+    `D-027: enforceLongDayFloors must respect the lerp's within-phase ramp ` +
+      `(8.5mi at base wip=1), got ${milesAfter}mi — pre-fix the validator's ` +
+      `peak-of-phase floor (10mi for 70.3 base) bumped this up.`,
+  );
+});
+
+Deno.test('D-027 no-regression: enforceLongDayFloors WITHOUT phaseBlocks falls back to peak-of-phase', () => {
+  // Legacy callers that don't pass phaseBlocks should see the prior
+  // peak-of-phase behavior unchanged (effectiveLongRunFloorMiles falls back
+  // to longRunFloorMiles). Locks the backward-compat path.
+  const goals: GoalInput[] = [
+    { id: 'a', event_name: 'A 70.3', event_date: '2026-09-13', distance: '70.3', sport: 'triathlon', priority: 'A' },
+  ];
+  const startDate = new Date('2026-05-18T12:00:00Z');
+  const { blocks, totalWeeks, raceAnchors } = buildPhaseTimeline(goals, startDate, makeAthleteState());
+
+  const baseWeekAt = (target: number): { w: number; wip: number } | null => {
+    for (let w = 1; w <= totalWeeks; w++) {
+      const blk = blockForWeek(blocks, w);
+      if (blk.phase !== 'base') continue;
+      const wip = weekInPhaseForTimeline(blocks, w, blk);
+      if (wip === target) return { w, wip };
+    }
+    return null;
+  };
+  const wip1 = baseWeekAt(1);
+  assert(wip1, 'expected a base week with wip=1');
+
+  // Construct a minimal under-floor long_run session for enforcement.
+  const wk: GeneratedWeek = {
+    weekNum: wip1!.w,
+    phase: 'base',
+    isRecovery: false,
+    sessions: [
+      {
+        day: 'Sunday',
+        type: 'run',
+        name: 'Long Run — 6 mi',
+        description: 'short',
+        duration: 57,
+        tss: 50,
+        weighted_tss: 65,
+        intensity_class: 'EASY',
+        steps_preset: ['longrun_6mi_easypace'],
+        tags: ['long_run'],
+        serves_goal: 'shared',
+        zone_targets: 'Z2',
+      },
+    ],
+    total_raw_tss: 50,
+    total_weighted_tss: 65,
+    sport_raw_tss: { run: 50, bike: 0, swim: 0, strength: 0, mobility: 0, pilates_yoga: 0 },
+    zone1_2_minutes: 57,
+    zone3_plus_minutes: 0,
+    eighty_twenty_ratio: 1,
+  } as unknown as GeneratedWeek;
+
+  enforceLongDayFloors([wk], {
+    hasTri: true,
+    primaryDistance: '70.3',
+    raceWeekNums: raceAnchors.map((a) => a.planWeek),
+    recentLongestRunMi: 0,
+    recentLongestRideHr: 0,
+    // phaseBlocks deliberately omitted — locks the backward-compat path.
+  });
+
+  const lrAfter = (wk.sessions as unknown as SessionLite[])
+    .find((s) => s.type === 'run' && (s.tags?.includes('long_run') ?? false));
+  const milesAfter = longRunMilesFromName(lrAfter!.name);
+  assertEquals(
+    milesAfter,
+    10,
+    `legacy fallback: without phaseBlocks, enforcer must use peak-of-phase floor (10mi for 70.3 base) — ` +
+      `bumps 6mi to 10mi unchanged from pre-D-027 behavior. Got ${milesAfter}mi.`,
   );
 });
 
