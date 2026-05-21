@@ -141,10 +141,24 @@ No long sets. No threshold work. Final swim 2-3 days before race.
 **Structure:** WU 300 → 2-3 drills (150-300yd) → Aerobic main set (1500-2500yd at Z2) → CD 200.
 **Phase use:** Base primarily.
 
+**Beginner variant (`swim_fitness === 'beginner'`):**
+- **Drill block:** 3-4 drills, 300-450yd (Path A per §10 / D-020). Distinct §6.1 stroke phases per the §6.3 Path A pairing rule — the larger drill block IS the work for the learner population, so cross-phase pairing is appropriate here.
+- **Main set:** Simpler structure — `4-6 × 200yd at Z1-Z2 (CSS + 10-15s), 20s rest`. Longer rest than the intermediate prescription so the swimmer can reset stroke focus between repeats.
+- **Coaching emphasis:** Drill execution > distance. *"This is a technique session first. If you lose form on a repeat, take longer rest before the next one."* Quality over volume — if the stroke breaks down, cut the main-set count rather than push through.
+- **Total yardage:** Same band as intermediate (~2000-2500yd post-D-022 cap); volume drops within the band via `protocolMidVolumeMultiplier`. Drill block grows; main set shrinks proportionally.
+- Foundation-drill bias per §6.3 fitness-tier biasing (D-020 Slice 3d): catchup, fingertipdrag, singlearm, 616 favored.
+
 ### 5.2 CSS Aerobic
 **Purpose:** Build CSS-specific aerobic capacity.
 **Structure:** WU 300 → Short drill block (100-150yd) → 12-16×100yd at CSS pace, 15s rest → CD 200.
 **Phase use:** Base late, Build.
+
+**Beginner variant (`swim_fitness === 'beginner'`):**
+- **Drill block:** 2-3 drills, 200-300yd (promotes the §5.2 session from Path B single-drill to Path A multi-drill for the learner population). **One stroke-phase focus per session** (per §6.5 — drill block smaller than §5.1, main set is the real work; don't pair a catch drill with a rotation drill here). Foundation-biased per §6.3 (catchup OR fingertipdrag OR singlearm, not mixed).
+- **Main set:** Simpler repeats — `6-8 × 100yd at CSS + 5s (Z2-Z3 boundary, conversational-effort), 20-25s rest` (vs intermediate's `12-16 × 100yd at CSS, 15s rest`). Slower target pace, longer rest, fewer reps — keeps the session aerobic and form-sustainable.
+- **Coaching emphasis:** Pace consistency > pace target. *"Hit the same 100yd time on every repeat — if the last one is more than 3 sec slower than the first, you started too fast."*
+- **Total yardage:** Capped at 2500yd per D-022. With the larger drill block, main set lands at ~1800-2000yd.
+- CSS pace itself is conservative for learners; if no CSS test on file, the fallback cue from §7.5 replaces the numeric pace target in session copy.
 
 ### 5.3 Threshold
 **Purpose:** Develop sustainable pace at and above CSS.
@@ -156,11 +170,31 @@ No long sets. No threshold work. Final swim 2-3 days before race.
 **Structure:** WU 300 → Sighting drill (100-200yd) → 5-8×200yd at race effort, OR 3×600yd at race effort, 45s rest → CD 200. **Total: 1500-2500yd** scaled by phase (1500 base, 2000 build, 2500 race-spec).
 **Phase use:** Race-specific primarily.
 
+**Open water race-specific elements** (intermediate / advanced only — banned for beginners per §10.2):
+
+When executed in open water OR when the athlete has open-water access during race-specific phase, the following race-rehearsal elements layer on top of the base structure:
+
+- **Sighting cadence:** every 6-8 strokes throughout the main set, not just during the sighting drill block. Head-up sight without breaking stroke rhythm — eyes open just long enough to spot the next buoy, then back to face-down.
+- **Bilateral breathing:** at least 50% of repeats with breathing pattern alternating sides (e.g., every 3rd or every 5th stroke). Required for managing sun glare and chop direction on race day. *"If the sun is on your right, you'll need to breathe left — practice it now."*
+- **Drafting position awareness:** when swimming with a group, practice both lead (no draft) and feet/hip-side draft positions. Real-race energy savings from drafting are ~10-15% effort reduction; learning to find and hold the draft is a race-day skill.
+- **Wetsuit requirement** (when race mandates wetsuit — water temp < 78°F per most race rules): athlete is recommended to complete **at least 2 open-water sessions in a wetsuit during the race-specific phase**. Pool wetsuit acclimation is not equivalent — buoyancy shifts body position; neck-chafe management is open-water-specific. If no open-water access logged, the engine surfaces a trade-off warning: *"Race requires wetsuit; no open-water access logged. Recommend at least 2 wetsuit-on swims in lake / ocean / reservoir before race day."*
+
+**Substitution when no open-water access:** session executes as written in pool (sighting drill at start, bilateral-breathing rule on main set). The trade-off message above surfaces; the §5.9 Open Water Skills session is skip-optional per §5.9.
+
+**Beginner exclusion (§10.2):** beginners receive Technique Aerobic in place of Race-Specific Aerobic per §10.3 substitution. Open water for a learner is a stroke-economy-degrading environment — deferred to a Masters coach per §2. The open-water specifics in this subsection do NOT apply to beginners.
+
 ### 5.5 Pull-Focused
 **Purpose:** Upper-body fitness, stroke isolation.
 **Structure:** WU 300 → Drills (100yd) → 6-8×100 pull with buoy, 4-6×100 full stroke → CD 200.
 **Phase use:** Any phase, athlete equipment-gated (requires pull buoy).
 **Substitution:** When no pull buoy, substitute with Endurance session (per Rock 2 equipment-aware substitution already shipped).
+
+**Beginner variant (`swim_fitness === 'beginner'`):**
+- **Drill block:** 2 drills, 200yd. **One stroke-phase focus per session** (per §6.5 — drill block smaller than §5.1, main set is the real work). Foundation drills only — catchup OR singlearm. NOT sculling (too advanced — beginners lack the catch fluency to feel pressure changes). NOT fist swim (counter-productive without catch fluency).
+- **Main set:** Lighter pull volume — `4-6 × 100yd pull with buoy at Z2 (CSS + 10-15s), 25s rest` + `4 × 100yd full stroke easy aerobic, 20s rest`. The buoy is a posture / catch-feel tool for beginners, not an upper-body conditioning tool.
+- **Paddles NOT recommended** for beginners on pull repeats — finger-tip sensitivity needed for catch development; paddles bypass the feedback. Coaching cue text suppresses the "paddles optional" line for `athleteFitness === 'beginner'` (per §8.4 surfacing rule).
+- **Coaching emphasis:** Catch feel > pull strength. *"With the buoy holding your hips, focus on getting an early grab on the water with each stroke. If your shoulders feel sore, you're pulling too hard — back off."*
+- **Total yardage:** Same band as intermediate, ~1000-1400yd typical.
 
 ### 5.6 Kick-Focused
 **Purpose:** Leg propulsion, body position.
@@ -193,6 +227,13 @@ No long sets. No threshold work. Final swim 2-3 days before race.
 **Purpose:** Active recovery, technique reinforcement at low intensity.
 **Structure:** WU 200 → 3-4×100 easy with drill focus → CD 200. Total 600-1000yd.
 **Phase use:** Any phase, sparingly.
+
+**Beginner variant (`swim_fitness === 'beginner'`):**
+- **Structure:** Drill-led entirely — `WU 200 → 4 × (50 drill + 50 full stroke) → CD 200`. ~500-700yd total. **One drill focus per session** (per §6.5) — single foundation drill chosen from catchup / fingertipdrag / singlearm; the recovery session for a beginner is essentially a low-volume technique session, not a fatigue-relief session.
+- **Coaching emphasis:** "Easy and aware" — keep stroke rate low (target ~50-55 strokes/min for a 25yd pool), focus on body position and recovery elbow height. A movement-quality session at low intensity.
+- **Phase use:** Deload weeks AND optionally a 3rd weekly touch for `swim_intent='focus'` beginners (per §10.4 slot 2 substitution — `[css_aerobic, technique_aerobic, recovery]`).
+- **Total yardage:** Lower end of band — 600-800yd.
+- **Equipment:** none (per §8.4) — the session is movement-quality-focused; gear bypasses that intent.
 
 ---
 
@@ -249,6 +290,35 @@ Selection rules:
 
 **Honest acknowledgment:** For Learning-level athletes, the system surfaces a Masters swim recommendation. Drill progression is sound, but individual stroke correction requires either Form goggle video analysis or human coaching.
 
+### 6.5 Drill volume by fitness tier
+
+Per-session drill block size is gated by `swim_fitness` tier, in addition to the per-§5 prescriptions. This subsection codifies the tier-level scaling that the picker (`pickSwimDrillInset`) currently encodes loosely via foundation-vs-race biasing (D-020 Slice 3d).
+
+| Swim fitness | Per-session drill volume | Drill count | Selection bias |
+|---|---|---|---|
+| **Beginner** | 200-400yd (10-15% of session) | 2-4 drills | Foundation drills (catchup, fingertipdrag, singlearm, 616). See per-§5 type-specific rules below for stroke-phase pairing. |
+| **Intermediate** | 100-200yd (4-8% of session) | 1-2 drills | Phase-appropriate rotation per §6.2 — base = foundation, build = refinement (fist, sculling, zipper), race-specific = race skills (sighting, bilateral breathing). |
+| **Advanced** | ≤100yd in hard sessions (threshold, race-spec, time trial); 100-200yd in technique-aerobic base sessions only | 1 drill (hard) / 2-3 drills (technique-aerobic base) | Race-specific drills dominate in race-spec and build phases; base allows technique reinforcement (singlearm for rotation, sighting for race carryover). Hard sessions minimize drill volume — main set IS the work. |
+
+**Beginner stroke-phase pairing (per session type):**
+
+| Session type | Phase-pairing rule for beginners |
+|---|---|
+| §5.1 Technique Aerobic | **2-3 distinct stroke phases** allowed (per §6.3 Path A pairing). The drill block is large enough to be the work; cross-phase pairing reinforces multiple cues. |
+| §5.2 CSS Aerobic | **One stroke-phase focus** per session. Drill block smaller, main set IS the work. Don't pair a catch drill with a rotation drill — alternate phases ACROSS sessions, not within. |
+| §5.5 Pull-Focused | **One stroke-phase focus** per session. Same rationale as §5.2. |
+| §5.11 Recovery | **One drill focus** per session. Movement-quality session; single drill chosen from foundation set. |
+
+**Stacking rules with the existing picker:**
+- For session types in §10.2 allowed list (beginner-routable), the per-session drill volume is the MAX of: §5 per-type prescription AND §6.5 tier prescription. Beginner sessions get the larger of the two.
+- The picker (`pickSwimDrillInset`) is the implementation point. D-020 Slice 3d already added fitness-tier biasing on drill SELECTION; §6.5 extends it to drill VOLUME (count + yardage).
+
+**Rationale:**
+- §2 ratio table prescribes 75% drill / 25% swim for Learning swimmers. The current §5 per-session structures cap drill volume at 4-7% of total yards (Q-016 documents this). §6.5 closes the gap for the beginner population — 10-15% per session is still well below §2's 75% intent but a meaningful improvement.
+- Beginners learn movements by repetition. One drill focus per CSS Aerobic / Pull-Focused / Recovery session lets the learner grok the cue before adding the next phase the following session.
+- Technique Aerobic is the exception because the drill block IS large (300-450yd) and IS the work — Path A pairing across 2-3 phases is appropriate at that volume.
+- Advanced athletes who pile drills onto every session dilute the work — the protocol explicitly minimizes drill volume in hard sessions for the competitive tier.
+
 ---
 
 ## 7. Pace derivation
@@ -294,6 +364,36 @@ When athlete has no swim pace data:
 - Trade-off message surfaces: "Pace targets will be conservative until you log a swim. Complete a Time Trial session in week 1-2 to calibrate."
 - All pace prescriptions shift to RPE language: "moderate effort, sustainable for 1500yd"
 
+### 7.5 CSS calibration for learning swimmers (no test data)
+
+§7.4 covers the conservative-defaults fallback. §7.5 adds an **active-calibration** path for learning swimmers who don't yet have a CSS test on file. The §5.8 Time Trial (400yd + 200yd protocol) is banned for beginners per §10.2 — they need a simpler entry point.
+
+**Simple 200yd time trial protocol (beginner-friendly):**
+
+1. **Athlete swims 200yd at sustainable hard effort** in a pool, alone or with a Masters coach. Record the time.
+2. **Initial CSS estimate** = `(200yd time ÷ 2) + 5 seconds`. The +5s buffer keeps the early-plan CSS conservative — better to under-prescribe and progress than over-prescribe and break form under fatigue.
+3. **Update athlete baseline** via `baselines.swim_threshold_pace_100` once the time trial is logged. The engine recalibrates pace prescriptions on the next plan regenerate.
+
+**Wizard / arc trigger:**
+
+Athletes who declare `swim_experience='learning'` are flagged to complete this 200yd protocol **before Week 3** of the plan. The wizard surfaces an inline note on the swim-baseline step:
+
+> *"No CSS test? Swim a 200yd time trial at sustainable hard effort in your first week or two, divide the time by 2, add 5 seconds. That's your starting CSS pace. Update your profile once you've got the number — your plan will recalibrate."*
+
+For `swim_fitness='beginner'` athletes the full §5.8 Time Trial protocol is **not auto-prescribed** (banned for beginners per §10.2); the informal 200yd trial above is the substitute. Intermediate / advanced athletes continue to receive the standard §5.8 Time Trial on the spec's 6-8-week cadence.
+
+**Session-copy fallback (engine-side):**
+
+For CSS Aerobic, Race-Specific Aerobic, and any other CSS-anchored session when the athlete has NO CSS pace on file, the session description includes a **fallback cue** in place of the numeric pace target:
+
+> *"If you don't have a CSS pace yet, swim at a pace where you can hold a short conversation but feel like you're working. Aim for the same effort on every repeat — pace consistency is more important than hitting a specific number."*
+
+This replaces the typical `"5×100 at CSS pace (1:40/100yd), 15s rest"` line. Once the athlete supplies a `swim_threshold_pace_100`, the numeric line returns automatically on the next plan regenerate.
+
+**Trade-off message at plan generation:**
+
+> *"No swim pace data — your CSS pace targets are conservative defaults. Complete a 200yd time trial in Week 1-2 and update your profile to recalibrate."*
+
 ---
 
 ## 8. Equipment tiers
@@ -324,6 +424,36 @@ Every swim session emits the "Pool gear" line (already shipped):
 - "Pool gear — Required: Pull buoy. Optional: Paddles, Snorkel."
 - "Pool gear — Optional: Snorkel." (when only athlete-owned optional applies)
 - (Omitted when nothing required and no useful optional)
+
+### 8.4 Equipment surfacing in session copy (per-equipment rules)
+
+§8.2 covers session-type substitution when required equipment is missing. §8.4 covers **which equipment appears as athlete-facing copy** (Pool gear line in the description AND chip-style surfaces on the calendar / drawer). The rules below extend the existing implementation (`session-factory.ts: appendPoolGearLine` → `src/lib/plan-tokens/swim-drill-tokens.ts: buildSwimGearLine` for the description path; `materialize-plan/index.ts: inferSwimEquipmentPack` for the chip-surface path via `req:*` / `optional:*` tags).
+
+**Per-equipment surfacing rules:**
+
+| Equipment | Surface on | Required vs Optional | Implementation status |
+|---|---|---|---|
+| **Pull buoy** | Pull-Focused (any tier); any session containing a pull-buoy-required drill (sculling, scullfront) | Required when used by the session | Already shipped — pull-focused tags `req:buoy`; drill tokens map via `DRILL_EQUIPMENT_MAP`. |
+| **Pull buoy** | CSS Aerobic / Technique Aerobic when athlete owns it AND `swim_fitness !== 'beginner'` | Optional | NEW — session-factory adds `optional:buoy` tag for intermediate / advanced when athlete owns buoy. **Beginner sessions explicitly OMIT this hint** (§5.5 rationale — paddles / buoy bypass beginner catch feedback). |
+| **Paddles** | CSS Aerobic, Threshold, Mixed/Fartlek, Pull-Focused — `swim_fitness !== 'beginner'` AND athlete owns | Optional | NEW — session-factory adds `optional:paddles` tag for these session types. Beginner sessions OMIT (per §5.5 rationale — finger-tip sensitivity needed for catch development). |
+| **Snorkel** | Technique Aerobic, CSS Aerobic, Pull-Focused — all tiers, when athlete owns | Optional | NEW — session-factory adds `optional:snorkel` tag for these session types. Currently surfaces only when a snorkel-using drill is in the inset (e.g., `snorkel_freeswim`); the new rule surfaces it across all listed types regardless of drill content. |
+| **Kickboard** | Kick-Focused only | Required (or `fins` substitute per §8.2 sprint/oly rule) | Already shipped — kick-focused tags `req:kickboard` or `req:fins`. |
+| **Fins** | Kick-Focused (required for 70.3/full per §8.2); drill-optional everywhere else (e.g., kick-on-side drill) | Required (kick-focused) / Optional (drill-implied) | Already shipped — kick-focused tags + drill-token map. |
+
+**Display semantics:**
+
+- "Pool gear — Required: <list>. Optional: <list>." in the session description text.
+- Chip surfaces (calendar / drawer) read the structured `computed.swim_equipment_suggested` field — driven by `req:*` / `optional:*` tags. Both surfaces must align: the description text and the chip must never disagree.
+- When the athlete owns NO listed equipment AND no session-required gear → omit the "Pool gear" line entirely (current behavior, unchanged).
+
+**Beginner-specific carve-outs (per §10 fitness-tier rules):**
+
+- §5.5 Pull-Focused for beginners: surfaces "Required: Pull buoy" only — NO "Optional: Paddles" hint. Beginners need raw-hand feedback on pull repeats per §5.5 coaching rationale.
+- §5.2 CSS Aerobic for beginners: surfaces "Optional: Snorkel" only (when owned) — NO buoy / paddles hints. Hands-only swimming is the spec.
+- §5.1 Technique Aerobic for beginners: surfaces "Optional: Snorkel" only (when owned). Drill-implied gear from §6.1 drill tokens passes through (e.g., kick-on-side → optional fins) if the drill block contains that drill.
+- §5.11 Recovery: no equipment hint regardless of inventory — the session is movement-quality-focused; gear bypasses that intent.
+
+**Anti-regression:** the description-text Pool gear line for pull-focused / kick-focused sessions is **unchanged**. Only NEW gear-hint surfacing on CSS Aerobic / Technique Aerobic / Pull-Focused (intermediate+) is added by this subsection.
 
 ---
 
@@ -456,7 +586,7 @@ The `raceTwoSwimRotationSlotMeta` function and the `FOCUS_70_3_SLOT_META` consta
 
 ## 11. Implementation pointers + research references
 
-### 10.1 Files that need to read this spec
+### 11.1 Files that need to read this spec
 
 - `supabase/functions/_shared/swim-protocol.ts` (new) — protocol selection logic
 - `generate-combined-plan/session-factory.ts` — swim session generation
@@ -464,7 +594,7 @@ The `raceTwoSwimRotationSlotMeta` function and the `FOCUS_70_3_SLOT_META` consta
 - `_shared/swim-drill-tokens.ts` — drill library + rendering
 - `ArcSetupWizard.tsx` — Masters swim recommendation for Learning-level
 
-### 10.2 What changes from current behavior
+### 11.2 What changes from current behavior
 
 - **Race-Specific Aerobic** sessions currently 1000yd, should scale 1500-2500yd by phase (§5.4)
 - **Drill rotation** currently per-session-type hard-coded; should rotate from phase pool (§6.3)
@@ -475,7 +605,7 @@ The `raceTwoSwimRotationSlotMeta` function and the `FOCUS_70_3_SLOT_META` consta
 - **CSS terminology** inconsistent across sessions — standardize to "CSS" + pace target
 - **Masters recommendation** for Learning-level — surface in wizard
 
-### 10.3 Same pattern as strength
+### 11.3 Same pattern as strength
 
 This spec follows the same architecture as `STRENGTH-PROTOCOL.md`:
 - Athlete intent + experience drive protocol selection
