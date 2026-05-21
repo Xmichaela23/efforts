@@ -357,6 +357,35 @@ Numbered D-001, D-002, … in order of recording. Entries are not removed; if a 
 
 ---
 
+## D-024 — Q-006 closure: swim-only fitness tier (`swim_fitness`) hard clamp on `swim_experience`
+
+- **Date:** 2026-05-21 (commit `8d1315af`; supersedes D-002's "swim experience as soft signal only" stance — the soft signal STAYS, this is the additive explicit-signal hard clamp that the original Q-006 entry already named as the "proper closure")
+- **Decision:** new optional field `AthleteState.swim_fitness` populated by a new pure helper `deriveSwimFitness(trainingFitness, swimExperience)` in `_shared/infer-training-fitness.ts`. Hard clamp at the swim tier:
+  - `swim_experience === 'learning'` → `'beginner'`
+  - `swim_experience === 'strong'` → `'advanced'`
+  - `'steady'` / unset / unrecognized → inherits `training_fitness`
+  Case-insensitive defensive normalize. `create-goal-and-materialize-plan/index.ts:1681-1687` populates the field alongside `training_fitness`. `generate-combined-plan/week-builder.ts:1169` derives `swimFitness = athleteState.swim_fitness ?? trainFitness` and threads it through **exactly five** swim-specific call sites: `getSwimSlotTemplates` (`:1216`), `resolveSwimSlotYardsWithBudget` (`:1260`), `applyOverdistanceIfApplicable` (`:1302`), `swimFromTplOpts.athleteFitness` (`:1313`), and the Full IM `enduranceOverdistanceNote` gate (`:1319`). All non-swim consumers (bike / run / strength / loading pattern / CTL fallback / weekly-hours bucket / run band selection) continue to read `training_fitness` unchanged.
+- **Alternatives considered / rejected:**
+  - **Hard global clamp** (`if swim_experience === 'learning' then training_fitness = 'beginner'`). Rejected per D-002 — over-clamps masters-cyclist learners on bike/run downstream consumers (CTL fallback 65→20, weekly hours 14→6, loading pattern, run band selection). Was the original "rejected" alternative when D-002 chose the soft signal.
+  - **Extend the Ticket-B cap to intermediate athletes** (`fitness === 'beginner' || fitness === 'intermediate'` in `learnerSessionCap`). Rejected per D-022's footgun — would over-tighten genuine intermediate athletes who legitimately train at 3000+yd aerobic. The cap targets a population the global tier already identifies; the bug was that this population doesn't reach the cap, not that the cap is too narrow.
+  - **Composer-side override in `getProtocolCeiling`** reading `swim_experience` directly. Rejected — would force the cap function to consume an additional parameter for an orthogonal concern; the right factoring is to express "swim-only tier" upstream and let downstream consumers stay as-is.
+  - **Asymmetric clamp (down-only)** — only `'learning'` clamps; ignore `'strong'`. Rejected — wizard captures `'strong'` as an explicit signal too; respecting it for caps + bands + OD window is the symmetric reading. A beginner-tier athlete who declares strong swim background SHOULD get the higher swim ceilings.
+  - **Touch `shouldMaintainTwoSwimsInRecovery` to read `swimFitness`** (`week-builder.ts:1197`). Out of scope — that helper already takes `swim_experience` directly and has internal learner-awareness; threading `swimFitness` there would be a parallel signal with no behavior change.
+- **Why:** Plan #60 W6 (filed in D-022's footgun) and Plan #78 (filed in this audit) are the same shape — high-CTL learner whose `swim_experience='learning'` soft `-1` was outweighed by `ctl_ge_42` / `ctl_ge_58` / FTP / race-history signals, resolving to `training_fitness='intermediate'`. The Ticket-B cap in `learnerSessionCap` gates on `fitness === 'beginner'` (D-022); intermediate-resolving learners passed the cap silently and received 2800-3200yd threshold sessions. The structural gap was always "no swim-specific tier" — D-022's footgun explicitly named "separate `swim_fitness` tier override" as the proper closure. This commit ships exactly that path with the explicit-signal symmetry on both ends.
+- **Tradeoff accepted:**
+  - **Two-tier mental model** — engineers must remember `training_fitness` (global) ≠ `swim_fitness` (swim-only). Mitigated by: optional field with `?? trainFitness` fallback at the consumer (legacy `athleteState` payloads keep working); concentrated threading (5 sites, all in one file); type-system enforcement (same enum, distinct field).
+  - **Hard clamp can over-down-shift on the learning side** — an experienced cyclist who has actually done a fair amount of swim training but still self-describes as "learning" (rare honesty bias) gets beginner-tier swim. Acceptable: the Plan 78 risk is over-prescription, not under-prescription, and the wizard text is clear about what "learning" means.
+  - **Symmetric strong-side clamp lifts ceilings** — an explicitly-declared strong swimmer at global beginner tier now unlocks `advanced` bands. By design — symmetric with the down-clamp; matches what an explicit wizard signal should mean.
+  - **Issue 1 (Plan 78 learner getting `[threshold, race_specific_aerobic]` rotation) is NOT closed** — `raceTwoSwimRotationSlotMeta` is a pure function of `planWeek % 4` and doesn't consult `swimFitness`. That's a separate spec-first swim arc slice (`docs/SWIM-PROTOCOL.md §X` fitness-tier session-type selection, then beginner rotation variant — option C in the audit). D-024 only closes the cap path; Issue 1 closure is its own D-NNN at swim-arc-slice close-out.
+- **Footgun (don't re-litigate):**
+  - **5-site threading is exact** — `shouldMaintainTwoSwimsInRecovery` (`:1197`) is deliberately NOT swapped (takes `swim_experience` directly already). Don't "complete" the threading by swapping it; that's redundant and breaks the careful scope.
+  - **`?? trainFitness` fallback at consumer is load-bearing** — legacy athleteState payloads or external test fixtures that don't populate `swim_fitness` keep working at the intermediate tier. Removing the fallback would break tests that construct athleteState directly.
+  - **Soft `-1` signal in `inferTrainingFitnessLevel` STAYS** — D-024 supplements it, doesn't replace it. The soft signal handles borderline athletes where the global tier SHOULD also nudge (low-CTL learner). The hard clamp handles explicit-signal cases where global tier should NOT change but swim should.
+  - **The new field is optional, not required** — if a future refactor makes `swim_fitness` non-optional, the `??` fallback must be removed in lockstep across week-builder + all test fixtures.
+  - **Issue 1 is NOT bundled into D-024** — Plan #78's "wrong session types for a learner" symptom is Issue 1, a separate spec-and-code slice. D-024 closes the cap path (Issue 2). Don't merge them retroactively.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
