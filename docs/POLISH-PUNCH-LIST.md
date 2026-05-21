@@ -194,6 +194,7 @@ Reference corpus: `~/Downloads/ironman-70.3-santa-cruz-+-ironman-70.3-northern-c
 - [ ] Cross-check swim session generation against the documented protocol; identify drift.
 
 ### Item 3 — Cycling protocol audit (CYCLING-PROTOCOL.md missing)
+- [ ] **Cycling protocol arc** — author `docs/CYCLING-PROTOCOL.md` (session generation spec parallel to RUN-PROTOCOL.md / SWIM-PROTOCOL.md), then audit cycling session generation against it and fix gaps. Same phased pattern as swim and run arcs. **Queue after run arc Phases 1-3 close.**
 - [ ] Write `CYCLING-PROTOCOL.md` spec doc — currently 0% (per §3 above).
 - [ ] Distinguish Easy / Endurance / Long / Quality / Brick rides; stop calling Z2 weekday rides "long rides."
 - [ ] Verify cycling power zones flow from FTP correctly.
