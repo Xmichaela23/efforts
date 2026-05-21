@@ -450,6 +450,34 @@ Numbered D-001, D-002, … in order of recording. Entries are not removed; if a 
 
 ---
 
+## D-027 — Validator long-run floor is within-phase-aware (completes the D-026 canonical contract)
+
+- **Date:** 2026-05-21 (commit `d1fd0745`; extends D-026 — D-026 made `week-builder.ts:864` canonical; D-027 makes the post-build validator floor follow the same lerp instead of bumping the realized output up to peak-of-phase)
+- **Decision:** `effectiveLongRunFloorMiles` (`validate-training-floors.ts:361`) accepts optional `weekInPhase` and `rampWeeks` parameters. When BOTH are provided, the spec floor routes through `longRunMilesForWeek` (the same canonical lerp the week-builder uses per D-026); when either is omitted, falls back to `longRunFloorMiles` (peak-of-phase) for backward compat. `EvaluateLongDayFloorsOpts` and `EnforceLongDayFloorsOpts` gain optional `phaseBlocks: PhaseBlock[]`; both validator loops compute `weekInPhase` per week (via an inlined `weekInPhaseInline` helper that mirrors `week-builder.ts:weekInPhaseForTimeline` — inlined to avoid the circular import) and thread through. `index.ts` passes `phaseBlocks: blocks` into both opts objects; the rebuild loop reassigns `blocks` after each `tightenPhaseBlocksForFloorRebuild` so `longDayFloorOpts.phaseBlocks` is refreshed at each iteration. History-aware `recentLongestRunMi × 0.5` path is **unchanged** — the protective layer for experienced athletes is preserved.
+- **Alternatives considered / rejected:**
+  - **Move `weekInPhaseForTimeline` to `phase-structure.ts`** (a non-circular module) and import normally from both consumers. Rejected for D-027 scope — the export site change has wider blast radius (week-builder + all test files referencing the function). Inlined mirror is contained and the docstring captures the duplication intent.
+  - **Compute `weekInPhase` from the weeks array iteratively** (forward-pass counter, reset on phase change, skip recovery). Rejected — `GeneratedWeek` doesn't carry `primaryGoalId`, so disambiguating phase boundaries across multi-goal plans (e.g. goal-A base → goal-B base) requires `PhaseBlock` lookup anyway.
+  - **Make `weekInPhase` mandatory in `effectiveLongRunFloorMiles`.** Rejected — would force every existing test that consumes the function to update; backward-compat fallback preserves the 15+ existing `long-day-volume-floors.test.ts` assertions untouched.
+  - **Lower the validator's peak-of-phase floor** so the lerp's lower-wip values aren't bumped. Rejected — peak-of-phase is the correct WARNING THRESHOLD for high-recent athletes (recent=42mi → floor 11mi, capped at build); making the validator's *threshold* within-phase-aware is the right targeted fix, not lowering it globally.
+  - **Skip enforcement for base/build/race_specific weeks entirely** (let the week-builder lerp drive directly; validator only enforces rebuild/taper/recovery). Rejected — loses the history-aware bump path that protects high-recent-volume athletes.
+  - **Extend the same fix to `effectiveLongRideFloorHours`** in D-027 scope. Rejected — cycling within-phase lerp doesn't exist yet (CYCLING-PROTOCOL Phase 1 work). The bike-side parity fix lands when Phase 1 ships `longRideHoursForWeek`.
+- **Why:** Bundle B (D-026) made `week-builder.ts:864` canonical — the lerp emits 8.5mi for 70.3 base wip=1. But the post-build `enforceLongDayFloors` immediately bumped that 8.5mi UP to 10mi because `effectiveLongRunFloorMiles('70.3', 'base', 0)` returned `longRunFloorMiles('70.3', 'base') = 10`. Two `Math.max` floors at two different layers; D-026 fixed the first; D-027 fixes the second. Plan #78 audit showed flat 10mi across base wks 1-6 in production even after Bundle B deploy — that was D-027 territory, not Bundle B incomplete deploy.
+- **Tradeoff accepted:**
+  - **Two parameters added to a load-bearing public function** (`effectiveLongRunFloorMiles`). Optional — every existing caller works unchanged. Future callers that want within-phase-aware behavior must pass both `weekInPhase` AND `rampWeeks` (the latter is trivially derived via `rampWeeksForPhase(phase)`).
+  - **Inlined `weekInPhaseInline` helper duplicates `week-builder.ts:weekInPhaseForTimeline`.** Net +13 lines of mirror code. Required to break the circular import (`week-builder.ts` imports from this file). Docstring captures the constraint; future refactor that moves `weekInPhaseForTimeline` to `phase-structure.ts` can eliminate the dupe.
+  - **`longDayFloorOpts.phaseBlocks` reassignment in the rebuild loop** is a `const`-object-mutable-field pattern. The opts object reference is const; the `phaseBlocks` field is reassigned each iteration after `tightenPhaseBlocksForFloorRebuild`. Documented inline.
+  - **High-budget athletes lose ~1-2mi of early-phase long-run volume** that D-026 deploy already shipped but the validator was silently restoring. Now the §4.5 contract fully delivered.
+  - **Production plans frozen JSON; behavior is opt-in via next regenerate.** Standard ship posture.
+- **Footgun (don't re-litigate):**
+  - **`weekInPhase` AND `rampWeeks` are both required to engage the within-phase-aware path.** Passing one without the other falls back to peak-of-phase. The optional-parameter design is deliberate — callers that don't have phase block context (e.g. test fixtures constructing a single `GeneratedWeek`) get the legacy behavior.
+  - **`weekInPhaseInline` is a mirror of `week-builder.ts:weekInPhaseForTimeline`.** Any change to the canonical (week-builder) function MUST be mirrored here. Documented in the helper's docstring; the two functions must stay in lockstep until a future refactor consolidates them in `phase-structure.ts`.
+  - **`longDayFloorOpts.phaseBlocks` must be REFRESHED after every `tightenPhaseBlocksForFloorRebuild`** reassignment. The current code refreshes at both rebuild call sites (`index.ts:260` normal pass, `:267` deep pass). Adding new rebuild call sites without the refresh would cause the enforcer to use stale phaseBlocks.
+  - **Cycling parity is pending** — `effectiveLongRideFloorHours` still uses peak-of-phase `longRideFloorHours`. When CYCLING-PROTOCOL Phase 1 ships `longRideHoursForWeek` (the bike lerp helper), apply the same fix-shape there: add optional `weekInPhase` + `rampWeeks` parameters, route through the new helper when provided. Same fallback semantics. Same `phaseBlocks` threading. Same circular-import constraint (likely needs the same inlined mirror or a `phase-structure.ts` consolidation).
+  - **Three-layer Plan #78 closure now fully end-to-end:** D-022 (Ticket-B cap) + D-024 (swim_fitness clamp) + D-025 (type substitution) — the swim axes — composed with **D-026 (week-builder canonical) + D-027 (validator within-phase-aware)** on the run axis. All five layers required.
+- **Decision:** D-027 (companion to D-026; both close the §4.5 LOCKED progression end-to-end).
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
