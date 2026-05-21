@@ -424,6 +424,32 @@ Numbered D-001, D-002, … in order of recording. Entries are not removed; if a 
 
 ---
 
+## D-026 — `longRunMilesForWeek` is canonical for base/build/race_specific (not a `Math.max` floor)
+
+- **Date:** 2026-05-21 (commit `0b983f07`; supersedes the Phase 1 wiring's `Math.max(longRunMiles, longRunFloor)` semantics at `week-builder.ts:863-864`, originally shipped in `60c23de2`)
+- **Decision:** `longRunMilesForWeek(distance, phase, weekInPhase, rampWeeks)` is the **canonical** source of long-run mileage for base / build / race_specific phases. The week-builder assigns its output directly to `longRunMiles` instead of taking `Math.max(tssDerived, lerpOutput)`. The lerp's realized progression (per RUN-PROTOCOL §4.5: 70.3 base 8.5 → 10mi, build 10 → 11mi, RS 11 → 13mi) IS the prescribed mileage. The TSS-derived value computed at `week-builder.ts:832` is still used as a sizing proxy for other downstream uses but no longer participates in long-run mileage selection for the three ramping phases.
+- **Alternatives considered / rejected:**
+  - **Keep `Math.max` floor; cap the TSS-derived value to the lerp PEAK.** Rejected — spreads the policy across two sites (the TSS proxy at `:832` and the floor at `:864`); the lerp is the canonical contract per §4.5 and should drive directly.
+  - **Lower the §4.5 LOCKED lerp endpoints so the natural TSS-derived value sits above them.** Rejected — would break the protocol's documented realized progression. The §4.5 endpoints are the contract; the engine should honor them, not work around them.
+  - **Per-athlete-tier scaling of the lerp endpoints.** Rejected — long-run mileage is anchored to **race distance**, not athlete tier. An advanced athlete and an intermediate athlete at the same race distance get the same long-run prescription per Friel / Daniels coaching consensus. Tier affects intensity, frequency, and recovery — not race-distance long-run volume.
+  - **Apply the canonical assignment to all phases (including rebuild/taper/recovery).** Rejected as redundant — `longRunMilesForWeek` already internally delegates to `longRunFloorMiles` for non-ramping phases, and the explicit `Math.min` clamps at `:868-882` handle the phase-specific external caps. Keeping the canonical assignment scoped to `hasTri && !raceThisWeek && !isRecovery` (the existing guard) leaves the other paths unchanged.
+- **Why:** Plan #78 audit revealed that for high-budget athletes (CTL 60, 11hr/wk, intermediate, performance/race_peak — Plan #78 demographics), the TSS-derived `longRunMiles` (line 832) naturally lands at ~10mi every base week. The post-Phase-3-lift lerp endpoint for 70.3 base is also 10mi. So the lerp's lower values (8.5 → 9.5 across wks 1-5) sat BELOW the TSS-derived 10 and `Math.max` rendered them invisible — the realized output was flat 10mi every base week, then flat 11mi every build week, then flat 13mi every RS week. The §4.5 LOCKED progression was dormant in production. The Phase 1 wiring (`60c23de2`) intended `longRunMilesForWeek` as canonical (the comment at `:860-862` literally said "Lerps START → PEAK"); the `Math.max` was a safety hedge that turned into a silent contract violation.
+- **Tradeoff accepted:**
+  - **High-budget athletes lose ~1-2mi of early-phase long-run volume** that the prior floor-semantics silently added. By design — the protocol's realized progression becomes engine reality. The "saved" budget flows to other sessions (more easy run miles, more bike volume, more swim density), which the per-session sizing logic handles.
+  - **`run-volume-ramp.test.ts` existing "ramps week-over-week" test was passing by accident** on a low-TSS fixture. It still passes post-fix (mileage monotonic increase still holds), but a NEW canonical-contract test asserts EXACT 8.5mi at base wip=1 — fails pre-fix regardless of fixture TSS, locks the contract.
+  - **Production plans frozen JSON; behavior is opt-in via next regenerate.** Standard ship posture.
+- **Footgun (don't re-litigate):**
+  - **Never re-introduce a `Math.max` or any floor-style clamp** between `longRunMilesForWeek` and `longRunMiles` at `week-builder.ts:~864`. The lerp IS canonical. If a future need arises to bump above the lerp (e.g., athlete-supplied "I want longer runs"), that override belongs at the lerp endpoints themselves (RUN-PROTOCOL §4.5 amendment + D-NNN), not at the assignment site.
+  - **Two long-run functions, two semantics, two consumers** — must move in lockstep at the source (D-023 footgun) but do NOT interchange at the consumer:
+    1. `longRunMilesForWeek` (this commit's canonical source) — drives PRESCRIBED mileage in `week-builder.ts`.
+    2. `longRunFloorMiles` — drives WARNING THRESHOLDS in `validate-training-floors.ts` (`evaluateLongDayVolumeFloors`, history-aware `effectiveLongRunFloorMiles`, `enforceLongDayFloors`). Returns peak-of-phase values for the validator path.
+    Conflating them collapses both contracts.
+  - **Rebuild/taper/recovery short-circuit through `longRunMilesForWeek`'s internal delegation** (returns `longRunFloorMiles(distance, phase)`); the external Math.min clamps at `:868-882` still apply on top. Removing either the internal delegation OR the external clamps breaks short-phase mileage caps.
+  - **Brick-run does NOT have this defect.** `brickRunMilesForWeek` at `:1012` already uses canonical assignment (no Math.max layer). Don't apply this fix again there or anywhere else without verifying the prior call site actually had the floor pattern.
+  - **The Phase 1 wiring's comment at `:860-862`** ("Lerps START → PEAK for base/build/race_specific") was the spec intent all along — D-026 makes the code match the comment. If a future refactor regresses, the comment is the canonical guide.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
