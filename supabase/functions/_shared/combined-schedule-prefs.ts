@@ -304,6 +304,15 @@ export interface CombinedSchedulePrefs {
   /** Tri swim: focus = higher-volume program; race = maintenance / execute leg (engine Step 2+). */
   swim_intent?: SwimIntentArc;
   /**
+   * Wizard-collected swim background (`learning` | `steady` | `strong`). Persisted at
+   * `goals.training_prefs.swim_experience`. Preserved here so the create-goal pipeline can
+   * thread it into `inferTrainingFitnessLevel` (soft `-1` signal per D-002) AND
+   * `deriveSwimFitness` (hard clamp per D-024). Both consumers read this via
+   * `freshCombinedPrefs.swim_experience` — drop preservation here and the Q-006 closure
+   * (D-024 / D-025) silently no-ops because the clamp argument becomes undefined.
+   */
+  swim_experience?: 'learning' | 'steady' | 'strong';
+  /**
    * Where the swim-focus TSS increase is funded from (only meaningful when swim_intent === 'focus').
    * split = 2:1 bike/run reduction; protect_run = all from bike; protect_bike = all from run.
    */
@@ -376,6 +385,17 @@ export function mergeCombinedSchedulePrefs(
     const swimIRaw = src.swim_intent ?? src.swimIntent;
     const swimI =
       swimIRaw === 'focus' || swimIRaw === 'race' ? (swimIRaw as SwimIntentArc) : undefined;
+    // Preserve `swim_experience` so the create-goal pipeline can feed
+    // `inferTrainingFitnessLevel` (D-002 soft signal) AND `deriveSwimFitness`
+    // (D-024 hard clamp). Defensive against snake/camel; lowercased to align
+    // with the canonical wizard enum.
+    const swimExpRaw = src.swim_experience ?? src.swimExperience;
+    const swimExpNorm = String(swimExpRaw ?? '').trim().toLowerCase();
+    const swimExp: 'learning' | 'steady' | 'strong' | undefined =
+      swimExpNorm === 'learning' ? 'learning'
+      : swimExpNorm === 'steady' ? 'steady'
+      : swimExpNorm === 'strong' ? 'strong'
+      : undefined;
     const swimLSRaw = src.swim_load_source ?? src.swimLoadSource;
     const swimLS: CombinedSchedulePrefs['swim_load_source'] =
       swimLSRaw === 'split' || swimLSRaw === 'protect_run' || swimLSRaw === 'protect_bike'
@@ -457,6 +477,7 @@ export function mergeCombinedSchedulePrefs(
     if (sop !== undefined) out.strength_ordering_preference = sop;
     if (im !== undefined) out.integration_mode = im;
     if (swimI !== undefined) out.swim_intent = swimI;
+    if (swimExp !== undefined) out.swim_experience = swimExp;
     if (swimLS !== undefined) out.swim_load_source = swimLS;
     if (ti !== undefined) out.training_intent = ti;
     if (bikeQualityLabel !== undefined) out.bike_quality_label = bikeQualityLabel;
