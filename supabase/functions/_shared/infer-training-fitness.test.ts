@@ -3,7 +3,7 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import type { ArcContext } from './arc-context.ts';
-import { inferTrainingFitnessLevel } from './infer-training-fitness.ts';
+import { inferTrainingFitnessLevel, deriveSwimFitness } from './infer-training-fitness.ts';
 
 function stubArc(partial: Partial<ArcContext>): ArcContext {
   return {
@@ -155,4 +155,42 @@ Deno.test('inferTrainingFitnessLevel — observed swim_training_from_workouts wi
   });
   assertEquals(r.level, 'intermediate');
   assertEquals(r.source, 'inferred');
+});
+
+// ── Q-006 deriveSwimFitness — swim-only fitness tier hard clamp ─────────────
+
+Deno.test('deriveSwimFitness — learning swimmer clamps DOWN to beginner regardless of training_fitness', () => {
+  // Plan 60 W6 / Plan 78 population: high-CTL learner resolved to intermediate
+  // via the soft -1 signal in inferTrainingFitnessLevel; the Ticket-B cap then
+  // never fired (gated on fitness === 'beginner'). This hard clamp closes that
+  // gap for swim consumers only.
+  assertEquals(deriveSwimFitness('intermediate', 'learning'), 'beginner');
+  assertEquals(deriveSwimFitness('advanced', 'learning'), 'beginner');
+  assertEquals(deriveSwimFitness('beginner', 'learning'), 'beginner');
+});
+
+Deno.test('deriveSwimFitness — strong swimmer clamps UP to advanced regardless of training_fitness', () => {
+  // Symmetric clamp on the strong side — explicit wizard signal wins for
+  // swim-specific decisions even when global tier is lower.
+  assertEquals(deriveSwimFitness('beginner', 'strong'), 'advanced');
+  assertEquals(deriveSwimFitness('intermediate', 'strong'), 'advanced');
+  assertEquals(deriveSwimFitness('advanced', 'strong'), 'advanced');
+});
+
+Deno.test('deriveSwimFitness — steady / unset / unknown inherits training_fitness', () => {
+  assertEquals(deriveSwimFitness('beginner', 'steady'), 'beginner');
+  assertEquals(deriveSwimFitness('intermediate', 'steady'), 'intermediate');
+  assertEquals(deriveSwimFitness('advanced', 'steady'), 'advanced');
+  assertEquals(deriveSwimFitness('intermediate', null), 'intermediate');
+  assertEquals(deriveSwimFitness('intermediate', undefined), 'intermediate');
+  assertEquals(deriveSwimFitness('advanced', ''), 'advanced');
+  // Unrecognized value falls through to inherit (defensive — wizard enum is
+  // strict but legacy / future rows might carry other strings).
+  assertEquals(deriveSwimFitness('intermediate', 'novice'), 'intermediate');
+});
+
+Deno.test('deriveSwimFitness — case-insensitive on swim_experience', () => {
+  // Defensive: legacy / external writes might preserve case.
+  assertEquals(deriveSwimFitness('intermediate', 'LEARNING'), 'beginner');
+  assertEquals(deriveSwimFitness('intermediate', 'Strong'), 'advanced');
 });

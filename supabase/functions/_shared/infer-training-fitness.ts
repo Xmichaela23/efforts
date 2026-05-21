@@ -228,3 +228,31 @@ export function inferTrainingFitnessLevel(opts: {
 
   return { level, source: 'inferred', reasons };
 }
+
+/**
+ * Q-006 closure — swim-only fitness tier (D-NNN at close-out).
+ *
+ * Hard clamp at the swim tier: `swim_experience='learning'` → `'beginner'`,
+ * `'strong'` → `'advanced'`, anything else (`'steady'` / undefined) inherits
+ * `training_fitness`. Does NOT touch global `training_fitness`, so bike / run /
+ * strength downstream consumers (CTL fallback, weekly-hours bucket, loading
+ * pattern, run band selection, strength protocol) are unaffected.
+ *
+ * Closes the case where a high-CTL learner (Plan #60 W6, Plan 78) resolved to
+ * `intermediate` via the soft `-1` signal in {@link inferTrainingFitnessLevel}
+ * and bypassed the Ticket-B learner per-session cap. The soft signal stays for
+ * borderline athletes where the global tier should also nudge; this helper is
+ * the explicit-signal hard clamp that the swim consumers need.
+ *
+ * Symmetric on the strong side: a wizard-declared strong swimmer is hard-clamped
+ * UP to `advanced` for swim purposes regardless of their global training_fitness.
+ */
+export function deriveSwimFitness(
+  trainingFitness: TrainingFitnessLevel,
+  swimExperience: string | null | undefined,
+): TrainingFitnessLevel {
+  const swimExp = String(swimExperience ?? '').toLowerCase();
+  if (swimExp === 'learning') return 'beginner';
+  if (swimExp === 'strong') return 'advanced';
+  return trainingFitness;
+}

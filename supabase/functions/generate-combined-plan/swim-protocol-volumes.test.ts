@@ -11,6 +11,7 @@ import {
   resolveSwimSlotYardsWithBudget,
   SWIM_VOLUME_RANGES,
 } from './swim-protocol-volumes.ts';
+import { deriveSwimFitness } from '../_shared/infer-training-fitness.ts';
 
 Deno.test('getProtocolFloor splits weekly minimum across two swim slots', () => {
   const f0 = getProtocolFloor('70.3', 'intermediate', 'build', 'threshold', {
@@ -244,4 +245,41 @@ Deno.test('Ticket B: advanced full endurance OD window still hits 4600 (cap is b
   // 4600yd endurance ceiling. The learner cap MUST NOT bleed into advanced.
   const advFullOD = getProtocolCeiling('full', 'advanced', 'build', 'endurance', { weekInPhase: 4 });
   assertEquals(advFullOD, 4600);
+});
+
+// ── Q-006 closure: deriveSwimFitness + getProtocolCeiling composition ───────
+// These tests lock the Plan #60 W6 / Plan #78 chain: a high-CTL learner who
+// resolves to training_fitness='intermediate' now derives swim_fitness='beginner'
+// via the explicit-signal hard clamp, which feeds the Ticket B cap. Pre-fix,
+// `getProtocolCeiling(..., 'intermediate', ...)` returned the bmax (3200) and
+// the cap silently no-op'd; post-fix the same athlete shape lands at the cap.
+
+Deno.test('Q-006: Plan #78 learner (training_fitness=intermediate) gets beginner cap via deriveSwimFitness', () => {
+  const swimFitness = deriveSwimFitness('intermediate', 'learning');
+  assertEquals(swimFitness, 'beginner');
+  // 70.3 build threshold: bmax 2400-3200; cap clamps to 2000.
+  assertEquals(getProtocolCeiling('70.3', swimFitness, 'build', 'threshold'), 2000);
+  // 70.3 race_specific race_specific_aerobic: bmax 3000-3200; cap clamps to 2500.
+  assertEquals(getProtocolCeiling('70.3', swimFitness, 'race_specific', 'race_specific_aerobic'), 2500);
+});
+
+Deno.test('Q-006: explicit strong swimmer (training_fitness=beginner) unlocks advanced ceilings', () => {
+  // Symmetric clamp: a beginner-tier athlete who declares strong swim background
+  // is treated as advanced for swim consumers — no cap, no down-shifted bands.
+  const swimFitness = deriveSwimFitness('beginner', 'strong');
+  assertEquals(swimFitness, 'advanced');
+  // Beginner cap would have clamped to 2000/2500; advanced gets the full bmax.
+  const thresholdCeil = getProtocolCeiling('70.3', swimFitness, 'build', 'threshold');
+  assertEquals(thresholdCeil > 2000, true, `expected > 2000 for advanced; got ${thresholdCeil}`);
+});
+
+Deno.test('Q-006: steady swimmer inherits training_fitness (no override)', () => {
+  // The path that does NOT clamp — preserves the prior behavior for intermediate
+  // athletes whose swim experience matches their global tier.
+  assertEquals(deriveSwimFitness('intermediate', 'steady'), 'intermediate');
+  // And the ceiling matches what intermediate currently gets.
+  assertEquals(
+    getProtocolCeiling('70.3', deriveSwimFitness('intermediate', 'steady'), 'build', 'threshold'),
+    getProtocolCeiling('70.3', 'intermediate', 'build', 'threshold'),
+  );
 });

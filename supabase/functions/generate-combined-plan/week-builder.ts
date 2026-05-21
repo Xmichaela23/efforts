@@ -1161,6 +1161,12 @@ export function buildWeek(
 
   const swimDistance = normalizeSwimProgramDistance(primaryGoal.distance);
   const trainFitness = athleteState.training_fitness ?? 'intermediate';
+  // Q-006: swim-only fitness tier override. Populated by create-goal-and-materialize-plan
+  // via `deriveSwimFitness(training_fitness, swim_experience)` — hard clamp on
+  // `swim_experience='learning'` → 'beginner' / 'strong' → 'advanced'. Threaded into the
+  // five swim-specific call sites below (templates, ceiling/band, OD window, OD note).
+  // Falls back to `trainFitness` when the upstream pipeline hasn't populated it.
+  const swimFitness = athleteState.swim_fitness ?? trainFitness;
   const swimSingleRecovery = hasTri && (isRecovery || recoveryRebuildWeek1);
   const swimTrainingPrefs = primaryGoal.training_prefs ?? null;
   const swimAnchorSlots = countSwimAnchorSlotsForRecovery(
@@ -1213,7 +1219,7 @@ export function buildWeek(
     swimTemplates = [getRecoverySwimTemplate()];
   } else {
     swimTemplates = getSwimSlotTemplates(swimTemplatesIntent, phase, swimDistance, swimWeekInPhase, {
-      athleteFitness: trainFitness,
+      athleteFitness: swimFitness,
       planWeekNumber: weekNum,
     });
     console.log('[buildWeek] swim templates selected', weekNum, {
@@ -1257,7 +1263,7 @@ export function buildWeek(
     preliminaryYards: preliminarySwimYards,
     swimBudgetYards,
     distance: swimDistance,
-    fitness: trainFitness,
+    fitness: swimFitness,
     phase,
     weekInPhase: swimWeekInPhase,
     swim_anchor_slot_count: swimAnchorSlots,
@@ -1299,7 +1305,7 @@ export function buildWeek(
     if (!t || t.session_type !== 'endurance') return y;
     return applyOverdistanceIfApplicable(y, {
       raceDistance: swimDistance,
-      athleteFitness: trainFitness,
+      athleteFitness: swimFitness,
       phase,
       weekInPhase: swimWeekInPhase,
       sessionType: 'endurance',
@@ -1310,13 +1316,13 @@ export function buildWeek(
     // race week (not every taper week). raceThisWeek is in scope from this buildWeek.
     isRaceWeek: Boolean(raceThisWeek),
     swimRaceDistanceKey: swimDistance,
-    athleteFitness: trainFitness,
+    athleteFitness: swimFitness,
     swimThresholdPace: athleteState.swim_threshold_pace ?? null,
     enduranceOverdistanceNote:
       template.session_type === 'endurance' &&
       yards >= 4500 &&
       swimDistance === 'full' &&
-      trainFitness === 'advanced',
+      swimFitness === 'advanced',
   });
   // ── Bike quality + easy (defaults Tue / Wed; from Arc `preferred_days.quality_bike` / `easy_bike`) ──
   const bikeQualIdxBase =

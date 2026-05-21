@@ -208,6 +208,14 @@ export interface AthleteState {
   swim_experience?: string;
   /** Goal / Arc swim tier — drives template scaling and swim session caps. */
   training_fitness?: 'beginner' | 'intermediate' | 'advanced';
+  /**
+   * Q-006 closure: swim-only fitness tier override. Derived from `training_fitness` plus the
+   * `swim_experience` hard clamp (`learning` → `beginner`, `strong` → `advanced`,
+   * `steady`/unset → inherits training_fitness). Read by swim-specific call sites in
+   * `week-builder.ts` (template selection, volume band / ceiling, OD window, OD note); all
+   * non-swim consumers continue to read `training_fitness` unchanged.
+   */
+  swim_fitness?: 'beginner' | 'intermediate' | 'advanced';
   /** Echo of training_prefs days_per_week (4–7) for diagnostics; optional. */
   days_per_week?: number;
   /**

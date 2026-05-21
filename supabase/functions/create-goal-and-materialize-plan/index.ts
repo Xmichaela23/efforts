@@ -6,7 +6,7 @@ import {
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
-import { inferTrainingFitnessLevel } from '../_shared/infer-training-fitness.ts';
+import { inferTrainingFitnessLevel, deriveSwimFitness } from '../_shared/infer-training-fitness.ts';
 import {
   computeRunPlanningSignals,
   findPostRaceRecoveryContext,
@@ -1679,6 +1679,12 @@ async function buildCombinedPlan(
         ? { bike_easy_day: freshCombinedPrefs.bike_easy_day }
         : {}),
       training_fitness: trainingFitnessResolution.level,
+      // Q-006: swim-only fitness override (hard clamp on swim_experience).
+      // Learning → beginner, strong → advanced, steady/unset → inherit.
+      swim_fitness: deriveSwimFitness(
+        trainingFitnessResolution.level,
+        freshCombinedPrefs.swim_experience as string | null | undefined,
+      ),
       ...(freshCombinedPrefs.training_intent !== undefined
         ? { training_intent: freshCombinedPrefs.training_intent }
         : {}),
