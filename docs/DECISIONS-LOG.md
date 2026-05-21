@@ -386,6 +386,44 @@ Numbered D-001, D-002, … in order of recording. Entries are not removed; if a 
 
 ---
 
+## D-025 — Swim arc §10: fitness-tier session-type selection (Plan #78 Issue 1 closure)
+
+- **Date:** 2026-05-21 (spec commit `656dc039`; engine commit `6ad97ee2`)
+- **Decision:** `swim_fitness === 'beginner'` athletes get **type-substituted** swim sessions at template selection time, per the substitution map codified in `docs/SWIM-PROTOCOL.md §10.3`:
+  - `threshold` → `css_aerobic`
+  - `race_specific_aerobic` → `technique_aerobic`
+  - `speed` → `technique_aerobic`
+  - `pull_focused` / `kick_focused` / `technique_aerobic` / `css_aerobic` / `recovery` — pass through unchanged (§10.2-allowed for beginners).
+  
+  Implementation is **purely additive** per §10.6 — `RACE_70_3_SLOT_META`, `FOCUS_70_3_SLOT_META`, `raceTwoSwimRotationSlotMeta`, `raceTemplatesFromYards`, `focusTemplatesFromYards` stay UNTOUCHED. New parallel constants (`RACE_70_3_SLOT_META_BEGINNER`, `FOCUS_70_3_SLOT_META_BEGINNER`) and emitters (`raceTemplatesFromYardsBeginner`, `focusTemplatesFromYardsBeginner`, `raceTwoSwimRotationSlotMetaForBeginner`) live in the same file. Dispatch is a ternary on `athleteFitness === 'beginner'` at four entry points in `getSwimSlotTemplates` (focus taper, focus non-taper, race taper, race non-taper rotation).
+- **Realized beginner rotations:**
+  - **Race intent (`planWeek % 4`):** `1 → [css_aerobic, technique_aerobic]`; `2 → [css_aerobic, pull_focused]`; `3 → [technique_aerobic, technique_aerobic]`; `0 → [css_aerobic, technique_aerobic]`.
+  - **Focus intent (3-slot):** `[css_aerobic, technique_aerobic, recovery]`. Slot 1 pull/kick phase alternation (build kick / RS pull) preserved unchanged — both types §10.2-allowed for beginners.
+  - **Taper bypass:** dispatches through the same beginner emitters; race-taper for beginners is `[css_aerobic, technique_aerobic]` instead of `[threshold, race_specific_aerobic]`.
+- **Alternatives considered / rejected:**
+  - **Pure substitution helper** applied to the existing meta output. Rejected — couples the existing functions to the substitution path; the parallel-constant + dispatch approach honors §10.6's "must stay untouched" rule literally.
+  - **Branch in `focusTemplatesFromYards` with an optional meta arg.** Rejected for the same reason — adding a parameter is a touch on the existing function. The parallel `focusTemplatesFromYardsBeginner` keeps the existing function bit-identical.
+  - **Beginner-specific phase definitions in §4.1-§4.4.** Rejected (§10.7) — phases describe slot mix, not session types. Type substitution lives at template selection.
+  - **Limiting substitution to the race-intent path.** Rejected — focus-intent slot 0 also defaults to `threshold` and slot 2 to `css_aerobic` (which we demote to `recovery` for beginners since the third weekly touch is most usefully a low-stress technique reinforcement, not a third density block).
+  - **Comeback-specific variant.** Out of scope (§10.7). Comeback athletes resolve via the soft `training_intent` signal in `inferTrainingFitnessLevel` and aren't touched by `swim_fitness`. Separate slice if a real need surfaces.
+  - **Strong-swimmer variant.** No change needed — `swim_fitness === 'advanced'` already uses the full intermediate/advanced rotation; D-024's symmetric clamp routes strong swimmers there regardless of global tier.
+- **Why:** Plan #78 Week 1 (and the audit's "Issue 1") showed a learning swimmer getting `[threshold, race_specific_aerobic]` — race-pace and threshold sessions for someone who lacks calibrated CSS and stroke economy. The rotation was a pure function of `planWeek % 4` (race-intent) or fixed slot meta (focus-intent); `athleteFitness` only modulated yardage. D-022 (Ticket-B cap) + D-024 (`swim_fitness` clamp) closed the **volume** axis for this population; D-025 closes the **type** axis. Both compose without coordination — type substitution at template selection, yardage capping at the resolver.
+- **Tradeoff accepted:**
+  - **Two parallel constants per intent path** (`*_SLOT_META` + `*_SLOT_META_BEGINNER`). Cost: duplication. Benefit: zero risk to the existing path; future spec changes can move the constants in lockstep with explicit-substitution-diff visibility.
+  - **Beginner focus-intent slot 2 = `recovery`**, not a lower-density `css_aerobic`. The third weekly touch trades aerobic density for technique reinforcement — chose the more conservative reading consistent with §10.4's "low-stress technique reinforcement, not a third density block" rationale.
+  - **Mixed/Fartlek (§5.7) banned for beginners.** The session type with Z3-Z4 segments isn't appropriate for athletes without threshold fluency. A Z2-only beginner-Fartlek variant could exist — explicitly out of scope; revisit if a real need surfaces.
+  - **Open Water Skills (§5.9) deferred to Masters coach.** §2 already recommends a Masters program for learning-tier athletes; algorithmic prescription of OW skills before stroke economy stabilizes trains compensatory patterns. Spec-level call.
+  - **Comeback athletes not differentiated.** Tier-only framing per §10.7. Comeback resolution flows through `inferTrainingFitnessLevel`'s soft signal; if comeback-specific session types surface as a real need, a separate D-NNN handles it.
+- **Footgun (don't re-litigate):**
+  - **§10.6 anti-regression rule is load-bearing.** `RACE_70_3_SLOT_META`, `FOCUS_70_3_SLOT_META`, `raceTwoSwimRotationSlotMeta`, and the template emitters stay BIT-IDENTICAL for intermediate/advanced. The pin tests at `swim-slot-templates.test.ts` lock both paths; do NOT delete the no-regression assertions for intermediate / advanced (3 of the 9 new tests are pure no-regression locks).
+  - **Dispatch is on `athleteFitness === 'beginner'`** — the parameter name in `getSwimSlotTemplates` opts. Upstream (`week-builder.ts:1216`) passes `swimFitness` (D-024) which already routes the Q-006 population to `'beginner'`. Don't change the parameter name; don't add a separate `swimFitness` opt.
+  - **Slot 1 pull/kick alternation runs for both paths.** The existing `if ((ph === 'build' || ph === 'race_specific') && slots[1])` block mutates `slots[1]` regardless of which template emitter produced the base slot. For beginners that mutation routes through `pull_focused` / `kick_focused` — both §10.2-allowed.
+  - **Full IM advanced endurance carve-out at slot 2** (`enduranceOverdistanceWindowActive` path at `swim-program-templates.ts:467-481`) gates on `athleteFitness === 'advanced'`. Beginners never hit it. Don't extend the carve-out to beginners — the §10.4 `recovery` substitution is the right slot-2 behavior for the learner population.
+  - **D-022 / D-024 / D-025 compose; do NOT collapse them.** D-022 caps per-session yards for `fitness === 'beginner'`. D-024 clamps `swim_fitness === 'beginner'` based on wizard `swim_experience`. D-025 substitutes session types for `swim_fitness === 'beginner'`. Three layers, three different concerns; together they close the Plan #78 / #60 W6 population end-to-end.
+  - **Plan #78 Issue 1 is closed by D-025; Issue 2 was closed by D-024.** Both shipped same day, separate commits. Don't conflate them in future refactors — the type axis and volume axis are deliberately separate.
+
+---
+
 ## When to add an entry
 
 Add a new D-NNN when:
