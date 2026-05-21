@@ -121,6 +121,44 @@ const RACE_70_3_SLOT_META: Omit<SwimSlotTemplate, 'target_yards'>[] = [
 const RACE_70_3_BUILD_START_YDS: [number, number] = [2200, 2000];
 const RACE_70_3_BUILD_PEAK_YDS: [number, number] = [2600, 2400];
 
+// ── SWIM-PROTOCOL §10 — beginner session-type variants ──────────────────────-
+// Parallel to RACE_70_3_SLOT_META / FOCUS_70_3_SLOT_META. Routed into via
+// `getSwimSlotTemplates` when `opts.athleteFitness === 'beginner'`. Source of
+// truth for the §10.3 substitution map (threshold → css_aerobic,
+// race_specific_aerobic → technique_aerobic, speed → technique_aerobic).
+// The existing META constants stay UNTOUCHED per §10.6 anti-regression rule.
+
+const RACE_70_3_SLOT_META_BEGINNER: Omit<SwimSlotTemplate, 'target_yards'>[] = [
+  {
+    session_type: 'css_aerobic',
+    drill_emphasis: false,
+    notes: 'CSS-paced aerobic — beginner substitution for threshold per SWIM-PROTOCOL §10.3; sustainable Z2 density without form penalty.',
+  },
+  {
+    session_type: 'technique_aerobic',
+    drill_emphasis: true,
+    notes: 'Technique-forward aerobic — beginner substitution for race-specific aerobic per SWIM-PROTOCOL §10.3; drill-led density for learners.',
+  },
+];
+
+const FOCUS_70_3_SLOT_META_BEGINNER: Omit<SwimSlotTemplate, 'target_yards'>[] = [
+  {
+    session_type: 'css_aerobic',
+    drill_emphasis: false,
+    notes: 'CSS-paced aerobic — beginner substitution for threshold per SWIM-PROTOCOL §10.4; sustainable Z2 density without form penalty.',
+  },
+  {
+    session_type: 'technique_aerobic',
+    drill_emphasis: true,
+    notes: 'Technique-forward aerobic volume — drills are structural, not filler.',
+  },
+  {
+    session_type: 'recovery',
+    drill_emphasis: true,
+    notes: 'Recovery / technique reinforcement — beginner substitution for the third CSS-aerobic touch per SWIM-PROTOCOL §10.4; low-stress, drill-focused.',
+  },
+];
+
 function clamp01(t: number): number {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
@@ -210,6 +248,73 @@ function raceTemplatesFromMeta(
 
 function raceTemplatesFromYards(yards: [number, number]): SwimSlotTemplate[] {
   return raceTemplatesFromMeta(RACE_70_3_SLOT_META, yards);
+}
+
+/** SWIM-PROTOCOL §10.3 — beginner race-intent template emitter (taper bypass + non-rotation path). */
+function raceTemplatesFromYardsBeginner(yards: [number, number]): SwimSlotTemplate[] {
+  return raceTemplatesFromMeta(RACE_70_3_SLOT_META_BEGINNER, yards);
+}
+
+/** SWIM-PROTOCOL §10.4 — beginner focus-intent template emitter. */
+function focusTemplatesFromYardsBeginner(yards: [number, number, number]): SwimSlotTemplate[] {
+  return FOCUS_70_3_SLOT_META_BEGINNER.map((meta, i) => ({
+    ...meta,
+    target_yards: yards[i]!,
+  }));
+}
+
+/**
+ * SWIM-PROTOCOL §10.3 — beginner 2-swim race-intent rotation. Substitutes the
+ * banned types (threshold / race_specific_aerobic / speed) per the §10.3 map;
+ * pull_focused passes through unchanged (allowed for beginners per §10.2).
+ *
+ * Realized rotation (planWeek % 4):
+ *   1 → [css_aerobic, technique_aerobic]
+ *   2 → [css_aerobic, pull_focused]
+ *   3 → [technique_aerobic, technique_aerobic]
+ *   0 → [css_aerobic, technique_aerobic]
+ */
+export function raceTwoSwimRotationSlotMetaForBeginner(planWeek: number): Omit<SwimSlotTemplate, 'target_yards'>[] {
+  const c = ((Math.floor(planWeek) % 4) + 4) % 4;
+  if (c === 1) {
+    return [
+      RACE_70_3_SLOT_META_BEGINNER[0]!,
+      RACE_70_3_SLOT_META_BEGINNER[1]!,
+    ];
+  }
+  if (c === 2) {
+    return [
+      RACE_70_3_SLOT_META_BEGINNER[0]!,
+      {
+        // Pull-focused passes through — §10.2 allows it for beginners (gear permitting).
+        session_type: 'pull_focused',
+        drill_emphasis: false,
+        notes:
+          'Pull-focused — buoy-required moderate aerobic density; integrates full-stroke easy aerobic (rotation week).',
+      },
+    ];
+  }
+  if (c === 3) {
+    return [
+      {
+        // Technique aerobic in slot 0 passes through — already §10.2-allowed.
+        session_type: 'technique_aerobic',
+        drill_emphasis: true,
+        notes: 'Technique-forward aerobic — drills + steady volume before easy-rhythm day (rotation week).',
+      },
+      RACE_70_3_SLOT_META_BEGINNER[1]!,
+    ];
+  }
+  return [
+    RACE_70_3_SLOT_META_BEGINNER[0]!,
+    {
+      // speed → technique_aerobic per §10.3 substitution map.
+      session_type: 'technique_aerobic',
+      drill_emphasis: true,
+      notes:
+        'Technique-forward aerobic — beginner substitution for speed/turnover per SWIM-PROTOCOL §10.3; foundation-focused rotation week.',
+    },
+  ];
 }
 
 /**
@@ -406,11 +511,18 @@ export function getSwimSlotTemplates(
   const distanceKey = normalizeSwimProgramDistance(distance);
   const athleteFitness: SwimFitnessKey = opts?.athleteFitness ?? 'intermediate';
 
+  // SWIM-PROTOCOL §10 dispatch — beginner gets type-substituted variants for
+  // both intents (race / focus) and across all phases including taper.
+  // Existing non-beginner paths stay untouched per §10.6 anti-regression rule.
+  const isBeginner = athleteFitness === 'beginner';
+
   if (swimIntent === 'focus') {
     let yards: [number, number, number];
     if (ph === 'taper') {
       yards = yardsForFocus70_3Build(BUILD_RAMP_WEEKS);
-      return applyTaperScale(focusTemplatesFromYards(yards));
+      return applyTaperScale(
+        isBeginner ? focusTemplatesFromYardsBeginner(yards) : focusTemplatesFromYards(yards),
+      );
     }
     if (ph === 'base') {
       const ref = yardsForFocus70_3Build(weekInPhase);
@@ -431,7 +543,7 @@ export function getSwimSlotTemplates(
       const mult = protocolMidVolumeMultiplier(ph, distanceKey, athleteFitness);
       yards = yards.map((y) => roundYards(y * mult)) as [number, number, number];
     }
-    const slots = focusTemplatesFromYards(yards);
+    const slots = isBeginner ? focusTemplatesFromYardsBeginner(yards) : focusTemplatesFromYards(yards);
     // Build: pull (even week_in_phase) alternates with kick (odd). Race-specific: ~10% pull — week 2 each RS block plus week_in_phase divisible by 10 for long blocks.
     if ((ph === 'build' || ph === 'race_specific') && slots[1]) {
       const rsPullWeek =
@@ -485,7 +597,9 @@ export function getSwimSlotTemplates(
   let yardsR: [number, number];
   if (ph === 'taper') {
     yardsR = yardsForRace70_3Build(BUILD_RAMP_WEEKS);
-    return applyTaperScale(raceTemplatesFromYards(yardsR));
+    return applyTaperScale(
+      isBeginner ? raceTemplatesFromYardsBeginner(yardsR) : raceTemplatesFromYards(yardsR),
+    );
   }
   if (ph === 'base') {
     const ref = yardsForRace70_3Build(weekInPhase);
@@ -506,6 +620,8 @@ export function getSwimSlotTemplates(
     yardsR = yardsR.map((y) => roundYards(y * mult)) as [number, number];
   }
   const rotationWeek = opts?.planWeekNumber ?? weekInPhase;
-  const meta = raceTwoSwimRotationSlotMeta(rotationWeek);
+  const meta = isBeginner
+    ? raceTwoSwimRotationSlotMetaForBeginner(rotationWeek)
+    : raceTwoSwimRotationSlotMeta(rotationWeek);
   return raceTemplatesFromMeta(meta, yardsR);
 }
