@@ -207,6 +207,142 @@ export function raceDaySessionSpec(distance: TriRaceDistance): {
   };
 }
 
+/**
+ * RUN-PROTOCOL §4.5 ramp endpoints (LOCKED 2026-05-20). Long-run within-phase
+ * ramp: `miles = lerp(START × peak, PEAK × peak, phaseProgress(weekInPhase, rampWeeks))`.
+ * START/PEAK multipliers from RUN-PROTOCOL.md §4.5; only base/build/race_specific
+ * have within-phase ramps. Rebuild/Taper/Recovery delegate to `longRunFloorMiles`
+ * (peak-of-phase semantics — those phases are short windows / capped externally).
+ */
+const LONG_RUN_RAMP_ENDPOINTS: Record<'base' | 'build' | 'race_specific', { start: number; peak: number }> = {
+  base:          { start: 0.65, peak: 0.75 },
+  build:         { start: 0.75, peak: 0.85 },
+  race_specific: { start: 0.85, peak: 1.00 },
+};
+
+/**
+ * Brick-run within-phase ramp endpoints per RUN-PROTOCOL §4.3 / §5.7. Same lerp
+ * pattern as long run, applied to `raceRunDistance × multiplier`.
+ */
+const BRICK_RUN_RAMP_ENDPOINTS: Record<'base' | 'build' | 'race_specific', { start: number; peak: number }> = {
+  base:          { start: 0.15, peak: 0.20 },
+  build:         { start: 0.25, peak: 0.30 },
+  race_specific: { start: 0.36, peak: 0.42 },
+};
+
+/** RUN-PROTOCOL §4 ramp-window length per phase (weeks). Matches swim arc constants. */
+export function rampWeeksForPhase(phase: Phase | string): number {
+  const p = String(phase ?? '').toLowerCase();
+  if (p === 'base') return 6;
+  return 4; // build / race_specific / others
+}
+
+/** 1-based week index → [0,1] progress within phase ramp. Mirrors `_shared/swim-program-templates.ts:phaseProgress`. */
+function runPhaseProgress(weekInPhase: number, rampWeeks: number): number {
+  const w = Math.max(1, Math.round(weekInPhase));
+  if (rampWeeks <= 1) return 1;
+  const t = (w - 1) / (rampWeeks - 1);
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/** Half-mile precision rounding (matches existing `longRunFloorMiles` / `brickRunTargetMiles` style). */
+function roundHalfMile(mi: number): number {
+  return Math.round(mi * 2) / 2;
+}
+
+/** Distance-keyed long-run peak target (mi). Phase 1 keeps existing peaks; Phase 3 lifts 70.3 to 13. */
+function longRunPeakTarget(distance: TriRaceDistance): number {
+  const peakTarget: Record<string, number> = {
+    sprint: 4.0,
+    olympic: 7.0,
+    '70.3': 11.0,
+    half: 11.0,
+    ironman: 18.0,
+    full: 18.0,
+    half_marathon: 11.0,
+    marathon: 18.0,
+  };
+  return peakTarget[distance] ?? 11.0;
+}
+
+/** Race-run distance (mi) used by brick-run ramp and brick floor math. */
+function raceRunDistanceMiles(distance: TriRaceDistance): number {
+  const raceRunMiles: Record<string, number> = {
+    sprint: 3.1,
+    olympic: 6.2,
+    '70.3': 13.1,
+    half: 13.1,
+    ironman: 26.2,
+    full: 26.2,
+    half_marathon: 13.1,
+    marathon: 26.2,
+  };
+  return raceRunMiles[distance] ?? 13.1;
+}
+
+/**
+ * Long-run within-phase RAMP (RUN-PROTOCOL §4.5). For base/build/race_specific
+ * phases, lerps from `START × peak` to `PEAK × peak` across `rampWeeks`.
+ * Other phases delegate to `longRunFloorMiles` (peak-of-phase semantics).
+ *
+ * `weekInPhase` MUST be `weekInPhaseForTimeline(phaseBlocks, weekNum, block)` — the
+ * recovery-non-resetting in-phase index. NEVER `weekInBlock` (always 1 per ADR 0002).
+ */
+export function longRunMilesForWeek(
+  distance: TriRaceDistance,
+  phase: Phase,
+  weekInPhase: number,
+  rampWeeks: number,
+): number {
+  const phaseKey = String(phase ?? '').toLowerCase() as 'base' | 'build' | 'race_specific';
+  const endpoints = LONG_RUN_RAMP_ENDPOINTS[phaseKey];
+  if (!endpoints) return longRunFloorMiles(distance, phase);
+  const peak = longRunPeakTarget(distance);
+  const start = peak * endpoints.start;
+  const target = peak * endpoints.peak;
+  const t = runPhaseProgress(weekInPhase, rampWeeks);
+  return roundHalfMile(lerp(start, target, t));
+}
+
+/**
+ * Brick-run within-phase RAMP (RUN-PROTOCOL §4.3 / §5.7). Same lerp pattern as
+ * `longRunMilesForWeek`. Other phases delegate to `brickRunTargetMiles`.
+ */
+export function brickRunMilesForWeek(
+  distance: TriRaceDistance,
+  phase: Phase | string,
+  weekInPhase: number,
+  rampWeeks: number,
+): number {
+  const phaseKey = String(phase ?? '').toLowerCase() as 'base' | 'build' | 'race_specific';
+  const endpoints = BRICK_RUN_RAMP_ENDPOINTS[phaseKey];
+  if (!endpoints) return brickRunTargetMiles(distance, phase as string);
+  const raceRun = raceRunDistanceMiles(distance);
+  const start = raceRun * endpoints.start;
+  const target = raceRun * endpoints.peak;
+  const t = runPhaseProgress(weekInPhase, rampWeeks);
+  const raw = lerp(start, target, t);
+  return Math.min(8, Math.max(1.5, roundHalfMile(raw)));
+}
+
+/**
+ * Race-pace miles peak per RUN-PROTOCOL §4.3. The race-pace run ramps from 3mi
+ * to this peak across race-specific weeks (`clamp(3, peak, 3 + (weekInPhase − 1))`).
+ */
+export function racePacePeakMiles(distance: TriRaceDistance): number {
+  const d = String(distance ?? '').toLowerCase();
+  if (d === 'sprint') return 3;
+  if (d === 'olympic') return 5;
+  if (d === 'ironman' || d === 'full' || d === '140.6' || d === 'marathon') return 8;
+  return 6; // 70.3 / half / default
+}
+
 /** Minimum long-run mileage by race distance and calendar phase (after TSS-derived miles). */
 export function longRunFloorMiles(distance: TriRaceDistance, phase: Phase): number {
   const peakTarget: Record<string, number> = {

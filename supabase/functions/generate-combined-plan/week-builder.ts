@@ -51,6 +51,7 @@ import {
   PHASE_ZONE_DIST, hardEasyOk, scaledWeeklyTSS, projectedCTL,
   rampThresholds, estimateSessionTSS, weightedTSS, TSS_PER_HOUR,
   expectedBikeDurationHours, brickRunTargetMiles, longRunFloorMiles,
+  longRunMilesForWeek, brickRunMilesForWeek, rampWeeksForPhase, racePacePeakMiles,
   raceDaySessionSpec,
   PHASE_TSS_RANGES,
   type TriRaceDistance,
@@ -807,8 +808,19 @@ export function buildWeek(
     longRunMiles = Math.max(3, Math.min(longRunMiles, 5));
   }
 
+  // RUN-PROTOCOL §4.5 within-phase ramp: `weekInPhaseForTimeline` is the
+  // recovery-non-resetting in-phase index. NEVER use `weekInBlock` (always 1
+  // per ADR 0002 — same anti-regression rule as the swim arc at c1c94cec).
+  const runWeekInPhase = options?.phaseBlocks?.length
+    ? weekInPhaseForTimeline(options.phaseBlocks, weekNum, block)
+    : 1;
+  const runRampWeeks = rampWeeksForPhase(phase);
+
   if (hasTri && !raceThisWeek && !isRecovery) {
-    const longRunFloor = longRunFloorMiles(primaryGoal.distance, phase);
+    // Long-run within-phase ramp (RUN-PROTOCOL §4.5). Lerps START → PEAK for
+    // base/build/race_specific; delegates to peak-of-phase floor for
+    // rebuild/taper/recovery (which are short windows / capped externally).
+    const longRunFloor = longRunMilesForWeek(primaryGoal.distance, phase, runWeekInPhase, runRampWeeks);
     longRunMiles = Math.max(longRunMiles, longRunFloor);
     longRunMinutes = Math.round(longRunMiles * 9.5);
   }
@@ -953,7 +965,16 @@ export function buildWeek(
     const useBrick =
       effectiveBricks >= 1 && phase !== 'base' && !preferStandaloneBikeEndurance;
     if (useBrick) {
-      const brickRunMi = brickRunTargetMiles(primaryGoal.distance, brickPhaseForSession);
+      // RUN-PROTOCOL §5.7 brick-run within-phase ramp. brickRunMilesForWeek
+      // delegates to brickRunTargetMiles for non-base/build/race_specific
+      // phases (rebuild/taper); ramps START→PEAK across the ramp window for
+      // the three primary phases. Same weekInPhase as long run.
+      const brickRunMi = brickRunMilesForWeek(
+        primaryGoal.distance,
+        brickPhaseForSession,
+        runWeekInPhase,
+        rampWeeksForPhase(brickPhaseForSession),
+      );
       const [bkBike, bkRun] = brick(longRideDay, rideHoursForSat, brickRunMi, brickPhaseForSession, servedGoal);
       longRideSlot!.sessions.push(bkBike, bkRun);
     } else {
@@ -1390,17 +1411,23 @@ export function buildWeek(
         // base_first: Base uses controlled interval progression; Build uses tempo;
         // Race-specific uses race-pace specificity.
         if (phase === 'race_specific') {
-          const rpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
+          // RUN-PROTOCOL §4.3 race-pace miles ramp: clamp(3, peak, 3 + (weekInPhase − 1)).
+          const peakRpMi = racePacePeakMiles(primaryGoal.distance);
+          const rpMiles = Math.max(3, Math.min(peakRpMi, 3 + (runWeekInPhase - 1)));
           runQualitySlot!.sessions.push(
             hasTri
               ? racePaceRun(runQualityDay, rpMiles, primaryGoal.distance, servedGoal)
               : marathonPaceRun(runQualityDay, rpMiles, servedGoal),
           );
         } else if (phase === 'base') {
-          const progressedBaseReps = Math.min(8, 4 + Math.floor((weekInBlock - 1) / 2));
+          // RUN-PROTOCOL §4.1 base interval rep ramp: clamp(4, 8, 4 + floor((weekInPhase − 1) / 2)).
+          // ADR 0002 footgun: weekInBlock is ALWAYS 1; use runWeekInPhase from
+          // weekInPhaseForTimeline (mirrors swim arc fix at c1c94cec).
+          const progressedBaseReps = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
           runQualitySlot!.sessions.push(intervalRun(runQualityDay, progressedBaseReps, phase, servedGoal));
         } else {
-          // Build: tempo (Z3) — builds muscular endurance safely
+          // Build: tempo (Z3) — builds muscular endurance safely. tempoMi inherits
+          // the long-run ramp via `longRunMiles` (which is now phase-progressive).
           const tempoMi = Math.max(3, Math.round(longRunMiles * 0.30));
           runQualitySlot!.sessions.push(tempoRun(runQualityDay, tempoMi, 1.5, servedGoal));
         }
@@ -1408,16 +1435,20 @@ export function buildWeek(
         // race_peak: base = short intervals; build = explicit VO2 (tri) or interval ladder (run-only);
         // race_specific = race-pace run (tri) / MP (run).
         if (phase === 'race_specific') {
-          const mpMiles = Math.max(3, Math.round(longRunMiles * 0.35));
+          // RUN-PROTOCOL §4.3 race-pace miles ramp (same formula as base_first branch).
+          const peakMpMi = racePacePeakMiles(primaryGoal.distance);
+          const mpMiles = Math.max(3, Math.min(peakMpMi, 3 + (runWeekInPhase - 1)));
           runQualitySlot!.sessions.push(
             hasTri
               ? racePaceRun(runQualityDay, mpMiles, primaryGoal.distance, servedGoal)
               : marathonPaceRun(runQualityDay, mpMiles, servedGoal),
           );
         } else if (hasTri && phase === 'build') {
-          runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal));
+          // RUN-PROTOCOL §4.2 VO2max rep ramp: 3 → 6 × 3min across build weeks.
+          runQualitySlot!.sessions.push(vo2Run(runQualityDay, servedGoal, runWeekInPhase));
         } else {
-          const progressedBaseReps = Math.min(8, 4 + Math.floor((weekInBlock - 1) / 2));
+          // RUN-PROTOCOL §4.1 base interval rep ramp (same as base_first branch).
+          const progressedBaseReps = Math.max(4, Math.min(8, 4 + Math.floor((runWeekInPhase - 1) / 2)));
           runQualitySlot!.sessions.push(intervalRun(runQualityDay, progressedBaseReps, phase, servedGoal));
         }
       }

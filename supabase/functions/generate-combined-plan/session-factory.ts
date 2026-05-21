@@ -217,13 +217,18 @@ export function tempoRun(day: string, miles: number, warmupMiles: number, goalId
 }
 
 /** Run VO2max — mirrors `vo2Bike` intent (ceiling work, not durability). Build-phase tri (`race_peak`) only. */
-export function vo2Run(day: string, goalId: string): PlannedSession {
+export function vo2Run(day: string, goalId: string, weekInPhase: number = 1): PlannedSession {
+  // RUN-PROTOCOL §4.2 VO2max rep ramp across build weeks: 3 → 6 × 3min @ Z5.
+  // weekInPhase = 1 → 3 reps; 2 → 4; 3 → 5; 4+ → 6 (clamped).
+  // Duration scales: WU+CD ~25min + (rep × 3min) + (rep × 1.5min float) ≈ 30 + 5×N.
+  const N = Math.max(3, Math.min(6, 3 + (weekInPhase - 1)));
+  const dur = 30 + N * 5;
   return session(
     day, 'run',
-    'VO2max Run — 5×3 min',
-    'Warm up 10 min easy. 5×3 min at Z5 (hard — controlled sprint, not all-out) with 90 sec float recovery. Cool down 10 min. Builds raw aerobic ceiling.',
-    55, 'HARD',
-    ['warmup_run_10min_easy', 'run_vo2_5x3min_z5', 'cooldown_run_10min_easy'],
+    `VO2max Run — ${N}×3 min`,
+    `Warm up 10 min easy. ${N}×3 min at Z5 (hard — controlled sprint, not all-out) with 90 sec float recovery. Cool down 10 min. Builds raw aerobic ceiling.`,
+    dur, 'HARD',
+    ['warmup_run_10min_easy', `run_vo2_${N}x3min_z5`, 'cooldown_run_10min_easy'],
     ['quality', 'vo2max', 'run'],
     'Z5 VO2max', goalId,
   );

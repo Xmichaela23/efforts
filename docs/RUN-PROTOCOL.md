@@ -191,8 +191,8 @@ peak_rp_miles_for_distance: sprint 3, olympic 5, 70.3 6, full IM 8
 | Build | 0.75 | 0.85 |
 | Race-specific | 0.85 | 1.00 |
 | Rebuild | 0.85 | 0.85 (flat, no within-phase ramp — short window) |
-| Taper | — | 0.40 (pre-race long run; capped to ≤5mi) |
-| Recovery | — | 0.55 (capped to ≤8mi) |
+| Taper | — | 0.45 (pre-race long run; capped to ≤5mi externally) |
+| Recovery | — | 0.40 (deload-light by design — capped to ≤8mi externally) |
 
 **Realized progression for 70.3** (peak 13mi, 6 base + 4 build + 4 RS weeks):
 
