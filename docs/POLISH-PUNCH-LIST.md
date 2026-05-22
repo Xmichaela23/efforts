@@ -80,13 +80,20 @@ For each numbered item:
 
 ## 2. Swim program 100%
 
-**Status:** ~80% — Phases 0-3 (§4.1 ramp, §6.2 pools, §6.3 hierarchy + pairing + tier biasing) shipped 2026-05-19; content gaps remain
+**Status:** ~92% — Phases 0-3 (§4.1 ramp, §6.2 pools, §6.3 hierarchy + pairing + tier biasing) shipped 2026-05-19; 2026-05-22 research-backed §5.2 / §6 / §8 revision (D-029) closed five more gaps; ankle band deferred (Q-020); CSS terminology strip parked.
 
 ### Done
 - [x] Drill display names lookup
 - [x] Sighting drill added end-to-end
 - [x] Equipment-aware session substitution
 - [x] Per-session gear summary line
+- [x] **§5.2 tier-adjusted CSS Aerobic rest** (2026-05-22, `92af2072`, D-029 Slice 1 / Fix 3) — beginner 25s / intermediate 15s / advanced 15s START rest; token grammar varies.
+- [x] **§5.2.1 within-phase CSS rest-interval lerp** (2026-05-22, `fc517e12`, D-029 Slice 2 / Fix 4) — rest tightens across the phase ramp per 220 Triathlon CSS progression; same `weekInPhaseForTimeline` mechanism as §4.5 / §4.1 volume ramps.
+- [x] **§8.4 fins/paddles split for beginners** (2026-05-22, `130de4b2`, D-029 Slice 3 / Fix 1) — fins SURFACED as `recommended:fins` for beginner Technique Aerobic + beginner CSS Aerobic when owned; paddles stay suppressed.
+- [x] **§6.6 drill-level equipment recommendations** (2026-05-22, `130de4b2`, D-029 Slice 3 / Fix 2) — fingertipdrag + fist always recommend fins; 6-3-6 recommends fins for beginners only.
+- [x] **Sculling hard-gate from beginner inset** (2026-05-22, `130de4b2`, D-029 Slice 3) — beginners never get sculling drills regardless of phase / pool diversity.
+- [x] **Per-step effort-tier propagation to Garmin export + Form Goggles** (2026-05-22, `92af2072`, D-029 Slice 1 bundle) — each swim work step now carries `intensity: easy/moderate/hard`; Garmin watch face shows the tier, not the internal session-type tag.
+- [x] **`recommended:*` tag class** (2026-05-22, `130de4b2`, D-029 Slice 3) — parallel to `optional:*` with distinct semantics; three-section Pool gear line render.
 
 ### Open
 - [x] Week 7 build week showing 1,750yd recovery-level volume — bug *(2026-05-19, `c1c94cec` Phase 1 band-lerp + weekInPhase wiring; mechanism locked by `swim-volume-ramp.test.ts` on base, identical for build)*
@@ -95,7 +102,9 @@ For each numbered item:
 - [ ] Equipment line duplicating on some sessions
 - [x] Wire new drill tokens (Single-Arm, 6-3-6, Zipper, Sculling) into session generators *(2026-05-19, Phase 2 `ef91c2ee` — singlearm/616/scull/scullfront/zipper added to base/build pools; singlearm to peak; fingertipdrag to taper)*
 - [ ] Add missing session types: Swim Time Trial, Open Water Skills, Mixed/Fartlek, Race-Pace Sustained
+- [ ] **Q-020 ankle band enum addition** — pull buoy + ankle band as beginner body-position tool. §6.4 prose references the coaching value; engine surface blocked on wizard scope decision (separate chip vs grouped with Pull buoy). Filed in `docs/OPEN-QUESTIONS.md`.
 - [ ] Standardize all swim intensity references to CSS percentages
+- [ ] **CSS terminology strip (PARKED 2026-05-22)** — replace "CSS" in athlete-facing copy with plain effort words (easy/moderate/hard). Separate decision from D-029; revisit when prioritized.
 
 ---
 
