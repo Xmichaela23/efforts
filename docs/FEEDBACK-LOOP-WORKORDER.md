@@ -80,9 +80,9 @@ The work order LOCKS the architectural SHAPE of the anti-volatility approach per
 3. **Test format for behavior-neutral.** Byte-equal serialized weeks? Hash of generated week structure? What's the granularity that catches accidental consumption but tolerates legitimate refactor noise?
 4. **Default value.** `arc?: ArcContext` (undefined when absent) vs. `arc: ArcContext = {}` (empty default). Trade-offs around accidental field reads.
 
-### Decision: D-032 (proposed)
+### Decision: D-032 — SHIPPED 2026-05-22
 
-**Status:** unscheduled. Spec is the next deliverable; implementation gated on user approval.
+**Status:** **shipped.** Spec at `docs/PHASE-0-ARC-CHANNEL-SPEC.md` (commit `30e88008`); implementation at commit `ad4102f8`; close-out at this commit. Engine + wrapper deployed. SHA-256 byte-identical hash gate green on 5 fixtures × 2 modes (`arc-channel.test.ts`). Phases 1-4 unblocked.
 
 ---
 
