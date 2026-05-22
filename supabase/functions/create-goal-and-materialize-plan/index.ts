@@ -1497,9 +1497,16 @@ async function buildCombinedPlan(
     arcForCombined.recent_completed_events,
     String(newGoal.sport || 'triathlon'),
   );
+  // SWIM-PROTOCOL §7.5 — flag tri athletes with no usable swim threshold pace
+  // so the build emits the calibration trade-off + the per-session RPE fallback
+  // cue. `swimSecPer100Yd` was already computed at line ~1249 from arc inputs.
+  const noSwimThresholdPace =
+    triPrimaryWithSwimLeg &&
+    (swimSecPer100Yd == null || !Number.isFinite(swimSecPer100Yd) || swimSecPer100Yd <= 0);
   const generation_trade_offs = buildCombinedPlanGenerationTradeOffs({
     postRace: postRaceForTradeOffs,
     optimizerSnapshots: optimizerSnapshotsForTradeOffs,
+    noSwimThresholdPace,
   });
   console.log('[buildCombinedPlan] generation_trade_offs:', JSON.stringify(generation_trade_offs));
 
@@ -2368,11 +2375,19 @@ Deno.serve(async (req: Request) => {
       if (latestSnap?.acwr != null) triGenerateBody.current_acwr = Number(latestSnap.acwr);
 
       const triTradeOffGoalId = String(createdGoalId || resolvedBuildId || '');
+      // §7.5 — surface the swim_calibration trade-off here too. `triPrimaryWithSwimLeg` /
+      // `swimSecPer100Yd` are computed earlier in this function (line ~1249) and remain
+      // in scope. Even though this path drives `generate-triathlon-plan` (legacy), the
+      // trade-off renderer is shared, so the athlete-facing message lands the same way.
+      const standaloneNoSwimThresholdPace =
+        triPrimaryWithSwimLeg &&
+        (swimSecPer100Yd == null || !Number.isFinite(swimSecPer100Yd) || swimSecPer100Yd <= 0);
       const standalone_generation_trade_offs = buildCombinedPlanGenerationTradeOffs({
         postRace: postRaceRecovery,
         optimizerSnapshots: standaloneTriOptimizerSnapshot
           ? [{ goal_id: triTradeOffGoalId || 'tri', ...standaloneTriOptimizerSnapshot }]
           : [],
+        noSwimThresholdPace: standaloneNoSwimThresholdPace,
       });
       triGenerateBody.generation_trade_offs = standalone_generation_trade_offs;
       console.log('[create-goal] standalone tri generation_trade_offs:', JSON.stringify(standalone_generation_trade_offs));

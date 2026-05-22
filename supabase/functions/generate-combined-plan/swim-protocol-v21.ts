@@ -137,3 +137,21 @@ export function resolveCssSecPer100Yd(swimThresholdPace: string | undefined | nu
   if (p != null && Number.isFinite(p) && p > 40 && p < 600) return p;
   return 105;
 }
+
+/**
+ * SWIM-PROTOCOL §7.5 — has the athlete supplied a usable CSS / swim threshold pace?
+ *
+ * Returns `true` only when `parseSwimThresholdPaceSecPer100Yd` produces a value in
+ * the same valid window `resolveCssSecPer100Yd` accepts (40 < sec < 600 s/100yd).
+ * Callers use this to decide whether session copy should annotate numeric pace
+ * targets vs surface the §7.5 RPE fallback cue ("swim at a pace where you can
+ * hold a short conversation but feel like you're working").
+ *
+ * Distinct from `resolveCssSecPer100Yd`: that helper SILENTLY returns 105 s/100yd
+ * when CSS is missing/invalid (so duration math always works); this helper exposes
+ * the missing state so session copy can speak honestly to the athlete.
+ */
+export function hasValidSwimThresholdPace(swimThresholdPace: string | undefined | null): boolean {
+  const p = parseSwimThresholdPaceSecPer100Yd(swimThresholdPace);
+  return p != null && Number.isFinite(p) && p > 40 && p < 600;
+}

@@ -36,6 +36,7 @@ import {
 /** Step 4: swim templates — same `../_shared/` reach as `../../../src/lib/plan-tokens/`. */
 import {
   calculateSwimTss,
+  hasValidSwimThresholdPace,
   kickFocusRequiredGear,
   resolveCssSecPer100Yd,
 } from './swim-protocol-v21.ts';
@@ -87,6 +88,26 @@ function appendPoolGearLine(
  *     (pull_focused already emits `optional:paddles` directly; this helper skips it to avoid dupe.)
  *   - Recovery: no equipment hint regardless of inventory (§8.4 explicit carve-out).
  */
+/**
+ * SWIM-PROTOCOL §7.5 — RPE fallback cue when athlete has no CSS pace on file.
+ *
+ * Returns the §7.5-prescribed sentence verbatim. Caller appends it to the
+ * session description for CSS-anchored session types (CSS Aerobic, Threshold,
+ * Speed, Race-Specific Aerobic) when `hasValidSwimThresholdPace` is false.
+ * RPE-anchored session types (Easy / Technique Aerobic / Pull-Focused /
+ * Endurance / Recovery) do NOT receive this cue — their copy is zone-based
+ * and reads fine without numeric pace anchor.
+ *
+ * The cue is one sentence; callers prefix a space when concatenating.
+ */
+function swimCssFallbackCue(): string {
+  return (
+    `If you don't have a CSS pace yet, swim at a pace where you can hold a ` +
+    `short conversation but feel like you're working. Aim for the same effort ` +
+    `on every repeat — pace consistency is more important than hitting a specific number.`
+  );
+}
+
 function swimSessionOptionalGear(
   sessionType:
     | 'css_aerobic'
@@ -653,6 +674,8 @@ export function speedSwim(
   phase?: string,
   swimEquipment?: string[] | null,
   athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
+  /** §7.5 — when missing/invalid, session appends the RPE fallback cue (defensive — beginners are blocked from speed per §10.2). */
+  swimThresholdPace?: string | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -678,6 +701,12 @@ export function speedSwim(
     drillTokens.length > 0
       ? `${swimSessionPhilosophyLead('threshold')}${swimDrillBlockAthleteCopy(drillTokens)} `
       : '';
+  // §7.5 — defensive fallback cue for athletes without CSS pace on file. Beginners
+  // are blocked from speedSwim per §10.2 substitution, but the cue is included
+  // symmetrically for any non-beginner athlete who somehow reaches it without a CSS.
+  const speedCssFallbackCue = !hasValidSwimThresholdPace(swimThresholdPace)
+    ? ` ${swimCssFallbackCue()}`
+    : '';
   const tags: string[] = ['quality', 'speed_swim', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   return session(
@@ -685,7 +714,7 @@ export function speedSwim(
     'swim',
     `Swim Speed / Turnover — ${totalYards} yd`,
     appendPoolGearLine(
-      `Warm up ${wu} yd easy. ${drillLead}${fastReps}×50 yd strong smooth speed (≈90–95% effort — crisp turnover, not all-out sprint) with 45 sec easy jog/walk rest. ${aeroReps}×150 yd easy aerobic to flush lactate. Cool down ${cd} yd.`,
+      `Warm up ${wu} yd easy. ${drillLead}${fastReps}×50 yd strong smooth speed (≈90–95% effort — crisp turnover, not all-out sprint) with 45 sec easy jog/walk rest. ${aeroReps}×150 yd easy aerobic to flush lactate. Cool down ${cd} yd.${speedCssFallbackCue}`,
       drillTokens,
       swimEquipment,
     ),
@@ -755,6 +784,8 @@ export function thresholdSwim(
   phase?: string,
   swimEquipment?: string[] | null,
   athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
+  /** §7.5 — when missing/invalid, session appends the RPE fallback cue. Threshold is banned for beginners per §10.2 but the cue covers any non-beginner who reaches it without a CSS. */
+  swimThresholdPace?: string | null,
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
   const wu = 300;
@@ -779,6 +810,10 @@ export function thresholdSwim(
       : '';
   // §8.4 — Threshold session-level optional gear (paddles for non-beginner when owned).
   const sessionOptional = swimSessionOptionalGear('threshold', athleteFitness, swimEquipment);
+  // §7.5 — fallback cue when no CSS pace on file (Z4 IS CSS-anchored implicitly).
+  const thresholdCssFallbackCue = !hasValidSwimThresholdPace(swimThresholdPace)
+    ? ` ${swimCssFallbackCue()}`
+    : '';
   const tags: string[] = ['quality', 'threshold', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   for (const g of sessionOptional) tags.push(`optional:${g}`);
@@ -786,7 +821,7 @@ export function thresholdSwim(
     day, 'swim',
     `Swim Threshold — ${totalYards} yd`,
     appendPoolGearLine(
-      `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.`,
+      `Warm up ${wu} yd easy. ${drillLead}${threshReps}×100 yd at threshold (Zone 4 — maximal sustainable effort) with 15 sec rest. ${aeroReps}×150 yd aerobic. Cool down ${cd} yd.${thresholdCssFallbackCue}`,
       drillTokens,
       swimEquipment,
       undefined,
@@ -828,6 +863,8 @@ export function cssAerobicSwim(
     raceSupport?: boolean;
     swimEquipment?: string[] | null;
     athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
+    /** §7.5 — when missing/invalid, session appends the RPE fallback cue. */
+    swimThresholdPace?: string | null;
   },
 ): PlannedSession {
   totalYards = snapSwimSessionTotalYdInterval100(totalYards);
@@ -860,6 +897,11 @@ export function cssAerobicSwim(
   const sessionOptional = raceSupport
     ? []
     : swimSessionOptionalGear('css_aerobic', options?.athleteFitness, options?.swimEquipment);
+  // §7.5 — when no CSS pace is on file, surface the RPE fallback cue so the
+  // athlete has actionable effort guidance in place of the implicit numeric anchor.
+  const cssFallbackCue = !hasValidSwimThresholdPace(options?.swimThresholdPace)
+    ? ` ${swimCssFallbackCue()}`
+    : '';
   const tags: string[] = ['quality', 'css_aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   if (raceSupport) tags.push('race_specific_swim');
@@ -874,7 +916,7 @@ export function cssAerobicSwim(
     day, 'swim',
     name,
     appendPoolGearLine(
-      `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.`,
+      `Warm up ${wu} yd. ${drillLead}${mainSet} Cool down ${cd} yd.${cssFallbackCue}`,
       drillTokens,
       options?.swimEquipment,
       undefined,
@@ -1354,11 +1396,15 @@ export function swimSessionFromTemplate(
     }
     switch (effectiveType) {
       case 'threshold':
-        return thresholdSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness);
+        return thresholdSwim(
+          day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness,
+          opts?.swimThresholdPace,
+        );
       case 'css_aerobic':
         return cssAerobicSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, {
           swimEquipment,
           athleteFitness: opts?.athleteFitness,
+          swimThresholdPace: opts?.swimThresholdPace,
         });
       case 'technique_aerobic':
         return easySwim(day, yards, goalId, planWeek, drillSlotSalt, phase, true, swimEquipment, opts?.athleteFitness);
@@ -1367,9 +1413,13 @@ export function swimSessionFromTemplate(
           raceSupport: true,
           swimEquipment,
           athleteFitness: opts?.athleteFitness,
+          swimThresholdPace: opts?.swimThresholdPace,
         });
       case 'speed':
-        return speedSwim(day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness);
+        return speedSwim(
+          day, yards, goalId, planWeek, drillSlotSalt, phase, swimEquipment, opts?.athleteFitness,
+          opts?.swimThresholdPace,
+        );
       case 'kick_focused':
         return kickFocusedSwim(day, yards, goalId, dk, opts?.swimThresholdPace ?? undefined, swimEquipment);
       case 'pull_focused':

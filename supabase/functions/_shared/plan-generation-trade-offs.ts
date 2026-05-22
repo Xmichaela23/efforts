@@ -4,7 +4,9 @@ export type PlanTradeOffKind =
   | 'recovery_context'
   | 'constraint_compromise'
   | 'conflict_warning'
-  | 'anchor_adjustment';
+  | 'anchor_adjustment'
+  // SWIM-PROTOCOL §7.5 — surfaced when athlete has tri swim sessions but no usable CSS pace.
+  | 'swim_calibration';
 
 export type PlanTradeOffSeverity = 'info' | 'notice' | 'warning';
 
@@ -262,6 +264,9 @@ export const PLAN_GENERATION_MESSAGE_TEMPLATES: Record<string, string> = {
     'Strength landed on different days than the usual default so the week still respects spacing around your bike and run quality sessions. {{placement_note}}',
   anchor_pin_not_kept:
     'A day you pinned in setup could not stay exactly where it was while keeping the schedule valid. {{detail}}',
+  // SWIM-PROTOCOL §7.5 — surfaced when athlete has tri swim sessions but no usable CSS / threshold pace on file.
+  no_swim_threshold_pace:
+    'No swim pace data — your CSS pace targets are conservative defaults. Complete a 200yd time trial in Week 1-2 and update your profile to recalibrate.',
 };
 
 export function renderPlanGenerationMessage(
@@ -311,6 +316,12 @@ function parseStrengthRelocationNote(line: string): string {
 export function buildCombinedPlanGenerationTradeOffs(opts: {
   postRace: PostRaceRecoveryResult;
   optimizerSnapshots: PlanOptimizerSnapshotInput[];
+  /**
+   * SWIM-PROTOCOL §7.5 — set `true` when the plan has tri swim sessions but the
+   * athlete has no usable `swim_threshold_pace` on file. Surfaces a single
+   * `info` trade-off with `message_template_id: 'no_swim_threshold_pace'`.
+   */
+  noSwimThresholdPace?: boolean;
 }): PlanGenerationTradeOff[] {
   const out: PlanGenerationTradeOff[] = [];
   const seen = new Set<string>();
@@ -344,6 +355,19 @@ export function buildCombinedPlanGenerationTradeOffs(opts: {
         },
       });
     }
+  }
+
+  // SWIM-PROTOCOL §7.5 — surfaced for tri athletes with no usable CSS pace on file.
+  // Pairs with the per-session RPE fallback cue emitted by cssAerobicSwim /
+  // thresholdSwim / speedSwim. Athlete-facing: tells them their CSS pace targets
+  // are conservative defaults and prescribes a 200yd time trial to recalibrate.
+  if (opts.noSwimThresholdPace === true) {
+    add({
+      kind: 'swim_calibration',
+      severity: 'info',
+      message_template_id: 'no_swim_threshold_pace',
+      variables: {},
+    });
   }
 
   const tradeOffLines: string[] = [];
