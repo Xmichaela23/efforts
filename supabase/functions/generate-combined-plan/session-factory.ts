@@ -56,12 +56,16 @@ function appendPoolGearLine(
   swimEquipment: string[] | null | undefined,
   sessionRequired?: string[],
   sessionOptional?: string[],
+  sessionRecommended?: string[],
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
 ): string {
   const line = buildSwimGearLine({
     drillTokens,
     athleteGearLabels: swimEquipment,
     sessionRequired: sessionRequired ?? [],
     sessionOptional: sessionOptional ?? [],
+    sessionRecommended: sessionRecommended ?? [],
+    athleteFitness,
   });
   return line ? `${description} ${line}` : description;
 }
@@ -106,6 +110,60 @@ function swimCssFallbackCue(): string {
     `short conversation but feel like you're working. Aim for the same effort ` +
     `on every repeat — pace consistency is more important than hitting a specific number.`
   );
+}
+
+/**
+ * SWIM-PROTOCOL §8.4 (LOCKED 2026-05-22, Fix 1) — session-type-specific RECOMMENDED gear,
+ * filtered to athlete inventory.
+ *
+ * Distinct from `swimSessionOptionalGear`: "recommended" carries a stronger surface
+ * signal — "this helps, grab it" vs optional's "fine either way". The §6.6 research
+ * is explicit: **fins and paddles are NOT equivalent for beginners**. Fins AID stroke
+ * acquisition by holding the swimmer horizontal; paddles AMPLIFY catch error and
+ * shoulder load on an undeveloped stroke. The fins-recommended rule is therefore
+ * **beginner-only on technique work** — exactly opposite the paddles-suppressed rule.
+ *
+ * Per-§8.4 rules (2026-05-22 carve-out, beginner-only):
+ *   - Fins: technique_aerobic + css_aerobic — BEGINNER tier ONLY (when owned).
+ *     Intermediate / advanced surface NOTHING here — they don't need the body-position
+ *     aid; §8.4 optional surfacing (snorkel / buoy / paddles via `swimSessionOptionalGear`)
+ *     covers their gear story.
+ *
+ * §5.5 Pull-Focused for beginners explicitly does NOT surface fins — pull-focused work
+ * is leg-isolated by design; fins would defeat the purpose.
+ *
+ * §5.11 Recovery returns empty regardless of tier — movement-quality intent (gear
+ * bypasses that).
+ *
+ * Source: Better Triathlete, Organic Coaching, MyMottiv, Swim Smooth (fin/paddle split).
+ */
+function swimSessionRecommendedGear(
+  sessionType:
+    | 'css_aerobic'
+    | 'technique_aerobic'
+    | 'pull_focused'
+    | 'threshold'
+    | 'recovery'
+    | 'easy'
+    | 'speed'
+    | 'endurance'
+    | 'kick_focused'
+    | 'race_specific_aerobic'
+    | string,
+  athleteFitness: 'beginner' | 'intermediate' | 'advanced' | undefined,
+  swimEquipment: string[] | null | undefined,
+): string[] {
+  if (!swimEquipment) return [];
+  if (athleteFitness !== 'beginner') return [];
+  const owned = swimGearNormalized(swimEquipment);
+  const out: string[] = [];
+  if (
+    (sessionType === 'technique_aerobic' || sessionType === 'css_aerobic') &&
+    owned.has('fins')
+  ) {
+    out.push('fins');
+  }
+  return out;
 }
 
 function swimSessionOptionalGear(
@@ -1003,6 +1061,13 @@ export function cssAerobicSwim(
   const sessionOptional = raceSupport
     ? []
     : swimSessionOptionalGear('css_aerobic', options?.athleteFitness, options?.swimEquipment);
+  // §8.4 + §6.6 (2026-05-22, Fix 1) — beginner-only fins recommendation on CSS Aerobic.
+  // raceSupport branch (Race-Specific Aerobic substitution) is beginner-banned upstream
+  // by D-025; even so, we suppress recommended gear there for symmetry with the
+  // sessionOptional suppression above (the inline copy already speaks to gear).
+  const sessionRecommended = raceSupport
+    ? []
+    : swimSessionRecommendedGear('css_aerobic', options?.athleteFitness, options?.swimEquipment);
   // §7.5 — when no CSS pace is on file, surface the RPE fallback cue so the
   // athlete has actionable effort guidance in place of the implicit numeric anchor.
   const cssFallbackCue = !hasValidSwimThresholdPace(options?.swimThresholdPace)
@@ -1023,6 +1088,7 @@ export function cssAerobicSwim(
   if (drillTokens.length) tags.push('swim_drills');
   if (raceSupport) tags.push('race_specific_swim');
   for (const g of sessionOptional) tags.push(`optional:${g}`);
+  for (const g of sessionRecommended) tags.push(`recommended:${g}`);
   const name = raceSupport
     ? `Race-Specific Aerobic Swim — ${totalYards} yd`
     : `CSS Aerobic Swim — ${totalYards} yd`;
@@ -1047,6 +1113,8 @@ export function cssAerobicSwim(
       options?.swimEquipment,
       undefined,
       sessionOptional,
+      sessionRecommended,
+      options?.athleteFitness,
     ),
     dur, 'MODERATE',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_css_${reps}x100yd_r${cssRestToken}`, `swim_cooldown_${cd}yd`],
@@ -1171,10 +1239,16 @@ export function easySwim(
   const sessionOptional = techniqueDrillEmphasis
     ? swimSessionOptionalGear('technique_aerobic', athleteFitness, swimEquipment)
     : [];
+  // §8.4 + §6.6 (2026-05-22, Fix 1) — beginner-only fins recommendation on Technique
+  // Aerobic. Empty for non-beginner and for plain easySwim (without drillEmphasis).
+  const sessionRecommended = techniqueDrillEmphasis
+    ? swimSessionRecommendedGear('technique_aerobic', athleteFitness, swimEquipment)
+    : [];
   const tags: string[] = ['easy', 'aerobic', 'swim'];
   if (drillTokens.length) tags.push('swim_drills');
   if (techniqueDrillEmphasis) tags.push('technique_swim');
   for (const g of sessionOptional) tags.push(`optional:${g}`);
+  for (const g of sessionRecommended) tags.push(`recommended:${g}`);
   const title = techniqueDrillEmphasis
     ? `Technique Aerobic Swim — ${totalYards} yd`
     : `Easy Swim — ${totalYards} yd`;
@@ -1187,6 +1261,8 @@ export function easySwim(
       swimEquipment,
       undefined,
       sessionOptional,
+      sessionRecommended,
+      athleteFitness,
     ),
     dur, 'EASY',
     [`swim_warmup_${wu}yd_easy`, ...drillTokens, `swim_aerobic_${reps}x150yd_easy_r20`, `swim_cooldown_${cd}yd`],

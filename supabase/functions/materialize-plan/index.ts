@@ -1379,14 +1379,23 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
 }
 
 /**
- * Session gear hints from planner tags only (`req:*`, `optional:*`). Never mirrors athlete
- * baseline inventory — that caused bogus full gear lists on CSS/threshold/easy swims.
+ * Session gear hints from planner tags only (`req:*`, `optional:*`, `recommended:*`).
+ * Never mirrors athlete baseline inventory — that caused bogus full gear lists on
+ * CSS/threshold/easy swims.
  *
- * **Upstream emission contract (SWIM-PROTOCOL §8.4):** the inventory + per-tier filtering
- * happens at session-factory tag-emission time (`swimSessionOptionalGear` helper). When
- * an `optional:<gear>` tag appears on a row, the session-factory has already verified
- * the athlete owns that gear AND that §8.4 prescribes it for that session-type × tier.
- * So this function safely surfaces the tag as-is without re-checking inventory.
+ * **Upstream emission contract (SWIM-PROTOCOL §8.4 + §6.6):** the inventory + per-tier
+ * filtering happens at session-factory tag-emission time (`swimSessionOptionalGear` +
+ * `swimSessionRecommendedGear` helpers). When an `optional:<gear>` or
+ * `recommended:<gear>` tag appears on a row, the session-factory has already verified
+ * the athlete owns that gear AND that §8.4/§6.6 prescribes it for that session-type
+ * × tier. So this function safely surfaces the tag as-is without re-checking
+ * inventory.
+ *
+ * §6.6 (2026-05-22): `recommended:*` carries stronger surface semantics in the
+ * description prose ("this helps, grab it" vs optional's "fine either way"), but
+ * on the chip surface — which is space-constrained and binary — recommended gear
+ * is bundled into `suggestedOptional`. The athlete sees the recommendation in the
+ * Pool gear line of the description; the chip just shows "Fins" as a gear hint.
  */
 function inferSwimEquipmentPack(row: any): {
   suggestedRequired: string[];
@@ -1424,6 +1433,26 @@ function inferSwimEquipmentPack(row: any): {
         // §8.4 — CSS Aerobic / Technique Aerobic non-beginner buoy hint. Upstream
         // session-factory emits this only when athlete owns a pull buoy AND tier !== beginner.
         addO('buoy');
+        continue;
+      }
+      // §6.6 (2026-05-22) — recommended gear merges into suggestedOptional on the
+      // chip surface (the prose carries the recommended/optional distinction).
+      if (t === 'recommended:fins') {
+        addO('fins');
+        continue;
+      }
+      if (t === 'recommended:snorkel') {
+        addO('snorkel');
+        continue;
+      }
+      if (t === 'recommended:buoy') {
+        addO('buoy');
+        continue;
+      }
+      if (t === 'recommended:paddles') {
+        // §6.6 does NOT currently recommend paddles for any drill (paddles bypass
+        // catch feedback). Surfacing path kept for defensive parsing only.
+        addO('paddles');
         continue;
       }
       if (/req:board|req:kickboard/.test(t)) addR('board');

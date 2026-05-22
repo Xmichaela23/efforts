@@ -118,6 +118,14 @@ export type DrillEquipment = {
   required: string[];
   /** Worthwhile to bring — enhances drill quality but not blocking. */
   optional: string[];
+  /**
+   * SWIM-PROTOCOL §6.6 (LOCKED 2026-05-22) — research-backed body-position aid.
+   * Soft-recommend layer between required and optional: "this helps, grab it"
+   * vs optional's "fine either way". Surfaced as `recommended:<gear>` tags and
+   * a distinct "Recommended:" section in the Pool gear line.
+   * Empty / undefined when the drill has no §6.6 recommendation.
+   */
+  recommended?: string[];
 };
 
 const NO_EQUIPMENT: DrillEquipment = { required: [], optional: [] };
@@ -125,6 +133,11 @@ const NO_EQUIPMENT: DrillEquipment = { required: [], optional: [] };
 /**
  * Maps the trailing drill name (e.g. `kick`, `snorkel_freeswim`) to gear requirements.
  * Drills not listed here map to `NO_EQUIPMENT`.
+ *
+ * §6.6 (2026-05-22) updates: fingertip-drag + fist drill now carry a fins recommendation
+ * (body-position aid lets the swimmer focus on the mechanic the drill targets without
+ * fighting drift). 616 carries a tier-gated fins recommendation (beginner only) — see
+ * `swimDrillEquipmentFromTokens` for the tier dispatch.
  */
 export const DRILL_EQUIPMENT_MAP: Record<string, DrillEquipment> = {
   kick:             { required: ['kickboard'], optional: [] },
@@ -133,15 +146,26 @@ export const DRILL_EQUIPMENT_MAP: Record<string, DrillEquipment> = {
   snorkel_freeswim: { required: ['snorkel'],   optional: [] },
   // Following drills are better with a snorkel but work fine without.
   catchup:          { required: [], optional: ['snorkel'] },
-  fingertipdrag:    { required: [], optional: ['snorkel'] },
+  fingertipdrag:    { required: [], optional: ['snorkel'], recommended: ['fins'] },
   singlearm:        { required: [], optional: ['snorkel'] },
-  fist:             { required: [], optional: ['snorkel'] },
+  // Fist: fins recommended (maintains swim speed while catch is compromised). NO paddles.
+  // §6.6 deliberately drops the prior snorkel-optional — the table prescribes fins only.
+  fist:             { required: [], optional: [],            recommended: ['fins'] },
   // Sighting / 6-3-6 / zipper / doggypaddle: no gear; head-up sighting is open-water race prep.
   sighting:         { required: [], optional: [] },
+  // 616 has a beginner-only fins recommendation per §6.6 — see swimDrillEquipmentFromTokens
+  // for the tier-gated dispatch (the static map doesn't carry tier context).
   '616':            { required: [], optional: [] },
   zipper:           { required: [], optional: [] },
   doggypaddle:      { required: [], optional: [] },
 };
+
+/**
+ * Drill suffixes that carry a tier-gated §6.6 fins recommendation — beginner only.
+ * 6-3-6 / kick-switch helps beginners hold body position; intermediate+ rotation
+ * work doesn't need the aid.
+ */
+const SWIM_DRILL_RECOMMENDED_FINS_BEGINNER_ONLY: Set<string> = new Set(['616']);
 
 // ── Stroke-phase annotation (SWIM-PROTOCOL §6.1 column 2) ─────────────────────
 
@@ -468,7 +492,19 @@ export function pickSwimDrillInset(opts: {
   }
 
   const gear = swimGearNormalized(opts.swimGearLabels ?? undefined);
-  const eligible = phaseDrillCandidates(opts.phase, gear);
+  // §6.1 / §6.6 (2026-05-22) — sculling is hard-banned from the beginner inset.
+  // Beginners lack the catch fluency to feel the pressure changes the drill teaches;
+  // surfacing sculling for them is wasted volume. Filter post phaseDrillCandidates so
+  // gear-availability + phase-pool logic stays uniform across tiers.
+  const eligible = ((): string[] => {
+    const raw = phaseDrillCandidates(opts.phase, gear);
+    if (opts.athleteFitness !== 'beginner') return raw;
+    return raw.filter((tok) => {
+      const m = String(tok).match(/^swim_drills_\d+x\d+(?:yd|m)_(.+?)(?:_r\d+)?(?:_(?:fins|board|buoy|snorkel))?$/i);
+      const suf = m ? m[1].toLowerCase() : '';
+      return suf !== 'scull' && suf !== 'scullfront';
+    });
+  })();
   const salt = opts.drillSlotSalt + SWIM_DRILL_KIND_SALT[opts.sessionKind];
 
   if (opts.techniqueDrillEmphasis && opts.sessionKind === 'easy') {
@@ -670,21 +706,43 @@ export function swimDrillBlockAthleteCopy(tokens: string[]): string {
 }
 
 /**
- * Derives deduplicated required + optional equipment from a set of `swim_drills_*` tokens.
- * Safe to call with any token list — non-drill tokens are ignored.
+ * Derives deduplicated required + optional + recommended equipment from a set of
+ * `swim_drills_*` tokens. Safe to call with any token list — non-drill tokens are ignored.
+ *
+ * §6.6 recommendations (LOCKED 2026-05-22) layer on top of the existing required +
+ * optional channels. `athleteFitness` is consulted ONLY for tier-gated recommendations
+ * (currently 616 → fins for beginners only); other §6.6 recommendations are tier-
+ * agnostic. Pass undefined for back-compat.
  */
-export function swimDrillEquipmentFromTokens(tokens: string[]): DrillEquipment {
+export function swimDrillEquipmentFromTokens(
+  tokens: string[],
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced',
+): DrillEquipment {
   const required = new Set<string>();
   const optional = new Set<string>();
+  const recommended = new Set<string>();
   for (const tok of tokens) {
-    // Token format: swim_drills_NxDist(yd|m)_<drill_name>
-    const m = String(tok).match(/^swim_drills_\d+x\d+(?:yd|m)_(.+)$/i);
+    // Token format: swim_drills_NxDist(yd|m)_<drill_name>(_r<rest>)?(_<gear>)?
+    // Strip trailing `_r\d+` rest marker and `_(fins|board|buoy|snorkel)` equipment
+    // marker so the lookup keys on the canonical drill name (matches the same
+    // pattern used by `swimDrillStrokePhase` and the bias helpers).
+    const m = String(tok).match(/^swim_drills_\d+x\d+(?:yd|m)_(.+?)(?:_r\d+)?(?:_(?:fins|board|buoy|snorkel))?$/i);
     if (!m) continue;
-    const eq = DRILL_EQUIPMENT_MAP[m[1].toLowerCase()] ?? NO_EQUIPMENT;
+    const suffix = m[1].toLowerCase();
+    const eq = DRILL_EQUIPMENT_MAP[suffix] ?? NO_EQUIPMENT;
     for (const r of eq.required) required.add(r);
     for (const o of eq.optional) optional.add(o);
+    for (const r of eq.recommended ?? []) recommended.add(r);
+    // §6.6 tier-gated recommendations: 6-3-6 → fins for beginners only.
+    if (athleteFitness === 'beginner' && SWIM_DRILL_RECOMMENDED_FINS_BEGINNER_ONLY.has(suffix)) {
+      recommended.add('fins');
+    }
   }
-  return { required: [...required], optional: [...optional] };
+  return {
+    required: [...required],
+    optional: [...optional],
+    ...(recommended.size ? { recommended: [...recommended] } : {}),
+  };
 }
 
 /** Normalize token / baseline key / step.equipment to a single display chip label (dedupe by lowercase). */
@@ -802,7 +860,7 @@ export function pickSwimDrillTokens(
 export type SwimSessionGearLineOpts = {
   /** Session-type-specific required gear (e.g. `['pull buoy']` for pull_focused). Empty if none. */
   sessionRequired?: string[];
-  /** Drill tokens for this session. Drill required + optional gear is pulled from the equipment map. */
+  /** Drill tokens for this session. Drill required + optional + recommended gear pulled from the equipment map. */
   drillTokens?: string[];
   /** Athlete's swim equipment chips from baselines.equipment.swimming (raw labels). Optional gear
    *  is filtered to what the athlete actually owns — no point naming a snorkel they don't have. */
@@ -814,6 +872,18 @@ export type SwimSessionGearLineOpts = {
    * Mirror channel of `sessionRequired` — caller controls the per-session-type / per-tier rules.
    */
   sessionOptional?: string[];
+  /**
+   * SWIM-PROTOCOL §8.4 + §6.6 (LOCKED 2026-05-22) — session-type-specific RECOMMENDED gear.
+   * Distinct from optional: "this helps, grab it" vs optional's "fine either way". Caller pre-
+   * filters to athlete inventory (session-factory's `swimSessionRecommendedGear` helper).
+   * Rendered as a separate "Recommended:" section in the Pool gear line.
+   */
+  sessionRecommended?: string[];
+  /**
+   * Athlete fitness tier — threads through to `swimDrillEquipmentFromTokens` for §6.6
+   * tier-gated recommendations (e.g. 6-3-6 → fins for beginners only).
+   */
+  athleteFitness?: 'beginner' | 'intermediate' | 'advanced';
 };
 
 /**
@@ -835,13 +905,37 @@ export function buildSwimGearLine(opts: SwimSessionGearLineOpts): string | null 
     if (lbl) required.add(lbl);
   }
 
-  const drillEq = swimDrillEquipmentFromTokens(opts.drillTokens ?? []);
+  // §6.6 (2026-05-22) — drill-level required + optional + recommended derived from tokens.
+  // athleteFitness threads through for tier-gated §6.6 rules (e.g. 616 → fins beginner only).
+  const drillEq = swimDrillEquipmentFromTokens(opts.drillTokens ?? [], opts.athleteFitness);
   for (const r of drillEq.required) {
     const lbl = swimGearLabelForDisplay(r);
     if (lbl) required.add(lbl);
   }
 
   const athleteGearKeys = swimGearNormalized(opts.athleteGearLabels ?? null);
+
+  // §6.6 recommended section — populated FIRST so it takes priority over optional dedupe.
+  // Drill-level recommendations from DRILL_EQUIPMENT_MAP are filtered to athlete inventory
+  // (no point naming fins they don't own).
+  const recommended = new Set<string>();
+  for (const r of drillEq.recommended ?? []) {
+    const k = String(r).toLowerCase();
+    if (!athleteGearKeys.has(k)) continue;
+    const lbl = swimGearLabelForDisplay(r);
+    if (!lbl) continue;
+    if (required.has(lbl)) continue;
+    recommended.add(lbl);
+  }
+  // SWIM-PROTOCOL §8.4 — session-level recommended (e.g. fins on beginner Technique
+  // Aerobic / CSS Aerobic). Caller pre-filters to athlete inventory + tier rules.
+  for (const r of opts.sessionRecommended ?? []) {
+    const lbl = swimGearLabelForDisplay(r);
+    if (!lbl) continue;
+    if (required.has(lbl)) continue;
+    recommended.add(lbl);
+  }
+
   const optional = new Set<string>();
   for (const o of drillEq.optional) {
     const k = String(o).toLowerCase();
@@ -849,26 +943,30 @@ export function buildSwimGearLine(opts: SwimSessionGearLineOpts): string | null 
     const lbl = swimGearLabelForDisplay(o);
     if (!lbl) continue;
     if (required.has(lbl)) continue; // de-dupe against required
+    if (recommended.has(lbl)) continue; // de-dupe against recommended (§6.6 priority)
     optional.add(lbl);
   }
 
   // SWIM-PROTOCOL §8.4 — session-type-specific optionals (e.g. snorkel on Technique
   // Aerobic / CSS Aerobic / Pull-Focused; buoy on intermediate+ CSS Aerobic; paddles
   // on intermediate+ Threshold). Caller pre-filters to athlete inventory and applies
-  // per-tier rules; we just merge + dedupe against required.
+  // per-tier rules; we just merge + dedupe against required + recommended.
   for (const o of opts.sessionOptional ?? []) {
     const lbl = swimGearLabelForDisplay(o);
     if (!lbl) continue;
     if (required.has(lbl)) continue;
+    if (recommended.has(lbl)) continue;
     optional.add(lbl);
   }
 
   const reqArr = [...required];
+  const recArr = [...recommended];
   const optArr = [...optional];
-  if (reqArr.length === 0 && optArr.length === 0) return null;
+  if (reqArr.length === 0 && recArr.length === 0 && optArr.length === 0) return null;
 
   const parts: string[] = [];
   if (reqArr.length > 0) parts.push(`Required: ${reqArr.join(', ')}.`);
+  if (recArr.length > 0) parts.push(`Recommended: ${recArr.join(', ')}.`);
   if (optArr.length > 0) parts.push(`Optional: ${optArr.join(', ')}.`);
   return `Pool gear — ${parts.join(' ')}`;
 }
